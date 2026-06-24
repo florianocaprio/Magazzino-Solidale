@@ -308,8 +308,8 @@ function AggiungiProdottoDialog({
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
           queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey({ magazzinoId }) });
           toast({ title: "Prodotto aggiunto" });
+          // mantieni il dialog aperto per aggiungere altri prodotti: resetta i campi
           setProdottoId(""); setLottoId(""); setQuantita(""); setUnitaMisura("pz");
-          onClose();
         },
         onError: (err: unknown) => {
           const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Errore durante l'aggiunta";
@@ -398,7 +398,7 @@ function AggiungiProdottoDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Annulla</Button>
+          <Button variant="outline" onClick={onClose}>Chiudi</Button>
           <Button onClick={onSubmit} disabled={!prodottoId || !quantita || eccedeDisponibilita || addRiga.isPending}>
             Aggiungi
           </Button>
