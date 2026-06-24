@@ -14,6 +14,7 @@ import {
   useListMagazzini,
   useListGiacenze,
   useListLotti,
+  useListProdotti,
   useListVolontari,
   useGetImpostazioniStampa,
   useListTrasferimenti,
@@ -314,14 +315,43 @@ function AggiungiProdottoDialog({
   const [lottoId, setLottoId] = useState("");
   const [quantita, setQuantita] = useState("");
   const [unitaMisura, setUnitaMisura] = useState("pz");
+  const [scanProdotto, setScanProdotto] = useState("");
 
   const { data: giacenze } = useListGiacenze({ magazzinoId });
+  const { data: prodotti } = useListProdotti();
   const { data: lotti } = useListLotti({ magazzinoId, prodottoId: prodottoId ? parseInt(prodottoId) : undefined });
 
   const addRiga = useAddBollaRiga();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  const handleScanProdotto = () => {
+    const code = scanProdotto.trim();
+    if (!code) return;
+    if (!prodotti) {
+      toast({ title: t("common.loading") });
+      return;
+    }
+    const lc = code.toLowerCase();
+    const p = prodotti.find(
+      x => (x.codiceBarre && x.codiceBarre.toLowerCase() === lc) || x.codice.toLowerCase() === lc,
+    );
+    if (!p) {
+      toast({ title: t("bolle.scanProdottoNotFound"), variant: "destructive" });
+      return;
+    }
+    const g = giacenze?.find(x => x.prodottoId === p.id);
+    if (!g) {
+      toast({ title: t("bolle.scanProdottoNoStock", { name: p.nome }), variant: "destructive" });
+      return;
+    }
+    setProdottoId(String(p.id));
+    setLottoId("");
+    setQuantita("");
+    setScanProdotto("");
+    toast({ title: t("bolle.scanProdottoFound", { name: p.nome }) });
+  };
 
   const giacenzaSelezionata = giacenze?.find(g => g.prodottoId === parseInt(prodottoId));
   const lottiDisponibili = lotti?.filter(l => l.magazzinoId === magazzinoId && l.quantitaResidua > 0) ?? [];
@@ -367,6 +397,22 @@ function AggiungiProdottoDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>{t("bolle.addProdottoTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>{t("bolle.scanProdottoLabel")}</Label>
+            <div className="flex gap-2">
+              <Input
+                value={scanProdotto}
+                onChange={e => setScanProdotto(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleScanProdotto(); } }}
+                placeholder={t("bolle.scanProdottoPlaceholder")}
+                autoFocus
+              />
+              <Button type="button" variant="secondary" onClick={handleScanProdotto} disabled={!scanProdotto.trim()}>
+                {t("bolle.scanProdottoButton")}
+              </Button>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label>{t("bolle.prodottoDisponibileLabel")}</Label>
             <Select value={prodottoId} onValueChange={v => { setProdottoId(v); setLottoId(""); setQuantita(""); }}>
