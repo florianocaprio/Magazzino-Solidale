@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,8 +14,10 @@ export const fornitoriTable = pgTable("fornitori", {
   email: varchar("email", { length: 120 }),
   referente: varchar("referente", { length: 120 }),
   siteWeb: varchar("site_web", { length: 200 }),
+  centroAscoltoId: integer("centro_ascolto_id"),
   attivo: boolean("attivo").notNull().default(true),
   note: text("note"),
+  noteOperative: text("note_operative"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 

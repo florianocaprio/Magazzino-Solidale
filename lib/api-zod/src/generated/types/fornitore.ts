@@ -26,8 +26,12 @@ export interface Fornitore {
   referente?: string | null;
   /** @nullable */
   siteWeb?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  noteOperative?: string | null;
   dataCreazione: string;
 }

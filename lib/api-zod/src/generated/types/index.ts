@@ -50,6 +50,7 @@ export * from './listApprovvigionamentiParams';
 export * from './listBeneficiariParams';
 export * from './listBolleParams';
 export * from './listConsegneParams';
+export * from './listFornitoriParams';
 export * from './listGiacenzeParams';
 export * from './listInterventiParams';
 export * from './listLottiParams';

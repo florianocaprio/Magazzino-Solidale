@@ -60,6 +60,7 @@ import type {
   ListBeneficiariParams,
   ListBolleParams,
   ListConsegneParams,
+  ListFornitoriParams,
   ListGiacenzeParams,
   ListInterventiParams,
   ListLottiParams,
@@ -2034,17 +2035,24 @@ export const useConfermaTrasferimento = <TError = ErrorType<unknown>,
       return useMutation(getConfermaTrasferimentoMutationOptions(options));
     }
 
-export const getListFornitoriUrl = () => {
+export const getListFornitoriUrl = (params?: ListFornitoriParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/fornitori`
+  return stringifiedParams.length > 0 ? `/api/fornitori?${stringifiedParams}` : `/api/fornitori`
 }
 
-export const listFornitori = async ( options?: RequestInit): Promise<Fornitore[]> => {
+export const listFornitori = async (params?: ListFornitoriParams, options?: RequestInit): Promise<Fornitore[]> => {
 
-  return customFetch<Fornitore[]>(getListFornitoriUrl(),
+  return customFetch<Fornitore[]>(getListFornitoriUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2057,23 +2065,23 @@ export const listFornitori = async ( options?: RequestInit): Promise<Fornitore[]
 
 
 
-export const getListFornitoriQueryKey = () => {
+export const getListFornitoriQueryKey = (params?: ListFornitoriParams,) => {
     return [
-    `/api/fornitori`
+    `/api/fornitori`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListFornitoriQueryOptions = <TData = Awaited<ReturnType<typeof listFornitori>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFornitori>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListFornitoriQueryOptions = <TData = Awaited<ReturnType<typeof listFornitori>>, TError = ErrorType<unknown>>(params?: ListFornitoriParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFornitori>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListFornitoriQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListFornitoriQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFornitori>>> = ({ signal }) => listFornitori({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFornitori>>> = ({ signal }) => listFornitori(params, { signal, ...requestOptions });
 
 
 
@@ -2088,11 +2096,11 @@ export type ListFornitoriQueryError = ErrorType<unknown>
 
 
 export function useListFornitori<TData = Awaited<ReturnType<typeof listFornitori>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFornitori>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListFornitoriParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFornitori>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListFornitoriQueryOptions(options)
+  const queryOptions = getListFornitoriQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

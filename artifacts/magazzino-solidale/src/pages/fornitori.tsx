@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, getListFornitoriQueryKey } from "@workspace/api-client-react";
+import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useListCentriAscolto, getListFornitoriQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, Building } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, Building, Filter } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,11 +30,17 @@ const formSchema = z.object({
   telefono: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   referente: z.string().optional(),
-  note: z.string().optional()
+  centroAscoltoId: z.string().optional(),
+  note: z.string().optional(),
+  noteOperative: z.string().optional()
 });
 
 export default function Fornitori() {
-  const { data: fornitori, isLoading } = useListFornitori();
+  const [centroFilter, setCentroFilter] = useState("all");
+  const { data: fornitori, isLoading } = useListFornitori(
+    centroFilter !== "all" ? { centroAscoltoId: parseInt(centroFilter) } : undefined
+  );
+  const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -49,7 +56,7 @@ export default function Fornitori() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: ""
+      nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", centroAscoltoId: "all", noteOperative: ""
     }
   });
 
@@ -58,18 +65,25 @@ export default function Fornitori() {
     form.reset({
       nome: f.nome, tipo: f.tipo, partitaIva: f.partitaIva || "", codiceFiscale: f.codiceFiscale || "",
       indirizzo: f.indirizzo || "", comune: f.comune || "", telefono: f.telefono || "", 
-      email: f.email || "", referente: f.referente || "", note: f.note || ""
+      email: f.email || "", referente: f.referente || "", note: f.note || "",
+      centroAscoltoId: f.centroAscoltoId != null ? String(f.centroAscoltoId) : "all",
+      noteOperative: f.noteOperative || ""
     });
     setIsFormOpen(true);
   };
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "" });
+    form.reset({ nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", centroAscoltoId: "all", noteOperative: "" });
     setIsFormOpen(true);
   };
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const { centroAscoltoId, ...rest } = values;
+    const data = {
+      ...rest,
+      centroAscoltoId: centroAscoltoId && centroAscoltoId !== "all" ? parseInt(centroAscoltoId) : null,
+    };
     if (editingId) {
       updateFornitore.mutate({ id: editingId, data }, {
         onSuccess: () => {
@@ -90,6 +104,7 @@ export default function Fornitori() {
   };
 
   const filtered = fornitori?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase()));
+  const centroNome = (id: number | null | undefined) => id != null ? (centri?.find(c => c.id === id)?.nome ?? "-") : "Tutti i centri";
 
   const tipoColors: Record<string, string> = {
     commerciale: "bg-blue-500/10 text-blue-700",
@@ -116,6 +131,8 @@ export default function Fornitori() {
               { header: "Telefono", accessor: (f) => f.telefono },
               { header: "Email", accessor: (f) => f.email },
               { header: "Referente", accessor: (f) => f.referente },
+              { header: "Centro", accessor: (f) => f.centroAscoltoId == null ? "Tutti i centri" : centroNome(f.centroAscoltoId) },
+              { header: "Note Operative", accessor: (f) => f.noteOperative },
             ]}
             filename="fornitori"
             title="Fornitori e Donatori"
@@ -126,7 +143,21 @@ export default function Fornitori() {
 
       <Card>
         <CardHeader className="py-4 border-b">
-          <Input placeholder="Cerca per nome..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <Input placeholder="Cerca per nome..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={centroFilter} onValueChange={setCentroFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Tutti i centri" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti i centri</SelectItem>
+                  {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -134,6 +165,7 @@ export default function Fornitori() {
               <TableRow>
                 <TableHead>Nominativo</TableHead>
                 <TableHead>Tipo</TableHead>
+                <TableHead>Centro</TableHead>
                 <TableHead>Contatti</TableHead>
                 <TableHead>Referente</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -144,6 +176,7 @@ export default function Fornitori() {
                 Array(3).fill(0).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
@@ -160,6 +193,11 @@ export default function Fornitori() {
                     <Badge variant="outline" className={`capitalize ${tipoColors[f.tipo] || tipoColors.altro}`}>
                       {f.tipo.replace('_', ' ')}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {f.centroAscoltoId == null
+                      ? <span className="text-muted-foreground italic">Tutti i centri</span>
+                      : centroNome(f.centroAscoltoId)}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm text-muted-foreground">
@@ -218,6 +256,24 @@ export default function Fornitori() {
                 </div>
                 <FormField control={form.control} name="referente" render={({ field }) => (
                   <FormItem><FormLabel>Persona di Riferimento</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Centro di Ascolto</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "all"}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="all">Tutti i centri</SelectItem>
+                        {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="noteOperative" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Note Operative</FormLabel>
+                    <FormControl><Textarea rows={4} placeholder="Come contattare il fornitore e procedura da seguire..." {...field} /></FormControl>
+                  </FormItem>
                 )} />
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>

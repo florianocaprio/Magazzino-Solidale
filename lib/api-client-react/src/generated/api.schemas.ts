@@ -344,9 +344,13 @@ export interface Fornitore {
   referente?: string | null;
   /** @nullable */
   siteWeb?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  noteOperative?: string | null;
   dataCreazione: string;
 }
 
@@ -361,7 +365,10 @@ export interface FornitoreInput {
   email?: string;
   referente?: string;
   siteWeb?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   note?: string;
+  noteOperative?: string;
 }
 
 export interface FornitoreUpdate {
@@ -375,8 +382,11 @@ export interface FornitoreUpdate {
   email?: string;
   referente?: string;
   siteWeb?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   attivo?: boolean;
   note?: string;
+  noteOperative?: string;
 }
 
 export interface ApprovvigionamentoRiga {
@@ -1045,6 +1055,10 @@ sottoscortaOnly?: boolean;
 
 export type ListTrasferimentiParams = {
 stato?: string;
+};
+
+export type ListFornitoriParams = {
+centroAscoltoId?: number;
 };
 
 export type ListApprovvigionamentiParams = {

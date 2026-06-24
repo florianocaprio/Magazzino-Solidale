@@ -626,6 +626,10 @@ export const ConfermaTrasferimentoResponse = zod.object({
 })
 
 
+export const ListFornitoriQueryParams = zod.object({
+  "centroAscoltoId": zod.coerce.number().optional()
+})
+
 export const ListFornitoriResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
@@ -638,8 +642,10 @@ export const ListFornitoriResponseItem = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
+  "noteOperative": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 export const ListFornitoriResponse = zod.array(ListFornitoriResponseItem)
@@ -656,7 +662,9 @@ export const CreateFornitoreBody = zod.object({
   "email": zod.string().optional(),
   "referente": zod.string().optional(),
   "siteWeb": zod.string().optional(),
-  "note": zod.string().optional()
+  "centroAscoltoId": zod.number().nullish(),
+  "note": zod.string().optional(),
+  "noteOperative": zod.string().optional()
 })
 
 
@@ -676,8 +684,10 @@ export const GetFornitoreResponse = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
+  "noteOperative": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 
@@ -697,8 +707,10 @@ export const UpdateFornitoreBody = zod.object({
   "email": zod.string().optional(),
   "referente": zod.string().optional(),
   "siteWeb": zod.string().optional(),
+  "centroAscoltoId": zod.number().nullish(),
   "attivo": zod.boolean().optional(),
-  "note": zod.string().optional()
+  "note": zod.string().optional(),
+  "noteOperative": zod.string().optional()
 })
 
 export const UpdateFornitoreResponse = zod.object({
@@ -713,8 +725,10 @@ export const UpdateFornitoreResponse = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
+  "noteOperative": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 

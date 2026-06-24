@@ -17,5 +17,8 @@ export interface FornitoreInput {
   email?: string;
   referente?: string;
   siteWeb?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   note?: string;
+  noteOperative?: string;
 }

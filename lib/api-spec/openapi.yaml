@@ -542,6 +542,11 @@ paths:
     get:
       operationId: listFornitori
       tags: [fornitori]
+      parameters:
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of suppliers
@@ -2128,9 +2133,13 @@ components:
           type: ["string", "null"]
         siteWeb:
           type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
         attivo:
           type: boolean
         note:
+          type: ["string", "null"]
+        noteOperative:
           type: ["string", "null"]
         dataCreazione:
           type: string
@@ -2159,7 +2168,11 @@ components:
           type: string
         siteWeb:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
         note:
+          type: string
+        noteOperative:
           type: string
       required: [nome, tipo]
 
@@ -2186,9 +2199,13 @@ components:
           type: string
         siteWeb:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
         attivo:
           type: boolean
         note:
+          type: string
+        noteOperative:
           type: string
 
     # ── Approvvigionamenti ────────────────────────────────────────────────

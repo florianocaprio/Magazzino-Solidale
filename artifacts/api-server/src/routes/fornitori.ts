@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { fornitoriTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, or, isNull } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -17,13 +17,21 @@ const fmt = (r: typeof fornitoriTable.$inferSelect) => ({
   email: r.email ?? null,
   referente: r.referente ?? null,
   siteWeb: r.siteWeb ?? null,
+  centroAscoltoId: r.centroAscoltoId ?? null,
   attivo: r.attivo,
   note: r.note ?? null,
+  noteOperative: r.noteOperative ?? null,
   dataCreazione: r.dataCreazione.toISOString(),
 });
 
-router.get("/fornitori", async (_req, res) => {
-  const rows = await db.select().from(fornitoriTable).orderBy(fornitoriTable.nome);
+router.get("/fornitori", async (req, res) => {
+  const { centroAscoltoId } = req.query as Record<string, string>;
+  // Un fornitore associato a un centro è visibile filtrando per quel centro;
+  // i fornitori "per tutti i centri" (centroAscoltoId null) sono sempre inclusi.
+  const where = centroAscoltoId
+    ? or(eq(fornitoriTable.centroAscoltoId, parseInt(centroAscoltoId)), isNull(fornitoriTable.centroAscoltoId))
+    : undefined;
+  const rows = await db.select().from(fornitoriTable).where(where).orderBy(fornitoriTable.nome);
   res.json(rows.map(fmt));
 });
 
