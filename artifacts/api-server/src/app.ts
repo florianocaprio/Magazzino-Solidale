@@ -54,11 +54,15 @@ app.use(
     resave: false,
     saveUninitialized: false,
     proxy: true,
+    // Idle timeout: the session expires 15 minutes after the last request.
+    // `rolling` resets that countdown on every request, so active use keeps the
+    // session alive while inactivity (no requests) lets it lapse.
+    rolling: true,
     cookie: {
       httpOnly: true,
       sameSite: "none",
       secure: true,
-      maxAge: 1000 * 60 * 60 * 8,
+      maxAge: 1000 * 60 * 15,
     },
   }),
 );

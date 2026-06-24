@@ -26,3 +26,10 @@ Frontend hides non-allowed areas via `hasArea`, but the backend `areaGuard` (rou
 
 ## Login hygiene
 Regenerate the session id on successful login (`req.session.regenerate`) before setting `userId` to prevent session fixation.
+
+## Idle auto-logout (15 min)
+Two layers, intentionally paired:
+- Server: `rolling: true` + `cookie.maxAge = 15 min` (app.ts) — each request resets the countdown; inactivity lets the session lapse.
+- Client: `src/lib/use-idle-logout.ts` mounted in `App.tsx` AuthGate (enabled while `user`). Resets a 15-min timer on real interaction events; on timeout calls `logout()` + a translated toast.
+**Pitfall it solves:** a user typing in a long form makes NO network calls, so the server rolling session would lapse mid-work. The hook therefore fires a throttled keepalive (`refresh()` → refetch `/auth/me`, at most once per 5 min while active) to keep the server session alive during active use. If you change the server maxAge, keep keepAliveMs comfortably below it.
+**Cross-tab pitfall:** timers are per-tab but the session is shared, so an idle 2nd tab would log out an active 1st tab. Fixed by broadcasting activity through `localStorage` (key `ms-last-activity`): every tab resets its timer on the `storage` event, and the timeout handler re-checks the shared timestamp before logging out. Any new "log out everywhere" / per-tab session logic must respect this shared-activity invariant.

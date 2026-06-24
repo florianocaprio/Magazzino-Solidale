@@ -44,6 +44,8 @@ export const base = {
       code: "Codice",
       active: "Attivo",
       inactive: "Inattivo",
+      sessionExpired: "Sessione scaduta",
+      sessionExpiredDesc: "Sei stato disconnesso per inattività.",
     },
     nav: {
       groups: {
@@ -124,6 +126,8 @@ export const base = {
       code: "Código",
       active: "Activo",
       inactive: "Inactivo",
+      sessionExpired: "Sesión expirada",
+      sessionExpiredDesc: "Se ha cerrado la sesión por inactividad.",
     },
     nav: {
       groups: {
@@ -204,6 +208,8 @@ export const base = {
       code: "Code",
       active: "Active",
       inactive: "Inactive",
+      sessionExpired: "Session expired",
+      sessionExpiredDesc: "You have been logged out due to inactivity.",
     },
     nav: {
       groups: {
@@ -284,6 +290,8 @@ export const base = {
       code: "Code",
       active: "Actif",
       inactive: "Inactif",
+      sessionExpired: "Session expirée",
+      sessionExpiredDesc: "Vous avez été déconnecté pour cause d'inactivité.",
     },
     nav: {
       groups: {
@@ -364,6 +372,8 @@ export const base = {
       code: "Code",
       active: "Aktiv",
       inactive: "Inaktiv",
+      sessionExpired: "Sitzung abgelaufen",
+      sessionExpiredDesc: "Sie wurden wegen Inaktivität abgemeldet.",
     },
     nav: {
       groups: {
@@ -444,6 +454,8 @@ export const base = {
       code: "الرمز",
       active: "نشط",
       inactive: "غير نشط",
+      sessionExpired: "انتهت الجلسة",
+      sessionExpiredDesc: "تم تسجيل خروجك بسبب عدم النشاط.",
     },
     nav: {
       groups: {

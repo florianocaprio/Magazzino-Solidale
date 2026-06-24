@@ -9,6 +9,12 @@ import Login from "@/pages/login";
 import ChangePassword from "@/pages/change-password";
 import { AppLayout } from "@/components/layout";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { useIdleLogout } from "@/lib/use-idle-logout";
+import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
+
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const IDLE_KEEPALIVE_MS = 5 * 60 * 1000;
 
 import Dashboard from "@/pages/dashboard";
 import Magazzini from "@/pages/magazzini";
@@ -225,7 +231,24 @@ function AppRoutes() {
 }
 
 function AuthGate() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout, refresh } = useAuth();
+  const { toast } = useToast();
+  const { t } = useTranslation();
+
+  useIdleLogout({
+    enabled: !!user,
+    timeoutMs: IDLE_TIMEOUT_MS,
+    keepAliveMs: IDLE_KEEPALIVE_MS,
+    onKeepAlive: refresh,
+    onIdle: () => {
+      logout();
+      toast({
+        title: t("common.sessionExpired"),
+        description: t("common.sessionExpiredDesc"),
+        variant: "destructive",
+      });
+    },
+  });
 
   if (isLoading) {
     return (
