@@ -1,21 +1,263 @@
 import { useState } from "react";
-import { useListLotti, useListMagazzini, useListProdotti } from "@workspace/api-client-react";
+import {
+  useListLotti,
+  useListMagazzini,
+  useListProdotti,
+  useCreateLotto,
+  useCreateMovimento,
+  getListGiacenzeQueryKey,
+  getListLottiQueryKey,
+  getListMovimentiQueryKey,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { ExportButtons } from "@/components/export-buttons";
-import { Calendar, Filter } from "lucide-react";
+import { Calendar, Filter, Plus, Info } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { it } from "date-fns/locale";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
+const nuovoLottoSchema = z.object({
+  prodottoId: z.string().min(1, "Seleziona un prodotto"),
+  magazzinoId: z.string().min(1, "Seleziona un magazzino"),
+  quantita: z.coerce.number().positive("La quantità deve essere maggiore di zero"),
+  dataCarico: z.string().min(1, "Campo obbligatorio"),
+  causale: z.string().min(1, "Campo obbligatorio"),
+  codiceLotto: z.string().optional(),
+  dataScadenza: z.string().optional(),
+  note: z.string().optional(),
+});
+
+function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
+  const { data: magazzini } = useListMagazzini();
+  const { data: prodotti } = useListProdotti();
+  const createLotto = useCreateLotto();
+  const createMovimento = useCreateMovimento();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof nuovoLottoSchema>>({
+    resolver: zodResolver(nuovoLottoSchema),
+    defaultValues: {
+      prodottoId: "",
+      magazzinoId: "",
+      quantita: 0,
+      dataCarico: new Date().toISOString().split("T")[0],
+      causale: "donazione",
+      codiceLotto: "",
+      dataScadenza: "",
+      note: "",
+    },
+  });
+
+  const submitting = createLotto.isPending || createMovimento.isPending;
+
+  const onSubmit = (data: z.infer<typeof nuovoLottoSchema>) => {
+    const prodotto = prodotti?.find((p) => p.id.toString() === data.prodottoId);
+    if (!prodotto) {
+      toast({ title: "Errore", description: "Prodotto non valido", variant: "destructive" });
+      return;
+    }
+    createLotto.mutate(
+      {
+        data: {
+          prodottoId: prodotto.id,
+          magazzinoId: parseInt(data.magazzinoId),
+          dataCarico: data.dataCarico,
+          quantitaCaricata: data.quantita,
+          codiceLotto: data.codiceLotto || undefined,
+          dataScadenza: data.dataScadenza || undefined,
+          note: data.note || undefined,
+        },
+      },
+      {
+        onSuccess: (lotto) => {
+          const invalidateStock = () => {
+            queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getListLottiQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
+          };
+          createMovimento.mutate(
+            {
+              data: {
+                tipoMovimento: "carico",
+                tipoDettaglio: data.causale,
+                dataMovimento: data.dataCarico,
+                magazzinoId: parseInt(data.magazzinoId),
+                prodottoId: prodotto.id,
+                lottoId: lotto.id,
+                quantita: data.quantita,
+                unitaMisura: prodotto.unitaMisura,
+                note: data.note || undefined,
+              },
+            },
+            {
+              onSuccess: () => {
+                invalidateStock();
+                toast({
+                  title: "Lotto caricato",
+                  description: `${data.quantita} ${prodotto.unitaMisura} di ${prodotto.nome} caricati in magazzino.`,
+                });
+                onClose();
+              },
+              onError: () => {
+                invalidateStock();
+                toast({
+                  title: "Lotto creato, log incompleto",
+                  description: "La giacenza è stata aggiornata, ma la registrazione del movimento è fallita.",
+                  variant: "destructive",
+                });
+                onClose();
+              },
+            },
+          );
+        },
+        onError: () =>
+          toast({ title: "Errore", description: "Impossibile creare il lotto", variant: "destructive" }),
+      },
+    );
+  };
+
+  return (
+    <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Nuovo Lotto</SheetTitle>
+          <SheetDescription>
+            Carica un lotto di prodotto assegnandolo a un singolo magazzino.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-4 flex gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+          <Info className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            Un lotto appartiene a un solo magazzino e non può essere diviso. Per spostare parte
+            della quantità in un altro magazzino usa un <strong>Trasferimento Interno</strong>.
+          </span>
+        </div>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+            <FormField control={form.control} name="prodottoId" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Prodotto</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Seleziona prodotto..." /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {prodotti?.map((p) => (
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="magazzinoId" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Magazzino</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Seleziona magazzino..." /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {magazzini?.map((m) => (
+                      <SelectItem key={m.id} value={m.id.toString()}>{m.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="quantita" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Quantità</FormLabel>
+                <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="dataCarico" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Data carico</FormLabel>
+                <FormControl><Input type="date" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="causale" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Causale</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="donazione">Donazione</SelectItem>
+                    <SelectItem value="acquisto">Acquisto</SelectItem>
+                    <SelectItem value="rettifica_inventario">Rettifica inventario</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="codiceLotto" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Codice lotto <span className="text-muted-foreground font-normal">(opzionale)</span></FormLabel>
+                <FormControl><Input placeholder="Es. LOT-2026-001" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="dataScadenza" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Data scadenza <span className="text-muted-foreground font-normal">(opzionale)</span></FormLabel>
+                <FormControl><Input type="date" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="note" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Note <span className="text-muted-foreground font-normal">(opzionale)</span></FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={onClose}>Annulla</Button>
+              <Button type="submit" disabled={submitting}>{submitting ? "Salvataggio…" : "Carica lotto"}</Button>
+            </div>
+          </form>
+        </Form>
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 export default function Lotti() {
   const [magazzinoId, setMagazzinoId] = useState<string>("all");
   const [prodottoId, setProdottoId] = useState<string>("all");
   const [inScadenza, setInScadenza] = useState(false);
+  const [nuovoOpen, setNuovoOpen] = useState(false);
   
   const { data: magazzini } = useListMagazzini();
   const { data: prodotti } = useListProdotti();
@@ -60,8 +302,13 @@ export default function Lotti() {
             title="Elenco Lotti"
             orientation="landscape"
           />
+          <Button onClick={() => setNuovoOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nuovo Lotto
+          </Button>
         </div>
       </div>
+
+      {nuovoOpen && <NuovoLottoDialog onClose={() => setNuovoOpen(false)} />}
 
       <Card>
         <CardHeader className="py-4 border-b bg-muted/20">
