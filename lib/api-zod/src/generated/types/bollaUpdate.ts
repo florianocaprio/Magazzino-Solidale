@@ -8,7 +8,15 @@
 
 export interface BollaUpdate {
   stato?: string;
-  noteConsegna?: string;
+  beneficiarioId?: number;
+  magazzinoId?: number;
+  /** @nullable */
+  volontarioConsegnaId?: number | null;
+  /** @nullable */
+  mezzoId?: number | null;
+  indirizzoConsegna?: string;
+  /** @nullable */
+  noteConsegna?: string | null;
   confermaRicezione?: boolean;
   noteRicezione?: string;
 }

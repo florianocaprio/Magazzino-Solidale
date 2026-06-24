@@ -15,6 +15,7 @@ export const movimentiTable = pgTable("movimenti", {
   fornitoreId: integer("fornitore_id"),
   beneficiarioId: integer("beneficiario_id"),
   bollaId: integer("bolla_id"),
+  bollaRigaId: integer("bolla_riga_id"),
   trasferimentoId: integer("trasferimento_id"),
   documentoRiferimento: varchar("documento_riferimento", { length: 100 }),
   note: text("note"),

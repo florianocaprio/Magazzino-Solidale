@@ -4328,6 +4328,76 @@ export const useConfermaBolla = <TError = ErrorType<unknown>,
       return useMutation(getConfermaBollaMutationOptions(options));
     }
 
+export const getAnnullaBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/annulla`
+}
+
+/**
+ * @summary Cancel bolla - revert stock if confermato, mark annullato
+ */
+export const annullaBolla = async (id: number, options?: RequestInit): Promise<BollaDettaglio> => {
+
+  return customFetch<BollaDettaglio>(getAnnullaBollaUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAnnullaBollaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['annullaBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annullaBolla>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  annullaBolla(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnnullaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof annullaBolla>>>
+
+    export type AnnullaBollaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Cancel bolla - revert stock if confermato, mark annullato
+ */
+export const useAnnullaBolla = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof annullaBolla>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getAnnullaBollaMutationOptions(options));
+    }
+
 export const getConsegnaBollaUrl = (id: number,) => {
 
 

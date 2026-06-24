@@ -1176,6 +1176,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/BollaDettaglio"
 
+  /bolle/{id}/annulla:
+    post:
+      operationId: annullaBolla
+      tags: [bolle]
+      summary: Cancel bolla - revert stock if confermato, mark annullato
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BollaDettaglio"
+
   /bolle/{id}/consegna:
     post:
       operationId: consegnaBolla
@@ -2623,6 +2642,8 @@ components:
           type: ["string", "null"]
         volontarioConsegnaId:
           type: ["integer", "null"]
+        volontarioNome:
+          type: ["string", "null"]
         mezzoId:
           type: ["integer", "null"]
         stato:
@@ -2711,8 +2732,18 @@ components:
       properties:
         stato:
           type: string
-        noteConsegna:
+        beneficiarioId:
+          type: integer
+        magazzinoId:
+          type: integer
+        volontarioConsegnaId:
+          type: ["integer", "null"]
+        mezzoId:
+          type: ["integer", "null"]
+        indirizzoConsegna:
           type: string
+        noteConsegna:
+          type: ["string", "null"]
         confermaRicezione:
           type: boolean
         noteRicezione:

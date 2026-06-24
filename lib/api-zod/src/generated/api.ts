@@ -1322,6 +1322,7 @@ export const GetBollaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
   "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
   "noteConsegna": zod.string().nullish(),
@@ -1348,7 +1349,12 @@ export const UpdateBollaParams = zod.object({
 
 export const UpdateBollaBody = zod.object({
   "stato": zod.string().optional(),
-  "noteConsegna": zod.string().optional(),
+  "beneficiarioId": zod.number().optional(),
+  "magazzinoId": zod.number().optional(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "indirizzoConsegna": zod.string().optional(),
+  "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean().optional(),
   "noteRicezione": zod.string().optional()
 })
@@ -1364,6 +1370,7 @@ export const UpdateBollaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
   "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
   "noteConsegna": zod.string().nullish(),
@@ -1448,6 +1455,46 @@ export const ConfermaBollaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
   "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Cancel bolla - revert stock if confermato, mark annullato
+ */
+export const AnnullaBollaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AnnullaBollaResponse = zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
   "noteConsegna": zod.string().nullish(),
@@ -1491,6 +1538,7 @@ export const ConsegnaBollaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
   "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
   "noteConsegna": zod.string().nullish(),

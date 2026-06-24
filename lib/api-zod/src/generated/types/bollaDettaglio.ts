@@ -24,6 +24,8 @@ export interface BollaDettaglio {
   /** @nullable */
   volontarioConsegnaId?: number | null;
   /** @nullable */
+  volontarioNome?: string | null;
+  /** @nullable */
   mezzoId?: number | null;
   stato: string;
   /** @nullable */

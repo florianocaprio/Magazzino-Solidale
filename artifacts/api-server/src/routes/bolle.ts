@@ -2,11 +2,14 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
   bolleTable, bollaRigheTable, beneficiariTable, magazziniTable,
-  movimentiTable, lottiTable, prodottiTable,
+  movimentiTable, lottiTable, prodottiTable, volontariTable,
 } from "@workspace/db";
-import { eq, and, desc, type SQL, sql } from "drizzle-orm";
+import { eq, and, desc, asc, gt, sum, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+// stati che consentono ancora modifiche
+const STATI_MODIFICABILI = ["bozza", "confermato"];
 
 async function buildDettaglio(id: number) {
   const [row] = await db
@@ -15,10 +18,13 @@ async function buildDettaglio(id: number) {
       cognome: beneficiariTable.cognome,
       nome: beneficiariTable.nome,
       magazzinoNome: magazziniTable.nome,
+      volontarioNome: volontariTable.nome,
+      volontarioCognome: volontariTable.cognome,
     })
     .from(bolleTable)
     .leftJoin(beneficiariTable, eq(bolleTable.beneficiarioId, beneficiariTable.id))
     .leftJoin(magazziniTable, eq(bolleTable.magazzinoId, magazziniTable.id))
+    .leftJoin(volontariTable, eq(bolleTable.volontarioConsegnaId, volontariTable.id))
     .where(eq(bolleTable.id, id));
 
   if (!row) return null;
@@ -45,6 +51,8 @@ async function buildDettaglio(id: number) {
     magazzinoNome: row.magazzinoNome ?? null,
     indirizzoConsegna: row.b.indirizzoConsegna ?? null,
     volontarioConsegnaId: row.b.volontarioConsegnaId ?? null,
+    volontarioNome: row.volontarioNome && row.volontarioCognome
+      ? `${row.volontarioCognome} ${row.volontarioNome}` : null,
     mezzoId: row.b.mezzoId ?? null,
     stato: row.b.stato,
     noteConsegna: row.b.noteConsegna ?? null,
@@ -63,6 +71,115 @@ async function buildDettaglio(id: number) {
       note: r.r.note ?? null,
     })),
   };
+}
+
+/** Calcola giacenza disponibile per un prodotto in un magazzino */
+async function giacenzaDisponibile(prodottoId: number, magazzinoId: number): Promise<number> {
+  const [res] = await db
+    .select({ totale: sum(lottiTable.quantitaResidua) })
+    .from(lottiTable)
+    .where(and(
+      eq(lottiTable.prodottoId, prodottoId),
+      eq(lottiTable.magazzinoId, magazzinoId),
+      gt(lottiTable.quantitaResidua, "0"),
+    ));
+  return parseFloat(res?.totale ?? "0");
+}
+
+/** Calcola quanto è già in bolla (bozza) per un prodotto */
+async function quantitaGiaInBolla(bollaId: number, prodottoId: number, excludeRigaId?: number): Promise<number> {
+  const righe = await db
+    .select({ q: bollaRigheTable.quantita, id: bollaRigheTable.id })
+    .from(bollaRigheTable)
+    .where(and(eq(bollaRigheTable.bollaId, bollaId), eq(bollaRigheTable.prodottoId, prodottoId)));
+  return righe
+    .filter(r => r.id !== excludeRigaId)
+    .reduce((acc, r) => acc + parseFloat(r.q), 0);
+}
+
+/** Scarico FEFO: scala quantità cercando lotti per scadenza crescente */
+async function scaricoFEFO(
+  prodottoId: number,
+  magazzinoId: number,
+  quantitaDaScaricare: number,
+  bollaId: number,
+  bolla: { beneficiarioId: number; numeroBolla: string },
+  unitaMisura: string,
+  note: string | null,
+  rigaId: number,
+) {
+  const today = new Date().toISOString().split("T")[0];
+  let rimanente = quantitaDaScaricare;
+
+  const lotti = await db
+    .select()
+    .from(lottiTable)
+    .where(and(
+      eq(lottiTable.prodottoId, prodottoId),
+      eq(lottiTable.magazzinoId, magazzinoId),
+      gt(lottiTable.quantitaResidua, "0"),
+    ))
+    .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.dataCarico));
+
+  let primoLottoId: number | null = null;
+
+  for (const lotto of lotti) {
+    if (rimanente <= 0) break;
+    const disp = parseFloat(lotto.quantitaResidua);
+    const scala = Math.min(disp, rimanente);
+
+    await db.update(lottiTable)
+      .set({ quantitaResidua: (disp - scala).toFixed(2) })
+      .where(eq(lottiTable.id, lotto.id));
+
+    await db.insert(movimentiTable).values({
+      tipoMovimento: "scarico",
+      tipoDettaglio: "consegna_beneficiario",
+      dataMovimento: today,
+      magazzinoId,
+      prodottoId,
+      lottoId: lotto.id,
+      quantita: scala.toFixed(2),
+      unitaMisura,
+      beneficiarioId: bolla.beneficiarioId,
+      bollaId,
+      bollaRigaId: rigaId,
+      documentoRiferimento: bolla.numeroBolla,
+      note: note ?? undefined,
+    });
+
+    if (!primoLottoId) primoLottoId = lotto.id;
+    rimanente -= scala;
+  }
+
+  if (primoLottoId) {
+    await db.update(bollaRigheTable).set({ lottoId: primoLottoId }).where(eq(bollaRigheTable.id, rigaId));
+  }
+}
+
+/** Storna una riga già scaricata: ripristina lotti e cancella i movimenti di QUELLA riga */
+async function stornoRiga(riga: { id: number }, bollaId: number) {
+  const movimenti = await db.select()
+    .from(movimentiTable)
+    .where(and(
+      eq(movimentiTable.bollaId, bollaId),
+      eq(movimentiTable.bollaRigaId, riga.id),
+    ));
+
+  for (const mov of movimenti) {
+    if (!mov.lottoId) continue;
+    const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, mov.lottoId));
+    if (lotto) {
+      const nuovaQta = parseFloat(lotto.quantitaResidua) + parseFloat(mov.quantita);
+      await db.update(lottiTable)
+        .set({ quantitaResidua: nuovaQta.toFixed(2) })
+        .where(eq(lottiTable.id, mov.lottoId));
+    }
+  }
+
+  await db.delete(movimentiTable).where(
+    and(eq(movimentiTable.bollaId, bollaId), eq(movimentiTable.bollaRigaId, riga.id))
+  );
 }
 
 // ─── LIST ────────────────────────────────────────────────────────────────────
@@ -129,60 +246,67 @@ router.get("/bolle/:id", async (req, res) => {
   res.json(det);
 });
 
-// ─── UPDATE ──────────────────────────────────────────────────────────────────
+// ─── UPDATE (magazzino/beneficiario/volontario) ──────────────────────────────
 
 router.patch("/bolle/:id", async (req, res) => {
-  const [row] = await db.update(bolleTable).set(req.body).where(eq(bolleTable.id, parseInt(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const bollaId = parseInt(req.params.id);
+  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
+  if (!bolla) { res.status(404).json({ error: "Not found" }); return; }
+
+  const body = req.body;
+
+  // cambio magazzino solo in bozza e solo senza righe
+  if (body.magazzinoId && body.magazzinoId !== bolla.magazzinoId) {
+    if (bolla.stato !== "bozza") {
+      res.status(400).json({ error: "Il magazzino si può cambiare solo quando la bolla è in bozza" });
+      return;
+    }
+    const righe = await db.select({ id: bollaRigheTable.id }).from(bollaRigheTable)
+      .where(eq(bollaRigheTable.bollaId, bollaId)).limit(1);
+    if (righe.length > 0) {
+      res.status(400).json({ error: "Non puoi cambiare magazzino se sono già stati aggiunti prodotti. Rimuovili prima." });
+      return;
+    }
+  }
+
+  const [row] = await db.update(bolleTable).set(body).where(eq(bolleTable.id, bollaId)).returning();
   const det = await buildDettaglio(row.id);
   res.json(det);
 });
 
-// ─── RIGHE ───────────────────────────────────────────────────────────────────
-
-router.get("/bolle/:id/righe", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const righe = await db
-    .select({
-      r: bollaRigheTable,
-      prodottoNome: prodottiTable.nome,
-      codiceLotto: lottiTable.codiceLotto,
-    })
-    .from(bollaRigheTable)
-    .leftJoin(prodottiTable, eq(bollaRigheTable.prodottoId, prodottiTable.id))
-    .leftJoin(lottiTable, eq(bollaRigheTable.lottoId, lottiTable.id))
-    .where(eq(bollaRigheTable.bollaId, id));
-
-  res.json(righe.map(r => ({
-    id: r.r.id,
-    bollaId: r.r.bollaId,
-    prodottoId: r.r.prodottoId,
-    prodottoNome: r.prodottoNome ?? null,
-    lottoId: r.r.lottoId ?? null,
-    codiceLotto: r.codiceLotto ?? null,
-    quantita: parseFloat(r.r.quantita),
-    unitaMisura: r.r.unitaMisura,
-    note: r.r.note ?? null,
-  })));
-});
+// ─── RIGHE — ADD ─────────────────────────────────────────────────────────────
 
 router.post("/bolle/:id/righe", async (req, res) => {
   const bollaId = parseInt(req.params.id);
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (bolla.stato !== "bozza") {
-    res.status(400).json({ error: "Si possono aggiungere prodotti solo a una bolla in bozza" });
+  if (!STATI_MODIFICABILI.includes(bolla.stato)) {
+    res.status(400).json({ error: "Non è possibile aggiungere prodotti a una bolla consegnata o annullata" });
     return;
   }
 
   const { prodottoId, lottoId, quantita, unitaMisura, note } = req.body;
 
+  const [prod] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, prodottoId));
+
   if (lottoId) {
     const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId));
     if (!lotto) { res.status(404).json({ error: "Lotto non trovato" }); return; }
     if (parseFloat(lotto.quantitaResidua) < quantita) {
-      res.status(400).json({ error: `Disponibilità insufficiente: ${parseFloat(lotto.quantitaResidua)} ${lotto.quantitaResidua}` });
+      res.status(400).json({
+        error: `Disponibilità insufficiente nel lotto: ${parseFloat(lotto.quantitaResidua)} disponibili, richiesti ${quantita}`,
+      });
+      return;
+    }
+  } else {
+    const disponibile = await giacenzaDisponibile(prodottoId, bolla.magazzinoId);
+    const giainBolla = bolla.stato === "bozza" ? await quantitaGiaInBolla(bollaId, prodottoId) : 0;
+    const netta = disponibile - giainBolla;
+    if (netta < quantita) {
+      res.status(400).json({
+        error: `Disponibilità insufficiente per ${prod?.nome ?? "prodotto"}: ${netta.toFixed(2)} disponibili (giacenza ${disponibile.toFixed(2)} − già in bolla ${giainBolla.toFixed(2)}), richiesti ${quantita}`,
+      });
       return;
     }
   }
@@ -192,18 +316,52 @@ router.post("/bolle/:id/righe", async (req, res) => {
     prodottoId,
     lottoId: lottoId ?? null,
     quantita: quantita.toString(),
-    unitaMisura: unitaMisura ?? "pz",
+    unitaMisura: unitaMisura ?? prod?.unitaMisura ?? "pz",
     note: note ?? null,
   }).returning();
 
-  const [prodotto] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, prodottoId));
-  const lotto = lottoId ? (await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId)))[0] : null;
+  // se bolla già confermata: scarica subito (FEFO auto se non c'è lotto)
+  if (bolla.stato === "confermato") {
+    if (riga.lottoId) {
+      const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, riga.lottoId));
+      if (lotto) {
+        const disp = parseFloat(lotto.quantitaResidua);
+        await db.update(lottiTable)
+          .set({ quantitaResidua: (disp - quantita).toFixed(2) })
+          .where(eq(lottiTable.id, riga.lottoId));
+        const today = new Date().toISOString().split("T")[0];
+        await db.insert(movimentiTable).values({
+          tipoMovimento: "scarico",
+          tipoDettaglio: "consegna_beneficiario",
+          dataMovimento: today,
+          magazzinoId: bolla.magazzinoId,
+          prodottoId: riga.prodottoId,
+          lottoId: riga.lottoId,
+          quantita: riga.quantita,
+          unitaMisura: riga.unitaMisura,
+          beneficiarioId: bolla.beneficiarioId,
+          bollaId,
+          bollaRigaId: riga.id,
+          documentoRiferimento: bolla.numeroBolla,
+          note: riga.note ?? undefined,
+        });
+      }
+    } else {
+      await scaricoFEFO(
+        prodottoId, bolla.magazzinoId, quantita, bollaId,
+        { beneficiarioId: bolla.beneficiarioId, numeroBolla: bolla.numeroBolla },
+        unitaMisura ?? "pz", note ?? null, riga.id,
+      );
+    }
+  }
+
+  const lotto = riga.lottoId ? (await db.select().from(lottiTable).where(eq(lottiTable.id, riga.lottoId)))[0] : null;
 
   res.status(201).json({
     id: riga.id,
     bollaId: riga.bollaId,
     prodottoId: riga.prodottoId,
-    prodottoNome: prodotto?.nome ?? null,
+    prodottoNome: prod?.nome ?? null,
     lottoId: riga.lottoId ?? null,
     codiceLotto: lotto?.codiceLotto ?? null,
     quantita: parseFloat(riga.quantita),
@@ -212,24 +370,33 @@ router.post("/bolle/:id/righe", async (req, res) => {
   });
 });
 
+// ─── RIGHE — DELETE ───────────────────────────────────────────────────────────
+
 router.delete("/bolle/:id/righe/:rigaId", async (req, res) => {
   const bollaId = parseInt(req.params.id);
   const rigaId = parseInt(req.params.rigaId);
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (bolla.stato !== "bozza") {
-    res.status(400).json({ error: "Non è possibile modificare una bolla già confermata" });
+  if (!STATI_MODIFICABILI.includes(bolla.stato)) {
+    res.status(400).json({ error: "Non è possibile modificare una bolla consegnata o annullata" });
     return;
   }
 
-  await db.delete(bollaRigheTable).where(
-    and(eq(bollaRigheTable.id, rigaId), eq(bollaRigheTable.bollaId, bollaId))
-  );
+  const [riga] = await db.select().from(bollaRigheTable)
+    .where(and(eq(bollaRigheTable.id, rigaId), eq(bollaRigheTable.bollaId, bollaId)));
+  if (!riga) { res.status(404).json({ error: "Riga non trovata" }); return; }
+
+  // se bolla già confermata: storna lo scarico
+  if (bolla.stato === "confermato") {
+    await stornoRiga(riga, bollaId);
+  }
+
+  await db.delete(bollaRigheTable).where(eq(bollaRigheTable.id, rigaId));
   res.status(204).end();
 });
 
-// ─── CONFERMA (bozza → confermato + scarico magazzino) ───────────────────────
+// ─── CONFERMA (bozza → confermato + scarico FEFO) ────────────────────────────
 
 router.post("/bolle/:id/conferma", async (req, res) => {
   const bollaId = parseInt(req.params.id);
@@ -247,50 +414,68 @@ router.post("/bolle/:id/conferma", async (req, res) => {
     return;
   }
 
+  // verifica disponibilità totale per prodotto
+  const byProdotto: Record<number, number> = {};
+  for (const riga of righe) {
+    byProdotto[riga.prodottoId] = (byProdotto[riga.prodottoId] ?? 0) + parseFloat(riga.quantita);
+  }
+  for (const [prodIdStr, qtaRichiesta] of Object.entries(byProdotto)) {
+    const prodId = parseInt(prodIdStr);
+    const disponibile = await giacenzaDisponibile(prodId, bolla.magazzinoId);
+    if (disponibile < qtaRichiesta) {
+      const [prod] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, prodId));
+      res.status(400).json({
+        error: `Disponibilità insufficiente per ${prod?.nome ?? `prodotto #${prodId}`}: disponibile ${disponibile.toFixed(2)}, totale in bolla ${qtaRichiesta.toFixed(2)}`,
+      });
+      return;
+    }
+  }
+
   const today = new Date().toISOString().split("T")[0];
 
   for (const riga of righe) {
     if (riga.lottoId) {
       const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, riga.lottoId));
-      if (!lotto) {
-        res.status(400).json({ error: `Lotto ${riga.lottoId} non trovato` });
-        return;
-      }
-      const disponibile = parseFloat(lotto.quantitaResidua);
-      const richiesta = parseFloat(riga.quantita);
-      if (disponibile < richiesta) {
-        const [prod] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, riga.prodottoId));
-        res.status(400).json({
-          error: `Disponibilità insufficiente per ${prod?.nome ?? `prodotto #${riga.prodottoId}`}: disponibile ${disponibile}, richiesto ${richiesta}`,
+      if (lotto) {
+        const disp = parseFloat(lotto.quantitaResidua);
+        const scala = parseFloat(riga.quantita);
+        if (disp < scala) {
+          const [prod] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, riga.prodottoId));
+          res.status(400).json({
+            error: `Disponibilità insufficiente nel lotto ${lotto.codiceLotto ?? `#${lotto.id}`} per ${prod?.nome ?? "prodotto"}: disponibile ${disp.toFixed(2)}, richiesto ${scala.toFixed(2)}`,
+          });
+          return;
+        }
+        await db.update(lottiTable)
+          .set({ quantitaResidua: (disp - scala).toFixed(2) })
+          .where(eq(lottiTable.id, riga.lottoId));
+
+        await db.insert(movimentiTable).values({
+          tipoMovimento: "scarico",
+          tipoDettaglio: "consegna_beneficiario",
+          dataMovimento: today,
+          magazzinoId: bolla.magazzinoId,
+          prodottoId: riga.prodottoId,
+          lottoId: riga.lottoId,
+          quantita: riga.quantita,
+          unitaMisura: riga.unitaMisura,
+          beneficiarioId: bolla.beneficiarioId,
+          bollaId,
+          bollaRigaId: riga.id,
+          documentoRiferimento: bolla.numeroBolla,
+          note: riga.note ?? undefined,
         });
-        return;
       }
-
-      await db.update(lottiTable)
-        .set({ quantitaResidua: (disponibile - richiesta).toFixed(2) })
-        .where(eq(lottiTable.id, riga.lottoId));
+    } else {
+      await scaricoFEFO(
+        riga.prodottoId, bolla.magazzinoId, parseFloat(riga.quantita), bollaId,
+        { beneficiarioId: bolla.beneficiarioId, numeroBolla: bolla.numeroBolla },
+        riga.unitaMisura, riga.note ?? null, riga.id,
+      );
     }
-
-    const [prod] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, riga.prodottoId));
-
-    await db.insert(movimentiTable).values({
-      tipoMovimento: "scarico",
-      tipoDettaglio: "consegna_beneficiario",
-      dataMovimento: today,
-      magazzinoId: bolla.magazzinoId,
-      prodottoId: riga.prodottoId,
-      lottoId: riga.lottoId ?? undefined,
-      quantita: riga.quantita,
-      unitaMisura: riga.unitaMisura,
-      beneficiarioId: bolla.beneficiarioId,
-      bollaId: bollaId,
-      documentoRiferimento: bolla.numeroBolla,
-      note: riga.note ?? undefined,
-    });
   }
 
   await db.update(bolleTable).set({ stato: "confermato" }).where(eq(bolleTable.id, bollaId));
-
   const det = await buildDettaglio(bollaId);
   res.json(det);
 });
@@ -315,6 +500,35 @@ router.post("/bolle/:id/consegna", async (req, res) => {
     noteRicezione: noteRicezione ?? null,
   }).where(eq(bolleTable.id, bollaId));
 
+  const det = await buildDettaglio(bollaId);
+  res.json(det);
+});
+
+// ─── ANNULLA ──────────────────────────────────────────────────────────────────
+
+router.post("/bolle/:id/annulla", async (req, res) => {
+  const bollaId = parseInt(req.params.id);
+
+  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
+  if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (bolla.stato === "consegnato") {
+    res.status(400).json({ error: "Non è possibile annullare una bolla già consegnata" });
+    return;
+  }
+  if (bolla.stato === "annullato") {
+    res.status(400).json({ error: "La bolla è già annullata" });
+    return;
+  }
+
+  // se confermata: storna tutti gli scarichi (uno per riga)
+  if (bolla.stato === "confermato") {
+    const righe = await db.select().from(bollaRigheTable).where(eq(bollaRigheTable.bollaId, bollaId));
+    for (const riga of righe) {
+      await stornoRiga(riga, bollaId);
+    }
+  }
+
+  await db.update(bolleTable).set({ stato: "annullato" }).where(eq(bolleTable.id, bollaId));
   const det = await buildDettaglio(bollaId);
   res.json(det);
 });

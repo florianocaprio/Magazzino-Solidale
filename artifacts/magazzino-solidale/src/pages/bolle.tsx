@@ -7,12 +7,16 @@ import {
   useDeleteBollaRiga,
   useConfermaBolla,
   useConsegnaBolla,
+  useAnnullaBolla,
+  useUpdateBolla,
   useListBeneficiari,
   useListMagazzini,
   useListGiacenze,
   useListLotti,
+  useListVolontari,
   getListBolleQueryKey,
   getGetBollaQueryKey,
+  getListGiacenzeQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,19 +25,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, Trash2, PackagePlus, CheckCircle, Truck, ChevronRight } from "lucide-react";
+import { Plus, FileText, Trash2, PackagePlus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
 function statoBadge(stato: string) {
   if (stato === "consegnato") return <Badge className="bg-green-500 text-white">Consegnato</Badge>;
   if (stato === "confermato") return <Badge className="border-blue-300 text-blue-700 bg-blue-50">Confermato</Badge>;
+  if (stato === "annullato") return <Badge variant="destructive">Annullato</Badge>;
   return <Badge variant="secondary">Bozza</Badge>;
 }
 
@@ -104,18 +113,88 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
+// ─── Dialog modifica intestazione (beneficiario / magazzino) ────────────────
+
+function ModificaBollaDialog({
+  open, onClose, bollaId, beneficiarioId, magazzinoId, hasRighe,
+}: {
+  open: boolean; onClose: () => void; bollaId: number;
+  beneficiarioId: number; magazzinoId: number; hasRighe: boolean;
+}) {
+  const [bId, setBId] = useState(String(beneficiarioId));
+  const [mId, setMId] = useState(String(magazzinoId));
+  const { data: beneficiari } = useListBeneficiari();
+  const { data: magazzini } = useListMagazzini();
+  const updateBolla = useUpdateBolla();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const onSubmit = () => {
+    updateBolla.mutate(
+      { id: bollaId, data: { beneficiarioId: parseInt(bId), magazzinoId: parseInt(mId) } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
+          queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
+          toast({ title: "Bolla aggiornata" });
+          onClose();
+        },
+        onError: (err: unknown) => {
+          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Errore durante l'aggiornamento";
+          toast({ title: "Errore", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Modifica intestazione bolla</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Beneficiario</Label>
+            <Select value={bId} onValueChange={setBId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {beneficiari?.map(b => (
+                  <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Magazzino di Uscita</Label>
+            <Select value={mId} onValueChange={setMId} disabled={hasRighe}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {magazzini?.map(m => (
+                  <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasRighe && (
+              <p className="text-xs text-amber-600">
+                Per cambiare magazzino rimuovi prima tutti i prodotti dalla bolla.
+              </p>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Chiudi</Button>
+          <Button onClick={onSubmit} disabled={updateBolla.isPending}>Salva</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Dialog aggiungi prodotto ────────────────────────────────────────────────
 
 function AggiungiProdottoDialog({
-  open,
-  onClose,
-  bollaId,
-  magazzinoId,
+  open, onClose, bollaId, magazzinoId,
 }: {
-  open: boolean;
-  onClose: () => void;
-  bollaId: number;
-  magazzinoId: number;
+  open: boolean; onClose: () => void; bollaId: number; magazzinoId: number;
 }) {
   const [prodottoId, setProdottoId] = useState("");
   const [lottoId, setLottoId] = useState("");
@@ -132,26 +211,32 @@ function AggiungiProdottoDialog({
   const giacenzaSelezionata = giacenze?.find(g => g.prodottoId === parseInt(prodottoId));
   const lottiDisponibili = lotti?.filter(l => l.magazzinoId === magazzinoId && l.quantitaResidua > 0) ?? [];
 
+  // limite massimo: lotto specifico oppure giacenza totale
+  const lottoSelezionato = lottiDisponibili.find(l => l.id === parseInt(lottoId));
+  const maxDisponibile = lottoSelezionato
+    ? lottoSelezionato.quantitaResidua
+    : giacenzaSelezionata?.quantitaTotale ?? 0;
+  const quantitaNum = parseFloat(quantita || "0");
+  const eccedeDisponibilita = quantitaNum > maxDisponibile;
+
   const onSubmit = () => {
-    if (!prodottoId || !quantita) return;
+    if (!prodottoId || !quantita || eccedeDisponibilita) return;
     addRiga.mutate(
       {
         id: bollaId,
         data: {
           prodottoId: parseInt(prodottoId),
           lottoId: lottoId ? parseInt(lottoId) : undefined,
-          quantita: parseFloat(quantita),
+          quantita: quantitaNum,
           unitaMisura,
         },
       },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
+          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey({ magazzinoId }) });
           toast({ title: "Prodotto aggiunto" });
-          setProdottoId("");
-          setLottoId("");
-          setQuantita("");
-          setUnitaMisura("pz");
+          setProdottoId(""); setLottoId(""); setQuantita(""); setUnitaMisura("pz");
           onClose();
         },
         onError: (err: unknown) => {
@@ -169,23 +254,27 @@ function AggiungiProdottoDialog({
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label>Prodotto disponibile in magazzino</Label>
-            <Select value={prodottoId} onValueChange={v => { setProdottoId(v); setLottoId(""); }}>
+            <Select value={prodottoId} onValueChange={v => { setProdottoId(v); setLottoId(""); setQuantita(""); }}>
               <SelectTrigger><SelectValue placeholder="Seleziona prodotto..." /></SelectTrigger>
               <SelectContent>
-                {giacenze?.map(g => (
+                {giacenze && giacenze.length > 0 ? giacenze.map(g => (
                   <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
                     {g.prodottoNome} — {g.quantitaTotale} {g.unitaMisura} disponibili
                   </SelectItem>
-                ))}
+                )) : (
+                  <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                    Nessun prodotto disponibile in questo magazzino
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </div>
 
           {prodottoId && lottiDisponibili.length > 0 && (
             <div className="space-y-2">
-              <Label>Lotto (FEFO — seleziona per tracciabilità)</Label>
-              <Select value={lottoId} onValueChange={setLottoId}>
-                <SelectTrigger><SelectValue placeholder="Seleziona lotto (opzionale)..." /></SelectTrigger>
+              <Label>Lotto (FEFO — opzionale)</Label>
+              <Select value={lottoId} onValueChange={v => { setLottoId(v); setQuantita(""); }}>
+                <SelectTrigger><SelectValue placeholder="Automatico (prima scadenza)" /></SelectTrigger>
                 <SelectContent>
                   {lottiDisponibili.map(l => (
                     <SelectItem key={l.id} value={String(l.id)}>
@@ -196,6 +285,9 @@ function AggiungiProdottoDialog({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Lascia vuoto per scaricare automaticamente i lotti in scadenza per primi.
+              </p>
             </div>
           )}
 
@@ -206,13 +298,17 @@ function AggiungiProdottoDialog({
                 type="number"
                 min="0.01"
                 step="0.01"
+                max={maxDisponibile || undefined}
                 value={quantita}
                 onChange={e => setQuantita(e.target.value)}
                 placeholder="0"
+                className={eccedeDisponibilita ? "border-destructive focus-visible:ring-destructive" : ""}
               />
-              {giacenzaSelezionata && (
-                <p className="text-xs text-muted-foreground">
-                  Disponibile: {giacenzaSelezionata.quantitaTotale} {giacenzaSelezionata.unitaMisura}
+              {prodottoId && (
+                <p className={`text-xs ${eccedeDisponibilita ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                  {eccedeDisponibilita
+                    ? `Massimo disponibile: ${maxDisponibile}`
+                    : `Disponibile: ${maxDisponibile} ${giacenzaSelezionata?.unitaMisura ?? ""}`}
                 </p>
               )}
             </div>
@@ -231,7 +327,7 @@ function AggiungiProdottoDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Annulla</Button>
-          <Button onClick={onSubmit} disabled={!prodottoId || !quantita || addRiga.isPending}>
+          <Button onClick={onSubmit} disabled={!prodottoId || !quantita || eccedeDisponibilita || addRiga.isPending}>
             Aggiungi
           </Button>
         </DialogFooter>
@@ -242,23 +338,35 @@ function AggiungiProdottoDialog({
 
 // ─── Dettaglio bolla ─────────────────────────────────────────────────────────
 
-function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => void }) {
+function BollaDettaglio({ bollaId }: { bollaId: number }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [annullaOpen, setAnnullaOpen] = useState(false);
   const { data: bolla, isLoading } = useGetBolla(bollaId);
+  const { data: volontari } = useListVolontari();
   const deleteRiga = useDeleteBollaRiga();
   const confermaBolla = useConfermaBolla();
   const consegnaBolla = useConsegnaBolla();
+  const annullaBolla = useAnnullaBolla();
+  const updateBolla = useUpdateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
+    queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+  };
+
+  const errMsg = (err: unknown, fallback: string) =>
+    (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? fallback;
 
   const onDeleteRiga = (rigaId: number) => {
     deleteRiga.mutate(
       { id: bollaId, rigaId },
       {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
-          toast({ title: "Prodotto rimosso" });
-        },
+        onSuccess: () => { invalidateAll(); toast({ title: "Prodotto rimosso" }); },
+        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Impossibile rimuovere"), variant: "destructive" }),
       }
     );
   };
@@ -267,15 +375,8 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
     confermaBolla.mutate(
       { id: bollaId },
       {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
-          queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
-          toast({ title: "Bolla confermata", description: "I prodotti sono stati scaricati dal magazzino." });
-        },
-        onError: (err: unknown) => {
-          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Errore durante la conferma";
-          toast({ title: "Errore", description: msg, variant: "destructive" });
-        },
+        onSuccess: () => { invalidateAll(); toast({ title: "Bolla confermata", description: "Prodotti scaricati dal magazzino." }); },
+        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Errore durante la conferma"), variant: "destructive" }),
       }
     );
   };
@@ -284,11 +385,37 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
     consegnaBolla.mutate(
       { id: bollaId, data: { confermaRicezione: true } },
       {
+        onSuccess: () => { invalidateAll(); toast({ title: "Bolla consegnata", description: "Consegna registrata." }); },
+        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Errore durante la consegna"), variant: "destructive" }),
+      }
+    );
+  };
+
+  const onAnnulla = () => {
+    annullaBolla.mutate(
+      { id: bollaId },
+      {
+        onSuccess: () => {
+          invalidateAll();
+          toast({ title: "Bolla annullata", description: "Eventuali scarichi sono stati ripristinati a magazzino." });
+          setAnnullaOpen(false);
+        },
+        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Impossibile annullare"), variant: "destructive" }),
+      }
+    );
+  };
+
+  const onChangeVolontario = (value: string) => {
+    updateBolla.mutate(
+      { id: bollaId, data: value === "__centro__"
+        ? { volontarioConsegnaId: null, noteConsegna: "Consegna presso il centro" }
+        : { volontarioConsegnaId: parseInt(value) } },
+      {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
-          queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
-          toast({ title: "Bolla consegnata", description: "La consegna è stata registrata." });
+          toast({ title: "Consegna aggiornata" });
         },
+        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Impossibile aggiornare"), variant: "destructive" }),
       }
     );
   };
@@ -308,6 +435,8 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
   const isBozza = bolla.stato === "bozza";
   const isConfermato = bolla.stato === "confermato";
   const isConsegnato = bolla.stato === "consegnato";
+  const isAnnullato = bolla.stato === "annullato";
+  const modificabile = isBozza || isConfermato; // si possono gestire i prodotti
 
   return (
     <div className="mt-4 space-y-5">
@@ -333,13 +462,47 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
         </div>
       </div>
 
+      {isBozza && (
+        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => setEditOpen(true)}>
+          <Pencil className="h-3.5 w-3.5" /> Modifica beneficiario/magazzino
+        </Button>
+      )}
+
+      <Separator />
+
+      {/* Consegna: volontario o presso centro */}
+      {!isAnnullato && (
+        <div className="space-y-2">
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5" /> Chi effettua la consegna
+          </Label>
+          {isConsegnato ? (
+            <p className="text-sm font-medium">{bolla.volontarioNome ?? bolla.noteConsegna ?? "—"}</p>
+          ) : (
+            <Select
+              value={bolla.volontarioConsegnaId ? String(bolla.volontarioConsegnaId) : (bolla.noteConsegna ? "__centro__" : "")}
+              onValueChange={onChangeVolontario}
+              disabled={updateBolla.isPending}
+            >
+              <SelectTrigger><SelectValue placeholder="Seleziona volontario o centro..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__centro__">📍 Consegna presso il centro</SelectItem>
+                {volontari?.filter(v => v.attivo).map(v => (
+                  <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      )}
+
       <Separator />
 
       {/* Righe prodotti */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-sm">Prodotti nella bolla</h3>
-          {isBozza && (
+          {modificabile && (
             <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => setAddOpen(true)}>
               <PackagePlus className="h-4 w-4" />
               Aggiungi prodotto
@@ -351,7 +514,7 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
           <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
             <PackagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">Nessun prodotto aggiunto.</p>
-            {isBozza && (
+            {modificabile && (
               <Button size="sm" className="mt-3 gap-1.5" onClick={() => setAddOpen(true)}>
                 <Plus className="h-4 w-4" /> Aggiungi il primo prodotto
               </Button>
@@ -365,7 +528,7 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
                   <TableHead className="text-xs">Prodotto</TableHead>
                   <TableHead className="text-xs">Lotto</TableHead>
                   <TableHead className="text-xs text-right">Quantità</TableHead>
-                  {isBozza && <TableHead className="w-10" />}
+                  {modificabile && <TableHead className="w-10" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -374,7 +537,7 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
                     <TableCell className="font-medium text-sm">{r.prodottoNome ?? `Prodotto #${r.prodottoId}`}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{r.codiceLotto ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono text-sm">{r.quantita} {r.unitaMisura}</TableCell>
-                    {isBozza && (
+                    {modificabile && (
                       <TableCell>
                         <Button
                           size="sm"
@@ -396,18 +559,18 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
       </div>
 
       {/* Azioni stato */}
-      {(isBozza || isConfermato) && (
+      {modificabile && (
         <>
           <Separator />
           <div className="space-y-2">
             {isBozza && (
               <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800 mb-3">
-                <strong>Conferma bolla</strong> — I prodotti verranno scaricati dal magazzino e verrà creato un movimento di uscita.
+                <strong>Conferma bolla</strong> — I prodotti verranno scaricati dal magazzino (lotti in scadenza per primi) e verrà creato un movimento di uscita.
               </div>
             )}
             {isConfermato && (
               <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800 mb-3">
-                <strong>Pronta per la consegna.</strong> Segna come consegnata quando il beneficiario ha ricevuto la merce.
+                <strong>Pronta per la consegna.</strong> Puoi ancora aggiungere o rimuovere prodotti (il magazzino si aggiorna in tempo reale). Segna come consegnata quando il beneficiario ha ricevuto la merce.
               </div>
             )}
             {isBozza && (
@@ -430,6 +593,16 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
                 {consegnaBolla.isPending ? "Registrazione..." : "Segna come consegnata"}
               </Button>
             )}
+            {/* Annulla */}
+            <Button
+              variant="outline"
+              className="w-full gap-2 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
+              onClick={() => setAnnullaOpen(true)}
+              disabled={annullaBolla.isPending}
+            >
+              <XCircle className="h-4 w-4" />
+              Annulla bolla
+            </Button>
           </div>
         </>
       )}
@@ -437,6 +610,12 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
       {isConsegnato && (
         <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
           ✓ Consegna completata. Merce scaricata dal magazzino.
+        </div>
+      )}
+
+      {isAnnullato && (
+        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+          ✕ Bolla annullata. Eventuali prodotti scaricati sono stati ripristinati a magazzino.
         </div>
       )}
 
@@ -448,6 +627,39 @@ function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose: () => 
           magazzinoId={bolla.magazzinoId}
         />
       )}
+
+      {editOpen && (
+        <ModificaBollaDialog
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          bollaId={bollaId}
+          beneficiarioId={bolla.beneficiarioId}
+          magazzinoId={bolla.magazzinoId}
+          hasRighe={bolla.righe.length > 0}
+        />
+      )}
+
+      <AlertDialog open={annullaOpen} onOpenChange={setAnnullaOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annullare la bolla {bolla.numeroBolla}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isConfermato
+                ? "I prodotti già scaricati verranno ripristinati a magazzino e i movimenti di uscita verranno annullati. L'operazione non è reversibile."
+                : "La bolla verrà contrassegnata come annullata. L'operazione non è reversibile."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, mantieni</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onAnnulla}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sì, annulla bolla
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -535,10 +747,7 @@ export default function Bolle() {
             <SheetTitle>Dettaglio Bolla</SheetTitle>
           </SheetHeader>
           {selectedBollaId !== null && (
-            <BollaDettaglio
-              bollaId={selectedBollaId}
-              onClose={() => setSelectedBollaId(null)}
-            />
+            <BollaDettaglio bollaId={selectedBollaId} />
           )}
         </SheetContent>
       </Sheet>
