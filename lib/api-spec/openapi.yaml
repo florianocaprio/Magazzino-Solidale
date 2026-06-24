@@ -1725,25 +1725,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/ConsegnePerCentroReport"
 
-  /report/beneficiari-per-zona:
-    get:
-      operationId: reportBeneficiariPerZona
-      tags: [report]
-      parameters:
-        - name: centroAscoltoId
-          in: query
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Beneficiaries per zone
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/BeneficiariZonaReport"
-
   /report/fse-plus:
     get:
       operationId: reportFsePlus
@@ -3923,19 +3904,6 @@ components:
         consegneMancate:
           type: integer
       required: [mese, totConsegne, consegneEffettuate, consegneMancate]
-
-    BeneficiariZonaReport:
-      type: object
-      properties:
-        zona:
-          type: string
-        totBeneficiari:
-          type: integer
-        attivi:
-          type: integer
-        consegneDomicilio:
-          type: integer
-      required: [zona, totBeneficiari, attivi, consegneDomicilio]
 
     ConsegnePerCentroReport:
       type: object

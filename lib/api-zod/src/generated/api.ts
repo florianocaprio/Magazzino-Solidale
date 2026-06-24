@@ -2253,19 +2253,6 @@ export const ReportConsegnePerCentroResponseItem = zod.object({
 export const ReportConsegnePerCentroResponse = zod.array(ReportConsegnePerCentroResponseItem)
 
 
-export const ReportBeneficiariPerZonaQueryParams = zod.object({
-  "centroAscoltoId": zod.coerce.number().optional()
-})
-
-export const ReportBeneficiariPerZonaResponseItem = zod.object({
-  "zona": zod.string(),
-  "totBeneficiari": zod.number(),
-  "attivi": zod.number(),
-  "consegneDomicilio": zod.number()
-})
-export const ReportBeneficiariPerZonaResponse = zod.array(ReportBeneficiariPerZonaResponseItem)
-
-
 /**
  * @summary FSE+ annual distribution report
  */

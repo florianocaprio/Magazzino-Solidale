@@ -1219,13 +1219,6 @@ export interface ConsegneMeseReport {
   consegneMancate: number;
 }
 
-export interface BeneficiariZonaReport {
-  zona: string;
-  totBeneficiari: number;
-  attivi: number;
-  consegneDomicilio: number;
-}
-
 export interface ConsegnePerCentroReport {
   /** @nullable */
   centroId?: number | null;
@@ -1419,10 +1412,6 @@ centroAscoltoId?: number;
 export type ReportConsegnePerCentroParams = {
 da?: string;
 a?: string;
-};
-
-export type ReportBeneficiariPerZonaParams = {
-centroAscoltoId?: number;
 };
 
 export type ReportFsePlusParams = {

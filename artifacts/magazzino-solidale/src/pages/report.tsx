@@ -3,14 +3,12 @@ import {
   useReportGiacenzePerMagazzino,
   useReportConsegnePerMese,
   useReportConsegnePerCentro,
-  useReportBeneficiariPerZona,
   useReportFsePlus,
   useListMagazzini,
   useListCentriAscolto,
   getReportGiacenzePerMagazzinoQueryKey,
   getReportConsegnePerMeseQueryKey,
   getReportConsegnePerCentroQueryKey,
-  getReportBeneficiariPerZonaQueryKey,
   getReportFsePlusQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -48,11 +46,6 @@ export default function Report() {
   const giacenzeParams = { magazzinoId: magParam };
   const { data: giacenze, isLoading: isLoadingGiacenze } = useReportGiacenzePerMagazzino(giacenzeParams, {
     query: { queryKey: getReportGiacenzePerMagazzinoQueryKey(giacenzeParams) },
-  });
-
-  const zonaParams = { centroAscoltoId: centroParam };
-  const { data: beneficiari, isLoading: isLoadingBeneficiari } = useReportBeneficiariPerZona(zonaParams, {
-    query: { queryKey: getReportBeneficiariPerZonaQueryKey(zonaParams) },
   });
 
   const perCentroParams = { da, a };
@@ -181,32 +174,6 @@ export default function Report() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Distribuzione Beneficiari per Zona</CardTitle>
-            <CardDescription>Concentrazione delle famiglie assistite e consegne a domicilio</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingBeneficiari ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : (beneficiari?.length ?? 0) === 0 ? (
-              <EmptyChart />
-            ) : (
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={beneficiari} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="zona" axisLine={false} tickLine={false} />
-                    <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
-                    <RechartsTooltip />
-                    <Bar dataKey="totBeneficiari" name="Totale Beneficiari" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="consegneDomicilio" name="Di cui a Domicilio" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       {/* Consegne per Centro di Ascolto: dirette vs con volontari */}

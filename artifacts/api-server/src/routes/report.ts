@@ -125,29 +125,6 @@ router.get("/report/consegne-per-centro", async (req, res) => {
   })));
 });
 
-router.get("/report/beneficiari-per-zona", async (req, res) => {
-  const centroAscoltoId = parseIntParam(req.query.centroAscoltoId);
-
-  const result3 = await db.execute(sql`
-    SELECT COALESCE(zona_municipio, 'Non specificato') as zona,
-           COUNT(*) as tot_beneficiari,
-           COUNT(CASE WHEN attivo = true THEN 1 END) as attivi,
-           COUNT(CASE WHEN consegna_domicilio = true THEN 1 END) as consegne_domicilio
-    FROM beneficiari
-    ${centroAscoltoId ? sql`WHERE centro_ascolto_id = ${centroAscoltoId}` : sql``}
-    GROUP BY zona_municipio
-    ORDER BY tot_beneficiari DESC
-  `);
-  const rows3 = result3.rows as Array<Record<string, unknown>>;
-
-  res.json(rows3.map((r: Record<string, unknown>) => ({
-    zona: r.zona,
-    totBeneficiari: Number(r.tot_beneficiari),
-    attivi: Number(r.attivi),
-    consegneDomicilio: Number(r.consegne_domicilio),
-  })));
-});
-
 router.get("/report/fse-plus", async (req, res) => {
   const parsedAnno = req.query.anno ? parseInt(req.query.anno as string, 10) : new Date().getFullYear();
   if (Number.isNaN(parsedAnno) || parsedAnno < 2000 || parsedAnno > 2100) {
