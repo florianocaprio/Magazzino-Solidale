@@ -75,10 +75,10 @@ const NAV_ITEMS = [
   { key: "approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, groupKey: "logistica", area: "logistica" },
   
   { key: "report", url: "/report", icon: BarChart3, groupKey: "analisi", area: "analisi" },
-  { key: "impostazioniStampa", url: "/impostazioni-stampa", icon: Printer, groupKey: "analisi", area: "analisi" },
 
   { key: "utenti", url: "/utenti", icon: UserCog, groupKey: "amministrazione", area: "amministrazione" },
   { key: "ruoli", url: "/ruoli", icon: ShieldCheck, groupKey: "amministrazione", area: "amministrazione" },
+  { key: "impostazioniStampa", url: "/impostazioni-stampa", icon: Printer, groupKey: "amministrazione", area: "amministrazione" },
 ];
 
 function LanguageSelector() {

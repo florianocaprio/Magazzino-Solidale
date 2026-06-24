@@ -197,7 +197,7 @@ function AppRoutes() {
         </Route>
         <Route path="/impostazioni-stampa">
           {() => (
-            <Guard area="analisi">
+            <Guard area="amministrazione">
               <ImpostazioniStampa />
             </Guard>
           )}
