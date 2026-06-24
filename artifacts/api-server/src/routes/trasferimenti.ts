@@ -1,9 +1,83 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTable, lottiTable, utentiTable, volontariTable } from "@workspace/db";
-import { eq, and, desc, inArray, type SQL } from "drizzle-orm";
+import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTable, lottiTable, movimentiTable, utentiTable, volontariTable } from "@workspace/db";
+import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Giacenza disponibile per un prodotto in un magazzino (somma quantità residue dei lotti). */
+async function giacenzaDisponibile(prodottoId: number, magazzinoId: number): Promise<number> {
+  const [res] = await db
+    .select({ totale: sum(lottiTable.quantitaResidua) })
+    .from(lottiTable)
+    .where(
+      and(
+        eq(lottiTable.prodottoId, prodottoId),
+        eq(lottiTable.magazzinoId, magazzinoId),
+        gt(lottiTable.quantitaResidua, "0"),
+      ),
+    );
+  return parseFloat(res?.totale ?? "0");
+}
+
+/**
+ * Uscita FEFO dal magazzino origine: scala la quantità dai lotti per scadenza
+ * crescente e registra un movimento "trasferimento/uscita" per ogni lotto toccato.
+ * I movimenti registrano il lotto origine così che la conferma possa ricreare i
+ * lotti a destinazione preservando scadenza e provenienza (FEFO).
+ */
+async function trasferimentoUscitaFEFO(tx: Tx, opts: {
+  prodottoId: number;
+  magazzinoId: number;
+  quantita: number;
+  unitaMisura: string;
+  dataMovimento: string;
+  trasferimentoId: number;
+  trasferimentoCodice: string;
+}) {
+  let rimanente = opts.quantita;
+  const lotti = await tx
+    .select()
+    .from(lottiTable)
+    .where(
+      and(
+        eq(lottiTable.prodottoId, opts.prodottoId),
+        eq(lottiTable.magazzinoId, opts.magazzinoId),
+        gt(lottiTable.quantitaResidua, "0"),
+      ),
+    )
+    .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.dataCarico));
+
+  for (const lotto of lotti) {
+    if (rimanente <= 0) break;
+    const disp = parseFloat(lotto.quantitaResidua);
+    const scala = Math.min(disp, rimanente);
+
+    await tx
+      .update(lottiTable)
+      .set({ quantitaResidua: (disp - scala).toFixed(2) })
+      .where(eq(lottiTable.id, lotto.id));
+
+    await tx.insert(movimentiTable).values({
+      tipoMovimento: "trasferimento",
+      tipoDettaglio: "uscita",
+      dataMovimento: opts.dataMovimento,
+      magazzinoId: opts.magazzinoId,
+      prodottoId: opts.prodottoId,
+      lottoId: lotto.id,
+      quantita: scala.toFixed(2),
+      unitaMisura: opts.unitaMisura,
+      fornitoreId: lotto.fornitoreId,
+      trasferimentoId: opts.trasferimentoId,
+      documentoRiferimento: opts.trasferimentoCodice,
+      note: `Trasferimento ${opts.trasferimentoCodice} — uscita`,
+    });
+
+    rimanente -= scala;
+  }
+}
 
 type TrasportatoreResult =
   | { ok: true; volontarioId: number | null; nome: string | null }
@@ -316,29 +390,145 @@ router.patch("/trasferimenti/:id", async (req, res) => {
   res.json(result);
 });
 
+// Avvia: deduce le quantità dai lotti del magazzino origine (FEFO) e mette il
+// trasferimento "in_transito". Da qui in poi le righe non sono più modificabili.
 router.post("/trasferimenti/:id/avvia", async (req, res) => {
-  const [row] = await db.update(trasferimentiTable)
-    .set({ stato: "in_transito", dataEsecuzione: new Date().toISOString().split("T")[0], operatoreId: req.user!.id })
-    .where(eq(trasferimentiTable.id, parseInt(req.params.id)))
-    .returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  const result = await getTrasferimentoWithRighe(row.id);
+  const id = parseInt(req.params.id);
+  const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  if (current.stato !== "richiesto" && current.stato !== "preparato") {
+    res.status(400).json({ error: "Il trasferimento è già stato avviato" });
+    return;
+  }
+
+  const righe = await db.select().from(trasferimentoRigheTable).where(eq(trasferimentoRigheTable.trasferimentoId, id));
+  if (righe.length === 0) {
+    res.status(400).json({ error: "Il trasferimento non ha prodotti da trasferire" });
+    return;
+  }
+
+  // Nomi prodotto per messaggi di errore leggibili.
+  const prodottoIds = [...new Set(righe.map((r) => r.prodottoId))];
+  const prodotti = await db
+    .select({ id: prodottiTable.id, nome: prodottiTable.nome })
+    .from(prodottiTable)
+    .where(inArray(prodottiTable.id, prodottoIds));
+  const prodottoMap = new Map(prodotti.map((p) => [p.id, p.nome]));
+
+  // Valida la disponibilità all'origine sommando per prodotto.
+  const richiestaPerProdotto = new Map<number, number>();
+  for (const r of righe) {
+    richiestaPerProdotto.set(r.prodottoId, (richiestaPerProdotto.get(r.prodottoId) ?? 0) + parseFloat(r.quantita));
+  }
+  for (const [prodottoId, richiesta] of richiestaPerProdotto) {
+    const disp = await giacenzaDisponibile(prodottoId, current.magazzinoOrigineId);
+    if (richiesta > disp) {
+      res.status(400).json({
+        error: `Disponibilità insufficiente all'origine per ${prodottoMap.get(prodottoId) ?? `prodotto #${prodottoId}`}: ${disp} disponibili, richiesti ${richiesta}`,
+      });
+      return;
+    }
+  }
+
+  const dataEsecuzione = new Date().toISOString().split("T")[0];
+
+  await db.transaction(async (tx) => {
+    for (const r of righe) {
+      await trasferimentoUscitaFEFO(tx, {
+        prodottoId: r.prodottoId,
+        magazzinoId: current.magazzinoOrigineId,
+        quantita: parseFloat(r.quantita),
+        unitaMisura: r.unitaMisura,
+        dataMovimento: dataEsecuzione,
+        trasferimentoId: id,
+        trasferimentoCodice: current.codice,
+      });
+    }
+    await tx
+      .update(trasferimentiTable)
+      .set({ stato: "in_transito", dataEsecuzione, operatoreId: req.user!.id })
+      .where(eq(trasferimentiTable.id, id));
+  });
+
+  const result = await getTrasferimentoWithRighe(id);
   res.json(result);
 });
 
+// Conferma: aggiunge le quantità ricevute al magazzino destinazione come nuovi
+// lotti, ricostruiti dai movimenti di uscita per preservare scadenza/provenienza.
 router.post("/trasferimenti/:id/conferma", async (req, res) => {
-  const body = req.body;
-  const [row] = await db.update(trasferimentiTable)
-    .set({
-      stato: "completato",
-      dataConfermaRicezione: body.dataConferma ?? new Date().toISOString().split("T")[0],
-      note: body.note,
-      operatoreId: req.user!.id,
-    })
-    .where(eq(trasferimentiTable.id, parseInt(req.params.id)))
-    .returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  const result = await getTrasferimentoWithRighe(row.id);
+  const id = parseInt(req.params.id);
+  const body = req.body ?? {};
+  const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  if (current.stato !== "in_transito") {
+    res.status(400).json({ error: "Solo un trasferimento in transito può essere confermato" });
+    return;
+  }
+
+  const dataConferma = body.dataConferma ?? new Date().toISOString().split("T")[0];
+
+  await db.transaction(async (tx) => {
+    // I movimenti di uscita portano il lotto origine: lo si rilegge per copiare
+    // scadenza, codice lotto e provenienza nei lotti creati a destinazione.
+    const uscite = await tx
+      .select({ m: movimentiTable, lotto: lottiTable })
+      .from(movimentiTable)
+      .leftJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
+      .where(
+        and(
+          eq(movimentiTable.trasferimentoId, id),
+          eq(movimentiTable.tipoMovimento, "trasferimento"),
+          eq(movimentiTable.tipoDettaglio, "uscita"),
+        ),
+      );
+
+    for (const u of uscite) {
+      const qty = u.m.quantita;
+      const [destLotto] = await tx
+        .insert(lottiTable)
+        .values({
+          prodottoId: u.m.prodottoId,
+          codiceLotto: u.lotto?.codiceLotto ?? null,
+          dataScadenza: u.lotto?.dataScadenza ?? null,
+          dataCarico: dataConferma,
+          quantitaCaricata: qty,
+          quantitaResidua: qty,
+          magazzinoId: current.magazzinoDestinoId,
+          fornitoreId: u.lotto?.fornitoreId ?? null,
+          fsePlus: u.lotto?.fsePlus ?? false,
+          note: `Da trasferimento ${current.codice}`,
+        })
+        .returning();
+
+      await tx.insert(movimentiTable).values({
+        tipoMovimento: "trasferimento",
+        tipoDettaglio: "entrata",
+        dataMovimento: dataConferma,
+        magazzinoId: current.magazzinoDestinoId,
+        prodottoId: u.m.prodottoId,
+        lottoId: destLotto.id,
+        quantita: qty,
+        unitaMisura: u.m.unitaMisura,
+        fornitoreId: u.lotto?.fornitoreId ?? null,
+        trasferimentoId: id,
+        documentoRiferimento: current.codice,
+        note: `Trasferimento ${current.codice} — entrata`,
+      });
+    }
+
+    await tx
+      .update(trasferimentiTable)
+      .set({
+        stato: "completato",
+        dataConfermaRicezione: dataConferma,
+        note: body.note,
+        operatoreId: req.user!.id,
+      })
+      .where(eq(trasferimentiTable.id, id));
+  });
+
+  const result = await getTrasferimentoWithRighe(id);
   res.json(result);
 });
 

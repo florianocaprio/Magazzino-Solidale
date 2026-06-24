@@ -36,7 +36,7 @@ Gestionale per un magazzino solidale: tracciamento di prodotti/lotti (FEFO), CRM
 
 - Contract-first API: OpenAPI spec → Orval codegen → typed hooks + Zod schemas used in both FE and BE.
 - Stock (giacenze) is computed on-the-fly from `lotti.quantita_residua` aggregated per product+warehouse — no separate stock table.
-- Transfers are a 2-phase workflow: "avvia" deducts from origin lot, "conferma" confirms receipt at destination.
+- Transfers are a 2-phase workflow: "avvia" FEFO-deducts the righe quantities from origin lots (with availability validation) and logs `trasferimento/uscita` movimenti per origin lot; "conferma" rebuilds the goods as new lots at the destination (preserving each origin lot's scadenza/codiceLotto/fornitore/fsePlus via the uscita movimenti) and logs `trasferimento/entrata` movimenti. Both phases run inside `db.transaction`.
 - Delivery bills (`bolle`) get auto-incremented numeric codes in format `BOLLA-YYYY-NNNN`.
 - Beneficiary codice auto-generated from timestamp if not provided by caller.
 
