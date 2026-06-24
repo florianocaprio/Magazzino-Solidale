@@ -835,7 +835,12 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
               <TableBody>
                 {bolla.righe.map(r => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium text-sm">{r.prodottoNome ?? t("bolle.prodottoFallback", { id: r.prodottoId })}</TableCell>
+                    <TableCell className="font-medium text-sm">
+                      {r.prodottoNome ?? t("bolle.prodottoFallback", { id: r.prodottoId })}
+                      {r.fsePlus && (
+                        <span className="ml-1 font-bold text-primary" title={t("bolle.fsePlusTitle")}>*</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{r.codiceLotto ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono text-sm">{r.quantita} {r.unitaMisura}</TableCell>
                     {modificabile && (
@@ -855,6 +860,9 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
                 ))}
               </TableBody>
             </Table>
+            {bolla.righe.some(r => r.fsePlus) && (
+              <p className="mt-2 text-xs text-muted-foreground">{t("bolle.fsePlusLegend")}</p>
+            )}
           </div>
         )}
       </div>

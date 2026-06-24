@@ -132,9 +132,12 @@ async function getTrasferimentoWithRighe(id: number) {
   const righe = await db.select({
     r: trasferimentoRigheTable,
     prodottoNome: prodottiTable.nome,
+    lottoFsePlus: lottiTable.fsePlus,
+    prodottoFsePlus: prodottiTable.fsePlus,
   })
     .from(trasferimentoRigheTable)
     .leftJoin(prodottiTable, eq(trasferimentoRigheTable.prodottoId, prodottiTable.id))
+    .leftJoin(lottiTable, eq(trasferimentoRigheTable.lottoId, lottiTable.id))
     .where(eq(trasferimentoRigheTable.trasferimentoId, id));
 
   return {
@@ -165,6 +168,7 @@ async function getTrasferimentoWithRighe(id: number) {
       prodottoId: r.r.prodottoId,
       prodottoNome: r.prodottoNome ?? null,
       lottoId: r.r.lottoId ?? null,
+      fsePlus: r.r.lottoId ? !!r.lottoFsePlus : !!r.prodottoFsePlus,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: r.r.note ?? null,
@@ -208,15 +212,18 @@ router.get("/trasferimenti", async (req, res) => {
   const ids = rows.map(r => r.id);
   const righeByT = new Map<number, Array<{
     id: number; prodottoId: number; prodottoNome: string | null;
-    lottoId: number | null; quantita: number; unitaMisura: string; note: string | null;
+    lottoId: number | null; fsePlus: boolean; quantita: number; unitaMisura: string; note: string | null;
   }>>();
   if (ids.length > 0) {
     const righe = await db.select({
       r: trasferimentoRigheTable,
       prodottoNome: prodottiTable.nome,
+      lottoFsePlus: lottiTable.fsePlus,
+      prodottoFsePlus: prodottiTable.fsePlus,
     })
       .from(trasferimentoRigheTable)
       .leftJoin(prodottiTable, eq(trasferimentoRigheTable.prodottoId, prodottiTable.id))
+      .leftJoin(lottiTable, eq(trasferimentoRigheTable.lottoId, lottiTable.id))
       .where(inArray(trasferimentoRigheTable.trasferimentoId, ids));
     for (const x of righe) {
       const arr = righeByT.get(x.r.trasferimentoId) ?? [];
@@ -225,6 +232,7 @@ router.get("/trasferimenti", async (req, res) => {
         prodottoId: x.r.prodottoId,
         prodottoNome: x.prodottoNome ?? null,
         lottoId: x.r.lottoId ?? null,
+        fsePlus: x.r.lottoId ? !!x.lottoFsePlus : !!x.prodottoFsePlus,
         quantita: parseFloat(x.r.quantita),
         unitaMisura: x.r.unitaMisura,
         note: x.r.note ?? null,

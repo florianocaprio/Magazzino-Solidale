@@ -13,6 +13,7 @@ export interface TrasferimentoRiga {
   prodottoNome?: string | null;
   /** @nullable */
   lottoId?: number | null;
+  fsePlus: boolean;
   quantita: number;
   unitaMisura: string;
   /** @nullable */

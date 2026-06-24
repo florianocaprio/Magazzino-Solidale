@@ -11,6 +11,7 @@ export interface ScaricoRiga {
   prodottoId: number;
   /** @nullable */
   prodottoNome?: string | null;
+  fsePlus: boolean;
   quantita: number;
   unitaMisura: string;
   /** @nullable */

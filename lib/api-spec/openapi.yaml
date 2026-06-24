@@ -2626,13 +2626,15 @@ components:
           type: ["string", "null"]
         lottoId:
           type: ["integer", "null"]
+        fsePlus:
+          type: boolean
         quantita:
           type: number
         unitaMisura:
           type: string
         note:
           type: ["string", "null"]
-      required: [id, prodottoId, quantita, unitaMisura]
+      required: [id, prodottoId, quantita, unitaMisura, fsePlus]
 
     TrasferimentoRigaInput:
       type: object
@@ -2710,13 +2712,15 @@ components:
           type: integer
         prodottoNome:
           type: ["string", "null"]
+        fsePlus:
+          type: boolean
         quantita:
           type: number
         unitaMisura:
           type: string
         note:
           type: ["string", "null"]
-      required: [id, prodottoId, quantita, unitaMisura]
+      required: [id, prodottoId, quantita, unitaMisura, fsePlus]
 
     ScaricoRigaInput:
       type: object
@@ -3660,13 +3664,15 @@ components:
           type: ["integer", "null"]
         codiceLotto:
           type: ["string", "null"]
+        fsePlus:
+          type: boolean
         quantita:
           type: number
         unitaMisura:
           type: string
         note:
           type: ["string", "null"]
-      required: [id, bollaId, prodottoId, quantita, unitaMisura]
+      required: [id, bollaId, prodottoId, quantita, unitaMisura, fsePlus]
 
     BollaRigaInput:
       type: object

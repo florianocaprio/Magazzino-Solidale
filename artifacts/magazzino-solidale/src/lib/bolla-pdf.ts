@@ -242,7 +242,7 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     head: [["#", "Prodotto", "Lotto", "Quantità", "U.M."]],
     body: bolla.righe.map((r, i) => [
       String(i + 1),
-      r.prodottoNome ?? `Prodotto #${r.prodottoId}`,
+      `${r.prodottoNome ?? `Prodotto #${r.prodottoId}`}${r.fsePlus ? " *" : ""}`,
       r.codiceLotto ?? "—",
       String(r.quantita),
       r.unitaMisura,
@@ -273,6 +273,16 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     afterTableY,
     { align: "right" },
   );
+  if (bolla.righe.some(r => r.fsePlus)) {
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    doc.text(
+      "* Prodotto FSE+ (Fondo Sociale Europeo Plus)",
+      margin,
+      afterTableY,
+    );
+    doc.setTextColor(0, 0, 0);
+  }
 
   // ---- Signatures ----
   const pageH = doc.internal.pageSize.getHeight();

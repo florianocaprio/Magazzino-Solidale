@@ -146,7 +146,7 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
     head: [["#", "Prodotto", "Quantità", "U.M."]],
     body: righe.map((r, i) => [
       String(i + 1),
-      r.prodottoNome ?? `Prodotto #${r.prodottoId}`,
+      `${r.prodottoNome ?? `Prodotto #${r.prodottoId}`}${r.fsePlus ? " *" : ""}`,
       String(r.quantita),
       r.unitaMisura,
     ]),
@@ -167,6 +167,12 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
   doc.text(`Totale articoli: ${righe.length}`, pageW - margin, afterTableY, { align: "right" });
+  if (righe.some(r => r.fsePlus)) {
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    doc.text("* Prodotto FSE+ (Fondo Sociale Europeo Plus)", margin, afterTableY);
+    doc.setTextColor(0, 0, 0);
+  }
 
   if (t.note) {
     afterTableY += 8;

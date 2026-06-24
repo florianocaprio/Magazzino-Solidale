@@ -309,6 +309,7 @@ export interface TrasferimentoRiga {
   prodottoNome?: string | null;
   /** @nullable */
   lottoId?: number | null;
+  fsePlus: boolean;
   quantita: number;
   unitaMisura: string;
   /** @nullable */
@@ -394,6 +395,7 @@ export interface ScaricoRiga {
   prodottoId: number;
   /** @nullable */
   prodottoNome?: string | null;
+  fsePlus: boolean;
   quantita: number;
   unitaMisura: string;
   /** @nullable */
@@ -1031,6 +1033,7 @@ export interface BollaRiga {
   lottoId?: number | null;
   /** @nullable */
   codiceLotto?: string | null;
+  fsePlus: boolean;
   quantita: number;
   unitaMisura: string;
   /** @nullable */

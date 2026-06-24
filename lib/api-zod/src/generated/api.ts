@@ -492,6 +492,7 @@ export const ListTrasferimentiResponseItem = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -550,6 +551,7 @@ export const GetTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -605,6 +607,7 @@ export const UpdateTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -648,6 +651,7 @@ export const AvviaTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -696,6 +700,7 @@ export const ConfermaTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -719,6 +724,7 @@ export const ListScarichiResponseItem = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -762,6 +768,7 @@ export const GetScaricoResponse = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -1677,6 +1684,7 @@ export const GetBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -1733,6 +1741,7 @@ export const UpdateBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -1754,6 +1763,7 @@ export const ListBollaRigheResponseItem = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -1825,6 +1835,7 @@ export const ConfermaBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -1871,6 +1882,7 @@ export const AnnullaBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -1922,6 +1934,7 @@ export const ConsegnaBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()

@@ -146,6 +146,8 @@ async function buildDettaglio(id: number) {
       r: bollaRigheTable,
       prodottoNome: prodottiTable.nome,
       codiceLotto: lottiTable.codiceLotto,
+      lottoFsePlus: lottiTable.fsePlus,
+      prodottoFsePlus: prodottiTable.fsePlus,
     })
     .from(bollaRigheTable)
     .leftJoin(prodottiTable, eq(bollaRigheTable.prodottoId, prodottiTable.id))
@@ -185,6 +187,7 @@ async function buildDettaglio(id: number) {
       prodottoNome: r.prodottoNome ?? null,
       lottoId: r.r.lottoId ?? null,
       codiceLotto: r.codiceLotto ?? null,
+      fsePlus: r.r.lottoId ? !!r.lottoFsePlus : !!r.prodottoFsePlus,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: r.r.note ?? null,
@@ -542,6 +545,7 @@ router.post("/bolle/:id/righe", async (req, res) => {
     prodottoNome: prod?.nome ?? null,
     lottoId: riga.lottoId ?? null,
     codiceLotto: lotto?.codiceLotto ?? null,
+    fsePlus: riga.lottoId ? !!lotto?.fsePlus : !!prod?.fsePlus,
     quantita: parseFloat(riga.quantita),
     unitaMisura: riga.unitaMisura,
     note: riga.note ?? null,

@@ -32,7 +32,7 @@ async function getScaricoWithRighe(id: number) {
   if (!s) return null;
 
   const righe = await db
-    .select({ r: scaricoRigheTable, prodottoNome: prodottiTable.nome })
+    .select({ r: scaricoRigheTable, prodottoNome: prodottiTable.nome, prodottoFsePlus: prodottiTable.fsePlus })
     .from(scaricoRigheTable)
     .leftJoin(prodottiTable, eq(scaricoRigheTable.prodottoId, prodottiTable.id))
     .where(eq(scaricoRigheTable.scaricoId, id));
@@ -52,6 +52,7 @@ async function getScaricoWithRighe(id: number) {
       id: r.r.id,
       prodottoId: r.r.prodottoId,
       prodottoNome: r.prodottoNome ?? null,
+      fsePlus: !!r.prodottoFsePlus,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: r.r.note ?? null,
@@ -154,6 +155,7 @@ router.get("/scarichi", async (_req, res) => {
       id: number;
       prodottoId: number;
       prodottoNome: string | null;
+      fsePlus: boolean;
       quantita: number;
       unitaMisura: string;
       note: string | null;
@@ -161,7 +163,7 @@ router.get("/scarichi", async (_req, res) => {
   >();
   if (ids.length > 0) {
     const righe = await db
-      .select({ r: scaricoRigheTable, prodottoNome: prodottiTable.nome })
+      .select({ r: scaricoRigheTable, prodottoNome: prodottiTable.nome, prodottoFsePlus: prodottiTable.fsePlus })
       .from(scaricoRigheTable)
       .leftJoin(prodottiTable, eq(scaricoRigheTable.prodottoId, prodottiTable.id))
       .where(inArray(scaricoRigheTable.scaricoId, ids));
@@ -171,6 +173,7 @@ router.get("/scarichi", async (_req, res) => {
         id: x.r.id,
         prodottoId: x.r.prodottoId,
         prodottoNome: x.prodottoNome ?? null,
+        fsePlus: !!x.prodottoFsePlus,
         quantita: parseFloat(x.r.quantita),
         unitaMisura: x.r.unitaMisura,
         note: x.r.note ?? null,
