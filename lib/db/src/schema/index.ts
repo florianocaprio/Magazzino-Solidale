@@ -14,3 +14,4 @@ export * from "./trasferimenti";
 export * from "./scarichi";
 export * from "./approvvigionamenti";
 export * from "./impostazioni";
+export * from "./auth";
