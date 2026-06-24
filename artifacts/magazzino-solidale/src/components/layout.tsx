@@ -63,8 +63,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <div className="flex h-screen w-full bg-background overflow-hidden">
         <Sidebar className="border-r border-border">
-          <div className="p-4 flex items-center justify-between border-b border-border">
-            <span className="font-semibold text-lg text-primary tracking-tight">AIM Solidale</span>
+          <div className="px-4 py-3 flex items-center border-b border-border">
+            <img src="/logo-aim.png" alt="Angeli in Moto" className="h-8 w-auto object-contain" />
           </div>
           <SidebarContent>
             {Object.entries(groupedNav).map(([group, items]) => (
