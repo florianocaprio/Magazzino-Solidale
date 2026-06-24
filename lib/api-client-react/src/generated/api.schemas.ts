@@ -319,6 +319,59 @@ export interface TrasferimentoUpdate {
   note?: string;
 }
 
+export interface ScaricoRiga {
+  id: number;
+  prodottoId: number;
+  /** @nullable */
+  prodottoNome?: string | null;
+  quantita: number;
+  unitaMisura: string;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface Scarico {
+  id: number;
+  codice: string;
+  magazzinoId: number;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  dataScarico: string;
+  causale: string;
+  /** @nullable */
+  causaleAltro?: string | null;
+  /** @nullable */
+  note?: string | null;
+  righe?: ScaricoRiga[];
+  dataCreazione: string;
+}
+
+export type ScaricoInputCausale = typeof ScaricoInputCausale[keyof typeof ScaricoInputCausale];
+
+
+export const ScaricoInputCausale = {
+  deteriorata: 'deteriorata',
+  rubata: 'rubata',
+  scaduta: 'scaduta',
+  altro: 'altro',
+} as const;
+
+export interface ScaricoRigaInput {
+  prodottoId: number;
+  quantita: number;
+  unitaMisura: string;
+  note?: string;
+}
+
+export interface ScaricoInput {
+  magazzinoId: number;
+  dataScarico: string;
+  causale: ScaricoInputCausale;
+  causaleAltro?: string;
+  note?: string;
+  righe: ScaricoRigaInput[];
+}
+
 export interface ConfermaRicezione {
   note?: string;
   dataConferma?: string;

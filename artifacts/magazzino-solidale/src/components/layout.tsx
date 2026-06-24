@@ -3,6 +3,7 @@ import {
   LayoutDashboard, 
   Warehouse, 
   Package, 
+  PackageMinus,
   Boxes, 
   ArrowRightLeft, 
   TrendingUpDown,
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { title: "Movimenti", url: "/movimenti", icon: ArrowRightLeft, group: "Magazzino" },
   { title: "Giacenze", url: "/giacenze", icon: TrendingUpDown, group: "Magazzino" },
   { title: "Trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, group: "Magazzino" },
+  { title: "Scarichi", url: "/scarichi", icon: PackageMinus, group: "Magazzino" },
   
   { title: "Centri di Ascolto", url: "/centri-ascolto", icon: Building2, group: "Sociale" },
   { title: "Beneficiari", url: "/beneficiari", icon: Users, group: "Sociale" },

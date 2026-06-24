@@ -11,5 +11,6 @@ export * from "./interventi";
 export * from "./consegne";
 export * from "./bolle";
 export * from "./trasferimenti";
+export * from "./scarichi";
 export * from "./approvvigionamenti";
 export * from "./impostazioni";

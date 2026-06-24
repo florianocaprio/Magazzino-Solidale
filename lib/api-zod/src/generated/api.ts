@@ -626,6 +626,68 @@ export const ConfermaTrasferimentoResponse = zod.object({
 })
 
 
+export const ListScarichiResponseItem = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "dataScarico": zod.string(),
+  "causale": zod.string(),
+  "causaleAltro": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})
+export const ListScarichiResponse = zod.array(ListScarichiResponseItem)
+
+
+export const CreateScaricoBody = zod.object({
+  "magazzinoId": zod.number(),
+  "dataScarico": zod.string(),
+  "causale": zod.enum(['deteriorata', 'rubata', 'scaduta', 'altro']),
+  "causaleAltro": zod.string().optional(),
+  "note": zod.string().optional(),
+  "righe": zod.array(zod.object({
+  "prodottoId": zod.number(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().optional()
+}))
+})
+
+
+export const GetScaricoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetScaricoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "dataScarico": zod.string(),
+  "causale": zod.string(),
+  "causaleAltro": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})
+
+
 export const ListFornitoriQueryParams = zod.object({
   "centroAscoltoId": zod.coerce.number().optional()
 })

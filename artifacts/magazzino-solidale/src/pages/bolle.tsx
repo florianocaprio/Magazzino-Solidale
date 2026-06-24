@@ -17,10 +17,12 @@ import {
   useListVolontari,
   useGetImpostazioniStampa,
   useListTrasferimenti,
+  useListScarichi,
   getListBolleQueryKey,
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
   type Trasferimento,
+  type Scarico,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,11 +41,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, Trash2, PackagePlus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowRightLeft } from "lucide-react";
+import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { generateBollaPdf, loadAssociationLogo, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
+import { generateScaricoPdf, causaleLabel } from "@/lib/scarico-pdf";
 
 function statoBadge(stato: string) {
   if (stato === "consegnato") return <Badge className="bg-green-500 text-white">Consegnato</Badge>;
@@ -787,11 +790,13 @@ function trasferimentoStatoBadge(stato: string) {
 export default function Bolle() {
   const { data: bolle, isLoading } = useListBolle();
   const { data: trasferimenti, isLoading: loadingTrasf } = useListTrasferimenti();
+  const { data: scarichi, isLoading: loadingScar } = useListScarichi();
   const { data: impostazioni } = useGetImpostazioniStampa();
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedBollaId, setSelectedBollaId] = useState<number | null>(null);
   const [downloadingTrasfId, setDownloadingTrasfId] = useState<number | null>(null);
+  const [downloadingScarId, setDownloadingScarId] = useState<number | null>(null);
 
   const downloadTrasf = async (e: React.MouseEvent, t: Trasferimento) => {
     e.stopPropagation();
@@ -810,16 +815,35 @@ export default function Bolle() {
     }
   };
 
+  const downloadScar = async (e: React.MouseEvent, s: Scarico) => {
+    e.stopPropagation();
+    setDownloadingScarId(s.id);
+    try {
+      const associationLogoDataUrl = await loadAssociationLogo();
+      await generateScaricoPdf({
+        scarico: s,
+        footer: impostazioni?.footerBolla ?? null,
+        associationLogoDataUrl,
+      });
+    } catch {
+      toast({ title: "Errore", description: "Impossibile generare la bolla.", variant: "destructive" });
+    } finally {
+      setDownloadingScarId(null);
+    }
+  };
+
   type Row =
     | { kind: "bolla"; date: string; bolla: NonNullable<typeof bolle>[number] }
-    | { kind: "trasf"; date: string; trasf: Trasferimento };
+    | { kind: "trasf"; date: string; trasf: Trasferimento }
+    | { kind: "scar"; date: string; scar: Scarico };
 
   const rows: Row[] = [
     ...(bolle ?? []).map((b): Row => ({ kind: "bolla", date: b.dataBolla, bolla: b })),
     ...(trasferimenti ?? []).map((t): Row => ({ kind: "trasf", date: t.dataRichiesta, trasf: t })),
+    ...(scarichi ?? []).map((s): Row => ({ kind: "scar", date: s.dataScarico, scar: s })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const loading = isLoading || loadingTrasf;
+  const loading = isLoading || loadingTrasf || loadingScar;
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -861,7 +885,45 @@ export default function Bolle() {
                     Nessuna bolla emessa. Crea la prima bolla con il pulsante in alto a destra.
                   </TableCell>
                 </TableRow>
-              ) : rows.map(row => row.kind === "bolla" ? (
+              ) : rows.map(row => row.kind === "scar" ? (
+                <TableRow key={`s-${row.scar.id}`} className="hover:bg-muted/40">
+                  <TableCell className="font-mono text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <PackageMinus className="h-4 w-4 text-red-600" />
+                      {row.scar.codice}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {format(new Date(row.scar.dataScarico), "dd MMM yyyy", { locale: it })}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                      Scarico Magazzino
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <span>{row.scar.magazzinoNome ?? "—"}</span>
+                      <span className="text-muted-foreground/60">·</span>
+                      <span>{causaleLabel(row.scar)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="secondary">{row.scar.righe?.length ?? 0} art.</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={(e) => downloadScar(e, row.scar)}
+                      disabled={downloadingScarId === row.scar.id}
+                    >
+                      <Download className="h-3.5 w-3.5" /> Bolla
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ) : row.kind === "bolla" ? (
                 <TableRow
                   key={`b-${row.bolla.id}`}
                   className="cursor-pointer hover:bg-muted/40"

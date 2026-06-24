@@ -86,6 +86,8 @@ import type {
   ProdottoInput,
   ProdottoUpdate,
   ReportConsegnePerMeseParams,
+  Scarico,
+  ScaricoInput,
   Trasferimento,
   TrasferimentoInput,
   TrasferimentoUpdate,
@@ -2035,6 +2037,213 @@ export const useConfermaTrasferimento = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getConfermaTrasferimentoMutationOptions(options));
     }
+
+export const getListScarichiUrl = () => {
+
+
+
+
+  return `/api/scarichi`
+}
+
+export const listScarichi = async ( options?: RequestInit): Promise<Scarico[]> => {
+
+  return customFetch<Scarico[]>(getListScarichiUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListScarichiQueryKey = () => {
+    return [
+    `/api/scarichi`
+    ] as const;
+    }
+
+
+export const getListScarichiQueryOptions = <TData = Awaited<ReturnType<typeof listScarichi>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listScarichi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListScarichiQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listScarichi>>> = ({ signal }) => listScarichi({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listScarichi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListScarichiQueryResult = NonNullable<Awaited<ReturnType<typeof listScarichi>>>
+export type ListScarichiQueryError = ErrorType<unknown>
+
+
+
+export function useListScarichi<TData = Awaited<ReturnType<typeof listScarichi>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listScarichi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListScarichiQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateScaricoUrl = () => {
+
+
+
+
+  return `/api/scarichi`
+}
+
+export const createScarico = async (scaricoInput: ScaricoInput, options?: RequestInit): Promise<Scarico> => {
+
+  return customFetch<Scarico>(getCreateScaricoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      scaricoInput,)
+  }
+);}
+
+
+
+
+export const getCreateScaricoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createScarico>>, TError,{data: BodyType<ScaricoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createScarico>>, TError,{data: BodyType<ScaricoInput>}, TContext> => {
+
+const mutationKey = ['createScarico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createScarico>>, {data: BodyType<ScaricoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createScarico(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateScaricoMutationResult = NonNullable<Awaited<ReturnType<typeof createScarico>>>
+    export type CreateScaricoMutationBody = BodyType<ScaricoInput>
+    export type CreateScaricoMutationError = ErrorType<unknown>
+
+    export const useCreateScarico = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createScarico>>, TError,{data: BodyType<ScaricoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createScarico>>,
+        TError,
+        {data: BodyType<ScaricoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateScaricoMutationOptions(options));
+    }
+
+export const getGetScaricoUrl = (id: number,) => {
+
+
+
+
+  return `/api/scarichi/${id}`
+}
+
+export const getScarico = async (id: number, options?: RequestInit): Promise<Scarico> => {
+
+  return customFetch<Scarico>(getGetScaricoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScaricoQueryKey = (id: number,) => {
+    return [
+    `/api/scarichi/${id}`
+    ] as const;
+    }
+
+
+export const getGetScaricoQueryOptions = <TData = Awaited<ReturnType<typeof getScarico>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScarico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScaricoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScarico>>> = ({ signal }) => getScarico(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScarico>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScaricoQueryResult = NonNullable<Awaited<ReturnType<typeof getScarico>>>
+export type GetScaricoQueryError = ErrorType<unknown>
+
+
+
+export function useGetScarico<TData = Awaited<ReturnType<typeof getScarico>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScarico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScaricoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListFornitoriUrl = (params?: ListFornitoriParams,) => {
   const normalizedParams = new URLSearchParams();

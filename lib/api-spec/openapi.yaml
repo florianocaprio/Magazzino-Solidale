@@ -15,6 +15,7 @@ tags:
   - name: movimenti
   - name: giacenze
   - name: trasferimenti
+  - name: scarichi
   - name: fornitori
   - name: approvvigionamenti
   - name: beneficiari
@@ -536,6 +537,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Trasferimento"
+
+  /scarichi:
+    get:
+      operationId: listScarichi
+      tags: [scarichi]
+      responses:
+        "200":
+          description: List of warehouse discharges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Scarico"
+    post:
+      operationId: createScarico
+      tags: [scarichi]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScaricoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scarico"
+
+  /scarichi/{id}:
+    get:
+      operationId: getScarico
+      tags: [scarichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Discharge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scarico"
 
   # ─── FORNITORI ───────────────────────────────────────────────────────────────
   /fornitori:
@@ -2115,6 +2164,84 @@ components:
         prodottoId:
           type: integer
         lottoId:
+          type: integer
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        note:
+          type: string
+      required: [prodottoId, quantita, unitaMisura]
+
+    # ── Scarichi ──────────────────────────────────────────────────────────
+    Scarico:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        magazzinoId:
+          type: integer
+        magazzinoNome:
+          type: ["string", "null"]
+        dataScarico:
+          type: string
+        causale:
+          type: string
+        causaleAltro:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScaricoRiga"
+        dataCreazione:
+          type: string
+      required: [id, codice, magazzinoId, dataScarico, causale, dataCreazione]
+
+    ScaricoInput:
+      type: object
+      properties:
+        magazzinoId:
+          type: integer
+        dataScarico:
+          type: string
+        causale:
+          type: string
+          enum: [deteriorata, rubata, scaduta, altro]
+        causaleAltro:
+          type: string
+        note:
+          type: string
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScaricoRigaInput"
+      required: [magazzinoId, dataScarico, causale, righe]
+
+    ScaricoRiga:
+      type: object
+      properties:
+        id:
+          type: integer
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: ["string", "null"]
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        note:
+          type: ["string", "null"]
+      required: [id, prodottoId, quantita, unitaMisura]
+
+    ScaricoRigaInput:
+      type: object
+      properties:
+        prodottoId:
           type: integer
         quantita:
           type: number
