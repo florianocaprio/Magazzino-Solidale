@@ -1432,7 +1432,9 @@ export const AssociaBollaResponse = zod.object({
 
 
 export const ListBolleQueryParams = zod.object({
-  "stato": zod.coerce.string().optional()
+  "stato": zod.coerce.string().optional(),
+  "magazzinoId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional()
 })
 
 export const ListBolleResponseItem = zod.object({

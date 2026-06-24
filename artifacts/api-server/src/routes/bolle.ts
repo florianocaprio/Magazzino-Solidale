@@ -287,9 +287,19 @@ async function stornoRiga(riga: { id: number }, bollaId: number) {
 // ─── LIST ────────────────────────────────────────────────────────────────────
 
 router.get("/bolle", async (req, res) => {
-  const { stato } = req.query as Record<string, string>;
+  const { stato, magazzinoId, centroAscoltoId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(bolleTable.stato, stato));
+  if (magazzinoId) {
+    const mid = Number(magazzinoId);
+    if (!Number.isInteger(mid)) { res.status(400).json({ error: "magazzinoId non valido" }); return; }
+    conditions.push(eq(bolleTable.magazzinoId, mid));
+  }
+  if (centroAscoltoId) {
+    const cid = Number(centroAscoltoId);
+    if (!Number.isInteger(cid)) { res.status(400).json({ error: "centroAscoltoId non valido" }); return; }
+    conditions.push(eq(beneficiariTable.centroAscoltoId, cid));
+  }
 
   const rows = await db
     .select({

@@ -788,9 +788,19 @@ function trasferimentoStatoBadge(stato: string) {
 }
 
 export default function Bolle() {
-  const { data: bolle, isLoading } = useListBolle();
+  const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
+  const [filterCentroId, setFilterCentroId] = useState("all");
+
+  const bolleParams: { magazzinoId?: number; centroAscoltoId?: number } = {};
+  if (filterMagazzinoId !== "all") bolleParams.magazzinoId = parseInt(filterMagazzinoId);
+  if (filterCentroId !== "all") bolleParams.centroAscoltoId = parseInt(filterCentroId);
+  const hasBolleParams = Object.keys(bolleParams).length > 0;
+
+  const { data: bolle, isLoading } = useListBolle(hasBolleParams ? bolleParams : undefined);
   const { data: trasferimenti, isLoading: loadingTrasf } = useListTrasferimenti();
   const { data: scarichi, isLoading: loadingScar } = useListScarichi();
+  const { data: centri } = useListCentriAscolto();
+  const { data: magazzini } = useListMagazzini();
   const { data: impostazioni } = useGetImpostazioniStampa();
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
@@ -837,11 +847,26 @@ export default function Bolle() {
     | { kind: "trasf"; date: string; trasf: Trasferimento }
     | { kind: "scar"; date: string; scar: Scarico };
 
+  const magId = filterMagazzinoId !== "all" ? parseInt(filterMagazzinoId) : null;
+  // Trasferimenti e scarichi non hanno un centro di ascolto: se è attivo quel
+  // filtro li nascondiamo; il filtro magazzino invece si applica anche a loro.
+  const showInterni = filterCentroId === "all";
+  const trasfFiltered = showInterni
+    ? (trasferimenti ?? []).filter(
+        (t) => magId === null || t.magazzinoOrigineId === magId || t.magazzinoDestinoId === magId,
+      )
+    : [];
+  const scarFiltered = showInterni
+    ? (scarichi ?? []).filter((s) => magId === null || s.magazzinoId === magId)
+    : [];
+
   const rows: Row[] = [
     ...(bolle ?? []).map((b): Row => ({ kind: "bolla", date: b.dataBolla, bolla: b })),
-    ...(trasferimenti ?? []).map((t): Row => ({ kind: "trasf", date: t.dataRichiesta, trasf: t })),
-    ...(scarichi ?? []).map((s): Row => ({ kind: "scar", date: s.dataScarico, scar: s })),
+    ...trasfFiltered.map((t): Row => ({ kind: "trasf", date: t.dataRichiesta, trasf: t })),
+    ...scarFiltered.map((s): Row => ({ kind: "scar", date: s.dataScarico, scar: s })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const filtersActive = filterMagazzinoId !== "all" || filterCentroId !== "all";
 
   const loading = isLoading || loadingTrasf || loadingScar;
 
@@ -855,6 +880,46 @@ export default function Bolle() {
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" /> Nuova Bolla
         </Button>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Magazzino</Label>
+          <Select value={filterMagazzinoId} onValueChange={setFilterMagazzinoId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Tutti i magazzini" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti i magazzini</SelectItem>
+              {(magazzini ?? []).map((m) => (
+                <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Centro di Ascolto</Label>
+          <Select value={filterCentroId} onValueChange={setFilterCentroId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Tutti i centri" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti i centri</SelectItem>
+              {(centri ?? []).map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {filtersActive && (
+          <Button
+            variant="ghost"
+            className="gap-1.5 text-muted-foreground"
+            onClick={() => { setFilterMagazzinoId("all"); setFilterCentroId("all"); }}
+          >
+            <XCircle className="h-4 w-4" /> Azzera filtri
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -882,7 +947,9 @@ export default function Bolle() {
               ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    Nessuna bolla emessa. Crea la prima bolla con il pulsante in alto a destra.
+                    {filtersActive
+                      ? "Nessun documento corrisponde ai filtri selezionati."
+                      : "Nessuna bolla emessa. Crea la prima bolla con il pulsante in alto a destra."}
                   </TableCell>
                 </TableRow>
               ) : rows.map(row => row.kind === "scar" ? (

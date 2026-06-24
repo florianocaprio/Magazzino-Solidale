@@ -1151,6 +1151,8 @@ centroAscoltoId?: number;
 
 export type ListBolleParams = {
 stato?: string;
+magazzinoId?: number;
+centroAscoltoId?: number;
 };
 
 export type ReportConsegnePerMeseParams = {

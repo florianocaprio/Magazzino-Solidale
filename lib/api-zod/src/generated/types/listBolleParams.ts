@@ -8,4 +8,6 @@
 
 export type ListBolleParams = {
 stato?: string;
+magazzinoId?: number;
+centroAscoltoId?: number;
 };
