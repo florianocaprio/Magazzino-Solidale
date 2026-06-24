@@ -36,4 +36,4 @@ Two layers, intentionally paired:
 
 ## Forced password change is a BACKEND boundary
 `mustChangePassword` is enforced server-side by `requirePasswordChange` (mounted right after `requireAuth` in routes/index.ts), not just by the FE ChangePassword screen. While the flag is true it 403s every protected route, allowing only `/auth/me`, `/auth/change-password`, `/auth/logout`.
-**Why:** the seed admin ships with a KNOWN credential (`admin`/`flocap!`) + `mustChangePassword=true`; FE-only gating let a scripted client log in and call business APIs without ever rotating it. Frontend gating is UX; the middleware is the real boundary. Keep the allowlist in sync if auth self-service routes change.
+**Why:** the seed admin ships with a known bootstrap credential (set by `lib/seedAdmin.ts`) + `mustChangePassword=true`; FE-only gating let a scripted client log in and call business APIs without ever rotating it. Frontend gating is UX; the middleware is the real boundary. Keep the allowlist in sync if auth self-service routes change.
