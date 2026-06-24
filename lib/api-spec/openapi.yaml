@@ -1065,11 +1065,11 @@ paths:
             type: integer
       responses:
         "200":
-          description: Bill
+          description: Bill with righe
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Bolla"
+                $ref: "#/components/schemas/BollaDettaglio"
     patch:
       operationId: updateBolla
       tags: [bolle]
@@ -1091,7 +1091,115 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Bolla"
+                $ref: "#/components/schemas/BollaDettaglio"
+
+  /bolle/{id}/righe:
+    get:
+      operationId: listBollaRighe
+      tags: [bolle]
+      summary: Get product lines for a bolla
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BollaRiga"
+    post:
+      operationId: addBollaRiga
+      tags: [bolle]
+      summary: Add a product line to a bolla
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BollaRigaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BollaRiga"
+
+  /bolle/{id}/righe/{rigaId}:
+    delete:
+      operationId: deleteBollaRiga
+      tags: [bolle]
+      summary: Remove a product line from a bolla
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: rigaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /bolle/{id}/conferma:
+    post:
+      operationId: confermaBolla
+      tags: [bolle]
+      summary: Confirm bolla - move from bozza to confermato
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BollaDettaglio"
+
+  /bolle/{id}/consegna:
+    post:
+      operationId: consegnaBolla
+      tags: [bolle]
+      summary: Mark bolla as delivered - move from confermato to consegnato
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsegnaRicezioneInput"
+      responses:
+        "200":
+          description: Delivered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BollaDettaglio"
 
   # ─── VOLONTARI ───────────────────────────────────────────────────────────────
   /volontari:
