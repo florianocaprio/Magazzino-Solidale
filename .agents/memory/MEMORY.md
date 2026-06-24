@@ -11,3 +11,4 @@
 - [Scarichi (warehouse discharge)](scarichi-warehouse-discharge.md) — discharge IS its own bolla; FEFO decrement; create is wrapped in db.transaction (the one exception to "no transactions"); unitaMisura derived server-side from product.
 - [Auth, sessions & area RBAC](auth-session-rbac.md) — SameSite=None cookie+CSRF guard are a package; connect-pg-simple session table needs manual Drizzle def; last-admin lockout has user AND role vectors; nav hiding is not the boundary.
 - [FSE+ end-of-year report](fse-plus-report.md) — counts ALL household members (titolare+nucleo); area_provenienza is family-level; null birthdate counts in M/F totals but not adulti/minori; delivered = bolla confermata/consegnata + lotti.fse_plus.
+- [Bolla trasportatore & PDF addresses](bolla-trasportatore.md) — bolla transporter is volontarioConsegnaId XOR free-text trasportatoreNome; BollaDettaglio joins magazzini+beneficiari so PDF shows warehouse/recipient addresses + transporter line.

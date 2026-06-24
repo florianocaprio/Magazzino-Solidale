@@ -3483,6 +3483,8 @@ components:
           type: ["string", "null"]
         volontarioConsegnaId:
           type: ["integer", "null"]
+        trasportatoreNome:
+          type: ["string", "null"]
         mezzoId:
           type: ["integer", "null"]
         stato:
@@ -3521,6 +3523,16 @@ components:
         volontarioConsegnaId:
           type: ["integer", "null"]
         volontarioNome:
+          type: ["string", "null"]
+        magazzinoIndirizzo:
+          type: ["string", "null"]
+        magazzinoComune:
+          type: ["string", "null"]
+        beneficiarioIndirizzo:
+          type: ["string", "null"]
+        beneficiarioTelefono:
+          type: ["string", "null"]
+        trasportatoreNome:
           type: ["string", "null"]
         mezzoId:
           type: ["integer", "null"]
@@ -3599,6 +3611,8 @@ components:
           type: string
         volontarioConsegnaId:
           type: integer
+        trasportatoreNome:
+          type: string
         mezzoId:
           type: integer
         noteConsegna:
@@ -3616,6 +3630,8 @@ components:
           type: integer
         volontarioConsegnaId:
           type: ["integer", "null"]
+        trasportatoreNome:
+          type: ["string", "null"]
         mezzoId:
           type: ["integer", "null"]
         indirizzoConsegna:

@@ -23,6 +23,8 @@ export interface Bolla {
   /** @nullable */
   volontarioConsegnaId?: number | null;
   /** @nullable */
+  trasportatoreNome?: string | null;
+  /** @nullable */
   mezzoId?: number | null;
   stato: string;
   /** @nullable */

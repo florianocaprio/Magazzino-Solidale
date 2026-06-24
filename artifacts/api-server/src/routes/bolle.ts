@@ -119,7 +119,13 @@ async function buildDettaglio(id: number) {
       b: bolleTable,
       cognome: beneficiariTable.cognome,
       nome: beneficiariTable.nome,
+      benefResidenza: beneficiariTable.residenza,
+      benefDomicilio: beneficiariTable.domicilio,
+      benefComune: beneficiariTable.comune,
+      benefTelefono: beneficiariTable.telefono,
       magazzinoNome: magazziniTable.nome,
+      magazzinoIndirizzo: magazziniTable.indirizzo,
+      magazzinoComune: magazziniTable.comune,
       volontarioNome: volontariTable.nome,
       volontarioCognome: volontariTable.cognome,
     })
@@ -151,10 +157,15 @@ async function buildDettaglio(id: number) {
     consegnaId: row.b.consegnaId ?? null,
     magazzinoId: row.b.magazzinoId,
     magazzinoNome: row.magazzinoNome ?? null,
+    magazzinoIndirizzo: row.magazzinoIndirizzo ?? null,
+    magazzinoComune: row.magazzinoComune ?? null,
     indirizzoConsegna: row.b.indirizzoConsegna ?? null,
+    beneficiarioIndirizzo: row.benefDomicilio ?? row.benefResidenza ?? row.benefComune ?? null,
+    beneficiarioTelefono: row.benefTelefono ?? null,
     volontarioConsegnaId: row.b.volontarioConsegnaId ?? null,
     volontarioNome: row.volontarioNome && row.volontarioCognome
       ? `${row.volontarioCognome} ${row.volontarioNome}` : null,
+    trasportatoreNome: row.b.trasportatoreNome ?? null,
     mezzoId: row.b.mezzoId ?? null,
     stato: row.b.stato,
     noteConsegna: row.b.noteConsegna ?? null,
@@ -326,6 +337,7 @@ router.get("/bolle", async (req, res) => {
     magazzinoNome: r.magazzinoNome ?? null,
     indirizzoConsegna: r.b.indirizzoConsegna ?? null,
     volontarioConsegnaId: r.b.volontarioConsegnaId ?? null,
+    trasportatoreNome: r.b.trasportatoreNome ?? null,
     mezzoId: r.b.mezzoId ?? null,
     stato: r.b.stato,
     noteConsegna: r.b.noteConsegna ?? null,
@@ -339,6 +351,10 @@ router.get("/bolle", async (req, res) => {
 
 router.post("/bolle", async (req, res) => {
   const body = req.body;
+  if (body.volontarioConsegnaId != null && body.trasportatoreNome != null) {
+    res.status(400).json({ error: "Indicare un volontario OPPURE un trasportatore esterno, non entrambi" });
+    return;
+  }
   const anno = new Date().getFullYear();
   const existing = await db.select({ n: bolleTable.numeroBolla }).from(bolleTable).orderBy(desc(bolleTable.id)).limit(1);
   const lastNum = existing.length > 0 ? parseInt(existing[0].n.split("-").pop() ?? "0") : 0;
@@ -374,6 +390,14 @@ router.patch("/bolle/:id", async (req, res) => {
     return;
   }
   delete body.stato;
+
+  // trasportatore: volontario OPPURE nome esterno, mai entrambi (coerente col POST e con la UI)
+  const nextVolontario = body.volontarioConsegnaId !== undefined ? body.volontarioConsegnaId : bolla.volontarioConsegnaId;
+  const nextTrasportatore = body.trasportatoreNome !== undefined ? body.trasportatoreNome : bolla.trasportatoreNome;
+  if (nextVolontario != null && nextTrasportatore != null) {
+    res.status(400).json({ error: "Indicare un volontario OPPURE un trasportatore esterno, non entrambi" });
+    return;
+  }
 
   // cambio magazzino: consentito solo in bozza (nessuno scarico ancora effettuato).
   // Le righe esistenti fanno riferimento alle giacenze/lotti del vecchio magazzino,

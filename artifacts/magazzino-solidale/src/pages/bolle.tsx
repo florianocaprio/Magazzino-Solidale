@@ -61,19 +61,33 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [beneficiarioId, setBeneficiarioId] = useState("");
   const [magazzinoId, setMagazzinoId] = useState("");
   const [centroId, setCentroId] = useState("all");
+  const [trasportatore, setTrasportatore] = useState("");
+  const [trasportatoreNome, setTrasportatoreNome] = useState("");
   const { data: centri } = useListCentriAscolto();
   const { data: beneficiari } = useListBeneficiari(
     centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : undefined
   );
   const { data: magazzini } = useListMagazzini();
+  const { data: volontari } = useListVolontari();
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const onSubmit = () => {
     if (!beneficiarioId || !magazzinoId) return;
+    const data: {
+      beneficiarioId: number;
+      magazzinoId: number;
+      volontarioConsegnaId?: number;
+      trasportatoreNome?: string;
+    } = { beneficiarioId: parseInt(beneficiarioId), magazzinoId: parseInt(magazzinoId) };
+    if (trasportatore === "__altro__") {
+      data.trasportatoreNome = trasportatoreNome.trim() || "Ritiro presso il magazzino";
+    } else if (trasportatore) {
+      data.volontarioConsegnaId = parseInt(trasportatore);
+    }
     createBolla.mutate(
-      { data: { beneficiarioId: parseInt(beneficiarioId), magazzinoId: parseInt(magazzinoId) } },
+      { data },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
@@ -81,6 +95,8 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
           setBeneficiarioId("");
           setMagazzinoId("");
           setCentroId("all");
+          setTrasportatore("");
+          setTrasportatoreNome("");
           onClose();
         },
         onError: () => toast({ title: "Errore", description: "Impossibile creare la bolla", variant: "destructive" }),
@@ -128,6 +144,25 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Trasportatore</Label>
+            <Select value={trasportatore} onValueChange={setTrasportatore}>
+              <SelectTrigger><SelectValue placeholder="Seleziona trasportatore..." /></SelectTrigger>
+              <SelectContent>
+                {volontari?.filter(v => v.attivo).map(v => (
+                  <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
+                ))}
+                <SelectItem value="__altro__">Altro (ritiro a mano presso il magazzino)</SelectItem>
+              </SelectContent>
+            </Select>
+            {trasportatore === "__altro__" && (
+              <Input
+                placeholder="Nome trasportatore (opzionale)"
+                value={trasportatoreNome}
+                onChange={(e) => setTrasportatoreNome(e.target.value)}
+              />
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -449,10 +484,14 @@ function BollaDettaglio({ bollaId }: { bollaId: number }) {
   };
 
   const onChangeVolontario = (value: string) => {
+    const data =
+      value === "__centro__"
+        ? { volontarioConsegnaId: null, trasportatoreNome: null, noteConsegna: "Consegna presso il centro" }
+        : value === "__altro__"
+          ? { volontarioConsegnaId: null, trasportatoreNome: "Ritiro presso il magazzino", noteConsegna: null }
+          : { volontarioConsegnaId: parseInt(value), trasportatoreNome: null, noteConsegna: null };
     updateBolla.mutate(
-      { id: bollaId, data: value === "__centro__"
-        ? { volontarioConsegnaId: null, noteConsegna: "Consegna presso il centro" }
-        : { volontarioConsegnaId: parseInt(value) } },
+      { id: bollaId, data },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
@@ -462,6 +501,24 @@ function BollaDettaglio({ bollaId }: { bollaId: number }) {
       }
     );
   };
+
+  const onChangeTrasportatoreNome = (value: string) => {
+    updateBolla.mutate(
+      { id: bollaId, data: { trasportatoreNome: value.trim() || "Ritiro presso il magazzino" } },
+      {
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) }),
+        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Impossibile aggiornare"), variant: "destructive" }),
+      }
+    );
+  };
+
+  const consegnaValue = bolla?.volontarioConsegnaId
+    ? String(bolla.volontarioConsegnaId)
+    : bolla?.trasportatoreNome
+      ? "__altro__"
+      : bolla?.noteConsegna
+        ? "__centro__"
+        : "";
 
   const openPrint = () => {
     setPrintTemplate((impostazioni?.templateBolla as BollaTemplate) ?? "standard");
@@ -556,21 +613,33 @@ function BollaDettaglio({ bollaId }: { bollaId: number }) {
             <User className="h-3.5 w-3.5" /> Chi effettua la consegna
           </Label>
           {isConsegnato ? (
-            <p className="text-sm font-medium">{bolla.volontarioNome ?? bolla.noteConsegna ?? "—"}</p>
+            <p className="text-sm font-medium">{bolla.volontarioNome ?? bolla.trasportatoreNome ?? bolla.noteConsegna ?? "—"}</p>
           ) : (
-            <Select
-              value={bolla.volontarioConsegnaId ? String(bolla.volontarioConsegnaId) : (bolla.noteConsegna ? "__centro__" : "")}
-              onValueChange={onChangeVolontario}
-              disabled={updateBolla.isPending}
-            >
-              <SelectTrigger><SelectValue placeholder="Seleziona volontario o centro..." /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__centro__">📍 Consegna presso il centro</SelectItem>
-                {volontari?.filter(v => v.attivo).map(v => (
-                  <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <>
+              <Select
+                value={consegnaValue}
+                onValueChange={onChangeVolontario}
+                disabled={updateBolla.isPending}
+              >
+                <SelectTrigger><SelectValue placeholder="Seleziona trasportatore o centro..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__centro__">📍 Consegna presso il centro</SelectItem>
+                  {volontari?.filter(v => v.attivo).map(v => (
+                    <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
+                  ))}
+                  <SelectItem value="__altro__">Altro (ritiro a mano presso il magazzino)</SelectItem>
+                </SelectContent>
+              </Select>
+              {consegnaValue === "__altro__" && (
+                <Input
+                  className="mt-2"
+                  defaultValue={bolla.trasportatoreNome ?? ""}
+                  placeholder="Nome trasportatore (opzionale)"
+                  onBlur={(e) => onChangeTrasportatoreNome(e.target.value)}
+                  disabled={updateBolla.isPending}
+                />
+              )}
+            </>
           )}
         </div>
       )}

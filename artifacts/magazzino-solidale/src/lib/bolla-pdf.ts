@@ -168,33 +168,59 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   }
 
   // ---- Recipient / delivery info ----
+  const colLeftX = margin;
+  const colRightX = pageW / 2 + 4;
+  const colWidth = pageW / 2 - margin - 6;
+
   doc.setFontSize(9);
   doc.setTextColor(110, 110, 110);
-  doc.text("DESTINATARIO", margin, y);
-  doc.text("CONSEGNA", pageW / 2 + 4, y);
+  doc.text("DESTINATARIO", colLeftX, y);
+  doc.text("CONSEGNA", colRightX, y);
   y += 5;
 
+  const rowY = y;
+
+  // Left column: recipient (name, address, phone)
+  let leftY = rowY;
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text(bolla.beneficiarioNome || `Beneficiario #${bolla.beneficiarioId}`, margin, y);
+  doc.text(bolla.beneficiarioNome || `Beneficiario #${bolla.beneficiarioId}`, colLeftX, leftY);
   doc.setFont("helvetica", "normal");
-
-  const consegnaChi = bolla.volontarioNome
-    ? `Volontario: ${bolla.volontarioNome}`
-    : bolla.noteConsegna
-      ? "Presso il centro"
-      : "—";
-  doc.text(`Magazzino: ${bolla.magazzinoNome || "—"}`, pageW / 2 + 4, y);
-  y += 5;
-
-  if (bolla.indirizzoConsegna) {
-    doc.setFontSize(9);
-    doc.text(bolla.indirizzoConsegna, margin, y);
-  }
   doc.setFontSize(9);
-  doc.text(consegnaChi, pageW / 2 + 4, y);
-  y += 8;
+  leftY += 5;
+  const indirizzoDest = bolla.indirizzoConsegna || bolla.beneficiarioIndirizzo;
+  if (indirizzoDest) {
+    const lines = doc.splitTextToSize(indirizzoDest, colWidth) as string[];
+    doc.text(lines, colLeftX, leftY);
+    leftY += lines.length * 4.5;
+  }
+  if (bolla.beneficiarioTelefono) {
+    doc.text(`Cell: ${bolla.beneficiarioTelefono}`, colLeftX, leftY);
+    leftY += 5;
+  }
+
+  // Right column: warehouse (name + address) and transporter
+  let rightY = rowY;
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Magazzino: ${bolla.magazzinoNome || "—"}`, colRightX, rightY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  rightY += 5;
+  const magAddr = [bolla.magazzinoIndirizzo, bolla.magazzinoComune].filter(Boolean).join(" — ");
+  if (magAddr) {
+    const lines = doc.splitTextToSize(magAddr, colWidth) as string[];
+    doc.text(lines, colRightX, rightY);
+    rightY += lines.length * 4.5;
+  }
+  const trasportatore = bolla.volontarioNome || bolla.trasportatoreNome
+    || (bolla.noteConsegna ? "Presso il centro" : "—");
+  doc.text(`Trasportatore: ${trasportatore}`, colRightX, rightY);
+  rightY += 5;
+
+  y = Math.max(leftY, rightY) + 4;
 
   // ---- Products table ----
   autoTable(doc, {

@@ -958,6 +958,8 @@ export interface Bolla {
   /** @nullable */
   volontarioConsegnaId?: number | null;
   /** @nullable */
+  trasportatoreNome?: string | null;
+  /** @nullable */
   mezzoId?: number | null;
   stato: string;
   /** @nullable */
@@ -1003,6 +1005,16 @@ export interface BollaDettaglio {
   /** @nullable */
   volontarioNome?: string | null;
   /** @nullable */
+  magazzinoIndirizzo?: string | null;
+  /** @nullable */
+  magazzinoComune?: string | null;
+  /** @nullable */
+  beneficiarioIndirizzo?: string | null;
+  /** @nullable */
+  beneficiarioTelefono?: string | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
+  /** @nullable */
   mezzoId?: number | null;
   stato: string;
   /** @nullable */
@@ -1033,6 +1045,7 @@ export interface BollaInput {
   magazzinoId: number;
   indirizzoConsegna?: string;
   volontarioConsegnaId?: number;
+  trasportatoreNome?: string;
   mezzoId?: number;
   noteConsegna?: string;
 }
@@ -1043,6 +1056,8 @@ export interface BollaUpdate {
   magazzinoId?: number;
   /** @nullable */
   volontarioConsegnaId?: number | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
   /** @nullable */
   mezzoId?: number | null;
   indirizzoConsegna?: string;

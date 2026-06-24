@@ -12,6 +12,7 @@ export interface BollaInput {
   magazzinoId: number;
   indirizzoConsegna?: string;
   volontarioConsegnaId?: number;
+  trasportatoreNome?: string;
   mezzoId?: number;
   noteConsegna?: string;
 }

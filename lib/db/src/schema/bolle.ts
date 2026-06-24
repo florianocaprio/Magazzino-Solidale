@@ -12,6 +12,7 @@ export const bolleTable = pgTable("bolle", {
   indirizzoConsegna: varchar("indirizzo_consegna", { length: 200 }),
   operatoreId: integer("operatore_id"),
   volontarioConsegnaId: integer("volontario_consegna_id"),
+  trasportatoreNome: varchar("trasportatore_nome", { length: 120 }),
   mezzoId: integer("mezzo_id"),
   stato: varchar("stato", { length: 20 }).notNull().default("bozza"),
   noteConsegna: text("note_consegna"),
