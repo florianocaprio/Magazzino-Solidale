@@ -28,6 +28,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   priorita: varchar("priorita", { length: 10 }).notNull().default("media"),
   consegnaDomicilio: boolean("consegna_domicilio").notNull().default(false),
   motivoConsegnaDomicilio: varchar("motivo_consegna_domicilio", { length: 60 }),
+  centroAscoltoId: integer("centro_ascolto_id"),
   attivo: boolean("attivo").notNull().default(true),
   dataPresaInCarico: date("data_presa_in_carico"),
   noteInterne: text("note_interne"),

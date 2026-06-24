@@ -714,6 +714,10 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of beneficiaries
@@ -1220,7 +1224,89 @@ paths:
               schema:
                 $ref: "#/components/schemas/BollaDettaglio"
 
-  # ─── VOLONTARI ───────────────────────────────────────────────────────────────
+  # ─── CENTRI DI ASCOLTO ─────────────────────────────────────────────────────
+  /centri-ascolto:
+    get:
+      operationId: listCentriAscolto
+      tags: [centri-ascolto]
+      responses:
+        "200":
+          description: List of listening centers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CentroAscolto"
+    post:
+      operationId: createCentroAscolto
+      tags: [centri-ascolto]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CentroAscoltoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CentroAscolto"
+
+  /centri-ascolto/{id}:
+    get:
+      operationId: getCentroAscolto
+      tags: [centri-ascolto]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Listening center
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CentroAscolto"
+    patch:
+      operationId: updateCentroAscolto
+      tags: [centri-ascolto]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CentroAscoltoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CentroAscolto"
+    delete:
+      operationId: deleteCentroAscolto
+      tags: [centri-ascolto]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /volontari:
     get:
       operationId: listVolontari
@@ -2192,6 +2278,10 @@ components:
           type: string
         consegnaDomicilio:
           type: boolean
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
         attivo:
           type: boolean
         dataPresaInCarico:
@@ -2252,6 +2342,10 @@ components:
         consegnaDomicilio:
           type: boolean
         motivoConsegnaDomicilio:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
           type: ["string", "null"]
         attivo:
           type: boolean
@@ -2326,6 +2420,8 @@ components:
           type: boolean
         motivoConsegnaDomicilio:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
         dataPresaInCarico:
           type: string
         noteInterne:
@@ -2381,9 +2477,80 @@ components:
           type: boolean
         motivoConsegnaDomicilio:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
         attivo:
           type: boolean
         noteInterne:
+          type: string
+
+    # ── Centri di Ascolto ────────────────────────────────────────────────
+    CentroAscolto:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        indirizzo:
+          type: ["string", "null"]
+        comune:
+          type: ["string", "null"]
+        responsabile:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+        note:
+          type: ["string", "null"]
+        beneficiariCount:
+          type: integer
+        dataCreazione:
+          type: string
+      required: [id, nome, attivo, dataCreazione]
+
+    CentroAscoltoInput:
+      type: object
+      properties:
+        nome:
+          type: string
+        indirizzo:
+          type: string
+        comune:
+          type: string
+        responsabile:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        attivo:
+          type: boolean
+        note:
+          type: string
+      required: [nome]
+
+    CentroAscoltoUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+        indirizzo:
+          type: string
+        comune:
+          type: string
+        responsabile:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        attivo:
+          type: boolean
+        note:
           type: string
 
     NucleoFamiliare:
@@ -2441,6 +2608,8 @@ components:
           type: integer
         beneficiarioNome:
           type: ["string", "null"]
+        bollaId:
+          type: ["integer", "null"]
         dataIntervento:
           type: string
         tipoIntervento:

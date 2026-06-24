@@ -826,7 +826,8 @@ export const UpdateApprovvigionamentoResponse = zod.object({
 export const ListBeneficiariQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
   "priorita": zod.coerce.string().optional(),
-  "domicilio": zod.coerce.boolean().optional()
+  "domicilio": zod.coerce.boolean().optional(),
+  "centroAscoltoId": zod.coerce.number().optional()
 })
 
 export const ListBeneficiariResponseItem = zod.object({
@@ -846,6 +847,8 @@ export const ListBeneficiariResponseItem = zod.object({
   "numAnziani": zod.number(),
   "priorita": zod.string(),
   "consegnaDomicilio": zod.boolean(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "dataPresaInCarico": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -878,6 +881,7 @@ export const CreateBeneficiarioBody = zod.object({
   "priorita": zod.string().optional(),
   "consegnaDomicilio": zod.boolean().optional(),
   "motivoConsegnaDomicilio": zod.string().optional(),
+  "centroAscoltoId": zod.number().nullish(),
   "dataPresaInCarico": zod.string().optional(),
   "noteInterne": zod.string().optional()
 })
@@ -913,6 +917,8 @@ export const GetBeneficiarioResponse = zod.object({
   "priorita": zod.string(),
   "consegnaDomicilio": zod.boolean(),
   "motivoConsegnaDomicilio": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "dataPresaInCarico": zod.string().nullish(),
   "noteInterne": zod.string().nullish(),
@@ -932,6 +938,7 @@ export const GetBeneficiarioResponse = zod.object({
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
+  "bollaId": zod.number().nullish(),
   "dataIntervento": zod.string(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -992,6 +999,7 @@ export const UpdateBeneficiarioBody = zod.object({
   "priorita": zod.string().optional(),
   "consegnaDomicilio": zod.boolean().optional(),
   "motivoConsegnaDomicilio": zod.string().optional(),
+  "centroAscoltoId": zod.number().nullish(),
   "attivo": zod.boolean().optional(),
   "noteInterne": zod.string().optional()
 })
@@ -1013,6 +1021,8 @@ export const UpdateBeneficiarioResponse = zod.object({
   "numAnziani": zod.number(),
   "priorita": zod.string(),
   "consegnaDomicilio": zod.boolean(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "dataPresaInCarico": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -1068,6 +1078,7 @@ export const ListInterventiResponseItem = zod.object({
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
+  "bollaId": zod.number().nullish(),
   "dataIntervento": zod.string(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -1098,6 +1109,7 @@ export const GetInterventoResponse = zod.object({
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
+  "bollaId": zod.number().nullish(),
   "dataIntervento": zod.string(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -1125,6 +1137,7 @@ export const UpdateInterventoResponse = zod.object({
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
+  "bollaId": zod.number().nullish(),
   "dataIntervento": zod.string(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -1556,6 +1569,88 @@ export const ConsegnaBollaResponse = zod.object({
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
 }))
+})
+
+
+export const ListCentriAscoltoResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "beneficiariCount": zod.number().optional(),
+  "dataCreazione": zod.string()
+})
+export const ListCentriAscoltoResponse = zod.array(ListCentriAscoltoResponseItem)
+
+
+export const CreateCentroAscoltoBody = zod.object({
+  "nome": zod.string(),
+  "indirizzo": zod.string().optional(),
+  "comune": zod.string().optional(),
+  "responsabile": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "email": zod.string().optional(),
+  "attivo": zod.boolean().optional(),
+  "note": zod.string().optional()
+})
+
+
+export const GetCentroAscoltoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCentroAscoltoResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "beneficiariCount": zod.number().optional(),
+  "dataCreazione": zod.string()
+})
+
+
+export const UpdateCentroAscoltoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCentroAscoltoBody = zod.object({
+  "nome": zod.string().optional(),
+  "indirizzo": zod.string().optional(),
+  "comune": zod.string().optional(),
+  "responsabile": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "email": zod.string().optional(),
+  "attivo": zod.boolean().optional(),
+  "note": zod.string().optional()
+})
+
+export const UpdateCentroAscoltoResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "beneficiariCount": zod.number().optional(),
+  "dataCreazione": zod.string()
+})
+
+
+export const DeleteCentroAscoltoParams = zod.object({
+  "id": zod.coerce.number()
 })
 
 

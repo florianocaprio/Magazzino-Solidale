@@ -30,6 +30,8 @@ export interface BeneficiarioUpdate {
   priorita?: string;
   consegnaDomicilio?: boolean;
   motivoConsegnaDomicilio?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   attivo?: boolean;
   noteInterne?: string;
 }

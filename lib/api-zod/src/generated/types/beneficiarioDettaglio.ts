@@ -48,6 +48,10 @@ export interface BeneficiarioDettaglio {
   consegnaDomicilio: boolean;
   /** @nullable */
   motivoConsegnaDomicilio?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   attivo: boolean;
   /** @nullable */
   dataPresaInCarico?: string | null;

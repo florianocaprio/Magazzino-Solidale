@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { interventiTable, beneficiariTable } from "@workspace/db";
-import { eq, and, desc, type SQL } from "drizzle-orm";
+import { eq, and, desc, or, ilike, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -9,7 +9,17 @@ router.get("/interventi", async (req, res) => {
   const { beneficiarioId, tipo } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (beneficiarioId) conditions.push(eq(interventiTable.beneficiarioId, parseInt(beneficiarioId)));
-  if (tipo) conditions.push(eq(interventiTable.tipoIntervento, tipo));
+  // tipoIntervento può essere una lista di etichette separate da virgola
+  // (es. "pacco_alimentare,igiene"): il filtro deve trovare anche i valori multipli
+  if (tipo) {
+    const tokenMatch = or(
+      eq(interventiTable.tipoIntervento, tipo),
+      ilike(interventiTable.tipoIntervento, `${tipo},%`),
+      ilike(interventiTable.tipoIntervento, `%,${tipo}`),
+      ilike(interventiTable.tipoIntervento, `%,${tipo},%`),
+    );
+    if (tokenMatch) conditions.push(tokenMatch);
+  }
 
   const rows = await db
     .select({

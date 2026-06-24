@@ -14,7 +14,8 @@ import {
   Car,
   Store,
   ShoppingCart,
-  BarChart3
+  BarChart3,
+  Building2
 } from "lucide-react";
 import { 
   Sidebar, 
@@ -37,6 +38,7 @@ const NAV_ITEMS = [
   { title: "Giacenze", url: "/giacenze", icon: TrendingUpDown, group: "Magazzino" },
   { title: "Trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, group: "Magazzino" },
   
+  { title: "Centri di Ascolto", url: "/centri-ascolto", icon: Building2, group: "Sociale" },
   { title: "Beneficiari", url: "/beneficiari", icon: Users, group: "Sociale" },
   { title: "Interventi", url: "/interventi", icon: ClipboardList, group: "Sociale" },
   { title: "Consegne", url: "/consegne", icon: Truck, group: "Sociale" },

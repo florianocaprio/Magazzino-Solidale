@@ -62,13 +62,21 @@ export default function Interventi() {
     });
   };
 
-  const getTipoBadge = (tipo: string) => {
+  const getSingleBadge = (tipo: string) => {
     switch(tipo) {
-      case 'colloquio': return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Colloquio</Badge>;
-      case 'pacco_alimentare': return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Pacco Alimentare</Badge>;
-      case 'vestiario': return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Vestiario</Badge>;
-      default: return <Badge variant="outline" className="capitalize">{tipo.replace('_', ' ')}</Badge>;
+      case 'colloquio': return <Badge key={tipo} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Colloquio</Badge>;
+      case 'pacco_alimentare': return <Badge key={tipo} variant="outline" className="bg-green-50 text-green-700 border-green-200">Pacco Alimentare</Badge>;
+      case 'vestiti':
+      case 'vestiario': return <Badge key={tipo} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Vestiti</Badge>;
+      case 'igiene': return <Badge key={tipo} variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">Igiene</Badge>;
+      case 'medicinali': return <Badge key={tipo} variant="outline" className="bg-red-50 text-red-700 border-red-200">Medicinali</Badge>;
+      default: return <Badge key={tipo} variant="outline" className="capitalize">{tipo.replace('_', ' ')}</Badge>;
     }
+  };
+
+  const getTipoBadge = (tipo: string) => {
+    const tipi = tipo.split(",").map(t => t.trim()).filter(Boolean);
+    return <div className="flex flex-wrap gap-1">{tipi.map(getSingleBadge)}</div>;
   };
 
   return (

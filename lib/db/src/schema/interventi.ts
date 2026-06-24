@@ -5,8 +5,9 @@ import { z } from "zod/v4";
 export const interventiTable = pgTable("interventi", {
   id: serial("id").primaryKey(),
   beneficiarioId: integer("beneficiario_id").notNull(),
+  bollaId: integer("bolla_id"),
   dataIntervento: date("data_intervento").notNull(),
-  tipoIntervento: varchar("tipo_intervento", { length: 50 }).notNull(),
+  tipoIntervento: varchar("tipo_intervento", { length: 120 }).notNull(),
   descrizione: text("descrizione"),
   esito: text("esito"),
   prossimAzione: text("prossim_azione"),

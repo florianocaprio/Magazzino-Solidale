@@ -15,6 +15,7 @@ import Mezzi from "@/pages/mezzi";
 import Fornitori from "@/pages/fornitori";
 import Trasferimenti from "@/pages/trasferimenti";
 import Movimenti from "@/pages/movimenti";
+import CentriAscolto from "@/pages/centri-ascolto";
 import Beneficiari from "@/pages/beneficiari";
 import BeneficiarioDettaglio from "@/pages/beneficiario-dettaglio";
 import Interventi from "@/pages/interventi";
@@ -44,6 +45,7 @@ function Router() {
         <Route path="/giacenze" component={Giacenze} />
         <Route path="/trasferimenti" component={Trasferimenti} />
         
+        <Route path="/centri-ascolto" component={CentriAscolto} />
         <Route path="/beneficiari" component={Beneficiari} />
         <Route path="/beneficiari/:id" component={BeneficiarioDettaglio} />
         <Route path="/interventi" component={Interventi} />

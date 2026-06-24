@@ -125,6 +125,7 @@ export default function Prodotti() {
     alimentare: "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20",
     igiene: "bg-teal-500/10 text-teal-700 hover:bg-teal-500/20",
     vestiario: "bg-purple-500/10 text-purple-700 hover:bg-purple-500/20",
+    medicinali: "bg-red-500/10 text-red-700 hover:bg-red-500/20",
     scarpe: "bg-indigo-500/10 text-indigo-700 hover:bg-indigo-500/20",
     sanitario: "bg-red-500/10 text-red-700 hover:bg-red-500/20",
     altro: "bg-gray-500/10 text-gray-700 hover:bg-gray-500/20",
@@ -162,6 +163,7 @@ export default function Prodotti() {
                   <SelectItem value="alimentare">Alimentare</SelectItem>
                   <SelectItem value="igiene">Igiene</SelectItem>
                   <SelectItem value="vestiario">Vestiario</SelectItem>
+                  <SelectItem value="medicinali">Medicinali</SelectItem>
                   <SelectItem value="scarpe">Scarpe</SelectItem>
                   <SelectItem value="sanitario">Sanitario</SelectItem>
                   <SelectItem value="altro">Altro</SelectItem>
@@ -304,6 +306,7 @@ export default function Prodotti() {
                           <SelectItem value="alimentare">Alimentare</SelectItem>
                           <SelectItem value="igiene">Igiene</SelectItem>
                           <SelectItem value="vestiario">Vestiario</SelectItem>
+                          <SelectItem value="medicinali">Medicinali</SelectItem>
                           <SelectItem value="scarpe">Scarpe</SelectItem>
                           <SelectItem value="sanitario">Sanitario</SelectItem>
                           <SelectItem value="altro">Altro</SelectItem>

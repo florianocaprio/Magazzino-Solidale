@@ -453,6 +453,10 @@ export interface Beneficiario {
   numAnziani: number;
   priorita: string;
   consegnaDomicilio: boolean;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   attivo: boolean;
   /** @nullable */
   dataPresaInCarico?: string | null;
@@ -485,6 +489,8 @@ export interface Intervento {
   beneficiarioId: number;
   /** @nullable */
   beneficiarioNome?: string | null;
+  /** @nullable */
+  bollaId?: number | null;
   dataIntervento: string;
   tipoIntervento: string;
   /** @nullable */
@@ -568,6 +574,10 @@ export interface BeneficiarioDettaglio {
   consegnaDomicilio: boolean;
   /** @nullable */
   motivoConsegnaDomicilio?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   attivo: boolean;
   /** @nullable */
   dataPresaInCarico?: string | null;
@@ -604,6 +614,8 @@ export interface BeneficiarioInput {
   priorita?: string;
   consegnaDomicilio?: boolean;
   motivoConsegnaDomicilio?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
 }
@@ -632,8 +644,52 @@ export interface BeneficiarioUpdate {
   priorita?: string;
   consegnaDomicilio?: boolean;
   motivoConsegnaDomicilio?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   attivo?: boolean;
   noteInterne?: string;
+}
+
+export interface CentroAscolto {
+  id: number;
+  nome: string;
+  /** @nullable */
+  indirizzo?: string | null;
+  /** @nullable */
+  comune?: string | null;
+  /** @nullable */
+  responsabile?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  email?: string | null;
+  attivo: boolean;
+  /** @nullable */
+  note?: string | null;
+  beneficiariCount?: number;
+  dataCreazione: string;
+}
+
+export interface CentroAscoltoInput {
+  nome: string;
+  indirizzo?: string;
+  comune?: string;
+  responsabile?: string;
+  telefono?: string;
+  email?: string;
+  attivo?: boolean;
+  note?: string;
+}
+
+export interface CentroAscoltoUpdate {
+  nome?: string;
+  indirizzo?: string;
+  comune?: string;
+  responsabile?: string;
+  telefono?: string;
+  email?: string;
+  attivo?: boolean;
+  note?: string;
 }
 
 export interface NucleoFamiliareInput {
@@ -950,6 +1006,7 @@ export type ListBeneficiariParams = {
 search?: string;
 priorita?: string;
 domicilio?: boolean;
+centroAscoltoId?: number;
 };
 
 export type ListInterventiParams = {

@@ -30,6 +30,10 @@ export interface Beneficiario {
   numAnziani: number;
   priorita: string;
   consegnaDomicilio: boolean;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   attivo: boolean;
   /** @nullable */
   dataPresaInCarico?: string | null;

@@ -10,4 +10,5 @@ export type ListBeneficiariParams = {
 search?: string;
 priorita?: string;
 domicilio?: boolean;
+centroAscoltoId?: number;
 };

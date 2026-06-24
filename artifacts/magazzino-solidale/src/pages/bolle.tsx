@@ -10,6 +10,7 @@ import {
   useAnnullaBolla,
   useUpdateBolla,
   useListBeneficiari,
+  useListCentriAscolto,
   useListMagazzini,
   useListGiacenze,
   useListLotti,
@@ -51,7 +52,11 @@ function statoBadge(stato: string) {
 function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [beneficiarioId, setBeneficiarioId] = useState("");
   const [magazzinoId, setMagazzinoId] = useState("");
-  const { data: beneficiari } = useListBeneficiari();
+  const [centroId, setCentroId] = useState("all");
+  const { data: centri } = useListCentriAscolto();
+  const { data: beneficiari } = useListBeneficiari(
+    centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : undefined
+  );
   const { data: magazzini } = useListMagazzini();
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
@@ -67,6 +72,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
           toast({ title: "Bolla creata" });
           setBeneficiarioId("");
           setMagazzinoId("");
+          setCentroId("all");
           onClose();
         },
         onError: () => toast({ title: "Errore", description: "Impossibile creare la bolla", variant: "destructive" }),
@@ -80,11 +86,25 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
         <DialogHeader><DialogTitle>Nuova Bolla di Consegna</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
+            <Label>Centro di Ascolto (filtro)</Label>
+            <Select value={centroId} onValueChange={(v) => { setCentroId(v); setBeneficiarioId(""); }}>
+              <SelectTrigger><SelectValue placeholder="Tutti i centri" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti i beneficiari</SelectItem>
+                {centri?.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label>Beneficiario</Label>
             <Select value={beneficiarioId} onValueChange={setBeneficiarioId}>
               <SelectTrigger><SelectValue placeholder="Seleziona beneficiario..." /></SelectTrigger>
               <SelectContent>
-                {beneficiari?.map(b => (
+                {beneficiari?.length === 0 ? (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">Nessun beneficiario per questo centro</div>
+                ) : beneficiari?.map(b => (
                   <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>
                 ))}
               </SelectContent>

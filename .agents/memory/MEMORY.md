@@ -2,3 +2,4 @@
 - [Drizzle db.execute() returns QueryResult](drizzle-execute-rows.md) — `db.execute(sql\`...\`)` returns a QueryResult with a `.rows` property, not a plain array; cast `result.rows as Array<Record<string, unknown>>`.
 - [DB lib typecheck:libs before API routes](db-lib-rebuild.md) — after adding new schema files, run `pnpm run typecheck:libs` before checking the API server or the new table exports will be missing.
 - [Bolle stock accounting & storno](bolle-stock-storno.md) — scarico movements must be keyed by bollaRigaId so reversal targets one riga; validate lot availability at conferma; no transactions (low-concurrency).
+- [Bolla → Intervento sync](bolla-intervento-sync.md) — confirmed bolla owns one auto-synced intervento (comma-joined type labels); stato only via dedicated endpoints; filter tipoIntervento token-aware.

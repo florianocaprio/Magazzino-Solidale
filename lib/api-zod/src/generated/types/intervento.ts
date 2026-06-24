@@ -11,6 +11,8 @@ export interface Intervento {
   beneficiarioId: number;
   /** @nullable */
   beneficiarioNome?: string | null;
+  /** @nullable */
+  bollaId?: number | null;
   dataIntervento: string;
   tipoIntervento: string;
   /** @nullable */

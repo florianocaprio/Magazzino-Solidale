@@ -35,6 +35,9 @@ import type {
   BollaRiga,
   BollaRigaInput,
   BollaUpdate,
+  CentroAscolto,
+  CentroAscoltoInput,
+  CentroAscoltoUpdate,
   ConfermaRicezione,
   Consegna,
   ConsegnaInput,
@@ -4468,6 +4471,343 @@ export const useConsegnaBolla = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getConsegnaBollaMutationOptions(options));
+    }
+
+export const getListCentriAscoltoUrl = () => {
+
+
+
+
+  return `/api/centri-ascolto`
+}
+
+export const listCentriAscolto = async ( options?: RequestInit): Promise<CentroAscolto[]> => {
+
+  return customFetch<CentroAscolto[]>(getListCentriAscoltoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCentriAscoltoQueryKey = () => {
+    return [
+    `/api/centri-ascolto`
+    ] as const;
+    }
+
+
+export const getListCentriAscoltoQueryOptions = <TData = Awaited<ReturnType<typeof listCentriAscolto>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCentriAscolto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCentriAscoltoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCentriAscolto>>> = ({ signal }) => listCentriAscolto({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCentriAscolto>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCentriAscoltoQueryResult = NonNullable<Awaited<ReturnType<typeof listCentriAscolto>>>
+export type ListCentriAscoltoQueryError = ErrorType<unknown>
+
+
+
+export function useListCentriAscolto<TData = Awaited<ReturnType<typeof listCentriAscolto>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCentriAscolto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCentriAscoltoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCentroAscoltoUrl = () => {
+
+
+
+
+  return `/api/centri-ascolto`
+}
+
+export const createCentroAscolto = async (centroAscoltoInput: CentroAscoltoInput, options?: RequestInit): Promise<CentroAscolto> => {
+
+  return customFetch<CentroAscolto>(getCreateCentroAscoltoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      centroAscoltoInput,)
+  }
+);}
+
+
+
+
+export const getCreateCentroAscoltoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCentroAscolto>>, TError,{data: BodyType<CentroAscoltoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCentroAscolto>>, TError,{data: BodyType<CentroAscoltoInput>}, TContext> => {
+
+const mutationKey = ['createCentroAscolto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCentroAscolto>>, {data: BodyType<CentroAscoltoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCentroAscolto(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCentroAscoltoMutationResult = NonNullable<Awaited<ReturnType<typeof createCentroAscolto>>>
+    export type CreateCentroAscoltoMutationBody = BodyType<CentroAscoltoInput>
+    export type CreateCentroAscoltoMutationError = ErrorType<unknown>
+
+    export const useCreateCentroAscolto = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCentroAscolto>>, TError,{data: BodyType<CentroAscoltoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCentroAscolto>>,
+        TError,
+        {data: BodyType<CentroAscoltoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCentroAscoltoMutationOptions(options));
+    }
+
+export const getGetCentroAscoltoUrl = (id: number,) => {
+
+
+
+
+  return `/api/centri-ascolto/${id}`
+}
+
+export const getCentroAscolto = async (id: number, options?: RequestInit): Promise<CentroAscolto> => {
+
+  return customFetch<CentroAscolto>(getGetCentroAscoltoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCentroAscoltoQueryKey = (id: number,) => {
+    return [
+    `/api/centri-ascolto/${id}`
+    ] as const;
+    }
+
+
+export const getGetCentroAscoltoQueryOptions = <TData = Awaited<ReturnType<typeof getCentroAscolto>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCentroAscolto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCentroAscoltoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCentroAscolto>>> = ({ signal }) => getCentroAscolto(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCentroAscolto>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCentroAscoltoQueryResult = NonNullable<Awaited<ReturnType<typeof getCentroAscolto>>>
+export type GetCentroAscoltoQueryError = ErrorType<unknown>
+
+
+
+export function useGetCentroAscolto<TData = Awaited<ReturnType<typeof getCentroAscolto>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCentroAscolto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCentroAscoltoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateCentroAscoltoUrl = (id: number,) => {
+
+
+
+
+  return `/api/centri-ascolto/${id}`
+}
+
+export const updateCentroAscolto = async (id: number,
+    centroAscoltoUpdate: CentroAscoltoUpdate, options?: RequestInit): Promise<CentroAscolto> => {
+
+  return customFetch<CentroAscolto>(getUpdateCentroAscoltoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      centroAscoltoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateCentroAscoltoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCentroAscolto>>, TError,{id: number;data: BodyType<CentroAscoltoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCentroAscolto>>, TError,{id: number;data: BodyType<CentroAscoltoUpdate>}, TContext> => {
+
+const mutationKey = ['updateCentroAscolto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCentroAscolto>>, {id: number;data: BodyType<CentroAscoltoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCentroAscolto(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCentroAscoltoMutationResult = NonNullable<Awaited<ReturnType<typeof updateCentroAscolto>>>
+    export type UpdateCentroAscoltoMutationBody = BodyType<CentroAscoltoUpdate>
+    export type UpdateCentroAscoltoMutationError = ErrorType<unknown>
+
+    export const useUpdateCentroAscolto = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCentroAscolto>>, TError,{id: number;data: BodyType<CentroAscoltoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCentroAscolto>>,
+        TError,
+        {id: number;data: BodyType<CentroAscoltoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateCentroAscoltoMutationOptions(options));
+    }
+
+export const getDeleteCentroAscoltoUrl = (id: number,) => {
+
+
+
+
+  return `/api/centri-ascolto/${id}`
+}
+
+export const deleteCentroAscolto = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCentroAscoltoUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCentroAscoltoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCentroAscolto>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCentroAscolto>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteCentroAscolto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCentroAscolto>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteCentroAscolto(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCentroAscoltoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCentroAscolto>>>
+
+    export type DeleteCentroAscoltoMutationError = ErrorType<unknown>
+
+    export const useDeleteCentroAscolto = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCentroAscolto>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCentroAscolto>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteCentroAscoltoMutationOptions(options));
     }
 
 export const getListVolontariUrl = () => {

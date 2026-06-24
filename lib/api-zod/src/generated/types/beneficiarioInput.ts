@@ -31,6 +31,8 @@ export interface BeneficiarioInput {
   priorita?: string;
   consegnaDomicilio?: boolean;
   motivoConsegnaDomicilio?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, getListBeneficiariQueryKey } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useListCentriAscolto, getListBeneficiariQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,12 +26,14 @@ const formSchema = z.object({
   zonaMunicipio: z.string().optional(),
   numComponenti: z.coerce.number().min(1).default(1),
   priorita: z.string().default("media"),
+  centroAscoltoId: z.string().optional(),
   consegnaDomicilio: z.boolean().default(false)
 });
 
 export default function Beneficiari() {
   const [search, setSearch] = useState("");
   const { data: beneficiari, isLoading } = useListBeneficiari({ search: search || undefined });
+  const { data: centri } = useListCentriAscolto();
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -45,12 +47,14 @@ export default function Beneficiari() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       cognome: "", nome: "", comune: "", zonaMunicipio: "",
-      numComponenti: 1, priorita: "media", consegnaDomicilio: false
+      numComponenti: 1, priorita: "media", centroAscoltoId: "", consegnaDomicilio: false
     }
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    createBeneficiario.mutate({ data }, {
+    const { centroAscoltoId, ...rest } = data;
+    const payload = { ...rest, centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null };
+    createBeneficiario.mutate({ data: payload }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
         toast({ title: "Beneficiario aggiunto" });
@@ -201,6 +205,18 @@ export default function Beneficiari() {
                     </FormItem>
                   )} />
                 </div>
+
+                <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Centro di Ascolto di riferimento</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Nessuno" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
                   <Button type="submit" disabled={createBeneficiario.isPending}>Salva</Button>

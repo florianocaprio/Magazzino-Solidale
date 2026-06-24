@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
   bolleTable, bollaRigheTable, beneficiariTable, magazziniTable,
-  movimentiTable, lottiTable, prodottiTable, volontariTable,
+  movimentiTable, lottiTable, prodottiTable, volontariTable, interventiTable,
 } from "@workspace/db";
 import { eq, and, desc, asc, gt, sum, type SQL } from "drizzle-orm";
 
@@ -10,6 +10,72 @@ const router: IRouter = Router();
 
 // stati che consentono ancora modifiche
 const STATI_MODIFICABILI = ["bozza", "confermato"];
+
+// mappa tipo prodotto → etichetta tipo intervento sociale
+const TIPO_PRODOTTO_INTERVENTO: Record<string, string> = {
+  alimentare: "pacco_alimentare",
+  vestiario: "vestiti",
+  igiene: "igiene",
+  medicinali: "medicinali",
+  farmaci: "medicinali",
+};
+
+const LABEL_INTERVENTO: Record<string, string> = {
+  pacco_alimentare: "Pacco Alimentare",
+  vestiti: "Vestiti",
+  igiene: "Igiene",
+  medicinali: "Medicinali",
+};
+
+// crea/aggiorna automaticamente l'intervento sociale collegato alla bolla,
+// etichettato in base ai tipi di prodotto consegnati. Rimuove l'intervento se
+// la bolla non ha più righe.
+async function syncInterventoBolla(bollaId: number) {
+  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
+  if (!bolla) return;
+
+  const righe = await db
+    .select({ tipoProdotto: prodottiTable.tipoProdotto })
+    .from(bollaRigheTable)
+    .leftJoin(prodottiTable, eq(bollaRigheTable.prodottoId, prodottiTable.id))
+    .where(eq(bollaRigheTable.bollaId, bollaId));
+
+  const [esistente] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
+
+  if (righe.length === 0) {
+    if (esistente) await db.delete(interventiTable).where(eq(interventiTable.id, esistente.id));
+    return;
+  }
+
+  // etichette distinte, in ordine di prima comparsa
+  const etichette: string[] = [];
+  for (const r of righe) {
+    const tipo = r.tipoProdotto ?? "";
+    const label = TIPO_PRODOTTO_INTERVENTO[tipo] ?? (tipo || "consegna");
+    if (!etichette.includes(label)) etichette.push(label);
+  }
+  const tipoIntervento = etichette.join(",");
+  const descLabels = etichette.map(e => LABEL_INTERVENTO[e] ?? e).join(", ");
+  const descrizione = `Consegna automatica da bolla ${bolla.numeroBolla}: ${descLabels}`;
+
+  if (esistente) {
+    await db.update(interventiTable)
+      .set({ tipoIntervento, descrizione, beneficiarioId: bolla.beneficiarioId, dataIntervento: bolla.dataBolla })
+      .where(eq(interventiTable.id, esistente.id));
+  } else {
+    await db.insert(interventiTable).values({
+      beneficiarioId: bolla.beneficiarioId,
+      bollaId,
+      dataIntervento: bolla.dataBolla,
+      tipoIntervento,
+      descrizione,
+    });
+  }
+}
+
+async function removeInterventoBolla(bollaId: number) {
+  await db.delete(interventiTable).where(eq(interventiTable.bollaId, bollaId));
+}
 
 async function buildDettaglio(id: number) {
   const [row] = await db
@@ -253,7 +319,15 @@ router.patch("/bolle/:id", async (req, res) => {
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Not found" }); return; }
 
-  const body = req.body;
+  const body = { ...req.body };
+
+  // i cambi di stato passano solo dagli endpoint dedicati (/conferma, /consegna, /annulla)
+  // per garantire scarichi/storni e sincronizzazione dell'intervento collegato
+  if (body.stato !== undefined && body.stato !== bolla.stato) {
+    res.status(400).json({ error: "Lo stato della bolla si cambia solo tramite le azioni dedicate (conferma, consegna, annulla)" });
+    return;
+  }
+  delete body.stato;
 
   // cambio magazzino solo in bozza e solo senza righe
   if (body.magazzinoId && body.magazzinoId !== bolla.magazzinoId) {
@@ -270,6 +344,12 @@ router.patch("/bolle/:id", async (req, res) => {
   }
 
   const [row] = await db.update(bolleTable).set(body).where(eq(bolleTable.id, bollaId)).returning();
+
+  // se è cambiato il beneficiario su una bolla confermata, allinea l'intervento collegato
+  if (row.stato === "confermato" && body.beneficiarioId && body.beneficiarioId !== bolla.beneficiarioId) {
+    await syncInterventoBolla(bollaId);
+  }
+
   const det = await buildDettaglio(row.id);
   res.json(det);
 });
@@ -355,6 +435,11 @@ router.post("/bolle/:id/righe", async (req, res) => {
     }
   }
 
+  // aggiorna l'intervento sociale collegato se la bolla è già confermata
+  if (bolla.stato === "confermato") {
+    await syncInterventoBolla(bollaId);
+  }
+
   const lotto = riga.lottoId ? (await db.select().from(lottiTable).where(eq(lottiTable.id, riga.lottoId)))[0] : null;
 
   res.status(201).json({
@@ -393,6 +478,12 @@ router.delete("/bolle/:id/righe/:rigaId", async (req, res) => {
   }
 
   await db.delete(bollaRigheTable).where(eq(bollaRigheTable.id, rigaId));
+
+  // aggiorna (o rimuove) l'intervento sociale collegato
+  if (bolla.stato === "confermato") {
+    await syncInterventoBolla(bollaId);
+  }
+
   res.status(204).end();
 });
 
@@ -476,6 +567,7 @@ router.post("/bolle/:id/conferma", async (req, res) => {
   }
 
   await db.update(bolleTable).set({ stato: "confermato" }).where(eq(bolleTable.id, bollaId));
+  await syncInterventoBolla(bollaId);
   const det = await buildDettaglio(bollaId);
   res.json(det);
 });
@@ -529,6 +621,7 @@ router.post("/bolle/:id/annulla", async (req, res) => {
   }
 
   await db.update(bolleTable).set({ stato: "annullato" }).where(eq(bolleTable.id, bollaId));
+  await removeInterventoBolla(bollaId);
   const det = await buildDettaglio(bollaId);
   res.json(det);
 });

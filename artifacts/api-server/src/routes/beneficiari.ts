@@ -1,11 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable } from "@workspace/db";
+import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable } from "@workspace/db";
 import { eq, and, ilike, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-function fmtBenef(r: typeof beneficiariTable.$inferSelect) {
+function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string | null) {
   return {
     id: r.id,
     codice: r.codice,
@@ -32,6 +32,8 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect) {
     priorita: r.priorita,
     consegnaDomicilio: r.consegnaDomicilio,
     motivoConsegnaDomicilio: r.motivoConsegnaDomicilio ?? null,
+    centroAscoltoId: r.centroAscoltoId ?? null,
+    centroAscoltoNome: centroNome ?? null,
     attivo: r.attivo,
     dataPresaInCarico: r.dataPresaInCarico ?? null,
     noteInterne: r.noteInterne ?? null,
@@ -40,18 +42,22 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect) {
 }
 
 router.get("/beneficiari", async (req, res) => {
-  const { search, priorita, domicilio } = req.query as Record<string, string>;
+  const { search, priorita, domicilio, centroAscoltoId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (search) {
     conditions.push(ilike(beneficiariTable.cognome, `%${search}%`));
   }
   if (priorita) conditions.push(eq(beneficiariTable.priorita, priorita));
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
+  if (centroAscoltoId) conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
 
-  const rows = await db.select().from(beneficiariTable)
+  const rows = await db
+    .select({ b: beneficiariTable, centroNome: centriAscoltoTable.nome })
+    .from(beneficiariTable)
+    .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(beneficiariTable.cognome);
-  res.json(rows.map(fmtBenef));
+  res.json(rows.map(r => fmtBenef(r.b, r.centroNome)));
 });
 
 router.post("/beneficiari", async (req, res) => {
@@ -66,17 +72,24 @@ router.get("/beneficiari/:id", async (req, res) => {
   const [row] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
 
+  let centroNome: string | null = null;
+  if (row.centroAscoltoId) {
+    const [c] = await db.select({ nome: centriAscoltoTable.nome }).from(centriAscoltoTable).where(eq(centriAscoltoTable.id, row.centroAscoltoId));
+    centroNome = c?.nome ?? null;
+  }
+
   const nucleo = await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, id));
   const interventi = await db.select().from(interventiTable).where(eq(interventiTable.beneficiarioId, id)).limit(20);
   const consegne = await db.select().from(consegneTable).where(eq(consegneTable.beneficiarioId, id)).limit(20);
 
   res.json({
-    ...fmtBenef(row),
+    ...fmtBenef(row, centroNome),
     nucleo: nucleo.map(n => ({ ...n, dataNascita: n.dataNascita ?? null })),
     interventi: interventi.map(i => ({
       id: i.id,
       beneficiarioId: i.beneficiarioId,
       beneficiarioNome: `${row.cognome} ${row.nome}`,
+      bollaId: i.bollaId ?? null,
       dataIntervento: i.dataIntervento,
       tipoIntervento: i.tipoIntervento,
       descrizione: i.descrizione ?? null,
