@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function Login() {
+  const { t } = useTranslation();
   const { setUser } = useAuth();
   const loginMutation = useLoginUser();
   const [username, setUsername] = useState("");
@@ -24,7 +26,7 @@ export default function Login() {
           setUser(user);
         },
         onError: () => {
-          setError("Username o password non corretti.");
+          setError(t("login.errorInvalid"));
         },
       },
     );
@@ -42,14 +44,14 @@ export default function Login() {
           <div className="text-center">
             <h1 className="text-lg font-semibold">Magazzino Solidale</h1>
             <p className="text-sm text-muted-foreground">
-              Accedi per continuare
+              {t("login.subtitle")}
             </p>
           </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{t("login.username")}</Label>
               <Input
                 id="username"
                 autoComplete="username"
@@ -60,7 +62,7 @@ export default function Login() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("login.password")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -79,7 +81,7 @@ export default function Login() {
               {loginMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Accedi
+              {t("login.signIn")}
             </Button>
           </form>
         </CardContent>

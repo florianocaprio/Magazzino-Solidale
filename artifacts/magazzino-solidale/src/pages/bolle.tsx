@@ -47,12 +47,14 @@ import { it } from "date-fns/locale";
 import { generateBollaPdf, loadAssociationLogo, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { generateScaricoPdf, causaleLabel } from "@/lib/scarico-pdf";
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 function statoBadge(stato: string) {
-  if (stato === "consegnato") return <Badge className="bg-green-500 text-white">Consegnato</Badge>;
-  if (stato === "confermato") return <Badge className="border-blue-300 text-blue-700 bg-blue-50">Confermato</Badge>;
-  if (stato === "annullato") return <Badge variant="destructive">Annullato</Badge>;
-  return <Badge variant="secondary">Bozza</Badge>;
+  if (stato === "consegnato") return <Badge className="bg-green-500 text-white">{i18n.t("bolle.statoConsegnato")}</Badge>;
+  if (stato === "confermato") return <Badge className="border-blue-300 text-blue-700 bg-blue-50">{i18n.t("bolle.statoConfermato")}</Badge>;
+  if (stato === "annullato") return <Badge variant="destructive">{i18n.t("bolle.statoAnnullato")}</Badge>;
+  return <Badge variant="secondary">{i18n.t("bolle.statoBozza")}</Badge>;
 }
 
 // ─── Form crea bolla ─────────────────────────────────────────────────────────
@@ -72,6 +74,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const onSubmit = () => {
     if (!beneficiarioId || !magazzinoId) return;
@@ -91,7 +94,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
-          toast({ title: "Bolla creata" });
+          toast({ title: t("bolle.bollaCreata") });
           setBeneficiarioId("");
           setMagazzinoId("");
           setCentroId("all");
@@ -99,7 +102,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
           setTrasportatoreNome("");
           onClose();
         },
-        onError: () => toast({ title: "Errore", description: "Impossibile creare la bolla", variant: "destructive" }),
+        onError: () => toast({ title: t("bolle.error"), description: t("bolle.createError"), variant: "destructive" }),
       }
     );
   };
@@ -107,14 +110,14 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Nuova Bolla di Consegna</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t("bolle.createTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Centro di Ascolto (filtro)</Label>
+            <Label>{t("bolle.centroFilterLabel")}</Label>
             <Select value={centroId} onValueChange={(v) => { setCentroId(v); setBeneficiarioId(""); }}>
-              <SelectTrigger><SelectValue placeholder="Tutti i centri" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("bolle.allCentriPlaceholder")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tutti i beneficiari</SelectItem>
+                <SelectItem value="all">{t("bolle.allBeneficiari")}</SelectItem>
                 {centri?.map(c => (
                   <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                 ))}
@@ -122,12 +125,12 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Beneficiario</Label>
+            <Label>{t("bolle.beneficiarioLabel")}</Label>
             <Select value={beneficiarioId} onValueChange={setBeneficiarioId}>
-              <SelectTrigger><SelectValue placeholder="Seleziona beneficiario..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("bolle.beneficiarioPlaceholder")} /></SelectTrigger>
               <SelectContent>
                 {beneficiari?.length === 0 ? (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">Nessun beneficiario per questo centro</div>
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">{t("bolle.noBeneficiarioForCentro")}</div>
                 ) : beneficiari?.map(b => (
                   <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>
                 ))}
@@ -135,9 +138,9 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Magazzino di Uscita</Label>
+            <Label>{t("bolle.magazzinoUscitaLabel")}</Label>
             <Select value={magazzinoId} onValueChange={setMagazzinoId}>
-              <SelectTrigger><SelectValue placeholder="Seleziona magazzino..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("bolle.magazzinoPlaceholder")} /></SelectTrigger>
               <SelectContent>
                 {magazzini?.map(m => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
@@ -146,19 +149,19 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Trasportatore</Label>
+            <Label>{t("bolle.trasportatoreLabel")}</Label>
             <Select value={trasportatore} onValueChange={setTrasportatore}>
-              <SelectTrigger><SelectValue placeholder="Seleziona trasportatore..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("bolle.trasportatorePlaceholder")} /></SelectTrigger>
               <SelectContent>
                 {volontari?.filter(v => v.attivo).map(v => (
                   <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
                 ))}
-                <SelectItem value="__altro__">Altro (ritiro a mano presso il magazzino)</SelectItem>
+                <SelectItem value="__altro__">{t("bolle.altroRitiro")}</SelectItem>
               </SelectContent>
             </Select>
             {trasportatore === "__altro__" && (
               <Input
-                placeholder="Nome trasportatore (opzionale)"
+                placeholder={t("bolle.trasportatoreNomePlaceholder")}
                 value={trasportatoreNome}
                 onChange={(e) => setTrasportatoreNome(e.target.value)}
               />
@@ -166,9 +169,9 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Annulla</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
           <Button onClick={onSubmit} disabled={!beneficiarioId || !magazzinoId || createBolla.isPending}>
-            Crea Bolla
+            {t("bolle.createBolla")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -191,13 +194,14 @@ function ModificaBollaDialog({
   const updateBolla = useUpdateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const magazzinoCambiato = parseInt(mId) !== magazzinoId;
 
   const onSubmit = () => {
     if (magazzinoCambiato && hasRighe) {
       const ok = window.confirm(
-        "Cambiando magazzino i prodotti già aggiunti alla bolla verranno rimossi (appartengono al magazzino precedente). Continuare?"
+        t("bolle.cambioMagazzinoConfirm")
       );
       if (!ok) return;
     }
@@ -208,12 +212,12 @@ function ModificaBollaDialog({
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
           queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
           queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey({ magazzinoId: parseInt(mId) }) });
-          toast({ title: "Bolla aggiornata" });
+          toast({ title: t("bolle.bollaAggiornata") });
           onClose();
         },
         onError: (err: unknown) => {
-          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Errore durante l'aggiornamento";
-          toast({ title: "Errore", description: msg, variant: "destructive" });
+          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? t("bolle.updateError");
+          toast({ title: t("bolle.error"), description: msg, variant: "destructive" });
         },
       }
     );
@@ -222,10 +226,10 @@ function ModificaBollaDialog({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Modifica intestazione bolla</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t("bolle.modificaTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Beneficiario</Label>
+            <Label>{t("bolle.beneficiarioLabel")}</Label>
             <Select value={bId} onValueChange={setBId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -236,7 +240,7 @@ function ModificaBollaDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Magazzino di Uscita</Label>
+            <Label>{t("bolle.magazzinoUscitaLabel")}</Label>
             <Select value={mId} onValueChange={setMId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -247,14 +251,14 @@ function ModificaBollaDialog({
             </Select>
             {magazzinoCambiato && hasRighe && (
               <p className="text-xs text-amber-600">
-                Cambiando magazzino i prodotti già aggiunti verranno rimossi (appartengono al magazzino precedente).
+                {t("bolle.cambioMagazzinoWarning")}
               </p>
             )}
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Chiudi</Button>
-          <Button onClick={onSubmit} disabled={updateBolla.isPending}>Salva</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.close")}</Button>
+          <Button onClick={onSubmit} disabled={updateBolla.isPending}>{t("common.save")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -279,6 +283,7 @@ function AggiungiProdottoDialog({
   const addRiga = useAddBollaRiga();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const giacenzaSelezionata = giacenze?.find(g => g.prodottoId === parseInt(prodottoId));
   const lottiDisponibili = lotti?.filter(l => l.magazzinoId === magazzinoId && l.quantitaResidua > 0) ?? [];
@@ -307,13 +312,13 @@ function AggiungiProdottoDialog({
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
           queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey({ magazzinoId }) });
-          toast({ title: "Prodotto aggiunto" });
+          toast({ title: t("bolle.prodottoAggiunto") });
           // mantieni il dialog aperto per aggiungere altri prodotti: resetta i campi
           setProdottoId(""); setLottoId(""); setQuantita(""); setUnitaMisura("pz");
         },
         onError: (err: unknown) => {
-          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Errore durante l'aggiunta";
-          toast({ title: "Errore", description: msg, variant: "destructive" });
+          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? t("bolle.addError");
+          toast({ title: t("bolle.error"), description: msg, variant: "destructive" });
         },
       }
     );
@@ -322,20 +327,20 @@ function AggiungiProdottoDialog({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Aggiungi Prodotto alla Bolla</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t("bolle.addProdottoTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Prodotto disponibile in magazzino</Label>
+            <Label>{t("bolle.prodottoDisponibileLabel")}</Label>
             <Select value={prodottoId} onValueChange={v => { setProdottoId(v); setLottoId(""); setQuantita(""); }}>
-              <SelectTrigger><SelectValue placeholder="Seleziona prodotto..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("bolle.prodottoPlaceholder")} /></SelectTrigger>
               <SelectContent>
                 {giacenze && giacenze.length > 0 ? giacenze.map(g => (
                   <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
-                    {g.prodottoNome} — {g.quantitaTotale} {g.unitaMisura} disponibili
+                    {g.prodottoNome} — {g.quantitaTotale} {g.unitaMisura} {t("bolle.disponibili")}
                   </SelectItem>
                 )) : (
                   <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-                    Nessun prodotto disponibile in questo magazzino
+                    {t("bolle.noProdottoInMagazzino")}
                   </div>
                 )}
               </SelectContent>
@@ -344,28 +349,28 @@ function AggiungiProdottoDialog({
 
           {prodottoId && lottiDisponibili.length > 0 && (
             <div className="space-y-2">
-              <Label>Lotto (FEFO — opzionale)</Label>
+              <Label>{t("bolle.lottoLabel")}</Label>
               <Select value={lottoId} onValueChange={v => { setLottoId(v); setQuantita(""); }}>
-                <SelectTrigger><SelectValue placeholder="Automatico (prima scadenza)" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("bolle.lottoPlaceholder")} /></SelectTrigger>
                 <SelectContent>
                   {lottiDisponibili.map(l => (
                     <SelectItem key={l.id} value={String(l.id)}>
-                      {l.codiceLotto ?? `Lotto #${l.id}`}
-                      {l.dataScadenza ? ` — scad. ${l.dataScadenza}` : ""}
-                      {` — ${l.quantitaResidua} disp.`}
+                      {l.codiceLotto ?? `${t("bolle.lottoPrefix")}${l.id}`}
+                      {l.dataScadenza ? ` — ${t("bolle.scadAbbr")} ${l.dataScadenza}` : ""}
+                      {` — ${l.quantitaResidua} ${t("bolle.dispAbbr")}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Lascia vuoto per scaricare automaticamente i lotti in scadenza per primi.
+                {t("bolle.lottoHint")}
               </p>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Quantità</Label>
+              <Label>{t("common.quantity")}</Label>
               <Input
                 type="number"
                 min="0.01"
@@ -373,19 +378,19 @@ function AggiungiProdottoDialog({
                 max={maxDisponibile || undefined}
                 value={quantita}
                 onChange={e => setQuantita(e.target.value)}
-                placeholder="0"
+                placeholder={t("bolle.quantitaPlaceholder")}
                 className={eccedeDisponibilita ? "border-destructive focus-visible:ring-destructive" : ""}
               />
               {prodottoId && (
                 <p className={`text-xs ${eccedeDisponibilita ? "text-destructive font-medium" : "text-muted-foreground"}`}>
                   {eccedeDisponibilita
-                    ? `Massimo disponibile: ${maxDisponibile}`
-                    : `Disponibile: ${maxDisponibile} ${giacenzaSelezionata?.unitaMisura ?? ""}`}
+                    ? t("bolle.massimoDisponibile", { max: maxDisponibile })
+                    : t("bolle.disponibileQta", { max: maxDisponibile, um: giacenzaSelezionata?.unitaMisura ?? "" })}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label>Unità di misura</Label>
+              <Label>{t("bolle.unitaMisuraLabel")}</Label>
               <Select value={unitaMisura} onValueChange={setUnitaMisura}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -398,9 +403,9 @@ function AggiungiProdottoDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Chiudi</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.close")}</Button>
           <Button onClick={onSubmit} disabled={!prodottoId || !quantita || eccedeDisponibilita || addRiga.isPending}>
-            Aggiungi
+            {t("common.add")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -429,6 +434,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
   const updateBolla = useUpdateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
@@ -443,8 +449,8 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
     deleteRiga.mutate(
       { id: bollaId, rigaId },
       {
-        onSuccess: () => { invalidateAll(); toast({ title: "Prodotto rimosso" }); },
-        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Impossibile rimuovere"), variant: "destructive" }),
+        onSuccess: () => { invalidateAll(); toast({ title: t("bolle.prodottoRimosso") }); },
+        onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.rimuoviError")), variant: "destructive" }),
       }
     );
   };
@@ -453,8 +459,8 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
     confermaBolla.mutate(
       { id: bollaId },
       {
-        onSuccess: () => { invalidateAll(); toast({ title: "Bolla confermata", description: "Prodotti scaricati dal magazzino." }); },
-        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Errore durante la conferma"), variant: "destructive" }),
+        onSuccess: () => { invalidateAll(); toast({ title: t("bolle.bollaConfermataTitle"), description: t("bolle.bollaConfermataDesc") }); },
+        onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.confermaError")), variant: "destructive" }),
       }
     );
   };
@@ -463,8 +469,8 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
     consegnaBolla.mutate(
       { id: bollaId, data: { confermaRicezione: true } },
       {
-        onSuccess: () => { invalidateAll(); toast({ title: "Bolla consegnata", description: "Consegna registrata." }); },
-        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Errore durante la consegna"), variant: "destructive" }),
+        onSuccess: () => { invalidateAll(); toast({ title: t("bolle.bollaConsegnataTitle"), description: t("bolle.bollaConsegnataDesc") }); },
+        onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.consegnaError")), variant: "destructive" }),
       }
     );
   };
@@ -475,10 +481,10 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
       {
         onSuccess: () => {
           invalidateAll();
-          toast({ title: "Bolla annullata", description: "Eventuali scarichi sono stati ripristinati a magazzino." });
+          toast({ title: t("bolle.bollaAnnullataTitle"), description: t("bolle.bollaAnnullataDesc") });
           setAnnullaOpen(false);
         },
-        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Impossibile annullare"), variant: "destructive" }),
+        onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.annullaError")), variant: "destructive" }),
       }
     );
   };
@@ -495,9 +501,9 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
-          toast({ title: "Consegna aggiornata" });
+          toast({ title: t("bolle.consegnaAggiornata") });
         },
-        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Impossibile aggiornare"), variant: "destructive" }),
+        onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.aggiornaError")), variant: "destructive" }),
       }
     );
   };
@@ -507,7 +513,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
       { id: bollaId, data: { trasportatoreNome: value.trim() || "Ritiro presso il magazzino" } },
       {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) }),
-        onError: (err) => toast({ title: "Errore", description: errMsg(err, "Impossibile aggiornare"), variant: "destructive" }),
+        onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.aggiornaError")), variant: "destructive" }),
       }
     );
   };
@@ -545,7 +551,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
       });
       setPrintOpen(false);
     } catch {
-      toast({ title: "Errore", description: "Impossibile generare il PDF.", variant: "destructive" });
+      toast({ title: t("bolle.error"), description: t("bolle.pdfError"), variant: "destructive" });
     } finally {
       setPrinting(false);
     }
@@ -561,7 +567,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
     );
   }
 
-  if (!bolla) return <p className="text-muted-foreground mt-4">Bolla non trovata.</p>;
+  if (!bolla) return <p className="text-muted-foreground mt-4">{t("bolle.bollaNonTrovata")}</p>;
 
   const isBozza = bolla.stato === "bozza";
   const isConfermato = bolla.stato === "confermato";
@@ -583,24 +589,24 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
           </p>
         </div>
         <Button size="sm" variant="outline" className="gap-1.5 h-8 shrink-0" onClick={openPrint}>
-          <Download className="h-3.5 w-3.5" /> Scarica PDF
+          <Download className="h-3.5 w-3.5" /> {t("bolle.scaricaPdf")}
         </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">Beneficiario</p>
+          <p className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">{t("bolle.beneficiarioLabel")}</p>
           <p className="font-medium">{bolla.beneficiarioNome ?? "—"}</p>
         </div>
         <div>
-          <p className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">Magazzino</p>
+          <p className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">{t("bolle.magazzinoLabel")}</p>
           <p className="font-medium">{bolla.magazzinoNome ?? "—"}</p>
         </div>
       </div>
 
       {isBozza && (
         <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => setEditOpen(true)}>
-          <Pencil className="h-3.5 w-3.5" /> Modifica beneficiario/magazzino
+          <Pencil className="h-3.5 w-3.5" /> {t("bolle.modificaIntestazione")}
         </Button>
       )}
 
@@ -610,7 +616,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
       {!isAnnullato && (
         <div className="space-y-2">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5" /> Chi effettua la consegna
+            <User className="h-3.5 w-3.5" /> {t("bolle.chiEffettuaConsegna")}
           </Label>
           {isConsegnato ? (
             <p className="text-sm font-medium">{bolla.volontarioNome ?? bolla.trasportatoreNome ?? bolla.noteConsegna ?? "—"}</p>
@@ -621,20 +627,20 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
                 onValueChange={onChangeVolontario}
                 disabled={updateBolla.isPending}
               >
-                <SelectTrigger><SelectValue placeholder="Seleziona trasportatore o centro..." /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("bolle.consegnaPlaceholder")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__centro__">📍 Consegna presso il centro</SelectItem>
+                  <SelectItem value="__centro__">{t("bolle.consegnaPressoCentro")}</SelectItem>
                   {volontari?.filter(v => v.attivo).map(v => (
                     <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
                   ))}
-                  <SelectItem value="__altro__">Altro (ritiro a mano presso il magazzino)</SelectItem>
+                  <SelectItem value="__altro__">{t("bolle.altroRitiro")}</SelectItem>
                 </SelectContent>
               </Select>
               {consegnaValue === "__altro__" && (
                 <Input
                   className="mt-2"
                   defaultValue={bolla.trasportatoreNome ?? ""}
-                  placeholder="Nome trasportatore (opzionale)"
+                  placeholder={t("bolle.trasportatoreNomePlaceholder")}
                   onBlur={(e) => onChangeTrasportatoreNome(e.target.value)}
                   disabled={updateBolla.isPending}
                 />
@@ -649,11 +655,11 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
       {/* Righe prodotti */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm">Prodotti nella bolla</h3>
+          <h3 className="font-semibold text-sm">{t("bolle.prodottiNellaBolla")}</h3>
           {modificabile && (
             <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => setAddOpen(true)}>
               <PackagePlus className="h-4 w-4" />
-              Aggiungi prodotto
+              {t("bolle.aggiungiProdotto")}
             </Button>
           )}
         </div>
@@ -661,10 +667,10 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
         {bolla.righe.length === 0 ? (
           <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
             <PackagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Nessun prodotto aggiunto.</p>
+            <p className="text-sm text-muted-foreground">{t("bolle.nessunProdotto")}</p>
             {modificabile && (
               <Button size="sm" className="mt-3 gap-1.5" onClick={() => setAddOpen(true)}>
-                <Plus className="h-4 w-4" /> Aggiungi il primo prodotto
+                <Plus className="h-4 w-4" /> {t("bolle.aggiungiPrimoProdotto")}
               </Button>
             )}
           </div>
@@ -673,16 +679,16 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
-                  <TableHead className="text-xs">Prodotto</TableHead>
-                  <TableHead className="text-xs">Lotto</TableHead>
-                  <TableHead className="text-xs text-right">Quantità</TableHead>
+                  <TableHead className="text-xs">{t("bolle.thProdotto")}</TableHead>
+                  <TableHead className="text-xs">{t("bolle.thLotto")}</TableHead>
+                  <TableHead className="text-xs text-right">{t("common.quantity")}</TableHead>
                   {modificabile && <TableHead className="w-10" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {bolla.righe.map(r => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium text-sm">{r.prodottoNome ?? `Prodotto #${r.prodottoId}`}</TableCell>
+                    <TableCell className="font-medium text-sm">{r.prodottoNome ?? t("bolle.prodottoFallback", { id: r.prodottoId })}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{r.codiceLotto ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono text-sm">{r.quantita} {r.unitaMisura}</TableCell>
                     {modificabile && (
@@ -713,12 +719,12 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
           <div className="space-y-2">
             {isBozza && (
               <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800 mb-3">
-                <strong>Conferma bolla</strong> — I prodotti verranno scaricati dal magazzino (lotti in scadenza per primi) e verrà creato un movimento di uscita.
+                <strong>{t("bolle.confermaInfoTitle")}</strong>{t("bolle.confermaInfoText")}
               </div>
             )}
             {isConfermato && (
               <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800 mb-3">
-                <strong>Pronta per la consegna.</strong> Puoi ancora aggiungere o rimuovere prodotti (il magazzino si aggiorna in tempo reale). Segna come consegnata quando il beneficiario ha ricevuto la merce.
+                <strong>{t("bolle.prontaTitle")}</strong>{t("bolle.prontaText")}
               </div>
             )}
             {isBozza && (
@@ -728,7 +734,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
                 disabled={bolla.righe.length === 0 || confermaBolla.isPending}
               >
                 <CheckCircle className="h-4 w-4" />
-                {confermaBolla.isPending ? "Conferma in corso..." : "Conferma bolla e scarica magazzino"}
+                {confermaBolla.isPending ? t("bolle.confermaInCorso") : t("bolle.confermaBolla")}
               </Button>
             )}
             {isConfermato && (
@@ -738,7 +744,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
                 disabled={consegnaBolla.isPending}
               >
                 <Truck className="h-4 w-4" />
-                {consegnaBolla.isPending ? "Registrazione..." : "Segna come consegnata"}
+                {consegnaBolla.isPending ? t("bolle.registrazione") : t("bolle.segnaConsegnata")}
               </Button>
             )}
             {/* Annulla */}
@@ -749,7 +755,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
               disabled={annullaBolla.isPending}
             >
               <XCircle className="h-4 w-4" />
-              Annulla bolla
+              {t("bolle.annullaBolla")}
             </Button>
           </div>
         </>
@@ -757,13 +763,13 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
 
       {isConsegnato && (
         <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
-          ✓ Consegna completata. Merce scaricata dal magazzino.
+          {t("bolle.consegnaCompletata")}
         </div>
       )}
 
       {isAnnullato && (
         <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
-          ✕ Bolla annullata. Eventuali prodotti scaricati sono stati ripristinati a magazzino.
+          {t("bolle.bollaAnnullataInfo")}
         </div>
       )}
 
@@ -790,20 +796,20 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
       <AlertDialog open={annullaOpen} onOpenChange={setAnnullaOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Annullare la bolla {bolla.numeroBolla}?</AlertDialogTitle>
+            <AlertDialogTitle>{t("bolle.annullareTitle", { numero: bolla.numeroBolla })}</AlertDialogTitle>
             <AlertDialogDescription>
               {isConfermato
-                ? "I prodotti già scaricati verranno ripristinati a magazzino e i movimenti di uscita verranno annullati. L'operazione non è reversibile."
-                : "La bolla verrà contrassegnata come annullata. L'operazione non è reversibile."}
+                ? t("bolle.annullaDescConfermato")
+                : t("bolle.annullaDescBozza")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>No, mantieni</AlertDialogCancel>
+            <AlertDialogCancel>{t("bolle.noMantieni")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={onAnnulla}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Sì, annulla bolla
+              {t("bolle.siAnnulla")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -812,33 +818,33 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
       <Dialog open={printOpen} onOpenChange={setPrintOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Scarica bolla in PDF</DialogTitle>
+            <DialogTitle>{t("bolle.printTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <Label className="text-sm">Modello</Label>
+            <Label className="text-sm">{t("bolle.modello")}</Label>
             <div className="grid gap-2">
-              {BOLLA_TEMPLATES.map((t) => (
+              {BOLLA_TEMPLATES.map((tpl) => (
                 <button
-                  key={t.value}
+                  key={tpl.value}
                   type="button"
-                  onClick={() => setPrintTemplate(t.value)}
+                  onClick={() => setPrintTemplate(tpl.value)}
                   className={`text-left rounded-lg border p-3 transition-colors ${
-                    printTemplate === t.value ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "hover:border-muted-foreground/40"
+                    printTemplate === tpl.value ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "hover:border-muted-foreground/40"
                   }`}
                 >
-                  <p className="font-medium text-sm">{t.label}</p>
-                  <p className="text-xs text-muted-foreground">{t.description}</p>
+                  <p className="font-medium text-sm">{tpl.label}</p>
+                  <p className="text-xs text-muted-foreground">{tpl.description}</p>
                 </button>
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Il modello predefinito si imposta in <span className="font-medium">Impostazioni Stampa</span>.
+              {t("bolle.modelloHint1")}<span className="font-medium">{t("bolle.modelloHintBold")}</span>{t("bolle.modelloHint2")}
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPrintOpen(false)}>Annulla</Button>
+            <Button variant="outline" onClick={() => setPrintOpen(false)}>{t("common.cancel")}</Button>
             <Button onClick={handleDownloadPdf} disabled={printing} className="gap-1.5">
-              <Download className="h-4 w-4" /> {printing ? "Generazione..." : "Scarica PDF"}
+              <Download className="h-4 w-4" /> {printing ? t("bolle.generazione") : t("bolle.scaricaPdf")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -850,9 +856,9 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
 // ─── Pagina principale ───────────────────────────────────────────────────────
 
 function trasferimentoStatoBadge(stato: string) {
-  if (stato === "completato") return <Badge className="bg-green-500 text-white">Completato</Badge>;
-  if (stato === "in_transito") return <Badge className="bg-amber-500 text-white">In transito</Badge>;
-  if (stato === "annullato") return <Badge variant="destructive">Annullato</Badge>;
+  if (stato === "completato") return <Badge className="bg-green-500 text-white">{i18n.t("bolle.trasfCompletato")}</Badge>;
+  if (stato === "in_transito") return <Badge className="bg-amber-500 text-white">{i18n.t("bolle.trasfInTransito")}</Badge>;
+  if (stato === "annullato") return <Badge variant="destructive">{i18n.t("bolle.statoAnnullato")}</Badge>;
   return <Badge variant="secondary">{stato.replace("_", " ")}</Badge>;
 }
 
@@ -874,23 +880,24 @@ export default function Bolle() {
   const { data: magazzini } = useListMagazzini();
   const { data: impostazioni } = useGetImpostazioniStampa();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedBollaId, setSelectedBollaId] = useState<number | null>(null);
   const [downloadingTrasfId, setDownloadingTrasfId] = useState<number | null>(null);
   const [downloadingScarId, setDownloadingScarId] = useState<number | null>(null);
 
-  const downloadTrasf = async (e: React.MouseEvent, t: Trasferimento) => {
+  const downloadTrasf = async (e: React.MouseEvent, trasf: Trasferimento) => {
     e.stopPropagation();
-    setDownloadingTrasfId(t.id);
+    setDownloadingTrasfId(trasf.id);
     try {
       const associationLogoDataUrl = await loadAssociationLogo();
       await generateTrasferimentoPdf({
-        trasferimento: t,
+        trasferimento: trasf,
         footer: impostazioni?.footerBolla ?? null,
         associationLogoDataUrl,
       });
     } catch {
-      toast({ title: "Errore", description: "Impossibile generare la bolla.", variant: "destructive" });
+      toast({ title: t("bolle.error"), description: t("bolle.genBollaError"), variant: "destructive" });
     } finally {
       setDownloadingTrasfId(null);
     }
@@ -907,7 +914,7 @@ export default function Bolle() {
         associationLogoDataUrl,
       });
     } catch {
-      toast({ title: "Errore", description: "Impossibile generare la bolla.", variant: "destructive" });
+      toast({ title: t("bolle.error"), description: t("bolle.genBollaError"), variant: "destructive" });
     } finally {
       setDownloadingScarId(null);
     }
@@ -945,23 +952,23 @@ export default function Bolle() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bolle di Consegna</h1>
-          <p className="text-muted-foreground">Documenti di accompagnamento per le uscite merce.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("bolle.title")}</h1>
+          <p className="text-muted-foreground">{t("bolle.subtitle")}</p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" /> Nuova Bolla
+          <Plus className="h-4 w-4" /> {t("bolle.newBolla")}
         </Button>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Magazzino</Label>
+          <Label className="text-xs text-muted-foreground">{t("bolle.magazzinoLabel")}</Label>
           <Select value={filterMagazzinoId} onValueChange={setFilterMagazzinoId}>
             <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Tutti i magazzini" />
+              <SelectValue placeholder={t("bolle.allMagazzini")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tutti i magazzini</SelectItem>
+              <SelectItem value="all">{t("bolle.allMagazzini")}</SelectItem>
               {(magazzini ?? []).map((m) => (
                 <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
               ))}
@@ -969,13 +976,13 @@ export default function Bolle() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Centro di Ascolto</Label>
+          <Label className="text-xs text-muted-foreground">{t("bolle.centroLabel")}</Label>
           <Select value={filterCentroId} onValueChange={setFilterCentroId}>
             <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Tutti i centri" />
+              <SelectValue placeholder={t("bolle.allCentriPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tutti i centri</SelectItem>
+              <SelectItem value="all">{t("bolle.allCentriPlaceholder")}</SelectItem>
               {(centri ?? []).map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
               ))}
@@ -983,17 +990,17 @@ export default function Bolle() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Stato</Label>
+          <Label className="text-xs text-muted-foreground">{t("common.status")}</Label>
           <Select value={filterStato} onValueChange={setFilterStato}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Tutti gli stati" />
+              <SelectValue placeholder={t("bolle.allStati")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tutti gli stati</SelectItem>
-              <SelectItem value="bozza">Bozza</SelectItem>
-              <SelectItem value="confermato">Confermato</SelectItem>
-              <SelectItem value="consegnato">Consegnato</SelectItem>
-              <SelectItem value="annullato">Annullato</SelectItem>
+              <SelectItem value="all">{t("bolle.allStati")}</SelectItem>
+              <SelectItem value="bozza">{t("bolle.statoBozza")}</SelectItem>
+              <SelectItem value="confermato">{t("bolle.statoConfermato")}</SelectItem>
+              <SelectItem value="consegnato">{t("bolle.statoConsegnato")}</SelectItem>
+              <SelectItem value="annullato">{t("bolle.statoAnnullato")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1003,7 +1010,7 @@ export default function Bolle() {
             className="gap-1.5 text-muted-foreground"
             onClick={() => { setFilterMagazzinoId("all"); setFilterCentroId("all"); setFilterStato("all"); }}
           >
-            <XCircle className="h-4 w-4" /> Azzera filtri
+            <XCircle className="h-4 w-4" /> {t("bolle.azzeraFiltri")}
           </Button>
         )}
       </div>
@@ -1013,11 +1020,11 @@ export default function Bolle() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Numero</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Beneficiario</TableHead>
-                <TableHead>Magazzino</TableHead>
-                <TableHead className="text-center">Stato</TableHead>
+                <TableHead>{t("bolle.numero")}</TableHead>
+                <TableHead>{t("common.date")}</TableHead>
+                <TableHead>{t("bolle.beneficiarioLabel")}</TableHead>
+                <TableHead>{t("bolle.magazzinoLabel")}</TableHead>
+                <TableHead className="text-center">{t("common.status")}</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -1034,8 +1041,8 @@ export default function Bolle() {
                 <TableRow>
                   <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     {filtersActive
-                      ? "Nessun documento corrisponde ai filtri selezionati."
-                      : "Nessuna bolla emessa. Crea la prima bolla con il pulsante in alto a destra."}
+                      ? t("bolle.noDocFiltri")
+                      : t("bolle.noBolle")}
                   </TableCell>
                 </TableRow>
               ) : rows.map(row => row.kind === "scar" ? (
@@ -1051,7 +1058,7 @@ export default function Bolle() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                      Scarico Magazzino
+                      {t("bolle.scaricoMagazzino")}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -1062,7 +1069,7 @@ export default function Bolle() {
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="secondary">{row.scar.righe?.length ?? 0} art.</Badge>
+                    <Badge variant="secondary">{t("bolle.articoli", { count: row.scar.righe?.length ?? 0 })}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -1072,7 +1079,7 @@ export default function Bolle() {
                       onClick={(e) => downloadScar(e, row.scar)}
                       disabled={downloadingScarId === row.scar.id}
                     >
-                      <Download className="h-3.5 w-3.5" /> Bolla
+                      <Download className="h-3.5 w-3.5" /> {t("bolle.bollaBtn")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -1111,7 +1118,7 @@ export default function Bolle() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                      Trasferimento Interno
+                      {t("bolle.trasferimentoInterno")}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -1130,7 +1137,7 @@ export default function Bolle() {
                       onClick={(e) => downloadTrasf(e, row.trasf)}
                       disabled={downloadingTrasfId === row.trasf.id}
                     >
-                      <Download className="h-3.5 w-3.5" /> Bolla
+                      <Download className="h-3.5 w-3.5" /> {t("bolle.bollaBtn")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -1145,7 +1152,7 @@ export default function Bolle() {
       <Sheet open={selectedBollaId !== null} onOpenChange={open => { if (!open) setSelectedBollaId(null); }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Dettaglio Bolla</SheetTitle>
+            <SheetTitle>{t("bolle.dettaglioBolla")}</SheetTitle>
           </SheetHeader>
           {selectedBollaId !== null && (
             <BollaDettaglio bollaId={selectedBollaId} />

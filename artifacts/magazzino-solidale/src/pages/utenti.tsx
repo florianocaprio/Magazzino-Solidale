@@ -64,10 +64,13 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus, Pencil, Trash2, KeyRound } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 const NO_ROLE = "none";
 
 export default function Utenti() {
+  const { t } = useTranslation();
   const { user: currentUser } = useAuth();
   const { data: utenti, isLoading } = useListUtenti();
   const { data: ruoli } = useListRuoli();
@@ -134,7 +137,7 @@ export default function Utenti() {
         {
           onSuccess: () => {
             invalidate();
-            toast({ title: "Utente aggiornato" });
+            toast({ title: t("utenti.toastUpdated") });
             setIsFormOpen(false);
           },
           onError: (err) => setFormError(extractError(err)),
@@ -142,7 +145,7 @@ export default function Utenti() {
       );
     } else {
       if (password.length < 8) {
-        setFormError("La password deve avere almeno 8 caratteri.");
+        setFormError(t("utenti.pwdShort"));
         return;
       }
       createUtente.mutate(
@@ -160,8 +163,8 @@ export default function Utenti() {
           onSuccess: () => {
             invalidate();
             toast({
-              title: "Utente creato",
-              description: "Dovrà cambiare la password al primo accesso.",
+              title: t("utenti.toastCreated"),
+              description: t("utenti.toastCreatedDesc"),
             });
             setIsFormOpen(false);
           },
@@ -178,12 +181,12 @@ export default function Utenti() {
       {
         onSuccess: () => {
           invalidate();
-          toast({ title: "Utente eliminato" });
+          toast({ title: t("utenti.toastDeleted") });
           setDeleting(null);
         },
         onError: (err) => {
           toast({
-            title: "Impossibile eliminare",
+            title: t("utenti.cannotDelete"),
             description: extractError(err),
             variant: "destructive",
           });
@@ -198,8 +201,8 @@ export default function Utenti() {
     if (!resetting) return;
     if (resetPwd.length < 8) {
       toast({
-        title: "Password troppo corta",
-        description: "Minimo 8 caratteri.",
+        title: t("utenti.pwdTooShort"),
+        description: t("utenti.minChars"),
         variant: "destructive",
       });
       return;
@@ -209,15 +212,15 @@ export default function Utenti() {
       {
         onSuccess: () => {
           toast({
-            title: "Password reimpostata",
-            description: "L'utente dovrà cambiarla al prossimo accesso.",
+            title: t("utenti.pwdReset"),
+            description: t("utenti.pwdResetDesc"),
           });
           setResetting(null);
           setResetPwd("");
         },
         onError: (err) =>
           toast({
-            title: "Errore",
+            title: t("utenti.error"),
             description: extractError(err),
             variant: "destructive",
           }),
@@ -229,14 +232,14 @@ export default function Utenti() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex justify-between items-center gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Utenti</h1>
+          <h1 className="text-2xl font-semibold">{t("utenti.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Gestisci gli account e i ruoli del personale
+            {t("utenti.subtitle")}
           </p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          Nuovo utente
+          {t("utenti.newUser")}
         </Button>
       </div>
 
@@ -253,12 +256,12 @@ export default function Utenti() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Matricola</TableHead>
-                  <TableHead>Ruolo</TableHead>
-                  <TableHead>Stato</TableHead>
-                  <TableHead>Ultimo accesso</TableHead>
+                  <TableHead>{t("utenti.colUsername")}</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("utenti.colMatricola")}</TableHead>
+                  <TableHead>{t("utenti.colRuolo")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
+                  <TableHead>{t("utenti.colUltimoAccesso")}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -272,16 +275,16 @@ export default function Utenti() {
                     <TableCell>
                       {u.attivo ? (
                         <Badge className="bg-emerald-500/10 text-emerald-700">
-                          Attivo
+                          {t("common.active")}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">Disattivato</Badge>
+                        <Badge variant="secondary">{t("utenti.disattivato")}</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {u.ultimoAccesso
                         ? new Date(u.ultimoAccesso).toLocaleString("it-IT")
-                        : "mai"}
+                        : t("utenti.never")}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -293,7 +296,7 @@ export default function Utenti() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEdit(u)}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Modifica
+                            {t("common.edit")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => {
@@ -302,7 +305,7 @@ export default function Utenti() {
                             }}
                           >
                             <KeyRound className="mr-2 h-4 w-4" />
-                            Reimposta password
+                            {t("utenti.resetPassword")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
@@ -310,7 +313,7 @@ export default function Utenti() {
                             onClick={() => setDeleting(u)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Elimina
+                            {t("common.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -323,7 +326,7 @@ export default function Utenti() {
                       colSpan={7}
                       className="text-center text-muted-foreground py-8"
                     >
-                      Nessun utente
+                      {t("utenti.emptyUsers")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -337,12 +340,12 @@ export default function Utenti() {
         <SheetContent>
           <SheetHeader>
             <SheetTitle>
-              {editing ? "Modifica utente" : "Nuovo utente"}
+              {editing ? t("utenti.editUser") : t("utenti.nuovoUtente")}
             </SheetTitle>
           </SheetHeader>
           <form onSubmit={onSubmit} className="space-y-4 mt-6">
             <div className="space-y-2">
-              <Label htmlFor="u-username">Username</Label>
+              <Label htmlFor="u-username">{t("utenti.colUsername")}</Label>
               <Input
                 id="u-username"
                 value={username}
@@ -352,7 +355,7 @@ export default function Utenti() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="u-nome">Nome completo</Label>
+              <Label htmlFor="u-nome">{t("utenti.nomeCompleto")}</Label>
               <Input
                 id="u-nome"
                 value={nome}
@@ -361,21 +364,20 @@ export default function Utenti() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="u-matricola">Matricola</Label>
+              <Label htmlFor="u-matricola">{t("utenti.colMatricola")}</Label>
               <Input
                 id="u-matricola"
                 value={matricola}
                 onChange={(e) => setMatricola(e.target.value)}
-                placeholder="Codice operatore (facoltativo)"
+                placeholder={t("utenti.matricolaPlaceholder")}
               />
               <p className="text-xs text-muted-foreground">
-                Stampata sulle bolle come codice operatore. Se vuota, viene usato
-                lo username.
+                {t("utenti.matricolaHint")}
               </p>
             </div>
             {!editing && (
               <div className="space-y-2">
-                <Label htmlFor="u-password">Password iniziale</Label>
+                <Label htmlFor="u-password">{t("utenti.passwordIniziale")}</Label>
                 <Input
                   id="u-password"
                   type="password"
@@ -385,18 +387,18 @@ export default function Utenti() {
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  L'utente dovrà cambiarla al primo accesso.
+                  {t("utenti.passwordHint")}
                 </p>
               </div>
             )}
             <div className="space-y-2">
-              <Label>Ruolo</Label>
+              <Label>{t("utenti.colRuolo")}</Label>
               <Select value={ruoloId} onValueChange={setRuoloId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleziona ruolo" />
+                  <SelectValue placeholder={t("utenti.selezionaRuolo")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_ROLE}>Nessun ruolo</SelectItem>
+                  <SelectItem value={NO_ROLE}>{t("utenti.nessunRuolo")}</SelectItem>
                   {ruoli?.map((r) => (
                     <SelectItem key={r.id} value={String(r.id)}>
                       {r.nome}
@@ -406,7 +408,7 @@ export default function Utenti() {
               </Select>
             </div>
             <div className="flex items-center justify-between">
-              <Label htmlFor="u-attivo">Account attivo</Label>
+              <Label htmlFor="u-attivo">{t("utenti.accountAttivo")}</Label>
               <Switch
                 id="u-attivo"
                 checked={attivo}
@@ -421,7 +423,7 @@ export default function Utenti() {
               className="w-full"
               disabled={createUtente.isPending || updateUtente.isPending}
             >
-              {editing ? "Salva modifiche" : "Crea utente"}
+              {editing ? t("utenti.saveChanges") : t("utenti.createUser")}
             </Button>
           </form>
         </SheetContent>
@@ -433,16 +435,16 @@ export default function Utenti() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reimposta password</DialogTitle>
+            <DialogTitle>{t("utenti.resetTitle")}</DialogTitle>
           </DialogHeader>
           <form onSubmit={confirmReset} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Imposta una nuova password per{" "}
-              <span className="font-medium">{resetting?.username}</span>. Dovrà
-              cambiarla al prossimo accesso.
+              {t("utenti.resetDescBefore")}{" "}
+              <span className="font-medium">{resetting?.username}</span>
+              {t("utenti.resetDescAfter")}
             </p>
             <div className="space-y-2">
-              <Label htmlFor="reset-pwd">Nuova password</Label>
+              <Label htmlFor="reset-pwd">{t("utenti.nuovaPassword")}</Label>
               <Input
                 id="reset-pwd"
                 type="password"
@@ -458,10 +460,10 @@ export default function Utenti() {
                 variant="outline"
                 onClick={() => setResetting(null)}
               >
-                Annulla
+                {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={resetPassword.isPending}>
-                Reimposta
+                {t("utenti.resetButton")}
               </Button>
             </DialogFooter>
           </form>
@@ -474,20 +476,20 @@ export default function Utenti() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminare l'utente?</AlertDialogTitle>
+            <AlertDialogTitle>{t("utenti.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              L'account{" "}
-              <span className="font-medium">{deleting?.username}</span> verrà
-              rimosso definitivamente.
+              {t("utenti.deleteDescBefore")}{" "}
+              <span className="font-medium">{deleting?.username}</span>{" "}
+              {t("utenti.deleteDescAfter")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Elimina
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -502,5 +504,5 @@ function extractError(err: unknown): string {
     const msg = (data as { error?: unknown }).error;
     if (typeof msg === "string") return msg;
   }
-  return "Operazione non riuscita.";
+  return i18n.t("utenti.operationFailed");
 }

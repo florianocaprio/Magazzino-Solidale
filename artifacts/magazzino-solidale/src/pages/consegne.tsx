@@ -20,6 +20,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
   beneficiarioId: z.coerce.number().min(1),
@@ -34,6 +35,7 @@ const formSchema = z.object({
 });
 
 export default function Consegne() {
+  const { t } = useTranslation();
   const [centroFilter, setCentroFilter] = useState("all");
   const [statoFilter, setStatoFilter] = useState("all");
   const consegneParams: { centroAscoltoId?: number; stato?: string } = {};
@@ -77,13 +79,13 @@ export default function Consegne() {
     associaBolla.mutate({ id: associatingId, data: { bollaId } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
-        toast({ title: bollaId ? "Bolla associata alla consegna" : "Bolla scollegata" });
+        toast({ title: bollaId ? t("consegne.toastBollaAssociata") : t("consegne.toastBollaScollegata") });
         setAssociatingId(null);
         setSelectedBollaId("");
       },
       onError: (e: unknown) => {
         const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-        toast({ title: "Operazione non riuscita", description: msg ?? "Errore", variant: "destructive" });
+        toast({ title: t("consegne.toastOpFallita"), description: msg ?? t("consegne.toastErrore"), variant: "destructive" });
       },
     });
   };
@@ -100,7 +102,7 @@ export default function Consegne() {
     createConsegna.mutate({ data }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
-        toast({ title: "Consegna programmata" });
+        toast({ title: t("consegne.toastConsegnaProgrammata") });
         setIsFormOpen(false);
       }
     });
@@ -111,12 +113,12 @@ export default function Consegne() {
     completaConsegna.mutate({ id: completingId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
-        toast({ title: "Consegna registrata come consegnata", description: "L'evento è stato annotato negli interventi del beneficiario." });
+        toast({ title: t("consegne.toastConsegnaRegistrata"), description: t("consegne.toastConsegnaRegistrataDesc") });
         setCompletingId(null);
       },
       onError: (e: unknown) => {
         const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-        toast({ title: "Impossibile completare", description: msg ?? "Errore", variant: "destructive" });
+        toast({ title: t("consegne.toastImpossibileCompletare"), description: msg ?? t("consegne.toastErrore"), variant: "destructive" });
         setCompletingId(null);
       },
     });
@@ -126,29 +128,29 @@ export default function Consegne() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Pianificazione Consegne</h1>
-          <p className="text-muted-foreground">Gestisci le distribuzioni in sede e a domicilio.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("consegne.title")}</h1>
+          <p className="text-muted-foreground">{t("consegne.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={consegne ?? []}
             columns={[
-              { header: "Codice", accessor: (c) => c.codice },
-              { header: "Data Prevista", accessor: (c) => c.dataPrevista ? new Date(c.dataPrevista).toLocaleDateString("it-IT") : "" },
-              { header: "Fascia Oraria", accessor: (c) => c.fasciaOraria },
-              { header: "Beneficiario", accessor: (c) => c.beneficiarioNome },
-              { header: "Tipo", accessor: (c) => c.tipoConsegna?.replace('_', ' ') },
-              { header: "Indirizzo", accessor: (c) => c.indirizzoConsegna },
-              { header: "Zona", accessor: (c) => c.zona },
-              { header: "Magazzino", accessor: (c) => c.magazzinoNome },
-              { header: "Volontario", accessor: (c) => c.volontarioNome },
-              { header: "Stato", accessor: (c) => c.stato },
+              { header: t("common.code"), accessor: (c) => c.codice },
+              { header: t("consegne.colDataPrevista"), accessor: (c) => c.dataPrevista ? new Date(c.dataPrevista).toLocaleDateString("it-IT") : "" },
+              { header: t("consegne.colFasciaOraria"), accessor: (c) => c.fasciaOraria },
+              { header: t("consegne.beneficiario"), accessor: (c) => c.beneficiarioNome },
+              { header: t("common.type"), accessor: (c) => c.tipoConsegna?.replace('_', ' ') },
+              { header: t("common.address"), accessor: (c) => c.indirizzoConsegna },
+              { header: t("consegne.zona"), accessor: (c) => c.zona },
+              { header: t("consegne.magazzino"), accessor: (c) => c.magazzinoNome },
+              { header: t("consegne.volontario"), accessor: (c) => c.volontarioNome },
+              { header: t("common.status"), accessor: (c) => c.stato },
             ]}
             filename="consegne"
-            title="Consegne"
+            title={t("consegne.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Pianifica Consegna</Button>
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("consegne.planDelivery")}</Button>
         </div>
       </div>
 
@@ -158,21 +160,21 @@ export default function Consegne() {
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={centroFilter} onValueChange={setCentroFilter}>
               <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Tutti i centri" />
+                <SelectValue placeholder={t("consegne.filterAllCenters")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tutti i centri</SelectItem>
+                <SelectItem value="all">{t("consegne.filterAllCenters")}</SelectItem>
                 {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={statoFilter} onValueChange={setStatoFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Tutti gli stati" />
+                <SelectValue placeholder={t("consegne.filterAllStatuses")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tutti gli stati</SelectItem>
-                <SelectItem value="pianificata">Pianificata</SelectItem>
-                <SelectItem value="effettuata">Effettuata</SelectItem>
+                <SelectItem value="all">{t("consegne.filterAllStatuses")}</SelectItem>
+                <SelectItem value="pianificata">{t("consegne.statoPianificata")}</SelectItem>
+                <SelectItem value="effettuata">{t("consegne.statoEffettuata")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -181,13 +183,13 @@ export default function Consegne() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Codice</TableHead>
-                <TableHead>Data & Fascia</TableHead>
-                <TableHead>Beneficiario</TableHead>
-                <TableHead>Dettagli</TableHead>
-                <TableHead>Bolla</TableHead>
-                <TableHead className="text-center">Stato</TableHead>
-                <TableHead className="text-right">Azione</TableHead>
+                <TableHead>{t("common.code")}</TableHead>
+                <TableHead>{t("consegne.thDataFascia")}</TableHead>
+                <TableHead>{t("consegne.beneficiario")}</TableHead>
+                <TableHead>{t("consegne.thDettagli")}</TableHead>
+                <TableHead>{t("consegne.thBolla")}</TableHead>
+                <TableHead className="text-center">{t("common.status")}</TableHead>
+                <TableHead className="text-right">{t("consegne.thAzione")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -205,7 +207,7 @@ export default function Consegne() {
                 ))
               ) : consegne?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">Nessuna consegna pianificata.</TableCell>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("consegne.emptyState")}</TableCell>
                 </TableRow>
               ) : consegne?.map((c) => (
                 <TableRow key={c.id}>
@@ -219,18 +221,18 @@ export default function Consegne() {
                     <div className="flex flex-col gap-1 text-sm">
                       {c.tipoConsegna === 'domicilio' ? (
                         <div className="flex items-center gap-1 text-blue-600">
-                          <MapPin className="h-3 w-3" /> {c.indirizzoConsegna || 'Domicilio'} {c.zona ? `(${c.zona})` : ''}
+                          <MapPin className="h-3 w-3" /> {c.indirizzoConsegna || t("consegne.domicilioFallback")} {c.zona ? `(${c.zona})` : ''}
                         </div>
                       ) : c.tipoConsegna === 'diretta' ? (
                         <div className="flex items-center gap-1 text-emerald-600">
-                          <Truck className="h-3 w-3" /> Consegna diretta dal centro di ascolto
+                          <Truck className="h-3 w-3" /> {t("consegne.consegnaDiretta")}
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 text-purple-600">
-                          <Truck className="h-3 w-3" /> Ritiro in {c.magazzinoNome}
+                          <Truck className="h-3 w-3" /> {t("consegne.ritiroIn", { magazzino: c.magazzinoNome })}
                         </div>
                       )}
-                      {c.volontarioNome && <div className="text-xs text-muted-foreground">Volontario: {c.volontarioNome}</div>}
+                      {c.volontarioNome && <div className="text-xs text-muted-foreground">{t("consegne.volontarioPrefix", { name: c.volontarioNome })}</div>}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -239,15 +241,15 @@ export default function Consegne() {
                       const pronta = c.bollaStato === 'confermato' || c.bollaStato === 'consegnato';
                       const badge = c.bollaStato == null ? (
                         <Badge variant="outline" className="gap-1 border-amber-200 bg-amber-50 text-amber-700">
-                          <FileClock className="h-3 w-3" /> In preparazione
+                          <FileClock className="h-3 w-3" /> {t("consegne.inPreparazione")}
                         </Badge>
                       ) : pronta ? (
                         <Badge variant="outline" className="gap-1 border-green-200 bg-green-50 text-green-700">
-                          <FileText className="h-3 w-3" /> {c.bollaNumero} · Pronta
+                          <FileText className="h-3 w-3" /> {c.bollaNumero} · {t("consegne.pronta")}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="gap-1 border-amber-200 bg-amber-50 text-amber-700">
-                          <FileClock className="h-3 w-3" /> {c.bollaNumero} · In preparazione
+                          <FileClock className="h-3 w-3" /> {c.bollaNumero} · {t("consegne.inPreparazione")}
                         </Badge>
                       );
                       return (
@@ -263,7 +265,7 @@ export default function Consegne() {
                             }
                           }}
                           className="text-left disabled:cursor-default disabled:opacity-100 enabled:hover:opacity-80"
-                          title={consegnata ? (c.bollaId != null ? "Visualizza e scarica la bolla" : undefined) : "Gestisci bolla associata"}
+                          title={consegnata ? (c.bollaId != null ? t("consegne.titleViewBolla") : undefined) : t("consegne.titleManageBolla")}
                         >
                           {badge}
                         </button>
@@ -273,24 +275,24 @@ export default function Consegne() {
                   <TableCell className="text-center">
                     <Badge variant={c.stato === 'effettuata' ? 'default' : 'outline'}
                            className={c.stato === 'effettuata' ? 'bg-green-500' : 'border-blue-200 text-blue-700 bg-blue-50'}>
-                      {c.stato === 'effettuata' ? 'Consegnata' : 'Pianificata'}
+                      {c.stato === 'effettuata' ? t("consegne.badgeConsegnata") : t("consegne.badgePianificata")}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     {c.stato === 'effettuata' ? (
                       c.bollaId != null && (
                         <Button size="sm" variant="outline" className="gap-1" onClick={() => setViewingBollaId(c.bollaId!)}>
-                          <Download className="h-3.5 w-3.5" /> Bolla
+                          <Download className="h-3.5 w-3.5" /> {t("consegne.btnBolla")}
                         </Button>
                       )
                     ) : (
                       (c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') ? (
                         <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Consegnato
+                          <CheckCircle2 className="h-3.5 w-3.5" /> {t("consegne.btnConsegnato")}
                         </Button>
                       ) : (
                         <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}>
-                          <Link2 className="h-3.5 w-3.5" /> Associa bolla
+                          <Link2 className="h-3.5 w-3.5" /> {t("consegne.btnAssociaBolla")}
                         </Button>
                       )
                     )}
@@ -304,22 +306,22 @@ export default function Consegne() {
 
       <Sheet open={viewingBollaId !== null} onOpenChange={(open) => { if (!open) setViewingBollaId(null); }}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader><SheetTitle>Bolla della consegna</SheetTitle></SheetHeader>
+          <SheetHeader><SheetTitle>{t("consegne.bollaConsegnaTitle")}</SheetTitle></SheetHeader>
           {viewingBollaId !== null && <BollaDettaglio bollaId={viewingBollaId} />}
         </SheetContent>
       </Sheet>
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader><SheetTitle>Pianifica Consegna</SheetTitle></SheetHeader>
+          <SheetHeader><SheetTitle>{t("consegne.planDelivery")}</SheetTitle></SheetHeader>
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="beneficiarioId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Beneficiario</FormLabel>
+                    <FormLabel>{t("consegne.beneficiario")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder={t("consegne.selectPlaceholder")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {beneficiari?.map(b => <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>)}
                       </SelectContent>
@@ -329,17 +331,17 @@ export default function Consegne() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="dataPrevista" render={({ field }) => (
-                    <FormItem><FormLabel>Data</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("common.date")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="fasciaOraria" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fascia</FormLabel>
+                      <FormLabel>{t("consegne.formFascia")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value="Mattina">Mattina (9-13)</SelectItem>
-                          <SelectItem value="Pomeriggio">Pomeriggio (14-18)</SelectItem>
-                          <SelectItem value="Sera">Sera (18-20)</SelectItem>
+                          <SelectItem value="Mattina">{t("consegne.fasciaMattina")}</SelectItem>
+                          <SelectItem value="Pomeriggio">{t("consegne.fasciaPomeriggio")}</SelectItem>
+                          <SelectItem value="Sera">{t("consegne.fasciaSera")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -348,12 +350,12 @@ export default function Consegne() {
 
                 <FormField control={form.control} name="tipoConsegna" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Modalità</FormLabel>
+                    <FormLabel>{t("consegne.formModalita")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="in_sede">Ritiro in Sede</SelectItem>
-                        <SelectItem value="domicilio">A Domicilio</SelectItem>
+                        <SelectItem value="in_sede">{t("consegne.modInSede")}</SelectItem>
+                        <SelectItem value="domicilio">{t("consegne.modDomicilio")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -362,18 +364,18 @@ export default function Consegne() {
                 {form.watch("tipoConsegna") === "domicilio" && (
                   <div className="space-y-4 pt-2 border-t">
                     <FormField control={form.control} name="indirizzoConsegna" render={({ field }) => (
-                      <FormItem><FormLabel>Indirizzo di Consegna</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                      <FormItem><FormLabel>{t("consegne.formIndirizzo")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                     )} />
                     <FormField control={form.control} name="zona" render={({ field }) => (
-                      <FormItem><FormLabel>Zona / Quartiere</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                      <FormItem><FormLabel>{t("consegne.formZona")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                     )} />
                     <FormField control={form.control} name="volontarioId" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Assegna Volontario (Opzionale)</FormLabel>
+                        <FormLabel>{t("consegne.formVolontario")}</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Nessuno" /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                           <SelectContent>
-                            <SelectItem value="0">Nessuno</SelectItem>
+                            <SelectItem value="0">{t("common.none")}</SelectItem>
                             {volontari?.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>)}
                           </SelectContent>
                         </Select>
@@ -385,9 +387,9 @@ export default function Consegne() {
                 <div className="pt-2 border-t">
                   <FormField control={form.control} name="magazzinoId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Magazzino di Partenza</FormLabel>
+                      <FormLabel>{t("consegne.formMagazzino")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder={t("consegne.selectPlaceholder")} /></SelectTrigger></FormControl>
                         <SelectContent>
                           {magazzini?.map(m => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
                         </SelectContent>
@@ -397,8 +399,8 @@ export default function Consegne() {
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
-                  <Button type="submit" disabled={createConsegna.isPending}>Salva</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="submit" disabled={createConsegna.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
             </Form>
@@ -408,13 +410,13 @@ export default function Consegne() {
 
       <AlertDialog open={!!completingId} onOpenChange={(open) => !open && setCompletingId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Segna come Consegnato</AlertDialogTitle>
+          <AlertDialogHeader><AlertDialogTitle>{t("consegne.dialogCompletaTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
-            Confermi che la merce è stata consegnata? La bolla associata verrà chiusa e l'evento sarà registrato negli interventi del beneficiario.
+            {t("consegne.dialogCompletaDesc")}
           </AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCompleta} className="bg-green-600 hover:bg-green-700">Conferma Consegna</AlertDialogAction>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCompleta} className="bg-green-600 hover:bg-green-700">{t("consegne.dialogCompletaConfirm")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -422,23 +424,23 @@ export default function Consegne() {
       <AlertDialog open={!!associatingId} onOpenChange={(open) => { if (!open) { setAssociatingId(null); setSelectedBollaId(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Associa Bolla alla Consegna</AlertDialogTitle>
+            <AlertDialogTitle>{t("consegne.dialogAssociaTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Collega una bolla a questa consegna. Finché la bolla è in bozza risulta "in preparazione"; una volta confermata (merce preparata) diventa "pronta" e potrai segnare la consegna come consegnata.
+              {t("consegne.dialogAssociaDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-2 space-y-3">
             {bolleDisponibili.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nessuna bolla disponibile per questo beneficiario. Crea prima una bolla dalla sezione <span className="font-medium">Bolle</span>.
+                {t("consegne.noBollaAvailable")} <span className="font-medium">{t("consegne.bolleSection")}</span>.
               </p>
             ) : (
               <Select value={selectedBollaId} onValueChange={setSelectedBollaId}>
-                <SelectTrigger><SelectValue placeholder="Seleziona una bolla..." /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("consegne.selectBollaPlaceholder")} /></SelectTrigger>
                 <SelectContent>
                   {bolleDisponibili.map(b => (
                     <SelectItem key={b.id} value={String(b.id)}>
-                      {b.numeroBolla} · {b.stato === 'confermato' ? 'pronta' : b.stato === 'consegnato' ? 'consegnata' : 'in preparazione'}
+                      {b.numeroBolla} · {b.stato === 'confermato' ? t("consegne.optPronta") : b.stato === 'consegnato' ? t("consegne.optConsegnata") : t("consegne.optInPreparazione")}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -448,15 +450,15 @@ export default function Consegne() {
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             {associatingConsegna?.bollaId != null && (
               <Button variant="outline" className="mr-auto text-destructive" disabled={associaBolla.isPending} onClick={() => handleAssocia(null)}>
-                Scollega bolla
+                {t("consegne.btnScollega")}
               </Button>
             )}
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <Button
               disabled={!selectedBollaId || associaBolla.isPending}
               onClick={() => handleAssocia(selectedBollaId ? parseInt(selectedBollaId) : null)}
             >
-              Associa
+              {t("consegne.btnAssocia")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

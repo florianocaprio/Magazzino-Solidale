@@ -10,8 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
 import { Check, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 export default function ImpostazioniStampa() {
+  const { t } = useTranslation();
   const { data, isLoading } = useGetImpostazioniStampa();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -33,9 +35,9 @@ export default function ImpostazioniStampa() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetImpostazioniStampaQueryKey() });
-          toast({ title: "Impostazioni salvate" });
+          toast({ title: t("impostazioniStampa.toastSaved") });
         },
-        onError: () => toast({ title: "Errore nel salvataggio", variant: "destructive" }),
+        onError: () => toast({ title: t("impostazioniStampa.toastError"), variant: "destructive" }),
       },
     );
   };
@@ -44,15 +46,15 @@ export default function ImpostazioniStampa() {
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Printer className="h-7 w-7" /> Impostazioni Stampa Bolla
+          <Printer className="h-7 w-7" /> {t("impostazioniStampa.title")}
         </h1>
-        <p className="text-muted-foreground">Modello e piè di pagina usati per le bolle di consegna in PDF.</p>
+        <p className="text-muted-foreground">{t("impostazioniStampa.subtitle")}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Modello bolla</CardTitle>
-          <CardDescription>Scegli l'aspetto del PDF generato per le bolle.</CardDescription>
+          <CardTitle>{t("impostazioniStampa.modelloTitle")}</CardTitle>
+          <CardDescription>{t("impostazioniStampa.modelloDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -85,18 +87,18 @@ export default function ImpostazioniStampa() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Piè di pagina personalizzato</CardTitle>
-          <CardDescription>Testo mostrato in fondo a ogni bolla (accanto al logo dell'associazione).</CardDescription>
+          <CardTitle>{t("impostazioniStampa.footerTitle")}</CardTitle>
+          <CardDescription>{t("impostazioniStampa.footerDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="footer">Testo piè di pagina</Label>
+            <Label htmlFor="footer">{t("impostazioniStampa.footerLabel")}</Label>
             <Textarea
               id="footer"
               rows={3}
               value={footer}
               onChange={(e) => setFooter(e.target.value)}
-              placeholder="Es. Associazione Angeli in Moto — C.F. 000000000 — info@angelinmoto.it"
+              placeholder={t("impostazioniStampa.footerPlaceholder")}
               disabled={isLoading}
             />
           </div>
@@ -105,7 +107,7 @@ export default function ImpostazioniStampa() {
 
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={update.isPending || isLoading}>
-          Salva impostazioni
+          {t("impostazioniStampa.saveSettings")}
         </Button>
       </div>
     </div>

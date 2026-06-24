@@ -18,6 +18,7 @@ import { MoreHorizontal, Plus, Pencil, Trash2, Building2, Users } from "lucide-r
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
   nome: z.string().min(2, "Nome obbligatorio"),
@@ -41,6 +42,7 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 export default function CentriAscolto() {
+  const { t } = useTranslation();
   const { data: centri, isLoading } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -87,7 +89,7 @@ export default function CentriAscolto() {
       updateCentro.mutate({ id: editingId, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListCentriAscoltoQueryKey() });
-          toast({ title: "Centro aggiornato" });
+          toast({ title: t("centriAscolto.toastUpdated") });
           setIsFormOpen(false);
         }
       });
@@ -95,7 +97,7 @@ export default function CentriAscolto() {
       createCentro.mutate({ data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListCentriAscoltoQueryKey() });
-          toast({ title: "Centro creato" });
+          toast({ title: t("centriAscolto.toastCreated") });
           setIsFormOpen(false);
         }
       });
@@ -107,7 +109,7 @@ export default function CentriAscolto() {
     deleteCentro.mutate({ id: deletingId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListCentriAscoltoQueryKey() });
-        toast({ title: "Centro eliminato" });
+        toast({ title: t("centriAscolto.toastDeleted") });
         setDeletingId(null);
       }
     });
@@ -117,26 +119,26 @@ export default function CentriAscolto() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Centri di Ascolto</h1>
-          <p className="text-muted-foreground">Punti di riferimento territoriali a cui sono associati i beneficiari.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("centriAscolto.title")}</h1>
+          <p className="text-muted-foreground">{t("centriAscolto.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={centri ?? []}
             columns={[
-              { header: "Nome", accessor: (c) => c.nome },
-              { header: "Indirizzo", accessor: (c) => c.indirizzo },
-              { header: "Comune", accessor: (c) => c.comune },
-              { header: "Responsabile", accessor: (c) => c.responsabile },
-              { header: "Telefono", accessor: (c) => c.telefono },
-              { header: "Email", accessor: (c) => c.email },
-              { header: "Attivo", accessor: (c) => c.attivo ? "Sì" : "No" },
+              { header: t("common.name"), accessor: (c) => c.nome },
+              { header: t("common.address"), accessor: (c) => c.indirizzo },
+              { header: t("centriAscolto.comune"), accessor: (c) => c.comune },
+              { header: t("centriAscolto.responsabile"), accessor: (c) => c.responsabile },
+              { header: t("common.phone"), accessor: (c) => c.telefono },
+              { header: t("common.email"), accessor: (c) => c.email },
+              { header: t("centriAscolto.attivoLabel"), accessor: (c) => c.attivo ? t("common.yes") : t("common.no") },
             ]}
             filename="centri_ascolto"
-            title="Centri di Ascolto"
+            title={t("centriAscolto.title")}
           />
           <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> Nuovo Centro
+            <Plus className="h-4 w-4" /> {t("centriAscolto.newCentro")}
           </Button>
         </div>
       </div>
@@ -146,12 +148,12 @@ export default function CentriAscolto() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Comune</TableHead>
-                <TableHead>Responsabile</TableHead>
-                <TableHead>Contatti</TableHead>
-                <TableHead className="text-center">Beneficiari</TableHead>
-                <TableHead className="text-center">Stato</TableHead>
+                <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("centriAscolto.comune")}</TableHead>
+                <TableHead>{t("centriAscolto.responsabile")}</TableHead>
+                <TableHead>{t("centriAscolto.contatti")}</TableHead>
+                <TableHead className="text-center">{t("centriAscolto.beneficiari")}</TableHead>
+                <TableHead className="text-center">{t("common.status")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -171,7 +173,7 @@ export default function CentriAscolto() {
               ) : centri?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                    Nessun centro di ascolto registrato.
+                    {t("centriAscolto.noCentri")}
                   </TableCell>
                 </TableRow>
               ) : centri?.map((c) => (
@@ -196,23 +198,23 @@ export default function CentriAscolto() {
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline" className={c.attivo ? 'bg-green-500/10 text-green-700 border-none' : 'bg-muted text-muted-foreground'}>
-                      {c.attivo ? 'Attivo' : 'Inattivo'}
+                      {c.attivo ? t("common.active") : t("common.inactive")}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Apri menu</span>
+                          <span className="sr-only">{t("centriAscolto.openMenu")}</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(c)}>
-                          <Pencil className="mr-2 h-4 w-4" /> Modifica
+                          <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(c.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Elimina
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -227,20 +229,20 @@ export default function CentriAscolto() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId ? "Modifica Centro" : "Nuovo Centro di Ascolto"}</SheetTitle>
+            <SheetTitle>{editingId ? t("centriAscolto.editTitle") : t("centriAscolto.newTitle")}</SheetTitle>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="nome" render={({ field }) => (
-                  <FormItem><FormLabel>Nome</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("common.name")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="logoUrl" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Logo (per intestazione bolle)</FormLabel>
+                    <FormLabel>{t("centriAscolto.logoLabel")}</FormLabel>
                     <div className="flex items-center gap-3">
                       {field.value ? (
-                        <img src={field.value} alt="Logo" className="h-14 w-14 object-contain rounded border bg-white" />
+                        <img src={field.value} alt={t("centriAscolto.logoAlt")} className="h-14 w-14 object-contain rounded border bg-white" />
                       ) : (
                         <div className="h-14 w-14 rounded border border-dashed flex items-center justify-center text-muted-foreground">
                           <Building2 className="h-5 w-5" />
@@ -256,7 +258,7 @@ export default function CentriAscolto() {
                               const file = e.target.files?.[0];
                               if (!file) return;
                               if (file.size > 500 * 1024) {
-                                toast({ title: "Logo troppo grande", description: "Usa un'immagine sotto i 500 KB.", variant: "destructive" });
+                                toast({ title: t("centriAscolto.logoTooBig"), description: t("centriAscolto.logoTooBigDesc"), variant: "destructive" });
                                 return;
                               }
                               field.onChange(await fileToDataUrl(file));
@@ -265,7 +267,7 @@ export default function CentriAscolto() {
                         </FormControl>
                         {field.value && (
                           <Button type="button" variant="ghost" size="sm" className="h-7 justify-start px-2 text-destructive hover:text-destructive" onClick={() => field.onChange("")}>
-                            <Trash2 className="mr-1 h-3.5 w-3.5" /> Rimuovi logo
+                            <Trash2 className="mr-1 h-3.5 w-3.5" /> {t("centriAscolto.removeLogo")}
                           </Button>
                         )}
                       </div>
@@ -274,35 +276,35 @@ export default function CentriAscolto() {
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="indirizzo" render={({ field }) => (
-                  <FormItem><FormLabel>Indirizzo</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("common.address")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <FormField control={form.control} name="comune" render={({ field }) => (
-                  <FormItem><FormLabel>Comune</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("centriAscolto.comune")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <FormField control={form.control} name="responsabile" render={({ field }) => (
-                  <FormItem><FormLabel>Responsabile</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("centriAscolto.responsabile")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="telefono" render={({ field }) => (
-                    <FormItem><FormLabel>Telefono</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("common.phone")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("common.email")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="note" render={({ field }) => (
-                  <FormItem><FormLabel>Note</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("common.notes")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <FormField control={form.control} name="attivo" render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                    <FormLabel className="m-0">Centro attivo</FormLabel>
+                    <FormLabel className="m-0">{t("centriAscolto.centroAttivo")}</FormLabel>
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
                 )} />
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
-                  <Button type="submit" disabled={createCentro.isPending || updateCentro.isPending}>Salva</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="submit" disabled={createCentro.isPending || updateCentro.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
             </Form>
@@ -313,14 +315,14 @@ export default function CentriAscolto() {
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+            <AlertDialogTitle>{t("centriAscolto.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              I beneficiari associati a questo centro verranno scollegati (non eliminati).
+              {t("centriAscolto.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Elimina</AlertDialogAction>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

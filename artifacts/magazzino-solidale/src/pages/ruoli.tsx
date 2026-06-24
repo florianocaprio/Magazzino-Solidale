@@ -50,8 +50,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
 import { AREA_LABEL } from "@/lib/areas";
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 export default function Ruoli() {
+  const { t } = useTranslation();
   const { data: ruoli, isLoading } = useListRuoli();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -114,7 +117,7 @@ export default function Ruoli() {
         {
           onSuccess: () => {
             invalidate();
-            toast({ title: "Ruolo aggiornato" });
+            toast({ title: t("ruoli.toastUpdated") });
             setIsFormOpen(false);
           },
           onError: (err) => setFormError(extractError(err)),
@@ -126,7 +129,7 @@ export default function Ruoli() {
         {
           onSuccess: () => {
             invalidate();
-            toast({ title: "Ruolo creato" });
+            toast({ title: t("ruoli.toastCreated") });
             setIsFormOpen(false);
           },
           onError: (err) => setFormError(extractError(err)),
@@ -142,12 +145,12 @@ export default function Ruoli() {
       {
         onSuccess: () => {
           invalidate();
-          toast({ title: "Ruolo eliminato" });
+          toast({ title: t("ruoli.toastDeleted") });
           setDeleting(null);
         },
         onError: (err) => {
           toast({
-            title: "Impossibile eliminare",
+            title: t("ruoli.cannotDelete"),
             description: extractError(err),
             variant: "destructive",
           });
@@ -161,14 +164,14 @@ export default function Ruoli() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex justify-between items-center gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Ruoli</h1>
+          <h1 className="text-2xl font-semibold">{t("ruoli.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Definisci i ruoli e le aree accessibili
+            {t("ruoli.subtitle")}
           </p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          Nuovo ruolo
+          {t("ruoli.newRole")}
         </Button>
       </div>
 
@@ -185,9 +188,9 @@ export default function Ruoli() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Aree</TableHead>
-                  <TableHead>Tipo</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("ruoli.colAree")}</TableHead>
+                  <TableHead>{t("common.type")}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -205,7 +208,7 @@ export default function Ruoli() {
                     <TableCell>
                       {r.isAdmin ? (
                         <span className="text-sm text-muted-foreground">
-                          Tutte le aree
+                          {t("ruoli.allAreas")}
                         </span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
@@ -226,10 +229,10 @@ export default function Ruoli() {
                       {r.isAdmin ? (
                         <Badge className="bg-amber-500/10 text-amber-700">
                           <ShieldCheck className="mr-1 h-3 w-3" />
-                          Amministratore
+                          {t("ruoli.admin")}
                         </Badge>
                       ) : (
-                        <Badge variant="outline">Standard</Badge>
+                        <Badge variant="outline">{t("ruoli.standard")}</Badge>
                       )}
                     </TableCell>
                     <TableCell>
@@ -242,14 +245,14 @@ export default function Ruoli() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEdit(r)}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Modifica
+                            {t("common.edit")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => setDeleting(r)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Elimina
+                            {t("common.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -262,7 +265,7 @@ export default function Ruoli() {
                       colSpan={4}
                       className="text-center text-muted-foreground py-8"
                     >
-                      Nessun ruolo
+                      {t("ruoli.emptyRoles")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -276,12 +279,12 @@ export default function Ruoli() {
         <SheetContent>
           <SheetHeader>
             <SheetTitle>
-              {editing ? "Modifica ruolo" : "Nuovo ruolo"}
+              {editing ? t("ruoli.editRole") : t("ruoli.newRole")}
             </SheetTitle>
           </SheetHeader>
           <form onSubmit={onSubmit} className="space-y-4 mt-6">
             <div className="space-y-2">
-              <Label htmlFor="r-nome">Nome ruolo</Label>
+              <Label htmlFor="r-nome">{t("ruoli.roleName")}</Label>
               <Input
                 id="r-nome"
                 value={nome}
@@ -290,7 +293,7 @@ export default function Ruoli() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="r-descr">Descrizione</Label>
+              <Label htmlFor="r-descr">{t("common.description")}</Label>
               <Input
                 id="r-descr"
                 value={descrizione}
@@ -299,9 +302,9 @@ export default function Ruoli() {
             </div>
             <div className="flex items-center justify-between rounded-md border p-3">
               <div>
-                <Label htmlFor="r-admin">Amministratore</Label>
+                <Label htmlFor="r-admin">{t("ruoli.admin")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Accesso completo a tutte le aree e alla gestione utenti.
+                  {t("ruoli.adminDesc")}
                 </p>
               </div>
               <Switch
@@ -312,7 +315,7 @@ export default function Ruoli() {
             </div>
             {!isAdmin && (
               <div className="space-y-2">
-                <Label>Aree accessibili</Label>
+                <Label>{t("ruoli.accessibleAreas")}</Label>
                 <div className="space-y-2 rounded-md border p-3">
                   {ALL_AREAS.filter((a) => a.key !== "amministrazione").map(
                     (a) => (
@@ -344,7 +347,7 @@ export default function Ruoli() {
               className="w-full"
               disabled={createRuolo.isPending || updateRuolo.isPending}
             >
-              {editing ? "Salva modifiche" : "Crea ruolo"}
+              {editing ? t("ruoli.saveChanges") : t("ruoli.createRole")}
             </Button>
           </form>
         </SheetContent>
@@ -356,20 +359,20 @@ export default function Ruoli() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminare il ruolo?</AlertDialogTitle>
+            <AlertDialogTitle>{t("ruoli.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Il ruolo <span className="font-medium">{deleting?.nome}</span>{" "}
-              verrà rimosso. Non sarà possibile se è ancora assegnato a degli
-              utenti.
+              {t("ruoli.deleteDescBefore")}{" "}
+              <span className="font-medium">{deleting?.nome}</span>{" "}
+              {t("ruoli.deleteDescAfter")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Elimina
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -384,5 +387,5 @@ function extractError(err: unknown): string {
     const msg = (data as { error?: unknown }).error;
     if (typeof msg === "string") return msg;
   }
-  return "Operazione non riuscita.";
+  return i18n.t("ruoli.operationFailed");
 }

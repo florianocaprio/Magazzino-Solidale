@@ -20,21 +20,22 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-
-const formSchema = z.object({
-  codice: z.string().min(2, "Codice obbligatorio"),
-  tipo: z.string().min(1, "Tipo obbligatorio"),
-  targa: z.string().optional(),
-  proprieta: z.string().default("associazione"),
-  proprietarioNome: z.string().optional(),
-  capacitaColli: z.coerce.number().optional(),
-  capacitaKg: z.coerce.number().optional(),
-  scadenzaAssicurazione: z.string().optional(),
-  scadenzaRevisione: z.string().optional(),
-  note: z.string().optional()
-});
+import { useTranslation } from "react-i18next";
 
 export default function Mezzi() {
+  const { t } = useTranslation();
+  const formSchema = z.object({
+    codice: z.string().min(2, t("mezzi.valCodice")),
+    tipo: z.string().min(1, t("mezzi.valTipo")),
+    targa: z.string().optional(),
+    proprieta: z.string().default("associazione"),
+    proprietarioNome: z.string().optional(),
+    capacitaColli: z.coerce.number().optional(),
+    capacitaKg: z.coerce.number().optional(),
+    scadenzaAssicurazione: z.string().optional(),
+    scadenzaRevisione: z.string().optional(),
+    note: z.string().optional()
+  });
   const { data: mezzi, isLoading } = useListMezzi();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -84,7 +85,7 @@ export default function Mezzi() {
       updateMezzo.mutate({ id: editingId, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
-          toast({ title: "Mezzo aggiornato" });
+          toast({ title: t("mezzi.toastUpdated") });
           setIsFormOpen(false);
         }
       });
@@ -92,7 +93,7 @@ export default function Mezzi() {
       createMezzo.mutate({ data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
-          toast({ title: "Mezzo creato" });
+          toast({ title: t("mezzi.toastCreated") });
           setIsFormOpen(false);
         }
       });
@@ -104,7 +105,7 @@ export default function Mezzi() {
     deleteMezzo.mutate({ id: deletingId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
-        toast({ title: "Mezzo eliminato" });
+        toast({ title: t("mezzi.toastDeleted") });
         setDeletingId(null);
       }
     });
@@ -116,34 +117,38 @@ export default function Mezzi() {
     return diff < 30 * 24 * 60 * 60 * 1000;
   };
 
+  const tipoLabel = (tipo?: string | null) => tipo ? t(`mezzi.tipos.${tipo}`, { defaultValue: tipo.replace('_', ' ') }) : "";
+  const proprietaLabel = (p?: string | null) => p ? t(`mezzi.proprietaOpts.${p}`, { defaultValue: p.replace('_', ' ') }) : "";
+  const statoLabel = (s?: string | null) => s ? t(`mezzi.stati.${s}`, { defaultValue: s.replace('_', ' ') }) : "";
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Mezzi</h1>
-          <p className="text-muted-foreground">Flotta veicoli per trasporti e consegne.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("mezzi.title")}</h1>
+          <p className="text-muted-foreground">{t("mezzi.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={mezzi ?? []}
             columns={[
-              { header: "Codice", accessor: (m) => m.codice },
-              { header: "Tipo", accessor: (m) => m.tipo?.replace('_', ' ') },
-              { header: "Targa", accessor: (m) => m.targa },
-              { header: "Proprietà", accessor: (m) => m.proprieta?.replace('_', ' ') },
-              { header: "Proprietario", accessor: (m) => m.proprietarioNome },
-              { header: "Capacità Colli", accessor: (m) => m.capacitaColli != null ? m.capacitaColli : "" },
-              { header: "Capacità Kg", accessor: (m) => m.capacitaKg != null ? m.capacitaKg : "" },
-              { header: "Scad. Assicurazione", accessor: (m) => m.scadenzaAssicurazione ? new Date(m.scadenzaAssicurazione).toLocaleDateString("it-IT") : "" },
-              { header: "Scad. Revisione", accessor: (m) => m.scadenzaRevisione ? new Date(m.scadenzaRevisione).toLocaleDateString("it-IT") : "" },
-              { header: "Stato", accessor: (m) => m.stato?.replace('_', ' ') },
+              { header: t("common.code"), accessor: (m) => m.codice },
+              { header: t("common.type"), accessor: (m) => tipoLabel(m.tipo) },
+              { header: t("mezzi.targa"), accessor: (m) => m.targa },
+              { header: t("mezzi.proprieta"), accessor: (m) => proprietaLabel(m.proprieta) },
+              { header: t("mezzi.proprietario"), accessor: (m) => m.proprietarioNome },
+              { header: t("mezzi.capacitaColli"), accessor: (m) => m.capacitaColli != null ? m.capacitaColli : "" },
+              { header: t("mezzi.capacitaKg"), accessor: (m) => m.capacitaKg != null ? m.capacitaKg : "" },
+              { header: t("mezzi.scadAssicurazione"), accessor: (m) => m.scadenzaAssicurazione ? new Date(m.scadenzaAssicurazione).toLocaleDateString("it-IT") : "" },
+              { header: t("mezzi.scadRevisione"), accessor: (m) => m.scadenzaRevisione ? new Date(m.scadenzaRevisione).toLocaleDateString("it-IT") : "" },
+              { header: t("common.status"), accessor: (m) => statoLabel(m.stato) },
             ]}
             filename="mezzi"
-            title="Parco Mezzi"
+            title={t("mezzi.exportTitle")}
             orientation="landscape"
           />
           <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> Nuovo Mezzo
+            <Plus className="h-4 w-4" /> {t("mezzi.newMezzo")}
           </Button>
         </div>
       </div>
@@ -153,12 +158,12 @@ export default function Mezzi() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Codice</TableHead>
-                <TableHead>Tipo & Targa</TableHead>
-                <TableHead>Proprietà</TableHead>
-                <TableHead>Capacità</TableHead>
-                <TableHead>Scadenze</TableHead>
-                <TableHead className="text-center">Stato</TableHead>
+                <TableHead className="w-[100px]">{t("common.code")}</TableHead>
+                <TableHead>{t("mezzi.thTipoTarga")}</TableHead>
+                <TableHead>{t("mezzi.proprieta")}</TableHead>
+                <TableHead>{t("mezzi.thCapacita")}</TableHead>
+                <TableHead>{t("mezzi.thScadenze")}</TableHead>
+                <TableHead className="text-center">{t("common.status")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -178,33 +183,33 @@ export default function Mezzi() {
               ) : mezzi?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                    Nessun mezzo registrato.
+                    {t("mezzi.empty")}
                   </TableCell>
                 </TableRow>
               ) : mezzi?.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-mono text-sm font-medium">{m.codice}</TableCell>
                   <TableCell>
-                    <div className="font-medium capitalize">{m.tipo.replace('_', ' ')}</div>
+                    <div className="font-medium capitalize">{tipoLabel(m.tipo)}</div>
                     {m.targa && <div className="text-xs font-mono text-muted-foreground uppercase">{m.targa}</div>}
                   </TableCell>
                   <TableCell>
-                    <div className="capitalize text-sm">{m.proprieta.replace('_', ' ')}</div>
+                    <div className="capitalize text-sm">{proprietaLabel(m.proprieta)}</div>
                     {m.proprietarioNome && <div className="text-xs text-muted-foreground">{m.proprietarioNome}</div>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {m.capacitaColli ? `${m.capacitaColli} colli` : '-'} / {m.capacitaKg ? `${m.capacitaKg} kg` : '-'}
+                    {m.capacitaColli ? `${m.capacitaColli} ${t("mezzi.colliUnit")}` : '-'} / {m.capacitaKg ? `${m.capacitaKg} kg` : '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 text-xs">
                       {m.scadenzaAssicurazione && (
                         <div className={`flex items-center gap-1 ${isExpiringSoon(m.scadenzaAssicurazione) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                          <Calendar className="h-3 w-3" /> Assic. {format(new Date(m.scadenzaAssicurazione), "dd/MM/yy")}
+                          <Calendar className="h-3 w-3" /> {t("mezzi.assicShort")} {format(new Date(m.scadenzaAssicurazione), "dd/MM/yy")}
                         </div>
                       )}
                       {m.scadenzaRevisione && (
                         <div className={`flex items-center gap-1 ${isExpiringSoon(m.scadenzaRevisione) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                          <Calendar className="h-3 w-3" /> Revis. {format(new Date(m.scadenzaRevisione), "dd/MM/yy")}
+                          <Calendar className="h-3 w-3" /> {t("mezzi.revisShort")} {format(new Date(m.scadenzaRevisione), "dd/MM/yy")}
                         </div>
                       )}
                     </div>
@@ -214,23 +219,23 @@ export default function Mezzi() {
                       m.stato === 'disponibile' ? 'bg-green-500/10 text-green-700 border-none' : 
                       m.stato === 'in_uso' ? 'bg-blue-500/10 text-blue-700' : 'bg-destructive/10 text-destructive'
                     }>
-                      {m.stato.replace('_', ' ')}
+                      {statoLabel(m.stato)}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Apri menu</span>
+                          <span className="sr-only">{t("mezzi.openMenu")}</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(m)}>
-                          <Pencil className="mr-2 h-4 w-4" /> Modifica
+                          <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(m.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Elimina
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -245,28 +250,28 @@ export default function Mezzi() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId ? "Modifica Mezzo" : "Nuovo Mezzo"}</SheetTitle>
+            <SheetTitle>{editingId ? t("mezzi.sheetEditTitle") : t("mezzi.sheetNewTitle")}</SheetTitle>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="codice" render={({ field }) => (
-                    <FormItem><FormLabel>Codice</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("common.code")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="targa" render={({ field }) => (
-                    <FormItem><FormLabel>Targa</FormLabel><FormControl><Input className="uppercase" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("mezzi.targa")}</FormLabel><FormControl><Input className="uppercase" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="tipo" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo Veicolo</FormLabel>
+                    <FormLabel>{t("mezzi.tipoVeicolo")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="furgone">Furgone</SelectItem>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="cargo_bike">Cargo Bike</SelectItem>
+                        <SelectItem value="furgone">{t("mezzi.tipos.furgone")}</SelectItem>
+                        <SelectItem value="auto">{t("mezzi.tipos.auto")}</SelectItem>
+                        <SelectItem value="cargo_bike">{t("mezzi.tipos.cargo_bike")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -275,34 +280,34 @@ export default function Mezzi() {
                 <div className="pt-4 border-t space-y-4">
                   <FormField control={form.control} name="proprieta" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Proprietà</FormLabel>
+                      <FormLabel>{t("mezzi.proprieta")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value="associazione">Associazione</SelectItem>
-                          <SelectItem value="noleggio">Noleggio / Leasing</SelectItem>
-                          <SelectItem value="volontario">Volontario</SelectItem>
+                          <SelectItem value="associazione">{t("mezzi.proprietaOpts.associazione")}</SelectItem>
+                          <SelectItem value="noleggio">{t("mezzi.proprietaOpts.noleggio")}</SelectItem>
+                          <SelectItem value="volontario">{t("mezzi.proprietaOpts.volontario")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="proprietarioNome" render={({ field }) => (
-                    <FormItem><FormLabel>Nome Proprietario (se non associazione)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("mezzi.nomeProprietario")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <FormField control={form.control} name="scadenzaAssicurazione" render={({ field }) => (
-                    <FormItem><FormLabel>Scadenza Assicurazione</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("mezzi.scadenzaAssicurazione")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="scadenzaRevisione" render={({ field }) => (
-                    <FormItem><FormLabel>Scadenza Revisione</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("mezzi.scadenzaRevisione")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
-                  <Button type="submit" disabled={createMezzo.isPending || updateMezzo.isPending}>Salva</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="submit" disabled={createMezzo.isPending || updateMezzo.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
             </Form>
@@ -312,10 +317,10 @@ export default function Mezzi() {
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Conferma eliminazione</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>{t("mezzi.confirmDelete")}</AlertDialogTitle></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Elimina</AlertDialogAction>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

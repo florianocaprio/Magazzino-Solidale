@@ -18,6 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
   beneficiarioId: z.coerce.number().min(1),
@@ -33,6 +34,7 @@ const formSchema = z.object({
 });
 
 export default function Interventi() {
+  const { t } = useTranslation();
   const [tipoFilter, setTipoFilter] = useState("all");
   const [centroFilter, setCentroFilter] = useState("all");
   const { data: interventi, isLoading } = useListInterventi({
@@ -75,7 +77,7 @@ export default function Interventi() {
     createIntervento.mutate({ data }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListInterventiQueryKey() });
-        toast({ title: "Intervento registrato" });
+        toast({ title: t("interventi.toastRegistered") });
         setIsFormOpen(false);
       }
     });
@@ -83,12 +85,12 @@ export default function Interventi() {
 
   const getSingleBadge = (tipo: string) => {
     switch(tipo) {
-      case 'colloquio': return <Badge key={tipo} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Colloquio</Badge>;
-      case 'pacco_alimentare': return <Badge key={tipo} variant="outline" className="bg-green-50 text-green-700 border-green-200">Pacco Alimentare</Badge>;
+      case 'colloquio': return <Badge key={tipo} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t("interventi.colloquio")}</Badge>;
+      case 'pacco_alimentare': return <Badge key={tipo} variant="outline" className="bg-green-50 text-green-700 border-green-200">{t("interventi.paccoAlimentare")}</Badge>;
       case 'vestiti':
-      case 'vestiario': return <Badge key={tipo} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Vestiti</Badge>;
-      case 'igiene': return <Badge key={tipo} variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">Igiene</Badge>;
-      case 'medicinali': return <Badge key={tipo} variant="outline" className="bg-red-50 text-red-700 border-red-200">Medicinali</Badge>;
+      case 'vestiario': return <Badge key={tipo} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{t("interventi.badgeVestiti")}</Badge>;
+      case 'igiene': return <Badge key={tipo} variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">{t("interventi.igiene")}</Badge>;
+      case 'medicinali': return <Badge key={tipo} variant="outline" className="bg-red-50 text-red-700 border-red-200">{t("interventi.medicinali")}</Badge>;
       default: return <Badge key={tipo} variant="outline" className="capitalize">{tipo.replace('_', ' ')}</Badge>;
     }
   };
@@ -102,28 +104,28 @@ export default function Interventi() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Interventi Sociali</h1>
-          <p className="text-muted-foreground">Registro dei colloqui e delle azioni di supporto.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("interventi.title")}</h1>
+          <p className="text-muted-foreground">{t("interventi.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={interventi ?? []}
             columns={[
-              { header: "Beneficiario", accessor: (i) => i.beneficiarioNome },
-              { header: "Data", accessor: (i) => i.dataIntervento ? new Date(i.dataIntervento).toLocaleDateString("it-IT") : "" },
-              { header: "Tipo Intervento", accessor: (i) => i.tipoIntervento },
-              { header: "Operatore", accessor: (i) => i.operatoreCodice },
-              { header: "Descrizione", accessor: (i) => i.descrizione },
-              { header: "Esito", accessor: (i) => i.esito },
-              { header: "Scadenza ISEE", accessor: (i) => i.scadenzaIsee ? new Date(i.scadenzaIsee).toLocaleDateString("it-IT") : "" },
-              { header: "Scadenza Rinnovo", accessor: (i) => i.scadenzaRinnovo ? new Date(i.scadenzaRinnovo).toLocaleDateString("it-IT") : "" },
-              { header: "Scadenza Autodich. Indigenza", accessor: (i) => i.scadenzaAutodichiarazioneIndigenza ? new Date(i.scadenzaAutodichiarazioneIndigenza).toLocaleDateString("it-IT") : "" },
+              { header: t("interventi.beneficiario"), accessor: (i) => i.beneficiarioNome },
+              { header: t("common.date"), accessor: (i) => i.dataIntervento ? new Date(i.dataIntervento).toLocaleDateString("it-IT") : "" },
+              { header: t("interventi.tipoIntervento"), accessor: (i) => i.tipoIntervento },
+              { header: t("interventi.operatore"), accessor: (i) => i.operatoreCodice },
+              { header: t("common.description"), accessor: (i) => i.descrizione },
+              { header: t("interventi.esito"), accessor: (i) => i.esito },
+              { header: t("interventi.scadenzaIseeCol"), accessor: (i) => i.scadenzaIsee ? new Date(i.scadenzaIsee).toLocaleDateString("it-IT") : "" },
+              { header: t("interventi.scadenzaRinnovoCol"), accessor: (i) => i.scadenzaRinnovo ? new Date(i.scadenzaRinnovo).toLocaleDateString("it-IT") : "" },
+              { header: t("interventi.scadenzaAutodichCol"), accessor: (i) => i.scadenzaAutodichiarazioneIndigenza ? new Date(i.scadenzaAutodichiarazioneIndigenza).toLocaleDateString("it-IT") : "" },
             ]}
             filename="interventi"
-            title="Registro Interventi"
+            title={t("interventi.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Registra Intervento</Button>
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("interventi.registerIntervention")}</Button>
         </div>
       </div>
 
@@ -133,22 +135,22 @@ export default function Interventi() {
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={tipoFilter} onValueChange={setTipoFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Tutti i tipi" />
+                <SelectValue placeholder={t("interventi.filterAllTypes")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tutti i tipi</SelectItem>
-                <SelectItem value="colloquio">Colloqui</SelectItem>
-                <SelectItem value="pacco_alimentare">Pacco Alimentare</SelectItem>
-                <SelectItem value="vestiario">Vestiario</SelectItem>
-                <SelectItem value="orientamento">Orientamento</SelectItem>
+                <SelectItem value="all">{t("interventi.filterAllTypes")}</SelectItem>
+                <SelectItem value="colloquio">{t("interventi.colloqui")}</SelectItem>
+                <SelectItem value="pacco_alimentare">{t("interventi.paccoAlimentare")}</SelectItem>
+                <SelectItem value="vestiario">{t("interventi.vestiario")}</SelectItem>
+                <SelectItem value="orientamento">{t("interventi.orientamento")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={centroFilter} onValueChange={setCentroFilter}>
               <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Tutti i centri" />
+                <SelectValue placeholder={t("interventi.filterAllCenters")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tutti i centri</SelectItem>
+                <SelectItem value="all">{t("interventi.filterAllCenters")}</SelectItem>
                 {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -158,13 +160,13 @@ export default function Interventi() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Beneficiario</TableHead>
-                <TableHead>Tipo Intervento</TableHead>
-                <TableHead>Operatore</TableHead>
-                <TableHead>Descrizione</TableHead>
-                <TableHead>Scadenze</TableHead>
-                <TableHead>Follow-up</TableHead>
+                <TableHead>{t("common.date")}</TableHead>
+                <TableHead>{t("interventi.beneficiario")}</TableHead>
+                <TableHead>{t("interventi.tipoIntervento")}</TableHead>
+                <TableHead>{t("interventi.operatore")}</TableHead>
+                <TableHead>{t("common.description")}</TableHead>
+                <TableHead>{t("interventi.thScadenze")}</TableHead>
+                <TableHead>{t("interventi.thFollowup")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -182,7 +184,7 @@ export default function Interventi() {
                 ))
               ) : interventi?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">Nessun intervento registrato.</TableCell>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("interventi.emptyState")}</TableCell>
                 </TableRow>
               ) : interventi?.map((i) => (
                 <TableRow key={i.id}>
@@ -204,9 +206,9 @@ export default function Interventi() {
                   <TableCell className="text-xs">
                     {(i.scadenzaIsee || i.scadenzaRinnovo || i.scadenzaAutodichiarazioneIndigenza) ? (
                       <div className="flex flex-col gap-0.5">
-                        {i.scadenzaIsee && <span><span className="text-muted-foreground">ISEE:</span> {format(new Date(i.scadenzaIsee), "dd/MM/yyyy")}</span>}
-                        {i.scadenzaRinnovo && <span><span className="text-muted-foreground">Rinnovo:</span> {format(new Date(i.scadenzaRinnovo), "dd/MM/yyyy")}</span>}
-                        {i.scadenzaAutodichiarazioneIndigenza && <span><span className="text-muted-foreground">Autodich.:</span> {format(new Date(i.scadenzaAutodichiarazioneIndigenza), "dd/MM/yyyy")}</span>}
+                        {i.scadenzaIsee && <span><span className="text-muted-foreground">{t("interventi.labelIsee")}</span> {format(new Date(i.scadenzaIsee), "dd/MM/yyyy")}</span>}
+                        {i.scadenzaRinnovo && <span><span className="text-muted-foreground">{t("interventi.labelRinnovo")}</span> {format(new Date(i.scadenzaRinnovo), "dd/MM/yyyy")}</span>}
+                        {i.scadenzaAutodichiarazioneIndigenza && <span><span className="text-muted-foreground">{t("interventi.labelAutodich")}</span> {format(new Date(i.scadenzaAutodichiarazioneIndigenza), "dd/MM/yyyy")}</span>}
                       </div>
                     ) : (
                       <span className="text-muted-foreground">-</span>
@@ -231,16 +233,16 @@ export default function Interventi() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Nuovo Intervento</SheetTitle>
+            <SheetTitle>{t("interventi.newIntervention")}</SheetTitle>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="beneficiarioId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Beneficiario</FormLabel>
+                    <FormLabel>{t("interventi.beneficiario")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder={t("interventi.selectPlaceholder")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {beneficiari?.map(b => <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>)}
                       </SelectContent>
@@ -251,56 +253,56 @@ export default function Interventi() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="tipoIntervento" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipo</FormLabel>
+                      <FormLabel>{t("common.type")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value="colloquio">Colloquio</SelectItem>
-                          <SelectItem value="pacco_alimentare">Pacco Alimentare</SelectItem>
-                          <SelectItem value="vestiario">Vestiario</SelectItem>
-                          <SelectItem value="orientamento">Orientamento</SelectItem>
-                          <SelectItem value="altro">Altro</SelectItem>
+                          <SelectItem value="colloquio">{t("interventi.colloquio")}</SelectItem>
+                          <SelectItem value="pacco_alimentare">{t("interventi.paccoAlimentare")}</SelectItem>
+                          <SelectItem value="vestiario">{t("interventi.vestiario")}</SelectItem>
+                          <SelectItem value="orientamento">{t("interventi.orientamento")}</SelectItem>
+                          <SelectItem value="altro">{t("interventi.optAltro")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="dataIntervento" render={({ field }) => (
-                    <FormItem><FormLabel>Data</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("common.date")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
 
                 <FormField control={form.control} name="descrizione" render={({ field }) => (
-                  <FormItem><FormLabel>Descrizione / Note del colloquio</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("interventi.descrizioneLabel")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <FormField control={form.control} name="esito" render={({ field }) => (
-                  <FormItem><FormLabel>Esito</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("interventi.esito")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 
                 <div className="pt-4 border-t space-y-4">
                   <FormField control={form.control} name="prossimAzione" render={({ field }) => (
-                    <FormItem><FormLabel>Prossima Azione</FormLabel><FormControl><Input placeholder="Es: Rinnovo ISEE" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("interventi.prossimaAzione")}</FormLabel><FormControl><Input placeholder={t("interventi.prossimaAzionePlaceholder")} {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="dataFollowup" render={({ field }) => (
-                    <FormItem><FormLabel>Data di Follow-up</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("interventi.dataFollowup")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
 
                 <div className="pt-4 border-t space-y-4">
-                  <h4 className="text-sm font-semibold text-muted-foreground">Scadenze documenti</h4>
+                  <h4 className="text-sm font-semibold text-muted-foreground">{t("interventi.scadenzeDocumenti")}</h4>
                   <FormField control={form.control} name="scadenzaIsee" render={({ field }) => (
-                    <FormItem><FormLabel>Scadenza ISEE</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("interventi.scadenzaIseeCol")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="scadenzaRinnovo" render={({ field }) => (
-                    <FormItem><FormLabel>Scadenza rinnovo</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("interventi.scadenzaRinnovoForm")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="scadenzaAutodichiarazioneIndigenza" render={({ field }) => (
-                    <FormItem><FormLabel>Scadenza autodichiarazione di indigenza</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("interventi.scadenzaAutodichForm")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
-                  <Button type="submit" disabled={createIntervento.isPending}>Salva</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="submit" disabled={createIntervento.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
             </Form>

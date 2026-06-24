@@ -11,8 +11,10 @@ import { Filter, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { ExportButtons } from "@/components/export-buttons";
+import { useTranslation } from "react-i18next";
 
 export default function Giacenze() {
+  const { t } = useTranslation();
   const [magazzinoId, setMagazzinoId] = useState<string>("all");
   const [sottoscortaOnly, setSottoscortaOnly] = useState(false);
   
@@ -24,11 +26,11 @@ export default function Giacenze() {
   });
 
   const magazzinoNome = magazzinoId !== "all"
-    ? magazzini?.find(m => m.id.toString() === magazzinoId)?.nome ?? "Magazzino"
+    ? magazzini?.find(m => m.id.toString() === magazzinoId)?.nome ?? t("giacenze.warehouseFallback")
     : null;
   const inventarioTitolo = magazzinoNome
-    ? `Inventario — ${magazzinoNome}`
-    : "Inventario — Tutti i magazzini";
+    ? t("giacenze.inventoryFor", { name: magazzinoNome })
+    : t("giacenze.inventoryAll");
   const inventarioFile = magazzinoNome
     ? `inventario_${magazzinoNome.replace(/\s+/g, "_").toLowerCase()}`
     : "inventario_tutti_magazzini";
@@ -37,26 +39,26 @@ export default function Giacenze() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Giacenze</h1>
-          <p className="text-muted-foreground">Monitora le quantità disponibili nei magazzini.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("giacenze.title")}</h1>
+          <p className="text-muted-foreground">{t("giacenze.subtitle")}</p>
         </div>
         <ExportButtons
           rows={giacenze ?? []}
           filename={inventarioFile}
           title={inventarioTitolo}
-          subtitle={sottoscortaOnly ? "Solo prodotti sottoscorta" : undefined}
-          sheetName="Inventario"
+          subtitle={sottoscortaOnly ? t("giacenze.exportSubtitleSottoscorta") : undefined}
+          sheetName={t("giacenze.sheetName")}
           orientation="landscape"
           columns={[
-            { header: "Codice", accessor: (g) => g.prodottoCodice },
-            { header: "Prodotto", accessor: (g) => g.prodottoNome },
-            { header: "Tipo", accessor: (g) => g.tipoProdotto?.replace("_", " ") },
-            { header: "Magazzino", accessor: (g) => g.magazzinoNome },
-            { header: "Q.tà Totale", accessor: (g) => g.quantitaTotale },
-            { header: "U.M.", accessor: (g) => g.unitaMisura },
-            { header: "Scorta Minima", accessor: (g) => g.scortaMinima },
-            { header: "Prossima Scadenza", accessor: (g) => g.prossimaScadenza ? new Date(g.prossimaScadenza).toLocaleDateString("it-IT") : "" },
-            { header: "Stato", accessor: (g) => g.sottoscorta ? "Sottoscorta" : "Regolare" },
+            { header: t("giacenze.colCodice"), accessor: (g) => g.prodottoCodice },
+            { header: t("giacenze.colProdotto"), accessor: (g) => g.prodottoNome },
+            { header: t("giacenze.colTipo"), accessor: (g) => g.tipoProdotto?.replace("_", " ") },
+            { header: t("giacenze.colMagazzino"), accessor: (g) => g.magazzinoNome },
+            { header: t("giacenze.colQtaTotale"), accessor: (g) => g.quantitaTotale },
+            { header: t("giacenze.colUM"), accessor: (g) => g.unitaMisura },
+            { header: t("giacenze.colScortaMinima"), accessor: (g) => g.scortaMinima },
+            { header: t("giacenze.colProssimaScadenza"), accessor: (g) => g.prossimaScadenza ? new Date(g.prossimaScadenza).toLocaleDateString("it-IT") : "" },
+            { header: t("giacenze.colStato"), accessor: (g) => g.sottoscorta ? t("giacenze.statusSottoscorta") : t("giacenze.statusRegolare") },
           ]}
         />
       </div>
@@ -68,10 +70,10 @@ export default function Giacenze() {
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={magazzinoId} onValueChange={setMagazzinoId}>
                 <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Tutti i magazzini" />
+                  <SelectValue placeholder={t("giacenze.allWarehouses")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tutti i magazzini</SelectItem>
+                  <SelectItem value="all">{t("giacenze.allWarehouses")}</SelectItem>
                   {magazzini?.map(m => (
                     <SelectItem key={m.id} value={m.id.toString()}>{m.nome}</SelectItem>
                   ))}
@@ -82,7 +84,7 @@ export default function Giacenze() {
             <div className="flex items-center space-x-2 ml-auto bg-amber-500/10 px-3 py-1.5 rounded-md border border-amber-500/20">
               <Switch id="sottoscorta" checked={sottoscortaOnly} onCheckedChange={setSottoscortaOnly} />
               <Label htmlFor="sottoscorta" className="text-amber-700 font-medium cursor-pointer flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" /> Solo Sottoscorta
+                <AlertTriangle className="h-3 w-3" /> {t("giacenze.sottoscortaOnly")}
               </Label>
             </div>
           </div>
@@ -91,13 +93,13 @@ export default function Giacenze() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Codice</TableHead>
-                <TableHead>Prodotto</TableHead>
-                <TableHead>Magazzino</TableHead>
-                <TableHead className="text-right">Q.tà Totale</TableHead>
-                <TableHead className="text-right">Scorta Minima</TableHead>
-                <TableHead className="text-center">Prossima Scad.</TableHead>
-                <TableHead className="w-[120px] text-center">Stato</TableHead>
+                <TableHead className="w-[100px]">{t("giacenze.colCodice")}</TableHead>
+                <TableHead>{t("giacenze.colProdotto")}</TableHead>
+                <TableHead>{t("giacenze.colMagazzino")}</TableHead>
+                <TableHead className="text-right">{t("giacenze.colQtaTotale")}</TableHead>
+                <TableHead className="text-right">{t("giacenze.colScortaMinima")}</TableHead>
+                <TableHead className="text-center">{t("giacenze.colProssimaScad")}</TableHead>
+                <TableHead className="w-[120px] text-center">{t("giacenze.colStato")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -116,7 +118,7 @@ export default function Giacenze() {
               ) : giacenze?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                    Nessuna giacenza trovata.
+                    {t("giacenze.noResults")}
                   </TableCell>
                 </TableRow>
               ) : giacenze?.map((g, idx) => (
@@ -142,9 +144,9 @@ export default function Giacenze() {
                   </TableCell>
                   <TableCell className="text-center">
                     {g.sottoscorta ? (
-                      <Badge variant="outline" className="bg-amber-500 text-white border-amber-600">Sottoscorta</Badge>
+                      <Badge variant="outline" className="bg-amber-500 text-white border-amber-600">{t("giacenze.statusSottoscorta")}</Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">Regolare</Badge>
+                      <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">{t("giacenze.statusRegolare")}</Badge>
                     )}
                   </TableCell>
                 </TableRow>

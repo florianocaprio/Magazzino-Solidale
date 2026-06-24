@@ -18,6 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
   tipoMovimento: z.string().min(1),
@@ -31,6 +32,7 @@ const formSchema = z.object({
 });
 
 export default function Movimenti() {
+  const { t } = useTranslation();
   const [tipoFilter, setTipoFilter] = useState("all");
   const { data: movimenti, isLoading } = useListMovimenti({ tipo: tipoFilter !== "all" ? tipoFilter : undefined });
   const { data: magazzini } = useListMagazzini();
@@ -60,37 +62,48 @@ export default function Movimenti() {
     createMovimento.mutate({ data }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
-        toast({ title: "Movimento registrato" });
+        toast({ title: t("movimenti.toastRegistered") });
         setIsFormOpen(false);
       }
     });
+  };
+
+  const causaleLabel = (val: string) => {
+    const map: Record<string, string> = {
+      acquisto: t("movimenti.causaleAcquisto"),
+      donazione: t("movimenti.causaleDonazione"),
+      rettifica_inventario: t("movimenti.causaleRettifica"),
+      scadenza: t("movimenti.causaleScadenza"),
+      smaltimento: t("movimenti.causaleSmaltimento"),
+    };
+    return map[val] ?? val.replace("_", " ");
   };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Movimenti</h1>
-          <p className="text-muted-foreground">Registro carichi e scarichi di magazzino.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("movimenti.title")}</h1>
+          <p className="text-muted-foreground">{t("movimenti.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={movimenti ?? []}
             columns={[
-              { header: "Data", accessor: (m) => m.dataMovimento ? new Date(m.dataMovimento).toLocaleDateString("it-IT") : "" },
-              { header: "Tipo", accessor: (m) => m.tipoMovimento },
-              { header: "Causale", accessor: (m) => m.tipoDettaglio },
-              { header: "Prodotto", accessor: (m) => m.prodottoNome },
-              { header: "Magazzino", accessor: (m) => m.magazzinoNome },
-              { header: "Quantità", accessor: (m) => m.quantita != null ? parseFloat(String(m.quantita)) : "" },
-              { header: "U.M.", accessor: (m) => m.unitaMisura },
-              { header: "Note", accessor: (m) => m.note },
+              { header: t("movimenti.colData"), accessor: (m) => m.dataMovimento ? new Date(m.dataMovimento).toLocaleDateString("it-IT") : "" },
+              { header: t("movimenti.colTipo"), accessor: (m) => m.tipoMovimento },
+              { header: t("movimenti.colCausale"), accessor: (m) => m.tipoDettaglio },
+              { header: t("movimenti.colProdotto"), accessor: (m) => m.prodottoNome },
+              { header: t("movimenti.colMagazzino"), accessor: (m) => m.magazzinoNome },
+              { header: t("movimenti.colQuantita"), accessor: (m) => m.quantita != null ? parseFloat(String(m.quantita)) : "" },
+              { header: t("movimenti.colUM"), accessor: (m) => m.unitaMisura },
+              { header: t("movimenti.colNote"), accessor: (m) => m.note },
             ]}
             filename="movimenti"
-            title="Movimenti di Magazzino"
+            title={t("movimenti.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Registra Movimento</Button>
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("movimenti.registerMovement")}</Button>
         </div>
       </div>
 
@@ -100,12 +113,12 @@ export default function Movimenti() {
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={tipoFilter} onValueChange={setTipoFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Tutti i movimenti" />
+                <SelectValue placeholder={t("movimenti.allMovements")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tutti i movimenti</SelectItem>
-                <SelectItem value="carico">Solo Carichi</SelectItem>
-                <SelectItem value="scarico">Solo Scarichi</SelectItem>
+                <SelectItem value="all">{t("movimenti.allMovements")}</SelectItem>
+                <SelectItem value="carico">{t("movimenti.onlyLoads")}</SelectItem>
+                <SelectItem value="scarico">{t("movimenti.onlyUnloads")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -114,11 +127,11 @@ export default function Movimenti() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Prodotto</TableHead>
-                <TableHead>Magazzino</TableHead>
-                <TableHead className="text-right">Quantità</TableHead>
+                <TableHead>{t("movimenti.colData")}</TableHead>
+                <TableHead>{t("movimenti.colTipo")}</TableHead>
+                <TableHead>{t("movimenti.colProdotto")}</TableHead>
+                <TableHead>{t("movimenti.colMagazzino")}</TableHead>
+                <TableHead className="text-right">{t("movimenti.colQuantita")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -134,7 +147,7 @@ export default function Movimenti() {
                 ))
               ) : movimenti?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">Nessun movimento trovato.</TableCell>
+                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">{t("movimenti.noResults")}</TableCell>
                 </TableRow>
               ) : movimenti?.map((m) => (
                 <TableRow key={m.id}>
@@ -149,7 +162,7 @@ export default function Movimenti() {
                         <ArrowUpRight className="h-4 w-4 text-amber-500" />
                       )}
                       <Badge variant="outline" className="capitalize">
-                        {m.tipoDettaglio.replace('_', ' ')}
+                        {causaleLabel(m.tipoDettaglio)}
                       </Badge>
                     </div>
                   </TableCell>
@@ -168,8 +181,8 @@ export default function Movimenti() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Registra Movimento</SheetTitle>
-            <SheetDescription>Aggiungi un carico o scarico manuale.</SheetDescription>
+            <SheetTitle>{t("movimenti.registerMovement")}</SheetTitle>
+            <SheetDescription>{t("movimenti.dialogDescription")}</SheetDescription>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
@@ -177,27 +190,27 @@ export default function Movimenti() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="tipoMovimento" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Direzione</FormLabel>
+                      <FormLabel>{t("movimenti.fldDirezione")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value="carico">Carico</SelectItem>
-                          <SelectItem value="scarico">Scarico</SelectItem>
+                          <SelectItem value="carico">{t("movimenti.dirCarico")}</SelectItem>
+                          <SelectItem value="scarico">{t("movimenti.dirScarico")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="tipoDettaglio" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Causale</FormLabel>
+                      <FormLabel>{t("movimenti.fldCausale")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value="acquisto">Acquisto</SelectItem>
-                          <SelectItem value="donazione">Donazione</SelectItem>
-                          <SelectItem value="rettifica_inventario">Rettifica (+/-)</SelectItem>
-                          <SelectItem value="scadenza">Scadenza</SelectItem>
-                          <SelectItem value="smaltimento">Smaltimento</SelectItem>
+                          <SelectItem value="acquisto">{t("movimenti.causaleAcquisto")}</SelectItem>
+                          <SelectItem value="donazione">{t("movimenti.causaleDonazione")}</SelectItem>
+                          <SelectItem value="rettifica_inventario">{t("movimenti.causaleRettifica")}</SelectItem>
+                          <SelectItem value="scadenza">{t("movimenti.causaleScadenza")}</SelectItem>
+                          <SelectItem value="smaltimento">{t("movimenti.causaleSmaltimento")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -205,14 +218,14 @@ export default function Movimenti() {
                 </div>
 
                 <FormField control={form.control} name="dataMovimento" render={({ field }) => (
-                  <FormItem><FormLabel>Data</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("movimenti.fldData")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                 )} />
 
                 <FormField control={form.control} name="magazzinoId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Magazzino</FormLabel>
+                    <FormLabel>{t("movimenti.fldMagazzino")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder={t("movimenti.phSeleziona")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {magazzini?.map(m => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
                       </SelectContent>
@@ -222,9 +235,9 @@ export default function Movimenti() {
 
                 <FormField control={form.control} name="prodottoId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Prodotto</FormLabel>
+                    <FormLabel>{t("movimenti.fldProdotto")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder={t("movimenti.phSeleziona")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {prodotti?.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
                       </SelectContent>
@@ -234,20 +247,20 @@ export default function Movimenti() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="quantita" render={({ field }) => (
-                    <FormItem><FormLabel>Quantità</FormLabel><FormControl><Input type="number" step="0.01" min="0.01" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("movimenti.fldQuantita")}</FormLabel><FormControl><Input type="number" step="0.01" min="0.01" {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="unitaMisura" render={({ field }) => (
-                    <FormItem><FormLabel>U.M.</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("movimenti.fldUM")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
                 </div>
 
                 <FormField control={form.control} name="note" render={({ field }) => (
-                  <FormItem><FormLabel>Note</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("movimenti.fldNote")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
-                  <Button type="submit" disabled={createMovimento.isPending}>Registra</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="submit" disabled={createMovimento.isPending}>{t("movimenti.submit")}</Button>
                 </div>
               </form>
             </Form>

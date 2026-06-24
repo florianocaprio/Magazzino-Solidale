@@ -27,14 +27,10 @@ import { ExportButtons } from "@/components/export-buttons";
 import { Plus, Trash2, Download, CheckCircle, PackageMinus } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { generateScaricoPdf, loadAssociationLogo, causaleLabel } from "@/lib/scarico-pdf";
+import { generateScaricoPdf, loadAssociationLogo } from "@/lib/scarico-pdf";
+import { useTranslation } from "react-i18next";
 
-const CAUSALI = [
-  { value: "deteriorata", label: "Merce deteriorata" },
-  { value: "rubata", label: "Merce rubata" },
-  { value: "scaduta", label: "Merce scaduta" },
-  { value: "altro", label: "Altra causale" },
-] as const;
+const CAUSALI = ["deteriorata", "rubata", "scaduta", "altro"] as const;
 
 interface RigaDraft {
   key: string;
@@ -58,6 +54,7 @@ function RigheEditor({
   righe: RigaDraft[];
   setRighe: (r: RigaDraft[]) => void;
 }) {
+  const { t } = useTranslation();
   const { data: giacenze } = useListGiacenze(
     { magazzinoId },
     { query: { enabled: !!magazzinoId, queryKey: getListGiacenzeQueryKey({ magazzinoId }) } },
@@ -73,7 +70,7 @@ function RigheEditor({
     <div className="space-y-3">
       {(!giacenze || giacenze.length === 0) && (
         <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">
-          Nessun prodotto disponibile nel magazzino selezionato.
+          {t("scarichi.noProdotti")}
         </p>
       )}
 
@@ -86,7 +83,7 @@ function RigheEditor({
           <div key={r.key} className="rounded-lg border p-3 space-y-3">
             <div className="flex items-start gap-2">
               <div className="flex-1 space-y-2">
-                <Label className="text-xs">Prodotto</Label>
+                <Label className="text-xs">{t("scarichi.prodotto")}</Label>
                 <Select
                   value={r.prodottoId}
                   onValueChange={(v) => {
@@ -94,13 +91,13 @@ function RigheEditor({
                     update(r.key, { prodottoId: v, unitaMisura: g?.unitaMisura ?? "pz", quantita: "" });
                   }}
                 >
-                  <SelectTrigger><SelectValue placeholder="Seleziona prodotto..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("scarichi.selezionaProdotto")} /></SelectTrigger>
                   <SelectContent>
                     {giacenze
                       ?.filter((g) => g.prodottoId === parseInt(r.prodottoId) || !usedIds.includes(String(g.prodottoId)))
                       .map((g) => (
                         <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
-                          {g.prodottoNome} — {g.quantitaTotale} {g.unitaMisura} disp.
+                          {g.prodottoNome} — {g.quantitaTotale} {g.unitaMisura} {t("scarichi.disponibileSuffix")}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -118,7 +115,7 @@ function RigheEditor({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label className="text-xs">Quantità</Label>
+                <Label className="text-xs">{t("common.quantity")}</Label>
                 <Input
                   type="number"
                   min="0.01"
@@ -131,12 +128,14 @@ function RigheEditor({
                 />
                 {r.prodottoId && (
                   <p className={`text-xs ${eccede ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                    {eccede ? `Massimo disponibile: ${max}` : `Disponibile: ${max} ${giac?.unitaMisura ?? ""}`}
+                    {eccede
+                      ? t("scarichi.massimoDisponibile", { max })
+                      : t("scarichi.disponibile", { max, um: giac?.unitaMisura ?? "" })}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Unità di misura</Label>
+                <Label className="text-xs">{t("scarichi.unitaMisura")}</Label>
                 <Select value={r.unitaMisura} onValueChange={(v) => update(r.key, { unitaMisura: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -158,7 +157,7 @@ function RigheEditor({
         onClick={() => setRighe([...righe, newRiga()])}
         disabled={!giacenze || giacenze.length === 0}
       >
-        <Plus className="h-4 w-4" /> Aggiungi prodotto
+        <Plus className="h-4 w-4" /> {t("scarichi.aggiungiProdotto")}
       </Button>
     </div>
   );
@@ -181,6 +180,7 @@ function NuovoScaricoForm({
   const [note, setNote] = useState("");
   const [righe, setRighe] = useState<RigaDraft[]>([newRiga()]);
 
+  const { t } = useTranslation();
   const { data: magazzini } = useListMagazzini();
   const createScarico = useCreateScarico();
   const { toast } = useToast();
@@ -236,7 +236,7 @@ function NuovoScaricoForm({
           onCreated(s);
         },
         onError: () =>
-          toast({ title: "Errore", description: "Impossibile registrare lo scarico", variant: "destructive" }),
+          toast({ title: t("scarichi.errorTitle"), description: t("scarichi.errorCreate"), variant: "destructive" }),
       },
     );
   };
@@ -245,17 +245,17 @@ function NuovoScaricoForm({
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Nuovo Scarico</SheetTitle>
+          <SheetTitle>{t("scarichi.formTitle")}</SheetTitle>
           <SheetDescription>
-            Registra l'uscita di merce dal magazzino. Verrà generata una bolla di scarico.
+            {t("scarichi.formDescription")}
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-5 py-5">
           <div className="space-y-2">
-            <Label>Magazzino</Label>
+            <Label>{t("scarichi.magazzino")}</Label>
             <Select value={magazzinoId} onValueChange={(v) => { setMagazzinoId(v); setRighe([newRiga()]); }}>
-              <SelectTrigger><SelectValue placeholder="Seleziona magazzino..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("scarichi.selectMagazzino")} /></SelectTrigger>
               <SelectContent>
                 {magazzini?.map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
@@ -265,12 +265,12 @@ function NuovoScaricoForm({
           </div>
 
           <div className="space-y-2">
-            <Label>Causale</Label>
+            <Label>{t("scarichi.causale")}</Label>
             <Select value={causale} onValueChange={setCausale}>
-              <SelectTrigger><SelectValue placeholder="Seleziona causale..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("scarichi.selectCausale")} /></SelectTrigger>
               <SelectContent>
                 {CAUSALI.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  <SelectItem key={c} value={c}>{t(`scarichi.causali.${c}`)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -278,32 +278,32 @@ function NuovoScaricoForm({
               <Input
                 value={causaleAltro}
                 onChange={(e) => setCausaleAltro(e.target.value)}
-                placeholder="Specifica la causale dello scarico"
+                placeholder={t("scarichi.causaleAltroPlaceholder")}
               />
             )}
           </div>
 
           <div className="space-y-2">
-            <Label>Prodotti da scaricare</Label>
+            <Label>{t("scarichi.prodottiDaScaricare")}</Label>
             {magazzinoId ? (
               <RigheEditor magazzinoId={parseInt(magazzinoId)} righe={righe} setRighe={setRighe} />
             ) : (
               <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">
-                Seleziona prima il magazzino.
+                {t("scarichi.selezionaPrimaMagazzino")}
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label>Note (opzionale)</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Eventuali note sullo scarico" />
+            <Label>{t("scarichi.noteOpzionale")}</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("scarichi.notePlaceholder")} />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 pb-4">
-          <Button variant="outline" onClick={onClose}>Annulla</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
           <Button onClick={onSubmit} disabled={!canSubmit} className="gap-2">
-            <PackageMinus className="h-4 w-4" /> Registra e genera bolla
+            <PackageMinus className="h-4 w-4" /> {t("scarichi.registra")}
           </Button>
         </div>
       </SheetContent>
@@ -314,6 +314,7 @@ function NuovoScaricoForm({
 // ─── Pagina ──────────────────────────────────────────────────────────────────
 
 export default function Scarichi() {
+  const { t } = useTranslation();
   const { data: scarichi, isLoading } = useListScarichi();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -322,6 +323,11 @@ export default function Scarichi() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [created, setCreated] = useState<Scarico | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  const causaleDisplay = (s: Pick<Scarico, "causale" | "causaleAltro">): string => {
+    if (s.causale === "altro") return s.causaleAltro?.trim() || t("scarichi.causali.altro");
+    return t(`scarichi.causali.${s.causale}`, { defaultValue: s.causale });
+  };
 
   const downloadBolla = async (s: Scarico) => {
     setDownloadingId(s.id);
@@ -333,7 +339,7 @@ export default function Scarichi() {
         associationLogoDataUrl,
       });
     } catch {
-      toast({ title: "Errore", description: "Impossibile generare la bolla.", variant: "destructive" });
+      toast({ title: t("scarichi.errorTitle"), description: t("scarichi.errorBolla"), variant: "destructive" });
     } finally {
       setDownloadingId(null);
     }
@@ -351,24 +357,24 @@ export default function Scarichi() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Scarichi</h1>
-          <p className="text-muted-foreground">Registra le uscite di merce per deterioramento, furto, scadenza o altre cause.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("scarichi.title")}</h1>
+          <p className="text-muted-foreground">{t("scarichi.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={scarichi ?? []}
             columns={[
-              { header: "Codice", accessor: (s) => s.codice },
-              { header: "Data", accessor: (s) => s.dataScarico ? new Date(s.dataScarico).toLocaleDateString("it-IT") : "" },
-              { header: "Magazzino", accessor: (s) => s.magazzinoNome },
-              { header: "Causale", accessor: (s) => causaleLabel(s) },
-              { header: "Articoli", accessor: (s) => s.righe?.length ?? 0 },
+              { header: t("common.code"), accessor: (s) => s.codice },
+              { header: t("common.date"), accessor: (s) => s.dataScarico ? new Date(s.dataScarico).toLocaleDateString("it-IT") : "" },
+              { header: t("scarichi.colMagazzino"), accessor: (s) => s.magazzinoNome },
+              { header: t("scarichi.colCausale"), accessor: (s) => causaleDisplay(s) },
+              { header: t("scarichi.colArticoli"), accessor: (s) => s.righe?.length ?? 0 },
             ]}
             filename="scarichi"
-            title="Scarichi di Magazzino"
+            title={t("scarichi.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Nuovo</Button>
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("common.new")}</Button>
         </div>
       </div>
 
@@ -377,12 +383,12 @@ export default function Scarichi() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Codice</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Magazzino</TableHead>
-                <TableHead>Causale</TableHead>
-                <TableHead>Dettaglio</TableHead>
-                <TableHead className="text-right w-[140px]">Azione</TableHead>
+                <TableHead>{t("common.code")}</TableHead>
+                <TableHead>{t("common.date")}</TableHead>
+                <TableHead>{t("scarichi.colMagazzino")}</TableHead>
+                <TableHead>{t("scarichi.colCausale")}</TableHead>
+                <TableHead>{t("scarichi.colArticoli")}</TableHead>
+                <TableHead className="text-right w-[140px]">{t("scarichi.colAzione")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -399,7 +405,7 @@ export default function Scarichi() {
                 ))
               ) : scarichi?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Nessuno scarico registrato.</TableCell>
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">{t("scarichi.emptyState")}</TableCell>
                 </TableRow>
               ) : scarichi?.map((s) => (
                 <TableRow key={s.id}>
@@ -410,11 +416,11 @@ export default function Scarichi() {
                   <TableCell className="text-sm font-medium">{s.magazzinoNome}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                      {causaleLabel(s)}
+                      {causaleDisplay(s)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {s.righe?.length || 0} articoli
+                    {t("scarichi.articoliCount", { count: s.righe?.length || 0 })}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -424,7 +430,7 @@ export default function Scarichi() {
                       onClick={() => downloadBolla(s)}
                       disabled={downloadingId === s.id}
                     >
-                      <Download className="h-3.5 w-3.5" /> Bolla
+                      <Download className="h-3.5 w-3.5" /> {t("scarichi.bolla")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -441,31 +447,30 @@ export default function Scarichi() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" /> Bolla creata
+              <CheckCircle className="h-5 w-5 text-green-600" /> {t("scarichi.bollaCreata")}
             </DialogTitle>
           </DialogHeader>
           {created && (
             <div className="space-y-3 py-2">
               <p className="text-sm text-muted-foreground">
-                Scarico <span className="font-mono font-medium text-foreground">{created.codice}</span> registrato.
-                La giacenza è stata aggiornata ed è stata generata la bolla di scarico.
+                {t("scarichi.createdPrefix")} <span className="font-mono font-medium text-foreground">{created.codice}</span> {t("scarichi.createdSuffix")}
               </p>
               <div className="rounded-lg border p-3 text-sm flex items-center gap-2">
                 <span className="font-medium">{created.magazzinoNome}</span>
                 <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground">{causaleLabel(created)}</span>
-                <span className="ml-auto text-muted-foreground">{created.righe?.length || 0} articoli</span>
+                <span className="text-muted-foreground">{causaleDisplay(created)}</span>
+                <span className="ml-auto text-muted-foreground">{t("scarichi.articoliCount", { count: created.righe?.length || 0 })}</span>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreated(null)}>Chiudi</Button>
+            <Button variant="outline" onClick={() => setCreated(null)}>{t("common.close")}</Button>
             <Button
               className="gap-2"
               disabled={!created || downloadingId === created.id}
               onClick={() => created && downloadBolla(created)}
             >
-              <Download className="h-4 w-4" /> Scarica bolla
+              <Download className="h-4 w-4" /> {t("scarichi.scaricaBolla")}
             </Button>
           </DialogFooter>
         </DialogContent>

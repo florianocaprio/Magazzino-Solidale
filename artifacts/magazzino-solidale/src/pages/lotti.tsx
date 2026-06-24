@@ -30,24 +30,26 @@ import { it } from "date-fns/locale";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 const nuovoLottoSchema = z.object({
-  prodottoId: z.string().min(1, "Seleziona un prodotto"),
-  magazzinoId: z.string().min(1, "Seleziona un magazzino"),
-  quantita: z.coerce.number().positive("La quantità deve essere maggiore di zero"),
-  dataCarico: z.string().min(1, "Campo obbligatorio"),
-  causale: z.string().min(1, "Campo obbligatorio"),
+  prodottoId: z.string().min(1),
+  magazzinoId: z.string().min(1),
+  quantita: z.coerce.number().positive(),
+  dataCarico: z.string().min(1),
+  causale: z.string().min(1),
   provenienza: z.enum(["fseplus", "fornitore"]),
   fornitoreId: z.string().optional(),
   codiceLotto: z.string().optional(),
   dataScadenza: z.string().optional(),
   note: z.string().optional(),
-}).refine((d) => d.provenienza !== "fornitore" || (d.fornitoreId && d.fornitoreId.length > 0), {
-  message: "Seleziona un fornitore",
-  path: ["fornitoreId"],
 });
 
+type NuovoLottoValues = z.infer<typeof nuovoLottoSchema>;
+
 function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const { data: magazzini } = useListMagazzini();
   const { data: prodotti } = useListProdotti();
   const { data: fornitori } = useListFornitori();
@@ -56,8 +58,24 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof nuovoLottoSchema>>({
-    resolver: zodResolver(nuovoLottoSchema),
+  const schema = useMemo(() => z.object({
+    prodottoId: z.string().min(1, t("lotti.valProdotto")),
+    magazzinoId: z.string().min(1, t("lotti.valMagazzino")),
+    quantita: z.coerce.number().positive(t("lotti.valQuantita")),
+    dataCarico: z.string().min(1, t("common.requiredField")),
+    causale: z.string().min(1, t("common.requiredField")),
+    provenienza: z.enum(["fseplus", "fornitore"]),
+    fornitoreId: z.string().optional(),
+    codiceLotto: z.string().optional(),
+    dataScadenza: z.string().optional(),
+    note: z.string().optional(),
+  }).refine((d) => d.provenienza !== "fornitore" || (d.fornitoreId && d.fornitoreId.length > 0), {
+    message: t("lotti.valFornitore"),
+    path: ["fornitoreId"],
+  }), [t]);
+
+  const form = useForm<NuovoLottoValues>({
+    resolver: zodResolver(schema),
     defaultValues: {
       prodottoId: "",
       magazzinoId: "",
@@ -92,10 +110,10 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 
   const submitting = createLotto.isPending || createMovimento.isPending;
 
-  const onSubmit = (data: z.infer<typeof nuovoLottoSchema>) => {
+  const onSubmit = (data: NuovoLottoValues) => {
     const prodotto = prodotti?.find((p) => p.id.toString() === data.prodottoId);
     if (!prodotto) {
-      toast({ title: "Errore", description: "Prodotto non valido", variant: "destructive" });
+      toast({ title: t("lotti.toastErrorTitle"), description: t("lotti.toastProdottoNonValido"), variant: "destructive" });
       return;
     }
     createLotto.mutate(
@@ -137,16 +155,16 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
               onSuccess: () => {
                 invalidateStock();
                 toast({
-                  title: "Lotto caricato",
-                  description: `${data.quantita} ${prodotto.unitaMisura} di ${prodotto.nome} caricati in magazzino.`,
+                  title: t("lotti.toastLottoCaricato"),
+                  description: t("lotti.toastLottoCaricatoDesc", { qty: data.quantita, um: prodotto.unitaMisura, nome: prodotto.nome }),
                 });
                 onClose();
               },
               onError: () => {
                 invalidateStock();
                 toast({
-                  title: "Lotto creato, log incompleto",
-                  description: "La giacenza è stata aggiornata, ma la registrazione del movimento è fallita.",
+                  title: t("lotti.toastLogIncompleto"),
+                  description: t("lotti.toastLogIncompletoDesc"),
                   variant: "destructive",
                 });
                 onClose();
@@ -155,7 +173,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
           );
         },
         onError: () =>
-          toast({ title: "Errore", description: "Impossibile creare il lotto", variant: "destructive" }),
+          toast({ title: t("lotti.toastErrorTitle"), description: t("lotti.toastImpossibileCreare"), variant: "destructive" }),
       },
     );
   };
@@ -164,17 +182,16 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
     <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Nuovo Lotto</SheetTitle>
+          <SheetTitle>{t("lotti.dialogTitle")}</SheetTitle>
           <SheetDescription>
-            Carica un lotto di prodotto assegnandolo a un singolo magazzino.
+            {t("lotti.dialogDescription")}
           </SheetDescription>
         </SheetHeader>
 
         <div className="mt-4 flex gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
           <Info className="h-4 w-4 shrink-0 mt-0.5" />
           <span>
-            Un lotto appartiene a un solo magazzino e non può essere diviso. Per spostare parte
-            della quantità in un altro magazzino usa un <strong>Trasferimento Interno</strong>.
+            {t("lotti.infoText")} <strong>{t("lotti.infoStrong")}</strong>.
           </span>
         </div>
 
@@ -182,10 +199,10 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
             <FormField control={form.control} name="prodottoId" render={({ field }) => (
               <FormItem>
-                <FormLabel>Prodotto</FormLabel>
+                <FormLabel>{t("lotti.fldProdotto")}</FormLabel>
                 <Select onValueChange={onProdottoChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Seleziona prodotto..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("lotti.phProdotto")} /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {prodotti?.map((p) => (
@@ -199,10 +216,10 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 
             <FormField control={form.control} name="magazzinoId" render={({ field }) => (
               <FormItem>
-                <FormLabel>Magazzino</FormLabel>
+                <FormLabel>{t("lotti.fldMagazzino")}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Seleziona magazzino..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("lotti.phMagazzino")} /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {magazzini?.map((m) => (
@@ -216,7 +233,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 
             <FormField control={form.control} name="quantita" render={({ field }) => (
               <FormItem>
-                <FormLabel>Quantità</FormLabel>
+                <FormLabel>{t("lotti.fldQuantita")}</FormLabel>
                 <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -224,7 +241,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 
             <FormField control={form.control} name="dataCarico" render={({ field }) => (
               <FormItem>
-                <FormLabel>Data carico</FormLabel>
+                <FormLabel>{t("lotti.fldDataCarico")}</FormLabel>
                 <FormControl><Input type="date" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -232,15 +249,15 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 
             <FormField control={form.control} name="causale" render={({ field }) => (
               <FormItem>
-                <FormLabel>Causale</FormLabel>
+                <FormLabel>{t("lotti.fldCausale")}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="donazione">Donazione</SelectItem>
-                    <SelectItem value="acquisto">Acquisto</SelectItem>
-                    <SelectItem value="rettifica_inventario">Rettifica inventario</SelectItem>
+                    <SelectItem value="donazione">{t("lotti.causaleDonazione")}</SelectItem>
+                    <SelectItem value="acquisto">{t("lotti.causaleAcquisto")}</SelectItem>
+                    <SelectItem value="rettifica_inventario">{t("lotti.causaleRettifica")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -249,14 +266,14 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 
             <FormField control={form.control} name="provenienza" render={({ field }) => (
               <FormItem>
-                <FormLabel>Provenienza</FormLabel>
+                <FormLabel>{t("lotti.fldProvenienza")}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="fseplus">FSE+ (Fondo Sociale Europeo Plus)</SelectItem>
-                    <SelectItem value="fornitore">Fornitore</SelectItem>
+                    <SelectItem value="fseplus">{t("lotti.provFseplus")}</SelectItem>
+                    <SelectItem value="fornitore">{t("lotti.provFornitore")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -266,10 +283,10 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
             {provenienza === "fornitore" && (
               <FormField control={form.control} name="fornitoreId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fornitore</FormLabel>
+                  <FormLabel>{t("lotti.fldFornitore")}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger><SelectValue placeholder="Seleziona fornitore..." /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("lotti.phFornitore")} /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {fornitori?.map((f) => (
@@ -284,15 +301,15 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 
             <FormField control={form.control} name="codiceLotto" render={({ field }) => (
               <FormItem>
-                <FormLabel>Codice lotto <span className="text-muted-foreground font-normal">(opzionale)</span></FormLabel>
-                <FormControl><Input placeholder="Es. LOT-2026-001" {...field} /></FormControl>
+                <FormLabel>{t("lotti.fldCodiceLotto")} <span className="text-muted-foreground font-normal">{t("lotti.optional")}</span></FormLabel>
+                <FormControl><Input placeholder={t("lotti.phCodiceLotto")} {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
 
             <FormField control={form.control} name="dataScadenza" render={({ field }) => (
               <FormItem>
-                <FormLabel>Data scadenza <span className="text-muted-foreground font-normal">(opzionale)</span></FormLabel>
+                <FormLabel>{t("lotti.fldDataScadenza")} <span className="text-muted-foreground font-normal">{t("lotti.optional")}</span></FormLabel>
                 <FormControl><Input type="date" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -300,15 +317,15 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 
             <FormField control={form.control} name="note" render={({ field }) => (
               <FormItem>
-                <FormLabel>Note <span className="text-muted-foreground font-normal">(opzionale)</span></FormLabel>
+                <FormLabel>{t("lotti.fldNote")} <span className="text-muted-foreground font-normal">{t("lotti.optional")}</span></FormLabel>
                 <FormControl><Input {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={onClose}>Annulla</Button>
-              <Button type="submit" disabled={submitting}>{submitting ? "Salvataggio…" : "Carica lotto"}</Button>
+              <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+              <Button type="submit" disabled={submitting}>{submitting ? t("common.saving") : t("lotti.submit")}</Button>
             </div>
           </form>
         </Form>
@@ -318,6 +335,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
 }
 
 export default function Lotti() {
+  const { t } = useTranslation();
   const [magazzinoId, setMagazzinoId] = useState<string>("all");
   const [prodottoId, setProdottoId] = useState<string>("all");
   const [inScadenza, setInScadenza] = useState(false);
@@ -333,42 +351,42 @@ export default function Lotti() {
   });
 
   const getExpiryStatus = (dateStr: string | null | undefined) => {
-    if (!dateStr) return { label: "No Scadenza", color: "text-muted-foreground", badge: "bg-gray-100 text-gray-800" };
+    if (!dateStr) return { key: "noExpiry", label: t("lotti.statusNoExpiry"), color: "text-muted-foreground", badge: "bg-gray-100 text-gray-800" };
     
     const expiryDate = new Date(dateStr);
     const daysLeft = differenceInDays(expiryDate, new Date());
     
-    if (daysLeft < 0) return { label: "Scaduto", color: "text-destructive font-bold", badge: "bg-destructive text-destructive-foreground" };
-    if (daysLeft <= 7) return { label: "Critico", color: "text-destructive font-semibold", badge: "bg-destructive/90 text-destructive-foreground" };
-    if (daysLeft <= 30) return { label: "Attenzione", color: "text-amber-600 font-medium", badge: "bg-amber-500 text-white" };
-    return { label: "Regolare", color: "text-green-600", badge: "bg-green-500/20 text-green-700" };
+    if (daysLeft < 0) return { key: "expired", label: t("lotti.statusExpired"), color: "text-destructive font-bold", badge: "bg-destructive text-destructive-foreground" };
+    if (daysLeft <= 7) return { key: "critical", label: t("lotti.statusCritical"), color: "text-destructive font-semibold", badge: "bg-destructive/90 text-destructive-foreground" };
+    if (daysLeft <= 30) return { key: "warning", label: t("lotti.statusWarning"), color: "text-amber-600 font-medium", badge: "bg-amber-500 text-white" };
+    return { key: "regular", label: t("lotti.statusRegular"), color: "text-green-600", badge: "bg-green-500/20 text-green-700" };
   };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tracciamento Lotti e Scadenze</h1>
-          <p className="text-muted-foreground">Monitora le date di scadenza per prevenire gli sprechi alimentari.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("lotti.title")}</h1>
+          <p className="text-muted-foreground">{t("lotti.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={lotti ?? []}
             columns={[
-              { header: "Cod. Lotto", accessor: (l) => l.codiceLotto },
-              { header: "Prodotto", accessor: (l) => l.prodottoNome },
-              { header: "Magazzino", accessor: (l) => l.magazzinoNome },
-              { header: "Provenienza", accessor: (l) => l.fsePlus ? "FSE+" : (l.fornitoreNome ?? "") },
-              { header: "Data Scadenza", accessor: (l) => l.dataScadenza ? new Date(l.dataScadenza).toLocaleDateString("it-IT") : "" },
-              { header: "Q.tà Iniziale", accessor: (l) => l.quantitaCaricata != null ? parseFloat(String(l.quantitaCaricata)) : "" },
-              { header: "Q.tà Residua", accessor: (l) => l.quantitaResidua != null ? parseFloat(String(l.quantitaResidua)) : "" },
+              { header: t("lotti.colCodLotto"), accessor: (l) => l.codiceLotto },
+              { header: t("lotti.colProdotto"), accessor: (l) => l.prodottoNome },
+              { header: t("lotti.colMagazzino"), accessor: (l) => l.magazzinoNome },
+              { header: t("lotti.colProvenienza"), accessor: (l) => l.fsePlus ? "FSE+" : (l.fornitoreNome ?? "") },
+              { header: t("lotti.colDataScadenza"), accessor: (l) => l.dataScadenza ? new Date(l.dataScadenza).toLocaleDateString("it-IT") : "" },
+              { header: t("lotti.colQtaIniziale"), accessor: (l) => l.quantitaCaricata != null ? parseFloat(String(l.quantitaCaricata)) : "" },
+              { header: t("lotti.colQtaResidua"), accessor: (l) => l.quantitaResidua != null ? parseFloat(String(l.quantitaResidua)) : "" },
             ]}
             filename="lotti"
-            title="Elenco Lotti"
+            title={t("lotti.exportTitle")}
             orientation="landscape"
           />
           <Button onClick={() => setNuovoOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Nuovo Lotto
+            <Plus className="h-4 w-4 mr-1" /> {t("lotti.newLot")}
           </Button>
         </div>
       </div>
@@ -382,10 +400,10 @@ export default function Lotti() {
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={magazzinoId} onValueChange={setMagazzinoId}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Tutti i magazzini" />
+                  <SelectValue placeholder={t("lotti.allWarehouses")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tutti i magazzini</SelectItem>
+                  <SelectItem value="all">{t("lotti.allWarehouses")}</SelectItem>
                   {magazzini?.map(m => (
                     <SelectItem key={m.id} value={m.id.toString()}>{m.nome}</SelectItem>
                   ))}
@@ -396,10 +414,10 @@ export default function Lotti() {
             <div className="flex items-center gap-2">
               <Select value={prodottoId} onValueChange={setProdottoId}>
                 <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Tutti i prodotti" />
+                  <SelectValue placeholder={t("lotti.allProducts")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tutti i prodotti</SelectItem>
+                  <SelectItem value="all">{t("lotti.allProducts")}</SelectItem>
                   {prodotti?.filter(p => p.gestioneScadenza || p.gestioneLotto).map(p => (
                     <SelectItem key={p.id} value={p.id.toString()}>{p.nome}</SelectItem>
                   ))}
@@ -410,7 +428,7 @@ export default function Lotti() {
             <div className="flex items-center space-x-2 ml-auto bg-amber-500/10 px-3 py-1.5 rounded-md border border-amber-500/20">
               <Switch id="scadenza" checked={inScadenza} onCheckedChange={setInScadenza} />
               <Label htmlFor="scadenza" className="text-amber-700 font-medium cursor-pointer">
-                Solo in scadenza (≤ 30gg)
+                {t("lotti.expiringOnly")}
               </Label>
             </div>
           </div>
@@ -419,14 +437,14 @@ export default function Lotti() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Cod. Lotto</TableHead>
-                <TableHead>Prodotto</TableHead>
-                <TableHead>Magazzino</TableHead>
-                <TableHead>Provenienza</TableHead>
-                <TableHead>Data Scadenza</TableHead>
-                <TableHead className="text-right">Q.tà Iniziale</TableHead>
-                <TableHead className="text-right">Q.tà Residua</TableHead>
-                <TableHead className="w-[100px] text-center">Stato</TableHead>
+                <TableHead>{t("lotti.colCodLotto")}</TableHead>
+                <TableHead>{t("lotti.colProdotto")}</TableHead>
+                <TableHead>{t("lotti.colMagazzino")}</TableHead>
+                <TableHead>{t("lotti.colProvenienza")}</TableHead>
+                <TableHead>{t("lotti.colDataScadenza")}</TableHead>
+                <TableHead className="text-right">{t("lotti.colQtaIniziale")}</TableHead>
+                <TableHead className="text-right">{t("lotti.colQtaResidua")}</TableHead>
+                <TableHead className="w-[100px] text-center">{t("lotti.colStato")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -446,19 +464,19 @@ export default function Lotti() {
               ) : lotti?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
-                    Nessun lotto trovato con questi filtri.
+                    {t("lotti.noResults")}
                   </TableCell>
                 </TableRow>
               ) : lotti?.map((lotto) => {
                 const status = getExpiryStatus(lotto.dataScadenza);
                 // Highlight row if critical
-                const isCritical = status.label === "Critico" || status.label === "Scaduto";
-                const isWarning = status.label === "Attenzione";
+                const isCritical = status.key === "critical" || status.key === "expired";
+                const isWarning = status.key === "warning";
                 
                 return (
                   <TableRow key={lotto.id} className={isCritical ? "bg-red-50/50 hover:bg-red-50 dark:bg-red-950/20" : isWarning ? "bg-amber-50/30 hover:bg-amber-50 dark:bg-amber-950/20" : ""}>
                     <TableCell className="font-mono text-xs font-medium">
-                      {lotto.codiceLotto || <span className="text-muted-foreground italic">N/D</span>}
+                      {lotto.codiceLotto || <span className="text-muted-foreground italic">{t("lotti.na")}</span>}
                     </TableCell>
                     <TableCell className="font-medium">{lotto.prodottoNome}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{lotto.magazzinoNome}</TableCell>
@@ -468,7 +486,7 @@ export default function Lotti() {
                       ) : lotto.fornitoreNome ? (
                         <span className="text-sm">{lotto.fornitoreNome}</span>
                       ) : (
-                        <span className="text-muted-foreground text-sm italic">N/D</span>
+                        <span className="text-muted-foreground text-sm italic">{t("lotti.na")}</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -478,7 +496,7 @@ export default function Lotti() {
                           {format(new Date(lotto.dataScadenza), "dd MMM yyyy", { locale: it })}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-sm italic">Non prevista</span>
+                        <span className="text-muted-foreground text-sm italic">{t("lotti.notProvided")}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">{lotto.quantitaCaricata}</TableCell>

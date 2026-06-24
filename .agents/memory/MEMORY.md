@@ -13,3 +13,4 @@
 - [Auth, sessions & area RBAC](auth-session-rbac.md) — SameSite=None cookie+CSRF guard are a package; connect-pg-simple session table needs manual Drizzle def; last-admin lockout has user AND role vectors; nav hiding is not the boundary.
 - [FSE+ end-of-year report](fse-plus-report.md) — counts ALL household members (titolare+nucleo); area_provenienza is family-level; null birthdate counts in M/F totals but not adulti/minori; delivered = bolla confermata/consegnata + lotti.fse_plus.
 - [Bolla trasportatore & PDF addresses](bolla-trasportatore.md) — bolla transporter is volontarioConsegnaId XOR free-text trasportatoreNome; BollaDettaglio joins magazzini+beneficiari so PDF shows warehouse/recipient addresses + transporter line.
+- [Full-GUI i18n](i18n-full-gui.md) — src/lib/i18n/ dir, single translation ns keyed per page; never call i18n.t() at module scope for schema messages (use makeXSchema(t)+useMemo); import i18n before App in main.tsx.

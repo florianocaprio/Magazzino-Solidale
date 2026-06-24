@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, LogOut } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function ChangePassword() {
+  const { t } = useTranslation();
   const { refresh, logout, user } = useAuth();
   const changePassword = useChangePassword();
   const { toast } = useToast();
@@ -23,22 +25,22 @@ export default function ChangePassword() {
     e.preventDefault();
     setError(null);
     if (newPassword.length < 8) {
-      setError("La nuova password deve avere almeno 8 caratteri.");
+      setError(t("changePassword.errorMinLength"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError("Le password non coincidono.");
+      setError(t("changePassword.errorMismatch"));
       return;
     }
     changePassword.mutate(
       { data: { currentPassword, newPassword } },
       {
         onSuccess: () => {
-          toast({ title: "Password aggiornata" });
+          toast({ title: t("changePassword.toastUpdated") });
           refresh();
         },
         onError: () => {
-          setError("Password attuale non corretta.");
+          setError(t("changePassword.errorCurrentWrong"));
         },
       },
     );
@@ -49,18 +51,18 @@ export default function ChangePassword() {
       <Card className="w-full max-w-sm">
         <CardHeader className="pt-8">
           <h1 className="text-lg font-semibold">
-            {forced ? "Imposta una nuova password" : "Cambia password"}
+            {forced ? t("changePassword.titleForced") : t("changePassword.titleNormal")}
           </h1>
           <p className="text-sm text-muted-foreground">
             {forced
-              ? "Al primo accesso è necessario scegliere una nuova password."
-              : "Aggiorna la tua password di accesso."}
+              ? t("changePassword.subtitleForced")
+              : t("changePassword.subtitleNormal")}
           </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="current">Password attuale</Label>
+              <Label htmlFor="current">{t("changePassword.currentPassword")}</Label>
               <Input
                 id="current"
                 type="password"
@@ -72,7 +74,7 @@ export default function ChangePassword() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="new">Nuova password</Label>
+              <Label htmlFor="new">{t("changePassword.newPassword")}</Label>
               <Input
                 id="new"
                 type="password"
@@ -83,7 +85,7 @@ export default function ChangePassword() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm">Conferma nuova password</Label>
+              <Label htmlFor="confirm">{t("changePassword.confirmPassword")}</Label>
               <Input
                 id="confirm"
                 type="password"
@@ -102,7 +104,7 @@ export default function ChangePassword() {
               {changePassword.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Salva password
+              {t("changePassword.savePassword")}
             </Button>
             {forced && (
               <Button
@@ -112,7 +114,7 @@ export default function ChangePassword() {
                 onClick={logout}
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                Esci
+                {t("common.logout")}
               </Button>
             )}
           </form>

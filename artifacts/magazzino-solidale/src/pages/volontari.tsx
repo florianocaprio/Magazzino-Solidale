@@ -19,20 +19,21 @@ import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, CheckCircle2, XCircl
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-
-const formSchema = z.object({
-  nome: z.string().min(2, "Nome troppo corto"),
-  cognome: z.string().min(2, "Cognome troppo corto"),
-  telefono: z.string().optional(),
-  email: z.string().email("Email non valida").optional().or(z.literal("")),
-  ruolo: z.string().min(1, "Ruolo obbligatorio"),
-  patente: z.boolean().default(false),
-  mezzoPersonale: z.boolean().default(false),
-  maxConsegneTurno: z.coerce.number().min(1).default(5),
-  note: z.string().optional()
-});
+import { useTranslation } from "react-i18next";
 
 export default function Volontari() {
+  const { t } = useTranslation();
+  const formSchema = z.object({
+    nome: z.string().min(2, t("volontari.valNome")),
+    cognome: z.string().min(2, t("volontari.valCognome")),
+    telefono: z.string().optional(),
+    email: z.string().email(t("volontari.valEmail")).optional().or(z.literal("")),
+    ruolo: z.string().min(1, t("volontari.valRuolo")),
+    patente: z.boolean().default(false),
+    mezzoPersonale: z.boolean().default(false),
+    maxConsegneTurno: z.coerce.number().min(1).default(5),
+    note: z.string().optional()
+  });
   const { data: volontari, isLoading } = useListVolontari();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -86,7 +87,7 @@ export default function Volontari() {
       updateVolontario.mutate({ id: editingId, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
-          toast({ title: "Volontario aggiornato" });
+          toast({ title: t("volontari.toastUpdated") });
           setIsFormOpen(false);
         }
       });
@@ -94,7 +95,7 @@ export default function Volontari() {
       createVolontario.mutate({ data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
-          toast({ title: "Volontario creato" });
+          toast({ title: t("volontari.toastCreated") });
           setIsFormOpen(false);
         }
       });
@@ -106,7 +107,7 @@ export default function Volontari() {
     deleteVolontario.mutate({ id: deletingId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
-        toast({ title: "Volontario eliminato" });
+        toast({ title: t("volontari.toastDeleted") });
         setDeletingId(null);
       }
     });
@@ -125,31 +126,33 @@ export default function Volontari() {
     v.cognome.toLowerCase().includes(search.toLowerCase())
   );
 
+  const roleLabel = (ruolo: string) => t(`volontari.roles.${ruolo}`, { defaultValue: ruolo.replace('_', ' ') });
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Volontari</h1>
-          <p className="text-muted-foreground">Gestisci il team operativo, ruoli e disponibilità.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("volontari.title")}</h1>
+          <p className="text-muted-foreground">{t("volontari.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={volontari ?? []}
             columns={[
-              { header: "Nome", accessor: (v) => v.nome },
-              { header: "Cognome", accessor: (v) => v.cognome },
-              { header: "Email", accessor: (v) => v.email },
-              { header: "Telefono", accessor: (v) => v.telefono },
-              { header: "Ruolo", accessor: (v) => v.ruolo },
-              { header: "Patente", accessor: (v) => (v.patente ? "Sì" : "No") },
-              { header: "Attivo", accessor: (v) => (v.attivo ? "Sì" : "No") },
+              { header: t("common.name"), accessor: (v) => v.nome },
+              { header: t("common.surname"), accessor: (v) => v.cognome },
+              { header: t("common.email"), accessor: (v) => v.email },
+              { header: t("common.phone"), accessor: (v) => v.telefono },
+              { header: t("volontari.ruolo"), accessor: (v) => roleLabel(v.ruolo) },
+              { header: t("volontari.patente"), accessor: (v) => (v.patente ? t("common.yes") : t("common.no")) },
+              { header: t("common.active"), accessor: (v) => (v.attivo ? t("common.yes") : t("common.no")) },
             ]}
             filename="volontari"
-            title="Elenco Volontari"
+            title={t("volontari.exportTitle")}
             orientation="landscape"
           />
           <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> Nuovo Volontario
+            <Plus className="h-4 w-4" /> {t("volontari.newVolontario")}
           </Button>
         </div>
       </div>
@@ -157,7 +160,7 @@ export default function Volontari() {
       <Card>
         <CardHeader className="py-4 border-b">
           <Input 
-            placeholder="Cerca per nome o cognome..." 
+            placeholder={t("volontari.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-sm"
@@ -167,12 +170,12 @@ export default function Volontari() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Contatti</TableHead>
-                <TableHead>Ruolo</TableHead>
-                <TableHead className="text-center">Patente</TableHead>
-                <TableHead className="text-center">Mezzo Proprio</TableHead>
-                <TableHead className="text-center">Stato</TableHead>
+                <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("volontari.contatti")}</TableHead>
+                <TableHead>{t("volontari.ruolo")}</TableHead>
+                <TableHead className="text-center">{t("volontari.patente")}</TableHead>
+                <TableHead className="text-center">{t("volontari.mezzoProprio")}</TableHead>
+                <TableHead className="text-center">{t("common.status")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -192,7 +195,7 @@ export default function Volontari() {
               ) : filtered?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                    Nessun volontario trovato.
+                    {t("volontari.empty")}
                   </TableCell>
                 </TableRow>
               ) : filtered?.map((v) => (
@@ -208,7 +211,7 @@ export default function Volontari() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="capitalize">
-                      {v.ruolo.replace('_', ' ')}
+                      {roleLabel(v.ruolo)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">
@@ -224,16 +227,16 @@ export default function Volontari() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Apri menu</span>
+                          <span className="sr-only">{t("volontari.openMenu")}</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(v)}>
-                          <Pencil className="mr-2 h-4 w-4" /> Modifica
+                          <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(v.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Elimina
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -248,8 +251,8 @@ export default function Volontari() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId ? "Modifica Volontario" : "Nuovo Volontario"}</SheetTitle>
-            <SheetDescription>Dettagli operativi per i turni.</SheetDescription>
+            <SheetTitle>{editingId ? t("volontari.sheetEditTitle") : t("volontari.sheetNewTitle")}</SheetTitle>
+            <SheetDescription>{t("volontari.sheetDesc")}</SheetDescription>
           </SheetHeader>
           
           <div className="mt-6">
@@ -258,14 +261,14 @@ export default function Volontari() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="nome" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nome</FormLabel>
+                      <FormLabel>{t("common.name")}</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="cognome" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cognome</FormLabel>
+                      <FormLabel>{t("common.surname")}</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -275,14 +278,14 @@ export default function Volontari() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="telefono" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Telefono</FormLabel>
+                      <FormLabel>{t("common.phone")}</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="email" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>{t("common.email")}</FormLabel>
                       <FormControl><Input type="email" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -291,14 +294,14 @@ export default function Volontari() {
 
                 <FormField control={form.control} name="ruolo" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Ruolo Principale</FormLabel>
+                    <FormLabel>{t("volontari.ruoloPrincipale")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="magazziniere">Magazziniere</SelectItem>
-                        <SelectItem value="autista">Autista</SelectItem>
-                        <SelectItem value="operatore_sportello">Operatore Sportello</SelectItem>
-                        <SelectItem value="coordinatore">Coordinatore</SelectItem>
+                        <SelectItem value="magazziniere">{t("volontari.roles.magazziniere")}</SelectItem>
+                        <SelectItem value="autista">{t("volontari.roles.autista")}</SelectItem>
+                        <SelectItem value="operatore_sportello">{t("volontari.roles.operatore_sportello")}</SelectItem>
+                        <SelectItem value="coordinatore">{t("volontari.roles.coordinatore")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -308,13 +311,13 @@ export default function Volontari() {
                 <div className="space-y-4 pt-4 border-t">
                   <FormField control={form.control} name="patente" render={({ field }) => (
                     <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                      <FormLabel>Possiede la Patente B</FormLabel>
+                      <FormLabel>{t("volontari.patenteB")}</FormLabel>
                       <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="mezzoPersonale" render={({ field }) => (
                     <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                      <FormLabel>Disponibile a usare mezzo personale</FormLabel>
+                      <FormLabel>{t("volontari.mezzoPersonale")}</FormLabel>
                       <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                     </FormItem>
                   )} />
@@ -322,16 +325,16 @@ export default function Volontari() {
 
                 <FormField control={form.control} name="maxConsegneTurno" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Max consegne per turno</FormLabel>
+                    <FormLabel>{t("volontari.maxConsegne")}</FormLabel>
                     <FormControl><Input type="number" min="1" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
                   <Button type="submit" disabled={createVolontario.isPending || updateVolontario.isPending}>
-                    {editingId ? "Salva Modifiche" : "Crea Volontario"}
+                    {editingId ? t("volontari.saveChanges") : t("volontari.createBtn")}
                   </Button>
                 </div>
               </form>
@@ -343,12 +346,12 @@ export default function Volontari() {
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
-            <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+            <AlertDialogTitle>{t("volontari.confirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("volontari.confirmDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Elimina</AlertDialogAction>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

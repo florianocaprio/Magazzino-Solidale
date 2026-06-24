@@ -32,14 +32,15 @@ import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslation } from "react-i18next";
 import * as z from "zod";
 
-const formSchema = z.object({
-  codice: z.string().min(2, "Codice troppo corto"),
-  nome: z.string().min(2, "Nome troppo corto"),
+const makeFormSchema = (t: (key: string) => string) => z.object({
+  codice: z.string().min(2, t("prodotti.errCodiceShort")),
+  nome: z.string().min(2, t("prodotti.errNomeShort")),
   descrizione: z.string().optional(),
-  tipoProdotto: z.string().min(1, "Campo obbligatorio"),
-  unitaMisura: z.string().min(1, "Campo obbligatorio"),
+  tipoProdotto: z.string().min(1, t("common.requiredField")),
+  unitaMisura: z.string().min(1, t("common.requiredField")),
   codiceBarre: z.string().optional(),
   gestioneLotto: z.boolean().default(false),
   gestioneScadenza: z.boolean().default(false),
@@ -49,20 +50,24 @@ const formSchema = z.object({
   note: z.string().optional()
 });
 
-const caricoSchema = z.object({
-  magazzinoId: z.string().min(1, "Seleziona un magazzino"),
-  quantita: z.coerce.number().positive("La quantità deve essere maggiore di zero"),
-  dataCarico: z.string().min(1, "Campo obbligatorio"),
-  causale: z.string().min(1, "Campo obbligatorio"),
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
+
+const makeCaricoSchema = (t: (key: string) => string) => z.object({
+  magazzinoId: z.string().min(1, t("prodotti.errSelectMagazzino")),
+  quantita: z.coerce.number().positive(t("prodotti.errQuantitaPositive")),
+  dataCarico: z.string().min(1, t("common.requiredField")),
+  causale: z.string().min(1, t("common.requiredField")),
   provenienza: z.enum(["fseplus", "fornitore"]),
   fornitoreId: z.string().optional(),
   codiceLotto: z.string().optional(),
   dataScadenza: z.string().optional(),
   note: z.string().optional(),
 }).refine((d) => d.provenienza !== "fornitore" || (d.fornitoreId && d.fornitoreId.length > 0), {
-  message: "Seleziona un fornitore",
+  message: t("prodotti.errSelectFornitore"),
   path: ["fornitoreId"],
 });
+
+type CaricoValues = z.infer<ReturnType<typeof makeCaricoSchema>>;
 
 type Prodotto = {
   id: number;
@@ -75,6 +80,7 @@ type Prodotto = {
 };
 
 function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => void }) {
+  const { t } = useTranslation();
   const { data: magazzini } = useListMagazzini();
   const { data: fornitori } = useListFornitori();
   const createLotto = useCreateLotto();
@@ -82,7 +88,9 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof caricoSchema>>({
+  const caricoSchema = makeCaricoSchema(t);
+
+  const form = useForm<CaricoValues>({
     resolver: zodResolver(caricoSchema),
     defaultValues: {
       magazzinoId: "",
@@ -101,7 +109,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
 
   const submitting = createLotto.isPending || createMovimento.isPending;
 
-  const onSubmit = (data: z.infer<typeof caricoSchema>) => {
+  const onSubmit = (data: CaricoValues) => {
     createLotto.mutate(
       {
         data: {
@@ -141,8 +149,8 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
               onSuccess: () => {
                 invalidateStock();
                 toast({
-                  title: "Carico registrato",
-                  description: `${data.quantita} ${prodotto.unitaMisura} di ${prodotto.nome} caricati in magazzino.`,
+                  title: t("prodotti.toastCaricoTitle"),
+                  description: t("prodotti.toastCaricoDesc", { quantita: data.quantita, um: prodotto.unitaMisura, nome: prodotto.nome }),
                 });
                 onClose();
               },
@@ -152,8 +160,8 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
                 // open, or re-submitting would load the quantity a second time.
                 invalidateStock();
                 toast({
-                  title: "Carico effettuato, log incompleto",
-                  description: "La giacenza è stata aggiornata, ma la registrazione del movimento è fallita.",
+                  title: t("prodotti.toastCaricoIncompletoTitle"),
+                  description: t("prodotti.toastCaricoIncompletoDesc"),
                   variant: "destructive",
                 });
                 onClose();
@@ -162,7 +170,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
           );
         },
         onError: () =>
-          toast({ title: "Errore", description: "Impossibile registrare il carico", variant: "destructive" }),
+          toast({ title: t("prodotti.toastErrorTitle"), description: t("prodotti.toastCaricoError"), variant: "destructive" }),
       },
     );
   };
@@ -171,9 +179,9 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
     <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Carica in magazzino</SheetTitle>
+          <SheetTitle>{t("prodotti.loadTitle")}</SheetTitle>
           <SheetDescription>
-            Aggiungi stock di <span className="font-medium text-foreground">{prodotto.nome}</span> selezionando magazzino e quantità.
+            {t("prodotti.loadDescription", { nome: prodotto.nome })}
           </SheetDescription>
         </SheetHeader>
 
@@ -182,11 +190,11 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField control={form.control} name="magazzinoId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Magazzino di competenza</FormLabel>
+                  <FormLabel>{t("prodotti.loadMagazzino")}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleziona magazzino..." />
+                        <SelectValue placeholder={t("prodotti.selectMagazzino")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -202,14 +210,14 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="quantita" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quantità ({prodotto.unitaMisura})</FormLabel>
+                    <FormLabel>{t("prodotti.quantityWithUm", { um: prodotto.unitaMisura })}</FormLabel>
                     <FormControl><Input type="number" min="0" step="any" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="dataCarico" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Data carico</FormLabel>
+                    <FormLabel>{t("prodotti.dataCarico")}</FormLabel>
                     <FormControl><Input type="date" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -218,17 +226,17 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
 
               <FormField control={form.control} name="causale" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Causale</FormLabel>
+                  <FormLabel>{t("prodotti.causale")}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleziona causale" />
+                        <SelectValue placeholder={t("prodotti.selectCausale")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="donazione">Donazione</SelectItem>
-                      <SelectItem value="acquisto">Acquisto</SelectItem>
-                      <SelectItem value="rettifica_inventario">Rettifica inventario</SelectItem>
+                      <SelectItem value="donazione">{t("prodotti.causale_donazione")}</SelectItem>
+                      <SelectItem value="acquisto">{t("prodotti.causale_acquisto")}</SelectItem>
+                      <SelectItem value="rettifica_inventario">{t("prodotti.causale_rettifica")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -237,14 +245,14 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
 
               <FormField control={form.control} name="provenienza" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Provenienza</FormLabel>
+                  <FormLabel>{t("prodotti.provenienza")}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="fseplus">FSE+ (Fondo Sociale Europeo Plus)</SelectItem>
-                      <SelectItem value="fornitore">Fornitore</SelectItem>
+                      <SelectItem value="fseplus">{t("prodotti.provenienza_fseplus")}</SelectItem>
+                      <SelectItem value="fornitore">{t("prodotti.provenienza_fornitore")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -254,10 +262,10 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
               {provenienza === "fornitore" && (
                 <FormField control={form.control} name="fornitoreId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fornitore</FormLabel>
+                    <FormLabel>{t("prodotti.fornitore")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Seleziona fornitore..." /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t("prodotti.selectFornitore")} /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {fornitori?.map((f) => (
@@ -275,8 +283,8 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
                   {prodotto.gestioneLotto && (
                     <FormField control={form.control} name="codiceLotto" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Codice lotto</FormLabel>
-                        <FormControl><Input placeholder="Opzionale" {...field} /></FormControl>
+                        <FormLabel>{t("prodotti.codiceLotto")}</FormLabel>
+                        <FormControl><Input placeholder={t("prodotti.optional")} {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -284,7 +292,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
                   {prodotto.gestioneScadenza && (
                     <FormField control={form.control} name="dataScadenza" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Data scadenza</FormLabel>
+                        <FormLabel>{t("prodotti.dataScadenza")}</FormLabel>
                         <FormControl><Input type="date" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
@@ -295,16 +303,16 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
 
               <FormField control={form.control} name="note" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Note</FormLabel>
-                  <FormControl><Input placeholder="Opzionale" {...field} /></FormControl>
+                  <FormLabel>{t("common.notes")}</FormLabel>
+                  <FormControl><Input placeholder={t("prodotti.optional")} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
 
               <div className="pt-6 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onClose}>Annulla</Button>
+                <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
                 <Button type="submit" disabled={submitting} className="gap-2">
-                  <PackagePlus className="h-4 w-4" /> Registra carico
+                  <PackagePlus className="h-4 w-4" /> {t("prodotti.registraCarico")}
                 </Button>
               </div>
             </form>
@@ -316,6 +324,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
 }
 
 function ProdottoLotti({ prodottoId }: { prodottoId: number }) {
+  const { t } = useTranslation();
   const { data: lotti, isLoading } = useListLotti(
     { prodottoId },
     { query: { queryKey: getListLottiQueryKey({ prodottoId }) } },
@@ -323,23 +332,23 @@ function ProdottoLotti({ prodottoId }: { prodottoId: number }) {
 
   return (
     <div className="pt-4 border-t space-y-2">
-      <FormLabel>Lotti di questo prodotto</FormLabel>
+      <FormLabel>{t("prodotti.lottiTitle")}</FormLabel>
       {isLoading ? (
         <Skeleton className="h-12 w-full" />
       ) : !lotti || lotti.length === 0 ? (
-        <p className="text-[0.8rem] text-muted-foreground">Nessun lotto registrato per questo prodotto.</p>
+        <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.noLotti")}</p>
       ) : (
         <div className="rounded-lg border divide-y">
           {lotti.map((l) => (
             <div key={l.id} className="flex items-center justify-between gap-2 p-2 text-sm">
               <div className="min-w-0">
                 <div className="font-medium truncate">
-                  {l.codiceLotto || <span className="text-muted-foreground italic">Senza codice</span>}
+                  {l.codiceLotto || <span className="text-muted-foreground italic">{t("prodotti.senzaCodice")}</span>}
                   <span className="text-muted-foreground font-normal"> · {l.magazzinoNome}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Residuo: {l.quantitaResidua}
-                  {l.dataScadenza ? ` · Scad. ${new Date(l.dataScadenza).toLocaleDateString("it-IT")}` : ""}
+                  {t("prodotti.residuoLabel")} {l.quantitaResidua}
+                  {l.dataScadenza ? ` · ${t("prodotti.scadShort")} ${new Date(l.dataScadenza).toLocaleDateString("it-IT")}` : ""}
                 </div>
               </div>
               {l.fsePlus ? (
@@ -347,7 +356,7 @@ function ProdottoLotti({ prodottoId }: { prodottoId: number }) {
               ) : l.fornitoreNome ? (
                 <Badge variant="outline" className="shrink-0">{l.fornitoreNome}</Badge>
               ) : (
-                <span className="text-muted-foreground text-xs italic shrink-0">Provenienza N/D</span>
+                <span className="text-muted-foreground text-xs italic shrink-0">{t("prodotti.provenienzaNd")}</span>
               )}
             </div>
           ))}
@@ -358,6 +367,7 @@ function ProdottoLotti({ prodottoId }: { prodottoId: number }) {
 }
 
 export default function Prodotti() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState("all");
   
@@ -378,7 +388,9 @@ export default function Prodotti() {
   const updateProdotto = useUpdateProdotto();
   const deleteProdotto = useDeleteProdotto();
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const formSchema = makeFormSchema(t);
+
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       codice: "", nome: "", descrizione: "", tipoProdotto: "alimentare",
@@ -416,12 +428,12 @@ export default function Prodotti() {
     setIsFormOpen(true);
   };
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = (data: FormValues) => {
     if (editingId) {
       updateProdotto.mutate({ id: editingId, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
-          toast({ title: "Prodotto aggiornato" });
+          toast({ title: t("prodotti.toastUpdated") });
           setIsFormOpen(false);
         }
       });
@@ -429,7 +441,7 @@ export default function Prodotti() {
       createProdotto.mutate({ data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
-          toast({ title: "Prodotto creato" });
+          toast({ title: t("prodotti.toastCreated") });
           setIsFormOpen(false);
         }
       });
@@ -441,7 +453,7 @@ export default function Prodotti() {
     deleteProdotto.mutate({ id: deletingId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
-        toast({ title: "Prodotto eliminato" });
+        toast({ title: t("prodotti.toastDeleted") });
         setDeletingId(null);
       }
     });
@@ -461,24 +473,24 @@ export default function Prodotti() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Catalogo Prodotti</h1>
-          <p className="text-muted-foreground">Gestisci i beni distribuiti dall'associazione.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("prodotti.title")}</h1>
+          <p className="text-muted-foreground">{t("prodotti.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={prodotti ?? []}
             columns={[
-              { header: "Codice", accessor: (p) => p.codice },
-              { header: "Nome", accessor: (p) => p.nome },
-              { header: "Tipo", accessor: (p) => p.tipoProdotto },
-              { header: "U.M.", accessor: (p) => p.unitaMisura },
-              { header: "Scorta Minima", accessor: (p) => p.scortaMinima != null ? parseFloat(String(p.scortaMinima)) : "" },
+              { header: t("common.code"), accessor: (p) => p.codice },
+              { header: t("common.name"), accessor: (p) => p.nome },
+              { header: t("common.type"), accessor: (p) => p.tipoProdotto },
+              { header: t("prodotti.colUm"), accessor: (p) => p.unitaMisura },
+              { header: t("prodotti.colScortaMinima"), accessor: (p) => p.scortaMinima != null ? parseFloat(String(p.scortaMinima)) : "" },
             ]}
             filename="prodotti"
-            title="Catalogo Prodotti"
+            title={t("prodotti.title")}
           />
           <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> Nuovo Prodotto
+            <Plus className="h-4 w-4" /> {t("prodotti.newProduct")}
           </Button>
         </div>
       </div>
@@ -487,7 +499,7 @@ export default function Prodotti() {
         <CardHeader className="py-4 border-b">
           <div className="flex flex-col sm:flex-row justify-between gap-4">
             <Input 
-              placeholder="Cerca per nome o codice..." 
+              placeholder={t("prodotti.searchPlaceholder")} 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
@@ -496,17 +508,17 @@ export default function Prodotti() {
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={tipoFilter} onValueChange={setTipoFilter}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Tutti i tipi" />
+                  <SelectValue placeholder={t("prodotti.allTypes")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tutti i tipi</SelectItem>
-                  <SelectItem value="alimentare">Alimentare</SelectItem>
-                  <SelectItem value="igiene">Igiene</SelectItem>
-                  <SelectItem value="vestiario">Vestiario</SelectItem>
-                  <SelectItem value="medicinali">Medicinali</SelectItem>
-                  <SelectItem value="scarpe">Scarpe</SelectItem>
-                  <SelectItem value="sanitario">Sanitario</SelectItem>
-                  <SelectItem value="altro">Altro</SelectItem>
+                  <SelectItem value="all">{t("prodotti.allTypes")}</SelectItem>
+                  <SelectItem value="alimentare">{t("prodotti.type_alimentare")}</SelectItem>
+                  <SelectItem value="igiene">{t("prodotti.type_igiene")}</SelectItem>
+                  <SelectItem value="vestiario">{t("prodotti.type_vestiario")}</SelectItem>
+                  <SelectItem value="medicinali">{t("prodotti.type_medicinali")}</SelectItem>
+                  <SelectItem value="scarpe">{t("prodotti.type_scarpe")}</SelectItem>
+                  <SelectItem value="sanitario">{t("prodotti.type_sanitario")}</SelectItem>
+                  <SelectItem value="altro">{t("prodotti.type_altro")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -516,12 +528,12 @@ export default function Prodotti() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[120px]">Codice</TableHead>
-                <TableHead>Prodotto</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>U.M.</TableHead>
-                <TableHead className="text-right">Scorta Minima</TableHead>
-                <TableHead className="text-center">Proprietà</TableHead>
+                <TableHead className="w-[120px]">{t("common.code")}</TableHead>
+                <TableHead>{t("prodotti.colProdotto")}</TableHead>
+                <TableHead>{t("common.type")}</TableHead>
+                <TableHead>{t("prodotti.colUm")}</TableHead>
+                <TableHead className="text-right">{t("prodotti.colScortaMinima")}</TableHead>
+                <TableHead className="text-center">{t("prodotti.colProprieta")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -541,7 +553,7 @@ export default function Prodotti() {
               ) : prodotti?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                    Nessun prodotto trovato.
+                    {t("prodotti.noProductsFound")}
                   </TableCell>
                 </TableRow>
               ) : prodotti?.map((prodotto) => (
@@ -553,7 +565,7 @@ export default function Prodotti() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={`capitalize ${tipoColors[prodotto.tipoProdotto] || tipoColors.altro}`}>
-                      {prodotto.tipoProdotto.replace('_', ' ')}
+                      {t(`prodotti.type_${prodotto.tipoProdotto}`, prodotto.tipoProdotto.replace('_', ' '))}
                     </Badge>
                   </TableCell>
                   <TableCell>{prodotto.unitaMisura}</TableCell>
@@ -561,10 +573,10 @@ export default function Prodotti() {
                   <TableCell>
                     <div className="flex justify-center gap-1">
                       {prodotto.gestioneScadenza && (
-                        <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-700 border-amber-200">Scadenza</Badge>
+                        <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-700 border-amber-200">{t("prodotti.badgeScadenza")}</Badge>
                       )}
                       {prodotto.gestioneLotto && (
-                        <Badge variant="outline" className="text-xs">Lotto</Badge>
+                        <Badge variant="outline" className="text-xs">{t("prodotti.badgeLotto")}</Badge>
                       )}
                     </div>
                   </TableCell>
@@ -572,7 +584,7 @@ export default function Prodotti() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Apri menu</span>
+                          <span className="sr-only">{t("prodotti.openMenu")}</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -587,15 +599,15 @@ export default function Prodotti() {
                           fornitoreId: prodotto.fornitoreId ?? null,
                         })}>
                           <PackagePlus className="mr-2 h-4 w-4" />
-                          Carica in magazzino
+                          {t("prodotti.loadToWarehouse")}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEdit(prodotto)}>
                           <Pencil className="mr-2 h-4 w-4" />
-                          Modifica
+                          {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(prodotto.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Elimina
+                          {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -610,9 +622,9 @@ export default function Prodotti() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId ? "Modifica Prodotto" : "Nuovo Prodotto"}</SheetTitle>
+            <SheetTitle>{editingId ? t("prodotti.editProduct") : t("prodotti.newProduct")}</SheetTitle>
             <SheetDescription>
-              Definisci l'anagrafica del bene nel catalogo.
+              {t("prodotti.formDescription")}
             </SheetDescription>
           </SheetHeader>
           
@@ -622,15 +634,15 @@ export default function Prodotti() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="codice" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Codice</FormLabel>
-                      <FormControl><Input placeholder="Es: ALI-001" {...field} /></FormControl>
+                      <FormLabel>{t("common.code")}</FormLabel>
+                      <FormControl><Input placeholder={t("prodotti.codePlaceholder")} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="codiceBarre" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Codice a Barre</FormLabel>
-                      <FormControl><Input placeholder="Opzionale" {...field} /></FormControl>
+                      <FormLabel>{t("prodotti.barcode")}</FormLabel>
+                      <FormControl><Input placeholder={t("prodotti.optional")} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -638,8 +650,8 @@ export default function Prodotti() {
                 
                 <FormField control={form.control} name="nome" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome</FormLabel>
-                    <FormControl><Input placeholder="Pasta di semola 500g" {...field} /></FormControl>
+                    <FormLabel>{t("common.name")}</FormLabel>
+                    <FormControl><Input placeholder={t("prodotti.namePlaceholder")} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -647,21 +659,21 @@ export default function Prodotti() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="tipoProdotto" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipo</FormLabel>
+                      <FormLabel>{t("common.type")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Seleziona tipo" />
+                            <SelectValue placeholder={t("prodotti.selectType")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="alimentare">Alimentare</SelectItem>
-                          <SelectItem value="igiene">Igiene</SelectItem>
-                          <SelectItem value="vestiario">Vestiario</SelectItem>
-                          <SelectItem value="medicinali">Medicinali</SelectItem>
-                          <SelectItem value="scarpe">Scarpe</SelectItem>
-                          <SelectItem value="sanitario">Sanitario</SelectItem>
-                          <SelectItem value="altro">Altro</SelectItem>
+                          <SelectItem value="alimentare">{t("prodotti.type_alimentare")}</SelectItem>
+                          <SelectItem value="igiene">{t("prodotti.type_igiene")}</SelectItem>
+                          <SelectItem value="vestiario">{t("prodotti.type_vestiario")}</SelectItem>
+                          <SelectItem value="medicinali">{t("prodotti.type_medicinali")}</SelectItem>
+                          <SelectItem value="scarpe">{t("prodotti.type_scarpe")}</SelectItem>
+                          <SelectItem value="sanitario">{t("prodotti.type_sanitario")}</SelectItem>
+                          <SelectItem value="altro">{t("prodotti.type_altro")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -669,18 +681,18 @@ export default function Prodotti() {
                   )} />
                   <FormField control={form.control} name="unitaMisura" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Unità Misura</FormLabel>
+                      <FormLabel>{t("prodotti.unitOfMeasure")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Seleziona U.M." />
+                            <SelectValue placeholder={t("prodotti.selectUm")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="pz">Pezzi (pz)</SelectItem>
-                          <SelectItem value="kg">Chilogrammi (kg)</SelectItem>
-                          <SelectItem value="l">Litri (l)</SelectItem>
-                          <SelectItem value="cf">Confezioni (cf)</SelectItem>
+                          <SelectItem value="pz">{t("prodotti.um_pz")}</SelectItem>
+                          <SelectItem value="kg">{t("prodotti.um_kg")}</SelectItem>
+                          <SelectItem value="l">{t("prodotti.um_l")}</SelectItem>
+                          <SelectItem value="cf">{t("prodotti.um_cf")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -691,14 +703,14 @@ export default function Prodotti() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="scortaMinima" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Scorta Minima</FormLabel>
+                      <FormLabel>{t("prodotti.scortaMinima")}</FormLabel>
                       <FormControl><Input type="number" min="0" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="scortaConsigliata" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Scorta Consigliata</FormLabel>
+                      <FormLabel>{t("prodotti.scortaConsigliata")}</FormLabel>
                       <FormControl><Input type="number" min="0" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -709,8 +721,8 @@ export default function Prodotti() {
                   <FormField control={form.control} name="gestioneScadenza" render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
-                        <FormLabel>Gestione Scadenza</FormLabel>
-                        <p className="text-[0.8rem] text-muted-foreground">Traccia la data di scadenza (es. alimentari)</p>
+                        <FormLabel>{t("prodotti.gestioneScadenza")}</FormLabel>
+                        <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.gestioneScadenzaDesc")}</p>
                       </div>
                       <FormControl>
                         <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -721,8 +733,8 @@ export default function Prodotti() {
                   <FormField control={form.control} name="gestioneLotto" render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
-                        <FormLabel>Gestione Lotto</FormLabel>
-                        <p className="text-[0.8rem] text-muted-foreground">Traccia il codice lotto di produzione</p>
+                        <FormLabel>{t("prodotti.gestioneLotto")}</FormLabel>
+                        <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.gestioneLottoDesc")}</p>
                       </div>
                       <FormControl>
                         <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -733,8 +745,8 @@ export default function Prodotti() {
                   <FormField control={form.control} name="fsePlus" render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
-                        <FormLabel>FSE+ (Fondo Sociale Europeo Plus)</FormLabel>
-                        <p className="text-[0.8rem] text-muted-foreground">Prodotto fornito tramite il programma FSE+. Sarà la provenienza predefinita dei nuovi lotti.</p>
+                        <FormLabel>{t("prodotti.fsePlus")}</FormLabel>
+                        <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.fsePlusDesc")}</p>
                       </div>
                       <FormControl>
                         <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -748,7 +760,7 @@ export default function Prodotti() {
                 <div className="pt-4 border-t">
                   <FormField control={form.control} name="descrizione" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Descrizione Extra</FormLabel>
+                      <FormLabel>{t("prodotti.descrizioneExtra")}</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -757,10 +769,10 @@ export default function Prodotti() {
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
-                    Annulla
+                    {t("common.cancel")}
                   </Button>
                   <Button type="submit" disabled={createProdotto.isPending || updateProdotto.isPending}>
-                    {editingId ? "Salva Modifiche" : "Crea Prodotto"}
+                    {editingId ? t("prodotti.saveChanges") : t("prodotti.createProduct")}
                   </Button>
                 </div>
               </form>
@@ -776,15 +788,15 @@ export default function Prodotti() {
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+            <AlertDialogTitle>{t("prodotti.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Stai per eliminare questo prodotto. Potrebbe causare problemi se ci sono giacenze o movimenti collegati.
+              {t("prodotti.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Elimina
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

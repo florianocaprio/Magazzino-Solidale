@@ -7,8 +7,10 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: alerts, isLoading: alertsLoading } = useGetDashboardAlerts();
   const { data: recenti, isLoading: recentiLoading } = useGetMovimentiRecenti();
@@ -16,58 +18,58 @@ export default function Dashboard() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard Operativa</h1>
-        <p className="text-muted-foreground">Panoramica dello stato del magazzino e delle attività sociali.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("dashboard.title")}</h1>
+        <p className="text-muted-foreground">{t("dashboard.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
-          title="Magazzini" 
+          title={t("dashboard.statMagazzini")} 
           value={stats?.totMagazzini} 
           icon={Warehouse} 
           loading={statsLoading} 
         />
         <StatCard 
-          title="Prodotti a Catalogo" 
+          title={t("dashboard.statProdotti")} 
           value={stats?.totProdotti} 
           icon={Package} 
           loading={statsLoading} 
         />
         <StatCard 
-          title="Beneficiari Attivi" 
+          title={t("dashboard.statBeneficiari")} 
           value={stats?.totBeneficiari} 
           icon={Users} 
           loading={statsLoading} 
         />
         <StatCard 
-          title="Volontari" 
+          title={t("dashboard.statVolontari")} 
           value={stats?.totVolontari} 
           icon={Users} 
           loading={statsLoading} 
         />
         <StatCard 
-          title="Consegne Oggi" 
+          title={t("dashboard.statConsegneOggi")} 
           value={stats?.consegneOggi} 
           icon={Truck} 
           loading={statsLoading} 
-          description={`${stats?.consegneMese || 0} questo mese`}
+          description={t("dashboard.consegneMese", { count: stats?.consegneMese || 0 })}
         />
         <StatCard 
-          title="Lotti in Scadenza" 
+          title={t("dashboard.statLottiScadenza")} 
           value={stats?.lottiInScadenza} 
           icon={AlertTriangle} 
           loading={statsLoading} 
           alert={!!stats?.lottiInScadenza && stats.lottiInScadenza > 0}
         />
         <StatCard 
-          title="Prodotti Sottoscorta" 
+          title={t("dashboard.statProdottiSottoscorta")} 
           value={stats?.prodottiSottoscorta} 
           icon={TrendingDown} 
           loading={statsLoading}
           alert={!!stats?.prodottiSottoscorta && stats.prodottiSottoscorta > 0}
         />
         <StatCard 
-          title="Trasferimenti in Corso" 
+          title={t("dashboard.statTrasferimenti")} 
           value={stats?.trasferimentiInCorso} 
           icon={ArrowRightLeft} 
           loading={statsLoading} 
@@ -78,9 +80,9 @@ export default function Dashboard() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BellRing className="h-5 w-5" /> Allarmi e Notifiche
+              <BellRing className="h-5 w-5" /> {t("dashboard.alertsTitle")}
             </CardTitle>
-            <CardDescription>Eventi che richiedono attenzione immediata</CardDescription>
+            <CardDescription>{t("dashboard.alertsDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             {alertsLoading ? (
@@ -124,7 +126,7 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Info className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground">Nessun allarme attivo al momento.</p>
+                <p className="text-muted-foreground">{t("dashboard.noAlerts")}</p>
               </div>
             )}
           </CardContent>
@@ -133,9 +135,9 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Box className="h-5 w-5" /> Movimenti Recenti
+              <Box className="h-5 w-5" /> {t("dashboard.movimentiTitle")}
             </CardTitle>
-            <CardDescription>Ultimi carichi e scarichi</CardDescription>
+            <CardDescription>{t("dashboard.movimentiDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             {recentiLoading ? (
@@ -172,7 +174,7 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <ArrowRightLeft className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground">Nessun movimento recente registrato.</p>
+                <p className="text-muted-foreground">{t("dashboard.noMovimenti")}</p>
               </div>
             )}
           </CardContent>

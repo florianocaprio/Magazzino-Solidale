@@ -21,10 +21,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ExportButtons } from "@/components/export-buttons";
 import { Package, Users, Weight, Building2, HeartHandshake } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const ALL = "all";
 
 export default function Report() {
+  const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
   const [da, setDa] = useState(`${currentYear}-01-01`);
   const [a, setA] = useState(new Date().toISOString().slice(0, 10));
@@ -65,18 +67,18 @@ export default function Report() {
 
   const personeChart = fse
     ? [
-        { categoria: "Maschi UE", value: fse.persone.ueMaschi },
-        { categoria: "Femmine UE", value: fse.persone.ueFemmine },
-        { categoria: "Maschi Extra-UE", value: fse.persone.extraUeMaschi },
-        { categoria: "Femmine Extra-UE", value: fse.persone.extraUeFemmine },
+        { categoria: t("report.catUeMaschi"), value: fse.persone.ueMaschi },
+        { categoria: t("report.catUeFemmine"), value: fse.persone.ueFemmine },
+        { categoria: t("report.catExtraUeMaschi"), value: fse.persone.extraUeMaschi },
+        { categoria: t("report.catExtraUeFemmine"), value: fse.persone.extraUeFemmine },
       ]
     : [];
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Analisi e Report</h1>
-        <p className="text-muted-foreground">Dati aggregati sulle attività dell'associazione.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("report.title")}</h1>
+        <p className="text-muted-foreground">{t("report.subtitle")}</p>
       </div>
 
       {/* Filtri globali */}
@@ -84,20 +86,20 @@ export default function Report() {
         <CardContent className="flex flex-col md:flex-row md:items-end gap-4 pt-6">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="da" className="text-xs">Dal</Label>
+              <Label htmlFor="da" className="text-xs">{t("report.from")}</Label>
               <Input id="da" type="date" value={da} max={a} onChange={(e) => setDa(e.target.value)} className="w-40" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="a" className="text-xs">Al</Label>
+              <Label htmlFor="a" className="text-xs">{t("report.to")}</Label>
               <Input id="a" type="date" value={a} min={da} onChange={(e) => setA(e.target.value)} className="w-40" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Magazzino</Label>
+            <Label className="text-xs">{t("report.warehouse")}</Label>
             <Select value={magazzinoId} onValueChange={setMagazzinoId}>
               <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>Tutti i magazzini</SelectItem>
+                <SelectItem value={ALL}>{t("report.allWarehouses")}</SelectItem>
                 {(magazzini ?? []).map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                 ))}
@@ -105,11 +107,11 @@ export default function Report() {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Centro di Ascolto</Label>
+            <Label className="text-xs">{t("report.listeningCentre")}</Label>
             <Select value={centroId} onValueChange={setCentroId}>
               <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>Tutti i centri</SelectItem>
+                <SelectItem value={ALL}>{t("report.allCentres")}</SelectItem>
                 {(centri ?? []).map((c) => (
                   <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                 ))}
@@ -122,8 +124,8 @@ export default function Report() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Consegne nel Periodo</CardTitle>
-            <CardDescription>Andamento mensile delle consegne effettuate · {periodoLabel}</CardDescription>
+            <CardTitle>{t("report.consegneTitle")}</CardTitle>
+            <CardDescription>{t("report.consegneDesc", { periodo: periodoLabel })}</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoadingConsegne ? (
@@ -138,8 +140,8 @@ export default function Report() {
                     <XAxis dataKey="mese" axisLine={false} tickLine={false} />
                     <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
                     <RechartsTooltip />
-                    <Line type="monotone" dataKey="consegneEffettuate" name="Effettuate" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                    <Line type="monotone" dataKey="consegneMancate" name="Mancate" stroke="hsl(var(--destructive))" strokeWidth={2} />
+                    <Line type="monotone" dataKey="consegneEffettuate" name={t("report.effettuate")} stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="consegneMancate" name={t("report.mancate")} stroke="hsl(var(--destructive))" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -149,8 +151,8 @@ export default function Report() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Prodotti Sottoscorta per Magazzino</CardTitle>
-            <CardDescription>Confronto tra articoli totali e critici (giacenze attuali)</CardDescription>
+            <CardTitle>{t("report.sottoscortaTitle")}</CardTitle>
+            <CardDescription>{t("report.sottoscortaDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoadingGiacenze ? (
@@ -165,8 +167,8 @@ export default function Report() {
                     <XAxis dataKey="magazzinoNome" axisLine={false} tickLine={false} />
                     <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
                     <RechartsTooltip />
-                    <Bar dataKey="totProdotti" name="Totale Articoli" fill="hsl(var(--primary) / 0.2)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="prodottiSottoscorta" name="Sottoscorta" fill="hsl(var(--amber-500))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="totProdotti" name={t("report.totaleArticoli")} fill="hsl(var(--primary) / 0.2)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="prodottiSottoscorta" name={t("report.sottoscorta")} fill="hsl(var(--amber-500))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -181,28 +183,28 @@ export default function Report() {
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <HeartHandshake className="w-5 h-5 text-primary" /> Consegne per Centro di Ascolto
+              <HeartHandshake className="w-5 h-5 text-primary" /> {t("report.perCentroTitle")}
             </CardTitle>
-            <CardDescription>Consegne effettuate dirette dal centro vs con i volontari · {periodoLabel}</CardDescription>
+            <CardDescription>{t("report.perCentroDesc", { periodo: periodoLabel })}</CardDescription>
           </div>
           <ExportButtons
             rows={perCentroFiltrato}
             columns={[
-              { header: "Centro di Ascolto", accessor: (c) => c.centroNome },
-              { header: "Dirette dal centro", accessor: (c) => c.dirette },
-              { header: "Con volontari", accessor: (c) => c.conVolontari },
-              { header: "Totale", accessor: (c) => c.totale },
+              { header: t("report.centro"), accessor: (c) => c.centroNome },
+              { header: t("report.diretteDalCentro"), accessor: (c) => c.dirette },
+              { header: t("report.conVolontari"), accessor: (c) => c.conVolontari },
+              { header: t("common.total"), accessor: (c) => c.totale },
             ]}
             filename={`consegne_per_centro_${da}_${a}`}
-            title="Consegne per Centro di Ascolto"
-            subtitle={`Periodo: ${periodoLabel}`}
+            title={t("report.perCentroTitle")}
+            subtitle={t("report.periodoSubtitle", { periodo: periodoLabel })}
           />
         </CardHeader>
         <CardContent className="space-y-6">
           {isLoadingPerCentro ? (
             <Skeleton className="h-[300px] w-full" />
           ) : perCentroFiltrato.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg">Nessuna consegna effettuata nel periodo selezionato.</p>
+            <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg">{t("report.perCentroEmpty")}</p>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
               <div className="h-[300px] w-full">
@@ -213,8 +215,8 @@ export default function Report() {
                     <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
                     <RechartsTooltip />
                     <Legend />
-                    <Bar dataKey="dirette" name="Dirette dal centro" stackId="x" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="conVolontari" name="Con volontari" stackId="x" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="dirette" name={t("report.diretteDalCentro")} stackId="x" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="conVolontari" name={t("report.conVolontari")} stackId="x" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -222,10 +224,10 @@ export default function Report() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Centro di Ascolto</TableHead>
-                      <TableHead className="text-right">Dirette</TableHead>
-                      <TableHead className="text-right">Con volontari</TableHead>
-                      <TableHead className="text-right">Totale</TableHead>
+                      <TableHead>{t("report.centro")}</TableHead>
+                      <TableHead className="text-right">{t("report.dirette")}</TableHead>
+                      <TableHead className="text-right">{t("report.conVolontari")}</TableHead>
+                      <TableHead className="text-right">{t("common.total")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -250,9 +252,9 @@ export default function Report() {
           <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-primary" /> Rendicontazione FSE+ (Fondo Sociale Europeo Plus)
+                <Package className="w-5 h-5 text-primary" /> {t("report.fseTitle")}
               </CardTitle>
-              <CardDescription>Riepilogo annuale prodotti FSE+ distribuiti e persone raggiunte</CardDescription>
+              <CardDescription>{t("report.fseDesc")}</CardDescription>
             </div>
             <div className="flex items-center gap-3">
               <Select value={String(fseAnno)} onValueChange={(v) => setFseAnno(parseInt(v))}>
@@ -266,14 +268,14 @@ export default function Report() {
               <ExportButtons
                 rows={fse?.prodotti ?? []}
                 columns={[
-                  { header: "Prodotto", accessor: (p) => p.prodottoNome },
-                  { header: "Unità", accessor: (p) => p.unitaMisura },
-                  { header: "Quantità totale", accessor: (p) => p.quantitaTotale },
-                  { header: "Peso (kg)", accessor: (p) => p.pesoKg },
+                  { header: t("report.prodotto"), accessor: (p) => p.prodottoNome },
+                  { header: t("report.unita"), accessor: (p) => p.unitaMisura },
+                  { header: t("report.quantitaTotale"), accessor: (p) => p.quantitaTotale },
+                  { header: t("report.pesoKg"), accessor: (p) => p.pesoKg },
                 ]}
                 filename={`report_fse_plus_${fseAnno}`}
-                title={`Report FSE+ ${fseAnno}`}
-                subtitle={`Persone raggiunte: ${fse?.personeTotali ?? 0} — Peso totale: ${(fse?.pesoTotaleKg ?? 0).toFixed(1)} kg`}
+                title={t("report.fseExportTitle", { anno: fseAnno })}
+                subtitle={t("report.fseExportSubtitle", { persone: fse?.personeTotali ?? 0, peso: (fse?.pesoTotaleKg ?? 0).toFixed(1) })}
               />
             </div>
           </CardHeader>
@@ -283,23 +285,23 @@ export default function Report() {
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <KpiCard icon={<Weight className="w-5 h-5" />} label="Peso totale distribuito" value={`${(fse?.pesoTotaleKg ?? 0).toFixed(1)} kg`} />
-                  <KpiCard icon={<Package className="w-5 h-5" />} label="Tipologie di prodotto" value={String(fse?.prodotti.length ?? 0)} />
-                  <KpiCard icon={<Users className="w-5 h-5" />} label="Nuclei familiari raggiunti" value={String(fse?.beneficiariTotali ?? 0)} />
-                  <KpiCard icon={<Users className="w-5 h-5" />} label="Persone totali raggiunte" value={String(fse?.personeTotali ?? 0)} />
+                  <KpiCard icon={<Weight className="w-5 h-5" />} label={t("report.kpiPeso")} value={`${(fse?.pesoTotaleKg ?? 0).toFixed(1)} kg`} />
+                  <KpiCard icon={<Package className="w-5 h-5" />} label={t("report.kpiTipologie")} value={String(fse?.prodotti.length ?? 0)} />
+                  <KpiCard icon={<Users className="w-5 h-5" />} label={t("report.kpiNuclei")} value={String(fse?.beneficiariTotali ?? 0)} />
+                  <KpiCard icon={<Users className="w-5 h-5" />} label={t("report.kpiPersone")} value={String(fse?.personeTotali ?? 0)} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div>
-                    <h3 className="text-sm font-semibold mb-3">Prodotti FSE+ distribuiti</h3>
+                    <h3 className="text-sm font-semibold mb-3">{t("report.prodottiDistribuiti")}</h3>
                     {fse && fse.prodotti.length > 0 ? (
                       <div className="border rounded-lg overflow-hidden">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Prodotto</TableHead>
-                              <TableHead className="text-right">Quantità</TableHead>
-                              <TableHead className="text-right">Peso (kg)</TableHead>
+                              <TableHead>{t("report.prodotto")}</TableHead>
+                              <TableHead className="text-right">{t("common.quantity")}</TableHead>
+                              <TableHead className="text-right">{t("report.pesoKg")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -314,12 +316,12 @@ export default function Report() {
                         </Table>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg">Nessun prodotto FSE+ distribuito nell'anno selezionato.</p>
+                      <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg">{t("report.emptyProdotti")}</p>
                     )}
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-semibold mb-3">Persone raggiunte per sesso e provenienza</h3>
+                    <h3 className="text-sm font-semibold mb-3">{t("report.personeChartTitle")}</h3>
                     <div className="h-[260px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={personeChart} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
@@ -327,7 +329,7 @@ export default function Report() {
                           <XAxis dataKey="categoria" axisLine={false} tickLine={false} fontSize={11} interval={0} />
                           <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
                           <RechartsTooltip />
-                          <Bar dataKey="value" name="Persone" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="value" name={t("report.personeChartName")} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -335,15 +337,15 @@ export default function Report() {
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-semibold mb-3">Dettaglio persone raggiunte</h3>
+                  <h3 className="text-sm font-semibold mb-3">{t("report.dettaglioPersone")}</h3>
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Categoria</TableHead>
-                          <TableHead className="text-right">Adulti</TableHead>
-                          <TableHead className="text-right">Minori</TableHead>
-                          <TableHead className="text-right">Totale</TableHead>
+                          <TableHead>{t("report.categoria")}</TableHead>
+                          <TableHead className="text-right">{t("report.adulti")}</TableHead>
+                          <TableHead className="text-right">{t("report.minori")}</TableHead>
+                          <TableHead className="text-right">{t("common.total")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

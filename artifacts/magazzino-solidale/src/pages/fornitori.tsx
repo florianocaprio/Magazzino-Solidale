@@ -19,6 +19,7 @@ import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, Building, Filter } f
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
   nome: z.string().min(2),
@@ -36,6 +37,7 @@ const formSchema = z.object({
 });
 
 export default function Fornitori() {
+  const { t } = useTranslation();
   const [centroFilter, setCentroFilter] = useState("all");
   const { data: fornitori, isLoading } = useListFornitori(
     centroFilter !== "all" ? { centroAscoltoId: parseInt(centroFilter) } : undefined
@@ -88,7 +90,7 @@ export default function Fornitori() {
       updateFornitore.mutate({ id: editingId, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListFornitoriQueryKey() });
-          toast({ title: "Fornitore aggiornato" });
+          toast({ title: t("fornitori.toastUpdated") });
           setIsFormOpen(false);
         }
       });
@@ -96,7 +98,7 @@ export default function Fornitori() {
       createFornitore.mutate({ data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListFornitoriQueryKey() });
-          toast({ title: "Fornitore creato" });
+          toast({ title: t("fornitori.toastCreated") });
           setIsFormOpen(false);
         }
       });
@@ -118,41 +120,41 @@ export default function Fornitori() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Fornitori e Donatori</h1>
-          <p className="text-muted-foreground">Gestisci le fonti di approvvigionamento del magazzino.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("fornitori.title")}</h1>
+          <p className="text-muted-foreground">{t("fornitori.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={fornitori ?? []}
             columns={[
-              { header: "Nominativo", accessor: (f) => f.nome },
-              { header: "Tipo", accessor: (f) => f.tipo?.replace('_', ' ') },
-              { header: "Comune", accessor: (f) => f.comune },
-              { header: "Telefono", accessor: (f) => f.telefono },
-              { header: "Email", accessor: (f) => f.email },
-              { header: "Referente", accessor: (f) => f.referente },
-              { header: "Centro", accessor: (f) => f.centroAscoltoId == null ? "Tutti i centri" : centroNome(f.centroAscoltoId) },
-              { header: "Note Operative", accessor: (f) => f.noteOperative },
+              { header: t("fornitori.nominativo"), accessor: (f) => f.nome },
+              { header: t("common.type"), accessor: (f) => f.tipo ? t(`fornitori.tipi.${f.tipo}`) : "" },
+              { header: t("fornitori.comune"), accessor: (f) => f.comune },
+              { header: t("common.phone"), accessor: (f) => f.telefono },
+              { header: t("common.email"), accessor: (f) => f.email },
+              { header: t("fornitori.referente"), accessor: (f) => f.referente },
+              { header: t("fornitori.centro"), accessor: (f) => f.centroAscoltoId == null ? t("fornitori.tuttiCentri") : centroNome(f.centroAscoltoId) },
+              { header: t("fornitori.noteOperative"), accessor: (f) => f.noteOperative },
             ]}
             filename="fornitori"
-            title="Fornitori e Donatori"
+            title={t("fornitori.exportTitle")}
           />
-          <Button onClick={handleCreate} className="gap-2"><Plus className="h-4 w-4" /> Nuovo Fornitore</Button>
+          <Button onClick={handleCreate} className="gap-2"><Plus className="h-4 w-4" /> {t("fornitori.newFornitore")}</Button>
         </div>
       </div>
 
       <Card>
         <CardHeader className="py-4 border-b">
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-            <Input placeholder="Cerca per nome..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+            <Input placeholder={t("fornitori.searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={centroFilter} onValueChange={setCentroFilter}>
                 <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Tutti i centri" />
+                  <SelectValue placeholder={t("fornitori.tuttiCentri")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tutti i centri</SelectItem>
+                  <SelectItem value="all">{t("fornitori.tuttiCentri")}</SelectItem>
                   {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -163,11 +165,11 @@ export default function Fornitori() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nominativo</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Centro</TableHead>
-                <TableHead>Contatti</TableHead>
-                <TableHead>Referente</TableHead>
+                <TableHead>{t("fornitori.nominativo")}</TableHead>
+                <TableHead>{t("common.type")}</TableHead>
+                <TableHead>{t("fornitori.centro")}</TableHead>
+                <TableHead>{t("fornitori.contatti")}</TableHead>
+                <TableHead>{t("fornitori.referente")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -191,12 +193,12 @@ export default function Fornitori() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`capitalize ${tipoColors[f.tipo] || tipoColors.altro}`}>
-                      {f.tipo.replace('_', ' ')}
+                      {t(`fornitori.tipi.${f.tipo}`)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">
                     {f.centroAscoltoId == null
-                      ? <span className="text-muted-foreground italic">Tutti i centri</span>
+                      ? <span className="text-muted-foreground italic">{t("fornitori.tuttiCentri")}</span>
                       : centroNome(f.centroAscoltoId)}
                   </TableCell>
                   <TableCell>
@@ -210,8 +212,8 @@ export default function Fornitori() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(f)}><Pencil className="mr-2 h-4 w-4" /> Modifica</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(f.id)}><Trash2 className="mr-2 h-4 w-4" /> Elimina</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(f)}><Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(f.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -224,46 +226,46 @@ export default function Fornitori() {
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader><SheetTitle>{editingId ? "Modifica Fornitore" : "Nuovo Fornitore"}</SheetTitle></SheetHeader>
+          <SheetHeader><SheetTitle>{editingId ? t("fornitori.sheetEditTitle") : t("fornitori.sheetNewTitle")}</SheetTitle></SheetHeader>
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="nome" render={({ field }) => (
-                  <FormItem><FormLabel>Nominativo / Ragione Sociale</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("fornitori.nominativoLabel")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <FormField control={form.control} name="tipo" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipologia</FormLabel>
+                    <FormLabel>{t("fornitori.tipologia")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="commerciale">Azienda Commerciale</SelectItem>
-                        <SelectItem value="donatore_privato">Donatore Privato</SelectItem>
-                        <SelectItem value="banco_alimentare">Banco Alimentare</SelectItem>
-                        <SelectItem value="ente_pubblico">Ente Pubblico</SelectItem>
-                        <SelectItem value="altro">Altro</SelectItem>
+                        <SelectItem value="commerciale">{t("fornitori.tipi.commerciale")}</SelectItem>
+                        <SelectItem value="donatore_privato">{t("fornitori.tipi.donatore_privato")}</SelectItem>
+                        <SelectItem value="banco_alimentare">{t("fornitori.tipi.banco_alimentare")}</SelectItem>
+                        <SelectItem value="ente_pubblico">{t("fornitori.tipi.ente_pubblico")}</SelectItem>
+                        <SelectItem value="altro">{t("fornitori.tipi.altro")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="telefono" render={({ field }) => (
-                    <FormItem><FormLabel>Telefono</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("common.phone")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("common.email")}</FormLabel><FormControl><Input type="email" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="referente" render={({ field }) => (
-                  <FormItem><FormLabel>Persona di Riferimento</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("fornitori.personaRiferimento")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Centro di Ascolto</FormLabel>
+                    <FormLabel>{t("fornitori.centroAscolto")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || "all"}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="all">Tutti i centri</SelectItem>
+                        <SelectItem value="all">{t("fornitori.tuttiCentri")}</SelectItem>
                         {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -271,13 +273,13 @@ export default function Fornitori() {
                 )} />
                 <FormField control={form.control} name="noteOperative" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Note Operative</FormLabel>
-                    <FormControl><Textarea rows={4} placeholder="Come contattare il fornitore e procedura da seguire..." {...field} /></FormControl>
+                    <FormLabel>{t("fornitori.noteOperative")}</FormLabel>
+                    <FormControl><Textarea rows={4} placeholder={t("fornitori.noteOperativePlaceholder")} {...field} /></FormControl>
                   </FormItem>
                 )} />
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
-                  <Button type="submit" disabled={createFornitore.isPending || updateFornitore.isPending}>Salva</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="submit" disabled={createFornitore.isPending || updateFornitore.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
             </Form>
@@ -287,9 +289,9 @@ export default function Fornitori() {
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Elimina fornitore?</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>{t("fornitori.confirmDelete")}</AlertDialogTitle></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (deletingId) {
                 deleteFornitore.mutate({ id: deletingId }, {
@@ -299,7 +301,7 @@ export default function Fornitori() {
                   }
                 });
               }
-            }} className="bg-destructive text-destructive-foreground">Elimina</AlertDialogAction>
+            }} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -29,6 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
   fornitoreId: z.coerce.number().optional(),
@@ -57,6 +58,7 @@ interface OrderRow {
 }
 
 export default function Approvvigionamenti() {
+  const { t } = useTranslation();
   const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
   const [filterCentroId, setFilterCentroId] = useState("all");
   const [filterStato, setFilterStato] = useState("all");
@@ -118,7 +120,7 @@ export default function Approvvigionamenti() {
         {
           onSuccess: () => {
             invalidate();
-            toast({ title: "Ordine aggiornato" });
+            toast({ title: t("approvvigionamenti.toastUpdated") });
             setIsFormOpen(false);
           },
         },
@@ -129,7 +131,7 @@ export default function Approvvigionamenti() {
         {
           onSuccess: () => {
             invalidate();
-            toast({ title: "Bozza salvata" });
+            toast({ title: t("approvvigionamenti.toastBozza") });
             setIsFormOpen(false);
           },
         },
@@ -143,7 +145,7 @@ export default function Approvvigionamenti() {
       {
         onSuccess: () => {
           invalidate();
-          toast({ title: "Ordine sottomesso", description: "L'ordine è stato inoltrato all'amministrazione." });
+          toast({ title: t("approvvigionamenti.toastSubmitted"), description: t("approvvigionamenti.toastSubmittedDesc") });
         },
       },
     );
@@ -155,7 +157,7 @@ export default function Approvvigionamenti() {
       {
         onSuccess: () => {
           invalidate();
-          toast({ title: "Ordine completato" });
+          toast({ title: t("approvvigionamenti.toastCompleted") });
         },
       },
     );
@@ -164,18 +166,18 @@ export default function Approvvigionamenti() {
   const getStatusBadge = (stato: string) => {
     switch (stato) {
       case "bozza":
-        return <Badge variant="secondary">Bozza</Badge>;
+        return <Badge variant="secondary">{t("approvvigionamenti.stati.bozza")}</Badge>;
       case "sottomesso":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Sottomesso</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t("approvvigionamenti.stati.sottomesso")}</Badge>;
       case "completato":
-        return <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">Completato</Badge>;
+        return <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">{t("approvvigionamenti.stati.completato")}</Badge>;
       // legacy values
       case "inviata":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Inviata</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t("approvvigionamenti.stati.inviata")}</Badge>;
       case "confermata":
-        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Confermata</Badge>;
+        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{t("approvvigionamenti.stati.confermata")}</Badge>;
       case "completata":
-        return <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">Completata</Badge>;
+        return <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">{t("approvvigionamenti.stati.completata")}</Badge>;
       default:
         return <Badge>{stato}</Badge>;
     }
@@ -185,35 +187,35 @@ export default function Approvvigionamenti() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Ordini & Approvvigionamenti</h1>
-          <p className="text-muted-foreground">Gestisci gli ordini in entrata e le donazioni programmate.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("approvvigionamenti.title")}</h1>
+          <p className="text-muted-foreground">{t("approvvigionamenti.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={approvvigionamenti ?? []}
             columns={[
-              { header: "Codice", accessor: (a) => a.codice },
-              { header: "Data Richiesta", accessor: (a) => (a.dataRichiesta ? new Date(a.dataRichiesta).toLocaleDateString("it-IT") : "") },
-              { header: "Fornitore", accessor: (a) => a.fornitoreNome ?? "" },
-              { header: "Magazzino", accessor: (a) => a.magazzinoNome ?? "" },
-              { header: "Centro di Ascolto", accessor: (a) => a.centroAscoltoNome ?? "" },
-              { header: "Data Prevista", accessor: (a) => (a.dataPrevista ? new Date(a.dataPrevista).toLocaleDateString("it-IT") : "") },
-              { header: "Stato", accessor: (a) => a.stato },
+              { header: t("common.code"), accessor: (a) => a.codice },
+              { header: t("approvvigionamenti.dataRichiesta"), accessor: (a) => (a.dataRichiesta ? new Date(a.dataRichiesta).toLocaleDateString("it-IT") : "") },
+              { header: t("approvvigionamenti.fornitore"), accessor: (a) => a.fornitoreNome ?? "" },
+              { header: t("approvvigionamenti.magazzino"), accessor: (a) => a.magazzinoNome ?? "" },
+              { header: t("approvvigionamenti.centroAscolto"), accessor: (a) => a.centroAscoltoNome ?? "" },
+              { header: t("approvvigionamenti.dataPrevista"), accessor: (a) => (a.dataPrevista ? new Date(a.dataPrevista).toLocaleDateString("it-IT") : "") },
+              { header: t("common.status"), accessor: (a) => a.stato },
             ]}
             filename="approvvigionamenti"
-            title="Approvvigionamenti"
+            title={t("approvvigionamenti.exportTitle")}
           />
-          <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> Nuovo Ordine</Button>
+          <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> {t("approvvigionamenti.newOrdine")}</Button>
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Magazzino</Label>
+          <Label className="text-xs text-muted-foreground">{t("approvvigionamenti.magazzino")}</Label>
           <Select value={filterMagazzinoId} onValueChange={setFilterMagazzinoId}>
-            <SelectTrigger className="w-[200px]"><SelectValue placeholder="Tutti i magazzini" /></SelectTrigger>
+            <SelectTrigger className="w-[200px]"><SelectValue placeholder={t("approvvigionamenti.tuttiMagazzini")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tutti i magazzini</SelectItem>
+              <SelectItem value="all">{t("approvvigionamenti.tuttiMagazzini")}</SelectItem>
               {(magazzini ?? []).map((m) => (
                 <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
               ))}
@@ -221,11 +223,11 @@ export default function Approvvigionamenti() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Centro di Ascolto</Label>
+          <Label className="text-xs text-muted-foreground">{t("approvvigionamenti.centroAscolto")}</Label>
           <Select value={filterCentroId} onValueChange={setFilterCentroId}>
-            <SelectTrigger className="w-[200px]"><SelectValue placeholder="Tutti i centri" /></SelectTrigger>
+            <SelectTrigger className="w-[200px]"><SelectValue placeholder={t("approvvigionamenti.tuttiCentri")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tutti i centri</SelectItem>
+              <SelectItem value="all">{t("approvvigionamenti.tuttiCentri")}</SelectItem>
               {(centri ?? []).map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
               ))}
@@ -233,14 +235,14 @@ export default function Approvvigionamenti() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Stato</Label>
+          <Label className="text-xs text-muted-foreground">{t("common.status")}</Label>
           <Select value={filterStato} onValueChange={setFilterStato}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Tutti gli stati" /></SelectTrigger>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder={t("approvvigionamenti.tuttiStati")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tutti gli stati</SelectItem>
-              <SelectItem value="bozza">Bozza</SelectItem>
-              <SelectItem value="sottomesso">Sottomesso</SelectItem>
-              <SelectItem value="completato">Completato</SelectItem>
+              <SelectItem value="all">{t("approvvigionamenti.tuttiStati")}</SelectItem>
+              <SelectItem value="bozza">{t("approvvigionamenti.stati.bozza")}</SelectItem>
+              <SelectItem value="sottomesso">{t("approvvigionamenti.stati.sottomesso")}</SelectItem>
+              <SelectItem value="completato">{t("approvvigionamenti.stati.completato")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -250,7 +252,7 @@ export default function Approvvigionamenti() {
             className="gap-1.5 text-muted-foreground"
             onClick={() => { setFilterMagazzinoId("all"); setFilterCentroId("all"); setFilterStato("all"); }}
           >
-            <XCircle className="h-4 w-4" /> Azzera filtri
+            <XCircle className="h-4 w-4" /> {t("approvvigionamenti.azzeraFiltri")}
           </Button>
         )}
       </div>
@@ -260,13 +262,13 @@ export default function Approvvigionamenti() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Codice</TableHead>
-                <TableHead>Data Richiesta</TableHead>
-                <TableHead>Fornitore</TableHead>
-                <TableHead>Magazzino</TableHead>
-                <TableHead>Centro di Ascolto</TableHead>
-                <TableHead className="text-center">Stato</TableHead>
-                <TableHead className="text-right">Azioni</TableHead>
+                <TableHead>{t("common.code")}</TableHead>
+                <TableHead>{t("approvvigionamenti.dataRichiesta")}</TableHead>
+                <TableHead>{t("approvvigionamenti.fornitore")}</TableHead>
+                <TableHead>{t("approvvigionamenti.magazzino")}</TableHead>
+                <TableHead>{t("approvvigionamenti.centroAscolto")}</TableHead>
+                <TableHead className="text-center">{t("common.status")}</TableHead>
+                <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -284,7 +286,7 @@ export default function Approvvigionamenti() {
                 ))
               ) : approvvigionamenti?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">Nessun ordine registrato.</TableCell>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("approvvigionamenti.empty")}</TableCell>
                 </TableRow>
               ) : approvvigionamenti?.map((a) => (
                 <TableRow key={a.id}>
@@ -303,7 +305,7 @@ export default function Approvvigionamenti() {
                       {a.stato === "bozza" && (
                         <>
                           <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => openEdit(a)}>
-                            <Pencil className="h-3.5 w-3.5" /> Modifica
+                            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
                           </Button>
                           <Button
                             size="sm"
@@ -311,7 +313,7 @@ export default function Approvvigionamenti() {
                             disabled={submitApprovvigionamento.isPending}
                             onClick={() => handleSottometti(a)}
                           >
-                            <Send className="h-3.5 w-3.5" /> Sottometti
+                            <Send className="h-3.5 w-3.5" /> {t("approvvigionamenti.sottometti")}
                           </Button>
                         </>
                       )}
@@ -323,7 +325,7 @@ export default function Approvvigionamenti() {
                           disabled={updateApprovvigionamento.isPending}
                           onClick={() => handleCompleta(a)}
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Completato
+                          <CheckCircle2 className="h-3.5 w-3.5" /> {t("approvvigionamenti.completatoBtn")}
                         </Button>
                       )}
                     </div>
@@ -338,11 +340,11 @@ export default function Approvvigionamenti() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId !== null ? "Modifica Ordine" : "Nuovo Ordine"}</SheetTitle>
+            <SheetTitle>{editingId !== null ? t("approvvigionamenti.sheetEditTitle") : t("approvvigionamenti.sheetNewTitle")}</SheetTitle>
             <SheetDescription>
               {editingId !== null
-                ? "Modifica l'ordine. Resta in bozza finché non clicchi Sottometti."
-                : "Crea una bozza d'ordine. Potrai modificarla finché non la sottometti."}
+                ? t("approvvigionamenti.sheetEditDesc")
+                : t("approvvigionamenti.sheetNewDesc")}
             </SheetDescription>
           </SheetHeader>
           <div className="mt-6">
@@ -350,9 +352,9 @@ export default function Approvvigionamenti() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="fornitoreId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fornitore / Donatore</FormLabel>
+                    <FormLabel>{t("approvvigionamenti.fornitoreDonatore")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {fornitori?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
                       </SelectContent>
@@ -362,9 +364,9 @@ export default function Approvvigionamenti() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="magazzinoId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Magazzino</FormLabel>
+                      <FormLabel>{t("approvvigionamenti.magazzino")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
                         <SelectContent>
                           {magazzini?.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
                         </SelectContent>
@@ -373,9 +375,9 @@ export default function Approvvigionamenti() {
                   )} />
                   <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Centro di Ascolto</FormLabel>
+                      <FormLabel>{t("approvvigionamenti.centroAscolto")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Seleziona..." /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
                         <SelectContent>
                           {centri?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                         </SelectContent>
@@ -385,19 +387,19 @@ export default function Approvvigionamenti() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="dataRichiesta" render={({ field }) => (
-                    <FormItem><FormLabel>Data Richiesta</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("approvvigionamenti.dataRichiesta")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="dataPrevista" render={({ field }) => (
-                    <FormItem><FormLabel>Data Prevista Consegna</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("approvvigionamenti.dataPrevistaConsegna")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="note" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Note / Materiale richiesto</FormLabel>
+                    <FormLabel>{t("approvvigionamenti.noteMateriale")}</FormLabel>
                     <FormControl>
                       <Textarea
                         rows={10}
-                        placeholder="Elenca tutto il materiale necessario per questo ordine..."
+                        placeholder={t("approvvigionamenti.noteMaterialePlaceholder")}
                         className="min-h-[200px] resize-y"
                         {...field}
                       />
@@ -405,9 +407,9 @@ export default function Approvvigionamenti() {
                   </FormItem>
                 )} />
                 <div className="pt-4 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
                   <Button type="submit" disabled={createApprovvigionamento.isPending || updateApprovvigionamento.isPending}>
-                    {editingId !== null ? "Salva modifiche" : "Salva bozza"}
+                    {editingId !== null ? t("approvvigionamenti.saveModifiche") : t("approvvigionamenti.saveBozza")}
                   </Button>
                 </div>
               </form>

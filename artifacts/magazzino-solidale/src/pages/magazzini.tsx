@@ -18,6 +18,7 @@ import { MoreHorizontal, Plus, Pencil, Trash2, MapPin, Building, User } from "lu
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
   codice: z.string().min(2, "Codice troppo corto"),
@@ -33,6 +34,7 @@ const formSchema = z.object({
 });
 
 export default function Magazzini() {
+  const { t } = useTranslation();
   const { data: magazzini, isLoading } = useListMagazzini();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -85,7 +87,7 @@ export default function Magazzini() {
       updateMagazzino.mutate({ id: editingId, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMagazziniQueryKey() });
-          toast({ title: "Magazzino aggiornato" });
+          toast({ title: t("magazzini.toastUpdated") });
           setIsFormOpen(false);
         }
       });
@@ -93,7 +95,7 @@ export default function Magazzini() {
       createMagazzino.mutate({ data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMagazziniQueryKey() });
-          toast({ title: "Magazzino creato" });
+          toast({ title: t("magazzini.toastCreated") });
           setIsFormOpen(false);
         }
       });
@@ -105,7 +107,7 @@ export default function Magazzini() {
     deleteMagazzino.mutate({ id: deletingId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListMagazziniQueryKey() });
-        toast({ title: "Magazzino eliminato" });
+        toast({ title: t("magazzini.toastDeleted") });
         setDeletingId(null);
       }
     });
@@ -121,29 +123,29 @@ export default function Magazzini() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Magazzini</h1>
-          <p className="text-muted-foreground">Gestisci le sedi e i punti di stoccaggio dell'associazione.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("magazzini.title")}</h1>
+          <p className="text-muted-foreground">{t("magazzini.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={magazzini ?? []}
             columns={[
-              { header: "Codice", accessor: (m) => m.codice },
-              { header: "Nome", accessor: (m) => m.nome },
-              { header: "Indirizzo", accessor: (m) => m.indirizzo },
-              { header: "Comune", accessor: (m) => m.comune },
-              { header: "Zona", accessor: (m) => m.zona },
-              { header: "Responsabile", accessor: (m) => m.responsabile },
-              { header: "Telefono", accessor: (m) => m.telefono },
-              { header: "Email", accessor: (m) => m.email },
-              { header: "Stato", accessor: (m) => m.stato === 'attivo' ? 'Attivo' : 'Inattivo' },
+              { header: t("common.code"), accessor: (m) => m.codice },
+              { header: t("common.name"), accessor: (m) => m.nome },
+              { header: t("common.address"), accessor: (m) => m.indirizzo },
+              { header: t("magazzini.comune"), accessor: (m) => m.comune },
+              { header: t("magazzini.zona"), accessor: (m) => m.zona },
+              { header: t("magazzini.responsabile"), accessor: (m) => m.responsabile },
+              { header: t("common.phone"), accessor: (m) => m.telefono },
+              { header: t("common.email"), accessor: (m) => m.email },
+              { header: t("common.status"), accessor: (m) => m.stato === 'attivo' ? t("common.active") : t("common.inactive") },
             ]}
             filename="magazzini"
-            title="Magazzini"
+            title={t("magazzini.title")}
             orientation="landscape"
           />
           <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> Nuovo Magazzino
+            <Plus className="h-4 w-4" /> {t("magazzini.newWarehouse")}
           </Button>
         </div>
       </div>
@@ -152,7 +154,7 @@ export default function Magazzini() {
         <CardHeader className="py-4 border-b">
           <div className="flex justify-between items-center">
             <Input 
-              placeholder="Cerca per nome, codice o comune..." 
+              placeholder={t("magazzini.searchPlaceholder")} 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
@@ -163,11 +165,11 @@ export default function Magazzini() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Codice</TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Luogo</TableHead>
-                <TableHead>Responsabile</TableHead>
-                <TableHead>Stato</TableHead>
+                <TableHead className="w-[100px]">{t("common.code")}</TableHead>
+                <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("magazzini.colPlace")}</TableHead>
+                <TableHead>{t("magazzini.colResponsabile")}</TableHead>
+                <TableHead>{t("common.status")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -186,7 +188,7 @@ export default function Magazzini() {
               ) : filtered?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    Nessun magazzino trovato.
+                    {t("magazzini.noWarehouses")}
                   </TableCell>
                 </TableRow>
               ) : filtered?.map((magazzino) => (
@@ -219,31 +221,31 @@ export default function Magazzini() {
                         <span>{magazzino.responsabile}</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground italic">Non assegnato</span>
+                      <span className="text-xs text-muted-foreground italic">{t("magazzini.notAssigned")}</span>
                     )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={magazzino.stato === 'attivo' ? 'default' : 'secondary'} 
                            className={magazzino.stato === 'attivo' ? 'bg-green-500/10 text-green-700 hover:bg-green-500/20' : ''}>
-                      {magazzino.stato === 'attivo' ? 'Attivo' : 'Inattivo'}
+                      {magazzino.stato === 'attivo' ? t("common.active") : t("common.inactive")}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Apri menu</span>
+                          <span className="sr-only">{t("magazzini.openMenu")}</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(magazzino)}>
                           <Pencil className="mr-2 h-4 w-4" />
-                          Modifica
+                          {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(magazzino.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Elimina
+                          {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -258,9 +260,9 @@ export default function Magazzini() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId ? "Modifica Magazzino" : "Nuovo Magazzino"}</SheetTitle>
+            <SheetTitle>{editingId ? t("magazzini.editTitle") : t("magazzini.newTitle")}</SheetTitle>
             <SheetDescription>
-              Compila i dettagli della sede o punto di stoccaggio.
+              {t("magazzini.formDescription")}
             </SheetDescription>
           </SheetHeader>
           
@@ -270,23 +272,23 @@ export default function Magazzini() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="codice" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Codice</FormLabel>
-                      <FormControl><Input placeholder="Es: MAG01" {...field} /></FormControl>
+                      <FormLabel>{t("common.code")}</FormLabel>
+                      <FormControl><Input placeholder={t("magazzini.codicePlaceholder")} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="stato" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Stato</FormLabel>
+                      <FormLabel>{t("common.status")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Seleziona stato" />
+                            <SelectValue placeholder={t("magazzini.selectStatus")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="attivo">Attivo</SelectItem>
-                          <SelectItem value="inattivo">Inattivo</SelectItem>
+                          <SelectItem value="attivo">{t("common.active")}</SelectItem>
+                          <SelectItem value="inattivo">{t("common.inactive")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -296,15 +298,15 @@ export default function Magazzini() {
                 
                 <FormField control={form.control} name="nome" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome</FormLabel>
-                    <FormControl><Input placeholder="Sede Centrale..." {...field} /></FormControl>
+                    <FormLabel>{t("common.name")}</FormLabel>
+                    <FormControl><Input placeholder={t("magazzini.nomePlaceholder")} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
 
                 <FormField control={form.control} name="indirizzo" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Indirizzo</FormLabel>
+                    <FormLabel>{t("common.address")}</FormLabel>
                     <FormControl><Input {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -313,25 +315,25 @@ export default function Magazzini() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="comune" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Comune</FormLabel>
+                      <FormLabel>{t("magazzini.comune")}</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="zona" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Zona</FormLabel>
-                      <FormControl><Input placeholder="Es: Nord" {...field} /></FormControl>
+                      <FormLabel>{t("magazzini.zona")}</FormLabel>
+                      <FormControl><Input placeholder={t("magazzini.zonaPlaceholder")} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                 </div>
 
                 <div className="pt-4 border-t">
-                  <h4 className="text-sm font-medium mb-4">Contatti</h4>
+                  <h4 className="text-sm font-medium mb-4">{t("magazzini.contacts")}</h4>
                   <FormField control={form.control} name="responsabile" render={({ field }) => (
                     <FormItem className="mb-4">
-                      <FormLabel>Responsabile</FormLabel>
+                      <FormLabel>{t("magazzini.responsabile")}</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -339,14 +341,14 @@ export default function Magazzini() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="telefono" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Telefono</FormLabel>
+                        <FormLabel>{t("common.phone")}</FormLabel>
                         <FormControl><Input {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
                     <FormField control={form.control} name="email" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>{t("common.email")}</FormLabel>
                         <FormControl><Input type="email" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
@@ -357,7 +359,7 @@ export default function Magazzini() {
                 <div className="pt-4 border-t">
                   <FormField control={form.control} name="note" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Note</FormLabel>
+                      <FormLabel>{t("common.notes")}</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -366,10 +368,10 @@ export default function Magazzini() {
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
-                    Annulla
+                    {t("common.cancel")}
                   </Button>
                   <Button type="submit" disabled={createMagazzino.isPending || updateMagazzino.isPending}>
-                    {editingId ? "Salva Modifiche" : "Crea Magazzino"}
+                    {editingId ? t("magazzini.saveChanges") : t("magazzini.createWarehouse")}
                   </Button>
                 </div>
               </form>
@@ -381,15 +383,15 @@ export default function Magazzini() {
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+            <AlertDialogTitle>{t("magazzini.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Questa azione non può essere annullata. Il magazzino verrà eliminato permanentemente.
+              {t("magazzini.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Elimina
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
