@@ -24,6 +24,9 @@ export interface Lotto {
   /** @nullable */
   fornitoreId?: number | null;
   /** @nullable */
+  fornitoreNome?: string | null;
+  fsePlus: boolean;
+  /** @nullable */
   documentoCarico?: string | null;
   /** @nullable */
   note?: string | null;

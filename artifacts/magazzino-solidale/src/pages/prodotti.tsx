@@ -5,6 +5,8 @@ import {
   useUpdateProdotto,
   useDeleteProdotto,
   useListMagazzini,
+  useListLotti,
+  useListFornitori,
   useCreateLotto,
   useCreateMovimento,
   getListProdottiQueryKey,
@@ -41,6 +43,7 @@ const formSchema = z.object({
   codiceBarre: z.string().optional(),
   gestioneLotto: z.boolean().default(false),
   gestioneScadenza: z.boolean().default(false),
+  fsePlus: z.boolean().default(false),
   scortaMinima: z.coerce.number().min(0).default(0),
   scortaConsigliata: z.coerce.number().min(0).default(0),
   note: z.string().optional()
@@ -51,9 +54,14 @@ const caricoSchema = z.object({
   quantita: z.coerce.number().positive("La quantità deve essere maggiore di zero"),
   dataCarico: z.string().min(1, "Campo obbligatorio"),
   causale: z.string().min(1, "Campo obbligatorio"),
+  provenienza: z.enum(["fseplus", "fornitore"]),
+  fornitoreId: z.string().optional(),
   codiceLotto: z.string().optional(),
   dataScadenza: z.string().optional(),
   note: z.string().optional(),
+}).refine((d) => d.provenienza !== "fornitore" || (d.fornitoreId && d.fornitoreId.length > 0), {
+  message: "Seleziona un fornitore",
+  path: ["fornitoreId"],
 });
 
 type Prodotto = {
@@ -62,10 +70,13 @@ type Prodotto = {
   unitaMisura: string;
   gestioneLotto: boolean;
   gestioneScadenza: boolean;
+  fsePlus: boolean;
+  fornitoreId: number | null;
 };
 
 function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => void }) {
   const { data: magazzini } = useListMagazzini();
+  const { data: fornitori } = useListFornitori();
   const createLotto = useCreateLotto();
   const createMovimento = useCreateMovimento();
   const queryClient = useQueryClient();
@@ -78,11 +89,15 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
       quantita: 0,
       dataCarico: new Date().toISOString().split("T")[0],
       causale: "donazione",
+      provenienza: prodotto.fsePlus ? "fseplus" : "fornitore",
+      fornitoreId: !prodotto.fsePlus && prodotto.fornitoreId ? String(prodotto.fornitoreId) : "",
       codiceLotto: "",
       dataScadenza: "",
       note: "",
     },
   });
+
+  const provenienza = form.watch("provenienza");
 
   const submitting = createLotto.isPending || createMovimento.isPending;
 
@@ -94,6 +109,8 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
           magazzinoId: parseInt(data.magazzinoId),
           dataCarico: data.dataCarico,
           quantitaCaricata: data.quantita,
+          fsePlus: data.provenienza === "fseplus",
+          fornitoreId: data.provenienza === "fornitore" && data.fornitoreId ? parseInt(data.fornitoreId) : undefined,
           codiceLotto: data.codiceLotto || undefined,
           dataScadenza: data.dataScadenza || undefined,
           note: data.note || undefined,
@@ -218,6 +235,41 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
                 </FormItem>
               )} />
 
+              <FormField control={form.control} name="provenienza" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Provenienza</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="fseplus">FSE+ (Fondo Sociale Europeo Plus)</SelectItem>
+                      <SelectItem value="fornitore">Fornitore</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {provenienza === "fornitore" && (
+                <FormField control={form.control} name="fornitoreId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fornitore</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Seleziona fornitore..." /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {fornitori?.map((f) => (
+                          <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
+
               {(prodotto.gestioneLotto || prodotto.gestioneScadenza) && (
                 <div className="grid grid-cols-2 gap-4">
                   {prodotto.gestioneLotto && (
@@ -263,6 +315,48 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
   );
 }
 
+function ProdottoLotti({ prodottoId }: { prodottoId: number }) {
+  const { data: lotti, isLoading } = useListLotti(
+    { prodottoId },
+    { query: { queryKey: getListLottiQueryKey({ prodottoId }) } },
+  );
+
+  return (
+    <div className="pt-4 border-t space-y-2">
+      <FormLabel>Lotti di questo prodotto</FormLabel>
+      {isLoading ? (
+        <Skeleton className="h-12 w-full" />
+      ) : !lotti || lotti.length === 0 ? (
+        <p className="text-[0.8rem] text-muted-foreground">Nessun lotto registrato per questo prodotto.</p>
+      ) : (
+        <div className="rounded-lg border divide-y">
+          {lotti.map((l) => (
+            <div key={l.id} className="flex items-center justify-between gap-2 p-2 text-sm">
+              <div className="min-w-0">
+                <div className="font-medium truncate">
+                  {l.codiceLotto || <span className="text-muted-foreground italic">Senza codice</span>}
+                  <span className="text-muted-foreground font-normal"> · {l.magazzinoNome}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Residuo: {l.quantitaResidua}
+                  {l.dataScadenza ? ` · Scad. ${new Date(l.dataScadenza).toLocaleDateString("it-IT")}` : ""}
+                </div>
+              </div>
+              {l.fsePlus ? (
+                <Badge variant="outline" className="border-none bg-blue-500/15 text-blue-700 shrink-0">FSE+</Badge>
+              ) : l.fornitoreNome ? (
+                <Badge variant="outline" className="shrink-0">{l.fornitoreNome}</Badge>
+              ) : (
+                <span className="text-muted-foreground text-xs italic shrink-0">Provenienza N/D</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Prodotti() {
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState("all");
@@ -288,7 +382,7 @@ export default function Prodotti() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       codice: "", nome: "", descrizione: "", tipoProdotto: "alimentare",
-      unitaMisura: "pz", gestioneLotto: false, gestioneScadenza: false,
+      unitaMisura: "pz", gestioneLotto: false, gestioneScadenza: false, fsePlus: false,
       scortaMinima: 0, scortaConsigliata: 0, note: "", codiceBarre: ""
     }
   });
@@ -304,6 +398,7 @@ export default function Prodotti() {
       codiceBarre: prodotto.codiceBarre || "",
       gestioneLotto: prodotto.gestioneLotto,
       gestioneScadenza: prodotto.gestioneScadenza,
+      fsePlus: prodotto.fsePlus,
       scortaMinima: prodotto.scortaMinima,
       scortaConsigliata: prodotto.scortaConsigliata,
       note: prodotto.note || ""
@@ -315,7 +410,7 @@ export default function Prodotti() {
     setEditingId(null);
     form.reset({
       codice: "", nome: "", descrizione: "", tipoProdotto: "alimentare",
-      unitaMisura: "pz", gestioneLotto: false, gestioneScadenza: false,
+      unitaMisura: "pz", gestioneLotto: false, gestioneScadenza: false, fsePlus: false,
       scortaMinima: 0, scortaConsigliata: 0, note: "", codiceBarre: ""
     });
     setIsFormOpen(true);
@@ -488,6 +583,8 @@ export default function Prodotti() {
                           unitaMisura: prodotto.unitaMisura,
                           gestioneLotto: prodotto.gestioneLotto,
                           gestioneScadenza: prodotto.gestioneScadenza,
+                          fsePlus: prodotto.fsePlus,
+                          fornitoreId: prodotto.fornitoreId ?? null,
                         })}>
                           <PackagePlus className="mr-2 h-4 w-4" />
                           Carica in magazzino
@@ -632,7 +729,21 @@ export default function Prodotti() {
                       </FormControl>
                     </FormItem>
                   )} />
+
+                  <FormField control={form.control} name="fsePlus" render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>FSE+ (Fondo Sociale Europeo Plus)</FormLabel>
+                        <p className="text-[0.8rem] text-muted-foreground">Prodotto fornito tramite il programma FSE+. Sarà la provenienza predefinita dei nuovi lotti.</p>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )} />
                 </div>
+
+                {editingId && <ProdottoLotti prodottoId={editingId} />}
 
                 <div className="pt-4 border-t">
                   <FormField control={form.control} name="descrizione" render={({ field }) => (

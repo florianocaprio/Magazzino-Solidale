@@ -15,6 +15,7 @@ export interface ProdottoInput {
   codiceBarre?: string;
   gestioneLotto?: boolean;
   gestioneScadenza?: boolean;
+  fsePlus?: boolean;
   scortaMinima?: number;
   scortaConsigliata?: number;
   conservazione?: string;

@@ -3,6 +3,7 @@ import {
   useListLotti,
   useListMagazzini,
   useListProdotti,
+  useListFornitori,
   useCreateLotto,
   useCreateMovimento,
   getListGiacenzeQueryKey,
@@ -36,14 +37,20 @@ const nuovoLottoSchema = z.object({
   quantita: z.coerce.number().positive("La quantità deve essere maggiore di zero"),
   dataCarico: z.string().min(1, "Campo obbligatorio"),
   causale: z.string().min(1, "Campo obbligatorio"),
+  provenienza: z.enum(["fseplus", "fornitore"]),
+  fornitoreId: z.string().optional(),
   codiceLotto: z.string().optional(),
   dataScadenza: z.string().optional(),
   note: z.string().optional(),
+}).refine((d) => d.provenienza !== "fornitore" || (d.fornitoreId && d.fornitoreId.length > 0), {
+  message: "Seleziona un fornitore",
+  path: ["fornitoreId"],
 });
 
 function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
   const { data: magazzini } = useListMagazzini();
   const { data: prodotti } = useListProdotti();
+  const { data: fornitori } = useListFornitori();
   const createLotto = useCreateLotto();
   const createMovimento = useCreateMovimento();
   const queryClient = useQueryClient();
@@ -57,11 +64,31 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
       quantita: 0,
       dataCarico: new Date().toISOString().split("T")[0],
       causale: "donazione",
+      provenienza: "fornitore",
+      fornitoreId: "",
       codiceLotto: "",
       dataScadenza: "",
       note: "",
     },
   });
+
+  const provenienza = form.watch("provenienza");
+
+  const onProdottoChange = (value: string) => {
+    form.setValue("prodottoId", value);
+    const prodotto = prodotti?.find((p) => p.id.toString() === value);
+    if (!prodotto) return;
+    if (prodotto.fsePlus) {
+      form.setValue("provenienza", "fseplus");
+      form.setValue("fornitoreId", "");
+    } else if (prodotto.fornitoreId) {
+      form.setValue("provenienza", "fornitore");
+      form.setValue("fornitoreId", prodotto.fornitoreId.toString());
+    } else {
+      form.setValue("provenienza", "fornitore");
+      form.setValue("fornitoreId", "");
+    }
+  };
 
   const submitting = createLotto.isPending || createMovimento.isPending;
 
@@ -78,6 +105,8 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
           magazzinoId: parseInt(data.magazzinoId),
           dataCarico: data.dataCarico,
           quantitaCaricata: data.quantita,
+          fsePlus: data.provenienza === "fseplus",
+          fornitoreId: data.provenienza === "fornitore" && data.fornitoreId ? parseInt(data.fornitoreId) : undefined,
           codiceLotto: data.codiceLotto || undefined,
           dataScadenza: data.dataScadenza || undefined,
           note: data.note || undefined,
@@ -154,7 +183,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
             <FormField control={form.control} name="prodottoId" render={({ field }) => (
               <FormItem>
                 <FormLabel>Prodotto</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={onProdottoChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger><SelectValue placeholder="Seleziona prodotto..." /></SelectTrigger>
                   </FormControl>
@@ -217,6 +246,41 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
                 <FormMessage />
               </FormItem>
             )} />
+
+            <FormField control={form.control} name="provenienza" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Provenienza</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="fseplus">FSE+ (Fondo Sociale Europeo Plus)</SelectItem>
+                    <SelectItem value="fornitore">Fornitore</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {provenienza === "fornitore" && (
+              <FormField control={form.control} name="fornitoreId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fornitore</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Seleziona fornitore..." /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {fornitori?.map((f) => (
+                        <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
 
             <FormField control={form.control} name="codiceLotto" render={({ field }) => (
               <FormItem>
@@ -294,6 +358,7 @@ export default function Lotti() {
               { header: "Cod. Lotto", accessor: (l) => l.codiceLotto },
               { header: "Prodotto", accessor: (l) => l.prodottoNome },
               { header: "Magazzino", accessor: (l) => l.magazzinoNome },
+              { header: "Provenienza", accessor: (l) => l.fsePlus ? "FSE+" : (l.fornitoreNome ?? "") },
               { header: "Data Scadenza", accessor: (l) => l.dataScadenza ? new Date(l.dataScadenza).toLocaleDateString("it-IT") : "" },
               { header: "Q.tà Iniziale", accessor: (l) => l.quantitaCaricata != null ? parseFloat(String(l.quantitaCaricata)) : "" },
               { header: "Q.tà Residua", accessor: (l) => l.quantitaResidua != null ? parseFloat(String(l.quantitaResidua)) : "" },
@@ -357,6 +422,7 @@ export default function Lotti() {
                 <TableHead>Cod. Lotto</TableHead>
                 <TableHead>Prodotto</TableHead>
                 <TableHead>Magazzino</TableHead>
+                <TableHead>Provenienza</TableHead>
                 <TableHead>Data Scadenza</TableHead>
                 <TableHead className="text-right">Q.tà Iniziale</TableHead>
                 <TableHead className="text-right">Q.tà Residua</TableHead>
@@ -371,6 +437,7 @@ export default function Lotti() {
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-12 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-12 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
@@ -378,7 +445,7 @@ export default function Lotti() {
                 ))
               ) : lotti?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     Nessun lotto trovato con questi filtri.
                   </TableCell>
                 </TableRow>
@@ -395,6 +462,15 @@ export default function Lotti() {
                     </TableCell>
                     <TableCell className="font-medium">{lotto.prodottoNome}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{lotto.magazzinoNome}</TableCell>
+                    <TableCell>
+                      {lotto.fsePlus ? (
+                        <Badge variant="outline" className="border-none bg-blue-500/15 text-blue-700">FSE+</Badge>
+                      ) : lotto.fornitoreNome ? (
+                        <span className="text-sm">{lotto.fornitoreNome}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm italic">N/D</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {lotto.dataScadenza ? (
                         <div className={`flex items-center gap-2 text-sm ${status.color}`}>

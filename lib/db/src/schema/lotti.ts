@@ -12,6 +12,7 @@ export const lottiTable = pgTable("lotti", {
   quantitaResidua: decimal("quantita_residua", { precision: 10, scale: 2 }).notNull(),
   magazzinoId: integer("magazzino_id").notNull(),
   fornitoreId: integer("fornitore_id"),
+  fsePlus: boolean("fse_plus").notNull().default(false),
   documentoCarico: varchar("documento_carico", { length: 100 }),
   note: text("note"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),

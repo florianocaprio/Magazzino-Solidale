@@ -102,6 +102,7 @@ export interface Prodotto {
   codiceBarre?: string | null;
   gestioneLotto: boolean;
   gestioneScadenza: boolean;
+  fsePlus: boolean;
   scortaMinima: number;
   scortaConsigliata: number;
   /** @nullable */
@@ -131,6 +132,7 @@ export interface ProdottoInput {
   codiceBarre?: string;
   gestioneLotto?: boolean;
   gestioneScadenza?: boolean;
+  fsePlus?: boolean;
   scortaMinima?: number;
   scortaConsigliata?: number;
   conservazione?: string;
@@ -150,6 +152,7 @@ export interface ProdottoUpdate {
   codiceBarre?: string;
   gestioneLotto?: boolean;
   gestioneScadenza?: boolean;
+  fsePlus?: boolean;
   scortaMinima?: number;
   scortaConsigliata?: number;
   conservazione?: string;
@@ -180,6 +183,9 @@ export interface Lotto {
   /** @nullable */
   fornitoreId?: number | null;
   /** @nullable */
+  fornitoreNome?: string | null;
+  fsePlus: boolean;
+  /** @nullable */
   documentoCarico?: string | null;
   /** @nullable */
   note?: string | null;
@@ -194,6 +200,7 @@ export interface LottoInput {
   quantitaCaricata: number;
   magazzinoId: number;
   fornitoreId?: number;
+  fsePlus?: boolean;
   documentoCarico?: string;
   note?: string;
 }

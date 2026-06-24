@@ -14,6 +14,7 @@ export interface ProdottoUpdate {
   codiceBarre?: string;
   gestioneLotto?: boolean;
   gestioneScadenza?: boolean;
+  fsePlus?: boolean;
   scortaMinima?: number;
   scortaConsigliata?: number;
   conservazione?: string;

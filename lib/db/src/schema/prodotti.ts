@@ -12,6 +12,7 @@ export const prodottiTable = pgTable("prodotti", {
   codiceBarre: varchar("codice_barre", { length: 50 }),
   gestioneLotto: boolean("gestione_lotto").notNull().default(false),
   gestioneScadenza: boolean("gestione_scadenza").notNull().default(false),
+  fsePlus: boolean("fse_plus").notNull().default(false),
   scortaMinima: decimal("scorta_minima", { precision: 10, scale: 2 }).notNull().default("0"),
   scortaConsigliata: decimal("scorta_consigliata", { precision: 10, scale: 2 }).notNull().default("0"),
   conservazione: varchar("conservazione", { length: 20 }),

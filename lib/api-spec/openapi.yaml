@@ -1817,6 +1817,8 @@ components:
           type: boolean
         gestioneScadenza:
           type: boolean
+        fsePlus:
+          type: boolean
         scortaMinima:
           type: number
         scortaConsigliata:
@@ -1839,7 +1841,7 @@ components:
           type: string
         fornitoreId:
           type: ["integer", "null"]
-      required: [id, codice, nome, tipoProdotto, unitaMisura, gestioneLotto, gestioneScadenza, scortaMinima, scortaConsigliata, attivo, dataCreazione]
+      required: [id, codice, nome, tipoProdotto, unitaMisura, gestioneLotto, gestioneScadenza, fsePlus, scortaMinima, scortaConsigliata, attivo, dataCreazione]
 
     ProdottoInput:
       type: object
@@ -1859,6 +1861,8 @@ components:
         gestioneLotto:
           type: boolean
         gestioneScadenza:
+          type: boolean
+        fsePlus:
           type: boolean
         scortaMinima:
           type: number
@@ -1896,6 +1900,8 @@ components:
         gestioneLotto:
           type: boolean
         gestioneScadenza:
+          type: boolean
+        fsePlus:
           type: boolean
         scortaMinima:
           type: number
@@ -1944,13 +1950,17 @@ components:
           type: ["string", "null"]
         fornitoreId:
           type: ["integer", "null"]
+        fornitoreNome:
+          type: ["string", "null"]
+        fsePlus:
+          type: boolean
         documentoCarico:
           type: ["string", "null"]
         note:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, prodottoId, dataCarico, quantitaCaricata, quantitaResidua, magazzinoId, dataCreazione]
+      required: [id, prodottoId, dataCarico, quantitaCaricata, quantitaResidua, magazzinoId, fsePlus, dataCreazione]
 
     LottoInput:
       type: object
@@ -1969,6 +1979,8 @@ components:
           type: integer
         fornitoreId:
           type: integer
+        fsePlus:
+          type: boolean
         documentoCarico:
           type: string
         note:

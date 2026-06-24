@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { lottiTable, prodottiTable, magazziniTable } from "@workspace/db";
+import { lottiTable, prodottiTable, magazziniTable, fornitoriTable } from "@workspace/db";
 import { eq, and, lte, gt, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
@@ -22,10 +22,12 @@ router.get("/lotti", async (req, res) => {
       lotto: lottiTable,
       prodottoNome: prodottiTable.nome,
       magazzinoNome: magazziniTable.nome,
+      fornitoreNome: fornitoriTable.nome,
     })
     .from(lottiTable)
     .leftJoin(prodottiTable, eq(lottiTable.prodottoId, prodottiTable.id))
     .leftJoin(magazziniTable, eq(lottiTable.magazzinoId, magazziniTable.id))
+    .leftJoin(fornitoriTable, eq(lottiTable.fornitoreId, fornitoriTable.id))
     .where(and(...conditions))
     .orderBy(lottiTable.dataScadenza);
 
@@ -41,6 +43,8 @@ router.get("/lotti", async (req, res) => {
     magazzinoId: r.lotto.magazzinoId,
     magazzinoNome: r.magazzinoNome ?? null,
     fornitoreId: r.lotto.fornitoreId ?? null,
+    fornitoreNome: r.fornitoreNome ?? null,
+    fsePlus: r.lotto.fsePlus,
     documentoCarico: r.lotto.documentoCarico ?? null,
     note: r.lotto.note ?? null,
     dataCreazione: r.lotto.dataCreazione.toISOString(),
@@ -49,6 +53,15 @@ router.get("/lotti", async (req, res) => {
 
 router.post("/lotti", async (req, res) => {
   const body = req.body;
+  const fsePlus = body.fsePlus ?? false;
+  if (fsePlus && body.fornitoreId != null) {
+    res.status(400).json({ error: "Un lotto FSE+ non può avere anche un fornitore" });
+    return;
+  }
+  if (!fsePlus && body.fornitoreId == null) {
+    res.status(400).json({ error: "Specificare la provenienza del lotto: FSE+ o un fornitore" });
+    return;
+  }
   const [row] = await db.insert(lottiTable).values({
     prodottoId: body.prodottoId,
     codiceLotto: body.codiceLotto,
@@ -58,6 +71,7 @@ router.post("/lotti", async (req, res) => {
     quantitaResidua: body.quantitaCaricata.toString(),
     magazzinoId: body.magazzinoId,
     fornitoreId: body.fornitoreId,
+    fsePlus: body.fsePlus ?? false,
     documentoCarico: body.documentoCarico,
     note: body.note,
   }).returning();

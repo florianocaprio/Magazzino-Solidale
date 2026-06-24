@@ -14,6 +14,7 @@ export interface LottoInput {
   quantitaCaricata: number;
   magazzinoId: number;
   fornitoreId?: number;
+  fsePlus?: boolean;
   documentoCarico?: string;
   note?: string;
 }

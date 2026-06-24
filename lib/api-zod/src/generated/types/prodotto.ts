@@ -18,6 +18,7 @@ export interface Prodotto {
   codiceBarre?: string | null;
   gestioneLotto: boolean;
   gestioneScadenza: boolean;
+  fsePlus: boolean;
   scortaMinima: number;
   scortaConsigliata: number;
   /** @nullable */
