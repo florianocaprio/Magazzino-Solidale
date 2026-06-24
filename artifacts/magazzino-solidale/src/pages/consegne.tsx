@@ -204,6 +204,10 @@ export default function Consegne() {
                         <div className="flex items-center gap-1 text-blue-600">
                           <MapPin className="h-3 w-3" /> {c.indirizzoConsegna || 'Domicilio'} {c.zona ? `(${c.zona})` : ''}
                         </div>
+                      ) : c.tipoConsegna === 'diretta' ? (
+                        <div className="flex items-center gap-1 text-emerald-600">
+                          <Truck className="h-3 w-3" /> Consegna diretta dal centro di ascolto
+                        </div>
                       ) : (
                         <div className="flex items-center gap-1 text-purple-600">
                           <Truck className="h-3 w-3" /> Ritiro in {c.magazzinoNome}

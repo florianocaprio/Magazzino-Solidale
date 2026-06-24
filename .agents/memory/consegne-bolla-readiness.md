@@ -13,6 +13,11 @@ description: Delivery (consegne) state values, how readiness derives from the li
 - GET /consegne enriches rows with `bollaId/bollaNumero/bollaStato`, picking the highest-priority non-`annullato` linked bolla (consegnato > confermato > bozza).
 - Associate endpoint `POST /consegne/:id/associa-bolla {bollaId|null}` validates: same beneficiario, not annullato, not already linked elsewhere.
 
+# Bidirectional sync: marking a bolla consegnato keeps consegne aligned
+- `POST /bolle/:id/consegna` calls `syncConsegnaDaBolla`: if the bolla is linked to a consegna, that consegna becomes `effettuata` (idempotent — skip if already effettuata); if NOT linked (or the link dangles to a missing consegna), it creates a `diretta` consegna (stato `effettuata`, dataPrevista = today, magazzino/beneficiario from the bolla) and links the bolla to it.
+- Direct consegne use `tipoConsegna = 'diretta'`; the frontend renders a distinct "Consegna diretta dal centro di ascolto" label. Centro di ascolto is implicit via beneficiarioId (consegne GET joins beneficiari.centroAscoltoId for the centro filter).
+- **Why:** the two views (Bolle and Consegne) must never diverge — delivering from either side must update the other. The reverse path (`/consegne/:id/completa`) already marks the linked bolla `consegnato`.
+
 # Completing a consegna does NOT create its own intervento
 - `POST /consegne/:id/completa` requires a linked bolla in `confermato`/`consegnato`; it promotes a `confermato` bolla to `consegnato` and sets consegna `effettuata`+dataEffettuata.
 - The intervento is created by the existing `syncInterventoBolla` at bolla CONFERMA time, not at consegna completion. Completing must NOT create a second intervento — rely on the bolla-owned one to avoid duplicates.

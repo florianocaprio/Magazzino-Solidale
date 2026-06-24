@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   bolleTable, bollaRigheTable, beneficiariTable, magazziniTable,
   movimentiTable, lottiTable, prodottiTable, volontariTable, interventiTable,
+  consegneTable,
 } from "@workspace/db";
 import { eq, and, desc, asc, gt, sum, type SQL } from "drizzle-orm";
 
@@ -75,6 +76,41 @@ async function syncInterventoBolla(bollaId: number) {
 
 async function removeInterventoBolla(bollaId: number) {
   await db.delete(interventiTable).where(eq(interventiTable.bollaId, bollaId));
+}
+
+// Allinea la pianificazione consegne quando una bolla viene consegnata.
+// - se la bolla è già collegata a una consegna, la marca come effettuata;
+// - altrimenti crea una "consegna diretta" (fatta in sede dal centro di ascolto
+//   a cui il beneficiario fa riferimento) già effettuata, e vi collega la bolla.
+async function syncConsegnaDaBolla(bolla: typeof bolleTable.$inferSelect) {
+  const now = new Date();
+
+  if (bolla.consegnaId != null) {
+    const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, bolla.consegnaId));
+    if (consegna) {
+      if (consegna.stato !== "effettuata") {
+        await db.update(consegneTable)
+          .set({ stato: "effettuata", dataEffettuata: now })
+          .where(eq(consegneTable.id, bolla.consegnaId));
+      }
+      return;
+    }
+    // link pendente verso una consegna inesistente: ricade nella creazione diretta
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+  const codice = `CON-${Date.now()}`;
+  const [nuova] = await db.insert(consegneTable).values({
+    codice,
+    beneficiarioId: bolla.beneficiarioId,
+    tipoConsegna: "diretta",
+    dataPrevista: today,
+    magazzinoId: bolla.magazzinoId,
+    stato: "effettuata",
+    dataEffettuata: now,
+    noteOperative: `Consegna diretta registrata dalla bolla ${bolla.numeroBolla}`,
+  }).returning();
+  await db.update(bolleTable).set({ consegnaId: nuova.id }).where(eq(bolleTable.id, bolla.id));
 }
 
 async function buildDettaglio(id: number) {
@@ -588,6 +624,9 @@ router.post("/bolle/:id/consegna", async (req, res) => {
     confermaRicezione: confermaRicezione ?? true,
     noteRicezione: noteRicezione ?? null,
   }).where(eq(bolleTable.id, bollaId));
+
+  // allinea la pianificazione consegne (aggiorna quella collegata o ne crea una diretta)
+  await syncConsegnaDaBolla(bolla);
 
   const det = await buildDettaglio(bollaId);
   res.json(det);
