@@ -6,10 +6,11 @@ import { eq, and, desc, type SQL } from "drizzle-orm";
 const router: IRouter = Router();
 
 router.get("/consegne", async (req, res) => {
-  const { stato, data, beneficiarioId } = req.query as Record<string, string>;
+  const { stato, data, beneficiarioId, centroAscoltoId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(consegneTable.stato, stato));
   if (beneficiarioId) conditions.push(eq(consegneTable.beneficiarioId, parseInt(beneficiarioId)));
+  if (centroAscoltoId) conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
 
   const rows = await db
     .select({

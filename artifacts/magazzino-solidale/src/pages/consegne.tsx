@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useListBeneficiari, useListMagazzini, useListVolontari, getListConsegneQueryKey } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useListBeneficiari, useListMagazzini, useListVolontari, useListCentriAscolto, getListConsegneQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, MapPin, Truck, CheckCircle2 } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -33,10 +33,14 @@ const formSchema = z.object({
 });
 
 export default function Consegne() {
-  const { data: consegne, isLoading } = useListConsegne();
+  const [centroFilter, setCentroFilter] = useState("all");
+  const { data: consegne, isLoading } = useListConsegne(
+    centroFilter !== "all" ? { centroAscoltoId: parseInt(centroFilter) } : undefined
+  );
   const { data: beneficiari } = useListBeneficiari();
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
+  const { data: centri } = useListCentriAscolto();
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -107,6 +111,20 @@ export default function Consegne() {
       </div>
 
       <Card>
+        <CardHeader className="py-4 border-b">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={centroFilter} onValueChange={setCentroFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Tutti i centri" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti i centri</SelectItem>
+                {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>

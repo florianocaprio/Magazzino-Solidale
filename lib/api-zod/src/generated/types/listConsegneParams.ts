@@ -10,4 +10,5 @@ export type ListConsegneParams = {
 stato?: string;
 data?: string;
 beneficiarioId?: number;
+centroAscoltoId?: number;
 };

@@ -1170,7 +1170,8 @@ export const UpdateInterventoResponse = zod.object({
 export const ListConsegneQueryParams = zod.object({
   "stato": zod.coerce.string().optional(),
   "data": zod.coerce.string().optional(),
-  "beneficiarioId": zod.coerce.number().optional()
+  "beneficiarioId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional()
 })
 
 export const ListConsegneResponseItem = zod.object({
