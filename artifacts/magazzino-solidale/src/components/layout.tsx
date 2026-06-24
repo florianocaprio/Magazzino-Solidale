@@ -20,6 +20,7 @@ import {
   Printer,
   ShieldCheck,
   UserCog,
+  Languages,
   LogOut
 } from "lucide-react";
 import { 
@@ -35,45 +36,77 @@ import {
   SidebarProvider
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { useTranslation } from "react-i18next";
+import { LANGUAGES } from "@/lib/i18n";
 
 const NAV_ITEMS = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard, group: "Generale", area: "generale" },
-  { title: "Magazzini", url: "/magazzini", icon: Warehouse, group: "Magazzino", area: "magazzino" },
-  { title: "Prodotti", url: "/prodotti", icon: Package, group: "Magazzino", area: "magazzino" },
-  { title: "Lotti", url: "/lotti", icon: Boxes, group: "Magazzino", area: "magazzino" },
-  { title: "Movimenti", url: "/movimenti", icon: ArrowRightLeft, group: "Magazzino", area: "magazzino" },
-  { title: "Giacenze", url: "/giacenze", icon: TrendingUpDown, group: "Magazzino", area: "magazzino" },
-  { title: "Trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, group: "Magazzino", area: "magazzino" },
-  { title: "Scarichi", url: "/scarichi", icon: PackageMinus, group: "Magazzino", area: "magazzino" },
+  { key: "dashboard", url: "/", icon: LayoutDashboard, groupKey: "generale", area: "generale" },
+  { key: "magazzini", url: "/magazzini", icon: Warehouse, groupKey: "magazzino", area: "magazzino" },
+  { key: "prodotti", url: "/prodotti", icon: Package, groupKey: "magazzino", area: "magazzino" },
+  { key: "lotti", url: "/lotti", icon: Boxes, groupKey: "magazzino", area: "magazzino" },
+  { key: "movimenti", url: "/movimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
+  { key: "giacenze", url: "/giacenze", icon: TrendingUpDown, groupKey: "magazzino", area: "magazzino" },
+  { key: "trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
+  { key: "scarichi", url: "/scarichi", icon: PackageMinus, groupKey: "magazzino", area: "magazzino" },
   
-  { title: "Centri di Ascolto", url: "/centri-ascolto", icon: Building2, group: "Sociale", area: "sociale" },
-  { title: "Beneficiari", url: "/beneficiari", icon: Users, group: "Sociale", area: "sociale" },
-  { title: "Interventi", url: "/interventi", icon: ClipboardList, group: "Sociale", area: "sociale" },
-  { title: "Consegne", url: "/consegne", icon: Truck, group: "Sociale", area: "sociale" },
-  { title: "Bolle", url: "/bolle", icon: FileText, group: "Sociale", area: "sociale" },
+  { key: "centriAscolto", url: "/centri-ascolto", icon: Building2, groupKey: "sociale", area: "sociale" },
+  { key: "beneficiari", url: "/beneficiari", icon: Users, groupKey: "sociale", area: "sociale" },
+  { key: "interventi", url: "/interventi", icon: ClipboardList, groupKey: "sociale", area: "sociale" },
+  { key: "consegne", url: "/consegne", icon: Truck, groupKey: "sociale", area: "sociale" },
+  { key: "bolle", url: "/bolle", icon: FileText, groupKey: "sociale", area: "sociale" },
   
-  { title: "Volontari", url: "/volontari", icon: UsersRound, group: "Logistica", area: "logistica" },
-  { title: "Mezzi", url: "/mezzi", icon: Car, group: "Logistica", area: "logistica" },
-  { title: "Fornitori", url: "/fornitori", icon: Store, group: "Logistica", area: "logistica" },
-  { title: "Approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, group: "Logistica", area: "logistica" },
+  { key: "volontari", url: "/volontari", icon: UsersRound, groupKey: "logistica", area: "logistica" },
+  { key: "mezzi", url: "/mezzi", icon: Car, groupKey: "logistica", area: "logistica" },
+  { key: "fornitori", url: "/fornitori", icon: Store, groupKey: "logistica", area: "logistica" },
+  { key: "approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, groupKey: "logistica", area: "logistica" },
   
-  { title: "Report", url: "/report", icon: BarChart3, group: "Analisi", area: "analisi" },
-  { title: "Impostazioni Stampa Bolla", url: "/impostazioni-stampa", icon: Printer, group: "Analisi", area: "analisi" },
+  { key: "report", url: "/report", icon: BarChart3, groupKey: "analisi", area: "analisi" },
+  { key: "impostazioniStampa", url: "/impostazioni-stampa", icon: Printer, groupKey: "analisi", area: "analisi" },
 
-  { title: "Utenti & Accessi", url: "/utenti", icon: UserCog, group: "Amministrazione", area: "amministrazione" },
-  { title: "Ruoli", url: "/ruoli", icon: ShieldCheck, group: "Amministrazione", area: "amministrazione" },
+  { key: "utenti", url: "/utenti", icon: UserCog, groupKey: "amministrazione", area: "amministrazione" },
+  { key: "ruoli", url: "/ruoli", icon: ShieldCheck, groupKey: "amministrazione", area: "amministrazione" },
 ];
+
+function LanguageSelector() {
+  const { t, i18n } = useTranslation();
+  return (
+    <Select value={i18n.language} onValueChange={(v) => i18n.changeLanguage(v)}>
+      <SelectTrigger
+        className="h-9 w-full gap-2"
+        aria-label={t("common.language")}
+      >
+        <Languages className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <SelectValue placeholder={t("common.language")} />
+      </SelectTrigger>
+      <SelectContent>
+        {LANGUAGES.map((lang) => (
+          <SelectItem key={lang.code} value={lang.code}>
+            {lang.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, logout } = useAuth();
+  const { t } = useTranslation();
 
   const visibleItems = NAV_ITEMS.filter((item) => hasArea(item.area));
 
   const groupedNav = visibleItems.reduce((acc, item) => {
-    if (!acc[item.group]) acc[item.group] = [];
-    acc[item.group].push(item);
+    if (!acc[item.groupKey]) acc[item.groupKey] = [];
+    acc[item.groupKey].push(item);
     return acc;
   }, {} as Record<string, typeof NAV_ITEMS>);
 
@@ -88,7 +121,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {Object.entries(groupedNav).map(([group, items]) => (
               <SidebarGroup key={group}>
                 <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground font-medium px-4 py-2">
-                  {group}
+                  {t(`nav.groups.${group}`)}
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -97,7 +130,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         <SidebarMenuButton asChild isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}>
                           <Link href={item.url} className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors">
                             <item.icon className="h-4 w-4" />
-                            <span>{item.title}</span>
+                            <span>{t(`nav.items.${item.key}`)}</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -108,19 +141,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             ))}
           </SidebarContent>
           <SidebarFooter className="border-t border-border">
+            <div className="px-2 pt-2">
+              <LanguageSelector />
+            </div>
             <div className="flex items-center justify-between gap-2 px-2 py-2">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{user?.nome}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {user?.ruoloNome ?? "Nessun ruolo"}
+                  {user?.ruoloNome ?? t("common.noRole")}
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={logout}
-                title="Esci"
-                aria-label="Esci"
+                title={t("common.logout")}
+                aria-label={t("common.logout")}
               >
                 <LogOut className="h-4 w-4" />
               </Button>
