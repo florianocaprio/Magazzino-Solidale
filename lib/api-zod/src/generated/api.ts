@@ -980,6 +980,9 @@ export const GetBeneficiarioResponse = zod.object({
   "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -1204,6 +1207,9 @@ export const ListConsegneResponseItem = zod.object({
   "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -1245,6 +1251,9 @@ export const GetConsegnaResponse = zod.object({
   "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -1283,6 +1292,9 @@ export const UpdateConsegnaResponse = zod.object({
   "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -1312,6 +1324,45 @@ export const CompletaConsegnaResponse = zod.object({
   "volontarioNome": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "stato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "noteOperative": zod.string().nullish(),
+  "dataEffettuata": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Associate (or detach with null) a bolla to a delivery
+ */
+export const AssociaBollaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AssociaBollaBody = zod.object({
+  "bollaId": zod.number().nullish()
+})
+
+export const AssociaBollaResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "tipoConsegna": zod.string(),
+  "dataPrevista": zod.string(),
+  "fasciaOraria": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "volontarioId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "stato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()

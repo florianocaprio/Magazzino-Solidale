@@ -12,6 +12,7 @@ export * from './approvvigionamentoInput';
 export * from './approvvigionamentoRiga';
 export * from './approvvigionamentoRigaInput';
 export * from './approvvigionamentoUpdate';
+export * from './associaBollaInput';
 export * from './beneficiario';
 export * from './beneficiarioDettaglio';
 export * from './beneficiarioInput';

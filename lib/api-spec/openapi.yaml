@@ -1034,6 +1034,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/Consegna"
 
+  /consegne/{id}/associa-bolla:
+    post:
+      operationId: associaBolla
+      tags: [consegne]
+      summary: Associate (or detach with null) a bolla to a delivery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssociaBollaInput"
+      responses:
+        "200":
+          description: Updated delivery
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consegna"
+
   # ─── BOLLE ───────────────────────────────────────────────────────────────────
   /bolle:
     get:
@@ -2793,6 +2818,12 @@ components:
           type: ["integer", "null"]
         stato:
           type: string
+        bollaId:
+          type: ["integer", "null"]
+        bollaNumero:
+          type: ["string", "null"]
+        bollaStato:
+          type: ["string", "null"]
         noteOperative:
           type: ["string", "null"]
         dataEffettuata:
@@ -2800,6 +2831,12 @@ components:
         dataCreazione:
           type: string
       required: [id, codice, beneficiarioId, tipoConsegna, dataPrevista, magazzinoId, stato, dataCreazione]
+
+    AssociaBollaInput:
+      type: object
+      properties:
+        bollaId:
+          type: ["integer", "null"]
 
     ConsegnaInput:
       type: object

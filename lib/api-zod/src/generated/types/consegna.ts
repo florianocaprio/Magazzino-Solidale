@@ -31,6 +31,12 @@ export interface Consegna {
   mezzoId?: number | null;
   stato: string;
   /** @nullable */
+  bollaId?: number | null;
+  /** @nullable */
+  bollaNumero?: string | null;
+  /** @nullable */
+  bollaStato?: string | null;
+  /** @nullable */
   noteOperative?: string | null;
   /** @nullable */
   dataEffettuata?: string | null;

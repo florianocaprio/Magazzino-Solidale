@@ -270,10 +270,10 @@ export default function BeneficiarioDettaglio() {
                             </div>
                           </div>
                           <Badge variant={
-                            c.stato === 'completata' ? 'default' : 
+                            c.stato === 'effettuata' ? 'default' : 
                             c.stato === 'annullata' ? 'destructive' : 'secondary'
-                          } className={c.stato === 'completata' ? 'bg-green-500 hover:bg-green-600' : ''}>
-                            {c.stato}
+                          } className={c.stato === 'effettuata' ? 'bg-green-500 hover:bg-green-600' : ''}>
+                            {c.stato === 'effettuata' ? 'Consegnata' : c.stato === 'pianificata' ? 'Pianificata' : c.stato}
                           </Badge>
                         </div>
                       ))}

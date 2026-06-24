@@ -24,6 +24,7 @@ import type {
   Approvvigionamento,
   ApprovvigionamentoInput,
   ApprovvigionamentoUpdate,
+  AssociaBollaInput,
   BeneficiariZonaReport,
   Beneficiario,
   BeneficiarioDettaglio,
@@ -3768,6 +3769,78 @@ export const useCompletaConsegna = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCompletaConsegnaMutationOptions(options));
+    }
+
+export const getAssociaBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/consegne/${id}/associa-bolla`
+}
+
+/**
+ * @summary Associate (or detach with null) a bolla to a delivery
+ */
+export const associaBolla = async (id: number,
+    associaBollaInput: AssociaBollaInput, options?: RequestInit): Promise<Consegna> => {
+
+  return customFetch<Consegna>(getAssociaBollaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      associaBollaInput,)
+  }
+);}
+
+
+
+
+export const getAssociaBollaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof associaBolla>>, TError,{id: number;data: BodyType<AssociaBollaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof associaBolla>>, TError,{id: number;data: BodyType<AssociaBollaInput>}, TContext> => {
+
+const mutationKey = ['associaBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof associaBolla>>, {id: number;data: BodyType<AssociaBollaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  associaBolla(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssociaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof associaBolla>>>
+    export type AssociaBollaMutationBody = BodyType<AssociaBollaInput>
+    export type AssociaBollaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Associate (or detach with null) a bolla to a delivery
+ */
+export const useAssociaBolla = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof associaBolla>>, TError,{id: number;data: BodyType<AssociaBollaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof associaBolla>>,
+        TError,
+        {id: number;data: BodyType<AssociaBollaInput>},
+        TContext
+      > => {
+      return useMutation(getAssociaBollaMutationOptions(options));
     }
 
 export const getListBolleUrl = (params?: ListBolleParams,) => {

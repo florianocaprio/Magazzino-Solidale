@@ -545,6 +545,12 @@ export interface Consegna {
   mezzoId?: number | null;
   stato: string;
   /** @nullable */
+  bollaId?: number | null;
+  /** @nullable */
+  bollaNumero?: string | null;
+  /** @nullable */
+  bollaStato?: string | null;
+  /** @nullable */
   noteOperative?: string | null;
   /** @nullable */
   dataEffettuata?: string | null;
@@ -779,6 +785,11 @@ export interface InterventoUpdate {
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;
   scadenzaAutodichiarazioneIndigenza?: string;
+}
+
+export interface AssociaBollaInput {
+  /** @nullable */
+  bollaId?: number | null;
 }
 
 export interface ConsegnaInput {

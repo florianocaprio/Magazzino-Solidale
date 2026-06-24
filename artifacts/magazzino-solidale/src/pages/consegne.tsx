@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useListBeneficiari, useListMagazzini, useListVolontari, useListCentriAscolto, getListConsegneQueryKey } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListCentriAscolto, getListConsegneQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, MapPin, Truck, CheckCircle2, Filter } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -47,9 +47,39 @@ export default function Consegne() {
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [completingId, setCompletingId] = useState<number | null>(null);
+  const [associatingId, setAssociatingId] = useState<number | null>(null);
+  const [selectedBollaId, setSelectedBollaId] = useState<string>("");
+
+  const { data: bolle } = useListBolle();
 
   const createConsegna = useCreateConsegna();
   const completaConsegna = useCompletaConsegna();
+  const associaBolla = useAssociaBolla();
+
+  const associatingConsegna = consegne?.find(c => c.id === associatingId) ?? null;
+  // bolle selezionabili: stesso beneficiario, non annullate, non già legate ad altra consegna
+  const bolleDisponibili = (bolle ?? []).filter(b =>
+    associatingConsegna != null &&
+    b.beneficiarioId === associatingConsegna.beneficiarioId &&
+    b.stato !== "annullato" &&
+    (b.consegnaId == null || b.consegnaId === associatingConsegna.id)
+  );
+
+  const handleAssocia = (bollaId: number | null) => {
+    if (!associatingId) return;
+    associaBolla.mutate({ id: associatingId, data: { bollaId } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
+        toast({ title: bollaId ? "Bolla associata alla consegna" : "Bolla scollegata" });
+        setAssociatingId(null);
+        setSelectedBollaId("");
+      },
+      onError: (e: unknown) => {
+        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        toast({ title: "Operazione non riuscita", description: msg ?? "Errore", variant: "destructive" });
+      },
+    });
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -74,9 +104,14 @@ export default function Consegne() {
     completaConsegna.mutate({ id: completingId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
-        toast({ title: "Consegna completata" });
+        toast({ title: "Consegna registrata come consegnata", description: "L'evento è stato annotato negli interventi del beneficiario." });
         setCompletingId(null);
-      }
+      },
+      onError: (e: unknown) => {
+        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        toast({ title: "Impossibile completare", description: msg ?? "Errore", variant: "destructive" });
+        setCompletingId(null);
+      },
     });
   };
 
@@ -133,6 +168,7 @@ export default function Consegne() {
                 <TableHead>Data & Fascia</TableHead>
                 <TableHead>Beneficiario</TableHead>
                 <TableHead>Dettagli</TableHead>
+                <TableHead>Bolla</TableHead>
                 <TableHead className="text-center">Stato</TableHead>
                 <TableHead className="text-right">Azione</TableHead>
               </TableRow>
@@ -145,13 +181,14 @@ export default function Consegne() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : consegne?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Nessuna consegna pianificata.</TableCell>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">Nessuna consegna pianificata.</TableCell>
                 </TableRow>
               ) : consegne?.map((c) => (
                 <TableRow key={c.id}>
@@ -175,17 +212,53 @@ export default function Consegne() {
                       {c.volontarioNome && <div className="text-xs text-muted-foreground">Volontario: {c.volontarioNome}</div>}
                     </div>
                   </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const consegnata = c.stato === 'effettuata';
+                      const pronta = c.bollaStato === 'confermato' || c.bollaStato === 'consegnato';
+                      const badge = c.bollaStato == null ? (
+                        <Badge variant="outline" className="gap-1 border-amber-200 bg-amber-50 text-amber-700">
+                          <FileClock className="h-3 w-3" /> In preparazione
+                        </Badge>
+                      ) : pronta ? (
+                        <Badge variant="outline" className="gap-1 border-green-200 bg-green-50 text-green-700">
+                          <FileText className="h-3 w-3" /> {c.bollaNumero} · Pronta
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 border-amber-200 bg-amber-50 text-amber-700">
+                          <FileClock className="h-3 w-3" /> {c.bollaNumero} · In preparazione
+                        </Badge>
+                      );
+                      return (
+                        <button
+                          type="button"
+                          disabled={consegnata}
+                          onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}
+                          className="text-left disabled:cursor-default disabled:opacity-100 enabled:hover:opacity-80"
+                          title={consegnata ? undefined : "Gestisci bolla associata"}
+                        >
+                          {badge}
+                        </button>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={c.stato === 'completata' ? 'default' : c.stato === 'programmata' ? 'outline' : 'secondary'}
-                           className={c.stato === 'completata' ? 'bg-green-500' : c.stato === 'programmata' ? 'border-blue-200 text-blue-700 bg-blue-50' : ''}>
-                      {c.stato}
+                    <Badge variant={c.stato === 'effettuata' ? 'default' : 'outline'}
+                           className={c.stato === 'effettuata' ? 'bg-green-500' : 'border-blue-200 text-blue-700 bg-blue-50'}>
+                      {c.stato === 'effettuata' ? 'Consegnata' : 'Pianificata'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {c.stato === 'programmata' && (
-                      <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Completa
-                      </Button>
+                    {c.stato !== 'effettuata' && (
+                      (c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') ? (
+                        <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Consegnato
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}>
+                          <Link2 className="h-3.5 w-3.5" /> Associa bolla
+                        </Button>
+                      )
                     )}
                   </TableCell>
                 </TableRow>
@@ -294,11 +367,56 @@ export default function Consegne() {
 
       <AlertDialog open={!!completingId} onOpenChange={(open) => !open && setCompletingId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Completa Consegna</AlertDialogTitle>
-          <AlertDialogDescription>Confermi che la consegna è stata effettuata con successo?</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Segna come Consegnato</AlertDialogTitle>
+          <AlertDialogDescription>
+            Confermi che la merce è stata consegnata? La bolla associata verrà chiusa e l'evento sarà registrato negli interventi del beneficiario.
+          </AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCompleta} className="bg-green-600 hover:bg-green-700">Conferma Completamento</AlertDialogAction>
+            <AlertDialogAction onClick={handleCompleta} className="bg-green-600 hover:bg-green-700">Conferma Consegna</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!associatingId} onOpenChange={(open) => { if (!open) { setAssociatingId(null); setSelectedBollaId(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Associa Bolla alla Consegna</AlertDialogTitle>
+            <AlertDialogDescription>
+              Collega una bolla a questa consegna. Finché la bolla è in bozza risulta "in preparazione"; una volta confermata (merce preparata) diventa "pronta" e potrai segnare la consegna come consegnata.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2 space-y-3">
+            {bolleDisponibili.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nessuna bolla disponibile per questo beneficiario. Crea prima una bolla dalla sezione <span className="font-medium">Bolle</span>.
+              </p>
+            ) : (
+              <Select value={selectedBollaId} onValueChange={setSelectedBollaId}>
+                <SelectTrigger><SelectValue placeholder="Seleziona una bolla..." /></SelectTrigger>
+                <SelectContent>
+                  {bolleDisponibili.map(b => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.numeroBolla} · {b.stato === 'confermato' ? 'pronta' : b.stato === 'consegnato' ? 'consegnata' : 'in preparazione'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            {associatingConsegna?.bollaId != null && (
+              <Button variant="outline" className="mr-auto text-destructive" disabled={associaBolla.isPending} onClick={() => handleAssocia(null)}>
+                Scollega bolla
+              </Button>
+            )}
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <Button
+              disabled={!selectedBollaId || associaBolla.isPending}
+              onClick={() => handleAssocia(selectedBollaId ? parseInt(selectedBollaId) : null)}
+            >
+              Associa
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
