@@ -87,7 +87,7 @@ export const ListMagazziniResponse = zod.array(ListMagazziniResponseItem)
  * @summary Create a warehouse
  */
 export const CreateMagazzinoBody = zod.object({
-  "codice": zod.string(),
+  "codice": zod.string().optional(),
   "nome": zod.string(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),

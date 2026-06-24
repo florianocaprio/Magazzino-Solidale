@@ -98,7 +98,7 @@ export interface Magazzino {
 }
 
 export interface MagazzinoInput {
-  codice: string;
+  codice?: string;
   nome: string;
   indirizzo?: string;
   comune?: string;

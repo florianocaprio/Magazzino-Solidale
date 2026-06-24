@@ -2197,7 +2197,7 @@ components:
           type: string
         note:
           type: string
-      required: [codice, nome]
+      required: [nome]
 
     MagazzinoUpdate:
       type: object

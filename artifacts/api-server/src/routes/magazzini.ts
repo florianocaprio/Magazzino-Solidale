@@ -25,8 +25,18 @@ router.get("/magazzini", async (_req, res) => {
 
 router.post("/magazzini", async (req, res) => {
   const body = req.body;
+  let codice = typeof body.codice === "string" ? body.codice.trim() : "";
+  if (!codice) {
+    const rows = await db.select({ codice: magazziniTable.codice }).from(magazziniTable);
+    let max = 0;
+    for (const r of rows) {
+      const m = /^MAG-(\d+)$/.exec(r.codice);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+    codice = `MAG-${String(max + 1).padStart(3, "0")}`;
+  }
   const [row] = await db.insert(magazziniTable).values({
-    codice: body.codice,
+    codice,
     nome: body.nome,
     indirizzo: body.indirizzo,
     comune: body.comune,

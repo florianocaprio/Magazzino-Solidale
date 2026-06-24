@@ -21,7 +21,7 @@ import * as z from "zod";
 import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
-  codice: z.string().min(2, "Codice troppo corto"),
+  codice: z.string().optional(),
   nome: z.string().min(3, "Nome troppo corto"),
   indirizzo: z.string().optional(),
   comune: z.string().optional(),
