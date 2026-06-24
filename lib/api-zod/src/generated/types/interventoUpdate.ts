@@ -13,4 +13,7 @@ export interface InterventoUpdate {
   esito?: string;
   prossimAzione?: string;
   dataFollowup?: string;
+  scadenzaIsee?: string;
+  scadenzaRinnovo?: string;
+  scadenzaAutodichiarazioneIndigenza?: string;
 }

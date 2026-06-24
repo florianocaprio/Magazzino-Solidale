@@ -501,6 +501,12 @@ export interface Intervento {
   prossimAzione?: string | null;
   /** @nullable */
   dataFollowup?: string | null;
+  /** @nullable */
+  scadenzaIsee?: string | null;
+  /** @nullable */
+  scadenzaRinnovo?: string | null;
+  /** @nullable */
+  scadenzaAutodichiarazioneIndigenza?: string | null;
   dataCreazione: string;
 }
 
@@ -748,6 +754,9 @@ export interface InterventoInput {
   esito?: string;
   prossimAzione?: string;
   dataFollowup?: string;
+  scadenzaIsee?: string;
+  scadenzaRinnovo?: string;
+  scadenzaAutodichiarazioneIndigenza?: string;
 }
 
 export interface InterventoUpdate {
@@ -757,6 +766,9 @@ export interface InterventoUpdate {
   esito?: string;
   prossimAzione?: string;
   dataFollowup?: string;
+  scadenzaIsee?: string;
+  scadenzaRinnovo?: string;
+  scadenzaAutodichiarazioneIndigenza?: string;
 }
 
 export interface ConsegnaInput {

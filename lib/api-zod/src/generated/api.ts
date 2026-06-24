@@ -945,6 +945,9 @@ export const GetBeneficiarioResponse = zod.object({
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
   "dataCreazione": zod.string()
 })).optional(),
   "consegne": zod.array(zod.object({
@@ -1085,6 +1088,9 @@ export const ListInterventiResponseItem = zod.object({
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 export const ListInterventiResponse = zod.array(ListInterventiResponseItem)
@@ -1097,7 +1103,10 @@ export const CreateInterventoBody = zod.object({
   "descrizione": zod.string().optional(),
   "esito": zod.string().optional(),
   "prossimAzione": zod.string().optional(),
-  "dataFollowup": zod.string().optional()
+  "dataFollowup": zod.string().optional(),
+  "scadenzaIsee": zod.string().optional(),
+  "scadenzaRinnovo": zod.string().optional(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().optional()
 })
 
 
@@ -1116,6 +1125,9 @@ export const GetInterventoResponse = zod.object({
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 
@@ -1130,7 +1142,10 @@ export const UpdateInterventoBody = zod.object({
   "descrizione": zod.string().optional(),
   "esito": zod.string().optional(),
   "prossimAzione": zod.string().optional(),
-  "dataFollowup": zod.string().optional()
+  "dataFollowup": zod.string().optional(),
+  "scadenzaIsee": zod.string().optional(),
+  "scadenzaRinnovo": zod.string().optional(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().optional()
 })
 
 export const UpdateInterventoResponse = zod.object({
@@ -1144,6 +1159,9 @@ export const UpdateInterventoResponse = zod.object({
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 

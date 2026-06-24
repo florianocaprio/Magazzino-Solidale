@@ -43,6 +43,9 @@ router.get("/interventi", async (req, res) => {
     esito: r.i.esito ?? null,
     prossimAzione: r.i.prossimAzione ?? null,
     dataFollowup: r.i.dataFollowup ?? null,
+    scadenzaIsee: r.i.scadenzaIsee ?? null,
+    scadenzaRinnovo: r.i.scadenzaRinnovo ?? null,
+    scadenzaAutodichiarazioneIndigenza: r.i.scadenzaAutodichiarazioneIndigenza ?? null,
     dataCreazione: r.i.dataCreazione.toISOString(),
   })));
 });

@@ -26,7 +26,10 @@ const formSchema = z.object({
   descrizione: z.string().min(1),
   esito: z.string().optional(),
   prossimAzione: z.string().optional(),
-  dataFollowup: z.string().optional()
+  dataFollowup: z.string().optional(),
+  scadenzaIsee: z.string().optional(),
+  scadenzaRinnovo: z.string().optional(),
+  scadenzaAutodichiarazioneIndigenza: z.string().optional()
 });
 
 export default function Interventi() {
@@ -49,11 +52,21 @@ export default function Interventi() {
       descrizione: "",
       esito: "",
       prossimAzione: "",
-      dataFollowup: ""
+      dataFollowup: "",
+      scadenzaIsee: "",
+      scadenzaRinnovo: "",
+      scadenzaAutodichiarazioneIndigenza: ""
     }
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const data = {
+      ...values,
+      dataFollowup: values.dataFollowup || undefined,
+      scadenzaIsee: values.scadenzaIsee || undefined,
+      scadenzaRinnovo: values.scadenzaRinnovo || undefined,
+      scadenzaAutodichiarazioneIndigenza: values.scadenzaAutodichiarazioneIndigenza || undefined,
+    };
     createIntervento.mutate({ data }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListInterventiQueryKey() });
@@ -96,6 +109,9 @@ export default function Interventi() {
               { header: "Tipo Intervento", accessor: (i) => i.tipoIntervento },
               { header: "Descrizione", accessor: (i) => i.descrizione },
               { header: "Esito", accessor: (i) => i.esito },
+              { header: "Scadenza ISEE", accessor: (i) => i.scadenzaIsee ? new Date(i.scadenzaIsee).toLocaleDateString("it-IT") : "" },
+              { header: "Scadenza Rinnovo", accessor: (i) => i.scadenzaRinnovo ? new Date(i.scadenzaRinnovo).toLocaleDateString("it-IT") : "" },
+              { header: "Scadenza Autodich. Indigenza", accessor: (i) => i.scadenzaAutodichiarazioneIndigenza ? new Date(i.scadenzaAutodichiarazioneIndigenza).toLocaleDateString("it-IT") : "" },
             ]}
             filename="interventi"
             title="Registro Interventi"
@@ -131,6 +147,7 @@ export default function Interventi() {
                 <TableHead>Beneficiario</TableHead>
                 <TableHead>Tipo Intervento</TableHead>
                 <TableHead>Descrizione</TableHead>
+                <TableHead>Scadenze</TableHead>
                 <TableHead>Follow-up</TableHead>
               </TableRow>
             </TableHeader>
@@ -143,11 +160,12 @@ export default function Interventi() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                   </TableRow>
                 ))
               ) : interventi?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">Nessun intervento registrato.</TableCell>
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Nessun intervento registrato.</TableCell>
                 </TableRow>
               ) : interventi?.map((i) => (
                 <TableRow key={i.id}>
@@ -158,6 +176,17 @@ export default function Interventi() {
                   <TableCell>{getTipoBadge(i.tipoIntervento)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground truncate max-w-[300px]">
                     {i.descrizione}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {(i.scadenzaIsee || i.scadenzaRinnovo || i.scadenzaAutodichiarazioneIndigenza) ? (
+                      <div className="flex flex-col gap-0.5">
+                        {i.scadenzaIsee && <span><span className="text-muted-foreground">ISEE:</span> {format(new Date(i.scadenzaIsee), "dd/MM/yyyy")}</span>}
+                        {i.scadenzaRinnovo && <span><span className="text-muted-foreground">Rinnovo:</span> {format(new Date(i.scadenzaRinnovo), "dd/MM/yyyy")}</span>}
+                        {i.scadenzaAutodichiarazioneIndigenza && <span><span className="text-muted-foreground">Autodich.:</span> {format(new Date(i.scadenzaAutodichiarazioneIndigenza), "dd/MM/yyyy")}</span>}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm">
                     {i.dataFollowup ? (
@@ -229,6 +258,19 @@ export default function Interventi() {
                   )} />
                   <FormField control={form.control} name="dataFollowup" render={({ field }) => (
                     <FormItem><FormLabel>Data di Follow-up</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
+
+                <div className="pt-4 border-t space-y-4">
+                  <h4 className="text-sm font-semibold text-muted-foreground">Scadenze documenti</h4>
+                  <FormField control={form.control} name="scadenzaIsee" render={({ field }) => (
+                    <FormItem><FormLabel>Scadenza ISEE</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="scadenzaRinnovo" render={({ field }) => (
+                    <FormItem><FormLabel>Scadenza rinnovo</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="scadenzaAutodichiarazioneIndigenza" render={({ field }) => (
+                    <FormItem><FormLabel>Scadenza autodichiarazione di indigenza</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
 

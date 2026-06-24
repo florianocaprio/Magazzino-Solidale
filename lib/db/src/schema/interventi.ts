@@ -12,6 +12,9 @@ export const interventiTable = pgTable("interventi", {
   esito: text("esito"),
   prossimAzione: text("prossim_azione"),
   dataFollowup: date("data_followup"),
+  scadenzaIsee: date("scadenza_isee"),
+  scadenzaRinnovo: date("scadenza_rinnovo"),
+  scadenzaAutodichiarazioneIndigenza: date("scadenza_autodichiarazione_indigenza"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 

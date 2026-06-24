@@ -2677,6 +2677,12 @@ components:
           type: ["string", "null"]
         dataFollowup:
           type: ["string", "null"]
+        scadenzaIsee:
+          type: ["string", "null"]
+        scadenzaRinnovo:
+          type: ["string", "null"]
+        scadenzaAutodichiarazioneIndigenza:
+          type: ["string", "null"]
         dataCreazione:
           type: string
       required: [id, beneficiarioId, dataIntervento, tipoIntervento, dataCreazione]
@@ -2698,6 +2704,12 @@ components:
           type: string
         dataFollowup:
           type: string
+        scadenzaIsee:
+          type: string
+        scadenzaRinnovo:
+          type: string
+        scadenzaAutodichiarazioneIndigenza:
+          type: string
       required: [beneficiarioId, dataIntervento, tipoIntervento]
 
     InterventoUpdate:
@@ -2714,6 +2726,12 @@ components:
         prossimAzione:
           type: string
         dataFollowup:
+          type: string
+        scadenzaIsee:
+          type: string
+        scadenzaRinnovo:
+          type: string
+        scadenzaAutodichiarazioneIndigenza:
           type: string
 
     # ── Consegne ──────────────────────────────────────────────────────────
