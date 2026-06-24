@@ -1,16 +1,26 @@
+import { useState } from "react";
 import { useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, getListBeneficiariQueryKey } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, getListBeneficiariQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { ExportButtons } from "@/components/export-buttons";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2 } from "lucide-react";
+import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 
 const NONE_VALUE = "__none__";
 
@@ -22,6 +32,7 @@ export default function BeneficiarioDettaglio() {
   const updateBeneficiario = useUpdateBeneficiario();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
 
   const onChangeCentro = (value: string) => {
     const next = value === NONE_VALUE ? null : parseInt(value);
@@ -56,7 +67,25 @@ export default function BeneficiarioDettaglio() {
             Priorità: <span className="font-medium capitalize">{b.priorita}</span>
           </p>
         </div>
+        <div>
+          <Button variant="outline" className="gap-2" onClick={() => setEditing(true)}>
+            <Pencil className="w-4 h-4" /> Modifica anagrafica
+          </Button>
+        </div>
       </div>
+
+      {editing && (
+        <EditBeneficiarioSheet
+          b={b}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) });
+            queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+            toast({ title: "Anagrafica aggiornata" });
+            setEditing(false);
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="md:col-span-1 shadow-sm">
@@ -259,5 +288,161 @@ export default function BeneficiarioDettaglio() {
         </div>
       </div>
     </div>
+  );
+}
+
+const editSchema = z.object({
+  cognome: z.string().min(1, "Obbligatorio"),
+  nome: z.string().min(1, "Obbligatorio"),
+  dataNascita: z.string().optional(),
+  cittadinanza: z.string().optional(),
+  residenza: z.string().optional(),
+  domicilio: z.string().optional(),
+  comune: z.string().optional(),
+  zonaMunicipio: z.string().optional(),
+  telefono: z.string().optional(),
+  email: z.string().optional(),
+  priorita: z.string(),
+  numComponenti: z.coerce.number().min(1),
+  consegnaDomicilio: z.boolean(),
+  motivoConsegnaDomicilio: z.string().optional(),
+  restrizioniAlimentari: z.string().optional(),
+});
+
+type EditValues = z.infer<typeof editSchema>;
+
+function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettaglioType; onClose: () => void; onSaved: () => void }) {
+  const updateBeneficiario = useUpdateBeneficiario();
+  const { toast } = useToast();
+
+  const form = useForm<EditValues>({
+    resolver: zodResolver(editSchema),
+    defaultValues: {
+      cognome: b.cognome ?? "",
+      nome: b.nome ?? "",
+      dataNascita: b.dataNascita ? b.dataNascita.slice(0, 10) : "",
+      cittadinanza: b.cittadinanza ?? "",
+      residenza: b.residenza ?? "",
+      domicilio: b.domicilio ?? "",
+      comune: b.comune ?? "",
+      zonaMunicipio: b.zonaMunicipio ?? "",
+      telefono: b.telefono ?? "",
+      email: b.email ?? "",
+      priorita: b.priorita ?? "media",
+      numComponenti: b.numComponenti ?? 1,
+      consegnaDomicilio: b.consegnaDomicilio ?? false,
+      motivoConsegnaDomicilio: b.motivoConsegnaDomicilio ?? "",
+      restrizioniAlimentari: b.restrizioniAlimentari ?? "",
+    },
+  });
+
+  const onSubmit = (data: EditValues) => {
+    const payload = {
+      ...data,
+      dataNascita: data.dataNascita || undefined,
+    };
+    updateBeneficiario.mutate(
+      { id: b.id, data: payload },
+      {
+        onSuccess: () => onSaved(),
+        onError: () => toast({ title: "Errore", description: "Impossibile salvare le modifiche.", variant: "destructive" }),
+      },
+    );
+  };
+
+  return (
+    <Sheet open onOpenChange={(open) => !open && onClose()}>
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader><SheetTitle>Modifica anagrafica</SheetTitle></SheetHeader>
+        <div className="mt-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="nome" render={({ field }) => (
+                  <FormItem><FormLabel>Nome</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="cognome" render={({ field }) => (
+                  <FormItem><FormLabel>Cognome</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="dataNascita" render={({ field }) => (
+                  <FormItem><FormLabel>Data di nascita</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="cittadinanza" render={({ field }) => (
+                  <FormItem><FormLabel>Cittadinanza</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+              </div>
+
+              <FormField control={form.control} name="residenza" render={({ field }) => (
+                <FormItem><FormLabel>Residenza</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+              )} />
+              <FormField control={form.control} name="domicilio" render={({ field }) => (
+                <FormItem><FormLabel>Domicilio</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+              )} />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="comune" render={({ field }) => (
+                  <FormItem><FormLabel>Comune</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="zonaMunicipio" render={({ field }) => (
+                  <FormItem><FormLabel>Zona / Municipio</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="telefono" render={({ field }) => (
+                  <FormItem><FormLabel>Telefono</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="numComponenti" render={({ field }) => (
+                  <FormItem><FormLabel>N. Componenti</FormLabel><FormControl><Input type="number" min="1" {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="priorita" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priorità Assistenziale</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="bassa">Bassa</SelectItem>
+                        <SelectItem value="media">Media</SelectItem>
+                        <SelectItem value="alta">Alta</SelectItem>
+                        <SelectItem value="urgente">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+              </div>
+
+              <FormField control={form.control} name="consegnaDomicilio" render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                  <FormLabel className="mb-0">Consegna a domicilio</FormLabel>
+                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                </FormItem>
+              )} />
+              {form.watch("consegnaDomicilio") && (
+                <FormField control={form.control} name="motivoConsegnaDomicilio" render={({ field }) => (
+                  <FormItem><FormLabel>Motivo consegna a domicilio</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
+                )} />
+              )}
+              <FormField control={form.control} name="restrizioniAlimentari" render={({ field }) => (
+                <FormItem><FormLabel>Restrizioni alimentari</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
+              )} />
+
+              <div className="pt-6 flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onClose}>Annulla</Button>
+                <Button type="submit" disabled={updateBeneficiario.isPending}>Salva</Button>
+              </div>
+            </form>
+          </Form>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -31,9 +31,15 @@ const formSchema = z.object({
   consegnaDomicilio: z.boolean().default(false)
 });
 
+const CENTRO_ALL = "__all__";
+
 export default function Beneficiari() {
   const [search, setSearch] = useState("");
-  const { data: beneficiari, isLoading } = useListBeneficiari({ search: search || undefined });
+  const [centroFilter, setCentroFilter] = useState<string>(CENTRO_ALL);
+  const { data: beneficiari, isLoading } = useListBeneficiari({
+    search: search || undefined,
+    centroAscoltoId: centroFilter !== CENTRO_ALL ? parseInt(centroFilter) : undefined,
+  });
   const { data: centri } = useListCentriAscolto();
   
   const queryClient = useQueryClient();
@@ -104,14 +110,27 @@ export default function Beneficiari() {
 
       <Card>
         <CardHeader className="py-4 border-b">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Cerca per cognome o nome..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative max-w-sm flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Cerca per cognome o nome..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={centroFilter} onValueChange={setCentroFilter}>
+              <SelectTrigger className="w-full sm:w-64">
+                <SelectValue placeholder="Tutti i centri di ascolto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={CENTRO_ALL}>Tutti i centri di ascolto</SelectItem>
+                {centri?.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent className="p-0">
