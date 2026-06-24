@@ -1165,6 +1165,104 @@ export interface BeneficiariZonaReport {
   consegneDomicilio: number;
 }
 
+export interface Area {
+  key: string;
+  label: string;
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  nome: string;
+  /** @nullable */
+  ruoloId?: number | null;
+  /** @nullable */
+  ruoloNome?: string | null;
+  isAdmin: boolean;
+  aree: string[];
+  mustChangePassword: boolean;
+}
+
+export interface LoginInput {
+  /** @minLength 1 */
+  username: string;
+  /** @minLength 1 */
+  password: string;
+}
+
+export interface ChangePasswordInput {
+  /** @minLength 1 */
+  currentPassword: string;
+  /** @minLength 6 */
+  newPassword: string;
+}
+
+export interface Utente {
+  id: number;
+  username: string;
+  nome: string;
+  /** @nullable */
+  ruoloId?: number | null;
+  /** @nullable */
+  ruoloNome?: string | null;
+  attivo: boolean;
+  mustChangePassword: boolean;
+  /** @nullable */
+  ultimoAccesso?: string | null;
+  dataCreazione: string;
+}
+
+export interface UtenteInput {
+  /** @minLength 1 */
+  username: string;
+  /** @minLength 6 */
+  password: string;
+  /** @minLength 1 */
+  nome: string;
+  /** @nullable */
+  ruoloId?: number | null;
+  attivo?: boolean;
+}
+
+export interface UtenteUpdate {
+  /** @minLength 1 */
+  nome?: string;
+  /** @nullable */
+  ruoloId?: number | null;
+  attivo?: boolean;
+}
+
+export interface ResetPasswordInput {
+  /** @minLength 6 */
+  newPassword: string;
+}
+
+export interface Ruolo {
+  id: number;
+  nome: string;
+  /** @nullable */
+  descrizione?: string | null;
+  aree: string[];
+  isAdmin: boolean;
+  dataCreazione: string;
+}
+
+export interface RuoloInput {
+  /** @minLength 1 */
+  nome: string;
+  descrizione?: string;
+  aree: string[];
+  isAdmin?: boolean;
+}
+
+export interface RuoloUpdate {
+  /** @minLength 1 */
+  nome?: string;
+  descrizione?: string;
+  aree?: string[];
+  isAdmin?: boolean;
+}
+
 export type ListProdottiParams = {
 categoria?: string;
 tipo?: string;

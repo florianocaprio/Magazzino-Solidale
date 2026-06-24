@@ -25,6 +25,10 @@ tags:
   - name: volontari
   - name: mezzi
   - name: report
+  - name: auth
+  - name: utenti
+  - name: ruoli
+  - name: aree
 
 paths:
   /healthz:
@@ -1707,6 +1711,268 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReportFsePlus"
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logoutUser
+      tags: [auth]
+      responses:
+        "204":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      responses:
+        "200":
+          description: Current authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
+
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "204":
+          description: Password changed
+        "400":
+          description: Invalid input
+        "401":
+          description: Not authenticated
+
+  /aree:
+    get:
+      operationId: listAree
+      tags: [aree]
+      responses:
+        "200":
+          description: List of access areas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Area"
+
+  /ruoli:
+    get:
+      operationId: listRuoli
+      tags: [ruoli]
+      responses:
+        "200":
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ruolo"
+    post:
+      operationId: createRuolo
+      tags: [ruoli]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuoloInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ruolo"
+
+  /ruoli/{id}:
+    get:
+      operationId: getRuolo
+      tags: [ruoli]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ruolo"
+    patch:
+      operationId: updateRuolo
+      tags: [ruoli]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuoloUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ruolo"
+    delete:
+      operationId: deleteRuolo
+      tags: [ruoli]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "409":
+          description: Role still assigned to users
+
+  /utenti:
+    get:
+      operationId: listUtenti
+      tags: [utenti]
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Utente"
+    post:
+      operationId: createUtente
+      tags: [utenti]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UtenteInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Utente"
+        "409":
+          description: Username already exists
+
+  /utenti/{id}:
+    get:
+      operationId: getUtente
+      tags: [utenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Utente"
+    patch:
+      operationId: updateUtente
+      tags: [utenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UtenteUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Utente"
+    delete:
+      operationId: deleteUtente
+      tags: [utenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /utenti/{id}/reset-password:
+    post:
+      operationId: resetUtentePassword
+      tags: [utenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "204":
+          description: Password reset
 
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
@@ -3558,3 +3824,167 @@ components:
         consegneDomicilio:
           type: integer
       required: [zona, totBeneficiari, attivi, consegneDomicilio]
+
+    Area:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+      required: [key, label]
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        nome:
+          type: string
+        ruoloId:
+          type: ["integer", "null"]
+        ruoloNome:
+          type: ["string", "null"]
+        isAdmin:
+          type: boolean
+        aree:
+          type: array
+          items:
+            type: string
+        mustChangePassword:
+          type: boolean
+      required: [id, username, nome, isAdmin, aree, mustChangePassword]
+
+    LoginInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+      required: [username, password]
+
+    ChangePasswordInput:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 6
+      required: [currentPassword, newPassword]
+
+    Utente:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        nome:
+          type: string
+        ruoloId:
+          type: ["integer", "null"]
+        ruoloNome:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+        mustChangePassword:
+          type: boolean
+        ultimoAccesso:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, username, nome, attivo, mustChangePassword, dataCreazione]
+
+    UtenteInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 6
+        nome:
+          type: string
+          minLength: 1
+        ruoloId:
+          type: ["integer", "null"]
+        attivo:
+          type: boolean
+      required: [username, password, nome]
+
+    UtenteUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        ruoloId:
+          type: ["integer", "null"]
+        attivo:
+          type: boolean
+
+    ResetPasswordInput:
+      type: object
+      properties:
+        newPassword:
+          type: string
+          minLength: 6
+      required: [newPassword]
+
+    Ruolo:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        descrizione:
+          type: ["string", "null"]
+        aree:
+          type: array
+          items:
+            type: string
+        isAdmin:
+          type: boolean
+        dataCreazione:
+          type: string
+      required: [id, nome, aree, isAdmin, dataCreazione]
+
+    RuoloInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        descrizione:
+          type: string
+        aree:
+          type: array
+          items:
+            type: string
+        isAdmin:
+          type: boolean
+      required: [nome, aree]
+
+    RuoloUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        descrizione:
+          type: string
+        aree:
+          type: array
+          items:
+            type: string
+        isAdmin:
+          type: boolean

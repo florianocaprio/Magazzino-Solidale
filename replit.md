@@ -10,7 +10,7 @@ Gestionale per un magazzino solidale: tracciamento di prodotti/lotti (FEFO), CRM
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL` — Postgres connection string; `SESSION_SECRET` — express-session signing secret
 
 ## Stack
 
@@ -57,9 +57,12 @@ Gestionale per un magazzino solidale: tracciamento di prodotti/lotti (FEFO), CRM
 - **Stato filters**: orders, bolle, and consegne lists each have a stato Select filter. Bolle stati: bozza/confermato/consegnato/annullato; consegne stati: pianificata/effettuata; orders stati: bozza/sottomesso/completato.
 - **Scarico magazzino**: unload goods from a warehouse with a document-level `causale` (deteriorata/rubata/scaduta/altro free-text). Auto-decrements stock FEFO over `lotti` and logs `scarico` movimenti for audit. Each scarico IS its own "bolla di scarico" (`SCAR-YYYY-NNNN`) with a client-side PDF download (red accent); appears in the Bolle list as read-only rows tagged "Scarico Magazzino". Create handler is wrapped in `db.transaction` (the one place that uses transactions); `unitaMisura` is derived server-side from the product.
 - **Dashboard**: Live KPIs, alerts for expiring lots and low stock, recent movements feed
+- **Accessi & Profilazione**: session-based internal auth (username/password, bcryptjs hashes). Areas: `generale/magazzino/sociale/logistica/analisi/amministrazione`. Roles (`ruoli`) define allowed `aree` (jsonb string[]) + an `isAdmin` flag (admin = all areas incl. amministrazione). Users (`utenti`) link to a role. Seed admin (`admin`/`flocap!`, `mustChangePassword=true`) created idempotently at startup (`lib/seedAdmin.ts`). FE auth gate (`src/App.tsx`): no user → Login; `mustChangePassword` → forced ChangePassword screen; else app. Nav (`layout.tsx`) hides non-allowed areas via `hasArea`; backend ALSO enforces via `areaGuard` (route-segment → area map) so hiding nav is not the security boundary. Admin-only "Utenti & Accessi" + "Ruoli" CRUD (`/utenti`, `/ruoli`, both `requireAdmin`). Last-admin lockout is blocked on BOTH user mutations (deactivate/demote/delete last active admin user) AND role demotion (`PATCH /ruoli/{id}` setting `isAdmin=false` on the only admin role with active users). Self-delete blocked. Out of scope: email reset, SSO, per-record perms, audit log.
 
 ## Gotchas
 
+- Session storage: `connect-pg-simple`'s bundled `table.sql` is NOT picked up by the esbuild CJS bundle, so the session table is defined as a normal Drizzle table (`userSessionsTable`, table name `user_sessions`, cols sid/sess/expire) in `lib/db/src/schema/auth.ts` and the store is configured with `createTableIfMissing:false`.
+- Auth cookies are `SameSite=None;Secure` + `trust proxy 1` so the session cookie works inside the cross-site preview iframe. Because of `SameSite=None`, a CSRF Origin/Referer allowlist guard (built from `REPLIT_DOMAINS`/`REPLIT_DEV_DOMAIN`) runs in `app.ts` for all non-GET/HEAD `/api` requests — curl POSTs must send a matching `-H "Origin: https://$REPLIT_DEV_DOMAIN"` or they get 403.
 - After adding new schema files to `lib/db`, run `pnpm run typecheck:libs` BEFORE checking the API server — otherwise stale `.d.ts` declarations miss the new table exports.
 - `db.execute(sql\`...\`)` returns a `QueryResult` with a `.rows` property — access `result.rows`, not the result directly.
 - Decimal columns in Drizzle come back as strings; always `parseFloat()` before sending to the client.

@@ -19,10 +19,22 @@ import scarichiRouter from "./scarichi";
 import approvvigionamentiRouter from "./approvvigionamenti";
 import impostazioniStampaRouter from "./impostazioni-stampa";
 import reportRouter from "./report";
+import authRouter from "./auth";
+import utentiRouter from "./utenti";
+import ruoliRouter from "./ruoli";
+import areeRouter from "./aree";
+import { requireAuth, areaGuard } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
+// Public endpoints (no authentication required).
 router.use(healthRouter);
+router.use(authRouter);
+
+// Everything below requires an authenticated session and respects role areas.
+router.use(requireAuth);
+router.use(areaGuard);
+
 router.use(dashboardRouter);
 router.use(magazziniRouter);
 router.use(prodottiRouter);
@@ -42,5 +54,10 @@ router.use(scarichiRouter);
 router.use(approvvigionamentiRouter);
 router.use(impostazioniStampaRouter);
 router.use(reportRouter);
+
+// Admin-only management endpoints.
+router.use(areeRouter);
+router.use(ruoliRouter);
+router.use(utentiRouter);
 
 export default router;

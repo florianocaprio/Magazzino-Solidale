@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, boolean, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, boolean, timestamp, integer, jsonb, json, index } from "drizzle-orm/pg-core";
 
 export const ruoliTable = pgTable("ruoli", {
   id: serial("id").primaryKey(),
@@ -20,6 +20,19 @@ export const utentiTable = pgTable("utenti", {
   ultimoAccesso: timestamp("ultimo_accesso"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
+
+// Session store table for connect-pg-simple. Defined here (instead of relying
+// on createTableIfMissing) because the bundled server can't read the library's
+// table.sql; pushing the schema creates it deterministically.
+export const userSessionsTable = pgTable(
+  "user_sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: json("sess").notNull(),
+    expire: timestamp("expire", { precision: 6 }).notNull(),
+  },
+  (table) => [index("IDX_user_sessions_expire").on(table.expire)],
+);
 
 export type Ruolo = typeof ruoliTable.$inferSelect;
 export type Utente = typeof utentiTable.$inferSelect;

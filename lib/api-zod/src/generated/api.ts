@@ -2161,3 +2161,209 @@ export const ReportFsePlusResponse = zod.object({
 })
 
 
+
+
+
+
+export const LoginUserBody = zod.object({
+  "username": zod.string().min(1),
+  "password": zod.string().min(1)
+})
+
+export const LoginUserResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "nome": zod.string(),
+  "ruoloId": zod.number().nullish(),
+  "ruoloNome": zod.string().nullish(),
+  "isAdmin": zod.boolean(),
+  "aree": zod.array(zod.string()),
+  "mustChangePassword": zod.boolean()
+})
+
+
+export const GetCurrentUserResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "nome": zod.string(),
+  "ruoloId": zod.number().nullish(),
+  "ruoloNome": zod.string().nullish(),
+  "isAdmin": zod.boolean(),
+  "aree": zod.array(zod.string()),
+  "mustChangePassword": zod.boolean()
+})
+
+
+
+export const changePasswordBodyNewPasswordMin = 6;
+
+
+
+export const ChangePasswordBody = zod.object({
+  "currentPassword": zod.string().min(1),
+  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
+})
+
+
+export const ListAreeResponseItem = zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})
+export const ListAreeResponse = zod.array(ListAreeResponseItem)
+
+
+export const ListRuoliResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "aree": zod.array(zod.string()),
+  "isAdmin": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+export const ListRuoliResponse = zod.array(ListRuoliResponseItem)
+
+
+
+
+
+export const CreateRuoloBody = zod.object({
+  "nome": zod.string().min(1),
+  "descrizione": zod.string().optional(),
+  "aree": zod.array(zod.string()),
+  "isAdmin": zod.boolean().optional()
+})
+
+
+export const GetRuoloParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetRuoloResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "aree": zod.array(zod.string()),
+  "isAdmin": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+
+
+export const UpdateRuoloParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateRuoloBody = zod.object({
+  "nome": zod.string().min(1).optional(),
+  "descrizione": zod.string().optional(),
+  "aree": zod.array(zod.string()).optional(),
+  "isAdmin": zod.boolean().optional()
+})
+
+export const UpdateRuoloResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "aree": zod.array(zod.string()),
+  "isAdmin": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+
+
+export const DeleteRuoloParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const ListUtentiResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "nome": zod.string(),
+  "ruoloId": zod.number().nullish(),
+  "ruoloNome": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "mustChangePassword": zod.boolean(),
+  "ultimoAccesso": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+export const ListUtentiResponse = zod.array(ListUtentiResponseItem)
+
+
+
+export const createUtenteBodyPasswordMin = 6;
+
+
+
+
+export const CreateUtenteBody = zod.object({
+  "username": zod.string().min(1),
+  "password": zod.string().min(createUtenteBodyPasswordMin),
+  "nome": zod.string().min(1),
+  "ruoloId": zod.number().nullish(),
+  "attivo": zod.boolean().optional()
+})
+
+
+export const GetUtenteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetUtenteResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "nome": zod.string(),
+  "ruoloId": zod.number().nullish(),
+  "ruoloNome": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "mustChangePassword": zod.boolean(),
+  "ultimoAccesso": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+export const UpdateUtenteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateUtenteBody = zod.object({
+  "nome": zod.string().min(1).optional(),
+  "ruoloId": zod.number().nullish(),
+  "attivo": zod.boolean().optional()
+})
+
+export const UpdateUtenteResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "nome": zod.string(),
+  "ruoloId": zod.number().nullish(),
+  "ruoloNome": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "mustChangePassword": zod.boolean(),
+  "ultimoAccesso": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+export const DeleteUtenteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const ResetUtentePasswordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const resetUtentePasswordBodyNewPasswordMin = 6;
+
+
+
+export const ResetUtentePasswordBody = zod.object({
+  "newPassword": zod.string().min(resetUtentePasswordBodyNewPasswordMin)
+})
+
+

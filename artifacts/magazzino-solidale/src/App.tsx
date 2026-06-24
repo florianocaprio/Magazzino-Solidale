@@ -2,8 +2,13 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
+import NotAuthorized from "@/pages/not-authorized";
+import Login from "@/pages/login";
+import ChangePassword from "@/pages/change-password";
 import { AppLayout } from "@/components/layout";
+import { AuthProvider, useAuth } from "@/lib/auth";
 
 import Dashboard from "@/pages/dashboard";
 import Magazzini from "@/pages/magazzini";
@@ -25,6 +30,8 @@ import Bolle from "@/pages/bolle";
 import ImpostazioniStampa from "@/pages/impostazioni-stampa";
 import Approvvigionamenti from "@/pages/approvvigionamenti";
 import Report from "@/pages/report";
+import Utenti from "@/pages/utenti";
+import Ruoli from "@/pages/ruoli";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,38 +42,203 @@ const queryClient = new QueryClient({
   },
 });
 
-function Router() {
+function Guard({
+  area,
+  children,
+}: {
+  area: string;
+  children: React.ReactNode;
+}) {
+  const { hasArea } = useAuth();
+  if (!hasArea(area)) return <NotAuthorized />;
+  return <>{children}</>;
+}
+
+function AppRoutes() {
   return (
     <AppLayout>
       <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/magazzini" component={Magazzini} />
-        <Route path="/prodotti" component={Prodotti} />
-        <Route path="/lotti" component={Lotti} />
-        <Route path="/movimenti" component={Movimenti} />
-        <Route path="/giacenze" component={Giacenze} />
-        <Route path="/trasferimenti" component={Trasferimenti} />
-        <Route path="/scarichi" component={Scarichi} />
-        
-        <Route path="/centri-ascolto" component={CentriAscolto} />
-        <Route path="/beneficiari" component={Beneficiari} />
-        <Route path="/beneficiari/:id" component={BeneficiarioDettaglio} />
-        <Route path="/interventi" component={Interventi} />
-        <Route path="/consegne" component={Consegne} />
-        <Route path="/bolle" component={Bolle} />
-        
-        <Route path="/volontari" component={Volontari} />
-        <Route path="/mezzi" component={Mezzi} />
-        <Route path="/fornitori" component={Fornitori} />
-        <Route path="/approvvigionamenti" component={Approvvigionamenti} />
-        
-        <Route path="/report" component={Report} />
-        <Route path="/impostazioni-stampa" component={ImpostazioniStampa} />
-        
+        <Route path="/">
+          {() => (
+            <Guard area="generale">
+              <Dashboard />
+            </Guard>
+          )}
+        </Route>
+
+        <Route path="/magazzini">
+          {() => (
+            <Guard area="magazzino">
+              <Magazzini />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/prodotti">
+          {() => (
+            <Guard area="magazzino">
+              <Prodotti />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/lotti">
+          {() => (
+            <Guard area="magazzino">
+              <Lotti />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/movimenti">
+          {() => (
+            <Guard area="magazzino">
+              <Movimenti />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/giacenze">
+          {() => (
+            <Guard area="magazzino">
+              <Giacenze />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/trasferimenti">
+          {() => (
+            <Guard area="magazzino">
+              <Trasferimenti />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/scarichi">
+          {() => (
+            <Guard area="magazzino">
+              <Scarichi />
+            </Guard>
+          )}
+        </Route>
+
+        <Route path="/centri-ascolto">
+          {() => (
+            <Guard area="sociale">
+              <CentriAscolto />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/beneficiari">
+          {() => (
+            <Guard area="sociale">
+              <Beneficiari />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/beneficiari/:id">
+          {() => (
+            <Guard area="sociale">
+              <BeneficiarioDettaglio />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/interventi">
+          {() => (
+            <Guard area="sociale">
+              <Interventi />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/consegne">
+          {() => (
+            <Guard area="sociale">
+              <Consegne />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/bolle">
+          {() => (
+            <Guard area="sociale">
+              <Bolle />
+            </Guard>
+          )}
+        </Route>
+
+        <Route path="/volontari">
+          {() => (
+            <Guard area="logistica">
+              <Volontari />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/mezzi">
+          {() => (
+            <Guard area="logistica">
+              <Mezzi />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/fornitori">
+          {() => (
+            <Guard area="logistica">
+              <Fornitori />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/approvvigionamenti">
+          {() => (
+            <Guard area="logistica">
+              <Approvvigionamenti />
+            </Guard>
+          )}
+        </Route>
+
+        <Route path="/report">
+          {() => (
+            <Guard area="analisi">
+              <Report />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/impostazioni-stampa">
+          {() => (
+            <Guard area="analisi">
+              <ImpostazioniStampa />
+            </Guard>
+          )}
+        </Route>
+
+        <Route path="/utenti">
+          {() => (
+            <Guard area="amministrazione">
+              <Utenti />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/ruoli">
+          {() => (
+            <Guard area="amministrazione">
+              <Ruoli />
+            </Guard>
+          )}
+        </Route>
+
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
   );
+}
+
+function AuthGate() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) return <Login />;
+  if (user.mustChangePassword) return <ChangePassword />;
+
+  return <AppRoutes />;
 }
 
 function App() {
@@ -74,7 +246,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <AuthProvider>
+            <AuthGate />
+          </AuthProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
