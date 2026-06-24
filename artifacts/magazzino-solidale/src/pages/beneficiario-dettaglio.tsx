@@ -1,18 +1,43 @@
 import { useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, getListBeneficiariQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExportButtons } from "@/components/export-buttons";
-import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+
+const NONE_VALUE = "__none__";
 
 export default function BeneficiarioDettaglio() {
   const { id } = useParams();
   const numId = Number(id);
   const { data: b, isLoading } = useGetBeneficiario(numId, { query: { enabled: !!id, queryKey: getGetBeneficiarioQueryKey(numId) } });
+  const { data: centri } = useListCentriAscolto();
+  const updateBeneficiario = useUpdateBeneficiario();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const onChangeCentro = (value: string) => {
+    const next = value === NONE_VALUE ? null : parseInt(value);
+    if (next === (b?.centroAscoltoId ?? null)) return;
+    updateBeneficiario.mutate(
+      { id: numId, data: { centroAscoltoId: next } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) });
+          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+          toast({ title: "Centro di Ascolto aggiornato" });
+        },
+        onError: () => toast({ title: "Errore", description: "Impossibile aggiornare il centro.", variant: "destructive" }),
+      },
+    );
+  };
 
   if (isLoading) return <div className="p-6 space-y-6 max-w-7xl mx-auto"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
   if (!b) return <div className="p-6">Beneficiario non trovato.</div>;
@@ -63,6 +88,28 @@ export default function BeneficiarioDettaglio() {
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span>Nato/a il {b.dataNascita ? format(new Date(b.dataNascita), "dd/MM/yyyy") : "-"}</span>
               </div>
+            </div>
+
+            <div className="pt-4 border-t border-border mt-4">
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-muted-foreground" /> Centro di Ascolto di riferimento
+              </h4>
+              <Select
+                value={b.centroAscoltoId ? String(b.centroAscoltoId) : NONE_VALUE}
+                onValueChange={onChangeCentro}
+                disabled={updateBeneficiario.isPending}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Nessuno" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>Nessuno</SelectItem>
+                  {centri?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1.5">Il centro che tiene in carico il beneficiario.</p>
             </div>
 
             <div className="pt-4 border-t border-border mt-4">
