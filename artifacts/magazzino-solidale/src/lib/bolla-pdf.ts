@@ -167,6 +167,24 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     }
   }
 
+  // ---- Centro di ascolto: trasportatore (se presente) + operatore ----
+  const trasportatoreHeader = bolla.volontarioNome || bolla.trasportatoreNome;
+  if (trasportatoreHeader || bolla.operatoreCodice) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    if (trasportatoreHeader) {
+      doc.text(`Trasportatore: ${trasportatoreHeader}`, margin, y);
+      y += 5;
+    }
+    if (bolla.operatoreCodice) {
+      doc.text(`Operatore: ${bolla.operatoreCodice}`, margin, y);
+      y += 5;
+    }
+    doc.setTextColor(0, 0, 0);
+    y += 1;
+  }
+
   // ---- Recipient / delivery info ----
   const colLeftX = margin;
   const colRightX = pageW / 2 + 4;
@@ -214,14 +232,6 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     const lines = doc.splitTextToSize(magAddr, colWidth) as string[];
     doc.text(lines, colRightX, rightY);
     rightY += lines.length * 4.5;
-  }
-  const trasportatore = bolla.volontarioNome || bolla.trasportatoreNome
-    || (bolla.noteConsegna ? "Presso il centro" : "—");
-  doc.text(`Trasportatore: ${trasportatore}`, colRightX, rightY);
-  rightY += 5;
-  if (bolla.operatoreCodice) {
-    doc.text(`Operatore: ${bolla.operatoreCodice}`, colRightX, rightY);
-    rightY += 5;
   }
 
   y = Math.max(leftY, rightY) + 4;
