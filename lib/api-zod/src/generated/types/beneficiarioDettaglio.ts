@@ -12,6 +12,8 @@ import type { NucleoFamiliare } from './nucleoFamiliare';
 export interface BeneficiarioDettaglio {
   id: number;
   codice: string;
+  /** @nullable */
+  codiceFiscale?: string | null;
   cognome: string;
   nome: string;
   /** @nullable */

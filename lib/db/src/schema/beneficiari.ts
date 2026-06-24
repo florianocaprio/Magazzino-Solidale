@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const beneficiariTable = pgTable("beneficiari", {
   id: serial("id").primaryKey(),
   codice: varchar("codice", { length: 20 }).notNull().unique(),
+  codiceFiscale: varchar("codice_fiscale", { length: 16 }),
   cognome: varchar("cognome", { length: 80 }).notNull(),
   nome: varchar("nome", { length: 80 }).notNull(),
   dataNascita: date("data_nascita"),

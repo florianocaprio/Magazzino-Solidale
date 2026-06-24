@@ -41,7 +41,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowRightLeft } from "lucide-react";
+import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowRightLeft, ScanLine } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { generateBollaPdf, loadAssociationLogo, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
@@ -65,17 +65,33 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [centroId, setCentroId] = useState("all");
   const [trasportatore, setTrasportatore] = useState("");
   const [trasportatoreNome, setTrasportatoreNome] = useState("");
+  const [scanCode, setScanCode] = useState("");
   const { data: centri } = useListCentriAscolto();
   const { data: beneficiari } = useListBeneficiari({
     attivo: true,
     ...(centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : {}),
   });
+  const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  const handleScan = () => {
+    const code = scanCode.trim();
+    if (!code) return;
+    const b = allBeneficiari?.find((x) => x.codice.toLowerCase() === code.toLowerCase());
+    if (!b) {
+      toast({ title: t("bolle.scanNotFound"), variant: "destructive" });
+      return;
+    }
+    setCentroId(b.centroAscoltoId ? String(b.centroAscoltoId) : "all");
+    setBeneficiarioId(String(b.id));
+    setScanCode("");
+    toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
+  };
 
   const onSubmit = () => {
     if (!beneficiarioId || !magazzinoId) return;
@@ -113,6 +129,27 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>{t("bolle.createTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>{t("bolle.scanLabel")}</Label>
+            <div className="flex gap-2">
+              <Input
+                autoFocus
+                placeholder={t("bolle.scanPlaceholder")}
+                value={scanCode}
+                onChange={(e) => setScanCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleScan();
+                  }
+                }}
+                className="font-mono"
+              />
+              <Button type="button" variant="outline" onClick={handleScan} disabled={!scanCode.trim()}>
+                <ScanLine className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           <div className="space-y-2">
             <Label>{t("bolle.centroFilterLabel")}</Label>
             <Select value={centroId} onValueChange={(v) => { setCentroId(v); setBeneficiarioId(""); }}>

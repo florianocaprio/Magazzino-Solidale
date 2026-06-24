@@ -28,6 +28,7 @@ import { login } from "./namespaces/login";
 import { changePassword } from "./namespaces/changePassword";
 import { notAuthorized } from "./namespaces/notAuthorized";
 import { notFound } from "./namespaces/notFound";
+import { tessera } from "./namespaces/tessera";
 
 export { LANGUAGES, isRtl, applyDirection } from "./languages";
 export type { LanguageCode } from "./languages";
@@ -59,6 +60,7 @@ const PAGE_NAMESPACES = {
   changePassword,
   notAuthorized,
   notFound,
+  tessera,
 } as const;
 
 function buildResources() {

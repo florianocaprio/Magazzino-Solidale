@@ -586,6 +586,8 @@ export interface ApprovvigionamentoUpdate {
 export interface Beneficiario {
   id: number;
   codice: string;
+  /** @nullable */
+  codiceFiscale?: string | null;
   cognome: string;
   nome: string;
   /** @nullable */
@@ -714,6 +716,8 @@ export interface Consegna {
 export interface BeneficiarioDettaglio {
   id: number;
   codice: string;
+  /** @nullable */
+  codiceFiscale?: string | null;
   cognome: string;
   nome: string;
   /** @nullable */
@@ -771,6 +775,8 @@ export interface BeneficiarioDettaglio {
 
 export interface BeneficiarioInput {
   codice?: string;
+  /** @nullable */
+  codiceFiscale?: string | null;
   cognome: string;
   nome: string;
   dataNascita?: string;
@@ -803,6 +809,8 @@ export interface BeneficiarioInput {
 }
 
 export interface BeneficiarioUpdate {
+  /** @nullable */
+  codiceFiscale?: string | null;
   cognome?: string;
   nome?: string;
   dataNascita?: string;

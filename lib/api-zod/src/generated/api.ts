@@ -1045,6 +1045,7 @@ export const ListBeneficiariQueryParams = zod.object({
 export const ListBeneficiariResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "codiceFiscale": zod.string().nullish(),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
@@ -1072,6 +1073,7 @@ export const ListBeneficiariResponse = zod.array(ListBeneficiariResponseItem)
 
 export const CreateBeneficiarioBody = zod.object({
   "codice": zod.string().optional(),
+  "codiceFiscale": zod.string().nullish(),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().optional(),
@@ -1110,6 +1112,7 @@ export const GetBeneficiarioParams = zod.object({
 export const GetBeneficiarioResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "codiceFiscale": zod.string().nullish(),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
@@ -1203,6 +1206,7 @@ export const UpdateBeneficiarioParams = zod.object({
 })
 
 export const UpdateBeneficiarioBody = zod.object({
+  "codiceFiscale": zod.string().nullish(),
   "cognome": zod.string().optional(),
   "nome": zod.string().optional(),
   "dataNascita": zod.string().optional(),
@@ -1236,6 +1240,7 @@ export const UpdateBeneficiarioBody = zod.object({
 export const UpdateBeneficiarioResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "codiceFiscale": zod.string().nullish(),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),

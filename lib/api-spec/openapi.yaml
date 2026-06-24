@@ -2955,6 +2955,8 @@ components:
           type: integer
         codice:
           type: string
+        codiceFiscale:
+          type: ["string", "null"]
         cognome:
           type: string
         nome:
@@ -3006,6 +3008,8 @@ components:
           type: integer
         codice:
           type: string
+        codiceFiscale:
+          type: ["string", "null"]
         cognome:
           type: string
         nome:
@@ -3087,6 +3091,8 @@ components:
       properties:
         codice:
           type: string
+        codiceFiscale:
+          type: ["string", "null"]
         cognome:
           type: string
         nome:
@@ -3148,6 +3154,8 @@ components:
     BeneficiarioUpdate:
       type: object
       properties:
+        codiceFiscale:
+          type: ["string", "null"]
         cognome:
           type: string
         nome:

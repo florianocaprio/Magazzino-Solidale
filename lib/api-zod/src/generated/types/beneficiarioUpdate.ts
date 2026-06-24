@@ -7,6 +7,8 @@
  */
 
 export interface BeneficiarioUpdate {
+  /** @nullable */
+  codiceFiscale?: string | null;
   cognome?: string;
   nome?: string;
   dataNascita?: string;

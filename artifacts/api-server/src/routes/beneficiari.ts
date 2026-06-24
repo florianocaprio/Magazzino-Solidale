@@ -9,6 +9,7 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
   return {
     id: r.id,
     codice: r.codice,
+    codiceFiscale: r.codiceFiscale ?? null,
     cognome: r.cognome,
     nome: r.nome,
     dataNascita: r.dataNascita ?? null,

@@ -16,7 +16,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { ExportButtons } from "@/components/export-buttons";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil, Plus, Trash2, CreditCard } from "lucide-react";
+import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
+import { loadAssociationLogo } from "@/lib/bolla-pdf";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
@@ -83,7 +85,21 @@ export default function BeneficiarioDettaglio() {
             {t("beneficiarioDettaglio.priorityLabel")} <span className="font-medium capitalize">{b.priorita}</span>
           </p>
         </div>
-        <div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={async () => {
+              const logo = await loadAssociationLogo();
+              await generateTesseraPdf({
+                beneficiario: { codice: b.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
+                labels: buildTesseraLabels(t),
+                associationLogoDataUrl: logo,
+              });
+            }}
+          >
+            <CreditCard className="w-4 h-4" /> {t("tessera.generate")}
+          </Button>
           <Button variant="outline" className="gap-2" onClick={() => setEditing(true)}>
             <Pencil className="w-4 h-4" /> {t("beneficiarioDettaglio.editAnagrafica")}
           </Button>
@@ -280,6 +296,7 @@ export default function BeneficiarioDettaglio() {
 const makeEditSchema = (t: (k: string) => string) => z.object({
   cognome: z.string().min(1, t("beneficiarioDettaglio.required")),
   nome: z.string().min(1, t("beneficiarioDettaglio.required")),
+  codiceFiscale: z.string().optional(),
   dataNascita: z.string().optional(),
   sesso: z.string().optional(),
   cittadinanza: z.string().optional(),
@@ -310,6 +327,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
     defaultValues: {
       cognome: b.cognome ?? "",
       nome: b.nome ?? "",
+      codiceFiscale: b.codiceFiscale ?? "",
       dataNascita: b.dataNascita ? b.dataNascita.slice(0, 10) : "",
       sesso: b.sesso ?? "",
       cittadinanza: b.cittadinanza ?? "",
@@ -334,6 +352,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       dataNascita: data.dataNascita || undefined,
       sesso: data.sesso || undefined,
       areaProvenienza: data.areaProvenienza || undefined,
+      codiceFiscale: data.codiceFiscale?.trim() ? data.codiceFiscale.trim().toUpperCase() : null,
     };
     updateBeneficiario.mutate(
       { id: b.id, data: payload },
@@ -359,6 +378,10 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                   <FormItem><FormLabel>{t("common.surname")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
               </div>
+
+              <FormField control={form.control} name="codiceFiscale" render={({ field }) => (
+                <FormItem><FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel><FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl></FormItem>
+              )} />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="dataNascita" render={({ field }) => (

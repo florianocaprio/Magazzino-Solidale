@@ -16,8 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil } from "lucide-react";
+import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, CreditCard } from "lucide-react";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
+import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
+import { loadAssociationLogo } from "@/lib/bolla-pdf";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +28,7 @@ import * as z from "zod";
 const formSchema = z.object({
   cognome: z.string().min(2),
   nome: z.string().min(2),
+  codiceFiscale: z.string().optional(),
   comune: z.string().optional(),
   zonaMunicipio: z.string().optional(),
   numComponenti: z.coerce.number().min(1).default(1),
@@ -78,8 +81,12 @@ export default function Beneficiari() {
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    const { centroAscoltoId, ...rest } = data;
-    const payload = { ...rest, centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null };
+    const { centroAscoltoId, codiceFiscale, ...rest } = data;
+    const payload = {
+      ...rest,
+      centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
+      codiceFiscale: codiceFiscale?.trim() ? codiceFiscale.trim().toUpperCase() : null,
+    };
     createBeneficiario.mutate({ data: payload }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
@@ -232,6 +239,17 @@ export default function Beneficiari() {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          onClick={async () => {
+                            const logo = await loadAssociationLogo();
+                            await generateTesseraPdf({
+                              beneficiario: { codice: b.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
+                              labels: buildTesseraLabels(t),
+                              associationLogoDataUrl: logo,
+                            });
+                          }}
+                        ><CreditCard className="mr-2 h-4 w-4" /> {t("tessera.generate")}</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -257,7 +275,11 @@ export default function Beneficiari() {
                     <FormItem><FormLabel>{t("common.surname")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
                 </div>
-                
+
+                <FormField control={form.control} name="codiceFiscale" render={({ field }) => (
+                  <FormItem><FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel><FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl></FormItem>
+                )} />
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="comune" render={({ field }) => (
                     <FormItem><FormLabel>{t("beneficiari.comune")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>

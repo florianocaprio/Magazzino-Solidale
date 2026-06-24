@@ -9,6 +9,8 @@
 export interface Beneficiario {
   id: number;
   codice: string;
+  /** @nullable */
+  codiceFiscale?: string | null;
   cognome: string;
   nome: string;
   /** @nullable */
