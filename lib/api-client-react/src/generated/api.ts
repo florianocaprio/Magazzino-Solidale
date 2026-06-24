@@ -30,11 +30,15 @@ import type {
   BeneficiarioInput,
   BeneficiarioUpdate,
   Bolla,
+  BollaDettaglio,
   BollaInput,
+  BollaRiga,
+  BollaRigaInput,
   BollaUpdate,
   ConfermaRicezione,
   Consegna,
   ConsegnaInput,
+  ConsegnaRicezioneInput,
   ConsegnaUpdate,
   ConsegneMeseReport,
   DashboardStats,
@@ -3904,9 +3908,9 @@ export const getGetBollaUrl = (id: number,) => {
   return `/api/bolle/${id}`
 }
 
-export const getBolla = async (id: number, options?: RequestInit): Promise<Bolla> => {
+export const getBolla = async (id: number, options?: RequestInit): Promise<BollaDettaglio> => {
 
-  return customFetch<Bolla>(getGetBollaUrl(id),
+  return customFetch<BollaDettaglio>(getGetBollaUrl(id),
   {
     ...options,
     method: 'GET'
@@ -3976,9 +3980,9 @@ export const getUpdateBollaUrl = (id: number,) => {
 }
 
 export const updateBolla = async (id: number,
-    bollaUpdate: BollaUpdate, options?: RequestInit): Promise<Bolla> => {
+    bollaUpdate: BollaUpdate, options?: RequestInit): Promise<BollaDettaglio> => {
 
-  return customFetch<Bolla>(getUpdateBollaUrl(id),
+  return customFetch<BollaDettaglio>(getUpdateBollaUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -4031,6 +4035,369 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateBollaMutationOptions(options));
+    }
+
+export const getListBollaRigheUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/righe`
+}
+
+/**
+ * @summary Get product lines for a bolla
+ */
+export const listBollaRighe = async (id: number, options?: RequestInit): Promise<BollaRiga[]> => {
+
+  return customFetch<BollaRiga[]>(getListBollaRigheUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBollaRigheQueryKey = (id: number,) => {
+    return [
+    `/api/bolle/${id}/righe`
+    ] as const;
+    }
+
+
+export const getListBollaRigheQueryOptions = <TData = Awaited<ReturnType<typeof listBollaRighe>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBollaRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBollaRigheQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBollaRighe>>> = ({ signal }) => listBollaRighe(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBollaRighe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBollaRigheQueryResult = NonNullable<Awaited<ReturnType<typeof listBollaRighe>>>
+export type ListBollaRigheQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get product lines for a bolla
+ */
+
+export function useListBollaRighe<TData = Awaited<ReturnType<typeof listBollaRighe>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBollaRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBollaRigheQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAddBollaRigaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/righe`
+}
+
+/**
+ * @summary Add a product line to a bolla
+ */
+export const addBollaRiga = async (id: number,
+    bollaRigaInput: BollaRigaInput, options?: RequestInit): Promise<BollaRiga> => {
+
+  return customFetch<BollaRiga>(getAddBollaRigaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bollaRigaInput,)
+  }
+);}
+
+
+
+
+export const getAddBollaRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addBollaRiga>>, TError,{id: number;data: BodyType<BollaRigaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addBollaRiga>>, TError,{id: number;data: BodyType<BollaRigaInput>}, TContext> => {
+
+const mutationKey = ['addBollaRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addBollaRiga>>, {id: number;data: BodyType<BollaRigaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addBollaRiga(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddBollaRigaMutationResult = NonNullable<Awaited<ReturnType<typeof addBollaRiga>>>
+    export type AddBollaRigaMutationBody = BodyType<BollaRigaInput>
+    export type AddBollaRigaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a product line to a bolla
+ */
+export const useAddBollaRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addBollaRiga>>, TError,{id: number;data: BodyType<BollaRigaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addBollaRiga>>,
+        TError,
+        {id: number;data: BodyType<BollaRigaInput>},
+        TContext
+      > => {
+      return useMutation(getAddBollaRigaMutationOptions(options));
+    }
+
+export const getDeleteBollaRigaUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/righe/${rigaId}`
+}
+
+/**
+ * @summary Remove a product line from a bolla
+ */
+export const deleteBollaRiga = async (id: number,
+    rigaId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteBollaRigaUrl(id,rigaId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteBollaRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number}, TContext> => {
+
+const mutationKey = ['deleteBollaRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBollaRiga>>, {id: number;rigaId: number}> = (props) => {
+          const {id,rigaId} = props ?? {};
+
+          return  deleteBollaRiga(id,rigaId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteBollaRigaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteBollaRiga>>>
+
+    export type DeleteBollaRigaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a product line from a bolla
+ */
+export const useDeleteBollaRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteBollaRiga>>,
+        TError,
+        {id: number;rigaId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteBollaRigaMutationOptions(options));
+    }
+
+export const getConfermaBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/conferma`
+}
+
+/**
+ * @summary Confirm bolla - move from bozza to confermato
+ */
+export const confermaBolla = async (id: number, options?: RequestInit): Promise<BollaDettaglio> => {
+
+  return customFetch<BollaDettaglio>(getConfermaBollaUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getConfermaBollaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['confermaBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confermaBolla>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  confermaBolla(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfermaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof confermaBolla>>>
+
+    export type ConfermaBollaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Confirm bolla - move from bozza to confermato
+ */
+export const useConfermaBolla = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confermaBolla>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getConfermaBollaMutationOptions(options));
+    }
+
+export const getConsegnaBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/consegna`
+}
+
+/**
+ * @summary Mark bolla as delivered - move from confermato to consegnato
+ */
+export const consegnaBolla = async (id: number,
+    consegnaRicezioneInput?: ConsegnaRicezioneInput, options?: RequestInit): Promise<BollaDettaglio> => {
+
+  return customFetch<BollaDettaglio>(getConsegnaBollaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      consegnaRicezioneInput,)
+  }
+);}
+
+
+
+
+export const getConsegnaBollaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data?: BodyType<ConsegnaRicezioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data?: BodyType<ConsegnaRicezioneInput>}, TContext> => {
+
+const mutationKey = ['consegnaBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof consegnaBolla>>, {id: number;data?: BodyType<ConsegnaRicezioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  consegnaBolla(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConsegnaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof consegnaBolla>>>
+    export type ConsegnaBollaMutationBody = BodyType<ConsegnaRicezioneInput> | undefined
+    export type ConsegnaBollaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark bolla as delivered - move from confermato to consegnato
+ */
+export const useConsegnaBolla = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data?: BodyType<ConsegnaRicezioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof consegnaBolla>>,
+        TError,
+        {id: number;data?: BodyType<ConsegnaRicezioneInput>},
+        TContext
+      > => {
+      return useMutation(getConsegnaBollaMutationOptions(options));
     }
 
 export const getListVolontariUrl = () => {

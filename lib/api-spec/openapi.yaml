@@ -2600,6 +2600,93 @@ components:
           type: string
       required: [id, numeroBolla, dataBolla, beneficiarioId, magazzinoId, stato, confermaRicezione, dataCreazione]
 
+    BollaDettaglio:
+      type: object
+      properties:
+        id:
+          type: integer
+        numeroBolla:
+          type: string
+        dataBolla:
+          type: string
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: ["string", "null"]
+        consegnaId:
+          type: ["integer", "null"]
+        magazzinoId:
+          type: integer
+        magazzinoNome:
+          type: ["string", "null"]
+        indirizzoConsegna:
+          type: ["string", "null"]
+        volontarioConsegnaId:
+          type: ["integer", "null"]
+        mezzoId:
+          type: ["integer", "null"]
+        stato:
+          type: string
+        noteConsegna:
+          type: ["string", "null"]
+        confermaRicezione:
+          type: boolean
+        noteRicezione:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/BollaRiga"
+      required: [id, numeroBolla, dataBolla, beneficiarioId, magazzinoId, stato, confermaRicezione, dataCreazione, righe]
+
+    BollaRiga:
+      type: object
+      properties:
+        id:
+          type: integer
+        bollaId:
+          type: integer
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: ["string", "null"]
+        lottoId:
+          type: ["integer", "null"]
+        codiceLotto:
+          type: ["string", "null"]
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        note:
+          type: ["string", "null"]
+      required: [id, bollaId, prodottoId, quantita, unitaMisura]
+
+    BollaRigaInput:
+      type: object
+      properties:
+        prodottoId:
+          type: integer
+        lottoId:
+          type: integer
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        note:
+          type: string
+      required: [prodottoId, quantita, unitaMisura]
+
+    ConsegnaRicezioneInput:
+      type: object
+      properties:
+        noteRicezione:
+          type: string
+        confermaRicezione:
+          type: boolean
+
     BollaInput:
       type: object
       properties:

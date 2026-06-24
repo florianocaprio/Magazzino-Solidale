@@ -1327,7 +1327,18 @@ export const GetBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
-  "dataCreazione": zod.string()
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+}))
 })
 
 
@@ -1358,7 +1369,145 @@ export const UpdateBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
-  "dataCreazione": zod.string()
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Get product lines for a bolla
+ */
+export const ListBollaRigheParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListBollaRigheResponseItem = zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})
+export const ListBollaRigheResponse = zod.array(ListBollaRigheResponseItem)
+
+
+/**
+ * @summary Add a product line to a bolla
+ */
+export const AddBollaRigaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AddBollaRigaBody = zod.object({
+  "prodottoId": zod.number(),
+  "lottoId": zod.number().optional(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().optional()
+})
+
+
+/**
+ * @summary Remove a product line from a bolla
+ */
+export const DeleteBollaRigaParams = zod.object({
+  "id": zod.coerce.number(),
+  "rigaId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Confirm bolla - move from bozza to confermato
+ */
+export const ConfermaBollaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ConfermaBollaResponse = zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Mark bolla as delivered - move from confermato to consegnato
+ */
+export const ConsegnaBollaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ConsegnaBollaBody = zod.object({
+  "noteRicezione": zod.string().optional(),
+  "confermaRicezione": zod.boolean().optional()
+})
+
+export const ConsegnaBollaResponse = zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+}))
 })
 
 

@@ -718,6 +718,63 @@ export interface Bolla {
   dataCreazione: string;
 }
 
+export interface BollaRiga {
+  id: number;
+  bollaId: number;
+  prodottoId: number;
+  /** @nullable */
+  prodottoNome?: string | null;
+  /** @nullable */
+  lottoId?: number | null;
+  /** @nullable */
+  codiceLotto?: string | null;
+  quantita: number;
+  unitaMisura: string;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface BollaDettaglio {
+  id: number;
+  numeroBolla: string;
+  dataBolla: string;
+  beneficiarioId: number;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  consegnaId?: number | null;
+  magazzinoId: number;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  /** @nullable */
+  indirizzoConsegna?: string | null;
+  /** @nullable */
+  volontarioConsegnaId?: number | null;
+  /** @nullable */
+  mezzoId?: number | null;
+  stato: string;
+  /** @nullable */
+  noteConsegna?: string | null;
+  confermaRicezione: boolean;
+  /** @nullable */
+  noteRicezione?: string | null;
+  dataCreazione: string;
+  righe: BollaRiga[];
+}
+
+export interface BollaRigaInput {
+  prodottoId: number;
+  lottoId?: number;
+  quantita: number;
+  unitaMisura: string;
+  note?: string;
+}
+
+export interface ConsegnaRicezioneInput {
+  noteRicezione?: string;
+  confermaRicezione?: boolean;
+}
+
 export interface BollaInput {
   beneficiarioId: number;
   consegnaId?: number;
