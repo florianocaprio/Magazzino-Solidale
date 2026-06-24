@@ -28,9 +28,14 @@ async function bollePerConsegne(consegnaIds: number[]) {
 }
 
 router.get("/consegne", async (req, res) => {
-  const { stato, beneficiarioId, centroAscoltoId } = req.query as Record<string, string>;
+  const { stato, data, beneficiarioId, centroAscoltoId } = req.query as Record<string, string>;
+  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    res.status(400).json({ error: "Parametro 'data' non valido (formato atteso: YYYY-MM-DD)" });
+    return;
+  }
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(consegneTable.stato, stato));
+  if (data) conditions.push(eq(consegneTable.dataPrevista, data));
   if (beneficiarioId) conditions.push(eq(consegneTable.beneficiarioId, parseInt(beneficiarioId)));
   if (centroAscoltoId) conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
 

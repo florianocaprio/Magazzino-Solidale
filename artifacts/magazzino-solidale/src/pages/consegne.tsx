@@ -38,9 +38,11 @@ export default function Consegne() {
   const { t } = useTranslation();
   const [centroFilter, setCentroFilter] = useState("all");
   const [statoFilter, setStatoFilter] = useState("all");
-  const consegneParams: { centroAscoltoId?: number; stato?: string } = {};
+  const [dataFilter, setDataFilter] = useState("");
+  const consegneParams: { centroAscoltoId?: number; stato?: string; data?: string } = {};
   if (centroFilter !== "all") consegneParams.centroAscoltoId = parseInt(centroFilter);
   if (statoFilter !== "all") consegneParams.stato = statoFilter;
+  if (dataFilter) consegneParams.data = dataFilter;
   const { data: consegne, isLoading } = useListConsegne(
     Object.keys(consegneParams).length > 0 ? consegneParams : undefined
   );
@@ -181,6 +183,18 @@ export default function Consegne() {
                 <SelectItem value="effettuata">{t("consegne.statoEffettuata")}</SelectItem>
               </SelectContent>
             </Select>
+            <Input
+              type="date"
+              value={dataFilter}
+              onChange={(e) => setDataFilter(e.target.value)}
+              className="w-[170px]"
+              aria-label={t("consegne.filterByDate")}
+            />
+            {dataFilter && (
+              <Button variant="ghost" size="sm" onClick={() => setDataFilter("")}>
+                {t("consegne.clearDate")}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
