@@ -624,6 +624,10 @@ export interface Intervento {
   beneficiarioNome?: string | null;
   /** @nullable */
   bollaId?: number | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
   dataIntervento: string;
   tipoIntervento: string;
   /** @nullable */

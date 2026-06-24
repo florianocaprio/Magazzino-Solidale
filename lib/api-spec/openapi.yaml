@@ -3347,6 +3347,10 @@ components:
           type: ["string", "null"]
         bollaId:
           type: ["integer", "null"]
+        operatoreId:
+          type: ["integer", "null"]
+        operatoreCodice:
+          type: ["string", "null"]
         dataIntervento:
           type: string
         tipoIntervento:

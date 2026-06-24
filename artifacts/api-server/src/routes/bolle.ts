@@ -61,7 +61,7 @@ async function syncInterventoBolla(bollaId: number) {
 
   if (esistente) {
     await db.update(interventiTable)
-      .set({ tipoIntervento, descrizione, beneficiarioId: bolla.beneficiarioId, dataIntervento: bolla.dataBolla })
+      .set({ tipoIntervento, descrizione, beneficiarioId: bolla.beneficiarioId, dataIntervento: bolla.dataBolla, operatoreId: bolla.operatoreId })
       .where(eq(interventiTable.id, esistente.id));
   } else {
     await db.insert(interventiTable).values({
@@ -70,6 +70,7 @@ async function syncInterventoBolla(bollaId: number) {
       dataIntervento: bolla.dataBolla,
       tipoIntervento,
       descrizione,
+      operatoreId: bolla.operatoreId,
     });
   }
 }
@@ -512,12 +513,14 @@ router.post("/bolle/:id/righe", async (req, res) => {
     }
   }
 
+  // stampa l'operatore PRIMA del sync così l'intervento collegato eredita
+  // l'operatore corrente (syncInterventoBolla rilegge bolla.operatoreId)
+  await db.update(bolleTable).set({ operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
+
   // aggiorna l'intervento sociale collegato se la bolla è già confermata
   if (bolla.stato === "confermato") {
     await syncInterventoBolla(bollaId);
   }
-
-  await db.update(bolleTable).set({ operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
 
   const lotto = riga.lottoId ? (await db.select().from(lottiTable).where(eq(lottiTable.id, riga.lottoId)))[0] : null;
 
@@ -558,12 +561,14 @@ router.delete("/bolle/:id/righe/:rigaId", async (req, res) => {
 
   await db.delete(bollaRigheTable).where(eq(bollaRigheTable.id, rigaId));
 
+  // stampa l'operatore PRIMA del sync così l'intervento collegato eredita
+  // l'operatore corrente (syncInterventoBolla rilegge bolla.operatoreId)
+  await db.update(bolleTable).set({ operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
+
   // aggiorna (o rimuove) l'intervento sociale collegato
   if (bolla.stato === "confermato") {
     await syncInterventoBolla(bollaId);
   }
-
-  await db.update(bolleTable).set({ operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
 
   res.status(204).end();
 });

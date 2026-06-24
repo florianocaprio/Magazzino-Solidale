@@ -112,6 +112,7 @@ export default function Interventi() {
               { header: "Beneficiario", accessor: (i) => i.beneficiarioNome },
               { header: "Data", accessor: (i) => i.dataIntervento ? new Date(i.dataIntervento).toLocaleDateString("it-IT") : "" },
               { header: "Tipo Intervento", accessor: (i) => i.tipoIntervento },
+              { header: "Operatore", accessor: (i) => i.operatoreCodice },
               { header: "Descrizione", accessor: (i) => i.descrizione },
               { header: "Esito", accessor: (i) => i.esito },
               { header: "Scadenza ISEE", accessor: (i) => i.scadenzaIsee ? new Date(i.scadenzaIsee).toLocaleDateString("it-IT") : "" },
@@ -160,6 +161,7 @@ export default function Interventi() {
                 <TableHead>Data</TableHead>
                 <TableHead>Beneficiario</TableHead>
                 <TableHead>Tipo Intervento</TableHead>
+                <TableHead>Operatore</TableHead>
                 <TableHead>Descrizione</TableHead>
                 <TableHead>Scadenze</TableHead>
                 <TableHead>Follow-up</TableHead>
@@ -172,6 +174,7 @@ export default function Interventi() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
@@ -179,7 +182,7 @@ export default function Interventi() {
                 ))
               ) : interventi?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Nessun intervento registrato.</TableCell>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">Nessun intervento registrato.</TableCell>
                 </TableRow>
               ) : interventi?.map((i) => (
                 <TableRow key={i.id}>
@@ -188,6 +191,13 @@ export default function Interventi() {
                   </TableCell>
                   <TableCell className="font-medium">{i.beneficiarioNome}</TableCell>
                   <TableCell>{getTipoBadge(i.tipoIntervento)}</TableCell>
+                  <TableCell className="text-sm">
+                    {i.operatoreCodice ? (
+                      <Badge variant="secondary" className="font-mono">{i.operatoreCodice}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground truncate max-w-[300px]">
                     {i.descrizione}
                   </TableCell>

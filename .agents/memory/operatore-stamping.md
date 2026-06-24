@@ -5,13 +5,18 @@ description: How the logged-in operator is recorded and surfaced on delivery doc
 
 # Operatore stamping
 
-bolle, trasferimenti and scarichi each carry a nullable `operatoreId` FK → `utenti`.
+bolle, trasferimenti, scarichi AND interventi each carry a nullable `operatoreId` FK → `utenti`.
 It records the operator who **last touched** the document (not just the creator).
 
 **Rule:** stamp `operatoreId: req.user!.id` on create AND on every mutating endpoint —
 bolle POST/PATCH/righe-add/righe-delete/conferma/consegna/annulla;
-trasferimenti POST/PATCH/avvia/conferma; scarichi POST. Miss one and the operator
-silently goes stale.
+trasferimenti POST/PATCH/avvia/conferma; scarichi POST; interventi POST/PATCH.
+Miss one and the operator silently goes stale.
+
+**Auto-synced interventi:** an intervento can be created/updated by `syncInterventoBolla`
+(bolla → intervento sync), not just by the interventi routes. That sync reloads the bolla
+fresh AFTER the bolla's operator was stamped, so set the intervento's `operatoreId` to
+`bolla.operatoreId` there — no extra param needed.
 
 **Display code is non-personal:** API returns `operatoreCodice = matricola ?? username`
 (never the full name). `utenti.matricola` is optional; falls back to username.

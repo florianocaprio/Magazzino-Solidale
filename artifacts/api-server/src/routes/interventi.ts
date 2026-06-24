@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { interventiTable, beneficiariTable } from "@workspace/db";
+import { interventiTable, beneficiariTable, utentiTable } from "@workspace/db";
 import { eq, and, desc, or, ilike, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -27,9 +27,12 @@ router.get("/interventi", async (req, res) => {
       i: interventiTable,
       cognome: beneficiariTable.cognome,
       nome: beneficiariTable.nome,
+      operatoreMatricola: utentiTable.matricola,
+      operatoreUsername: utentiTable.username,
     })
     .from(interventiTable)
     .leftJoin(beneficiariTable, eq(interventiTable.beneficiarioId, beneficiariTable.id))
+    .leftJoin(utentiTable, eq(interventiTable.operatoreId, utentiTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(interventiTable.dataIntervento))
     .limit(200);
@@ -38,6 +41,8 @@ router.get("/interventi", async (req, res) => {
     id: r.i.id,
     beneficiarioId: r.i.beneficiarioId,
     beneficiarioNome: r.cognome && r.nome ? `${r.cognome} ${r.nome}` : null,
+    operatoreId: r.i.operatoreId ?? null,
+    operatoreCodice: r.operatoreMatricola ?? r.operatoreUsername ?? null,
     dataIntervento: r.i.dataIntervento,
     tipoIntervento: r.i.tipoIntervento,
     descrizione: r.i.descrizione ?? null,
@@ -52,7 +57,7 @@ router.get("/interventi", async (req, res) => {
 });
 
 router.post("/interventi", async (req, res) => {
-  const [row] = await db.insert(interventiTable).values(req.body).returning();
+  const [row] = await db.insert(interventiTable).values({ ...req.body, operatoreId: req.user!.id }).returning();
   res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
@@ -63,7 +68,7 @@ router.get("/interventi/:id", async (req, res) => {
 });
 
 router.patch("/interventi/:id", async (req, res) => {
-  const [row] = await db.update(interventiTable).set(req.body).where(eq(interventiTable.id, parseInt(req.params.id))).returning();
+  const [row] = await db.update(interventiTable).set({ ...req.body, operatoreId: req.user!.id }).where(eq(interventiTable.id, parseInt(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
