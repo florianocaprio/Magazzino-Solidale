@@ -2610,6 +2610,10 @@ components:
           type: ["string", "null"]
         note:
           type: string
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrasferimentoRigaInput"
 
     TrasferimentoRiga:
       type: object

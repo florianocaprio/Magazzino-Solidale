@@ -386,6 +386,7 @@ export interface TrasferimentoUpdate {
   /** @nullable */
   trasportatoreNome?: string | null;
   note?: string;
+  righe?: TrasferimentoRigaInput[];
 }
 
 export interface ScaricoRiga {

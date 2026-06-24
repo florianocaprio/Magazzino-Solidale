@@ -335,6 +335,112 @@ function NuovoTrasferimentoForm({
   );
 }
 
+// ─── Form modifica trasferimento (note + righe, solo stati editabili) ────────
+
+function ModificaTrasferimentoForm({
+  trasferimento,
+  open,
+  onClose,
+}: {
+  trasferimento: Trasferimento;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [note, setNote] = useState(trasferimento.note ?? "");
+  const [righe, setRighe] = useState<RigaDraft[]>(
+    (trasferimento.righe ?? []).map((r) => ({
+      key: Math.random().toString(36).slice(2),
+      prodottoId: String(r.prodottoId),
+      quantita: String(r.quantita),
+      unitaMisura: r.unitaMisura,
+    })),
+  );
+
+  const updateTrasferimento = useUpdateTrasferimento();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const origineIdNum = trasferimento.magazzinoOrigineId;
+  const { data: origineGiacenze } = useListGiacenze(
+    { magazzinoId: origineIdNum },
+    { query: { enabled: open, queryKey: getListGiacenzeQueryKey({ magazzinoId: origineIdNum }) } },
+  );
+
+  const righeValide = righe.filter((r) => r.prodottoId && parseFloat(r.quantita || "0") > 0);
+  const hasEccesso = righeValide.some((r) => {
+    const giac = origineGiacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
+    return parseFloat(r.quantita) > (giac?.quantitaTotale ?? 0);
+  });
+  const canSubmit = righeValide.length > 0 && !hasEccesso && !updateTrasferimento.isPending;
+
+  const onSubmit = () => {
+    if (!canSubmit) return;
+    updateTrasferimento.mutate(
+      {
+        id: trasferimento.id,
+        data: {
+          note,
+          righe: righeValide.map((r) => ({
+            prodottoId: parseInt(r.prodottoId),
+            quantita: parseFloat(r.quantita),
+            unitaMisura: r.unitaMisura,
+          })),
+        },
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListTrasferimentiQueryKey() });
+          toast({ title: t("trasferimenti.toastAggiornato") });
+          onClose();
+        },
+        onError: () =>
+          toast({ title: t("trasferimenti.errorTitle"), description: t("trasferimenti.errorUpdate"), variant: "destructive" }),
+      },
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{t("trasferimenti.modificaTitle")}</SheetTitle>
+          <SheetDescription>
+            {t("trasferimenti.modificaDescPrefix")}{" "}
+            <span className="font-mono font-medium text-foreground">{trasferimento.codice}</span>.{" "}
+            {t("trasferimenti.modificaDescSuffix")}
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="space-y-5 py-5">
+          <div className="rounded-lg border p-3 text-sm flex items-center gap-2 bg-muted/40">
+            <span className="font-medium">{trasferimento.magazzinoOrigineNome}</span>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{trasferimento.magazzinoDestinoNome}</span>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("trasferimenti.prodottiDaTrasferire")}</Label>
+            <RigheEditor magazzinoId={origineIdNum} righe={righe} setRighe={setRighe} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("trasferimenti.noteOpzionale")}</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("trasferimenti.notePlaceholder")} />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pb-4">
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button onClick={onSubmit} disabled={!canSubmit} className="gap-2">
+            <Pencil className="h-4 w-4" /> {t("trasferimenti.salvaModifiche")}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // ─── Trasportatore: display + riassegnazione ─────────────────────────────────
 
 function trasportatoreLabel(t: Trasferimento, volontarioFallback = "Volontario"): string | null {
@@ -460,6 +566,7 @@ export default function Trasferimenti() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [created, setCreated] = useState<Trasferimento | null>(null);
+  const [editing, setEditing] = useState<Trasferimento | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const avviaTrasferimento = useAvviaTrasferimento();
   const confermaTrasferimento = useConfermaTrasferimento();
@@ -552,7 +659,7 @@ export default function Trasferimenti() {
                 <TableHead>{t("trasferimenti.colTrasportatore")}</TableHead>
                 <TableHead>{t("common.details")}</TableHead>
                 <TableHead className="text-center">{t("common.status")}</TableHead>
-                <TableHead className="text-right w-[230px]">{t("trasferimenti.colAzione")}</TableHead>
+                <TableHead className="text-right w-[320px]">{t("trasferimenti.colAzione")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -606,9 +713,14 @@ export default function Trasferimenti() {
                         <Download className="h-3.5 w-3.5" /> {t("trasferimenti.bolla")}
                       </Button>
                       {(tr.stato === "richiesto" || tr.stato === "preparato") && (
-                        <Button size="sm" variant="outline" className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handleAction(tr)} disabled={avviaTrasferimento.isPending}>
-                          <Play className="h-3.5 w-3.5" /> {t("trasferimenti.avvia")}
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(tr)}>
+                            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                          </Button>
+                          <Button size="sm" variant="outline" className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handleAction(tr)} disabled={avviaTrasferimento.isPending}>
+                            <Play className="h-3.5 w-3.5" /> {t("trasferimenti.avvia")}
+                          </Button>
+                        </>
                       )}
                       {tr.stato === "in_transito" && (
                         <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => handleAction(tr)} disabled={confermaTrasferimento.isPending}>
@@ -625,6 +737,15 @@ export default function Trasferimenti() {
       </Card>
 
       <NuovoTrasferimentoForm open={isFormOpen} onClose={() => setIsFormOpen(false)} onCreated={handleCreated} />
+
+      {editing && (
+        <ModificaTrasferimentoForm
+          key={editing.id}
+          trasferimento={editing}
+          open={!!editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       {/* Conferma creazione + download bolla */}
       <Dialog open={!!created} onOpenChange={(o) => { if (!o) setCreated(null); }}>

@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { TrasferimentoRigaInput } from './trasferimentoRigaInput';
 
 export interface TrasferimentoUpdate {
   stato?: string;
@@ -14,4 +15,5 @@ export interface TrasferimentoUpdate {
   /** @nullable */
   trasportatoreNome?: string | null;
   note?: string;
+  righe?: TrasferimentoRigaInput[];
 }

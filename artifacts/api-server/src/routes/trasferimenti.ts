@@ -243,7 +243,12 @@ router.get("/trasferimenti/:id", async (req, res) => {
 });
 
 router.patch("/trasferimenti/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
   const body = req.body ?? {};
+
+  const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+
   const updates: Partial<typeof trasferimentiTable.$inferInsert> = {};
   if ("stato" in body) updates.stato = body.stato;
   if ("dataEsecuzione" in body) updates.dataEsecuzione = body.dataEsecuzione;
@@ -261,18 +266,53 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     updates.trasportatoreNome = trasportatore.nome;
   }
 
-  if (Object.keys(updates).length === 0) {
-    const current = await getTrasferimentoWithRighe(parseInt(req.params.id));
-    if (!current) { res.status(404).json({ error: "Not found" }); return; }
-    res.json(current);
+  // Item rows can only be edited before the transfer is started ("avvia"
+  // deducts stock from the origin lots, so rewriting righe afterwards would
+  // desync giacenze). Allowed states: richiesto / preparato.
+  const editRighe = "righe" in body;
+  let righeInput: Array<{ prodottoId: number; lottoId?: number; quantita: number; unitaMisura: string; note?: string }> = [];
+  if (editRighe) {
+    if (current.stato !== "richiesto" && current.stato !== "preparato") {
+      res.status(400).json({ error: "Le righe possono essere modificate solo prima dell'avvio del trasferimento" });
+      return;
+    }
+    righeInput = body.righe ?? [];
+    if (righeInput.length === 0) {
+      res.status(400).json({ error: "Indicare almeno un prodotto da trasferire" });
+      return;
+    }
+    if (righeInput.some((r) => !(r.quantita > 0))) {
+      res.status(400).json({ error: "Le quantità devono essere maggiori di zero" });
+      return;
+    }
+  }
+
+  if (Object.keys(updates).length === 0 && !editRighe) {
+    const cur = await getTrasferimentoWithRighe(id);
+    res.json(cur);
     return;
   }
 
   // Stamp the operator who performed this mutation alongside the allow-listed updates.
   updates.operatoreId = req.user!.id;
-  const [row] = await db.update(trasferimentiTable).set(updates).where(eq(trasferimentiTable.id, parseInt(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  const result = await getTrasferimentoWithRighe(row.id);
+  await db.update(trasferimentiTable).set(updates).where(eq(trasferimentiTable.id, id));
+
+  if (editRighe) {
+    // Replace-all: the editor sends the full desired set of rows.
+    await db.delete(trasferimentoRigheTable).where(eq(trasferimentoRigheTable.trasferimentoId, id));
+    await db.insert(trasferimentoRigheTable).values(
+      righeInput.map((r) => ({
+        trasferimentoId: id,
+        prodottoId: r.prodottoId,
+        lottoId: r.lottoId,
+        quantita: r.quantita.toString(),
+        unitaMisura: r.unitaMisura,
+        note: r.note,
+      }))
+    );
+  }
+
+  const result = await getTrasferimentoWithRighe(id);
   res.json(result);
 });
 

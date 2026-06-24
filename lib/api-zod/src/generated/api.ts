@@ -567,7 +567,14 @@ export const UpdateTrasferimentoBody = zod.object({
   "dataEsecuzione": zod.string().optional(),
   "trasportatoreVolontarioId": zod.number().nullish(),
   "trasportatoreNome": zod.string().nullish(),
+  "note": zod.string().optional(),
+  "righe": zod.array(zod.object({
+  "prodottoId": zod.number(),
+  "lottoId": zod.number().optional(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
   "note": zod.string().optional()
+})).optional()
 })
 
 export const UpdateTrasferimentoResponse = zod.object({
