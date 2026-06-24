@@ -4,7 +4,36 @@ import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-router.get("/report/giacenze-per-magazzino", async (_req, res) => {
+function parseIntParam(v: unknown): number | undefined {
+  if (v === undefined || v === null || v === "") return undefined;
+  const n = parseInt(String(v), 10);
+  return Number.isNaN(n) ? undefined : n;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+function isValidIsoDate(s: string): boolean {
+  if (!ISO_DATE.test(s)) return false;
+  const [y, m, d] = s.split("-").map((p) => parseInt(p, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+type DateRange = { ok: true; da: string; a: string } | { ok: false; message: string };
+function parseDateRange(req: { query: Record<string, unknown> }): DateRange {
+  const anno = parseIntParam(req.query.anno) ?? new Date().getFullYear();
+  const daRaw = req.query.da ? String(req.query.da) : "";
+  const aRaw = req.query.a ? String(req.query.a) : "";
+  if (daRaw && !isValidIsoDate(daRaw)) return { ok: false, message: "Parametro 'da' non è una data valida (atteso YYYY-MM-DD)." };
+  if (aRaw && !isValidIsoDate(aRaw)) return { ok: false, message: "Parametro 'a' non è una data valida (atteso YYYY-MM-DD)." };
+  const da = daRaw || `${anno}-01-01`;
+  const a = aRaw || `${anno}-12-31`;
+  if (da > a) return { ok: false, message: "L'intervallo di date non è valido: 'da' è successivo ad 'a'." };
+  return { ok: true, da, a };
+}
+
+router.get("/report/giacenze-per-magazzino", async (req, res) => {
+  const magazzinoId = parseIntParam(req.query.magazzinoId);
+
   const result1 = await db.execute(sql`
     SELECT mg.nome as magazzino_nome,
            COUNT(DISTINCT l.prodotto_id) as tot_prodotti,
@@ -13,6 +42,7 @@ router.get("/report/giacenze-per-magazzino", async (_req, res) => {
     FROM magazzini mg
     LEFT JOIN lotti l ON l.magazzino_id = mg.id AND l.quantita_residua::numeric > 0
     LEFT JOIN prodotti p ON l.prodotto_id = p.id
+    ${magazzinoId ? sql`WHERE mg.id = ${magazzinoId}` : sql``}
     GROUP BY mg.id, mg.nome
     ORDER BY mg.nome
   `);
@@ -27,15 +57,28 @@ router.get("/report/giacenze-per-magazzino", async (_req, res) => {
 });
 
 router.get("/report/consegne-per-mese", async (req, res) => {
-  const anno = req.query.anno ? parseInt(req.query.anno as string) : new Date().getFullYear();
+  const range = parseDateRange(req);
+  if (!range.ok) {
+    res.status(400).json({ message: range.message });
+    return;
+  }
+  const { da, a } = range;
+  const magazzinoId = parseIntParam(req.query.magazzinoId);
+  const centroAscoltoId = parseIntParam(req.query.centroAscoltoId);
+
+  const conds = [sql`c.data_prevista::date BETWEEN ${da} AND ${a}`];
+  if (magazzinoId) conds.push(sql`c.magazzino_id = ${magazzinoId}`);
+  if (centroAscoltoId) conds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
+  const where = sql.join(conds, sql` AND `);
 
   const result2 = await db.execute(sql`
-    SELECT TO_CHAR(data_prevista::date, 'YYYY-MM') as mese,
+    SELECT TO_CHAR(c.data_prevista::date, 'YYYY-MM') as mese,
            COUNT(*) as tot_consegne,
-           COUNT(CASE WHEN stato = 'effettuata' THEN 1 END) as consegne_effettuate,
-           COUNT(CASE WHEN stato = 'mancata' THEN 1 END) as consegne_mancate
-    FROM consegne
-    WHERE EXTRACT(YEAR FROM data_prevista::date) = ${anno}
+           COUNT(*) FILTER (WHERE c.stato = 'effettuata') as consegne_effettuate,
+           COUNT(*) FILTER (WHERE c.stato = 'mancata') as consegne_mancate
+    FROM consegne c
+    JOIN beneficiari be ON be.id = c.beneficiario_id
+    WHERE ${where}
     GROUP BY mese
     ORDER BY mese
   `);
@@ -49,13 +92,49 @@ router.get("/report/consegne-per-mese", async (req, res) => {
   })));
 });
 
-router.get("/report/beneficiari-per-zona", async (_req, res) => {
+router.get("/report/consegne-per-centro", async (req, res) => {
+  const range = parseDateRange(req);
+  if (!range.ok) {
+    res.status(400).json({ message: range.message });
+    return;
+  }
+  const { da, a } = range;
+
+  const result = await db.execute(sql`
+    SELECT be.centro_ascolto_id as centro_id,
+           COALESCE(ca.nome, 'Senza centro di ascolto') as centro_nome,
+           COUNT(*) FILTER (WHERE c.volontario_id IS NULL) as dirette,
+           COUNT(*) FILTER (WHERE c.volontario_id IS NOT NULL) as con_volontari,
+           COUNT(*) as totale
+    FROM consegne c
+    JOIN beneficiari be ON be.id = c.beneficiario_id
+    LEFT JOIN centri_di_ascolto ca ON ca.id = be.centro_ascolto_id
+    WHERE c.stato = 'effettuata'
+      AND c.data_prevista::date BETWEEN ${da} AND ${a}
+    GROUP BY be.centro_ascolto_id, ca.nome
+    ORDER BY totale DESC, centro_nome
+  `);
+  const rows = result.rows as Array<Record<string, unknown>>;
+
+  res.json(rows.map((r: Record<string, unknown>) => ({
+    centroId: r.centro_id === null || r.centro_id === undefined ? null : Number(r.centro_id),
+    centroNome: r.centro_nome as string,
+    dirette: Number(r.dirette),
+    conVolontari: Number(r.con_volontari),
+    totale: Number(r.totale),
+  })));
+});
+
+router.get("/report/beneficiari-per-zona", async (req, res) => {
+  const centroAscoltoId = parseIntParam(req.query.centroAscoltoId);
+
   const result3 = await db.execute(sql`
     SELECT COALESCE(zona_municipio, 'Non specificato') as zona,
            COUNT(*) as tot_beneficiari,
            COUNT(CASE WHEN attivo = true THEN 1 END) as attivi,
            COUNT(CASE WHEN consegna_domicilio = true THEN 1 END) as consegne_domicilio
     FROM beneficiari
+    ${centroAscoltoId ? sql`WHERE centro_ascolto_id = ${centroAscoltoId}` : sql``}
     GROUP BY zona_municipio
     ORDER BY tot_beneficiari DESC
   `);

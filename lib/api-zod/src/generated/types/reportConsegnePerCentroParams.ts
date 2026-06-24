@@ -6,10 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportConsegnePerMeseParams = {
-anno?: number;
+export type ReportConsegnePerCentroParams = {
 da?: string;
 a?: string;
-magazzinoId?: number;
-centroAscoltoId?: number;
 };

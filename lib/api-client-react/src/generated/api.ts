@@ -48,6 +48,7 @@ import type {
   ConsegnaRicezioneInput,
   ConsegnaUpdate,
   ConsegneMeseReport,
+  ConsegnePerCentroReport,
   DashboardStats,
   Fornitore,
   FornitoreInput,
@@ -89,9 +90,12 @@ import type {
   Prodotto,
   ProdottoInput,
   ProdottoUpdate,
+  ReportBeneficiariPerZonaParams,
+  ReportConsegnePerCentroParams,
   ReportConsegnePerMeseParams,
   ReportFsePlus,
   ReportFsePlusParams,
+  ReportGiacenzePerMagazzinoParams,
   ResetPasswordInput,
   Ruolo,
   RuoloInput,
@@ -6061,20 +6065,27 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getDeleteMezzoMutationOptions(options));
     }
 
-export const getReportGiacenzePerMagazzinoUrl = () => {
+export const getReportGiacenzePerMagazzinoUrl = (params?: ReportGiacenzePerMagazzinoParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/report/giacenze-per-magazzino`
+  return stringifiedParams.length > 0 ? `/api/report/giacenze-per-magazzino?${stringifiedParams}` : `/api/report/giacenze-per-magazzino`
 }
 
 /**
  * @summary Stock grouped by warehouse
  */
-export const reportGiacenzePerMagazzino = async ( options?: RequestInit): Promise<GiacenzaMagazzinoReport[]> => {
+export const reportGiacenzePerMagazzino = async (params?: ReportGiacenzePerMagazzinoParams, options?: RequestInit): Promise<GiacenzaMagazzinoReport[]> => {
 
-  return customFetch<GiacenzaMagazzinoReport[]>(getReportGiacenzePerMagazzinoUrl(),
+  return customFetch<GiacenzaMagazzinoReport[]>(getReportGiacenzePerMagazzinoUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6087,23 +6098,23 @@ export const reportGiacenzePerMagazzino = async ( options?: RequestInit): Promis
 
 
 
-export const getReportGiacenzePerMagazzinoQueryKey = () => {
+export const getReportGiacenzePerMagazzinoQueryKey = (params?: ReportGiacenzePerMagazzinoParams,) => {
     return [
-    `/api/report/giacenze-per-magazzino`
+    `/api/report/giacenze-per-magazzino`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getReportGiacenzePerMagazzinoQueryOptions = <TData = Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getReportGiacenzePerMagazzinoQueryOptions = <TData = Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>, TError = ErrorType<unknown>>(params?: ReportGiacenzePerMagazzinoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getReportGiacenzePerMagazzinoQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getReportGiacenzePerMagazzinoQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>> = ({ signal }) => reportGiacenzePerMagazzino({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>> = ({ signal }) => reportGiacenzePerMagazzino(params, { signal, ...requestOptions });
 
 
 
@@ -6121,11 +6132,11 @@ export type ReportGiacenzePerMagazzinoQueryError = ErrorType<unknown>
  */
 
 export function useReportGiacenzePerMagazzino<TData = Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ReportGiacenzePerMagazzinoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportGiacenzePerMagazzino>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getReportGiacenzePerMagazzinoQueryOptions(options)
+  const queryOptions = getReportGiacenzePerMagazzinoQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -6216,17 +6227,27 @@ export function useReportConsegnePerMese<TData = Awaited<ReturnType<typeof repor
 
 
 
-export const getReportBeneficiariPerZonaUrl = () => {
+export const getReportConsegnePerCentroUrl = (params?: ReportConsegnePerCentroParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/report/beneficiari-per-zona`
+  return stringifiedParams.length > 0 ? `/api/report/consegne-per-centro?${stringifiedParams}` : `/api/report/consegne-per-centro`
 }
 
-export const reportBeneficiariPerZona = async ( options?: RequestInit): Promise<BeneficiariZonaReport[]> => {
+/**
+ * @summary Deliveries grouped by centro di ascolto, split direct vs with volunteers
+ */
+export const reportConsegnePerCentro = async (params?: ReportConsegnePerCentroParams, options?: RequestInit): Promise<ConsegnePerCentroReport[]> => {
 
-  return customFetch<BeneficiariZonaReport[]>(getReportBeneficiariPerZonaUrl(),
+  return customFetch<ConsegnePerCentroReport[]>(getReportConsegnePerCentroUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6239,23 +6260,104 @@ export const reportBeneficiariPerZona = async ( options?: RequestInit): Promise<
 
 
 
-export const getReportBeneficiariPerZonaQueryKey = () => {
+export const getReportConsegnePerCentroQueryKey = (params?: ReportConsegnePerCentroParams,) => {
     return [
-    `/api/report/beneficiari-per-zona`
+    `/api/report/consegne-per-centro`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getReportBeneficiariPerZonaQueryOptions = <TData = Awaited<ReturnType<typeof reportBeneficiariPerZona>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportBeneficiariPerZona>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getReportConsegnePerCentroQueryOptions = <TData = Awaited<ReturnType<typeof reportConsegnePerCentro>>, TError = ErrorType<unknown>>(params?: ReportConsegnePerCentroParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportConsegnePerCentro>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getReportBeneficiariPerZonaQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getReportConsegnePerCentroQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportBeneficiariPerZona>>> = ({ signal }) => reportBeneficiariPerZona({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportConsegnePerCentro>>> = ({ signal }) => reportConsegnePerCentro(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof reportConsegnePerCentro>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReportConsegnePerCentroQueryResult = NonNullable<Awaited<ReturnType<typeof reportConsegnePerCentro>>>
+export type ReportConsegnePerCentroQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Deliveries grouped by centro di ascolto, split direct vs with volunteers
+ */
+
+export function useReportConsegnePerCentro<TData = Awaited<ReturnType<typeof reportConsegnePerCentro>>, TError = ErrorType<unknown>>(
+ params?: ReportConsegnePerCentroParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportConsegnePerCentro>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReportConsegnePerCentroQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReportBeneficiariPerZonaUrl = (params?: ReportBeneficiariPerZonaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/beneficiari-per-zona?${stringifiedParams}` : `/api/report/beneficiari-per-zona`
+}
+
+export const reportBeneficiariPerZona = async (params?: ReportBeneficiariPerZonaParams, options?: RequestInit): Promise<BeneficiariZonaReport[]> => {
+
+  return customFetch<BeneficiariZonaReport[]>(getReportBeneficiariPerZonaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportBeneficiariPerZonaQueryKey = (params?: ReportBeneficiariPerZonaParams,) => {
+    return [
+    `/api/report/beneficiari-per-zona`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getReportBeneficiariPerZonaQueryOptions = <TData = Awaited<ReturnType<typeof reportBeneficiariPerZona>>, TError = ErrorType<unknown>>(params?: ReportBeneficiariPerZonaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportBeneficiariPerZona>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReportBeneficiariPerZonaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportBeneficiariPerZona>>> = ({ signal }) => reportBeneficiariPerZona(params, { signal, ...requestOptions });
 
 
 
@@ -6270,11 +6372,11 @@ export type ReportBeneficiariPerZonaQueryError = ErrorType<unknown>
 
 
 export function useReportBeneficiariPerZona<TData = Awaited<ReturnType<typeof reportBeneficiariPerZona>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportBeneficiariPerZona>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ReportBeneficiariPerZonaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportBeneficiariPerZona>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getReportBeneficiariPerZonaQueryOptions(options)
+  const queryOptions = getReportBeneficiariPerZonaQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

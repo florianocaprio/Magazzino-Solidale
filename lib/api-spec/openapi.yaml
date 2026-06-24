@@ -1651,6 +1651,11 @@ paths:
       operationId: reportGiacenzePerMagazzino
       tags: [report]
       summary: Stock grouped by warehouse
+      parameters:
+        - name: magazzinoId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Report data
@@ -1670,6 +1675,22 @@ paths:
           in: query
           schema:
             type: integer
+        - name: da
+          in: query
+          schema:
+            type: string
+        - name: a
+          in: query
+          schema:
+            type: string
+        - name: magazzinoId
+          in: query
+          schema:
+            type: integer
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Deliveries per month
@@ -1680,10 +1701,39 @@ paths:
                 items:
                   $ref: "#/components/schemas/ConsegneMeseReport"
 
+  /report/consegne-per-centro:
+    get:
+      operationId: reportConsegnePerCentro
+      tags: [report]
+      summary: Deliveries grouped by centro di ascolto, split direct vs with volunteers
+      parameters:
+        - name: da
+          in: query
+          schema:
+            type: string
+        - name: a
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deliveries per centro
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsegnePerCentroReport"
+
   /report/beneficiari-per-zona:
     get:
       operationId: reportBeneficiariPerZona
       tags: [report]
+      parameters:
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Beneficiaries per zone
@@ -3840,6 +3890,21 @@ components:
         consegneDomicilio:
           type: integer
       required: [zona, totBeneficiari, attivi, consegneDomicilio]
+
+    ConsegnePerCentroReport:
+      type: object
+      properties:
+        centroId:
+          type: ["integer", "null"]
+        centroNome:
+          type: string
+        dirette:
+          type: integer
+        conVolontari:
+          type: integer
+        totale:
+          type: integer
+      required: [centroNome, dirette, conVolontari, totale]
 
     Area:
       type: object

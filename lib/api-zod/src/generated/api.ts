@@ -2122,6 +2122,10 @@ export const DeleteMezzoParams = zod.object({
 /**
  * @summary Stock grouped by warehouse
  */
+export const ReportGiacenzePerMagazzinoQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().optional()
+})
+
 export const ReportGiacenzePerMagazzinoResponseItem = zod.object({
   "magazzinoNome": zod.string(),
   "totProdotti": zod.number(),
@@ -2132,7 +2136,11 @@ export const ReportGiacenzePerMagazzinoResponse = zod.array(ReportGiacenzePerMag
 
 
 export const ReportConsegnePerMeseQueryParams = zod.object({
-  "anno": zod.coerce.number().optional()
+  "anno": zod.coerce.number().optional(),
+  "da": zod.coerce.string().optional(),
+  "a": zod.coerce.string().optional(),
+  "magazzinoId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional()
 })
 
 export const ReportConsegnePerMeseResponseItem = zod.object({
@@ -2143,6 +2151,28 @@ export const ReportConsegnePerMeseResponseItem = zod.object({
 })
 export const ReportConsegnePerMeseResponse = zod.array(ReportConsegnePerMeseResponseItem)
 
+
+/**
+ * @summary Deliveries grouped by centro di ascolto, split direct vs with volunteers
+ */
+export const ReportConsegnePerCentroQueryParams = zod.object({
+  "da": zod.coerce.string().optional(),
+  "a": zod.coerce.string().optional()
+})
+
+export const ReportConsegnePerCentroResponseItem = zod.object({
+  "centroId": zod.number().nullish(),
+  "centroNome": zod.string(),
+  "dirette": zod.number(),
+  "conVolontari": zod.number(),
+  "totale": zod.number()
+})
+export const ReportConsegnePerCentroResponse = zod.array(ReportConsegnePerCentroResponseItem)
+
+
+export const ReportBeneficiariPerZonaQueryParams = zod.object({
+  "centroAscoltoId": zod.coerce.number().optional()
+})
 
 export const ReportBeneficiariPerZonaResponseItem = zod.object({
   "zona": zod.string(),

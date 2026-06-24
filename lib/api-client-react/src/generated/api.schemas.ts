@@ -1180,6 +1180,15 @@ export interface BeneficiariZonaReport {
   consegneDomicilio: number;
 }
 
+export interface ConsegnePerCentroReport {
+  /** @nullable */
+  centroId?: number | null;
+  centroNome: string;
+  dirette: number;
+  conVolontari: number;
+  totale: number;
+}
+
 export interface Area {
   key: string;
   label: string;
@@ -1341,8 +1350,25 @@ magazzinoId?: number;
 centroAscoltoId?: number;
 };
 
+export type ReportGiacenzePerMagazzinoParams = {
+magazzinoId?: number;
+};
+
 export type ReportConsegnePerMeseParams = {
 anno?: number;
+da?: string;
+a?: string;
+magazzinoId?: number;
+centroAscoltoId?: number;
+};
+
+export type ReportConsegnePerCentroParams = {
+da?: string;
+a?: string;
+};
+
+export type ReportBeneficiariPerZonaParams = {
+centroAscoltoId?: number;
 };
 
 export type ReportFsePlusParams = {
