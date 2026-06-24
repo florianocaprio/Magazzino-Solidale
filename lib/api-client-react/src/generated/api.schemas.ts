@@ -332,6 +332,10 @@ export interface Trasferimento {
   stato: string;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
   righe?: TrasferimentoRiga[];
   dataCreazione: string;
 }
@@ -381,6 +385,10 @@ export interface Scarico {
   causaleAltro?: string | null;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
   righe?: ScaricoRiga[];
   dataCreazione: string;
 }
@@ -967,6 +975,10 @@ export interface Bolla {
   confermaRicezione: boolean;
   /** @nullable */
   noteRicezione?: string | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
   dataCreazione: string;
 }
 
@@ -1022,6 +1034,10 @@ export interface BollaDettaglio {
   confermaRicezione: boolean;
   /** @nullable */
   noteRicezione?: string | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
   dataCreazione: string;
   righe: BollaRiga[];
 }
@@ -1199,6 +1215,8 @@ export interface AuthUser {
   username: string;
   nome: string;
   /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
@@ -1226,6 +1244,8 @@ export interface Utente {
   username: string;
   nome: string;
   /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
@@ -1244,6 +1264,8 @@ export interface UtenteInput {
   /** @minLength 1 */
   nome: string;
   /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
   ruoloId?: number | null;
   attivo?: boolean;
 }
@@ -1251,6 +1273,8 @@ export interface UtenteInput {
 export interface UtenteUpdate {
   /** @minLength 1 */
   nome?: string;
+  /** @nullable */
+  matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
   attivo?: boolean;

@@ -11,6 +11,8 @@ export interface AuthUser {
   username: string;
   nome: string;
   /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;

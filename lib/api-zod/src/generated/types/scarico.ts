@@ -19,6 +19,10 @@ export interface Scarico {
   causaleAltro?: string | null;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
   righe?: ScaricoRiga[];
   dataCreazione: string;
 }

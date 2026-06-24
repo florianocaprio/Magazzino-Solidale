@@ -43,6 +43,10 @@ export interface BollaDettaglio {
   confermaRicezione: boolean;
   /** @nullable */
   noteRicezione?: string | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
   dataCreazione: string;
   righe: BollaRiga[];
 }

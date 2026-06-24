@@ -219,6 +219,10 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     || (bolla.noteConsegna ? "Presso il centro" : "—");
   doc.text(`Trasportatore: ${trasportatore}`, colRightX, rightY);
   rightY += 5;
+  if (bolla.operatoreCodice) {
+    doc.text(`Operatore: ${bolla.operatoreCodice}`, colRightX, rightY);
+    rightY += 5;
+  }
 
   y = Math.max(leftY, rightY) + 4;
 

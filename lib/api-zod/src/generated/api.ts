@@ -476,6 +476,8 @@ export const ListTrasferimentiResponseItem = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -521,6 +523,8 @@ export const GetTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -556,6 +560,8 @@ export const UpdateTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -588,6 +594,8 @@ export const AvviaTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -625,6 +633,8 @@ export const ConfermaTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -647,6 +657,8 @@ export const ListScarichiResponseItem = zod.object({
   "causale": zod.string(),
   "causaleAltro": zod.string().nullish(),
   "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -688,6 +700,8 @@ export const GetScaricoResponse = zod.object({
   "causale": zod.string(),
   "causaleAltro": zod.string().nullish(),
   "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -1538,6 +1552,8 @@ export const ListBolleResponseItem = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 export const ListBolleResponse = zod.array(ListBolleResponseItem)
@@ -1581,6 +1597,8 @@ export const GetBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -1635,6 +1653,8 @@ export const UpdateBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -1725,6 +1745,8 @@ export const ConfermaBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -1769,6 +1791,8 @@ export const AnnullaBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -1818,6 +1842,8 @@ export const ConsegnaBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -2232,6 +2258,7 @@ export const LoginUserResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
   "isAdmin": zod.boolean(),
@@ -2244,6 +2271,7 @@ export const GetCurrentUserResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
   "isAdmin": zod.boolean(),
@@ -2339,6 +2367,7 @@ export const ListUtentiResponseItem = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
   "attivo": zod.boolean(),
@@ -2359,6 +2388,7 @@ export const CreateUtenteBody = zod.object({
   "username": zod.string().min(1),
   "password": zod.string().min(createUtenteBodyPasswordMin),
   "nome": zod.string().min(1),
+  "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "attivo": zod.boolean().optional()
 })
@@ -2372,6 +2402,7 @@ export const GetUtenteResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
   "attivo": zod.boolean(),
@@ -2390,6 +2421,7 @@ export const UpdateUtenteParams = zod.object({
 
 export const UpdateUtenteBody = zod.object({
   "nome": zod.string().min(1).optional(),
+  "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "attivo": zod.boolean().optional()
 })
@@ -2398,6 +2430,7 @@ export const UpdateUtenteResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
   "attivo": zod.boolean(),

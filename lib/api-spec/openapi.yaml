@@ -2561,6 +2561,10 @@ components:
           type: string
         note:
           type: ["string", "null"]
+        operatoreId:
+          type: ["integer", "null"]
+        operatoreCodice:
+          type: ["string", "null"]
         righe:
           type: array
           items:
@@ -2649,6 +2653,10 @@ components:
         causaleAltro:
           type: ["string", "null"]
         note:
+          type: ["string", "null"]
+        operatoreId:
+          type: ["integer", "null"]
+        operatoreCodice:
           type: ["string", "null"]
         righe:
           type: array
@@ -3545,6 +3553,10 @@ components:
           type: boolean
         noteRicezione:
           type: ["string", "null"]
+        operatoreId:
+          type: ["integer", "null"]
+        operatoreCodice:
+          type: ["string", "null"]
         dataCreazione:
           type: string
       required: [id, numeroBolla, dataBolla, beneficiarioId, magazzinoId, stato, confermaRicezione, dataCreazione]
@@ -3593,6 +3605,10 @@ components:
         confermaRicezione:
           type: boolean
         noteRicezione:
+          type: ["string", "null"]
+        operatoreId:
+          type: ["integer", "null"]
+        operatoreCodice:
           type: ["string", "null"]
         dataCreazione:
           type: string
@@ -3924,6 +3940,8 @@ components:
           type: string
         nome:
           type: string
+        matricola:
+          type: ["string", "null"]
         ruoloId:
           type: ["integer", "null"]
         ruoloNome:
@@ -3969,6 +3987,8 @@ components:
           type: string
         nome:
           type: string
+        matricola:
+          type: ["string", "null"]
         ruoloId:
           type: ["integer", "null"]
         ruoloNome:
@@ -3995,6 +4015,8 @@ components:
         nome:
           type: string
           minLength: 1
+        matricola:
+          type: ["string", "null"]
         ruoloId:
           type: ["integer", "null"]
         attivo:
@@ -4007,6 +4029,8 @@ components:
         nome:
           type: string
           minLength: 1
+        matricola:
+          type: ["string", "null"]
         ruoloId:
           type: ["integer", "null"]
         attivo:

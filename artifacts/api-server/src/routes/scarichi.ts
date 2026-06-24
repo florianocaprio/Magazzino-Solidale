@@ -7,6 +7,7 @@ import {
   prodottiTable,
   lottiTable,
   movimentiTable,
+  utentiTable,
 } from "@workspace/db";
 import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
 
@@ -18,9 +19,15 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function getScaricoWithRighe(id: number) {
   const [s] = await db
-    .select({ s: scarichiTable, magazzinoNome: magazziniTable.nome })
+    .select({
+      s: scarichiTable,
+      magazzinoNome: magazziniTable.nome,
+      operatoreMatricola: utentiTable.matricola,
+      operatoreUsername: utentiTable.username,
+    })
     .from(scarichiTable)
     .leftJoin(magazziniTable, eq(scarichiTable.magazzinoId, magazziniTable.id))
+    .leftJoin(utentiTable, eq(scarichiTable.operatoreId, utentiTable.id))
     .where(eq(scarichiTable.id, id));
   if (!s) return null;
 
@@ -39,6 +46,8 @@ async function getScaricoWithRighe(id: number) {
     causale: s.s.causale,
     causaleAltro: s.s.causaleAltro ?? null,
     note: s.s.note ?? null,
+    operatoreId: s.s.operatoreId ?? null,
+    operatoreCodice: s.operatoreMatricola ?? s.operatoreUsername ?? null,
     righe: righe.map((r) => ({
       id: r.r.id,
       prodottoId: r.r.prodottoId,
@@ -128,6 +137,16 @@ router.get("/scarichi", async (_req, res) => {
     .from(magazziniTable);
   const magMap = new Map(magazzini.map((m) => [m.id, m.nome]));
 
+  const operatoreIds = [...new Set(rows.map((r) => r.operatoreId).filter((x): x is number => x != null))];
+  const opMap = new Map<number, string | null>();
+  if (operatoreIds.length > 0) {
+    const utenti = await db
+      .select({ id: utentiTable.id, matricola: utentiTable.matricola, username: utentiTable.username })
+      .from(utentiTable)
+      .where(inArray(utentiTable.id, operatoreIds));
+    for (const u of utenti) opMap.set(u.id, u.matricola ?? u.username ?? null);
+  }
+
   const ids = rows.map((r) => r.id);
   const righeByS = new Map<
     number,
@@ -170,6 +189,8 @@ router.get("/scarichi", async (_req, res) => {
       causale: r.causale,
       causaleAltro: r.causaleAltro ?? null,
       note: r.note ?? null,
+      operatoreId: r.operatoreId ?? null,
+      operatoreCodice: r.operatoreId != null ? (opMap.get(r.operatoreId) ?? null) : null,
       righe: righeByS.get(r.id) ?? [],
       dataCreazione: r.dataCreazione.toISOString(),
     })),
@@ -236,6 +257,7 @@ router.post("/scarichi", async (req, res) => {
         causale: body.causale,
         causaleAltro: body.causale === "altro" ? body.causaleAltro ?? null : null,
         note: body.note ?? null,
+        operatoreId: req.user!.id,
       })
       .returning();
 

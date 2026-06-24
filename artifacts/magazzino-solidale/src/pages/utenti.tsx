@@ -86,6 +86,7 @@ export default function Utenti() {
 
   const [username, setUsername] = useState("");
   const [nome, setNome] = useState("");
+  const [matricola, setMatricola] = useState("");
   const [password, setPassword] = useState("");
   const [ruoloId, setRuoloId] = useState<string>(NO_ROLE);
   const [attivo, setAttivo] = useState(true);
@@ -99,6 +100,7 @@ export default function Utenti() {
     setEditing(null);
     setUsername("");
     setNome("");
+    setMatricola("");
     setPassword("");
     setRuoloId(NO_ROLE);
     setAttivo(true);
@@ -110,6 +112,7 @@ export default function Utenti() {
     setEditing(u);
     setUsername(u.username);
     setNome(u.nome);
+    setMatricola(u.matricola ?? "");
     setPassword("");
     setRuoloId(u.ruoloId != null ? String(u.ruoloId) : NO_ROLE);
     setAttivo(u.attivo);
@@ -126,7 +129,7 @@ export default function Utenti() {
       updateUtente.mutate(
         {
           id: editing.id,
-          data: { nome, ruoloId: ruoloIdValue, attivo },
+          data: { nome, matricola: matricola.trim() || null, ruoloId: ruoloIdValue, attivo },
         },
         {
           onSuccess: () => {
@@ -147,6 +150,7 @@ export default function Utenti() {
           data: {
             username: username.trim(),
             nome,
+            matricola: matricola.trim() || null,
             password,
             ruoloId: ruoloIdValue,
             attivo,
@@ -251,6 +255,7 @@ export default function Utenti() {
                 <TableRow>
                   <TableHead>Username</TableHead>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Matricola</TableHead>
                   <TableHead>Ruolo</TableHead>
                   <TableHead>Stato</TableHead>
                   <TableHead>Ultimo accesso</TableHead>
@@ -262,6 +267,7 @@ export default function Utenti() {
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.username}</TableCell>
                     <TableCell>{u.nome}</TableCell>
+                    <TableCell>{u.matricola ?? "—"}</TableCell>
                     <TableCell>{u.ruoloNome ?? "—"}</TableCell>
                     <TableCell>
                       {u.attivo ? (
@@ -314,7 +320,7 @@ export default function Utenti() {
                 {utenti?.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center text-muted-foreground py-8"
                     >
                       Nessun utente
@@ -353,6 +359,19 @@ export default function Utenti() {
                 onChange={(e) => setNome(e.target.value)}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="u-matricola">Matricola</Label>
+              <Input
+                id="u-matricola"
+                value={matricola}
+                onChange={(e) => setMatricola(e.target.value)}
+                placeholder="Codice operatore (facoltativo)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Stampata sulle bolle come codice operatore. Se vuota, viene usato
+                lo username.
+              </p>
             </div>
             {!editing && (
               <div className="space-y-2">

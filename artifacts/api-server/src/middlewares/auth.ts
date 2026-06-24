@@ -7,6 +7,7 @@ export interface SessionUser {
   id: number;
   username: string;
   nome: string;
+  matricola: string | null;
   ruoloId: number | null;
   ruoloNome: string | null;
   isAdmin: boolean;
@@ -37,6 +38,7 @@ export async function loadSessionUser(
       id: utentiTable.id,
       username: utentiTable.username,
       nome: utentiTable.nome,
+      matricola: utentiTable.matricola,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
       ruoloId: utentiTable.ruoloId,
@@ -54,6 +56,7 @@ export async function loadSessionUser(
     id: row.id,
     username: row.username,
     nome: row.nome,
+    matricola: row.matricola ?? null,
     ruoloId: row.ruoloId ?? null,
     ruoloNome: row.ruoloNome ?? null,
     isAdmin: row.isAdmin ?? false,

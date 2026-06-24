@@ -1,6 +1,7 @@
 import { pgTable, serial, varchar, text, timestamp, integer, date, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { utentiTable } from "./auth";
 
 export const trasferimentiTable = pgTable("trasferimenti", {
   id: serial("id").primaryKey(),
@@ -12,6 +13,7 @@ export const trasferimentiTable = pgTable("trasferimenti", {
   dataConfermaRicezione: date("data_conferma_ricezione"),
   stato: varchar("stato", { length: 20 }).notNull().default("richiesto"),
   note: text("note"),
+  operatoreId: integer("operatore_id").references(() => utentiTable.id),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 

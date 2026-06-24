@@ -24,6 +24,10 @@ export interface Trasferimento {
   stato: string;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
   righe?: TrasferimentoRiga[];
   dataCreazione: string;
 }

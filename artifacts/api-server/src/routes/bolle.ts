@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import {
   bolleTable, bollaRigheTable, beneficiariTable, magazziniTable,
   movimentiTable, lottiTable, prodottiTable, volontariTable, interventiTable,
-  consegneTable,
+  consegneTable, utentiTable,
 } from "@workspace/db";
 import { eq, and, desc, asc, gt, sum, type SQL } from "drizzle-orm";
 
@@ -128,11 +128,14 @@ async function buildDettaglio(id: number) {
       magazzinoComune: magazziniTable.comune,
       volontarioNome: volontariTable.nome,
       volontarioCognome: volontariTable.cognome,
+      operatoreMatricola: utentiTable.matricola,
+      operatoreUsername: utentiTable.username,
     })
     .from(bolleTable)
     .leftJoin(beneficiariTable, eq(bolleTable.beneficiarioId, beneficiariTable.id))
     .leftJoin(magazziniTable, eq(bolleTable.magazzinoId, magazziniTable.id))
     .leftJoin(volontariTable, eq(bolleTable.volontarioConsegnaId, volontariTable.id))
+    .leftJoin(utentiTable, eq(bolleTable.operatoreId, utentiTable.id))
     .where(eq(bolleTable.id, id));
 
   if (!row) return null;
@@ -171,6 +174,8 @@ async function buildDettaglio(id: number) {
     noteConsegna: row.b.noteConsegna ?? null,
     confermaRicezione: row.b.confermaRicezione,
     noteRicezione: row.b.noteRicezione ?? null,
+    operatoreId: row.b.operatoreId ?? null,
+    operatoreCodice: row.operatoreMatricola ?? row.operatoreUsername ?? null,
     dataCreazione: row.b.dataCreazione.toISOString(),
     righe: righe.map(r => ({
       id: r.r.id,
@@ -318,10 +323,13 @@ router.get("/bolle", async (req, res) => {
       cognome: beneficiariTable.cognome,
       nome: beneficiariTable.nome,
       magazzinoNome: magazziniTable.nome,
+      operatoreMatricola: utentiTable.matricola,
+      operatoreUsername: utentiTable.username,
     })
     .from(bolleTable)
     .leftJoin(beneficiariTable, eq(bolleTable.beneficiarioId, beneficiariTable.id))
     .leftJoin(magazziniTable, eq(bolleTable.magazzinoId, magazziniTable.id))
+    .leftJoin(utentiTable, eq(bolleTable.operatoreId, utentiTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(bolleTable.dataCreazione))
     .limit(200);
@@ -343,6 +351,8 @@ router.get("/bolle", async (req, res) => {
     noteConsegna: r.b.noteConsegna ?? null,
     confermaRicezione: r.b.confermaRicezione,
     noteRicezione: r.b.noteRicezione ?? null,
+    operatoreId: r.b.operatoreId ?? null,
+    operatoreCodice: r.operatoreMatricola ?? r.operatoreUsername ?? null,
     dataCreazione: r.b.dataCreazione.toISOString(),
   })));
 });
@@ -361,7 +371,7 @@ router.post("/bolle", async (req, res) => {
   const numeroBolla = `BOLLA-${anno}-${String(lastNum + 1).padStart(4, "0")}`;
   const dataBolla = body.dataBolla ?? new Date().toISOString().split("T")[0];
 
-  const [row] = await db.insert(bolleTable).values({ ...body, numeroBolla, dataBolla }).returning();
+  const [row] = await db.insert(bolleTable).values({ ...body, numeroBolla, dataBolla, operatoreId: req.user!.id }).returning();
   const det = await buildDettaglio(row.id);
   res.status(201).json(det);
 });
@@ -410,7 +420,7 @@ router.patch("/bolle/:id", async (req, res) => {
     await db.delete(bollaRigheTable).where(eq(bollaRigheTable.bollaId, bollaId));
   }
 
-  const [row] = await db.update(bolleTable).set(body).where(eq(bolleTable.id, bollaId)).returning();
+  const [row] = await db.update(bolleTable).set({ ...body, operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId)).returning();
 
   // se è cambiato il beneficiario su una bolla confermata, allinea l'intervento collegato
   if (row.stato === "confermato" && body.beneficiarioId && body.beneficiarioId !== bolla.beneficiarioId) {
@@ -507,6 +517,8 @@ router.post("/bolle/:id/righe", async (req, res) => {
     await syncInterventoBolla(bollaId);
   }
 
+  await db.update(bolleTable).set({ operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
+
   const lotto = riga.lottoId ? (await db.select().from(lottiTable).where(eq(lottiTable.id, riga.lottoId)))[0] : null;
 
   res.status(201).json({
@@ -550,6 +562,8 @@ router.delete("/bolle/:id/righe/:rigaId", async (req, res) => {
   if (bolla.stato === "confermato") {
     await syncInterventoBolla(bollaId);
   }
+
+  await db.update(bolleTable).set({ operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
 
   res.status(204).end();
 });
@@ -633,7 +647,7 @@ router.post("/bolle/:id/conferma", async (req, res) => {
     }
   }
 
-  await db.update(bolleTable).set({ stato: "confermato" }).where(eq(bolleTable.id, bollaId));
+  await db.update(bolleTable).set({ stato: "confermato", operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
   await syncInterventoBolla(bollaId);
   const det = await buildDettaglio(bollaId);
   res.json(det);
@@ -657,6 +671,7 @@ router.post("/bolle/:id/consegna", async (req, res) => {
     stato: "consegnato",
     confermaRicezione: confermaRicezione ?? true,
     noteRicezione: noteRicezione ?? null,
+    operatoreId: req.user!.id,
   }).where(eq(bolleTable.id, bollaId));
 
   // allinea la pianificazione consegne (aggiorna quella collegata o ne crea una diretta)
@@ -690,7 +705,7 @@ router.post("/bolle/:id/annulla", async (req, res) => {
     }
   }
 
-  await db.update(bolleTable).set({ stato: "annullato" }).where(eq(bolleTable.id, bollaId));
+  await db.update(bolleTable).set({ stato: "annullato", operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
   await removeInterventoBolla(bollaId);
   const det = await buildDettaglio(bollaId);
   res.json(det);

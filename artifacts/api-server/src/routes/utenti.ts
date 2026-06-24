@@ -17,6 +17,7 @@ type UtenteRow = {
   id: number;
   username: string;
   nome: string;
+  matricola: string | null;
   ruoloId: number | null;
   ruoloNome: string | null;
   attivo: boolean;
@@ -29,6 +30,7 @@ const fmt = (r: UtenteRow) => ({
   id: r.id,
   username: r.username,
   nome: r.nome,
+  matricola: r.matricola ?? null,
   ruoloId: r.ruoloId ?? null,
   ruoloNome: r.ruoloNome ?? null,
   attivo: r.attivo,
@@ -43,6 +45,7 @@ const selectUtente = () =>
       id: utentiTable.id,
       username: utentiTable.username,
       nome: utentiTable.nome,
+      matricola: utentiTable.matricola,
       ruoloId: utentiTable.ruoloId,
       ruoloNome: ruoliTable.nome,
       attivo: utentiTable.attivo,
@@ -88,7 +91,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { username, password, nome, ruoloId, attivo } = parsed.data;
+  const { username, password, nome, matricola, ruoloId, attivo } = parsed.data;
 
   const [existing] = await db
     .select({ id: utentiTable.id })
@@ -106,6 +109,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
       username,
       passwordHash,
       nome,
+      matricola: matricola ?? null,
       ruoloId: ruoloId ?? null,
       attivo: attivo ?? true,
       mustChangePassword: true,
@@ -167,6 +171,7 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
 
   const updates: Partial<typeof utentiTable.$inferInsert> = {};
   if (body.nome !== undefined) updates.nome = body.nome;
+  if (body.matricola !== undefined) updates.matricola = body.matricola;
   if (body.ruoloId !== undefined) updates.ruoloId = body.ruoloId;
   if (body.attivo !== undefined) updates.attivo = body.attivo;
 

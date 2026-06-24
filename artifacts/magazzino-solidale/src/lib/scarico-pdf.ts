@@ -154,6 +154,13 @@ export async function generateScaricoPdf(opts: ScaricoPdfOptions): Promise<void>
     doc.text(lines, margin, afterTableY);
   }
 
+  if (s.operatoreCodice) {
+    afterTableY += 8;
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Operatore: ${s.operatoreCodice}`, margin, afterTableY);
+  }
+
   // ---- Firme ----
   const sigY = Math.max(afterTableY + 22, pageH - 50);
   doc.setDrawColor(150, 150, 150);

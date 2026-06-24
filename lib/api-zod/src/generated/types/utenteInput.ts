@@ -14,6 +14,8 @@ export interface UtenteInput {
   /** @minLength 1 */
   nome: string;
   /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
   ruoloId?: number | null;
   attivo?: boolean;
 }

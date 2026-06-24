@@ -142,6 +142,13 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
     doc.text(lines, margin, afterTableY);
   }
 
+  if (t.operatoreCodice) {
+    afterTableY += 8;
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Operatore: ${t.operatoreCodice}`, margin, afterTableY);
+  }
+
   // ---- Firme ----
   const sigY = Math.max(afterTableY + 22, pageH - 50);
   doc.setDrawColor(150, 150, 150);

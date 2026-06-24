@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTable, lottiTable } from "@workspace/db";
+import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTable, lottiTable, utentiTable } from "@workspace/db";
 import { eq, and, desc, inArray, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -9,9 +9,12 @@ async function getTrasferimentoWithRighe(id: number) {
   const [t] = await db.select({
     t: trasferimentiTable,
     origineNome: magazziniTable.nome,
+    operatoreMatricola: utentiTable.matricola,
+    operatoreUsername: utentiTable.username,
   })
     .from(trasferimentiTable)
     .leftJoin(magazziniTable, eq(trasferimentiTable.magazzinoOrigineId, magazziniTable.id))
+    .leftJoin(utentiTable, eq(trasferimentiTable.operatoreId, utentiTable.id))
     .where(eq(trasferimentiTable.id, id));
   if (!t) return null;
 
@@ -38,6 +41,8 @@ async function getTrasferimentoWithRighe(id: number) {
     dataConfermaRicezione: t.t.dataConfermaRicezione ?? null,
     stato: t.t.stato,
     note: t.t.note ?? null,
+    operatoreId: t.t.operatoreId ?? null,
+    operatoreCodice: t.operatoreMatricola ?? t.operatoreUsername ?? null,
     righe: righe.map(r => ({
       id: r.r.id,
       prodottoId: r.r.prodottoId,
@@ -65,6 +70,14 @@ router.get("/trasferimenti", async (req, res) => {
 
   const magazzini = await db.select({ id: magazziniTable.id, nome: magazziniTable.nome }).from(magazziniTable);
   const magMap = new Map(magazzini.map(m => [m.id, m.nome]));
+
+  const operatoreIds = [...new Set(rows.map(r => r.operatoreId).filter((x): x is number => x != null))];
+  const opMap = new Map<number, string | null>();
+  if (operatoreIds.length > 0) {
+    const utenti = await db.select({ id: utentiTable.id, matricola: utentiTable.matricola, username: utentiTable.username })
+      .from(utentiTable).where(inArray(utentiTable.id, operatoreIds));
+    for (const u of utenti) opMap.set(u.id, u.matricola ?? u.username ?? null);
+  }
 
   const ids = rows.map(r => r.id);
   const righeByT = new Map<number, Array<{
@@ -106,6 +119,8 @@ router.get("/trasferimenti", async (req, res) => {
     dataConfermaRicezione: r.dataConfermaRicezione ?? null,
     stato: r.stato,
     note: r.note ?? null,
+    operatoreId: r.operatoreId ?? null,
+    operatoreCodice: r.operatoreId != null ? (opMap.get(r.operatoreId) ?? null) : null,
     righe: righeByT.get(r.id) ?? [],
     dataCreazione: r.dataCreazione.toISOString(),
   })));
@@ -129,6 +144,7 @@ router.post("/trasferimenti", async (req, res) => {
     magazzinoDestinoId: body.magazzinoDestinoId,
     dataRichiesta: body.dataRichiesta,
     note: body.note,
+    operatoreId: req.user!.id,
   }).returning();
 
   if (body.righe?.length) {
@@ -155,7 +171,7 @@ router.get("/trasferimenti/:id", async (req, res) => {
 });
 
 router.patch("/trasferimenti/:id", async (req, res) => {
-  const [row] = await db.update(trasferimentiTable).set(req.body).where(eq(trasferimentiTable.id, parseInt(req.params.id))).returning();
+  const [row] = await db.update(trasferimentiTable).set({ ...req.body, operatoreId: req.user!.id }).where(eq(trasferimentiTable.id, parseInt(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   const result = await getTrasferimentoWithRighe(row.id);
   res.json(result);
@@ -163,7 +179,7 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 
 router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const [row] = await db.update(trasferimentiTable)
-    .set({ stato: "in_transito", dataEsecuzione: new Date().toISOString().split("T")[0] })
+    .set({ stato: "in_transito", dataEsecuzione: new Date().toISOString().split("T")[0], operatoreId: req.user!.id })
     .where(eq(trasferimentiTable.id, parseInt(req.params.id)))
     .returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -178,6 +194,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
       stato: "completato",
       dataConfermaRicezione: body.dataConferma ?? new Date().toISOString().split("T")[0],
       note: body.note,
+      operatoreId: req.user!.id,
     })
     .where(eq(trasferimentiTable.id, parseInt(req.params.id)))
     .returning();

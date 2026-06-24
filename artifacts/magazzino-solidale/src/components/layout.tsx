@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   UserCog,
   Languages,
+  ChevronDown,
   LogOut
 } from "lucide-react";
 import { 
@@ -35,6 +36,11 @@ import {
   SidebarMenuItem,
   SidebarProvider
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -119,25 +125,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <SidebarContent>
             {Object.entries(groupedNav).map(([group, items]) => (
-              <SidebarGroup key={group}>
-                <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground font-medium px-4 py-2">
-                  {t(`nav.groups.${group}`)}
-                </SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {items.map((item) => (
-                      <SidebarMenuItem key={item.url}>
-                        <SidebarMenuButton asChild isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}>
-                          <Link href={item.url} className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors">
-                            <item.icon className="h-4 w-4" />
-                            <span>{t(`nav.items.${item.key}`)}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
+              <Collapsible key={group} defaultOpen className="group/collapsible">
+                <SidebarGroup>
+                  <SidebarGroupLabel asChild>
+                    <CollapsibleTrigger className="flex w-full items-center justify-between text-xs uppercase tracking-wider text-muted-foreground font-medium px-4 py-2 hover:text-foreground transition-colors">
+                      {t(`nav.groups.${group}`)}
+                      <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=closed]/collapsible:-rotate-90" />
+                    </CollapsibleTrigger>
+                  </SidebarGroupLabel>
+                  <CollapsibleContent>
+                    <SidebarGroupContent>
+                      <SidebarMenu>
+                        {items.map((item) => (
+                          <SidebarMenuItem key={item.url}>
+                            <SidebarMenuButton asChild isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}>
+                              <Link href={item.url} className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors">
+                                <item.icon className="h-4 w-4" />
+                                <span>{t(`nav.items.${item.key}`)}</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </CollapsibleContent>
+                </SidebarGroup>
+              </Collapsible>
             ))}
           </SidebarContent>
           <SidebarFooter className="border-t border-border">

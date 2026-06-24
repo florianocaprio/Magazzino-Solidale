@@ -1,6 +1,7 @@
 import { pgTable, serial, varchar, text, boolean, timestamp, decimal, integer, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { utentiTable } from "./auth";
 
 export const bolleTable = pgTable("bolle", {
   id: serial("id").primaryKey(),
@@ -10,7 +11,7 @@ export const bolleTable = pgTable("bolle", {
   consegnaId: integer("consegna_id"),
   magazzinoId: integer("magazzino_id").notNull(),
   indirizzoConsegna: varchar("indirizzo_consegna", { length: 200 }),
-  operatoreId: integer("operatore_id"),
+  operatoreId: integer("operatore_id").references(() => utentiTable.id),
   volontarioConsegnaId: integer("volontario_consegna_id"),
   trasportatoreNome: varchar("trasportatore_nome", { length: 120 }),
   mezzoId: integer("mezzo_id"),
