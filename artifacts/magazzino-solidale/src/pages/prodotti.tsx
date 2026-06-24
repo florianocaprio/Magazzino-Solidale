@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { useListProdotti, useCreateProdotto, useUpdateProdotto, useDeleteProdotto, getListProdottiQueryKey } from "@workspace/api-client-react";
+import {
+  useListProdotti,
+  useCreateProdotto,
+  useUpdateProdotto,
+  useDeleteProdotto,
+  useListMagazzini,
+  useCreateLotto,
+  useCreateMovimento,
+  getListProdottiQueryKey,
+  getListGiacenzeQueryKey,
+  getListLottiQueryKey,
+  getListMovimentiQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Filter } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,6 +46,223 @@ const formSchema = z.object({
   note: z.string().optional()
 });
 
+const caricoSchema = z.object({
+  magazzinoId: z.string().min(1, "Seleziona un magazzino"),
+  quantita: z.coerce.number().positive("La quantità deve essere maggiore di zero"),
+  dataCarico: z.string().min(1, "Campo obbligatorio"),
+  causale: z.string().min(1, "Campo obbligatorio"),
+  codiceLotto: z.string().optional(),
+  dataScadenza: z.string().optional(),
+  note: z.string().optional(),
+});
+
+type Prodotto = {
+  id: number;
+  nome: string;
+  unitaMisura: string;
+  gestioneLotto: boolean;
+  gestioneScadenza: boolean;
+};
+
+function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => void }) {
+  const { data: magazzini } = useListMagazzini();
+  const createLotto = useCreateLotto();
+  const createMovimento = useCreateMovimento();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof caricoSchema>>({
+    resolver: zodResolver(caricoSchema),
+    defaultValues: {
+      magazzinoId: "",
+      quantita: 0,
+      dataCarico: new Date().toISOString().split("T")[0],
+      causale: "donazione",
+      codiceLotto: "",
+      dataScadenza: "",
+      note: "",
+    },
+  });
+
+  const submitting = createLotto.isPending || createMovimento.isPending;
+
+  const onSubmit = (data: z.infer<typeof caricoSchema>) => {
+    createLotto.mutate(
+      {
+        data: {
+          prodottoId: prodotto.id,
+          magazzinoId: parseInt(data.magazzinoId),
+          dataCarico: data.dataCarico,
+          quantitaCaricata: data.quantita,
+          codiceLotto: data.codiceLotto || undefined,
+          dataScadenza: data.dataScadenza || undefined,
+          note: data.note || undefined,
+        },
+      },
+      {
+        onSuccess: (lotto) => {
+          const invalidateStock = () => {
+            queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getListLottiQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
+          };
+          createMovimento.mutate(
+            {
+              data: {
+                tipoMovimento: "carico",
+                tipoDettaglio: data.causale,
+                dataMovimento: data.dataCarico,
+                magazzinoId: parseInt(data.magazzinoId),
+                prodottoId: prodotto.id,
+                lottoId: lotto.id,
+                quantita: data.quantita,
+                unitaMisura: prodotto.unitaMisura,
+                note: data.note || undefined,
+              },
+            },
+            {
+              onSuccess: () => {
+                invalidateStock();
+                toast({
+                  title: "Carico registrato",
+                  description: `${data.quantita} ${prodotto.unitaMisura} di ${prodotto.nome} caricati in magazzino.`,
+                });
+                onClose();
+              },
+              onError: () => {
+                // The lotto (and therefore the stock) was already created; only the
+                // audit movement failed. Refresh stock and warn — do NOT keep the form
+                // open, or re-submitting would load the quantity a second time.
+                invalidateStock();
+                toast({
+                  title: "Carico effettuato, log incompleto",
+                  description: "La giacenza è stata aggiornata, ma la registrazione del movimento è fallita.",
+                  variant: "destructive",
+                });
+                onClose();
+              },
+            },
+          );
+        },
+        onError: () =>
+          toast({ title: "Errore", description: "Impossibile registrare il carico", variant: "destructive" }),
+      },
+    );
+  };
+
+  return (
+    <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Carica in magazzino</SheetTitle>
+          <SheetDescription>
+            Aggiungi stock di <span className="font-medium text-foreground">{prodotto.nome}</span> selezionando magazzino e quantità.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="magazzinoId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Magazzino di competenza</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleziona magazzino..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {magazzini?.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="quantita" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantità ({prodotto.unitaMisura})</FormLabel>
+                    <FormControl><Input type="number" min="0" step="any" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="dataCarico" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data carico</FormLabel>
+                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <FormField control={form.control} name="causale" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Causale</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleziona causale" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="donazione">Donazione</SelectItem>
+                      <SelectItem value="acquisto">Acquisto</SelectItem>
+                      <SelectItem value="rettifica_inventario">Rettifica inventario</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {(prodotto.gestioneLotto || prodotto.gestioneScadenza) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {prodotto.gestioneLotto && (
+                    <FormField control={form.control} name="codiceLotto" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Codice lotto</FormLabel>
+                        <FormControl><Input placeholder="Opzionale" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                  {prodotto.gestioneScadenza && (
+                    <FormField control={form.control} name="dataScadenza" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data scadenza</FormLabel>
+                        <FormControl><Input type="date" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                </div>
+              )}
+
+              <FormField control={form.control} name="note" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Note</FormLabel>
+                  <FormControl><Input placeholder="Opzionale" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="pt-6 flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onClose}>Annulla</Button>
+                <Button type="submit" disabled={submitting} className="gap-2">
+                  <PackagePlus className="h-4 w-4" /> Registra carico
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export default function Prodotti() {
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState("all");
@@ -49,6 +278,7 @@ export default function Prodotti() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [caricoProdotto, setCaricoProdotto] = useState<Prodotto | null>(null);
 
   const createProdotto = useCreateProdotto();
   const updateProdotto = useUpdateProdotto();
@@ -252,6 +482,16 @@ export default function Prodotti() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setCaricoProdotto({
+                          id: prodotto.id,
+                          nome: prodotto.nome,
+                          unitaMisura: prodotto.unitaMisura,
+                          gestioneLotto: prodotto.gestioneLotto,
+                          gestioneScadenza: prodotto.gestioneScadenza,
+                        })}>
+                          <PackagePlus className="mr-2 h-4 w-4" />
+                          Carica in magazzino
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEdit(prodotto)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           Modifica
@@ -417,6 +657,10 @@ export default function Prodotti() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {caricoProdotto && (
+        <CaricoForm prodotto={caricoProdotto} onClose={() => setCaricoProdotto(null)} />
+      )}
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>

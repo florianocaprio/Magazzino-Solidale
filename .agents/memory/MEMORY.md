@@ -6,3 +6,4 @@
 - [Consegne stato & bolla readiness](consegne-bolla-readiness.md) — consegne stati are pianificata/effettuata (NOT programmata/completata); readiness derives from linked bolla.stato; completa needs a ready bolla and reuses bolla's intervento (no duplicate).
 - [Bolla PDF templates & print settings](bolla-pdf-templates.md) — template enum lives in 4 places (DB/OpenAPI/API/PDF ACCENT) kept in lockstep; centro logo is base64 data URL in centri.logo_url; settings is atomic singleton.
 - [Trasferimenti as transfer-bolla](trasferimenti-as-bolla.md) — a transfer IS the trasferimenti record (no separate bolla; bolle.beneficiarioId is NOT NULL); PDF client-side; shown in Bolle as read-only "Trasferimento Interno" rows.
+- [Carico / stock model](carico-stock-model.md) — adding stock REQUIRES creating a lotto (giacenze = sum of lotti.quantitaResidua); a movimento alone is only an audit log. Create lotto then movimento.
