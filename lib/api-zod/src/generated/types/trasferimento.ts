@@ -13,9 +13,27 @@ export interface Trasferimento {
   magazzinoOrigineId: number;
   /** @nullable */
   magazzinoOrigineNome?: string | null;
+  /** @nullable */
+  magazzinoOrigineIndirizzo?: string | null;
+  /** @nullable */
+  magazzinoOrigineComune?: string | null;
+  /** @nullable */
+  magazzinoOrigineZona?: string | null;
   magazzinoDestinoId: number;
   /** @nullable */
   magazzinoDestinoNome?: string | null;
+  /** @nullable */
+  magazzinoDestinoIndirizzo?: string | null;
+  /** @nullable */
+  magazzinoDestinoComune?: string | null;
+  /** @nullable */
+  magazzinoDestinoZona?: string | null;
+  /** @nullable */
+  trasportatoreVolontarioId?: number | null;
+  /** @nullable */
+  trasportatoreVolontarioNome?: string | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
   dataRichiesta: string;
   /** @nullable */
   dataEsecuzione?: string | null;

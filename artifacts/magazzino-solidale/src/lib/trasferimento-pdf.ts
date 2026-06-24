@@ -93,16 +93,50 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   y += 6;
 
   // ---- Origine / Destinazione ----
+  const colDestX = pageW / 2 + 4;
+  const addrLines = (
+    indirizzo?: string | null,
+    comune?: string | null,
+    zona?: string | null,
+  ): string[] => {
+    const lines: string[] = [];
+    if (indirizzo) lines.push(indirizzo);
+    if (comune) lines.push(comune);
+    if (zona) lines.push(`Zona: ${zona}`);
+    return lines;
+  };
+  const origineAddr = addrLines(t.magazzinoOrigineIndirizzo, t.magazzinoOrigineComune, t.magazzinoOrigineZona);
+  const destinoAddr = addrLines(t.magazzinoDestinoIndirizzo, t.magazzinoDestinoComune, t.magazzinoDestinoZona);
+
   doc.setFontSize(9);
   doc.setTextColor(110, 110, 110);
   doc.text("MAGAZZINO ORIGINE", margin, y);
-  doc.text("MAGAZZINO DESTINAZIONE", pageW / 2 + 4, y);
+  doc.text("MAGAZZINO DESTINAZIONE", colDestX, y);
   y += 5;
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text(t.magazzinoOrigineNome || `Magazzino #${t.magazzinoOrigineId}`, margin, y);
-  doc.text(t.magazzinoDestinoNome || `Magazzino #${t.magazzinoDestinoId}`, pageW / 2 + 4, y);
+  doc.text(t.magazzinoDestinoNome || `Magazzino #${t.magazzinoDestinoId}`, colDestX, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  let addrY = y + 5;
+  origineAddr.forEach((line, i) => doc.text(line, margin, addrY + i * 4.5));
+  destinoAddr.forEach((line, i) => doc.text(line, colDestX, addrY + i * 4.5));
+  doc.setTextColor(0, 0, 0);
+  const addrRows = Math.max(origineAddr.length, destinoAddr.length);
+  y = addrY + addrRows * 4.5 + 4;
+
+  // ---- Trasportatore ----
+  const trasportatore = t.trasportatoreVolontarioNome || t.trasportatoreNome || "—";
+  doc.setFontSize(9);
+  doc.setTextColor(110, 110, 110);
+  doc.text("TRASPORTATORE", margin, y);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text(trasportatore, margin + 36, y);
   doc.setFont("helvetica", "normal");
   y += 9;
 

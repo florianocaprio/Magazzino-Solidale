@@ -10,6 +10,10 @@ import type { TrasferimentoRigaInput } from './trasferimentoRigaInput';
 export interface TrasferimentoInput {
   magazzinoOrigineId: number;
   magazzinoDestinoId: number;
+  /** @nullable */
+  trasportatoreVolontarioId?: number | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
   dataRichiesta: string;
   note?: string;
   righe: TrasferimentoRigaInput[];

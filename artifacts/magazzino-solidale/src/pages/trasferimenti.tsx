@@ -6,6 +6,7 @@ import {
   useConfermaTrasferimento,
   useListMagazzini,
   useListGiacenze,
+  useListVolontari,
   useGetImpostazioniStampa,
   getListTrasferimentiQueryKey,
   getListGiacenzeQueryKey,
@@ -167,10 +168,13 @@ function NuovoTrasferimentoForm({
 }) {
   const [origineId, setOrigineId] = useState("");
   const [destinoId, setDestinoId] = useState("");
+  const [trasportatore, setTrasportatore] = useState("");
+  const [trasportatoreAltro, setTrasportatoreAltro] = useState("");
   const [note, setNote] = useState("");
   const [righe, setRighe] = useState<RigaDraft[]>([newRiga()]);
 
   const { data: magazzini } = useListMagazzini();
+  const { data: volontari } = useListVolontari();
   const createTrasferimento = useCreateTrasferimento();
   const { toast } = useToast();
 
@@ -183,6 +187,8 @@ function NuovoTrasferimentoForm({
   const reset = () => {
     setOrigineId("");
     setDestinoId("");
+    setTrasportatore("");
+    setTrasportatoreAltro("");
     setNote("");
     setRighe([newRiga()]);
   };
@@ -192,12 +198,16 @@ function NuovoTrasferimentoForm({
     const giac = origineGiacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
     return parseFloat(r.quantita) > (giac?.quantitaTotale ?? 0);
   });
+  const trasportatoreValido =
+    (!!trasportatore && trasportatore !== "altro") ||
+    (trasportatore === "altro" && trasportatoreAltro.trim().length > 0);
   const canSubmit =
     !!origineId &&
     !!destinoId &&
     origineId !== destinoId &&
     righeValide.length > 0 &&
     !hasEccesso &&
+    trasportatoreValido &&
     !createTrasferimento.isPending;
 
   const onSubmit = () => {
@@ -208,6 +218,10 @@ function NuovoTrasferimentoForm({
           magazzinoOrigineId: parseInt(origineId),
           magazzinoDestinoId: parseInt(destinoId),
           dataRichiesta: new Date().toISOString().split("T")[0],
+          trasportatoreVolontarioId:
+            trasportatore && trasportatore !== "altro" ? parseInt(trasportatore) : undefined,
+          trasportatoreNome:
+            trasportatore === "altro" ? (trasportatoreAltro.trim() || undefined) : undefined,
           note: note || undefined,
           righe: righeValide.map((r) => ({
             prodottoId: parseInt(r.prodottoId),
@@ -265,6 +279,26 @@ function NuovoTrasferimentoForm({
                 <p className="text-xs text-destructive">Origine e destinazione devono essere diverse.</p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Trasportatore <span className="text-destructive">*</span></Label>
+            <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); if (v !== "altro") setTrasportatoreAltro(""); }}>
+              <SelectTrigger><SelectValue placeholder="Seleziona trasportatore..." /></SelectTrigger>
+              <SelectContent>
+                {volontari?.filter((v) => v.attivo).map((v) => (
+                  <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>
+                ))}
+                <SelectItem value="altro">Altro…</SelectItem>
+              </SelectContent>
+            </Select>
+            {trasportatore === "altro" && (
+              <Input
+                value={trasportatoreAltro}
+                onChange={(e) => setTrasportatoreAltro(e.target.value)}
+                placeholder="Nome del trasportatore"
+              />
+            )}
           </div>
 
           <div className="space-y-2">

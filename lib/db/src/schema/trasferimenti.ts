@@ -12,6 +12,8 @@ export const trasferimentiTable = pgTable("trasferimenti", {
   dataEsecuzione: date("data_esecuzione"),
   dataConfermaRicezione: date("data_conferma_ricezione"),
   stato: varchar("stato", { length: 20 }).notNull().default("richiesto"),
+  trasportatoreVolontarioId: integer("trasportatore_volontario_id"),
+  trasportatoreNome: varchar("trasportatore_nome", { length: 120 }),
   note: text("note"),
   operatoreId: integer("operatore_id").references(() => utentiTable.id),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),

@@ -2547,9 +2547,27 @@ components:
           type: integer
         magazzinoOrigineNome:
           type: ["string", "null"]
+        magazzinoOrigineIndirizzo:
+          type: ["string", "null"]
+        magazzinoOrigineComune:
+          type: ["string", "null"]
+        magazzinoOrigineZona:
+          type: ["string", "null"]
         magazzinoDestinoId:
           type: integer
         magazzinoDestinoNome:
+          type: ["string", "null"]
+        magazzinoDestinoIndirizzo:
+          type: ["string", "null"]
+        magazzinoDestinoComune:
+          type: ["string", "null"]
+        magazzinoDestinoZona:
+          type: ["string", "null"]
+        trasportatoreVolontarioId:
+          type: ["integer", "null"]
+        trasportatoreVolontarioNome:
+          type: ["string", "null"]
+        trasportatoreNome:
           type: ["string", "null"]
         dataRichiesta:
           type: string
@@ -2580,6 +2598,10 @@ components:
           type: integer
         magazzinoDestinoId:
           type: integer
+        trasportatoreVolontarioId:
+          type: ["integer", "null"]
+        trasportatoreNome:
+          type: ["string", "null"]
         dataRichiesta:
           type: string
         note:
@@ -2597,6 +2619,10 @@ components:
           type: string
         dataEsecuzione:
           type: string
+        trasportatoreVolontarioId:
+          type: ["integer", "null"]
+        trasportatoreNome:
+          type: ["string", "null"]
         note:
           type: string
 

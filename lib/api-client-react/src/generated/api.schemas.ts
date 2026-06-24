@@ -321,9 +321,27 @@ export interface Trasferimento {
   magazzinoOrigineId: number;
   /** @nullable */
   magazzinoOrigineNome?: string | null;
+  /** @nullable */
+  magazzinoOrigineIndirizzo?: string | null;
+  /** @nullable */
+  magazzinoOrigineComune?: string | null;
+  /** @nullable */
+  magazzinoOrigineZona?: string | null;
   magazzinoDestinoId: number;
   /** @nullable */
   magazzinoDestinoNome?: string | null;
+  /** @nullable */
+  magazzinoDestinoIndirizzo?: string | null;
+  /** @nullable */
+  magazzinoDestinoComune?: string | null;
+  /** @nullable */
+  magazzinoDestinoZona?: string | null;
+  /** @nullable */
+  trasportatoreVolontarioId?: number | null;
+  /** @nullable */
+  trasportatoreVolontarioNome?: string | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
   dataRichiesta: string;
   /** @nullable */
   dataEsecuzione?: string | null;
@@ -351,6 +369,10 @@ export interface TrasferimentoRigaInput {
 export interface TrasferimentoInput {
   magazzinoOrigineId: number;
   magazzinoDestinoId: number;
+  /** @nullable */
+  trasportatoreVolontarioId?: number | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
   dataRichiesta: string;
   note?: string;
   righe: TrasferimentoRigaInput[];
@@ -359,6 +381,10 @@ export interface TrasferimentoInput {
 export interface TrasferimentoUpdate {
   stato?: string;
   dataEsecuzione?: string;
+  /** @nullable */
+  trasportatoreVolontarioId?: number | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
   note?: string;
 }
 

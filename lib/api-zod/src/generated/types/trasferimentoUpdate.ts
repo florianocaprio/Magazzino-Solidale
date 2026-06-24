@@ -9,5 +9,9 @@
 export interface TrasferimentoUpdate {
   stato?: string;
   dataEsecuzione?: string;
+  /** @nullable */
+  trasportatoreVolontarioId?: number | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
   note?: string;
 }
