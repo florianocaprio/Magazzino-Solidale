@@ -3,6 +3,7 @@ import {
   useListScarichi,
   useCreateScarico,
   useListMagazzini,
+  useListCentriAscolto,
   useListGiacenze,
   useGetImpostazioniStampa,
   getListScarichiQueryKey,
@@ -24,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, Trash2, Download, CheckCircle, PackageMinus } from "lucide-react";
+import { Plus, Trash2, Download, CheckCircle, PackageMinus, ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { generateScaricoPdf, loadAssociationLogo } from "@/lib/scarico-pdf";
@@ -175,6 +176,7 @@ function NuovoScaricoForm({
   onCreated: (s: Scarico) => void;
 }) {
   const [magazzinoId, setMagazzinoId] = useState("");
+  const [centroAscoltoId, setCentroAscoltoId] = useState("");
   const [causale, setCausale] = useState("");
   const [causaleAltro, setCausaleAltro] = useState("");
   const [note, setNote] = useState("");
@@ -182,6 +184,7 @@ function NuovoScaricoForm({
 
   const { t } = useTranslation();
   const { data: magazzini } = useListMagazzini();
+  const { data: centri } = useListCentriAscolto();
   const createScarico = useCreateScarico();
   const { toast } = useToast();
 
@@ -193,6 +196,7 @@ function NuovoScaricoForm({
 
   const reset = () => {
     setMagazzinoId("");
+    setCentroAscoltoId("");
     setCausale("");
     setCausaleAltro("");
     setNote("");
@@ -218,6 +222,7 @@ function NuovoScaricoForm({
       {
         data: {
           magazzinoId: parseInt(magazzinoId),
+          centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
           dataScarico: new Date().toISOString().split("T")[0],
           causale: causale as "deteriorata" | "rubata" | "scaduta" | "altro",
           causaleAltro: causale === "altro" ? causaleAltro.trim() : undefined,
@@ -259,6 +264,19 @@ function NuovoScaricoForm({
               <SelectContent>
                 {magazzini?.map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("scarichi.centro")}</Label>
+            <Select value={centroAscoltoId || "none"} onValueChange={(v) => setCentroAscoltoId(v === "none" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder={t("scarichi.selectCentro")} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("scarichi.nessunCentro")}</SelectItem>
+                {centri?.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -316,6 +334,7 @@ function NuovoScaricoForm({
 export default function Scarichi() {
   const { t } = useTranslation();
   const { data: scarichi, isLoading } = useListScarichi();
+  const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: impostazioni } = useGetImpostazioniStampa();
@@ -323,6 +342,22 @@ export default function Scarichi() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [created, setCreated] = useState<Scarico | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [centroFilter, setCentroFilter] = useState("all");
+  const [sortAsc, setSortAsc] = useState(false);
+
+  const displayed = (scarichi ?? [])
+    .filter((s) =>
+      centroFilter === "all"
+        ? true
+        : centroFilter === "none"
+          ? s.centroAscoltoId == null
+          : s.centroAscoltoId === parseInt(centroFilter),
+    )
+    .slice()
+    .sort((a, b) => {
+      const d = new Date(a.dataScarico).getTime() - new Date(b.dataScarico).getTime();
+      return sortAsc ? d : -d;
+    });
 
   const causaleDisplay = (s: Pick<Scarico, "causale" | "causaleAltro">): string => {
     if (s.causale === "altro") return s.causaleAltro?.trim() || t("scarichi.causali.altro");
@@ -361,12 +396,23 @@ export default function Scarichi() {
           <p className="text-muted-foreground">{t("scarichi.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={centroFilter} onValueChange={setCentroFilter}>
+            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("scarichi.filterTuttiCentri")}</SelectItem>
+              <SelectItem value="none">{t("scarichi.senzaCentro")}</SelectItem>
+              {centri?.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <ExportButtons
-            rows={scarichi ?? []}
+            rows={displayed}
             columns={[
               { header: t("common.code"), accessor: (s) => s.codice },
               { header: t("common.date"), accessor: (s) => s.dataScarico ? new Date(s.dataScarico).toLocaleDateString("it-IT") : "" },
               { header: t("scarichi.colMagazzino"), accessor: (s) => s.magazzinoNome },
+              { header: t("scarichi.colCentro"), accessor: (s) => s.centroAscoltoNome ?? "" },
               { header: t("scarichi.colCausale"), accessor: (s) => causaleDisplay(s) },
               { header: t("scarichi.colArticoli"), accessor: (s) => s.righe?.length ?? 0 },
             ]}
@@ -384,8 +430,17 @@ export default function Scarichi() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.code")}</TableHead>
-                <TableHead>{t("common.date")}</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => setSortAsc((v) => !v)}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    {t("common.date")} <ArrowUpDown className="h-3.5 w-3.5" />
+                  </button>
+                </TableHead>
                 <TableHead>{t("scarichi.colMagazzino")}</TableHead>
+                <TableHead>{t("scarichi.colCentro")}</TableHead>
                 <TableHead>{t("scarichi.colCausale")}</TableHead>
                 <TableHead>{t("scarichi.colArticoli")}</TableHead>
                 <TableHead className="text-right w-[140px]">{t("scarichi.colAzione")}</TableHead>
@@ -399,21 +454,25 @@ export default function Scarichi() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : scarichi?.length === 0 ? (
+              ) : displayed.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">{t("scarichi.emptyState")}</TableCell>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("scarichi.emptyState")}</TableCell>
                 </TableRow>
-              ) : scarichi?.map((s) => (
+              ) : displayed.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell className="font-mono text-sm font-medium">{s.codice}</TableCell>
                   <TableCell className="text-sm">
                     {format(new Date(s.dataScarico), "dd MMM yyyy", { locale: it })}
                   </TableCell>
                   <TableCell className="text-sm font-medium">{s.magazzinoNome}</TableCell>
+                  <TableCell className="text-sm">
+                    {s.centroAscoltoNome ?? <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                       {causaleDisplay(s)}

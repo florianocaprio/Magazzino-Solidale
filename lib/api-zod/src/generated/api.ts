@@ -715,6 +715,8 @@ export const ListScarichiResponseItem = zod.object({
   "codice": zod.string(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "dataScarico": zod.string(),
   "causale": zod.string(),
   "causaleAltro": zod.string().nullish(),
@@ -737,6 +739,7 @@ export const ListScarichiResponse = zod.array(ListScarichiResponseItem)
 
 export const CreateScaricoBody = zod.object({
   "magazzinoId": zod.number(),
+  "centroAscoltoId": zod.number().nullish(),
   "dataScarico": zod.string(),
   "causale": zod.enum(['deteriorata', 'rubata', 'scaduta', 'altro']),
   "causaleAltro": zod.string().optional(),
@@ -759,6 +762,8 @@ export const GetScaricoResponse = zod.object({
   "codice": zod.string(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "dataScarico": zod.string(),
   "causale": zod.string(),
   "causaleAltro": zod.string().nullish(),

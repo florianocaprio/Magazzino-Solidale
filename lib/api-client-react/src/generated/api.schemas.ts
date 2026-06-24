@@ -408,6 +408,10 @@ export interface Scarico {
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   dataScarico: string;
   causale: string;
   /** @nullable */
@@ -441,6 +445,8 @@ export interface ScaricoRigaInput {
 
 export interface ScaricoInput {
   magazzinoId: number;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   dataScarico: string;
   causale: ScaricoInputCausale;
   causaleAltro?: string;

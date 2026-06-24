@@ -10,6 +10,8 @@ import type { ScaricoRigaInput } from './scaricoRigaInput';
 
 export interface ScaricoInput {
   magazzinoId: number;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   dataScarico: string;
   causale: ScaricoInputCausale;
   causaleAltro?: string;

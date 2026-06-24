@@ -13,6 +13,10 @@ export interface Scarico {
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   dataScarico: string;
   causale: string;
   /** @nullable */

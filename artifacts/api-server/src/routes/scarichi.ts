@@ -4,6 +4,7 @@ import {
   scarichiTable,
   scaricoRigheTable,
   magazziniTable,
+  centriAscoltoTable,
   prodottiTable,
   lottiTable,
   movimentiTable,
@@ -22,11 +23,13 @@ async function getScaricoWithRighe(id: number) {
     .select({
       s: scarichiTable,
       magazzinoNome: magazziniTable.nome,
+      centroAscoltoNome: centriAscoltoTable.nome,
       operatoreMatricola: utentiTable.matricola,
       operatoreUsername: utentiTable.username,
     })
     .from(scarichiTable)
     .leftJoin(magazziniTable, eq(scarichiTable.magazzinoId, magazziniTable.id))
+    .leftJoin(centriAscoltoTable, eq(scarichiTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(utentiTable, eq(scarichiTable.operatoreId, utentiTable.id))
     .where(eq(scarichiTable.id, id));
   if (!s) return null;
@@ -42,6 +45,8 @@ async function getScaricoWithRighe(id: number) {
     codice: s.s.codice,
     magazzinoId: s.s.magazzinoId,
     magazzinoNome: s.magazzinoNome ?? null,
+    centroAscoltoId: s.s.centroAscoltoId ?? null,
+    centroAscoltoNome: s.centroAscoltoNome ?? null,
     dataScarico: s.s.dataScarico,
     causale: s.s.causale,
     causaleAltro: s.s.causaleAltro ?? null,
@@ -138,6 +143,11 @@ router.get("/scarichi", async (_req, res) => {
     .from(magazziniTable);
   const magMap = new Map(magazzini.map((m) => [m.id, m.nome]));
 
+  const centri = await db
+    .select({ id: centriAscoltoTable.id, nome: centriAscoltoTable.nome })
+    .from(centriAscoltoTable);
+  const centroMap = new Map(centri.map((c) => [c.id, c.nome]));
+
   const operatoreIds = [...new Set(rows.map((r) => r.operatoreId).filter((x): x is number => x != null))];
   const opMap = new Map<number, string | null>();
   if (operatoreIds.length > 0) {
@@ -188,6 +198,8 @@ router.get("/scarichi", async (_req, res) => {
       codice: r.codice,
       magazzinoId: r.magazzinoId,
       magazzinoNome: magMap.get(r.magazzinoId) ?? null,
+      centroAscoltoId: r.centroAscoltoId ?? null,
+      centroAscoltoNome: r.centroAscoltoId != null ? (centroMap.get(r.centroAscoltoId) ?? null) : null,
       dataScarico: r.dataScarico,
       causale: r.causale,
       causaleAltro: r.causaleAltro ?? null,
@@ -256,6 +268,7 @@ router.post("/scarichi", async (req, res) => {
       .values({
         codice,
         magazzinoId: body.magazzinoId,
+        centroAscoltoId: body.centroAscoltoId ?? null,
         dataScarico: body.dataScarico,
         causale: body.causale,
         causaleAltro: body.causale === "altro" ? body.causaleAltro ?? null : null,

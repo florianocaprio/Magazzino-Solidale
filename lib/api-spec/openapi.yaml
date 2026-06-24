@@ -2667,6 +2667,10 @@ components:
           type: integer
         magazzinoNome:
           type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
         dataScarico:
           type: string
         causale:
@@ -2692,6 +2696,8 @@ components:
       properties:
         magazzinoId:
           type: integer
+        centroAscoltoId:
+          type: ["integer", "null"]
         dataScarico:
           type: string
         causale:

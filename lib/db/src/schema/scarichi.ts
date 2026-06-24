@@ -2,11 +2,13 @@ import { pgTable, serial, varchar, text, timestamp, integer, date, decimal } fro
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { utentiTable } from "./auth";
+import { centriAscoltoTable } from "./centri";
 
 export const scarichiTable = pgTable("scarichi", {
   id: serial("id").primaryKey(),
   codice: varchar("codice", { length: 30 }).notNull().unique(),
   magazzinoId: integer("magazzino_id").notNull(),
+  centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
   dataScarico: date("data_scarico").notNull(),
   causale: varchar("causale", { length: 30 }).notNull(),
   causaleAltro: text("causale_altro"),
