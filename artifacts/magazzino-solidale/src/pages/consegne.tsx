@@ -407,7 +407,11 @@ export default function Consegne() {
                           <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="0">{t("common.none")}</SelectItem>
-                            {volontari?.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>)}
+                            {volontari?.filter(v => {
+                              if (v.centroAscoltoId == null) return true;
+                              const benefCentro = beneficiari?.find(b => b.id === form.watch("beneficiarioId"))?.centroAscoltoId ?? null;
+                              return benefCentro != null && v.centroAscoltoId === benefCentro;
+                            }).map(v => <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </FormItem>

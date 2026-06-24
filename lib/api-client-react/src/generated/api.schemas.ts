@@ -1127,6 +1127,10 @@ export interface Volontario {
   nome: string;
   cognome: string;
   /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
   telefono?: string | null;
   /** @nullable */
   email?: string | null;
@@ -1143,6 +1147,8 @@ export interface Volontario {
 export interface VolontarioInput {
   nome: string;
   cognome: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
   ruolo: string;
@@ -1155,6 +1161,8 @@ export interface VolontarioInput {
 export interface VolontarioUpdate {
   nome?: string;
   cognome?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
   ruolo?: string;
@@ -1247,6 +1255,8 @@ export interface AuthUser {
   username: string;
   nome: string;
   /** @nullable */
+  cognome?: string | null;
+  /** @nullable */
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
@@ -1276,6 +1286,8 @@ export interface Utente {
   username: string;
   nome: string;
   /** @nullable */
+  cognome?: string | null;
+  /** @nullable */
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
@@ -1295,6 +1307,8 @@ export interface UtenteInput {
   password: string;
   /** @minLength 1 */
   nome: string;
+  /** @minLength 1 */
+  cognome: string;
   /** @nullable */
   matricola?: string | null;
   /** @nullable */
@@ -1305,6 +1319,8 @@ export interface UtenteInput {
 export interface UtenteUpdate {
   /** @minLength 1 */
   nome?: string;
+  /** @nullable */
+  cognome?: string | null;
   /** @nullable */
   matricola?: string | null;
   /** @nullable */

@@ -192,7 +192,12 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
             <Select value={trasportatore} onValueChange={setTrasportatore}>
               <SelectTrigger><SelectValue placeholder={t("bolle.trasportatorePlaceholder")} /></SelectTrigger>
               <SelectContent>
-                {volontari?.filter(v => v.attivo).map(v => (
+                {volontari?.filter(v => {
+                  if (!v.attivo) return false;
+                  if (v.centroAscoltoId == null) return true;
+                  const benefCentro = allBeneficiari?.find(b => String(b.id) === beneficiarioId)?.centroAscoltoId ?? null;
+                  return benefCentro != null && v.centroAscoltoId === benefCentro;
+                }).map(v => (
                   <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
                 ))}
                 <SelectItem value="__altro__">{t("bolle.altroRitiro")}</SelectItem>

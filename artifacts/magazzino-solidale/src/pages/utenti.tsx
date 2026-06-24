@@ -89,6 +89,7 @@ export default function Utenti() {
 
   const [username, setUsername] = useState("");
   const [nome, setNome] = useState("");
+  const [cognome, setCognome] = useState("");
   const [matricola, setMatricola] = useState("");
   const [password, setPassword] = useState("");
   const [ruoloId, setRuoloId] = useState<string>(NO_ROLE);
@@ -103,6 +104,7 @@ export default function Utenti() {
     setEditing(null);
     setUsername("");
     setNome("");
+    setCognome("");
     setMatricola("");
     setPassword("");
     setRuoloId(NO_ROLE);
@@ -115,6 +117,7 @@ export default function Utenti() {
     setEditing(u);
     setUsername(u.username);
     setNome(u.nome);
+    setCognome(u.cognome ?? "");
     setMatricola(u.matricola ?? "");
     setPassword("");
     setRuoloId(u.ruoloId != null ? String(u.ruoloId) : NO_ROLE);
@@ -132,7 +135,7 @@ export default function Utenti() {
       updateUtente.mutate(
         {
           id: editing.id,
-          data: { nome, matricola: matricola.trim() || null, ruoloId: ruoloIdValue, attivo },
+          data: { nome, cognome: cognome.trim() || null, matricola: matricola.trim() || null, ruoloId: ruoloIdValue, attivo },
         },
         {
           onSuccess: () => {
@@ -153,6 +156,7 @@ export default function Utenti() {
           data: {
             username: username.trim(),
             nome,
+            cognome: cognome.trim(),
             matricola: matricola.trim() || null,
             password,
             ruoloId: ruoloIdValue,
@@ -269,7 +273,7 @@ export default function Utenti() {
                 {utenti?.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.username}</TableCell>
-                    <TableCell>{u.nome}</TableCell>
+                    <TableCell>{[u.nome, u.cognome].filter(Boolean).join(" ")}</TableCell>
                     <TableCell>{u.matricola ?? "—"}</TableCell>
                     <TableCell>{u.ruoloNome ?? "—"}</TableCell>
                     <TableCell>
@@ -354,14 +358,25 @@ export default function Utenti() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="u-nome">{t("utenti.nomeCompleto")}</Label>
-              <Input
-                id="u-nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="u-nome">{t("common.name")}</Label>
+                <Input
+                  id="u-nome"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="u-cognome">{t("common.surname")}</Label>
+                <Input
+                  id="u-cognome"
+                  value={cognome}
+                  onChange={(e) => setCognome(e.target.value)}
+                  required
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="u-matricola">{t("utenti.colMatricola")}</Label>

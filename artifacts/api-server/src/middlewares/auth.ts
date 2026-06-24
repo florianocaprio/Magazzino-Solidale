@@ -7,6 +7,7 @@ export interface SessionUser {
   id: number;
   username: string;
   nome: string;
+  cognome: string | null;
   matricola: string | null;
   ruoloId: number | null;
   ruoloNome: string | null;
@@ -38,6 +39,7 @@ export async function loadSessionUser(
       id: utentiTable.id,
       username: utentiTable.username,
       nome: utentiTable.nome,
+      cognome: utentiTable.cognome,
       matricola: utentiTable.matricola,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
@@ -56,6 +58,7 @@ export async function loadSessionUser(
     id: row.id,
     username: row.username,
     nome: row.nome,
+    cognome: row.cognome ?? null,
     matricola: row.matricola ?? null,
     ruoloId: row.ruoloId ?? null,
     ruoloNome: row.ruoloNome ?? null,

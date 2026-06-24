@@ -159,7 +159,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center justify-between gap-2 px-2 py-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{user?.nome}</p>
+                <p className="truncate text-sm font-medium">{[user?.nome, user?.cognome].filter(Boolean).join(" ")}</p>
                 <p className="truncate text-xs text-muted-foreground">
                   {user?.ruoloNome ?? t("common.noRole")}
                 </p>

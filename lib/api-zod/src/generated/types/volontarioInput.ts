@@ -9,6 +9,8 @@
 export interface VolontarioInput {
   nome: string;
   cognome: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
   ruolo: string;

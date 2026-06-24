@@ -35,6 +35,9 @@ export const volontari = {
     valCognome: "Cognome troppo corto",
     valEmail: "Email non valida",
     valRuolo: "Ruolo obbligatorio",
+    centroAscolto: "Centro di Ascolto",
+    tuttiCentri: "Tutti i centri",
+    centroHint: "Se vuoto, il volontario è disponibile per tutti i centri.",
   },
   es: {
     title: "Voluntarios",
@@ -72,6 +75,9 @@ export const volontari = {
     valCognome: "Apellido demasiado corto",
     valEmail: "Correo electrónico no válido",
     valRuolo: "Rol obligatorio",
+    centroAscolto: "Centro de Escucha",
+    tuttiCentri: "Todos los centros",
+    centroHint: "Si está vacío, el voluntario está disponible para todos los centros.",
   },
   en: {
     title: "Volunteers",
@@ -109,6 +115,9 @@ export const volontari = {
     valCognome: "Surname too short",
     valEmail: "Invalid email",
     valRuolo: "Role required",
+    centroAscolto: "Listening Centre",
+    tuttiCentri: "All centres",
+    centroHint: "If empty, the volunteer is available for all centres.",
   },
   fr: {
     title: "Bénévoles",
@@ -146,6 +155,9 @@ export const volontari = {
     valCognome: "Nom de famille trop court",
     valEmail: "E-mail invalide",
     valRuolo: "Rôle obligatoire",
+    centroAscolto: "Centre d'écoute",
+    tuttiCentri: "Tous les centres",
+    centroHint: "Si vide, le bénévole est disponible pour tous les centres.",
   },
   de: {
     title: "Freiwillige",
@@ -183,6 +195,9 @@ export const volontari = {
     valCognome: "Nachname zu kurz",
     valEmail: "Ungültige E-Mail",
     valRuolo: "Rolle erforderlich",
+    centroAscolto: "Anlaufstelle",
+    tuttiCentri: "Alle Stellen",
+    centroHint: "Wenn leer, ist der Freiwillige für alle Stellen verfügbar.",
   },
   ar: {
     title: "المتطوعون",
@@ -220,5 +235,8 @@ export const volontari = {
     valCognome: "اللقب قصير جدًا",
     valEmail: "بريد إلكتروني غير صالح",
     valRuolo: "الدور مطلوب",
+    centroAscolto: "مركز الإصغاء",
+    tuttiCentri: "جميع المراكز",
+    centroHint: "إذا كان فارغًا، يكون المتطوع متاحًا لجميع المراكز.",
   },
 } as const;

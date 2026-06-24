@@ -3746,6 +3746,10 @@ components:
           type: string
         cognome:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
         telefono:
           type: ["string", "null"]
         email:
@@ -3773,6 +3777,8 @@ components:
           type: string
         cognome:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
         telefono:
           type: string
         email:
@@ -3796,6 +3802,8 @@ components:
           type: string
         cognome:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
         telefono:
           type: string
         email:
@@ -3954,6 +3962,8 @@ components:
           type: string
         nome:
           type: string
+        cognome:
+          type: ["string", "null"]
         matricola:
           type: ["string", "null"]
         ruoloId:
@@ -4001,6 +4011,8 @@ components:
           type: string
         nome:
           type: string
+        cognome:
+          type: ["string", "null"]
         matricola:
           type: ["string", "null"]
         ruoloId:
@@ -4029,13 +4041,16 @@ components:
         nome:
           type: string
           minLength: 1
+        cognome:
+          type: string
+          minLength: 1
         matricola:
           type: ["string", "null"]
         ruoloId:
           type: ["integer", "null"]
         attivo:
           type: boolean
-      required: [username, password, nome]
+      required: [username, password, nome, cognome]
 
     UtenteUpdate:
       type: object
@@ -4043,6 +4058,8 @@ components:
         nome:
           type: string
           minLength: 1
+        cognome:
+          type: ["string", "null"]
         matricola:
           type: ["string", "null"]
         ruoloId:

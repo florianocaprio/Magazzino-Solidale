@@ -2039,6 +2039,8 @@ export const ListVolontariResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "cognome": zod.string(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "telefono": zod.string().nullish(),
   "email": zod.string().nullish(),
   "ruolo": zod.string(),
@@ -2055,6 +2057,7 @@ export const ListVolontariResponse = zod.array(ListVolontariResponseItem)
 export const CreateVolontarioBody = zod.object({
   "nome": zod.string(),
   "cognome": zod.string(),
+  "centroAscoltoId": zod.number().nullish(),
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "ruolo": zod.string(),
@@ -2073,6 +2076,8 @@ export const GetVolontarioResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "cognome": zod.string(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "telefono": zod.string().nullish(),
   "email": zod.string().nullish(),
   "ruolo": zod.string(),
@@ -2092,6 +2097,7 @@ export const UpdateVolontarioParams = zod.object({
 export const UpdateVolontarioBody = zod.object({
   "nome": zod.string().optional(),
   "cognome": zod.string().optional(),
+  "centroAscoltoId": zod.number().nullish(),
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "ruolo": zod.string().optional(),
@@ -2106,6 +2112,8 @@ export const UpdateVolontarioResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "cognome": zod.string(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "telefono": zod.string().nullish(),
   "email": zod.string().nullish(),
   "ruolo": zod.string(),
@@ -2315,6 +2323,7 @@ export const LoginUserResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
@@ -2328,6 +2337,7 @@ export const GetCurrentUserResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
@@ -2424,6 +2434,7 @@ export const ListUtentiResponseItem = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
@@ -2441,10 +2452,12 @@ export const createUtenteBodyPasswordMin = 6;
 
 
 
+
 export const CreateUtenteBody = zod.object({
   "username": zod.string().min(1),
   "password": zod.string().min(createUtenteBodyPasswordMin),
   "nome": zod.string().min(1),
+  "cognome": zod.string().min(1),
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "attivo": zod.boolean().optional()
@@ -2459,6 +2472,7 @@ export const GetUtenteResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),
@@ -2478,6 +2492,7 @@ export const UpdateUtenteParams = zod.object({
 
 export const UpdateUtenteBody = zod.object({
   "nome": zod.string().min(1).optional(),
+  "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "attivo": zod.boolean().optional()
@@ -2487,6 +2502,7 @@ export const UpdateUtenteResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "nome": zod.string(),
+  "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "ruoloNome": zod.string().nullish(),

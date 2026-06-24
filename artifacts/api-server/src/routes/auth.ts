@@ -18,6 +18,7 @@ function authUserResponse(u: SessionUser) {
     id: u.id,
     username: u.username,
     nome: u.nome,
+    cognome: u.cognome,
     matricola: u.matricola,
     ruoloId: u.ruoloId,
     ruoloNome: u.ruoloNome,

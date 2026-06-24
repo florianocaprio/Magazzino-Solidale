@@ -17,6 +17,7 @@ type UtenteRow = {
   id: number;
   username: string;
   nome: string;
+  cognome: string | null;
   matricola: string | null;
   ruoloId: number | null;
   ruoloNome: string | null;
@@ -30,6 +31,7 @@ const fmt = (r: UtenteRow) => ({
   id: r.id,
   username: r.username,
   nome: r.nome,
+  cognome: r.cognome ?? null,
   matricola: r.matricola ?? null,
   ruoloId: r.ruoloId ?? null,
   ruoloNome: r.ruoloNome ?? null,
@@ -45,6 +47,7 @@ const selectUtente = () =>
       id: utentiTable.id,
       username: utentiTable.username,
       nome: utentiTable.nome,
+      cognome: utentiTable.cognome,
       matricola: utentiTable.matricola,
       ruoloId: utentiTable.ruoloId,
       ruoloNome: ruoliTable.nome,
@@ -71,6 +74,19 @@ async function otherActiveAdminExists(excludeId: number): Promise<boolean> {
   return rows.length > 0;
 }
 
+/**
+ * Generates a matricola from the initials of nome + cognome followed by the
+ * current day-of-month and 2-digit year (ddyy). Example: Mario Rossi on
+ * 24 June 2026 → "MR2426".
+ */
+function generateMatricola(nome: string, cognome: string): string {
+  const initials = `${nome.trim().charAt(0)}${cognome.trim().charAt(0)}`.toUpperCase();
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const yy = String(now.getFullYear()).slice(-2);
+  return `${initials}${dd}${yy}`;
+}
+
 async function roleIsAdmin(ruoloId: number | null): Promise<boolean> {
   if (ruoloId == null) return false;
   const [r] = await db
@@ -91,7 +107,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { username, password, nome, matricola, ruoloId, attivo } = parsed.data;
+  const { username, password, nome, cognome, matricola, ruoloId, attivo } = parsed.data;
 
   const [existing] = await db
     .select({ id: utentiTable.id })
@@ -102,14 +118,19 @@ router.post("/utenti", async (req, res): Promise<void> => {
     return;
   }
 
+  const nomeTrim = nome.trim();
+  const cognomeTrim = cognome.trim();
+  const finalMatricola = matricola?.trim() || generateMatricola(nomeTrim, cognomeTrim);
+
   const passwordHash = await bcrypt.hash(password, 10);
   const [created] = await db
     .insert(utentiTable)
     .values({
       username,
       passwordHash,
-      nome,
-      matricola: matricola ?? null,
+      nome: nomeTrim,
+      cognome: cognomeTrim,
+      matricola: finalMatricola,
       ruoloId: ruoloId ?? null,
       attivo: attivo ?? true,
       mustChangePassword: true,
@@ -171,6 +192,7 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
 
   const updates: Partial<typeof utentiTable.$inferInsert> = {};
   if (body.nome !== undefined) updates.nome = body.nome;
+  if (body.cognome !== undefined) updates.cognome = body.cognome;
   if (body.matricola !== undefined) updates.matricola = body.matricola;
   if (body.ruoloId !== undefined) updates.ruoloId = body.ruoloId;
   if (body.attivo !== undefined) updates.attivo = body.attivo;

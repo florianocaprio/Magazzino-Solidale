@@ -13,6 +13,8 @@ export interface UtenteInput {
   password: string;
   /** @minLength 1 */
   nome: string;
+  /** @minLength 1 */
+  cognome: string;
   /** @nullable */
   matricola?: string | null;
   /** @nullable */

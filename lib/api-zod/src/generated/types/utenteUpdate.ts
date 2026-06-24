@@ -10,6 +10,8 @@ export interface UtenteUpdate {
   /** @minLength 1 */
   nome?: string;
   /** @nullable */
+  cognome?: string | null;
+  /** @nullable */
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListVolontari, useCreateVolontario, useUpdateVolontario, useDeleteVolontario, getListVolontariQueryKey } from "@workspace/api-client-react";
+import { useListVolontari, useCreateVolontario, useUpdateVolontario, useDeleteVolontario, getListVolontariQueryKey, useListCentriAscolto } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,9 +32,11 @@ export default function Volontari() {
     patente: z.boolean().default(false),
     mezzoPersonale: z.boolean().default(false),
     maxConsegneTurno: z.coerce.number().min(1).default(5),
+    centroAscoltoId: z.number().nullable().default(null),
     note: z.string().optional()
   });
   const { data: volontari, isLoading } = useListVolontari();
+  const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -52,7 +54,7 @@ export default function Volontari() {
     defaultValues: {
       nome: "", cognome: "", telefono: "", email: "",
       ruolo: "magazziniere", patente: false, mezzoPersonale: false,
-      maxConsegneTurno: 5, note: ""
+      maxConsegneTurno: 5, centroAscoltoId: null, note: ""
     }
   });
 
@@ -67,6 +69,7 @@ export default function Volontari() {
       patente: volontario.patente,
       mezzoPersonale: volontario.mezzoPersonale,
       maxConsegneTurno: volontario.maxConsegneTurno,
+      centroAscoltoId: volontario.centroAscoltoId ?? null,
       note: volontario.note || ""
     });
     setIsFormOpen(true);
@@ -77,7 +80,7 @@ export default function Volontari() {
     form.reset({
       nome: "", cognome: "", telefono: "", email: "",
       ruolo: "magazziniere", patente: false, mezzoPersonale: false,
-      maxConsegneTurno: 5, note: ""
+      maxConsegneTurno: 5, centroAscoltoId: null, note: ""
     });
     setIsFormOpen(true);
   };
@@ -141,6 +144,7 @@ export default function Volontari() {
             columns={[
               { header: t("common.name"), accessor: (v) => v.nome },
               { header: t("common.surname"), accessor: (v) => v.cognome },
+              { header: t("volontari.centroAscolto"), accessor: (v) => v.centroAscoltoNome ?? t("volontari.tuttiCentri") },
               { header: t("common.email"), accessor: (v) => v.email },
               { header: t("common.phone"), accessor: (v) => v.telefono },
               { header: t("volontari.ruolo"), accessor: (v) => roleLabel(v.ruolo) },
@@ -171,6 +175,7 @@ export default function Volontari() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("volontari.centroAscolto")}</TableHead>
                 <TableHead>{t("volontari.contatti")}</TableHead>
                 <TableHead>{t("volontari.ruolo")}</TableHead>
                 <TableHead className="text-center">{t("volontari.patente")}</TableHead>
@@ -184,6 +189,7 @@ export default function Volontari() {
                 Array(5).fill(0).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
@@ -194,7 +200,7 @@ export default function Volontari() {
                 ))
               ) : filtered?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     {t("volontari.empty")}
                   </TableCell>
                 </TableRow>
@@ -202,6 +208,9 @@ export default function Volontari() {
                 <TableRow key={v.id} className={!v.attivo ? "opacity-60" : ""}>
                   <TableCell>
                     <div className="font-medium">{v.nome} {v.cognome}</div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">{v.centroAscoltoNome ?? t("volontari.tuttiCentri")}</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm text-muted-foreground">
@@ -304,6 +313,24 @@ export default function Volontari() {
                         <SelectItem value="coordinatore">{t("volontari.roles.coordinatore")}</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("volontari.centroAscolto")}</FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(v === "all" ? null : Number(v))}
+                      value={field.value == null ? "all" : String(field.value)}
+                    >
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="all">{t("volontari.tuttiCentri")}</SelectItem>
+                        {centri?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">{t("volontari.centroHint")}</p>
                     <FormMessage />
                   </FormItem>
                 )} />
