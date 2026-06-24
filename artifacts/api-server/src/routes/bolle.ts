@@ -216,6 +216,15 @@ async function quantitaGiaInBolla(bollaId: number, prodottoId: number, excludeRi
     .reduce((acc, r) => acc + parseFloat(r.q), 0);
 }
 
+/** Calcola quanto è già in bolla (bozza) per uno specifico lotto */
+async function quantitaGiaInBollaLotto(bollaId: number, lottoId: number): Promise<number> {
+  const righe = await db
+    .select({ q: bollaRigheTable.quantita })
+    .from(bollaRigheTable)
+    .where(and(eq(bollaRigheTable.bollaId, bollaId), eq(bollaRigheTable.lottoId, lottoId)));
+  return righe.reduce((acc, r) => acc + parseFloat(r.q), 0);
+}
+
 /** Scarico FEFO: scala quantità cercando lotti per scadenza crescente */
 async function scaricoFEFO(
   prodottoId: number,
@@ -451,9 +460,11 @@ router.post("/bolle/:id/righe", async (req, res) => {
   if (lottoId) {
     const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId));
     if (!lotto) { res.status(404).json({ error: "Lotto non trovato" }); return; }
-    if (parseFloat(lotto.quantitaResidua) < quantita) {
+    const giaInBollaLotto = bolla.stato === "bozza" ? await quantitaGiaInBollaLotto(bollaId, lottoId) : 0;
+    const nettaLotto = parseFloat(lotto.quantitaResidua) - giaInBollaLotto;
+    if (nettaLotto < quantita) {
       res.status(400).json({
-        error: `Disponibilità insufficiente nel lotto: ${parseFloat(lotto.quantitaResidua)} disponibili, richiesti ${quantita}`,
+        error: `Disponibilità insufficiente nel lotto: ${Math.max(0, nettaLotto).toFixed(2)} disponibili, richiesti ${quantita}`,
       });
       return;
     }
@@ -463,7 +474,7 @@ router.post("/bolle/:id/righe", async (req, res) => {
     const netta = disponibile - giainBolla;
     if (netta < quantita) {
       res.status(400).json({
-        error: `Disponibilità insufficiente per ${prod?.nome ?? "prodotto"}: ${netta.toFixed(2)} disponibili (giacenza ${disponibile.toFixed(2)} − già in bolla ${giainBolla.toFixed(2)}), richiesti ${quantita}`,
+        error: `Disponibilità insufficiente per ${prod?.nome ?? "prodotto"}: ${Math.max(0, netta).toFixed(2)} disponibili (giacenza ${disponibile.toFixed(2)} − già in bolla ${giainBolla.toFixed(2)}), richiesti ${quantita}`,
       });
       return;
     }
@@ -603,6 +614,24 @@ router.post("/bolle/:id/conferma", async (req, res) => {
       const [prod] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, prodId));
       res.status(400).json({
         error: `Disponibilità insufficiente per ${prod?.nome ?? `prodotto #${prodId}`}: disponibile ${disponibile.toFixed(2)}, totale in bolla ${qtaRichiesta.toFixed(2)}`,
+      });
+      return;
+    }
+  }
+
+  // verifica disponibilità per singolo lotto (somma righe sullo stesso lotto)
+  const byLotto: Record<number, number> = {};
+  for (const riga of righe) {
+    if (riga.lottoId) byLotto[riga.lottoId] = (byLotto[riga.lottoId] ?? 0) + parseFloat(riga.quantita);
+  }
+  for (const [lottoIdStr, qtaRichiesta] of Object.entries(byLotto)) {
+    const lId = parseInt(lottoIdStr);
+    const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, lId));
+    const disp = lotto ? parseFloat(lotto.quantitaResidua) : 0;
+    if (disp < qtaRichiesta) {
+      const [prod] = lotto ? await db.select().from(prodottiTable).where(eq(prodottiTable.id, lotto.prodottoId)) : [];
+      res.status(400).json({
+        error: `Disponibilità insufficiente nel lotto ${lotto?.codiceLotto ?? `#${lId}`}${prod ? ` per ${prod.nome}` : ""}: disponibile ${disp.toFixed(2)}, totale in bolla ${qtaRichiesta.toFixed(2)}`,
       });
       return;
     }

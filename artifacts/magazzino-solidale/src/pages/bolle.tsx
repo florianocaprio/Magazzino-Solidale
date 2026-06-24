@@ -363,6 +363,9 @@ function AggiungiProdottoDialog({
   const { data: giacenze } = useListGiacenze({ magazzinoId });
   const { data: prodotti } = useListProdotti();
   const { data: lotti } = useListLotti({ magazzinoId, prodottoId: prodottoId ? parseInt(prodottoId) : undefined });
+  const { data: bollaCorrente } = useGetBolla(bollaId, {
+    query: { enabled: open, queryKey: getGetBollaQueryKey(bollaId) },
+  });
 
   const addRiga = useAddBollaRiga();
   const queryClient = useQueryClient();
@@ -399,11 +402,28 @@ function AggiungiProdottoDialog({
   const giacenzaSelezionata = giacenze?.find(g => g.prodottoId === parseInt(prodottoId));
   const lottiDisponibili = lotti?.filter(l => l.magazzinoId === magazzinoId && l.quantitaResidua > 0) ?? [];
 
-  // limite massimo: lotto specifico oppure giacenza totale
+  // quantità già inserita in questa bolla: va sottratta solo in bozza
+  // (in una bolla confermata la giacenza/lotto è già stata scalata)
+  const isBozza = bollaCorrente?.stato === "bozza";
+  const giaInBollaProdotto = isBozza && prodottoId
+    ? (bollaCorrente?.righe ?? [])
+        .filter(r => r.prodottoId === parseInt(prodottoId))
+        .reduce((acc, r) => acc + r.quantita, 0)
+    : 0;
+  const giaInBollaLotto = (lid: number) =>
+    isBozza
+      ? (bollaCorrente?.righe ?? [])
+          .filter(r => r.lottoId === lid)
+          .reduce((acc, r) => acc + r.quantita, 0)
+      : 0;
+
+  // limite massimo: lotto specifico oppure giacenza totale, al netto di quanto già in bolla
   const lottoSelezionato = lottiDisponibili.find(l => l.id === parseInt(lottoId));
-  const maxDisponibile = lottoSelezionato
+  const maxBase = lottoSelezionato
     ? lottoSelezionato.quantitaResidua
     : giacenzaSelezionata?.quantitaTotale ?? 0;
+  const giaUsato = lottoSelezionato ? giaInBollaLotto(lottoSelezionato.id) : giaInBollaProdotto;
+  const maxDisponibile = Math.max(0, Math.round((maxBase - giaUsato) * 100) / 100);
   const quantitaNum = parseFloat(quantita || "0");
   const eccedeDisponibilita = quantitaNum > maxDisponibile;
 
