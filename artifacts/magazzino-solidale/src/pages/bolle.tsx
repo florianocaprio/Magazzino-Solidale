@@ -228,12 +228,30 @@ function ModificaBollaDialog({
 }) {
   const [bId, setBId] = useState(String(beneficiarioId));
   const [mId, setMId] = useState(String(magazzinoId));
+  const [scanCode, setScanCode] = useState("");
   const { data: beneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
   const updateBolla = useUpdateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  const handleScan = () => {
+    const code = scanCode.trim();
+    if (!code) return;
+    if (!beneficiari) {
+      toast({ title: t("common.loading") });
+      return;
+    }
+    const b = beneficiari.find((x) => x.codice.toLowerCase() === code.toLowerCase());
+    if (!b) {
+      toast({ title: t("bolle.scanNotFound"), variant: "destructive" });
+      return;
+    }
+    setBId(String(b.id));
+    setScanCode("");
+    toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
+  };
 
   const magazzinoCambiato = parseInt(mId) !== magazzinoId;
 
@@ -267,6 +285,26 @@ function ModificaBollaDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>{t("bolle.modificaTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>{t("bolle.scanLabel")}</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder={t("bolle.scanPlaceholder")}
+                value={scanCode}
+                onChange={(e) => setScanCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleScan();
+                  }
+                }}
+                className="font-mono"
+              />
+              <Button type="button" variant="outline" onClick={handleScan} disabled={!scanCode.trim()}>
+                <ScanLine className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           <div className="space-y-2">
             <Label>{t("bolle.beneficiarioLabel")}</Label>
             <Select value={bId} onValueChange={setBId}>
