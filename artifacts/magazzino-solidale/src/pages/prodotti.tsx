@@ -28,6 +28,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -332,7 +333,7 @@ function ProdottoLotti({ prodottoId }: { prodottoId: number }) {
 
   return (
     <div className="pt-4 border-t space-y-2">
-      <FormLabel>{t("prodotti.lottiTitle")}</FormLabel>
+      <Label className="text-sm font-medium">{t("prodotti.lottiTitle")}</Label>
       {isLoading ? (
         <Skeleton className="h-12 w-full" />
       ) : !lotti || lotti.length === 0 ? (
