@@ -13,7 +13,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2 } from "lucide-react";
+import { BollaDettaglio } from "@/pages/bolle";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -53,6 +54,7 @@ export default function Consegne() {
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [associatingId, setAssociatingId] = useState<number | null>(null);
   const [selectedBollaId, setSelectedBollaId] = useState<string>("");
+  const [viewingBollaId, setViewingBollaId] = useState<number | null>(null);
 
   const { data: bolle } = useListBolle();
 
@@ -61,11 +63,12 @@ export default function Consegne() {
   const associaBolla = useAssociaBolla();
 
   const associatingConsegna = consegne?.find(c => c.id === associatingId) ?? null;
-  // bolle selezionabili: stesso beneficiario, non annullate, non già legate ad altra consegna
+  // bolle selezionabili: stesso beneficiario, non annullate, non già consegnate, non già legate ad altra consegna
   const bolleDisponibili = (bolle ?? []).filter(b =>
     associatingConsegna != null &&
     b.beneficiarioId === associatingConsegna.beneficiarioId &&
     b.stato !== "annullato" &&
+    b.stato !== "consegnato" &&
     (b.consegnaId == null || b.consegnaId === associatingConsegna.id)
   );
 
@@ -250,10 +253,17 @@ export default function Consegne() {
                       return (
                         <button
                           type="button"
-                          disabled={consegnata}
-                          onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}
+                          disabled={consegnata && c.bollaId == null}
+                          onClick={() => {
+                            if (consegnata) {
+                              if (c.bollaId != null) setViewingBollaId(c.bollaId);
+                            } else {
+                              setAssociatingId(c.id);
+                              setSelectedBollaId(c.bollaId ? String(c.bollaId) : "");
+                            }
+                          }}
                           className="text-left disabled:cursor-default disabled:opacity-100 enabled:hover:opacity-80"
-                          title={consegnata ? undefined : "Gestisci bolla associata"}
+                          title={consegnata ? (c.bollaId != null ? "Visualizza e scarica la bolla" : undefined) : "Gestisci bolla associata"}
                         >
                           {badge}
                         </button>
@@ -267,7 +277,13 @@ export default function Consegne() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {c.stato !== 'effettuata' && (
+                    {c.stato === 'effettuata' ? (
+                      c.bollaId != null && (
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setViewingBollaId(c.bollaId!)}>
+                          <Download className="h-3.5 w-3.5" /> Bolla
+                        </Button>
+                      )
+                    ) : (
                       (c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') ? (
                         <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
                           <CheckCircle2 className="h-3.5 w-3.5" /> Consegnato
@@ -285,6 +301,13 @@ export default function Consegne() {
           </Table>
         </CardContent>
       </Card>
+
+      <Sheet open={viewingBollaId !== null} onOpenChange={(open) => { if (!open) setViewingBollaId(null); }}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader><SheetTitle>Bolla della consegna</SheetTitle></SheetHeader>
+          {viewingBollaId !== null && <BollaDettaglio bollaId={viewingBollaId} />}
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">

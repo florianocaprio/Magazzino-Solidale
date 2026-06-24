@@ -410,7 +410,7 @@ function AggiungiProdottoDialog({
 
 // ─── Dettaglio bolla ─────────────────────────────────────────────────────────
 
-function BollaDettaglio({ bollaId }: { bollaId: number }) {
+export function BollaDettaglio({ bollaId }: { bollaId: number }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
