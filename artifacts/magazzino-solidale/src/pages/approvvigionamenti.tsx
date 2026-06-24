@@ -143,7 +143,7 @@ export default function Approvvigionamenti() {
       {
         onSuccess: () => {
           invalidate();
-          toast({ title: "Ordine sottomesso", description: "Email inviata all'amministrazione." });
+          toast({ title: "Ordine sottomesso", description: "L'ordine è stato inoltrato all'amministrazione." });
         },
       },
     );

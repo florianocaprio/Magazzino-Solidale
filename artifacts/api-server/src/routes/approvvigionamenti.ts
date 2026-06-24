@@ -131,14 +131,43 @@ router.get("/approvvigionamenti/:id", async (req, res) => {
 });
 
 router.patch("/approvvigionamenti/:id", async (req, res) => {
-  const [row] = await db.update(approvvigionamentiTable).set(req.body).where(eq(approvvigionamentiTable.id, parseInt(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const id = parseInt(req.params.id);
+  const [current] = await db.select().from(approvvigionamentiTable).where(eq(approvvigionamentiTable.id, id));
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+
+  const targetStato: string | undefined = req.body?.stato;
+  const isStatoChange = targetStato !== undefined && targetStato !== current.stato;
+
+  if (isStatoChange) {
+    // The only stato transition allowed via PATCH is sottomesso -> completato.
+    if (!(current.stato === "sottomesso" && targetStato === "completato")) {
+      res.status(409).json({ error: "Transizione di stato non consentita" });
+      return;
+    }
+    const [row] = await db.update(approvvigionamentiTable).set({ stato: "completato" }).where(eq(approvvigionamentiTable.id, id)).returning();
+    const result = await getWithRighe(row.id);
+    res.json(result);
+    return;
+  }
+
+  // Field edits are only allowed while the order is still a bozza.
+  if (current.stato !== "bozza") {
+    res.status(409).json({ error: "Ordine non modificabile: non è più in bozza" });
+    return;
+  }
+  const [row] = await db.update(approvvigionamentiTable).set(req.body).where(eq(approvvigionamentiTable.id, id)).returning();
   const result = await getWithRighe(row.id);
   res.json(result);
 });
 
 router.post("/approvvigionamenti/:id/sottometti", async (req, res) => {
   const id = parseInt(req.params.id);
+  const [current] = await db.select().from(approvvigionamentiTable).where(eq(approvvigionamentiTable.id, id));
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  if (current.stato !== "bozza") {
+    res.status(409).json({ error: "Solo gli ordini in bozza possono essere sottomessi" });
+    return;
+  }
   const [row] = await db
     .update(approvvigionamentiTable)
     .set({ stato: "sottomesso" })
