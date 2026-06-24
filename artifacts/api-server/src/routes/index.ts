@@ -23,7 +23,11 @@ import authRouter from "./auth";
 import utentiRouter from "./utenti";
 import ruoliRouter from "./ruoli";
 import areeRouter from "./aree";
-import { requireAuth, areaGuard } from "../middlewares/auth";
+import {
+  requireAuth,
+  requirePasswordChange,
+  areaGuard,
+} from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -33,6 +37,8 @@ router.use(authRouter);
 
 // Everything below requires an authenticated session and respects role areas.
 router.use(requireAuth);
+// Force first-login password rotation before any business endpoint is reachable.
+router.use(requirePasswordChange);
 router.use(areaGuard);
 
 router.use(dashboardRouter);

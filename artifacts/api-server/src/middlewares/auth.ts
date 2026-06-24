@@ -80,6 +80,27 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   next();
 };
 
+/**
+ * When the authenticated user is flagged `mustChangePassword`, blocks every
+ * protected route except the auth self-service endpoints needed to actually
+ * change the password (`/auth/me`, `/auth/change-password`, `/auth/logout`).
+ * Frontend gating is UX only — this is the real enforcement boundary so a user
+ * with the known bootstrap credential cannot operate before rotating it.
+ */
+const PASSWORD_CHANGE_ALLOWLIST = new Set([
+  "/auth/me",
+  "/auth/change-password",
+  "/auth/logout",
+]);
+
+export const requirePasswordChange: RequestHandler = (req, res, next) => {
+  if (req.user?.mustChangePassword && !PASSWORD_CHANGE_ALLOWLIST.has(req.path)) {
+    res.status(403).json({ error: "Cambio password obbligatorio" });
+    return;
+  }
+  next();
+};
+
 export const requireAdmin: RequestHandler = (req, res, next) => {
   if (!req.user?.isAdmin) {
     res.status(403).json({ error: "Accesso riservato agli amministratori" });
