@@ -6,9 +6,10 @@ import { eq, and, desc, or, ilike, type SQL } from "drizzle-orm";
 const router: IRouter = Router();
 
 router.get("/interventi", async (req, res) => {
-  const { beneficiarioId, tipo } = req.query as Record<string, string>;
+  const { beneficiarioId, tipo, centroAscoltoId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (beneficiarioId) conditions.push(eq(interventiTable.beneficiarioId, parseInt(beneficiarioId)));
+  if (centroAscoltoId) conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
   // tipoIntervento può essere una lista di etichette separate da virgola
   // (es. "pacco_alimentare,igiene"): il filtro deve trovare anche i valori multipli
   if (tipo) {

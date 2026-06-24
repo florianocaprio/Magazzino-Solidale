@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListInterventi, useCreateIntervento, useListBeneficiari, getListInterventiQueryKey } from "@workspace/api-client-react";
+import { useListInterventi, useCreateIntervento, useListBeneficiari, useListCentriAscolto, getListInterventiQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,8 +34,13 @@ const formSchema = z.object({
 
 export default function Interventi() {
   const [tipoFilter, setTipoFilter] = useState("all");
-  const { data: interventi, isLoading } = useListInterventi({ tipo: tipoFilter !== "all" ? tipoFilter : undefined });
+  const [centroFilter, setCentroFilter] = useState("all");
+  const { data: interventi, isLoading } = useListInterventi({
+    tipo: tipoFilter !== "all" ? tipoFilter : undefined,
+    centroAscoltoId: centroFilter !== "all" ? parseInt(centroFilter) : undefined,
+  });
   const { data: beneficiari } = useListBeneficiari();
+  const { data: centri } = useListCentriAscolto();
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -135,6 +140,15 @@ export default function Interventi() {
                 <SelectItem value="pacco_alimentare">Pacco Alimentare</SelectItem>
                 <SelectItem value="vestiario">Vestiario</SelectItem>
                 <SelectItem value="orientamento">Orientamento</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={centroFilter} onValueChange={setCentroFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Tutti i centri" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti i centri</SelectItem>
+                {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

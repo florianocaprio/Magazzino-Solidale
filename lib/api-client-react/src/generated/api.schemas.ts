@@ -1061,6 +1061,7 @@ centroAscoltoId?: number;
 export type ListInterventiParams = {
 beneficiarioId?: number;
 tipo?: string;
+centroAscoltoId?: number;
 };
 
 export type ListConsegneParams = {

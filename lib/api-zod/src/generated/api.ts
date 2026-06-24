@@ -1074,7 +1074,8 @@ export const AddNucleoFamiliareBody = zod.object({
 
 export const ListInterventiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
-  "tipo": zod.coerce.string().optional()
+  "tipo": zod.coerce.string().optional(),
+  "centroAscoltoId": zod.coerce.number().optional()
 })
 
 export const ListInterventiResponseItem = zod.object({
