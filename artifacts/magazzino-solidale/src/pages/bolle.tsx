@@ -16,9 +16,11 @@ import {
   useListLotti,
   useListVolontari,
   useGetImpostazioniStampa,
+  useListTrasferimenti,
   getListBolleQueryKey,
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
+  type Trasferimento,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,10 +39,11 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, Trash2, PackagePlus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download } from "lucide-react";
+import { Plus, FileText, Trash2, PackagePlus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { generateBollaPdf, loadAssociationLogo, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
+import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 
 function statoBadge(stato: string) {
   if (stato === "consegnato") return <Badge className="bg-green-500 text-white">Consegnato</Badge>;
@@ -774,10 +777,49 @@ function BollaDettaglio({ bollaId }: { bollaId: number }) {
 
 // ─── Pagina principale ───────────────────────────────────────────────────────
 
+function trasferimentoStatoBadge(stato: string) {
+  if (stato === "completato") return <Badge className="bg-green-500 text-white">Completato</Badge>;
+  if (stato === "in_transito") return <Badge className="bg-amber-500 text-white">In transito</Badge>;
+  if (stato === "annullato") return <Badge variant="destructive">Annullato</Badge>;
+  return <Badge variant="secondary">{stato.replace("_", " ")}</Badge>;
+}
+
 export default function Bolle() {
   const { data: bolle, isLoading } = useListBolle();
+  const { data: trasferimenti, isLoading: loadingTrasf } = useListTrasferimenti();
+  const { data: impostazioni } = useGetImpostazioniStampa();
+  const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedBollaId, setSelectedBollaId] = useState<number | null>(null);
+  const [downloadingTrasfId, setDownloadingTrasfId] = useState<number | null>(null);
+
+  const downloadTrasf = async (e: React.MouseEvent, t: Trasferimento) => {
+    e.stopPropagation();
+    setDownloadingTrasfId(t.id);
+    try {
+      const associationLogoDataUrl = await loadAssociationLogo();
+      await generateTrasferimentoPdf({
+        trasferimento: t,
+        footer: impostazioni?.footerBolla ?? null,
+        associationLogoDataUrl,
+      });
+    } catch {
+      toast({ title: "Errore", description: "Impossibile generare la bolla.", variant: "destructive" });
+    } finally {
+      setDownloadingTrasfId(null);
+    }
+  };
+
+  type Row =
+    | { kind: "bolla"; date: string; bolla: NonNullable<typeof bolle>[number] }
+    | { kind: "trasf"; date: string; trasf: Trasferimento };
+
+  const rows: Row[] = [
+    ...(bolle ?? []).map((b): Row => ({ kind: "bolla", date: b.dataBolla, bolla: b })),
+    ...(trasferimenti ?? []).map((t): Row => ({ kind: "trasf", date: t.dataRichiesta, trasf: t })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const loading = isLoading || loadingTrasf;
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -805,7 +847,7 @@ export default function Bolle() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {loading ? (
                 Array(3).fill(0).map((_, i) => (
                   <TableRow key={i}>
                     {Array(6).fill(0).map((__, j) => (
@@ -813,32 +855,68 @@ export default function Bolle() {
                     ))}
                   </TableRow>
                 ))
-              ) : bolle?.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     Nessuna bolla emessa. Crea la prima bolla con il pulsante in alto a destra.
                   </TableCell>
                 </TableRow>
-              ) : bolle?.map(b => (
+              ) : rows.map(row => row.kind === "bolla" ? (
                 <TableRow
-                  key={b.id}
+                  key={`b-${row.bolla.id}`}
                   className="cursor-pointer hover:bg-muted/40"
-                  onClick={() => setSelectedBollaId(b.id)}
+                  onClick={() => setSelectedBollaId(row.bolla.id)}
                 >
                   <TableCell className="font-mono text-sm font-medium">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-muted-foreground" />
-                      {b.numeroBolla}
+                      {row.bolla.numeroBolla}
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {format(new Date(b.dataBolla), "dd MMM yyyy", { locale: it })}
+                    {format(new Date(row.bolla.dataBolla), "dd MMM yyyy", { locale: it })}
                   </TableCell>
-                  <TableCell className="font-medium">{b.beneficiarioNome ?? "—"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{b.magazzinoNome ?? "—"}</TableCell>
-                  <TableCell className="text-center">{statoBadge(b.stato)}</TableCell>
+                  <TableCell className="font-medium">{row.bolla.beneficiarioNome ?? "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{row.bolla.magazzinoNome ?? "—"}</TableCell>
+                  <TableCell className="text-center">{statoBadge(row.bolla.stato)}</TableCell>
                   <TableCell className="text-right">
                     <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <TableRow key={`t-${row.trasf.id}`} className="hover:bg-muted/40">
+                  <TableCell className="font-mono text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <ArrowRightLeft className="h-4 w-4 text-emerald-600" />
+                      {row.trasf.codice}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {format(new Date(row.trasf.dataRichiesta), "dd MMM yyyy", { locale: it })}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                      Trasferimento Interno
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <span>{row.trasf.magazzinoOrigineNome ?? "—"}</span>
+                      <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                      <span>{row.trasf.magazzinoDestinoNome ?? "—"}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">{trasferimentoStatoBadge(row.trasf.stato)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={(e) => downloadTrasf(e, row.trasf)}
+                      disabled={downloadingTrasfId === row.trasf.id}
+                    >
+                      <Download className="h-3.5 w-3.5" /> Bolla
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTable, lottiTable } from "@workspace/db";
-import { eq, and, desc, type SQL } from "drizzle-orm";
+import { eq, and, desc, inArray, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -57,35 +57,71 @@ router.get("/trasferimenti", async (req, res) => {
   if (stato) conditions.push(eq(trasferimentiTable.stato, stato));
 
   const rows = await db
-    .select({
-      t: trasferimentiTable,
-      origineNome: magazziniTable.nome,
-    })
+    .select()
     .from(trasferimentiTable)
-    .leftJoin(magazziniTable, eq(trasferimentiTable.magazzinoOrigineId, magazziniTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(trasferimentiTable.dataCreazione))
     .limit(100);
 
+  const magazzini = await db.select({ id: magazziniTable.id, nome: magazziniTable.nome }).from(magazziniTable);
+  const magMap = new Map(magazzini.map(m => [m.id, m.nome]));
+
+  const ids = rows.map(r => r.id);
+  const righeByT = new Map<number, Array<{
+    id: number; prodottoId: number; prodottoNome: string | null;
+    lottoId: number | null; quantita: number; unitaMisura: string; note: string | null;
+  }>>();
+  if (ids.length > 0) {
+    const righe = await db.select({
+      r: trasferimentoRigheTable,
+      prodottoNome: prodottiTable.nome,
+    })
+      .from(trasferimentoRigheTable)
+      .leftJoin(prodottiTable, eq(trasferimentoRigheTable.prodottoId, prodottiTable.id))
+      .where(inArray(trasferimentoRigheTable.trasferimentoId, ids));
+    for (const x of righe) {
+      const arr = righeByT.get(x.r.trasferimentoId) ?? [];
+      arr.push({
+        id: x.r.id,
+        prodottoId: x.r.prodottoId,
+        prodottoNome: x.prodottoNome ?? null,
+        lottoId: x.r.lottoId ?? null,
+        quantita: parseFloat(x.r.quantita),
+        unitaMisura: x.r.unitaMisura,
+        note: x.r.note ?? null,
+      });
+      righeByT.set(x.r.trasferimentoId, arr);
+    }
+  }
+
   res.json(rows.map(r => ({
-    id: r.t.id,
-    codice: r.t.codice,
-    magazzinoOrigineId: r.t.magazzinoOrigineId,
-    magazzinoOrigineNome: r.origineNome ?? null,
-    magazzinoDestinoId: r.t.magazzinoDestinoId,
-    magazzinoDestinoNome: null,
-    dataRichiesta: r.t.dataRichiesta,
-    dataEsecuzione: r.t.dataEsecuzione ?? null,
-    dataConfermaRicezione: r.t.dataConfermaRicezione ?? null,
-    stato: r.t.stato,
-    note: r.t.note ?? null,
-    righe: [],
-    dataCreazione: r.t.dataCreazione.toISOString(),
+    id: r.id,
+    codice: r.codice,
+    magazzinoOrigineId: r.magazzinoOrigineId,
+    magazzinoOrigineNome: magMap.get(r.magazzinoOrigineId) ?? null,
+    magazzinoDestinoId: r.magazzinoDestinoId,
+    magazzinoDestinoNome: magMap.get(r.magazzinoDestinoId) ?? null,
+    dataRichiesta: r.dataRichiesta,
+    dataEsecuzione: r.dataEsecuzione ?? null,
+    dataConfermaRicezione: r.dataConfermaRicezione ?? null,
+    stato: r.stato,
+    note: r.note ?? null,
+    righe: righeByT.get(r.id) ?? [],
+    dataCreazione: r.dataCreazione.toISOString(),
   })));
 });
 
 router.post("/trasferimenti", async (req, res) => {
   const body = req.body;
+  if (body.magazzinoOrigineId === body.magazzinoDestinoId) {
+    res.status(400).json({ error: "Origine e destinazione devono essere diverse" });
+    return;
+  }
+  const righeInput: Array<{ quantita: number }> = body.righe ?? [];
+  if (righeInput.some((r) => !(r.quantita > 0))) {
+    res.status(400).json({ error: "Le quantità devono essere maggiori di zero" });
+    return;
+  }
   const codice = `TRASM-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
   const [t] = await db.insert(trasferimentiTable).values({
     codice,

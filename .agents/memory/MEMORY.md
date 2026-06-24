@@ -5,3 +5,4 @@
 - [Bolla → Intervento sync](bolla-intervento-sync.md) — confirmed bolla owns one auto-synced intervento (comma-joined type labels); stato only via dedicated endpoints; filter tipoIntervento token-aware.
 - [Consegne stato & bolla readiness](consegne-bolla-readiness.md) — consegne stati are pianificata/effettuata (NOT programmata/completata); readiness derives from linked bolla.stato; completa needs a ready bolla and reuses bolla's intervento (no duplicate).
 - [Bolla PDF templates & print settings](bolla-pdf-templates.md) — template enum lives in 4 places (DB/OpenAPI/API/PDF ACCENT) kept in lockstep; centro logo is base64 data URL in centri.logo_url; settings is atomic singleton.
+- [Trasferimenti as transfer-bolla](trasferimenti-as-bolla.md) — a transfer IS the trasferimenti record (no separate bolla; bolle.beneficiarioId is NOT NULL); PDF client-side; shown in Bolle as read-only "Trasferimento Interno" rows.

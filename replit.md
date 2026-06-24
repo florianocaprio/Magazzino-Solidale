@@ -47,6 +47,7 @@ Gestionale per un magazzino solidale: tracciamento di prodotti/lotti (FEFO), CRM
 - **Logistica**: Volunteer management, vehicle fleet, supplier/donor registry, procurement planning
 - **Report**: Stock by warehouse, deliveries by month, beneficiaries by zone — with Recharts charts; every list/entity exportable to XLSX and PDF (client-side: `xlsx` + `jspdf`/`jspdf-autotable`)
 - **Bolle PDF**: delivery bills downloadable as PDF in 3 selectable templates (standard/moderno/minimal); header shows the beneficiary's Centro di Ascolto name/logo/address, footer shows custom text + association logo. Template + footer set in **Impostazioni Stampa** (singleton settings)
+- **Trasferimenti**: create inter-warehouse transfers (origin+destination select, product rows from origin stock capped at available). Each transfer IS its own "bolla di trasferimento" (no separate bolla row — `bolle.beneficiarioId` is NOT NULL); on create a "Bolla creata" dialog offers a client-side PDF download. Transfers also appear in the Bolle list as read-only rows tagged "Trasferimento Interno" with a PDF download.
 - **Dashboard**: Live KPIs, alerts for expiring lots and low stock, recent movements feed
 
 ## Gotchas
