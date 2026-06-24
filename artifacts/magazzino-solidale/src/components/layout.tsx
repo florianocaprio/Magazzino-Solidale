@@ -53,7 +53,7 @@ const NAV_ITEMS = [
   { title: "Approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, group: "Logistica" },
   
   { title: "Report", url: "/report", icon: BarChart3, group: "Analisi" },
-  { title: "Impostazioni Stampa", url: "/impostazioni-stampa", icon: Printer, group: "Analisi" },
+  { title: "Impostazioni Stampa Bolla", url: "/impostazioni-stampa", icon: Printer, group: "Analisi" },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

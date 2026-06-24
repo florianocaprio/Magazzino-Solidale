@@ -44,7 +44,7 @@ export default function ImpostazioniStampa() {
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Printer className="h-7 w-7" /> Impostazioni Stampa
+          <Printer className="h-7 w-7" /> Impostazioni Stampa Bolla
         </h1>
         <p className="text-muted-foreground">Modello e piè di pagina usati per le bolle di consegna in PDF.</p>
       </div>
