@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useListCentriAscolto, getListBeneficiariQueryKey } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useListCentriAscolto, useGetBeneficiario, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home } from "lucide-react";
+import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil } from "lucide-react";
+import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -46,6 +47,7 @@ export default function Beneficiari() {
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const createBeneficiario = useCreateBeneficiario();
   const deleteBeneficiario = useDeleteBeneficiario();
@@ -189,6 +191,7 @@ export default function Beneficiari() {
                             Dettaglio Profilo
                           </Link>
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> Modifica anagrafica</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> Elimina</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -265,6 +268,8 @@ export default function Beneficiari() {
         </SheetContent>
       </Sheet>
 
+      {editingId != null && <QuickEditBeneficiario id={editingId} onClose={() => setEditingId(null)} />}
+
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Elimina beneficiario?</AlertDialogTitle></AlertDialogHeader>
@@ -284,5 +289,24 @@ export default function Beneficiari() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function QuickEditBeneficiario({ id, onClose }: { id: number; onClose: () => void }) {
+  const { data: b } = useGetBeneficiario(id, { query: { queryKey: getGetBeneficiarioQueryKey(id) } });
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  if (!b) return null;
+  return (
+    <EditBeneficiarioSheet
+      b={b}
+      onClose={onClose}
+      onSaved={() => {
+        queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(id) });
+        toast({ title: "Anagrafica aggiornata" });
+        onClose();
+      }}
+    />
   );
 }

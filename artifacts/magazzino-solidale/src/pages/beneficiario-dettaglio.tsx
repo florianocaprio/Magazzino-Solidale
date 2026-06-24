@@ -297,7 +297,7 @@ const editSchema = z.object({
 
 type EditValues = z.infer<typeof editSchema>;
 
-function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettaglioType; onClose: () => void; onSaved: () => void }) {
+export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettaglioType; onClose: () => void; onSaved: () => void }) {
   const updateBeneficiario = useUpdateBeneficiario();
   const { toast } = useToast();
 
