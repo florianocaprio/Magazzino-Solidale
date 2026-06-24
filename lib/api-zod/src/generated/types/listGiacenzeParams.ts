@@ -9,4 +9,5 @@
 export type ListGiacenzeParams = {
 magazzinoId?: number;
 sottoscortaOnly?: boolean;
+fsePlusOnly?: boolean;
 };

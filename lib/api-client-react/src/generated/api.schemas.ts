@@ -1383,6 +1383,7 @@ prodottoId?: number;
 export type ListGiacenzeParams = {
 magazzinoId?: number;
 sottoscortaOnly?: boolean;
+fsePlusOnly?: boolean;
 };
 
 export type ListTrasferimentiParams = {

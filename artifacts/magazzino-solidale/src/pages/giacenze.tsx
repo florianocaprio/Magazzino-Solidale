@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Filter, AlertTriangle } from "lucide-react";
+import { Filter, AlertTriangle, Star } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { ExportButtons } from "@/components/export-buttons";
@@ -17,12 +17,14 @@ export default function Giacenze() {
   const { t } = useTranslation();
   const [magazzinoId, setMagazzinoId] = useState<string>("all");
   const [sottoscortaOnly, setSottoscortaOnly] = useState(false);
+  const [fsePlusOnly, setFsePlusOnly] = useState(false);
   
   const { data: magazzini } = useListMagazzini();
   
   const { data: giacenze, isLoading } = useListGiacenze({
     magazzinoId: magazzinoId !== "all" ? Number(magazzinoId) : undefined,
-    sottoscortaOnly: sottoscortaOnly || undefined
+    sottoscortaOnly: sottoscortaOnly || undefined,
+    fsePlusOnly: fsePlusOnly || undefined
   });
 
   const magazzinoNome = magazzinoId !== "all"
@@ -46,7 +48,7 @@ export default function Giacenze() {
           rows={giacenze ?? []}
           filename={inventarioFile}
           title={inventarioTitolo}
-          subtitle={sottoscortaOnly ? t("giacenze.exportSubtitleSottoscorta") : undefined}
+          subtitle={[sottoscortaOnly ? t("giacenze.exportSubtitleSottoscorta") : null, fsePlusOnly ? t("giacenze.exportSubtitleFsePlus") : null].filter(Boolean).join(" · ") || undefined}
           sheetName={t("giacenze.sheetName")}
           orientation="landscape"
           columns={[
@@ -81,6 +83,13 @@ export default function Giacenze() {
               </Select>
             </div>
             
+            <div className="flex items-center space-x-2 bg-blue-500/10 px-3 py-1.5 rounded-md border border-blue-500/20">
+              <Switch id="fseplus" checked={fsePlusOnly} onCheckedChange={setFsePlusOnly} />
+              <Label htmlFor="fseplus" className="text-blue-700 font-medium cursor-pointer flex items-center gap-1">
+                <Star className="h-3 w-3" /> {t("giacenze.fsePlusOnly")}
+              </Label>
+            </div>
+
             <div className="flex items-center space-x-2 ml-auto bg-amber-500/10 px-3 py-1.5 rounded-md border border-amber-500/20">
               <Switch id="sottoscorta" checked={sottoscortaOnly} onCheckedChange={setSottoscortaOnly} />
               <Label htmlFor="sottoscorta" className="text-amber-700 font-medium cursor-pointer flex items-center gap-1">

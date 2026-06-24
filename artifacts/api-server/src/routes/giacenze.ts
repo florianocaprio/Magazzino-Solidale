@@ -6,7 +6,11 @@ import { eq, and, gt, sum, count, min, sql as drizzleSql } from "drizzle-orm";
 const router: IRouter = Router();
 
 router.get("/giacenze", async (req, res) => {
-  const { magazzinoId, sottoscortaOnly } = req.query as Record<string, string>;
+  const { magazzinoId, sottoscortaOnly, fsePlusOnly } = req.query as Record<string, string>;
+
+  const conditions = [gt(lottiTable.quantitaResidua, "0")];
+  if (magazzinoId) conditions.push(eq(lottiTable.magazzinoId, parseInt(magazzinoId)));
+  if (fsePlusOnly === "true") conditions.push(eq(lottiTable.fsePlus, true));
 
   const rows = await db
     .select({
@@ -26,11 +30,7 @@ router.get("/giacenze", async (req, res) => {
     .from(lottiTable)
     .innerJoin(prodottiTable, eq(lottiTable.prodottoId, prodottiTable.id))
     .innerJoin(magazziniTable, eq(lottiTable.magazzinoId, magazziniTable.id))
-    .where(
-      magazzinoId
-        ? and(gt(lottiTable.quantitaResidua, "0"), eq(lottiTable.magazzinoId, parseInt(magazzinoId)))
-        : gt(lottiTable.quantitaResidua, "0")
-    )
+    .where(and(...conditions))
     .groupBy(prodottiTable.id, magazziniTable.id)
     .orderBy(prodottiTable.nome);
 

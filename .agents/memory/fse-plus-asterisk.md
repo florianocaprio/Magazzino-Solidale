@@ -30,6 +30,13 @@ the product default, so the lot wins when known.
   on-screen views show only article COUNTS (no product-name table), so nothing to mark
   there.
 
+## Giacenze FSE+ filter
+`GET /giacenze?fsePlusOnly=true` restricts the aggregation to FSE+ lots
+(`eq(lottiTable.fsePlus, true)` in the WHERE, before group-by) — so it shows the
+FSE+ portion of stock per warehouse, NOT all stock of products flagged FSE+.
+**Why:** provenance is per-lot; a product can hold both FSE+ and non-FSE+ lots, so
+lot-level filtering is the only accurate "FSE+ stock" figure.
+
 ## Gotcha: both detail AND list route paths
 Each of bolle/trasferimenti/scarichi builds righe in TWO places — the single-entity
 detail builder and the batched list builder. Add the fsePlus join/derivation to BOTH

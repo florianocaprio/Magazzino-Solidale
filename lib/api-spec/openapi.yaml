@@ -412,6 +412,10 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: fsePlusOnly
+          in: query
+          schema:
+            type: boolean
       responses:
         "200":
           description: Stock levels

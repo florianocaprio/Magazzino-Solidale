@@ -439,7 +439,8 @@ export const CreateMovimentoBody = zod.object({
 
 export const ListGiacenzeQueryParams = zod.object({
   "magazzinoId": zod.coerce.number().optional(),
-  "sottoscortaOnly": zod.coerce.boolean().optional()
+  "sottoscortaOnly": zod.coerce.boolean().optional(),
+  "fsePlusOnly": zod.coerce.boolean().optional()
 })
 
 export const ListGiacenzeResponseItem = zod.object({
