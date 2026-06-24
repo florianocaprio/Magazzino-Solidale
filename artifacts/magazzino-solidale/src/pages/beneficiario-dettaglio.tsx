@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, getListBeneficiariQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, getListBeneficiariQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { ExportButtons } from "@/components/export-buttons";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil } from "lucide-react";
+import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useForm } from "react-hook-form";
@@ -23,6 +24,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
 const NONE_VALUE = "__none__";
+
+function calcEta(dataNascita?: string | null): number | null {
+  if (!dataNascita) return null;
+  const d = new Date(dataNascita);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let eta = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) eta--;
+  return eta;
+}
+
+const SESSO_LABEL: Record<string, string> = { M: "M", F: "F" };
 
 export default function BeneficiarioDettaglio() {
   const { id } = useParams();
@@ -170,40 +184,10 @@ export default function BeneficiarioDettaglio() {
             </TabsList>
             
             <TabsContent value="nucleo" className="mt-4">
-              <Card>
-                <CardHeader className="py-4 flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Composizione Nucleo Familiare</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-4 mb-6">
-                    <Badge variant="secondary">Minori: {b.numMinori}</Badge>
-                    <Badge variant="secondary">Anziani: {b.numAnziani}</Badge>
-                    <Badge variant="secondary">Disabili: {b.numDisabili}</Badge>
-                  </div>
-                  
-                  {b.nucleo && b.nucleo.length > 0 ? (
-                    <div className="space-y-4">
-                      {b.nucleo.map((m, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-card">
-                          <div>
-                            <div className="font-medium">{m.nome} {m.cognome}</div>
-                            <div className="text-xs text-muted-foreground flex gap-3">
-                              <span>Relazione: {m.relazione || '-'}</span>
-                              {m.dataNascita && <span>Nato/a: {format(new Date(m.dataNascita), "yyyy")}</span>}
-                            </div>
-                          </div>
-                          <div className="text-right text-xs space-y-1">
-                            {m.tagliiaVestiti && <div>Taglia: <span className="font-medium">{m.tagliiaVestiti}</span></div>}
-                            {m.numeroScarpe && <div>Scarpe: <span className="font-medium">{m.numeroScarpe}</span></div>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-6">Nessun componente aggiunto al nucleo.</p>
-                  )}
-                </CardContent>
-              </Card>
+              <NucleoSection
+                b={b}
+                onChanged={() => queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) })}
+              />
             </TabsContent>
             
             <TabsContent value="interventi" className="mt-4">
@@ -295,7 +279,9 @@ const editSchema = z.object({
   cognome: z.string().min(1, "Obbligatorio"),
   nome: z.string().min(1, "Obbligatorio"),
   dataNascita: z.string().optional(),
+  sesso: z.string().optional(),
   cittadinanza: z.string().optional(),
+  areaProvenienza: z.string().optional(),
   residenza: z.string().optional(),
   domicilio: z.string().optional(),
   comune: z.string().optional(),
@@ -321,7 +307,9 @@ function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettagl
       cognome: b.cognome ?? "",
       nome: b.nome ?? "",
       dataNascita: b.dataNascita ? b.dataNascita.slice(0, 10) : "",
+      sesso: b.sesso ?? "",
       cittadinanza: b.cittadinanza ?? "",
+      areaProvenienza: b.areaProvenienza ?? "",
       residenza: b.residenza ?? "",
       domicilio: b.domicilio ?? "",
       comune: b.comune ?? "",
@@ -340,6 +328,8 @@ function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettagl
     const payload = {
       ...data,
       dataNascita: data.dataNascita || undefined,
+      sesso: data.sesso || undefined,
+      areaProvenienza: data.areaProvenienza || undefined,
     };
     updateBeneficiario.mutate(
       { id: b.id, data: payload },
@@ -370,8 +360,35 @@ function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettagl
                 <FormField control={form.control} name="dataNascita" render={({ field }) => (
                   <FormItem><FormLabel>Data di nascita</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                 )} />
+                <FormField control={form.control} name="sesso" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sesso</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="M">Maschio</SelectItem>
+                        <SelectItem value="F">Femmina</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="cittadinanza" render={({ field }) => (
                   <FormItem><FormLabel>Cittadinanza</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="areaProvenienza" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Area provenienza</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="UE">UE</SelectItem>
+                        <SelectItem value="Extra-UE">Extra-UE</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
                 )} />
               </div>
 
@@ -444,5 +461,162 @@ function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettagl
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+const membroSchema = z.object({
+  nome: z.string().min(1, "Obbligatorio"),
+  cognome: z.string().optional(),
+  relazione: z.string().optional(),
+  dataNascita: z.string().optional(),
+  sesso: z.string().optional(),
+});
+type MembroValues = z.infer<typeof membroSchema>;
+
+function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChanged: () => void }) {
+  const { toast } = useToast();
+  const [adding, setAdding] = useState(false);
+  const addMembro = useAddNucleoFamiliare();
+  const deleteMembro = useDeleteNucleoFamiliare();
+
+  const form = useForm<MembroValues>({
+    resolver: zodResolver(membroSchema),
+    defaultValues: { nome: "", cognome: "", relazione: "", dataNascita: "", sesso: "" },
+  });
+
+  const onAdd = (data: MembroValues) => {
+    addMembro.mutate(
+      {
+        id: b.id,
+        data: {
+          nome: data.nome,
+          cognome: data.cognome || undefined,
+          relazione: data.relazione || undefined,
+          dataNascita: data.dataNascita || undefined,
+          sesso: data.sesso || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          setAdding(false);
+          form.reset();
+          onChanged();
+          toast({ title: "Componente aggiunto" });
+        },
+        onError: () => toast({ title: "Errore", description: "Impossibile aggiungere il componente.", variant: "destructive" }),
+      },
+    );
+  };
+
+  const onDelete = (membroId: number) => {
+    deleteMembro.mutate(
+      { id: b.id, membroId },
+      {
+        onSuccess: () => {
+          onChanged();
+          toast({ title: "Componente rimosso" });
+        },
+        onError: () => toast({ title: "Errore", description: "Impossibile rimuovere il componente.", variant: "destructive" }),
+      },
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader className="py-4 flex flex-row items-center justify-between">
+        <CardTitle className="text-base">Composizione Nucleo Familiare</CardTitle>
+        <Button size="sm" variant="outline" className="gap-2" onClick={() => setAdding(true)}>
+          <Plus className="w-4 h-4" /> Aggiungi componente
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-4 mb-6">
+          <Badge variant="secondary">Minori: {b.numMinori}</Badge>
+          <Badge variant="secondary">Anziani: {b.numAnziani}</Badge>
+          <Badge variant="secondary">Disabili: {b.numDisabili}</Badge>
+        </div>
+
+        {b.nucleo && b.nucleo.length > 0 ? (
+          <div className="space-y-4">
+            {b.nucleo.map((m) => {
+              const eta = calcEta(m.dataNascita);
+              return (
+                <div key={m.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                  <div>
+                    <div className="font-medium flex items-center gap-2">
+                      {m.nome} {m.cognome}
+                      {m.sesso && <Badge variant="outline" className="text-[10px]">{SESSO_LABEL[m.sesso] ?? m.sesso}</Badge>}
+                    </div>
+                    <div className="text-xs text-muted-foreground flex gap-3">
+                      <span>Relazione: {m.relazione || '-'}</span>
+                      {eta !== null && <span>Età: {eta} anni</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right text-xs space-y-1">
+                      {m.tagliiaVestiti && <div>Taglia: <span className="font-medium">{m.tagliiaVestiti}</span></div>}
+                      {m.numeroScarpe && <div>Scarpe: <span className="font-medium">{m.numeroScarpe}</span></div>}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => onDelete(m.id)}
+                      disabled={deleteMembro.isPending}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-6">Nessun componente aggiunto al nucleo.</p>
+        )}
+      </CardContent>
+
+      <Dialog open={adding} onOpenChange={(open) => { if (!open) { setAdding(false); form.reset(); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Aggiungi componente</DialogTitle></DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onAdd)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="nome" render={({ field }) => (
+                  <FormItem><FormLabel>Nome</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="cognome" render={({ field }) => (
+                  <FormItem><FormLabel>Cognome</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+              </div>
+              <FormField control={form.control} name="relazione" render={({ field }) => (
+                <FormItem><FormLabel>Relazione</FormLabel><FormControl><Input placeholder="es. figlio/a, coniuge" {...field} /></FormControl></FormItem>
+              )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="dataNascita" render={({ field }) => (
+                  <FormItem><FormLabel>Data di nascita</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="sesso" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sesso</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="M">Maschio</SelectItem>
+                        <SelectItem value="F">Femmina</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setAdding(false); form.reset(); }}>Annulla</Button>
+                <Button type="submit" disabled={addMembro.isPending}>Aggiungi</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

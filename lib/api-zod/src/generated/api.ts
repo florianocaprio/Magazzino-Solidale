@@ -924,7 +924,9 @@ export const ListBeneficiariResponseItem = zod.object({
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
+  "sesso": zod.string().nullish(),
   "cittadinanza": zod.string().nullish(),
+  "areaProvenienza": zod.string().nullish(),
   "residenza": zod.string().nullish(),
   "comune": zod.string().nullish(),
   "zonaMunicipio": zod.string().nullish(),
@@ -971,7 +973,9 @@ export const CreateBeneficiarioBody = zod.object({
   "motivoConsegnaDomicilio": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
   "dataPresaInCarico": zod.string().optional(),
-  "noteInterne": zod.string().optional()
+  "noteInterne": zod.string().optional(),
+  "sesso": zod.string().optional(),
+  "areaProvenienza": zod.string().optional()
 })
 
 
@@ -985,7 +989,9 @@ export const GetBeneficiarioResponse = zod.object({
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
+  "sesso": zod.string().nullish(),
   "cittadinanza": zod.string().nullish(),
+  "areaProvenienza": zod.string().nullish(),
   "residenza": zod.string().nullish(),
   "domicilio": zod.string().nullish(),
   "comune": zod.string().nullish(),
@@ -1016,6 +1022,7 @@ export const GetBeneficiarioResponse = zod.object({
   "nome": zod.string().nullish(),
   "cognome": zod.string().nullish(),
   "dataNascita": zod.string().nullish(),
+  "sesso": zod.string().nullish(),
   "relazione": zod.string().nullish(),
   "tagliiaVestiti": zod.string().nullish(),
   "numeroScarpe": zod.string().nullish(),
@@ -1095,7 +1102,9 @@ export const UpdateBeneficiarioBody = zod.object({
   "motivoConsegnaDomicilio": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
   "attivo": zod.boolean().optional(),
-  "noteInterne": zod.string().optional()
+  "noteInterne": zod.string().optional(),
+  "sesso": zod.string().optional(),
+  "areaProvenienza": zod.string().optional()
 })
 
 export const UpdateBeneficiarioResponse = zod.object({
@@ -1104,7 +1113,9 @@ export const UpdateBeneficiarioResponse = zod.object({
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
+  "sesso": zod.string().nullish(),
   "cittadinanza": zod.string().nullish(),
+  "areaProvenienza": zod.string().nullish(),
   "residenza": zod.string().nullish(),
   "comune": zod.string().nullish(),
   "zonaMunicipio": zod.string().nullish(),
@@ -1138,6 +1149,7 @@ export const GetNucleoFamiliareResponseItem = zod.object({
   "nome": zod.string().nullish(),
   "cognome": zod.string().nullish(),
   "dataNascita": zod.string().nullish(),
+  "sesso": zod.string().nullish(),
   "relazione": zod.string().nullish(),
   "tagliiaVestiti": zod.string().nullish(),
   "numeroScarpe": zod.string().nullish(),
@@ -1155,11 +1167,18 @@ export const AddNucleoFamiliareBody = zod.object({
   "nome": zod.string().optional(),
   "cognome": zod.string().optional(),
   "dataNascita": zod.string().optional(),
+  "sesso": zod.string().optional(),
   "relazione": zod.string().optional(),
   "tagliaVestiti": zod.string().optional(),
   "numeroScarpe": zod.string().optional(),
   "esigenzeParticolari": zod.string().optional(),
   "note": zod.string().optional()
+})
+
+
+export const DeleteNucleoFamiliareParams = zod.object({
+  "id": zod.coerce.number(),
+  "membroId": zod.coerce.number()
 })
 
 
@@ -2051,5 +2070,41 @@ export const ReportBeneficiariPerZonaResponseItem = zod.object({
   "consegneDomicilio": zod.number()
 })
 export const ReportBeneficiariPerZonaResponse = zod.array(ReportBeneficiariPerZonaResponseItem)
+
+
+/**
+ * @summary FSE+ annual distribution report
+ */
+export const ReportFsePlusQueryParams = zod.object({
+  "anno": zod.coerce.number().optional()
+})
+
+export const ReportFsePlusResponse = zod.object({
+  "anno": zod.number(),
+  "pesoTotaleKg": zod.number(),
+  "beneficiariTotali": zod.number(),
+  "personeTotali": zod.number(),
+  "prodotti": zod.array(zod.object({
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string(),
+  "unitaMisura": zod.string(),
+  "quantitaTotale": zod.number(),
+  "pesoKg": zod.number()
+})),
+  "persone": zod.object({
+  "maschi": zod.number(),
+  "femmine": zod.number(),
+  "ue": zod.number(),
+  "extraUe": zod.number(),
+  "maschiAdulti": zod.number(),
+  "maschiMinori": zod.number(),
+  "femmineAdulte": zod.number(),
+  "femmineMinori": zod.number(),
+  "ueMaschi": zod.number(),
+  "ueFemmine": zod.number(),
+  "extraUeMaschi": zod.number(),
+  "extraUeFemmine": zod.number()
+})
+})
 
 

@@ -892,6 +892,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/NucleoFamiliare"
 
+  /beneficiari/{id}/nucleo/{membroId}:
+    delete:
+      operationId: deleteNucleoFamiliare
+      tags: [beneficiari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: membroId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   # ─── INTERVENTI ──────────────────────────────────────────────────────────────
   /interventi:
     get:
@@ -1644,9 +1663,84 @@ paths:
                 items:
                   $ref: "#/components/schemas/BeneficiariZonaReport"
 
+  /report/fse-plus:
+    get:
+      operationId: reportFsePlus
+      tags: [report]
+      summary: FSE+ annual distribution report
+      parameters:
+        - name: anno
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: FSE+ report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportFsePlus"
+
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
   schemas:
+    ReportFsePlus:
+      type: object
+      properties:
+        anno:
+          type: integer
+        pesoTotaleKg:
+          type: number
+        beneficiariTotali:
+          type: integer
+        personeTotali:
+          type: integer
+        prodotti:
+          type: array
+          items:
+            type: object
+            properties:
+              prodottoId:
+                type: integer
+              prodottoNome:
+                type: string
+              unitaMisura:
+                type: string
+              quantitaTotale:
+                type: number
+              pesoKg:
+                type: number
+            required: [prodottoId, prodottoNome, unitaMisura, quantitaTotale, pesoKg]
+        persone:
+          type: object
+          properties:
+            maschi:
+              type: integer
+            femmine:
+              type: integer
+            ue:
+              type: integer
+            extraUe:
+              type: integer
+            maschiAdulti:
+              type: integer
+            maschiMinori:
+              type: integer
+            femmineAdulte:
+              type: integer
+            femmineMinori:
+              type: integer
+            ueMaschi:
+              type: integer
+            ueFemmine:
+              type: integer
+            extraUeMaschi:
+              type: integer
+            extraUeFemmine:
+              type: integer
+          required: [maschi, femmine, ue, extraUe, maschiAdulti, maschiMinori, femmineAdulte, femmineMinori, ueMaschi, ueFemmine, extraUeMaschi, extraUeFemmine]
+      required: [anno, pesoTotaleKg, beneficiariTotali, personeTotali, prodotti, persone]
+
     HealthStatus:
       type: object
       properties:
@@ -2481,7 +2575,11 @@ components:
           type: string
         dataNascita:
           type: ["string", "null"]
+        sesso:
+          type: ["string", "null"]
         cittadinanza:
+          type: ["string", "null"]
+        areaProvenienza:
           type: ["string", "null"]
         residenza:
           type: ["string", "null"]
@@ -2528,7 +2626,11 @@ components:
           type: string
         dataNascita:
           type: ["string", "null"]
+        sesso:
+          type: ["string", "null"]
         cittadinanza:
+          type: ["string", "null"]
+        areaProvenienza:
           type: ["string", "null"]
         residenza:
           type: ["string", "null"]
@@ -2651,6 +2753,10 @@ components:
           type: string
         noteInterne:
           type: string
+        sesso:
+          type: string
+        areaProvenienza:
+          type: string
       required: [cognome, nome]
 
     BeneficiarioUpdate:
@@ -2707,6 +2813,10 @@ components:
         attivo:
           type: boolean
         noteInterne:
+          type: string
+        sesso:
+          type: string
+        areaProvenienza:
           type: string
 
     # ── Centri di Ascolto ────────────────────────────────────────────────
@@ -2818,6 +2928,8 @@ components:
           type: ["string", "null"]
         dataNascita:
           type: ["string", "null"]
+        sesso:
+          type: ["string", "null"]
         relazione:
           type: ["string", "null"]
         tagliiaVestiti:
@@ -2838,6 +2950,8 @@ components:
         cognome:
           type: string
         dataNascita:
+          type: string
+        sesso:
           type: string
         relazione:
           type: string

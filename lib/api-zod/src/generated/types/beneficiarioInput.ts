@@ -35,4 +35,6 @@ export interface BeneficiarioInput {
   centroAscoltoId?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
+  sesso?: string;
+  areaProvenienza?: string;
 }

@@ -86,6 +86,8 @@ import type {
   ProdottoInput,
   ProdottoUpdate,
   ReportConsegnePerMeseParams,
+  ReportFsePlus,
+  ReportFsePlusParams,
   Scarico,
   ScaricoInput,
   Trasferimento,
@@ -3350,6 +3352,72 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getAddNucleoFamiliareMutationOptions(options));
     }
 
+export const getDeleteNucleoFamiliareUrl = (id: number,
+    membroId: number,) => {
+
+
+
+
+  return `/api/beneficiari/${id}/nucleo/${membroId}`
+}
+
+export const deleteNucleoFamiliare = async (id: number,
+    membroId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteNucleoFamiliareUrl(id,membroId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteNucleoFamiliareMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteNucleoFamiliare>>, TError,{id: number;membroId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteNucleoFamiliare>>, TError,{id: number;membroId: number}, TContext> => {
+
+const mutationKey = ['deleteNucleoFamiliare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteNucleoFamiliare>>, {id: number;membroId: number}> = (props) => {
+          const {id,membroId} = props ?? {};
+
+          return  deleteNucleoFamiliare(id,membroId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteNucleoFamiliareMutationResult = NonNullable<Awaited<ReturnType<typeof deleteNucleoFamiliare>>>
+
+    export type DeleteNucleoFamiliareMutationError = ErrorType<unknown>
+
+    export const useDeleteNucleoFamiliare = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteNucleoFamiliare>>, TError,{id: number;membroId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteNucleoFamiliare>>,
+        TError,
+        {id: number;membroId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteNucleoFamiliareMutationOptions(options));
+    }
+
 export const getListInterventiUrl = (params?: ListInterventiParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6126,6 +6194,90 @@ export function useReportBeneficiariPerZona<TData = Awaited<ReturnType<typeof re
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getReportBeneficiariPerZonaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReportFsePlusUrl = (params?: ReportFsePlusParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/fse-plus?${stringifiedParams}` : `/api/report/fse-plus`
+}
+
+/**
+ * @summary FSE+ annual distribution report
+ */
+export const reportFsePlus = async (params?: ReportFsePlusParams, options?: RequestInit): Promise<ReportFsePlus> => {
+
+  return customFetch<ReportFsePlus>(getReportFsePlusUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportFsePlusQueryKey = (params?: ReportFsePlusParams,) => {
+    return [
+    `/api/report/fse-plus`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getReportFsePlusQueryOptions = <TData = Awaited<ReturnType<typeof reportFsePlus>>, TError = ErrorType<unknown>>(params?: ReportFsePlusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportFsePlus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReportFsePlusQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportFsePlus>>> = ({ signal }) => reportFsePlus(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof reportFsePlus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReportFsePlusQueryResult = NonNullable<Awaited<ReturnType<typeof reportFsePlus>>>
+export type ReportFsePlusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary FSE+ annual distribution report
+ */
+
+export function useReportFsePlus<TData = Awaited<ReturnType<typeof reportFsePlus>>, TError = ErrorType<unknown>>(
+ params?: ReportFsePlusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportFsePlus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReportFsePlusQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

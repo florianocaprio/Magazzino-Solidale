@@ -34,4 +34,6 @@ export interface BeneficiarioUpdate {
   centroAscoltoId?: number | null;
   attivo?: boolean;
   noteInterne?: string;
+  sesso?: string;
+  areaProvenienza?: string;
 }

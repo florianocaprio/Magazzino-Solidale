@@ -16,6 +16,8 @@ export interface NucleoFamiliare {
   /** @nullable */
   dataNascita?: string | null;
   /** @nullable */
+  sesso?: string | null;
+  /** @nullable */
   relazione?: string | null;
   /** @nullable */
   tagliiaVestiti?: string | null;

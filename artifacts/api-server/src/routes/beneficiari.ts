@@ -12,7 +12,9 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
     cognome: r.cognome,
     nome: r.nome,
     dataNascita: r.dataNascita ?? null,
+    sesso: r.sesso ?? null,
     cittadinanza: r.cittadinanza ?? null,
+    areaProvenienza: r.areaProvenienza ?? null,
     residenza: r.residenza ?? null,
     domicilio: r.domicilio ?? null,
     comune: r.comune ?? null,
@@ -84,7 +86,7 @@ router.get("/beneficiari/:id", async (req, res) => {
 
   res.json({
     ...fmtBenef(row, centroNome),
-    nucleo: nucleo.map(n => ({ ...n, dataNascita: n.dataNascita ?? null })),
+    nucleo: nucleo.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, sesso: n.sesso ?? null })),
     interventi: interventi.map(i => ({
       id: i.id,
       beneficiarioId: i.beneficiarioId,
@@ -125,12 +127,19 @@ router.delete("/beneficiari/:id", async (req, res) => {
 
 router.get("/beneficiari/:id/nucleo", async (req, res) => {
   const rows = await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, parseInt(req.params.id)));
-  res.json(rows.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, tagliaVestiti: n.tagliaVestiti ?? null, numeroScarpe: n.numeroScarpe ?? null })));
+  res.json(rows.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, sesso: n.sesso ?? null, tagliaVestiti: n.tagliaVestiti ?? null, numeroScarpe: n.numeroScarpe ?? null })));
 });
 
 router.post("/beneficiari/:id/nucleo", async (req, res) => {
   const [row] = await db.insert(nucleoFamiliareTable).values({ ...req.body, beneficiarioId: parseInt(req.params.id) }).returning();
   res.status(201).json(row);
+});
+
+router.delete("/beneficiari/:id/nucleo/:membroId", async (req, res) => {
+  await db
+    .delete(nucleoFamiliareTable)
+    .where(and(eq(nucleoFamiliareTable.id, parseInt(req.params.membroId)), eq(nucleoFamiliareTable.beneficiarioId, parseInt(req.params.id))));
+  res.status(204).send();
 });
 
 export default router;

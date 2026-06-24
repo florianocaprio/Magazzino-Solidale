@@ -69,4 +69,119 @@ router.get("/report/beneficiari-per-zona", async (_req, res) => {
   })));
 });
 
+router.get("/report/fse-plus", async (req, res) => {
+  const parsedAnno = req.query.anno ? parseInt(req.query.anno as string, 10) : new Date().getFullYear();
+  if (Number.isNaN(parsedAnno) || parsedAnno < 2000 || parsedAnno > 2100) {
+    res.status(400).json({ message: "Parametro 'anno' non valido." });
+    return;
+  }
+  const anno = parsedAnno;
+
+  const prodRes = await db.execute(sql`
+    SELECT p.id as prodotto_id,
+           p.nome as prodotto_nome,
+           p.unita_misura,
+           SUM(br.quantita::numeric) as quantita_totale,
+           SUM(CASE WHEN p.unita_misura = 'kg' THEN br.quantita::numeric ELSE 0 END) as peso_kg
+    FROM bolle b
+    JOIN bolla_righe br ON br.bolla_id = b.id
+    JOIN lotti l ON br.lotto_id = l.id
+    JOIN prodotti p ON br.prodotto_id = p.id
+    WHERE l.fse_plus = true
+      AND b.stato IN ('confermata', 'consegnata')
+      AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}
+    GROUP BY p.id, p.nome, p.unita_misura
+    ORDER BY p.nome
+  `);
+  const prodRows = prodRes.rows as Array<Record<string, unknown>>;
+
+  const famRes = await db.execute(sql`
+    SELECT COUNT(DISTINCT b.beneficiario_id) as tot
+    FROM bolle b
+    JOIN bolla_righe br ON br.bolla_id = b.id
+    JOIN lotti l ON br.lotto_id = l.id
+    WHERE l.fse_plus = true
+      AND b.stato IN ('confermata', 'consegnata')
+      AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}
+  `);
+  const beneficiariTotali = Number((famRes.rows[0] as Record<string, unknown>)?.tot ?? 0);
+
+  const persRes = await db.execute(sql`
+    WITH famiglie AS (
+      SELECT DISTINCT b.beneficiario_id
+      FROM bolle b
+      JOIN bolla_righe br ON br.bolla_id = b.id
+      JOIN lotti l ON br.lotto_id = l.id
+      WHERE l.fse_plus = true
+        AND b.stato IN ('confermata', 'consegnata')
+        AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}
+    ),
+    persone AS (
+      SELECT be.sesso, be.data_nascita, be.area_provenienza
+      FROM beneficiari be
+      JOIN famiglie f ON f.beneficiario_id = be.id
+      UNION ALL
+      SELECT n.sesso, n.data_nascita, be.area_provenienza
+      FROM nucleo_familiare n
+      JOIN famiglie f ON f.beneficiario_id = n.beneficiario_id
+      JOIN beneficiari be ON be.id = n.beneficiario_id
+    ),
+    classificate AS (
+      SELECT sesso,
+             area_provenienza,
+             (data_nascita IS NOT NULL AND data_nascita <= (CURRENT_DATE - INTERVAL '18 years')) as adulto,
+             (data_nascita IS NOT NULL AND data_nascita > (CURRENT_DATE - INTERVAL '18 years')) as minore
+      FROM persone
+    )
+    SELECT
+      COUNT(*) as totale,
+      COUNT(*) FILTER (WHERE sesso = 'M') as maschi,
+      COUNT(*) FILTER (WHERE sesso = 'F') as femmine,
+      COUNT(*) FILTER (WHERE area_provenienza = 'UE') as ue,
+      COUNT(*) FILTER (WHERE area_provenienza = 'Extra-UE') as extra_ue,
+      COUNT(*) FILTER (WHERE sesso = 'M' AND adulto) as maschi_adulti,
+      COUNT(*) FILTER (WHERE sesso = 'M' AND minore) as maschi_minori,
+      COUNT(*) FILTER (WHERE sesso = 'F' AND adulto) as femmine_adulte,
+      COUNT(*) FILTER (WHERE sesso = 'F' AND minore) as femmine_minori,
+      COUNT(*) FILTER (WHERE area_provenienza = 'UE' AND sesso = 'M') as ue_maschi,
+      COUNT(*) FILTER (WHERE area_provenienza = 'UE' AND sesso = 'F') as ue_femmine,
+      COUNT(*) FILTER (WHERE area_provenienza = 'Extra-UE' AND sesso = 'M') as extra_ue_maschi,
+      COUNT(*) FILTER (WHERE area_provenienza = 'Extra-UE' AND sesso = 'F') as extra_ue_femmine
+    FROM classificate
+  `);
+  const p = (persRes.rows[0] ?? {}) as Record<string, unknown>;
+
+  const prodotti = prodRows.map((r) => ({
+    prodottoId: Number(r.prodotto_id),
+    prodottoNome: r.prodotto_nome as string,
+    unitaMisura: r.unita_misura as string,
+    quantitaTotale: parseFloat(String(r.quantita_totale ?? 0)),
+    pesoKg: parseFloat(String(r.peso_kg ?? 0)),
+  }));
+
+  const pesoTotaleKg = prodotti.reduce((acc, x) => acc + x.pesoKg, 0);
+
+  res.json({
+    anno,
+    pesoTotaleKg,
+    beneficiariTotali,
+    personeTotali: Number(p.totale ?? 0),
+    prodotti,
+    persone: {
+      maschi: Number(p.maschi ?? 0),
+      femmine: Number(p.femmine ?? 0),
+      ue: Number(p.ue ?? 0),
+      extraUe: Number(p.extra_ue ?? 0),
+      maschiAdulti: Number(p.maschi_adulti ?? 0),
+      maschiMinori: Number(p.maschi_minori ?? 0),
+      femmineAdulte: Number(p.femmine_adulte ?? 0),
+      femmineMinori: Number(p.femmine_minori ?? 0),
+      ueMaschi: Number(p.ue_maschi ?? 0),
+      ueFemmine: Number(p.ue_femmine ?? 0),
+      extraUeMaschi: Number(p.extra_ue_maschi ?? 0),
+      extraUeFemmine: Number(p.extra_ue_femmine ?? 0),
+    },
+  });
+});
+
 export default router;

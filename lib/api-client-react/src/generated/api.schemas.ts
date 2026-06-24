@@ -5,6 +5,38 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export type ReportFsePlusProdottiItem = {
+  prodottoId: number;
+  prodottoNome: string;
+  unitaMisura: string;
+  quantitaTotale: number;
+  pesoKg: number;
+};
+
+export type ReportFsePlusPersone = {
+  maschi: number;
+  femmine: number;
+  ue: number;
+  extraUe: number;
+  maschiAdulti: number;
+  maschiMinori: number;
+  femmineAdulte: number;
+  femmineMinori: number;
+  ueMaschi: number;
+  ueFemmine: number;
+  extraUeMaschi: number;
+  extraUeFemmine: number;
+};
+
+export interface ReportFsePlus {
+  anno: number;
+  pesoTotaleKg: number;
+  beneficiariTotali: number;
+  personeTotali: number;
+  prodotti: ReportFsePlusProdottiItem[];
+  persone: ReportFsePlusPersone;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -507,7 +539,11 @@ export interface Beneficiario {
   /** @nullable */
   dataNascita?: string | null;
   /** @nullable */
+  sesso?: string | null;
+  /** @nullable */
   cittadinanza?: string | null;
+  /** @nullable */
+  areaProvenienza?: string | null;
   /** @nullable */
   residenza?: string | null;
   /** @nullable */
@@ -542,6 +578,8 @@ export interface NucleoFamiliare {
   cognome?: string | null;
   /** @nullable */
   dataNascita?: string | null;
+  /** @nullable */
+  sesso?: string | null;
   /** @nullable */
   relazione?: string | null;
   /** @nullable */
@@ -625,7 +663,11 @@ export interface BeneficiarioDettaglio {
   /** @nullable */
   dataNascita?: string | null;
   /** @nullable */
+  sesso?: string | null;
+  /** @nullable */
   cittadinanza?: string | null;
+  /** @nullable */
+  areaProvenienza?: string | null;
   /** @nullable */
   residenza?: string | null;
   /** @nullable */
@@ -700,6 +742,8 @@ export interface BeneficiarioInput {
   centroAscoltoId?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
+  sesso?: string;
+  areaProvenienza?: string;
 }
 
 export interface BeneficiarioUpdate {
@@ -730,6 +774,8 @@ export interface BeneficiarioUpdate {
   centroAscoltoId?: number | null;
   attivo?: boolean;
   noteInterne?: string;
+  sesso?: string;
+  areaProvenienza?: string;
 }
 
 export interface CentroAscolto {
@@ -815,6 +861,7 @@ export interface NucleoFamiliareInput {
   nome?: string;
   cognome?: string;
   dataNascita?: string;
+  sesso?: string;
   relazione?: string;
   tagliaVestiti?: string;
   numeroScarpe?: string;
@@ -1163,6 +1210,10 @@ centroAscoltoId?: number;
 };
 
 export type ReportConsegnePerMeseParams = {
+anno?: number;
+};
+
+export type ReportFsePlusParams = {
 anno?: number;
 };
 

@@ -14,7 +14,11 @@ export interface Beneficiario {
   /** @nullable */
   dataNascita?: string | null;
   /** @nullable */
+  sesso?: string | null;
+  /** @nullable */
   cittadinanza?: string | null;
+  /** @nullable */
+  areaProvenienza?: string | null;
   /** @nullable */
   residenza?: string | null;
   /** @nullable */

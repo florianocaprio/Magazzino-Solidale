@@ -9,3 +9,4 @@
 - [Trasferimenti as transfer-bolla](trasferimenti-as-bolla.md) — a transfer IS the trasferimenti record (no separate bolla; bolle.beneficiarioId is NOT NULL); PDF client-side; shown in Bolle as read-only "Trasferimento Interno" rows.
 - [Carico / stock model](carico-stock-model.md) — adding stock REQUIRES creating a lotto (giacenze = sum of lotti.quantitaResidua); a movimento alone is only an audit log. Create lotto then movimento.
 - [Scarichi (warehouse discharge)](scarichi-warehouse-discharge.md) — discharge IS its own bolla; FEFO decrement; create is wrapped in db.transaction (the one exception to "no transactions"); unitaMisura derived server-side from product.
+- [FSE+ end-of-year report](fse-plus-report.md) — counts ALL household members (titolare+nucleo); area_provenienza is family-level; null birthdate counts in M/F totals but not adulti/minori; delivered = bolla confermata/consegnata + lotti.fse_plus.
