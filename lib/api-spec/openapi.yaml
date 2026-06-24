@@ -1,22 +1,36 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Magazzino Solidale AIM API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: dashboard
+  - name: magazzini
+  - name: prodotti
+  - name: lotti
+  - name: movimenti
+  - name: giacenze
+  - name: trasferimenti
+  - name: fornitori
+  - name: approvvigionamenti
+  - name: beneficiari
+  - name: interventi
+  - name: consegne
+  - name: bolle
+  - name: volontari
+  - name: mezzi
+  - name: report
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +38,1277 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── DASHBOARD ───────────────────────────────────────────────────────────────
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: KPI summary for dashboard
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/alerts:
+    get:
+      operationId: getDashboardAlerts
+      tags: [dashboard]
+      summary: Active alerts (low stock, expiring lots, pending deliveries)
+      responses:
+        "200":
+          description: List of alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alert"
+
+  /dashboard/movimenti-recenti:
+    get:
+      operationId: getMovimentiRecenti
+      tags: [dashboard]
+      summary: Recent stock movements for activity feed
+      responses:
+        "200":
+          description: Recent movements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MovimentoSummary"
+
+  # ─── MAGAZZINI ───────────────────────────────────────────────────────────────
+  /magazzini:
+    get:
+      operationId: listMagazzini
+      tags: [magazzini]
+      summary: List all warehouses
+      responses:
+        "200":
+          description: List of warehouses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Magazzino"
+    post:
+      operationId: createMagazzino
+      tags: [magazzini]
+      summary: Create a warehouse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MagazzinoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Magazzino"
+
+  /magazzini/{id}:
+    get:
+      operationId: getMagazzino
+      tags: [magazzini]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Warehouse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Magazzino"
+    patch:
+      operationId: updateMagazzino
+      tags: [magazzini]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MagazzinoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Magazzino"
+    delete:
+      operationId: deleteMagazzino
+      tags: [magazzini]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── PRODOTTI ────────────────────────────────────────────────────────────────
+  /prodotti:
+    get:
+      operationId: listProdotti
+      tags: [prodotti]
+      summary: List products
+      parameters:
+        - name: categoria
+          in: query
+          schema:
+            type: string
+        - name: tipo
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Prodotto"
+    post:
+      operationId: createProdotto
+      tags: [prodotti]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProdottoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prodotto"
+
+  /prodotti/{id}:
+    get:
+      operationId: getProdotto
+      tags: [prodotti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prodotto"
+    patch:
+      operationId: updateProdotto
+      tags: [prodotti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProdottoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prodotto"
+    delete:
+      operationId: deleteProdotto
+      tags: [prodotti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── LOTTI ───────────────────────────────────────────────────────────────────
+  /lotti:
+    get:
+      operationId: listLotti
+      tags: [lotti]
+      parameters:
+        - name: prodottoId
+          in: query
+          schema:
+            type: integer
+        - name: magazzinoId
+          in: query
+          schema:
+            type: integer
+        - name: inScadenza
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of lots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lotto"
+    post:
+      operationId: createLotto
+      tags: [lotti]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LottoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lotto"
+
+  /lotti/{id}:
+    get:
+      operationId: getLotto
+      tags: [lotti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lotto"
+    patch:
+      operationId: updateLotto
+      tags: [lotti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LottoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lotto"
+
+  # ─── MOVIMENTI ───────────────────────────────────────────────────────────────
+  /movimenti:
+    get:
+      operationId: listMovimenti
+      tags: [movimenti]
+      parameters:
+        - name: tipo
+          in: query
+          schema:
+            type: string
+        - name: magazzinoId
+          in: query
+          schema:
+            type: integer
+        - name: prodottoId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of movements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Movimento"
+    post:
+      operationId: createMovimento
+      tags: [movimenti]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MovimentoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Movimento"
+
+  # ─── GIACENZE ────────────────────────────────────────────────────────────────
+  /giacenze:
+    get:
+      operationId: listGiacenze
+      tags: [giacenze]
+      parameters:
+        - name: magazzinoId
+          in: query
+          schema:
+            type: integer
+        - name: sottoscortaOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Stock levels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Giacenza"
+
+  # ─── TRASFERIMENTI ───────────────────────────────────────────────────────────
+  /trasferimenti:
+    get:
+      operationId: listTrasferimenti
+      tags: [trasferimenti]
+      parameters:
+        - name: stato
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of transfers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trasferimento"
+    post:
+      operationId: createTrasferimento
+      tags: [trasferimenti]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrasferimentoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trasferimento"
+
+  /trasferimenti/{id}:
+    get:
+      operationId: getTrasferimento
+      tags: [trasferimenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transfer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trasferimento"
+    patch:
+      operationId: updateTrasferimento
+      tags: [trasferimenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrasferimentoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trasferimento"
+
+  /trasferimenti/{id}/avvia:
+    post:
+      operationId: avviaTrasferimento
+      tags: [trasferimenti]
+      summary: Phase 1 - start transfer (deduct from origin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transfer started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trasferimento"
+
+  /trasferimenti/{id}/conferma:
+    post:
+      operationId: confermaTrasferimento
+      tags: [trasferimenti]
+      summary: Phase 2 - confirm receipt (add to destination)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfermaRicezione"
+      responses:
+        "200":
+          description: Transfer confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trasferimento"
+
+  # ─── FORNITORI ───────────────────────────────────────────────────────────────
+  /fornitori:
+    get:
+      operationId: listFornitori
+      tags: [fornitori]
+      responses:
+        "200":
+          description: List of suppliers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fornitore"
+    post:
+      operationId: createFornitore
+      tags: [fornitori]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FornitoreInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fornitore"
+
+  /fornitori/{id}:
+    get:
+      operationId: getFornitore
+      tags: [fornitori]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Supplier
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fornitore"
+    patch:
+      operationId: updateFornitore
+      tags: [fornitori]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FornitoreUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fornitore"
+    delete:
+      operationId: deleteFornitore
+      tags: [fornitori]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── APPROVVIGIONAMENTI ──────────────────────────────────────────────────────
+  /approvvigionamenti:
+    get:
+      operationId: listApprovvigionamenti
+      tags: [approvvigionamenti]
+      parameters:
+        - name: stato
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of procurements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Approvvigionamento"
+    post:
+      operationId: createApprovvigionamento
+      tags: [approvvigionamenti]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovvigionamentoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approvvigionamento"
+
+  /approvvigionamenti/{id}:
+    get:
+      operationId: getApprovvigionamento
+      tags: [approvvigionamenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Procurement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approvvigionamento"
+    patch:
+      operationId: updateApprovvigionamento
+      tags: [approvvigionamenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovvigionamentoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approvvigionamento"
+
+  # ─── BENEFICIARI ─────────────────────────────────────────────────────────────
+  /beneficiari:
+    get:
+      operationId: listBeneficiari
+      tags: [beneficiari]
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: priorita
+          in: query
+          schema:
+            type: string
+        - name: domicilio
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of beneficiaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Beneficiario"
+    post:
+      operationId: createBeneficiario
+      tags: [beneficiari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeneficiarioInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beneficiario"
+
+  /beneficiari/{id}:
+    get:
+      operationId: getBeneficiario
+      tags: [beneficiari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Beneficiary with family and history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BeneficiarioDettaglio"
+    patch:
+      operationId: updateBeneficiario
+      tags: [beneficiari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeneficiarioUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beneficiario"
+    delete:
+      operationId: deleteBeneficiario
+      tags: [beneficiari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /beneficiari/{id}/nucleo:
+    get:
+      operationId: getNucleoFamiliare
+      tags: [beneficiari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Family members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NucleoFamiliare"
+    post:
+      operationId: addNucleoFamiliare
+      tags: [beneficiari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NucleoFamiliareInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NucleoFamiliare"
+
+  # ─── INTERVENTI ──────────────────────────────────────────────────────────────
+  /interventi:
+    get:
+      operationId: listInterventi
+      tags: [interventi]
+      parameters:
+        - name: beneficiarioId
+          in: query
+          schema:
+            type: integer
+        - name: tipo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of interventions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Intervento"
+    post:
+      operationId: createIntervento
+      tags: [interventi]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterventoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intervento"
+
+  /interventi/{id}:
+    get:
+      operationId: getIntervento
+      tags: [interventi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Intervention
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intervento"
+    patch:
+      operationId: updateIntervento
+      tags: [interventi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterventoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intervento"
+
+  # ─── CONSEGNE ────────────────────────────────────────────────────────────────
+  /consegne:
+    get:
+      operationId: listConsegne
+      tags: [consegne]
+      parameters:
+        - name: stato
+          in: query
+          schema:
+            type: string
+        - name: data
+          in: query
+          schema:
+            type: string
+        - name: beneficiarioId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of deliveries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Consegna"
+    post:
+      operationId: createConsegna
+      tags: [consegne]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsegnaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consegna"
+
+  /consegne/{id}:
+    get:
+      operationId: getConsegna
+      tags: [consegne]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Delivery
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consegna"
+    patch:
+      operationId: updateConsegna
+      tags: [consegne]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsegnaUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consegna"
+
+  /consegne/{id}/completa:
+    post:
+      operationId: completaConsegna
+      tags: [consegne]
+      summary: Mark delivery as completed - atomic operation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Delivery completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consegna"
+
+  # ─── BOLLE ───────────────────────────────────────────────────────────────────
+  /bolle:
+    get:
+      operationId: listBolle
+      tags: [bolle]
+      parameters:
+        - name: stato
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of delivery bills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bolla"
+    post:
+      operationId: createBolla
+      tags: [bolle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BollaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bolla"
+
+  /bolle/{id}:
+    get:
+      operationId: getBolla
+      tags: [bolle]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bolla"
+    patch:
+      operationId: updateBolla
+      tags: [bolle]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BollaUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bolla"
+
+  # ─── VOLONTARI ───────────────────────────────────────────────────────────────
+  /volontari:
+    get:
+      operationId: listVolontari
+      tags: [volontari]
+      responses:
+        "200":
+          description: List of volunteers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Volontario"
+    post:
+      operationId: createVolontario
+      tags: [volontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VolontarioInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Volontario"
+
+  /volontari/{id}:
+    get:
+      operationId: getVolontario
+      tags: [volontari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Volunteer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Volontario"
+    patch:
+      operationId: updateVolontario
+      tags: [volontari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VolontarioUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Volontario"
+    delete:
+      operationId: deleteVolontario
+      tags: [volontari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── MEZZI ───────────────────────────────────────────────────────────────────
+  /mezzi:
+    get:
+      operationId: listMezzi
+      tags: [mezzi]
+      responses:
+        "200":
+          description: List of vehicles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Mezzo"
+    post:
+      operationId: createMezzo
+      tags: [mezzi]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MezzoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mezzo"
+
+  /mezzi/{id}:
+    get:
+      operationId: getMezzo
+      tags: [mezzi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vehicle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mezzo"
+    patch:
+      operationId: updateMezzo
+      tags: [mezzi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MezzoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mezzo"
+    delete:
+      operationId: deleteMezzo
+      tags: [mezzi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── REPORT ──────────────────────────────────────────────────────────────────
+  /report/giacenze-per-magazzino:
+    get:
+      operationId: reportGiacenzePerMagazzino
+      tags: [report]
+      summary: Stock grouped by warehouse
+      responses:
+        "200":
+          description: Report data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GiacenzaMagazzinoReport"
+
+  /report/consegne-per-mese:
+    get:
+      operationId: reportConsegnePerMese
+      tags: [report]
+      parameters:
+        - name: anno
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deliveries per month
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsegneMeseReport"
+
+  /report/beneficiari-per-zona:
+    get:
+      operationId: reportBeneficiariPerZona
+      tags: [report]
+      responses:
+        "200":
+          description: Beneficiaries per zone
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BeneficiariZonaReport"
+
+# ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
   schemas:
     HealthStatus:
@@ -31,6 +1316,1407 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    # ── Dashboard ───────────────────────────────────────────────────────────
+    DashboardStats:
+      type: object
+      properties:
+        totMagazzini:
+          type: integer
+        totProdotti:
+          type: integer
+        totBeneficiari:
+          type: integer
+        totVolontari:
+          type: integer
+        consegneOggi:
+          type: integer
+        consegneMese:
+          type: integer
+        lottiInScadenza:
+          type: integer
+        prodottiSottoscorta:
+          type: integer
+        trasferimentiInCorso:
+          type: integer
+        interventiMese:
+          type: integer
+      required: [totMagazzini, totProdotti, totBeneficiari, totVolontari, consegneOggi, consegneMese, lottiInScadenza, prodottiSottoscorta, trasferimentiInCorso, interventiMese]
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: integer
+        tipo:
+          type: string
+        livello:
+          type: string
+        messaggio:
+          type: string
+        dettaglio:
+          type: ["string", "null"]
+        data:
+          type: string
+      required: [id, tipo, livello, messaggio, data]
+
+    MovimentoSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        tipo:
+          type: string
+        tipoDettaglio:
+          type: string
+        prodottoNome:
+          type: string
+        magazzinoNome:
+          type: string
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        dataMovimento:
+          type: string
+      required: [id, tipo, tipoDettaglio, prodottoNome, magazzinoNome, quantita, unitaMisura, dataMovimento]
+
+    # ── Magazzini ──────────────────────────────────────────────────────────
+    Magazzino:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        nome:
+          type: string
+        indirizzo:
+          type: ["string", "null"]
+        comune:
+          type: ["string", "null"]
+        zona:
+          type: ["string", "null"]
+        responsabile:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        stato:
+          type: string
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, codice, nome, stato, dataCreazione]
+
+    MagazzinoInput:
+      type: object
+      properties:
+        codice:
+          type: string
+        nome:
+          type: string
+        indirizzo:
+          type: string
+        comune:
+          type: string
+        zona:
+          type: string
+        responsabile:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        stato:
+          type: string
+        note:
+          type: string
+      required: [codice, nome]
+
+    MagazzinoUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+        indirizzo:
+          type: string
+        comune:
+          type: string
+        zona:
+          type: string
+        responsabile:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        stato:
+          type: string
+        note:
+          type: string
+
+    # ── Prodotti ───────────────────────────────────────────────────────────
+    Prodotto:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        nome:
+          type: string
+        descrizione:
+          type: ["string", "null"]
+        tipoProdotto:
+          type: string
+        unitaMisura:
+          type: string
+        codiceBarre:
+          type: ["string", "null"]
+        gestioneLotto:
+          type: boolean
+        gestioneScadenza:
+          type: boolean
+        scortaMinima:
+          type: number
+        scortaConsigliata:
+          type: number
+        conservazione:
+          type: ["string", "null"]
+        taglia:
+          type: ["string", "null"]
+        genere:
+          type: ["string", "null"]
+        stagione:
+          type: ["string", "null"]
+        condizione:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+        fornitoreId:
+          type: ["integer", "null"]
+      required: [id, codice, nome, tipoProdotto, unitaMisura, gestioneLotto, gestioneScadenza, scortaMinima, scortaConsigliata, attivo, dataCreazione]
+
+    ProdottoInput:
+      type: object
+      properties:
+        codice:
+          type: string
+        nome:
+          type: string
+        descrizione:
+          type: string
+        tipoProdotto:
+          type: string
+        unitaMisura:
+          type: string
+        codiceBarre:
+          type: string
+        gestioneLotto:
+          type: boolean
+        gestioneScadenza:
+          type: boolean
+        scortaMinima:
+          type: number
+        scortaConsigliata:
+          type: number
+        conservazione:
+          type: string
+        taglia:
+          type: string
+        genere:
+          type: string
+        stagione:
+          type: string
+        condizione:
+          type: string
+        note:
+          type: string
+        fornitoreId:
+          type: integer
+      required: [codice, nome, tipoProdotto, unitaMisura]
+
+    ProdottoUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+        descrizione:
+          type: string
+        tipoProdotto:
+          type: string
+        unitaMisura:
+          type: string
+        codiceBarre:
+          type: string
+        gestioneLotto:
+          type: boolean
+        gestioneScadenza:
+          type: boolean
+        scortaMinima:
+          type: number
+        scortaConsigliata:
+          type: number
+        conservazione:
+          type: string
+        taglia:
+          type: string
+        genere:
+          type: string
+        stagione:
+          type: string
+        condizione:
+          type: string
+        attivo:
+          type: boolean
+        note:
+          type: string
+        fornitoreId:
+          type: integer
+
+    # ── Lotti ─────────────────────────────────────────────────────────────
+    Lotto:
+      type: object
+      properties:
+        id:
+          type: integer
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: ["string", "null"]
+        codiceLotto:
+          type: ["string", "null"]
+        dataScadenza:
+          type: ["string", "null"]
+        dataCarico:
+          type: string
+        quantitaCaricata:
+          type: number
+        quantitaResidua:
+          type: number
+        magazzinoId:
+          type: integer
+        magazzinoNome:
+          type: ["string", "null"]
+        fornitoreId:
+          type: ["integer", "null"]
+        documentoCarico:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, prodottoId, dataCarico, quantitaCaricata, quantitaResidua, magazzinoId, dataCreazione]
+
+    LottoInput:
+      type: object
+      properties:
+        prodottoId:
+          type: integer
+        codiceLotto:
+          type: string
+        dataScadenza:
+          type: string
+        dataCarico:
+          type: string
+        quantitaCaricata:
+          type: number
+        magazzinoId:
+          type: integer
+        fornitoreId:
+          type: integer
+        documentoCarico:
+          type: string
+        note:
+          type: string
+      required: [prodottoId, dataCarico, quantitaCaricata, magazzinoId]
+
+    LottoUpdate:
+      type: object
+      properties:
+        codiceLotto:
+          type: string
+        dataScadenza:
+          type: string
+        quantitaResidua:
+          type: number
+        note:
+          type: string
+
+    # ── Movimenti ─────────────────────────────────────────────────────────
+    Movimento:
+      type: object
+      properties:
+        id:
+          type: integer
+        tipoMovimento:
+          type: string
+        tipoDettaglio:
+          type: string
+        dataMovimento:
+          type: string
+        magazzinoId:
+          type: integer
+        magazzinoNome:
+          type: ["string", "null"]
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: ["string", "null"]
+        lottoId:
+          type: ["integer", "null"]
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        fornitoreId:
+          type: ["integer", "null"]
+        beneficiarioId:
+          type: ["integer", "null"]
+        documentoRiferimento:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, tipoMovimento, tipoDettaglio, dataMovimento, magazzinoId, prodottoId, quantita, unitaMisura, dataCreazione]
+
+    MovimentoInput:
+      type: object
+      properties:
+        tipoMovimento:
+          type: string
+        tipoDettaglio:
+          type: string
+        dataMovimento:
+          type: string
+        magazzinoId:
+          type: integer
+        prodottoId:
+          type: integer
+        lottoId:
+          type: integer
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        fornitoreId:
+          type: integer
+        beneficiarioId:
+          type: integer
+        documentoRiferimento:
+          type: string
+        note:
+          type: string
+      required: [tipoMovimento, tipoDettaglio, dataMovimento, magazzinoId, prodottoId, quantita, unitaMisura]
+
+    # ── Giacenze ──────────────────────────────────────────────────────────
+    Giacenza:
+      type: object
+      properties:
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: string
+        prodottoCodice:
+          type: string
+        tipoProdotto:
+          type: string
+        unitaMisura:
+          type: string
+        magazzinoId:
+          type: integer
+        magazzinoNome:
+          type: string
+        quantitaTotale:
+          type: number
+        scortaMinima:
+          type: number
+        scortaConsigliata:
+          type: number
+        sottoscorta:
+          type: boolean
+        lottiAttivi:
+          type: integer
+        prossimaScadenza:
+          type: ["string", "null"]
+      required: [prodottoId, prodottoNome, prodottoCodice, tipoProdotto, unitaMisura, magazzinoId, magazzinoNome, quantitaTotale, scortaMinima, scortaConsigliata, sottoscorta, lottiAttivi]
+
+    # ── Trasferimenti ─────────────────────────────────────────────────────
+    Trasferimento:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        magazzinoOrigineId:
+          type: integer
+        magazzinoOrigineNome:
+          type: ["string", "null"]
+        magazzinoDestinoId:
+          type: integer
+        magazzinoDestinoNome:
+          type: ["string", "null"]
+        dataRichiesta:
+          type: string
+        dataEsecuzione:
+          type: ["string", "null"]
+        dataConfermaRicezione:
+          type: ["string", "null"]
+        stato:
+          type: string
+        note:
+          type: ["string", "null"]
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrasferimentoRiga"
+        dataCreazione:
+          type: string
+      required: [id, codice, magazzinoOrigineId, magazzinoDestinoId, dataRichiesta, stato, dataCreazione]
+
+    TrasferimentoInput:
+      type: object
+      properties:
+        magazzinoOrigineId:
+          type: integer
+        magazzinoDestinoId:
+          type: integer
+        dataRichiesta:
+          type: string
+        note:
+          type: string
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrasferimentoRigaInput"
+      required: [magazzinoOrigineId, magazzinoDestinoId, dataRichiesta, righe]
+
+    TrasferimentoUpdate:
+      type: object
+      properties:
+        stato:
+          type: string
+        dataEsecuzione:
+          type: string
+        note:
+          type: string
+
+    TrasferimentoRiga:
+      type: object
+      properties:
+        id:
+          type: integer
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: ["string", "null"]
+        lottoId:
+          type: ["integer", "null"]
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        note:
+          type: ["string", "null"]
+      required: [id, prodottoId, quantita, unitaMisura]
+
+    TrasferimentoRigaInput:
+      type: object
+      properties:
+        prodottoId:
+          type: integer
+        lottoId:
+          type: integer
+        quantita:
+          type: number
+        unitaMisura:
+          type: string
+        note:
+          type: string
+      required: [prodottoId, quantita, unitaMisura]
+
+    ConfermaRicezione:
+      type: object
+      properties:
+        note:
+          type: string
+        dataConferma:
+          type: string
+
+    # ── Fornitori ─────────────────────────────────────────────────────────
+    Fornitore:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        tipo:
+          type: string
+        partitaIva:
+          type: ["string", "null"]
+        codiceFiscale:
+          type: ["string", "null"]
+        indirizzo:
+          type: ["string", "null"]
+        comune:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        referente:
+          type: ["string", "null"]
+        siteWeb:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, nome, tipo, attivo, dataCreazione]
+
+    FornitoreInput:
+      type: object
+      properties:
+        nome:
+          type: string
+        tipo:
+          type: string
+        partitaIva:
+          type: string
+        codiceFiscale:
+          type: string
+        indirizzo:
+          type: string
+        comune:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        referente:
+          type: string
+        siteWeb:
+          type: string
+        note:
+          type: string
+      required: [nome, tipo]
+
+    FornitoreUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+        tipo:
+          type: string
+        partitaIva:
+          type: string
+        codiceFiscale:
+          type: string
+        indirizzo:
+          type: string
+        comune:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        referente:
+          type: string
+        siteWeb:
+          type: string
+        attivo:
+          type: boolean
+        note:
+          type: string
+
+    # ── Approvvigionamenti ────────────────────────────────────────────────
+    Approvvigionamento:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        fornitoreId:
+          type: ["integer", "null"]
+        fornitoreNome:
+          type: ["string", "null"]
+        dataRichiesta:
+          type: string
+        dataPrevista:
+          type: ["string", "null"]
+        stato:
+          type: string
+        note:
+          type: ["string", "null"]
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovvigionamentoRiga"
+        dataCreazione:
+          type: string
+      required: [id, codice, dataRichiesta, stato, dataCreazione]
+
+    ApprovvigionamentoInput:
+      type: object
+      properties:
+        fornitoreId:
+          type: integer
+        dataRichiesta:
+          type: string
+        dataPrevista:
+          type: string
+        note:
+          type: string
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovvigionamentoRigaInput"
+      required: [dataRichiesta, righe]
+
+    ApprovvigionamentoUpdate:
+      type: object
+      properties:
+        stato:
+          type: string
+        dataPrevista:
+          type: string
+        note:
+          type: string
+
+    ApprovvigionamentoRiga:
+      type: object
+      properties:
+        id:
+          type: integer
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: ["string", "null"]
+        quantitaRichiesta:
+          type: number
+        quantitaRicevuta:
+          type: number
+        unitaMisura:
+          type: string
+        note:
+          type: ["string", "null"]
+      required: [id, prodottoId, quantitaRichiesta, quantitaRicevuta, unitaMisura]
+
+    ApprovvigionamentoRigaInput:
+      type: object
+      properties:
+        prodottoId:
+          type: integer
+        quantitaRichiesta:
+          type: number
+        unitaMisura:
+          type: string
+        note:
+          type: string
+      required: [prodottoId, quantitaRichiesta, unitaMisura]
+
+    # ── Beneficiari ───────────────────────────────────────────────────────
+    Beneficiario:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        cognome:
+          type: string
+        nome:
+          type: string
+        dataNascita:
+          type: ["string", "null"]
+        cittadinanza:
+          type: ["string", "null"]
+        residenza:
+          type: ["string", "null"]
+        comune:
+          type: ["string", "null"]
+        zonaMunicipio:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        numComponenti:
+          type: integer
+        numMinori:
+          type: integer
+        numAnziani:
+          type: integer
+        priorita:
+          type: string
+        consegnaDomicilio:
+          type: boolean
+        attivo:
+          type: boolean
+        dataPresaInCarico:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, attivo, dataCreazione]
+
+    BeneficiarioDettaglio:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        cognome:
+          type: string
+        nome:
+          type: string
+        dataNascita:
+          type: ["string", "null"]
+        cittadinanza:
+          type: ["string", "null"]
+        residenza:
+          type: ["string", "null"]
+        domicilio:
+          type: ["string", "null"]
+        comune:
+          type: ["string", "null"]
+        zonaMunicipio:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        statoCivile:
+          type: ["string", "null"]
+        numComponenti:
+          type: integer
+        numFigliMaschi:
+          type: integer
+        numFiglieFemmine:
+          type: integer
+        numMinori:
+          type: integer
+        numAnziani:
+          type: integer
+        numDisabili:
+          type: integer
+        restrizioniAlimentari:
+          type: ["string", "null"]
+        allergie:
+          type: ["string", "null"]
+        notePaccoAlimentare:
+          type: ["string", "null"]
+        priorita:
+          type: string
+        consegnaDomicilio:
+          type: boolean
+        motivoConsegnaDomicilio:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+        dataPresaInCarico:
+          type: ["string", "null"]
+        noteInterne:
+          type: ["string", "null"]
+        nucleo:
+          type: array
+          items:
+            $ref: "#/components/schemas/NucleoFamiliare"
+        interventi:
+          type: array
+          items:
+            $ref: "#/components/schemas/Intervento"
+        consegne:
+          type: array
+          items:
+            $ref: "#/components/schemas/Consegna"
+        dataCreazione:
+          type: string
+      required: [id, codice, cognome, nome, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, attivo, dataCreazione]
+
+    BeneficiarioInput:
+      type: object
+      properties:
+        codice:
+          type: string
+        cognome:
+          type: string
+        nome:
+          type: string
+        dataNascita:
+          type: string
+        cittadinanza:
+          type: string
+        residenza:
+          type: string
+        domicilio:
+          type: string
+        comune:
+          type: string
+        zonaMunicipio:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        statoCivile:
+          type: string
+        numComponenti:
+          type: integer
+        numFigliMaschi:
+          type: integer
+        numFiglieFemmine:
+          type: integer
+        numMinori:
+          type: integer
+        numAnziani:
+          type: integer
+        numDisabili:
+          type: integer
+        restrizioniAlimentari:
+          type: string
+        allergie:
+          type: string
+        notePaccoAlimentare:
+          type: string
+        priorita:
+          type: string
+        consegnaDomicilio:
+          type: boolean
+        motivoConsegnaDomicilio:
+          type: string
+        dataPresaInCarico:
+          type: string
+        noteInterne:
+          type: string
+      required: [cognome, nome]
+
+    BeneficiarioUpdate:
+      type: object
+      properties:
+        cognome:
+          type: string
+        nome:
+          type: string
+        dataNascita:
+          type: string
+        cittadinanza:
+          type: string
+        residenza:
+          type: string
+        domicilio:
+          type: string
+        comune:
+          type: string
+        zonaMunicipio:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        statoCivile:
+          type: string
+        numComponenti:
+          type: integer
+        numFigliMaschi:
+          type: integer
+        numFiglieFemmine:
+          type: integer
+        numMinori:
+          type: integer
+        numAnziani:
+          type: integer
+        numDisabili:
+          type: integer
+        restrizioniAlimentari:
+          type: string
+        allergie:
+          type: string
+        notePaccoAlimentare:
+          type: string
+        priorita:
+          type: string
+        consegnaDomicilio:
+          type: boolean
+        motivoConsegnaDomicilio:
+          type: string
+        attivo:
+          type: boolean
+        noteInterne:
+          type: string
+
+    NucleoFamiliare:
+      type: object
+      properties:
+        id:
+          type: integer
+        beneficiarioId:
+          type: integer
+        nome:
+          type: ["string", "null"]
+        cognome:
+          type: ["string", "null"]
+        dataNascita:
+          type: ["string", "null"]
+        relazione:
+          type: ["string", "null"]
+        tagliiaVestiti:
+          type: ["string", "null"]
+        numeroScarpe:
+          type: ["string", "null"]
+        esigenzeParticolari:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+      required: [id, beneficiarioId]
+
+    NucleoFamiliareInput:
+      type: object
+      properties:
+        nome:
+          type: string
+        cognome:
+          type: string
+        dataNascita:
+          type: string
+        relazione:
+          type: string
+        tagliaVestiti:
+          type: string
+        numeroScarpe:
+          type: string
+        esigenzeParticolari:
+          type: string
+        note:
+          type: string
+
+    # ── Interventi ────────────────────────────────────────────────────────
+    Intervento:
+      type: object
+      properties:
+        id:
+          type: integer
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: ["string", "null"]
+        dataIntervento:
+          type: string
+        tipoIntervento:
+          type: string
+        descrizione:
+          type: ["string", "null"]
+        esito:
+          type: ["string", "null"]
+        prossimAzione:
+          type: ["string", "null"]
+        dataFollowup:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, beneficiarioId, dataIntervento, tipoIntervento, dataCreazione]
+
+    InterventoInput:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        dataIntervento:
+          type: string
+        tipoIntervento:
+          type: string
+        descrizione:
+          type: string
+        esito:
+          type: string
+        prossimAzione:
+          type: string
+        dataFollowup:
+          type: string
+      required: [beneficiarioId, dataIntervento, tipoIntervento]
+
+    InterventoUpdate:
+      type: object
+      properties:
+        dataIntervento:
+          type: string
+        tipoIntervento:
+          type: string
+        descrizione:
+          type: string
+        esito:
+          type: string
+        prossimAzione:
+          type: string
+        dataFollowup:
+          type: string
+
+    # ── Consegne ──────────────────────────────────────────────────────────
+    Consegna:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: ["string", "null"]
+        tipoConsegna:
+          type: string
+        dataPrevista:
+          type: string
+        fasciaOraria:
+          type: ["string", "null"]
+        indirizzoConsegna:
+          type: ["string", "null"]
+        zona:
+          type: ["string", "null"]
+        magazzinoId:
+          type: integer
+        magazzinoNome:
+          type: ["string", "null"]
+        volontarioId:
+          type: ["integer", "null"]
+        volontarioNome:
+          type: ["string", "null"]
+        mezzoId:
+          type: ["integer", "null"]
+        stato:
+          type: string
+        noteOperative:
+          type: ["string", "null"]
+        dataEffettuata:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, codice, beneficiarioId, tipoConsegna, dataPrevista, magazzinoId, stato, dataCreazione]
+
+    ConsegnaInput:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        tipoConsegna:
+          type: string
+        dataPrevista:
+          type: string
+        fasciaOraria:
+          type: string
+        indirizzoConsegna:
+          type: string
+        zona:
+          type: string
+        magazzinoId:
+          type: integer
+        volontarioId:
+          type: integer
+        mezzoId:
+          type: integer
+        noteOperative:
+          type: string
+      required: [beneficiarioId, tipoConsegna, dataPrevista, magazzinoId]
+
+    ConsegnaUpdate:
+      type: object
+      properties:
+        tipoConsegna:
+          type: string
+        dataPrevista:
+          type: string
+        fasciaOraria:
+          type: string
+        indirizzoConsegna:
+          type: string
+        zona:
+          type: string
+        volontarioId:
+          type: integer
+        mezzoId:
+          type: integer
+        stato:
+          type: string
+        noteOperative:
+          type: string
+
+    # ── Bolle ─────────────────────────────────────────────────────────────
+    Bolla:
+      type: object
+      properties:
+        id:
+          type: integer
+        numeroBolla:
+          type: string
+        dataBolla:
+          type: string
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: ["string", "null"]
+        consegnaId:
+          type: ["integer", "null"]
+        magazzinoId:
+          type: integer
+        magazzinoNome:
+          type: ["string", "null"]
+        indirizzoConsegna:
+          type: ["string", "null"]
+        volontarioConsegnaId:
+          type: ["integer", "null"]
+        mezzoId:
+          type: ["integer", "null"]
+        stato:
+          type: string
+        noteConsegna:
+          type: ["string", "null"]
+        confermaRicezione:
+          type: boolean
+        noteRicezione:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, numeroBolla, dataBolla, beneficiarioId, magazzinoId, stato, confermaRicezione, dataCreazione]
+
+    BollaInput:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        consegnaId:
+          type: integer
+        magazzinoId:
+          type: integer
+        indirizzoConsegna:
+          type: string
+        volontarioConsegnaId:
+          type: integer
+        mezzoId:
+          type: integer
+        noteConsegna:
+          type: string
+      required: [beneficiarioId, magazzinoId]
+
+    BollaUpdate:
+      type: object
+      properties:
+        stato:
+          type: string
+        noteConsegna:
+          type: string
+        confermaRicezione:
+          type: boolean
+        noteRicezione:
+          type: string
+
+    # ── Volontari ─────────────────────────────────────────────────────────
+    Volontario:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        cognome:
+          type: string
+        telefono:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        ruolo:
+          type: string
+        patente:
+          type: boolean
+        mezzoPersonale:
+          type: boolean
+        maxConsegneTurno:
+          type: integer
+        attivo:
+          type: boolean
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, nome, cognome, ruolo, patente, mezzoPersonale, maxConsegneTurno, attivo, dataCreazione]
+
+    VolontarioInput:
+      type: object
+      properties:
+        nome:
+          type: string
+        cognome:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        ruolo:
+          type: string
+        patente:
+          type: boolean
+        mezzoPersonale:
+          type: boolean
+        maxConsegneTurno:
+          type: integer
+        note:
+          type: string
+      required: [nome, cognome, ruolo]
+
+    VolontarioUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+        cognome:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+        ruolo:
+          type: string
+        patente:
+          type: boolean
+        mezzoPersonale:
+          type: boolean
+        maxConsegneTurno:
+          type: integer
+        attivo:
+          type: boolean
+        note:
+          type: string
+
+    # ── Mezzi ─────────────────────────────────────────────────────────────
+    Mezzo:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        tipo:
+          type: string
+        targa:
+          type: ["string", "null"]
+        proprieta:
+          type: string
+        proprietarioNome:
+          type: ["string", "null"]
+        capacitaColli:
+          type: ["integer", "null"]
+        capacitaKg:
+          type: ["number", "null"]
+        stato:
+          type: string
+        scadenzaAssicurazione:
+          type: ["string", "null"]
+        scadenzaRevisione:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, codice, tipo, proprieta, stato, dataCreazione]
+
+    MezzoInput:
+      type: object
+      properties:
+        codice:
+          type: string
+        tipo:
+          type: string
+        targa:
+          type: string
+        proprieta:
+          type: string
+        proprietarioNome:
+          type: string
+        capacitaColli:
+          type: integer
+        capacitaKg:
+          type: number
+        scadenzaAssicurazione:
+          type: string
+        scadenzaRevisione:
+          type: string
+        note:
+          type: string
+      required: [codice, tipo, proprieta]
+
+    MezzoUpdate:
+      type: object
+      properties:
+        tipo:
+          type: string
+        targa:
+          type: string
+        proprieta:
+          type: string
+        proprietarioNome:
+          type: string
+        capacitaColli:
+          type: integer
+        capacitaKg:
+          type: number
+        stato:
+          type: string
+        scadenzaAssicurazione:
+          type: string
+        scadenzaRevisione:
+          type: string
+        note:
+          type: string
+
+    # ── Report ────────────────────────────────────────────────────────────
+    GiacenzaMagazzinoReport:
+      type: object
+      properties:
+        magazzinoNome:
+          type: string
+        totProdotti:
+          type: integer
+        prodottiSottoscorta:
+          type: integer
+        lottiInScadenza:
+          type: integer
+      required: [magazzinoNome, totProdotti, prodottiSottoscorta, lottiInScadenza]
+
+    ConsegneMeseReport:
+      type: object
+      properties:
+        mese:
+          type: string
+        totConsegne:
+          type: integer
+        consegneEffettuate:
+          type: integer
+        consegneMancate:
+          type: integer
+      required: [mese, totConsegne, consegneEffettuate, consegneMancate]
+
+    BeneficiariZonaReport:
+      type: object
+      properties:
+        zona:
+          type: string
+        totBeneficiari:
+          type: integer
+        attivi:
+          type: integer
+        consegneDomicilio:
+          type: integer
+      required: [zona, totBeneficiari, attivi, consegneDomicilio]

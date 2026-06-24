@@ -1,0 +1,3 @@
+- [Orval query enabled pattern](orval-query-enabled.md) — when using `enabled` in Orval-generated hooks, must also pass `queryKey` in the query options object.
+- [Drizzle db.execute() returns QueryResult](drizzle-execute-rows.md) — `db.execute(sql\`...\`)` returns a QueryResult with a `.rows` property, not a plain array; cast `result.rows as Array<Record<string, unknown>>`.
+- [DB lib typecheck:libs before API routes](db-lib-rebuild.md) — after adding new schema files, run `pnpm run typecheck:libs` before checking the API server or the new table exports will be missing.

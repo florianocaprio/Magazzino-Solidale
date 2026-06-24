@@ -1,8 +1,40 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import dashboardRouter from "./dashboard";
+import magazziniRouter from "./magazzini";
+import prodottiRouter from "./prodotti";
+import fornitoriRouter from "./fornitori";
+import lottiRouter from "./lotti";
+import movimentiRouter from "./movimenti";
+import giacenzeRouter from "./giacenze";
+import volontariRouter from "./volontari";
+import mezziRouter from "./mezzi";
+import beneficiariRouter from "./beneficiari";
+import interventiRouter from "./interventi";
+import consegneRouter from "./consegne";
+import bolleRouter from "./bolle";
+import trasferimentiRouter from "./trasferimenti";
+import approvvigionamentiRouter from "./approvvigionamenti";
+import reportRouter from "./report";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(dashboardRouter);
+router.use(magazziniRouter);
+router.use(prodottiRouter);
+router.use(fornitoriRouter);
+router.use(lottiRouter);
+router.use(movimentiRouter);
+router.use(giacenzeRouter);
+router.use(volontariRouter);
+router.use(mezziRouter);
+router.use(beneficiariRouter);
+router.use(interventiRouter);
+router.use(consegneRouter);
+router.use(bolleRouter);
+router.use(trasferimentiRouter);
+router.use(approvvigionamentiRouter);
+router.use(reportRouter);
 
 export default router;
