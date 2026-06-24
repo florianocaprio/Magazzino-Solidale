@@ -10,6 +10,8 @@ export interface CentroAscolto {
   id: number;
   nome: string;
   /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
   indirizzo?: string | null;
   /** @nullable */
   comune?: string | null;

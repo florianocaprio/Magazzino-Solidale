@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, MapPin, Building, User } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -123,9 +124,28 @@ export default function Magazzini() {
           <h1 className="text-3xl font-bold tracking-tight">Magazzini</h1>
           <p className="text-muted-foreground">Gestisci le sedi e i punti di stoccaggio dell'associazione.</p>
         </div>
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Nuovo Magazzino
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={magazzini ?? []}
+            columns={[
+              { header: "Codice", accessor: (m) => m.codice },
+              { header: "Nome", accessor: (m) => m.nome },
+              { header: "Indirizzo", accessor: (m) => m.indirizzo },
+              { header: "Comune", accessor: (m) => m.comune },
+              { header: "Zona", accessor: (m) => m.zona },
+              { header: "Responsabile", accessor: (m) => m.responsabile },
+              { header: "Telefono", accessor: (m) => m.telefono },
+              { header: "Email", accessor: (m) => m.email },
+              { header: "Stato", accessor: (m) => m.stato === 'attivo' ? 'Attivo' : 'Inattivo' },
+            ]}
+            filename="magazzini"
+            title="Magazzini"
+            orientation="landscape"
+          />
+          <Button onClick={handleCreate} className="gap-2">
+            <Plus className="h-4 w-4" /> Nuovo Magazzino
+          </Button>
+        </div>
       </div>
 
       <Card>

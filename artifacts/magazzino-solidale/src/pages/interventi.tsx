@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { Plus, Filter, ClipboardList, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -86,7 +87,22 @@ export default function Interventi() {
           <h1 className="text-3xl font-bold tracking-tight">Interventi Sociali</h1>
           <p className="text-muted-foreground">Registro dei colloqui e delle azioni di supporto.</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Registra Intervento</Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={interventi ?? []}
+            columns={[
+              { header: "Beneficiario", accessor: (i) => i.beneficiarioNome },
+              { header: "Data", accessor: (i) => i.dataIntervento ? new Date(i.dataIntervento).toLocaleDateString("it-IT") : "" },
+              { header: "Tipo Intervento", accessor: (i) => i.tipoIntervento },
+              { header: "Descrizione", accessor: (i) => i.descrizione },
+              { header: "Esito", accessor: (i) => i.esito },
+            ]}
+            filename="interventi"
+            title="Registro Interventi"
+            orientation="landscape"
+          />
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Registra Intervento</Button>
+        </div>
       </div>
 
       <Card>

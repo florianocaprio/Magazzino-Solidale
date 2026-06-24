@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const centriAscoltoTable = pgTable("centri_di_ascolto", {
   id: serial("id").primaryKey(),
   nome: varchar("nome", { length: 120 }).notNull(),
+  logoUrl: text("logo_url"),
   indirizzo: varchar("indirizzo", { length: 200 }),
   comune: varchar("comune", { length: 80 }),
   responsabile: varchar("responsabile", { length: 120 }),

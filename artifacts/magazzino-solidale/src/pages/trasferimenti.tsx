@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { Plus, ArrowRight, ArrowRightLeft, Play, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -57,7 +58,23 @@ export default function Trasferimenti() {
           <h1 className="text-3xl font-bold tracking-tight">Trasferimenti</h1>
           <p className="text-muted-foreground">Sposta merce tra i diversi magazzini dell'associazione.</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Nuovo</Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={trasferimenti ?? []}
+            columns={[
+              { header: "Codice", accessor: (t) => t.codice },
+              { header: "Data Richiesta", accessor: (t) => t.dataRichiesta ? new Date(t.dataRichiesta).toLocaleDateString("it-IT") : "" },
+              { header: "Origine", accessor: (t) => t.magazzinoOrigineNome },
+              { header: "Destinazione", accessor: (t) => t.magazzinoDestinoNome },
+              { header: "Articoli", accessor: (t) => t.righe?.length ?? 0 },
+              { header: "Stato", accessor: (t) => t.stato?.replace('_', ' ') },
+            ]}
+            filename="trasferimenti"
+            title="Trasferimenti"
+            orientation="landscape"
+          />
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Nuovo</Button>
+        </div>
       </div>
 
       <Card>

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { ExportButtons } from "@/components/export-buttons";
 import { Calendar, Filter } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { it } from "date-fns/locale";
@@ -43,6 +44,22 @@ export default function Lotti() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tracciamento Lotti e Scadenze</h1>
           <p className="text-muted-foreground">Monitora le date di scadenza per prevenire gli sprechi alimentari.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={lotti ?? []}
+            columns={[
+              { header: "Cod. Lotto", accessor: (l) => l.codiceLotto },
+              { header: "Prodotto", accessor: (l) => l.prodottoNome },
+              { header: "Magazzino", accessor: (l) => l.magazzinoNome },
+              { header: "Data Scadenza", accessor: (l) => l.dataScadenza ? new Date(l.dataScadenza).toLocaleDateString("it-IT") : "" },
+              { header: "Q.tà Iniziale", accessor: (l) => l.quantitaCaricata != null ? parseFloat(String(l.quantitaCaricata)) : "" },
+              { header: "Q.tà Residua", accessor: (l) => l.quantitaResidua != null ? parseFloat(String(l.quantitaResidua)) : "" },
+            ]}
+            filename="lotti"
+            title="Elenco Lotti"
+            orientation="landscape"
+          />
         </div>
       </div>
 

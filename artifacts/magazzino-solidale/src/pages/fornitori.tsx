@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, Building } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -105,7 +106,22 @@ export default function Fornitori() {
           <h1 className="text-3xl font-bold tracking-tight">Fornitori e Donatori</h1>
           <p className="text-muted-foreground">Gestisci le fonti di approvvigionamento del magazzino.</p>
         </div>
-        <Button onClick={handleCreate} className="gap-2"><Plus className="h-4 w-4" /> Nuovo Fornitore</Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={fornitori ?? []}
+            columns={[
+              { header: "Nominativo", accessor: (f) => f.nome },
+              { header: "Tipo", accessor: (f) => f.tipo?.replace('_', ' ') },
+              { header: "Comune", accessor: (f) => f.comune },
+              { header: "Telefono", accessor: (f) => f.telefono },
+              { header: "Email", accessor: (f) => f.email },
+              { header: "Referente", accessor: (f) => f.referente },
+            ]}
+            filename="fornitori"
+            title="Fornitori e Donatori"
+          />
+          <Button onClick={handleCreate} className="gap-2"><Plus className="h-4 w-4" /> Nuovo Fornitore</Button>
+        </div>
       </div>
 
       <Card>

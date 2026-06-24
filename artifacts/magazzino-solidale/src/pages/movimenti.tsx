@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { ExportButtons } from "@/components/export-buttons";
 import { Plus, ArrowDownRight, ArrowUpRight, Filter } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -72,7 +73,25 @@ export default function Movimenti() {
           <h1 className="text-3xl font-bold tracking-tight">Movimenti</h1>
           <p className="text-muted-foreground">Registro carichi e scarichi di magazzino.</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Registra Movimento</Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={movimenti ?? []}
+            columns={[
+              { header: "Data", accessor: (m) => m.dataMovimento ? new Date(m.dataMovimento).toLocaleDateString("it-IT") : "" },
+              { header: "Tipo", accessor: (m) => m.tipoMovimento },
+              { header: "Causale", accessor: (m) => m.tipoDettaglio },
+              { header: "Prodotto", accessor: (m) => m.prodottoNome },
+              { header: "Magazzino", accessor: (m) => m.magazzinoNome },
+              { header: "Quantità", accessor: (m) => m.quantita != null ? parseFloat(String(m.quantita)) : "" },
+              { header: "U.M.", accessor: (m) => m.unitaMisura },
+              { header: "Note", accessor: (m) => m.note },
+            ]}
+            filename="movimenti"
+            title="Movimenti di Magazzino"
+            orientation="landscape"
+          />
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Registra Movimento</Button>
+        </div>
       </div>
 
       <Card>

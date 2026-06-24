@@ -1575,6 +1575,7 @@ export const ConsegnaBollaResponse = zod.object({
 export const ListCentriAscoltoResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
+  "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
   "responsabile": zod.string().nullish(),
@@ -1590,6 +1591,7 @@ export const ListCentriAscoltoResponse = zod.array(ListCentriAscoltoResponseItem
 
 export const CreateCentroAscoltoBody = zod.object({
   "nome": zod.string(),
+  "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
   "responsabile": zod.string().optional(),
@@ -1607,6 +1609,7 @@ export const GetCentroAscoltoParams = zod.object({
 export const GetCentroAscoltoResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
+  "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
   "responsabile": zod.string().nullish(),
@@ -1625,6 +1628,7 @@ export const UpdateCentroAscoltoParams = zod.object({
 
 export const UpdateCentroAscoltoBody = zod.object({
   "nome": zod.string().optional(),
+  "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
   "responsabile": zod.string().optional(),
@@ -1637,6 +1641,7 @@ export const UpdateCentroAscoltoBody = zod.object({
 export const UpdateCentroAscoltoResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
+  "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
   "responsabile": zod.string().nullish(),
@@ -1651,6 +1656,25 @@ export const UpdateCentroAscoltoResponse = zod.object({
 
 export const DeleteCentroAscoltoParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+export const GetImpostazioniStampaResponse = zod.object({
+  "templateBolla": zod.enum(['standard', 'moderno', 'minimal']),
+  "footerBolla": zod.string().nullish(),
+  "dataAggiornamento": zod.string().optional()
+})
+
+
+export const UpdateImpostazioniStampaBody = zod.object({
+  "templateBolla": zod.enum(['standard', 'moderno', 'minimal']).optional(),
+  "footerBolla": zod.string().nullish()
+})
+
+export const UpdateImpostazioniStampaResponse = zod.object({
+  "templateBolla": zod.enum(['standard', 'moderno', 'minimal']),
+  "footerBolla": zod.string().nullish(),
+  "dataAggiornamento": zod.string().optional()
 })
 
 

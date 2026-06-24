@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { Plus, ShoppingCart } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,7 +72,21 @@ export default function Approvvigionamenti() {
           <h1 className="text-3xl font-bold tracking-tight">Ordini & Approvvigionamenti</h1>
           <p className="text-muted-foreground">Gestisci gli ordini in entrata e le donazioni programmate.</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Nuovo Ordine</Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={approvvigionamenti ?? []}
+            columns={[
+              { header: "Codice", accessor: (a) => a.codice },
+              { header: "Data Richiesta", accessor: (a) => a.dataRichiesta ? new Date(a.dataRichiesta).toLocaleDateString("it-IT") : "" },
+              { header: "Fornitore", accessor: (a) => a.fornitoreNome },
+              { header: "Data Prevista", accessor: (a) => a.dataPrevista ? new Date(a.dataPrevista).toLocaleDateString("it-IT") : "" },
+              { header: "Stato", accessor: (a) => a.stato },
+            ]}
+            filename="approvvigionamenti"
+            title="Approvvigionamenti"
+          />
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Nuovo Ordine</Button>
+        </div>
       </div>
 
       <Card>

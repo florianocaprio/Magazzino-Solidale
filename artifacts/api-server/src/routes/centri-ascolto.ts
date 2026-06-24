@@ -9,6 +9,7 @@ function fmt(r: typeof centriAscoltoTable.$inferSelect, beneficiariCount = 0) {
   return {
     id: r.id,
     nome: r.nome,
+    logoUrl: r.logoUrl ?? null,
     indirizzo: r.indirizzo ?? null,
     comune: r.comune ?? null,
     responsabile: r.responsabile ?? null,

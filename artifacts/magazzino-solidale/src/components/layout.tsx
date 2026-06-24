@@ -15,7 +15,8 @@ import {
   Store,
   ShoppingCart,
   BarChart3,
-  Building2
+  Building2,
+  Printer
 } from "lucide-react";
 import { 
   Sidebar, 
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
   { title: "Approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, group: "Logistica" },
   
   { title: "Report", url: "/report", icon: BarChart3, group: "Analisi" },
+  { title: "Impostazioni Stampa", url: "/impostazioni-stampa", icon: Printer, group: "Analisi" },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

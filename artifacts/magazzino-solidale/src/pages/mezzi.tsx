@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -122,9 +123,29 @@ export default function Mezzi() {
           <h1 className="text-3xl font-bold tracking-tight">Mezzi</h1>
           <p className="text-muted-foreground">Flotta veicoli per trasporti e consegne.</p>
         </div>
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Nuovo Mezzo
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={mezzi ?? []}
+            columns={[
+              { header: "Codice", accessor: (m) => m.codice },
+              { header: "Tipo", accessor: (m) => m.tipo?.replace('_', ' ') },
+              { header: "Targa", accessor: (m) => m.targa },
+              { header: "Proprietà", accessor: (m) => m.proprieta?.replace('_', ' ') },
+              { header: "Proprietario", accessor: (m) => m.proprietarioNome },
+              { header: "Capacità Colli", accessor: (m) => m.capacitaColli != null ? m.capacitaColli : "" },
+              { header: "Capacità Kg", accessor: (m) => m.capacitaKg != null ? m.capacitaKg : "" },
+              { header: "Scad. Assicurazione", accessor: (m) => m.scadenzaAssicurazione ? new Date(m.scadenzaAssicurazione).toLocaleDateString("it-IT") : "" },
+              { header: "Scad. Revisione", accessor: (m) => m.scadenzaRevisione ? new Date(m.scadenzaRevisione).toLocaleDateString("it-IT") : "" },
+              { header: "Stato", accessor: (m) => m.stato?.replace('_', ' ') },
+            ]}
+            filename="mezzi"
+            title="Parco Mezzi"
+            orientation="landscape"
+          />
+          <Button onClick={handleCreate} className="gap-2">
+            <Plus className="h-4 w-4" /> Nuovo Mezzo
+          </Button>
+        </div>
       </div>
 
       <Card>

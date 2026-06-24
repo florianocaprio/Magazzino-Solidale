@@ -51,6 +51,8 @@ import type {
   Giacenza,
   GiacenzaMagazzinoReport,
   HealthStatus,
+  ImpostazioniStampa,
+  ImpostazioniStampaUpdate,
   Intervento,
   InterventoInput,
   InterventoUpdate,
@@ -4808,6 +4810,142 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteCentroAscoltoMutationOptions(options));
+    }
+
+export const getGetImpostazioniStampaUrl = () => {
+
+
+
+
+  return `/api/impostazioni-stampa`
+}
+
+export const getImpostazioniStampa = async ( options?: RequestInit): Promise<ImpostazioniStampa> => {
+
+  return customFetch<ImpostazioniStampa>(getGetImpostazioniStampaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetImpostazioniStampaQueryKey = () => {
+    return [
+    `/api/impostazioni-stampa`
+    ] as const;
+    }
+
+
+export const getGetImpostazioniStampaQueryOptions = <TData = Awaited<ReturnType<typeof getImpostazioniStampa>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniStampa>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetImpostazioniStampaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getImpostazioniStampa>>> = ({ signal }) => getImpostazioniStampa({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniStampa>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetImpostazioniStampaQueryResult = NonNullable<Awaited<ReturnType<typeof getImpostazioniStampa>>>
+export type GetImpostazioniStampaQueryError = ErrorType<unknown>
+
+
+
+export function useGetImpostazioniStampa<TData = Awaited<ReturnType<typeof getImpostazioniStampa>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniStampa>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetImpostazioniStampaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateImpostazioniStampaUrl = () => {
+
+
+
+
+  return `/api/impostazioni-stampa`
+}
+
+export const updateImpostazioniStampa = async (impostazioniStampaUpdate: ImpostazioniStampaUpdate, options?: RequestInit): Promise<ImpostazioniStampa> => {
+
+  return customFetch<ImpostazioniStampa>(getUpdateImpostazioniStampaUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      impostazioniStampaUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateImpostazioniStampaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniStampa>>, TError,{data: BodyType<ImpostazioniStampaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniStampa>>, TError,{data: BodyType<ImpostazioniStampaUpdate>}, TContext> => {
+
+const mutationKey = ['updateImpostazioniStampa'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateImpostazioniStampa>>, {data: BodyType<ImpostazioniStampaUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateImpostazioniStampa(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateImpostazioniStampaMutationResult = NonNullable<Awaited<ReturnType<typeof updateImpostazioniStampa>>>
+    export type UpdateImpostazioniStampaMutationBody = BodyType<ImpostazioniStampaUpdate>
+    export type UpdateImpostazioniStampaMutationError = ErrorType<unknown>
+
+    export const useUpdateImpostazioniStampa = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniStampa>>, TError,{data: BodyType<ImpostazioniStampaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateImpostazioniStampa>>,
+        TError,
+        {data: BodyType<ImpostazioniStampaUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateImpostazioniStampaMutationOptions(options));
     }
 
 export const getListVolontariUrl = () => {

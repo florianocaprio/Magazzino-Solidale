@@ -329,18 +329,15 @@ router.patch("/bolle/:id", async (req, res) => {
   }
   delete body.stato;
 
-  // cambio magazzino solo in bozza e solo senza righe
+  // cambio magazzino: consentito solo in bozza (nessuno scarico ancora effettuato).
+  // Le righe esistenti fanno riferimento alle giacenze/lotti del vecchio magazzino,
+  // quindi vengono rimosse: l'utente le ri-seleziona dal nuovo magazzino.
   if (body.magazzinoId && body.magazzinoId !== bolla.magazzinoId) {
     if (bolla.stato !== "bozza") {
       res.status(400).json({ error: "Il magazzino si può cambiare solo quando la bolla è in bozza" });
       return;
     }
-    const righe = await db.select({ id: bollaRigheTable.id }).from(bollaRigheTable)
-      .where(eq(bollaRigheTable.bollaId, bollaId)).limit(1);
-    if (righe.length > 0) {
-      res.status(400).json({ error: "Non puoi cambiare magazzino se sono già stati aggiunti prodotti. Rimuovili prima." });
-      return;
-    }
+    await db.delete(bollaRigheTable).where(eq(bollaRigheTable.bollaId, bollaId));
   }
 
   const [row] = await db.update(bolleTable).set(body).where(eq(bolleTable.id, bollaId)).returning();

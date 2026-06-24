@@ -14,6 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, CheckCircle2, XCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -131,9 +132,26 @@ export default function Volontari() {
           <h1 className="text-3xl font-bold tracking-tight">Volontari</h1>
           <p className="text-muted-foreground">Gestisci il team operativo, ruoli e disponibilità.</p>
         </div>
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Nuovo Volontario
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={volontari ?? []}
+            columns={[
+              { header: "Nome", accessor: (v) => v.nome },
+              { header: "Cognome", accessor: (v) => v.cognome },
+              { header: "Email", accessor: (v) => v.email },
+              { header: "Telefono", accessor: (v) => v.telefono },
+              { header: "Ruolo", accessor: (v) => v.ruolo },
+              { header: "Patente", accessor: (v) => (v.patente ? "Sì" : "No") },
+              { header: "Attivo", accessor: (v) => (v.attivo ? "Sì" : "No") },
+            ]}
+            filename="volontari"
+            title="Elenco Volontari"
+            orientation="landscape"
+          />
+          <Button onClick={handleCreate} className="gap-2">
+            <Plus className="h-4 w-4" /> Nuovo Volontario
+          </Button>
+        </div>
       </div>
 
       <Card>

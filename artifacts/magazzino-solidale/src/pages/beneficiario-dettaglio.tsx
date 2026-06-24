@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExportButtons } from "@/components/export-buttons";
 import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -131,6 +132,22 @@ export default function BeneficiarioDettaglio() {
             
             <TabsContent value="interventi" className="mt-4">
               <Card>
+                <CardHeader className="py-4 flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Storico Interventi</CardTitle>
+                  <ExportButtons
+                    rows={b.interventi ?? []}
+                    columns={[
+                      { header: "Data", accessor: (i) => i.dataIntervento ? new Date(i.dataIntervento).toLocaleDateString("it-IT") : "" },
+                      { header: "Tipo Intervento", accessor: (i) => i.tipoIntervento },
+                      { header: "Descrizione", accessor: (i) => i.descrizione },
+                      { header: "Esito", accessor: (i) => i.esito },
+                      { header: "Prossima Azione", accessor: (i) => i.prossimAzione },
+                    ]}
+                    filename={`interventi_${b.cognome}`}
+                    title={`Interventi - ${b.cognome} ${b.nome}`}
+                    orientation="landscape"
+                  />
+                </CardHeader>
                 <CardContent className="pt-6">
                   {b.interventi && b.interventi.length > 0 ? (
                     <div className="space-y-4 border-l-2 border-muted pl-4 ml-2">

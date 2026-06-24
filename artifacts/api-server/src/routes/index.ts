@@ -16,6 +16,7 @@ import consegneRouter from "./consegne";
 import bolleRouter from "./bolle";
 import trasferimentiRouter from "./trasferimenti";
 import approvvigionamentiRouter from "./approvvigionamenti";
+import impostazioniStampaRouter from "./impostazioni-stampa";
 import reportRouter from "./report";
 
 const router: IRouter = Router();
@@ -37,6 +38,7 @@ router.use(consegneRouter);
 router.use(bolleRouter);
 router.use(trasferimentiRouter);
 router.use(approvvigionamentiRouter);
+router.use(impostazioniStampaRouter);
 router.use(reportRouter);
 
 export default router;

@@ -45,7 +45,8 @@ Gestionale per un magazzino solidale: tracciamento di prodotti/lotti (FEFO), CRM
 - **Magazzino**: CRUD for warehouses, products (multi-category), lots with expiry (FEFO), movements (load/unload), real-time stock levels, inter-warehouse transfers
 - **Sociale**: Beneficiary CRM with family dossier, social intervention log, delivery planning calendar, delivery documents (bolle)
 - **Logistica**: Volunteer management, vehicle fleet, supplier/donor registry, procurement planning
-- **Report**: Stock by warehouse, deliveries by month, beneficiaries by zone — with Recharts charts
+- **Report**: Stock by warehouse, deliveries by month, beneficiaries by zone — with Recharts charts; every list/entity exportable to XLSX and PDF (client-side: `xlsx` + `jspdf`/`jspdf-autotable`)
+- **Bolle PDF**: delivery bills downloadable as PDF in 3 selectable templates (standard/moderno/minimal); header shows the beneficiary's Centro di Ascolto name/logo/address, footer shows custom text + association logo. Template + footer set in **Impostazioni Stampa** (singleton settings)
 - **Dashboard**: Live KPIs, alerts for expiring lots and low stock, recent movements feed
 
 ## Gotchas
@@ -54,6 +55,7 @@ Gestionale per un magazzino solidale: tracciamento di prodotti/lotti (FEFO), CRM
 - `db.execute(sql\`...\`)` returns a `QueryResult` with a `.rows` property — access `result.rows`, not the result directly.
 - Decimal columns in Drizzle come back as strings; always `parseFloat()` before sending to the client.
 - When passing `enabled` to an Orval-generated hook's `query` options, also pass `queryKey` or TypeScript will error.
+- Bolla PDF template names (`standard|moderno|minimal`) live in 4 places (DB column, OpenAPI enum, API `VALID_TEMPLATES`, frontend PDF `ACCENT` map) — change them in lockstep + re-run codegen.
 
 ## Pointers
 

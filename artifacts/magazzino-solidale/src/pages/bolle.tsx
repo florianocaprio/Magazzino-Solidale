@@ -15,6 +15,7 @@ import {
   useListGiacenze,
   useListLotti,
   useListVolontari,
+  useGetImpostazioniStampa,
   getListBolleQueryKey,
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
@@ -36,9 +37,10 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, Trash2, PackagePlus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User } from "lucide-react";
+import { Plus, FileText, Trash2, PackagePlus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { generateBollaPdf, loadAssociationLogo, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
 
 function statoBadge(stato: string) {
   if (stato === "consegnato") return <Badge className="bg-green-500 text-white">Consegnato</Badge>;
@@ -149,13 +151,22 @@ function ModificaBollaDialog({
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const magazzinoCambiato = parseInt(mId) !== magazzinoId;
+
   const onSubmit = () => {
+    if (magazzinoCambiato && hasRighe) {
+      const ok = window.confirm(
+        "Cambiando magazzino i prodotti già aggiunti alla bolla verranno rimossi (appartengono al magazzino precedente). Continuare?"
+      );
+      if (!ok) return;
+    }
     updateBolla.mutate(
       { id: bollaId, data: { beneficiarioId: parseInt(bId), magazzinoId: parseInt(mId) } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
           queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey({ magazzinoId: parseInt(mId) }) });
           toast({ title: "Bolla aggiornata" });
           onClose();
         },
@@ -185,7 +196,7 @@ function ModificaBollaDialog({
           </div>
           <div className="space-y-2">
             <Label>Magazzino di Uscita</Label>
-            <Select value={mId} onValueChange={setMId} disabled={hasRighe}>
+            <Select value={mId} onValueChange={setMId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {magazzini?.map(m => (
@@ -193,9 +204,9 @@ function ModificaBollaDialog({
                 ))}
               </SelectContent>
             </Select>
-            {hasRighe && (
+            {magazzinoCambiato && hasRighe && (
               <p className="text-xs text-amber-600">
-                Per cambiare magazzino rimuovi prima tutti i prodotti dalla bolla.
+                Cambiando magazzino i prodotti già aggiunti verranno rimossi (appartengono al magazzino precedente).
               </p>
             )}
           </div>
@@ -362,8 +373,14 @@ function BollaDettaglio({ bollaId }: { bollaId: number }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printTemplate, setPrintTemplate] = useState<BollaTemplate>("standard");
+  const [printing, setPrinting] = useState(false);
   const { data: bolla, isLoading } = useGetBolla(bollaId);
   const { data: volontari } = useListVolontari();
+  const { data: beneficiari } = useListBeneficiari();
+  const { data: centri } = useListCentriAscolto();
+  const { data: impostazioni } = useGetImpostazioniStampa();
   const deleteRiga = useDeleteBollaRiga();
   const confermaBolla = useConfermaBolla();
   const consegnaBolla = useConsegnaBolla();
@@ -440,6 +457,37 @@ function BollaDettaglio({ bollaId }: { bollaId: number }) {
     );
   };
 
+  const openPrint = () => {
+    setPrintTemplate((impostazioni?.templateBolla as BollaTemplate) ?? "standard");
+    setPrintOpen(true);
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!bolla) return;
+    setPrinting(true);
+    try {
+      const benef = beneficiari?.find((b) => b.id === bolla.beneficiarioId);
+      const centro = benef?.centroAscoltoId
+        ? centri?.find((c) => c.id === benef.centroAscoltoId)
+        : undefined;
+      const associationLogoDataUrl = await loadAssociationLogo();
+      await generateBollaPdf({
+        bolla,
+        centro: centro
+          ? { nome: centro.nome, indirizzo: centro.indirizzo, comune: centro.comune, logoUrl: centro.logoUrl }
+          : null,
+        footer: impostazioni?.footerBolla ?? null,
+        template: printTemplate,
+        associationLogoDataUrl,
+      });
+      setPrintOpen(false);
+    } catch {
+      toast({ title: "Errore", description: "Impossibile generare il PDF.", variant: "destructive" });
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4 mt-4">
@@ -461,14 +509,19 @@ function BollaDettaglio({ bollaId }: { bollaId: number }) {
   return (
     <div className="mt-4 space-y-5">
       {/* Header info */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="font-mono font-semibold text-lg">{bolla.numeroBolla}</span>
-          {statoBadge(bolla.stato)}
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono font-semibold text-lg">{bolla.numeroBolla}</span>
+            {statoBadge(bolla.stato)}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {format(new Date(bolla.dataBolla), "dd MMMM yyyy", { locale: it })}
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {format(new Date(bolla.dataBolla), "dd MMMM yyyy", { locale: it })}
-        </p>
+        <Button size="sm" variant="outline" className="gap-1.5 h-8 shrink-0" onClick={openPrint}>
+          <Download className="h-3.5 w-3.5" /> Scarica PDF
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
@@ -680,6 +733,41 @@ function BollaDettaglio({ bollaId }: { bollaId: number }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={printOpen} onOpenChange={setPrintOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Scarica bolla in PDF</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label className="text-sm">Modello</Label>
+            <div className="grid gap-2">
+              {BOLLA_TEMPLATES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setPrintTemplate(t.value)}
+                  className={`text-left rounded-lg border p-3 transition-colors ${
+                    printTemplate === t.value ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "hover:border-muted-foreground/40"
+                  }`}
+                >
+                  <p className="font-medium text-sm">{t.label}</p>
+                  <p className="text-xs text-muted-foreground">{t.description}</p>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Il modello predefinito si imposta in <span className="font-medium">Impostazioni Stampa</span>.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPrintOpen(false)}>Annulla</Button>
+            <Button onClick={handleDownloadPdf} disabled={printing} className="gap-1.5">
+              <Download className="h-4 w-4" /> {printing ? "Generazione..." : "Scarica PDF"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

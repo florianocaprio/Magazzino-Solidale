@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { Plus, MapPin, Truck, CheckCircle2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -82,7 +83,27 @@ export default function Consegne() {
           <h1 className="text-3xl font-bold tracking-tight">Pianificazione Consegne</h1>
           <p className="text-muted-foreground">Gestisci le distribuzioni in sede e a domicilio.</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Pianifica Consegna</Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={consegne ?? []}
+            columns={[
+              { header: "Codice", accessor: (c) => c.codice },
+              { header: "Data Prevista", accessor: (c) => c.dataPrevista ? new Date(c.dataPrevista).toLocaleDateString("it-IT") : "" },
+              { header: "Fascia Oraria", accessor: (c) => c.fasciaOraria },
+              { header: "Beneficiario", accessor: (c) => c.beneficiarioNome },
+              { header: "Tipo", accessor: (c) => c.tipoConsegna?.replace('_', ' ') },
+              { header: "Indirizzo", accessor: (c) => c.indirizzoConsegna },
+              { header: "Zona", accessor: (c) => c.zona },
+              { header: "Magazzino", accessor: (c) => c.magazzinoNome },
+              { header: "Volontario", accessor: (c) => c.volontarioNome },
+              { header: "Stato", accessor: (c) => c.stato },
+            ]}
+            filename="consegne"
+            title="Consegne"
+            orientation="landscape"
+          />
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Pianifica Consegna</Button>
+        </div>
       </div>
 
       <Card>

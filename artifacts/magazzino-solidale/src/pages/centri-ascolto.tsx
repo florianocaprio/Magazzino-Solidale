@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, Building2, Users } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,6 +21,7 @@ import * as z from "zod";
 
 const formSchema = z.object({
   nome: z.string().min(2, "Nome obbligatorio"),
+  logoUrl: z.string().optional(),
   indirizzo: z.string().optional(),
   comune: z.string().optional(),
   responsabile: z.string().optional(),
@@ -28,6 +30,15 @@ const formSchema = z.object({
   attivo: z.boolean().default(true),
   note: z.string().optional()
 });
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function CentriAscolto() {
   const { data: centri, isLoading } = useListCentriAscolto();
@@ -45,13 +56,13 @@ export default function CentriAscolto() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: ""
+      nome: "", logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: ""
     }
   });
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: "" });
+    form.reset({ nome: "", logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: "" });
     setIsFormOpen(true);
   };
 
@@ -59,6 +70,7 @@ export default function CentriAscolto() {
     setEditingId(c.id);
     form.reset({
       nome: c.nome,
+      logoUrl: c.logoUrl || "",
       indirizzo: c.indirizzo || "",
       comune: c.comune || "",
       responsabile: c.responsabile || "",
@@ -108,9 +120,25 @@ export default function CentriAscolto() {
           <h1 className="text-3xl font-bold tracking-tight">Centri di Ascolto</h1>
           <p className="text-muted-foreground">Punti di riferimento territoriali a cui sono associati i beneficiari.</p>
         </div>
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Nuovo Centro
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={centri ?? []}
+            columns={[
+              { header: "Nome", accessor: (c) => c.nome },
+              { header: "Indirizzo", accessor: (c) => c.indirizzo },
+              { header: "Comune", accessor: (c) => c.comune },
+              { header: "Responsabile", accessor: (c) => c.responsabile },
+              { header: "Telefono", accessor: (c) => c.telefono },
+              { header: "Email", accessor: (c) => c.email },
+              { header: "Attivo", accessor: (c) => c.attivo ? "Sì" : "No" },
+            ]}
+            filename="centri_ascolto"
+            title="Centri di Ascolto"
+          />
+          <Button onClick={handleCreate} className="gap-2">
+            <Plus className="h-4 w-4" /> Nuovo Centro
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -206,6 +234,44 @@ export default function CentriAscolto() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="nome" render={({ field }) => (
                   <FormItem><FormLabel>Nome</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="logoUrl" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Logo (per intestazione bolle)</FormLabel>
+                    <div className="flex items-center gap-3">
+                      {field.value ? (
+                        <img src={field.value} alt="Logo" className="h-14 w-14 object-contain rounded border bg-white" />
+                      ) : (
+                        <div className="h-14 w-14 rounded border border-dashed flex items-center justify-center text-muted-foreground">
+                          <Building2 className="h-5 w-5" />
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-1.5">
+                        <FormControl>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="text-xs"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 500 * 1024) {
+                                toast({ title: "Logo troppo grande", description: "Usa un'immagine sotto i 500 KB.", variant: "destructive" });
+                                return;
+                              }
+                              field.onChange(await fileToDataUrl(file));
+                            }}
+                          />
+                        </FormControl>
+                        {field.value && (
+                          <Button type="button" variant="ghost" size="sm" className="h-7 justify-start px-2 text-destructive hover:text-destructive" onClick={() => field.onChange("")}>
+                            <Trash2 className="mr-1 h-3.5 w-3.5" /> Rimuovi logo
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="indirizzo" render={({ field }) => (
                   <FormItem><FormLabel>Indirizzo</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>

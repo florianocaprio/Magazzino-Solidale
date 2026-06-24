@@ -8,6 +8,8 @@
 
 export interface CentroAscoltoUpdate {
   nome?: string;
+  /** @nullable */
+  logoUrl?: string | null;
   indirizzo?: string;
   comune?: string;
   responsabile?: string;

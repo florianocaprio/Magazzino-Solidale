@@ -654,6 +654,8 @@ export interface CentroAscolto {
   id: number;
   nome: string;
   /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
   indirizzo?: string | null;
   /** @nullable */
   comune?: string | null;
@@ -672,6 +674,8 @@ export interface CentroAscolto {
 
 export interface CentroAscoltoInput {
   nome: string;
+  /** @nullable */
+  logoUrl?: string | null;
   indirizzo?: string;
   comune?: string;
   responsabile?: string;
@@ -683,6 +687,8 @@ export interface CentroAscoltoInput {
 
 export interface CentroAscoltoUpdate {
   nome?: string;
+  /** @nullable */
+  logoUrl?: string | null;
   indirizzo?: string;
   comune?: string;
   responsabile?: string;
@@ -690,6 +696,37 @@ export interface CentroAscoltoUpdate {
   email?: string;
   attivo?: boolean;
   note?: string;
+}
+
+export type ImpostazioniStampaTemplateBolla = typeof ImpostazioniStampaTemplateBolla[keyof typeof ImpostazioniStampaTemplateBolla];
+
+
+export const ImpostazioniStampaTemplateBolla = {
+  standard: 'standard',
+  moderno: 'moderno',
+  minimal: 'minimal',
+} as const;
+
+export interface ImpostazioniStampa {
+  templateBolla: ImpostazioniStampaTemplateBolla;
+  /** @nullable */
+  footerBolla?: string | null;
+  dataAggiornamento?: string;
+}
+
+export type ImpostazioniStampaUpdateTemplateBolla = typeof ImpostazioniStampaUpdateTemplateBolla[keyof typeof ImpostazioniStampaUpdateTemplateBolla];
+
+
+export const ImpostazioniStampaUpdateTemplateBolla = {
+  standard: 'standard',
+  moderno: 'moderno',
+  minimal: 'minimal',
+} as const;
+
+export interface ImpostazioniStampaUpdate {
+  templateBolla?: ImpostazioniStampaUpdateTemplateBolla;
+  /** @nullable */
+  footerBolla?: string | null;
 }
 
 export interface NucleoFamiliareInput {

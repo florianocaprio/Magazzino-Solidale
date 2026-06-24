@@ -12,3 +12,4 @@ export * from "./consegne";
 export * from "./bolle";
 export * from "./trasferimenti";
 export * from "./approvvigionamenti";
+export * from "./impostazioni";

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -80,7 +81,25 @@ export default function Beneficiari() {
           <h1 className="text-3xl font-bold tracking-tight">Beneficiari</h1>
           <p className="text-muted-foreground">Persone e nuclei familiari assistiti.</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Nuovo Beneficiario</Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons
+            rows={beneficiari ?? []}
+            columns={[
+              { header: "Codice", accessor: (b) => b.codice },
+              { header: "Cognome", accessor: (b) => b.cognome },
+              { header: "Nome", accessor: (b) => b.nome },
+              { header: "Email", accessor: (b) => b.email },
+              { header: "Telefono", accessor: (b) => b.telefono },
+              { header: "Comune", accessor: (b) => b.comune },
+              { header: "Zona / Municipio", accessor: (b) => b.zonaMunicipio },
+              { header: "Centro di Ascolto", accessor: (b) => b.centroAscoltoNome },
+            ]}
+            filename="beneficiari"
+            title="Elenco Beneficiari"
+            orientation="landscape"
+          />
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Nuovo Beneficiario</Button>
+        </div>
       </div>
 
       <Card>

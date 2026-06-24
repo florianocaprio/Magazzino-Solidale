@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Filter, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { ExportButtons } from "@/components/export-buttons";
 
 export default function Giacenze() {
   const [magazzinoId, setMagazzinoId] = useState<string>("all");
@@ -22,6 +23,16 @@ export default function Giacenze() {
     sottoscortaOnly: sottoscortaOnly || undefined
   });
 
+  const magazzinoNome = magazzinoId !== "all"
+    ? magazzini?.find(m => m.id.toString() === magazzinoId)?.nome ?? "Magazzino"
+    : null;
+  const inventarioTitolo = magazzinoNome
+    ? `Inventario — ${magazzinoNome}`
+    : "Inventario — Tutti i magazzini";
+  const inventarioFile = magazzinoNome
+    ? `inventario_${magazzinoNome.replace(/\s+/g, "_").toLowerCase()}`
+    : "inventario_tutti_magazzini";
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -29,6 +40,25 @@ export default function Giacenze() {
           <h1 className="text-3xl font-bold tracking-tight">Giacenze</h1>
           <p className="text-muted-foreground">Monitora le quantità disponibili nei magazzini.</p>
         </div>
+        <ExportButtons
+          rows={giacenze ?? []}
+          filename={inventarioFile}
+          title={inventarioTitolo}
+          subtitle={sottoscortaOnly ? "Solo prodotti sottoscorta" : undefined}
+          sheetName="Inventario"
+          orientation="landscape"
+          columns={[
+            { header: "Codice", accessor: (g) => g.prodottoCodice },
+            { header: "Prodotto", accessor: (g) => g.prodottoNome },
+            { header: "Tipo", accessor: (g) => g.tipoProdotto?.replace("_", " ") },
+            { header: "Magazzino", accessor: (g) => g.magazzinoNome },
+            { header: "Q.tà Totale", accessor: (g) => g.quantitaTotale },
+            { header: "U.M.", accessor: (g) => g.unitaMisura },
+            { header: "Scorta Minima", accessor: (g) => g.scortaMinima },
+            { header: "Prossima Scadenza", accessor: (g) => g.prossimaScadenza ? new Date(g.prossimaScadenza).toLocaleDateString("it-IT") : "" },
+            { header: "Stato", accessor: (g) => g.sottoscorta ? "Sottoscorta" : "Regolare" },
+          ]}
+        />
       </div>
 
       <Card>

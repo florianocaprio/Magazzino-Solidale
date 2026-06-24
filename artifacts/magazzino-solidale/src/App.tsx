@@ -21,6 +21,7 @@ import BeneficiarioDettaglio from "@/pages/beneficiario-dettaglio";
 import Interventi from "@/pages/interventi";
 import Consegne from "@/pages/consegne";
 import Bolle from "@/pages/bolle";
+import ImpostazioniStampa from "@/pages/impostazioni-stampa";
 import Approvvigionamenti from "@/pages/approvvigionamenti";
 import Report from "@/pages/report";
 
@@ -58,6 +59,7 @@ function Router() {
         <Route path="/approvvigionamenti" component={Approvvigionamenti} />
         
         <Route path="/report" component={Report} />
+        <Route path="/impostazioni-stampa" component={ImpostazioniStampa} />
         
         <Route component={NotFound} />
       </Switch>
