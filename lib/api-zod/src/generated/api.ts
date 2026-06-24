@@ -813,7 +813,9 @@ export const DeleteFornitoreParams = zod.object({
 
 
 export const ListApprovvigionamentiQueryParams = zod.object({
-  "stato": zod.coerce.string().optional()
+  "stato": zod.coerce.string().optional(),
+  "magazzinoId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional()
 })
 
 export const ListApprovvigionamentiResponseItem = zod.object({
@@ -821,6 +823,10 @@ export const ListApprovvigionamentiResponseItem = zod.object({
   "codice": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
+  "magazzinoId": zod.number().nullish(),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "dataRichiesta": zod.string(),
   "dataPrevista": zod.string().nullish(),
   "stato": zod.string(),
@@ -841,6 +847,8 @@ export const ListApprovvigionamentiResponse = zod.array(ListApprovvigionamentiRe
 
 export const CreateApprovvigionamentoBody = zod.object({
   "fornitoreId": zod.number().optional(),
+  "magazzinoId": zod.number().optional(),
+  "centroAscoltoId": zod.number().optional(),
   "dataRichiesta": zod.string(),
   "dataPrevista": zod.string().optional(),
   "note": zod.string().optional(),
@@ -862,6 +870,10 @@ export const GetApprovvigionamentoResponse = zod.object({
   "codice": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
+  "magazzinoId": zod.number().nullish(),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "dataRichiesta": zod.string(),
   "dataPrevista": zod.string().nullish(),
   "stato": zod.string(),
@@ -885,6 +897,10 @@ export const UpdateApprovvigionamentoParams = zod.object({
 
 export const UpdateApprovvigionamentoBody = zod.object({
   "stato": zod.string().optional(),
+  "fornitoreId": zod.number().nullish(),
+  "magazzinoId": zod.number().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "dataRichiesta": zod.string().optional(),
   "dataPrevista": zod.string().optional(),
   "note": zod.string().optional()
 })
@@ -894,6 +910,43 @@ export const UpdateApprovvigionamentoResponse = zod.object({
   "codice": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
+  "magazzinoId": zod.number().nullish(),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "dataRichiesta": zod.string(),
+  "dataPrevista": zod.string().nullish(),
+  "stato": zod.string(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "quantitaRichiesta": zod.number(),
+  "quantitaRicevuta": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Submit a draft order (sets stato=sottomesso and emails amministrazione)
+ */
+export const SubmitApprovvigionamentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SubmitApprovvigionamentoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "fornitoreId": zod.number().nullish(),
+  "fornitoreNome": zod.string().nullish(),
+  "magazzinoId": zod.number().nullish(),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "dataRichiesta": zod.string(),
   "dataPrevista": zod.string().nullish(),
   "stato": zod.string(),

@@ -790,10 +790,12 @@ function trasferimentoStatoBadge(stato: string) {
 export default function Bolle() {
   const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
   const [filterCentroId, setFilterCentroId] = useState("all");
+  const [filterStato, setFilterStato] = useState("all");
 
-  const bolleParams: { magazzinoId?: number; centroAscoltoId?: number } = {};
+  const bolleParams: { magazzinoId?: number; centroAscoltoId?: number; stato?: string } = {};
   if (filterMagazzinoId !== "all") bolleParams.magazzinoId = parseInt(filterMagazzinoId);
   if (filterCentroId !== "all") bolleParams.centroAscoltoId = parseInt(filterCentroId);
+  if (filterStato !== "all") bolleParams.stato = filterStato;
   const hasBolleParams = Object.keys(bolleParams).length > 0;
 
   const { data: bolle, isLoading } = useListBolle(hasBolleParams ? bolleParams : undefined);
@@ -850,7 +852,7 @@ export default function Bolle() {
   const magId = filterMagazzinoId !== "all" ? parseInt(filterMagazzinoId) : null;
   // Trasferimenti e scarichi non hanno un centro di ascolto: se è attivo quel
   // filtro li nascondiamo; il filtro magazzino invece si applica anche a loro.
-  const showInterni = filterCentroId === "all";
+  const showInterni = filterCentroId === "all" && filterStato === "all";
   const trasfFiltered = showInterni
     ? (trasferimenti ?? []).filter(
         (t) => magId === null || t.magazzinoOrigineId === magId || t.magazzinoDestinoId === magId,
@@ -866,7 +868,7 @@ export default function Bolle() {
     ...scarFiltered.map((s): Row => ({ kind: "scar", date: s.dataScarico, scar: s })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const filtersActive = filterMagazzinoId !== "all" || filterCentroId !== "all";
+  const filtersActive = filterMagazzinoId !== "all" || filterCentroId !== "all" || filterStato !== "all";
 
   const loading = isLoading || loadingTrasf || loadingScar;
 
@@ -911,11 +913,26 @@ export default function Bolle() {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Stato</Label>
+          <Select value={filterStato} onValueChange={setFilterStato}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Tutti gli stati" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti gli stati</SelectItem>
+              <SelectItem value="bozza">Bozza</SelectItem>
+              <SelectItem value="confermato">Confermato</SelectItem>
+              <SelectItem value="consegnato">Consegnato</SelectItem>
+              <SelectItem value="annullato">Annullato</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         {filtersActive && (
           <Button
             variant="ghost"
             className="gap-1.5 text-muted-foreground"
-            onClick={() => { setFilterMagazzinoId("all"); setFilterCentroId("all"); }}
+            onClick={() => { setFilterMagazzinoId("all"); setFilterCentroId("all"); setFilterStato("all"); }}
           >
             <XCircle className="h-4 w-4" /> Azzera filtri
           </Button>

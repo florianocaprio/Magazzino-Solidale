@@ -8,6 +8,13 @@
 
 export interface ApprovvigionamentoUpdate {
   stato?: string;
+  /** @nullable */
+  fornitoreId?: number | null;
+  /** @nullable */
+  magazzinoId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  dataRichiesta?: string;
   dataPrevista?: string;
   note?: string;
 }

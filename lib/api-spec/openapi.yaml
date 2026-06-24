@@ -684,6 +684,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: magazzinoId
+          in: query
+          schema:
+            type: integer
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of procurements
@@ -745,6 +753,25 @@ paths:
       responses:
         "200":
           description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approvvigionamento"
+
+  /approvvigionamenti/{id}/sottometti:
+    post:
+      operationId: submitApprovvigionamento
+      tags: [approvvigionamenti]
+      summary: Submit a draft order (sets stato=sottomesso and emails amministrazione)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Submitted
           content:
             application/json:
               schema:
@@ -2486,6 +2513,14 @@ components:
           type: ["integer", "null"]
         fornitoreNome:
           type: ["string", "null"]
+        magazzinoId:
+          type: ["integer", "null"]
+        magazzinoNome:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
         dataRichiesta:
           type: string
         dataPrevista:
@@ -2507,6 +2542,10 @@ components:
       properties:
         fornitoreId:
           type: integer
+        magazzinoId:
+          type: integer
+        centroAscoltoId:
+          type: integer
         dataRichiesta:
           type: string
         dataPrevista:
@@ -2523,6 +2562,14 @@ components:
       type: object
       properties:
         stato:
+          type: string
+        fornitoreId:
+          type: ["integer", "null"]
+        magazzinoId:
+          type: ["integer", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        dataRichiesta:
           type: string
         dataPrevista:
           type: string

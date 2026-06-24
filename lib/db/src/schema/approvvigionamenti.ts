@@ -6,6 +6,8 @@ export const approvvigionamentiTable = pgTable("approvvigionamenti", {
   id: serial("id").primaryKey(),
   codice: varchar("codice", { length: 30 }).notNull().unique(),
   fornitoreId: integer("fornitore_id"),
+  magazzinoId: integer("magazzino_id"),
+  centroAscoltoId: integer("centro_ascolto_id"),
   dataRichiesta: date("data_richiesta").notNull(),
   dataPrevista: date("data_prevista"),
   stato: varchar("stato", { length: 30 }).notNull().default("bozza"),

@@ -34,8 +34,12 @@ const formSchema = z.object({
 
 export default function Consegne() {
   const [centroFilter, setCentroFilter] = useState("all");
+  const [statoFilter, setStatoFilter] = useState("all");
+  const consegneParams: { centroAscoltoId?: number; stato?: string } = {};
+  if (centroFilter !== "all") consegneParams.centroAscoltoId = parseInt(centroFilter);
+  if (statoFilter !== "all") consegneParams.stato = statoFilter;
   const { data: consegne, isLoading } = useListConsegne(
-    centroFilter !== "all" ? { centroAscoltoId: parseInt(centroFilter) } : undefined
+    Object.keys(consegneParams).length > 0 ? consegneParams : undefined
   );
   const { data: beneficiari } = useListBeneficiari();
   const { data: magazzini } = useListMagazzini();
@@ -156,6 +160,16 @@ export default function Consegne() {
               <SelectContent>
                 <SelectItem value="all">Tutti i centri</SelectItem>
                 {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statoFilter} onValueChange={setStatoFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Tutti gli stati" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti gli stati</SelectItem>
+                <SelectItem value="pianificata">Pianificata</SelectItem>
+                <SelectItem value="effettuata">Effettuata</SelectItem>
               </SelectContent>
             </Select>
           </div>

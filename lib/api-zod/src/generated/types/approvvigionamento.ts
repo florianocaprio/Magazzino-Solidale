@@ -14,6 +14,14 @@ export interface Approvvigionamento {
   fornitoreId?: number | null;
   /** @nullable */
   fornitoreNome?: string | null;
+  /** @nullable */
+  magazzinoId?: number | null;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   dataRichiesta: string;
   /** @nullable */
   dataPrevista?: string | null;

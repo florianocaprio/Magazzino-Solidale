@@ -500,6 +500,14 @@ export interface Approvvigionamento {
   fornitoreId?: number | null;
   /** @nullable */
   fornitoreNome?: string | null;
+  /** @nullable */
+  magazzinoId?: number | null;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   dataRichiesta: string;
   /** @nullable */
   dataPrevista?: string | null;
@@ -519,6 +527,8 @@ export interface ApprovvigionamentoRigaInput {
 
 export interface ApprovvigionamentoInput {
   fornitoreId?: number;
+  magazzinoId?: number;
+  centroAscoltoId?: number;
   dataRichiesta: string;
   dataPrevista?: string;
   note?: string;
@@ -527,6 +537,13 @@ export interface ApprovvigionamentoInput {
 
 export interface ApprovvigionamentoUpdate {
   stato?: string;
+  /** @nullable */
+  fornitoreId?: number | null;
+  /** @nullable */
+  magazzinoId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  dataRichiesta?: string;
   dataPrevista?: string;
   note?: string;
 }
@@ -1181,6 +1198,8 @@ centroAscoltoId?: number;
 
 export type ListApprovvigionamentiParams = {
 stato?: string;
+magazzinoId?: number;
+centroAscoltoId?: number;
 };
 
 export type ListBeneficiariParams = {

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { approvvigionamentiTable, approvvigionamentoRigheTable, fornitoriTable, prodottiTable } from "@workspace/db";
+import { approvvigionamentiTable, approvvigionamentoRigheTable, fornitoriTable, prodottiTable, magazziniTable, centriAscoltoTable } from "@workspace/db";
 import { eq, and, desc, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -9,9 +9,13 @@ async function getWithRighe(id: number) {
   const [a] = await db.select({
     a: approvvigionamentiTable,
     fornitoreNome: fornitoriTable.nome,
+    magazzinoNome: magazziniTable.nome,
+    centroAscoltoNome: centriAscoltoTable.nome,
   })
     .from(approvvigionamentiTable)
     .leftJoin(fornitoriTable, eq(approvvigionamentiTable.fornitoreId, fornitoriTable.id))
+    .leftJoin(magazziniTable, eq(approvvigionamentiTable.magazzinoId, magazziniTable.id))
+    .leftJoin(centriAscoltoTable, eq(approvvigionamentiTable.centroAscoltoId, centriAscoltoTable.id))
     .where(eq(approvvigionamentiTable.id, id));
   if (!a) return null;
 
@@ -28,6 +32,10 @@ async function getWithRighe(id: number) {
     codice: a.a.codice,
     fornitoreId: a.a.fornitoreId ?? null,
     fornitoreNome: a.fornitoreNome ?? null,
+    magazzinoId: a.a.magazzinoId ?? null,
+    magazzinoNome: a.magazzinoNome ?? null,
+    centroAscoltoId: a.a.centroAscoltoId ?? null,
+    centroAscoltoNome: a.centroAscoltoNome ?? null,
     dataRichiesta: a.a.dataRichiesta,
     dataPrevista: a.a.dataPrevista ?? null,
     stato: a.a.stato,
@@ -46,17 +54,23 @@ async function getWithRighe(id: number) {
 }
 
 router.get("/approvvigionamenti", async (req, res) => {
-  const { stato } = req.query as Record<string, string>;
+  const { stato, magazzinoId, centroAscoltoId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(approvvigionamentiTable.stato, stato));
+  if (magazzinoId) conditions.push(eq(approvvigionamentiTable.magazzinoId, parseInt(magazzinoId)));
+  if (centroAscoltoId) conditions.push(eq(approvvigionamentiTable.centroAscoltoId, parseInt(centroAscoltoId)));
 
   const rows = await db
     .select({
       a: approvvigionamentiTable,
       fornitoreNome: fornitoriTable.nome,
+      magazzinoNome: magazziniTable.nome,
+      centroAscoltoNome: centriAscoltoTable.nome,
     })
     .from(approvvigionamentiTable)
     .leftJoin(fornitoriTable, eq(approvvigionamentiTable.fornitoreId, fornitoriTable.id))
+    .leftJoin(magazziniTable, eq(approvvigionamentiTable.magazzinoId, magazziniTable.id))
+    .leftJoin(centriAscoltoTable, eq(approvvigionamentiTable.centroAscoltoId, centriAscoltoTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(approvvigionamentiTable.dataCreazione))
     .limit(100);
@@ -66,6 +80,10 @@ router.get("/approvvigionamenti", async (req, res) => {
     codice: r.a.codice,
     fornitoreId: r.a.fornitoreId ?? null,
     fornitoreNome: r.fornitoreNome ?? null,
+    magazzinoId: r.a.magazzinoId ?? null,
+    magazzinoNome: r.magazzinoNome ?? null,
+    centroAscoltoId: r.a.centroAscoltoId ?? null,
+    centroAscoltoNome: r.centroAscoltoNome ?? null,
     dataRichiesta: r.a.dataRichiesta,
     dataPrevista: r.a.dataPrevista ?? null,
     stato: r.a.stato,
@@ -81,6 +99,8 @@ router.post("/approvvigionamenti", async (req, res) => {
   const [a] = await db.insert(approvvigionamentiTable).values({
     codice,
     fornitoreId: body.fornitoreId,
+    magazzinoId: body.magazzinoId,
+    centroAscoltoId: body.centroAscoltoId,
     dataRichiesta: body.dataRichiesta,
     dataPrevista: body.dataPrevista,
     stato: "bozza",
@@ -114,6 +134,28 @@ router.patch("/approvvigionamenti/:id", async (req, res) => {
   const [row] = await db.update(approvvigionamentiTable).set(req.body).where(eq(approvvigionamentiTable.id, parseInt(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   const result = await getWithRighe(row.id);
+  res.json(result);
+});
+
+router.post("/approvvigionamenti/:id/sottometti", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const [row] = await db
+    .update(approvvigionamentiTable)
+    .set({ stato: "sottomesso" })
+    .where(eq(approvvigionamentiTable.id, id))
+    .returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+
+  const result = await getWithRighe(id);
+
+  // Email notification to amministrazione (best-effort; does not block submission).
+  try {
+    const { sendApprovvigionamentoEmail } = await import("../lib/orderEmail.js");
+    if (result) await sendApprovvigionamentoEmail(result);
+  } catch (err) {
+    req.log.error({ err }, "Invio email approvvigionamento fallito");
+  }
+
   res.json(result);
 });
 

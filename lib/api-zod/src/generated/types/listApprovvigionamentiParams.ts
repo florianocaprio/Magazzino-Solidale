@@ -8,4 +8,6 @@
 
 export type ListApprovvigionamentiParams = {
 stato?: string;
+magazzinoId?: number;
+centroAscoltoId?: number;
 };
