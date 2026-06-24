@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useListCentriAscolto, useGetBeneficiario, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useListCentriAscolto, useGetBeneficiario, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil } from "lucide-react";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
@@ -34,14 +35,17 @@ const formSchema = z.object({
 });
 
 const CENTRO_ALL = "__all__";
+const PRIORITA_ALL = "__all__";
 
 export default function Beneficiari() {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState<string>(CENTRO_ALL);
+  const [prioritaFilter, setPrioritaFilter] = useState<string>(PRIORITA_ALL);
   const { data: beneficiari, isLoading } = useListBeneficiari({
     search: search || undefined,
     centroAscoltoId: centroFilter !== CENTRO_ALL ? parseInt(centroFilter) : undefined,
+    priorita: prioritaFilter !== PRIORITA_ALL ? prioritaFilter : undefined,
   });
   const { data: centri } = useListCentriAscolto();
   
@@ -53,6 +57,17 @@ export default function Beneficiari() {
 
   const createBeneficiario = useCreateBeneficiario();
   const deleteBeneficiario = useDeleteBeneficiario();
+  const updateBeneficiario = useUpdateBeneficiario();
+
+  const toggleStatus = (b: { id: number; attivo: boolean }) => {
+    updateBeneficiario.mutate({ id: b.id, data: { attivo: !b.attivo } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) });
+        toast({ title: b.attivo ? t("beneficiari.toastDisattivato") : t("beneficiari.toastAttivato") });
+      },
+    });
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -135,6 +150,18 @@ export default function Beneficiari() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={prioritaFilter} onValueChange={setPrioritaFilter}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder={t("beneficiari.allPriorita")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={PRIORITA_ALL}>{t("beneficiari.allPriorita")}</SelectItem>
+                <SelectItem value="urgente">{t("beneficiari.prioUrgente")}</SelectItem>
+                <SelectItem value="alta">{t("beneficiari.prioAlta")}</SelectItem>
+                <SelectItem value="media">{t("beneficiari.prioMedia")}</SelectItem>
+                <SelectItem value="bassa">{t("beneficiari.prioBassa")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -147,6 +174,7 @@ export default function Beneficiari() {
                 <TableHead className="text-center">{t("beneficiari.colComponenti")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colDomicilio")}</TableHead>
+                <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -160,15 +188,16 @@ export default function Beneficiari() {
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
-                <TableRow key={b.id}>
+                <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
                   <TableCell>
                     <Link href={`/beneficiari/${b.id}`} className="font-medium hover:underline text-primary flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
@@ -183,6 +212,15 @@ export default function Beneficiari() {
                   <TableCell className="text-center">{getPriorityBadge(b.priorita)}</TableCell>
                   <TableCell className="text-center">
                     {b.consegnaDomicilio && <Home className="h-4 w-4 text-blue-500 mx-auto" />}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center">
+                      <Switch
+                        checked={b.attivo}
+                        onCheckedChange={() => toggleStatus(b)}
+                        aria-label={b.attivo ? t("beneficiari.disattiva") : t("beneficiari.attiva")}
+                      />
+                    </div>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>

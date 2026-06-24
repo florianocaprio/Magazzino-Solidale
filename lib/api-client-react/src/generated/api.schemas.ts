@@ -1376,6 +1376,7 @@ search?: string;
 priorita?: string;
 domicilio?: boolean;
 centroAscoltoId?: number;
+attivo?: boolean;
 };
 
 export type ListInterventiParams = {

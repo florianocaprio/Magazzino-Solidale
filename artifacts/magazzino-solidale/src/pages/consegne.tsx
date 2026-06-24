@@ -44,7 +44,11 @@ export default function Consegne() {
   const { data: consegne, isLoading } = useListConsegne(
     Object.keys(consegneParams).length > 0 ? consegneParams : undefined
   );
-  const { data: beneficiari } = useListBeneficiari();
+  const [createCentroId, setCreateCentroId] = useState("all");
+  const { data: beneficiari } = useListBeneficiari({
+    attivo: true,
+    ...(createCentroId !== "all" ? { centroAscoltoId: parseInt(createCentroId) } : {}),
+  });
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
   const { data: centri } = useListCentriAscolto();
@@ -317,13 +321,26 @@ export default function Consegne() {
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormItem>
+                  <FormLabel>{t("consegne.centroFilterLabel")}</FormLabel>
+                  <Select value={createCentroId} onValueChange={(v) => { setCreateCentroId(v); form.setValue("beneficiarioId", 0); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("consegne.allBeneficiari")}</SelectItem>
+                      {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+
                 <FormField control={form.control} name="beneficiarioId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("consegne.beneficiario")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
+                    <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
                       <FormControl><SelectTrigger><SelectValue placeholder={t("consegne.selectPlaceholder")} /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {beneficiari?.map(b => <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>)}
+                        {beneficiari?.length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">{t("consegne.noBeneficiarioForCentro")}</div>
+                        ) : beneficiari?.map(b => <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </FormItem>

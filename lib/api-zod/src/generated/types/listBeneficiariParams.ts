@@ -11,4 +11,5 @@ search?: string;
 priorita?: string;
 domicilio?: boolean;
 centroAscoltoId?: number;
+attivo?: boolean;
 };

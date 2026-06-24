@@ -66,9 +66,10 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [trasportatore, setTrasportatore] = useState("");
   const [trasportatoreNome, setTrasportatoreNome] = useState("");
   const { data: centri } = useListCentriAscolto();
-  const { data: beneficiari } = useListBeneficiari(
-    centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : undefined
-  );
+  const { data: beneficiari } = useListBeneficiari({
+    attivo: true,
+    ...(centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : {}),
+  });
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
   const createBolla = useCreateBolla();
@@ -189,7 +190,7 @@ function ModificaBollaDialog({
 }) {
   const [bId, setBId] = useState(String(beneficiarioId));
   const [mId, setMId] = useState(String(magazzinoId));
-  const { data: beneficiari } = useListBeneficiari();
+  const { data: beneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
   const updateBolla = useUpdateBolla();
   const queryClient = useQueryClient();

@@ -44,7 +44,7 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
 }
 
 router.get("/beneficiari", async (req, res) => {
-  const { search, priorita, domicilio, centroAscoltoId } = req.query as Record<string, string>;
+  const { search, priorita, domicilio, centroAscoltoId, attivo } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (search) {
     conditions.push(ilike(beneficiariTable.cognome, `%${search}%`));
@@ -52,6 +52,8 @@ router.get("/beneficiari", async (req, res) => {
   if (priorita) conditions.push(eq(beneficiariTable.priorita, priorita));
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
   if (centroAscoltoId) conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
+  else if (attivo === "false") conditions.push(eq(beneficiariTable.attivo, false));
 
   const rows = await db
     .select({ b: beneficiariTable, centroNome: centriAscoltoTable.nome })

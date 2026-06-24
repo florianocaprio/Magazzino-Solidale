@@ -803,6 +803,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: attivo
+          in: query
+          schema:
+            type: boolean
       responses:
         "200":
           description: List of beneficiaries

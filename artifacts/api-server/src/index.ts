@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdmin } from "./lib/seedAdmin";
+import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
 
 const rawPort = process.env["PORT"];
 
@@ -27,4 +28,6 @@ app.listen(port, (err) => {
   seedAdmin().catch((err) => {
     logger.error({ err }, "Failed to seed admin user");
   });
+
+  schedulePriorityDowngrade();
 });

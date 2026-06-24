@@ -1031,7 +1031,8 @@ export const ListBeneficiariQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
   "priorita": zod.coerce.string().optional(),
   "domicilio": zod.coerce.boolean().optional(),
-  "centroAscoltoId": zod.coerce.number().optional()
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "attivo": zod.coerce.boolean().optional()
 })
 
 export const ListBeneficiariResponseItem = zod.object({
