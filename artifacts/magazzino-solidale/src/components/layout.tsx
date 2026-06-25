@@ -17,6 +17,8 @@ import {
   ShoppingCart,
   BarChart3,
   Building2,
+  MapPin,
+  Map,
   Printer,
   ShieldCheck,
   UserCog,
@@ -76,6 +78,8 @@ const NAV_ITEMS = [
   
   { key: "report", url: "/report", icon: BarChart3, groupKey: "analisi", area: "analisi" },
 
+  { key: "citta", url: "/citta", icon: MapPin, groupKey: "amministrazione", area: "amministrazione" },
+  { key: "zoneUds", url: "/zone-uds", icon: Map, groupKey: "amministrazione", area: "amministrazione" },
   { key: "utenti", url: "/utenti", icon: UserCog, groupKey: "amministrazione", area: "amministrazione" },
   { key: "ruoli", url: "/ruoli", icon: ShieldCheck, groupKey: "amministrazione", area: "amministrazione" },
   { key: "impostazioniStampa", url: "/impostazioni-stampa", icon: Printer, groupKey: "amministrazione", area: "amministrazione" },

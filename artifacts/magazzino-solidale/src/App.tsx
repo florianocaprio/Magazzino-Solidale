@@ -38,6 +38,8 @@ import Approvvigionamenti from "@/pages/approvvigionamenti";
 import Report from "@/pages/report";
 import Utenti from "@/pages/utenti";
 import Ruoli from "@/pages/ruoli";
+import Citta from "@/pages/citta";
+import ZoneUds from "@/pages/zone-uds";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -198,6 +200,20 @@ function AppRoutes() {
           {() => (
             <Guard area="analisi">
               <Report />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/citta">
+          {() => (
+            <Guard area="amministrazione">
+              <Citta />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/zone-uds">
+          {() => (
+            <Guard area="amministrazione">
+              <ZoneUds />
             </Guard>
           )}
         </Route>

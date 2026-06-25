@@ -24,3 +24,11 @@ A second scoping axis, **città**, sits above the per-Centro-di-Ascolto axis. It
 **Why:** the architect review caught exactly these (fornitori/volontari POST, utenti DELETE, approvvigionamenti POST/PATCH centroAscoltoId) after the read paths were already correct. Read-path correctness does not imply write-path correctness for a hard boundary.
 
 **Regression safety:** all helpers return `undefined`/`null`/`true` for a città-global caller, so existing global-user behavior is unchanged (the 118-test suite uses a stub req.user with no cittaId → all green).
+
+## Zona UDS (soft axis) + canale persona + FE
+
+- **Zona UDS** (municipio, `zone_uds` FK `cittaId`) is a SOFT preference UNDER a città — the operator sees their zone first but can filter the whole città. It is NOT a hard cut (unlike città). `utenti.zonaUdsId` nullable = all zones of the città.
+- **Canale persona**: ONE person record, no separate UDS table. `centroAscoltoId` set = centro member; `zonaUdsId` set = UDS; both populated = visible to both staffs.
+- `beneficiari` carry `cittaId` + `zonaUdsId` + `soprannome`; `centri_ascolto`/`magazzini` carry `cittaId`.
+- `/auth/me` exposes `cittaId/cittaNome/zonaUdsId/zonaUdsNome` so the FE can lock the città select for scoped users.
+- **FE Utenti form pattern**: Città select + DEPENDENT Zona UDS select. Zona query is `useListZoneUds({cittaId})` with the Orval `enabled`+`queryKey` pattern; "Tutte le zone" = null; reset zona to null whenever città changes; zona disabled until a città is chosen; `zonaUdsId` forced null when città is null. Admin CRUD pages `citta.tsx` + `zone-uds.tsx` live in area amministrazione.

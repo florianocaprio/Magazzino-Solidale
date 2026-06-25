@@ -11,6 +11,8 @@ import { giacenze } from "./namespaces/giacenze";
 import { trasferimenti } from "./namespaces/trasferimenti";
 import { scarichi } from "./namespaces/scarichi";
 import { centriAscolto } from "./namespaces/centriAscolto";
+import { citta } from "./namespaces/citta";
+import { zoneUds } from "./namespaces/zoneUds";
 import { beneficiari } from "./namespaces/beneficiari";
 import { beneficiarioDettaglio } from "./namespaces/beneficiarioDettaglio";
 import { interventi } from "./namespaces/interventi";
@@ -44,6 +46,8 @@ const PAGE_NAMESPACES = {
   trasferimenti,
   scarichi,
   centriAscolto,
+  citta,
+  zoneUds,
   beneficiari,
   beneficiarioDettaglio,
   interventi,

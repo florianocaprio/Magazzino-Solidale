@@ -7,6 +7,8 @@ import {
   useResetUtentePassword,
   useListRuoli,
   useListCentriAscolto,
+  useListCitta,
+  useListZoneUds,
   getListUtentiQueryKey,
   type Utente,
 } from "@workspace/api-client-react";
@@ -70,15 +72,20 @@ import i18n from "@/lib/i18n";
 
 const NO_ROLE = "none";
 const NO_CENTRO = "__none__";
+const NO_CITTA = "__nocitta__";
+const ALL_ZONE = "__allzone__";
 
 export default function Utenti() {
   const { t } = useTranslation();
   const { user: currentUser } = useAuth();
   const lockedCentroId = currentUser?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const lockedCittaId = currentUser?.cittaId ?? null;
+  const isCittaLocked = lockedCittaId != null;
   const { data: utenti, isLoading } = useListUtenti();
   const { data: ruoli } = useListRuoli();
   const { data: centri } = useListCentriAscolto();
+  const { data: citta } = useListCitta();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -99,9 +106,17 @@ export default function Utenti() {
   const [password, setPassword] = useState("");
   const [ruoloId, setRuoloId] = useState<string>(NO_ROLE);
   const [centroId, setCentroId] = useState<string>(NO_CENTRO);
+  const [cittaId, setCittaId] = useState<string>(NO_CITTA);
+  const [zonaUdsId, setZonaUdsId] = useState<string>(ALL_ZONE);
   const [attivo, setAttivo] = useState(true);
   const [resetPwd, setResetPwd] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+
+  const selectedCittaNum = cittaId === NO_CITTA ? undefined : parseInt(cittaId, 10);
+  const { data: zoneUds } = useListZoneUds(
+    { cittaId: selectedCittaNum },
+    { query: { enabled: selectedCittaNum != null, queryKey: ["zoneUds", selectedCittaNum] } },
+  );
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: getListUtentiQueryKey() });
@@ -115,6 +130,8 @@ export default function Utenti() {
     setPassword("");
     setRuoloId(NO_ROLE);
     setCentroId(isCentroLocked ? String(lockedCentroId) : NO_CENTRO);
+    setCittaId(isCittaLocked ? String(lockedCittaId) : NO_CITTA);
+    setZonaUdsId(ALL_ZONE);
     setAttivo(true);
     setFormError(null);
     setIsFormOpen(true);
@@ -129,6 +146,8 @@ export default function Utenti() {
     setPassword("");
     setRuoloId(u.ruoloId != null ? String(u.ruoloId) : NO_ROLE);
     setCentroId(u.centroAscoltoId != null ? String(u.centroAscoltoId) : NO_CENTRO);
+    setCittaId(u.cittaId != null ? String(u.cittaId) : NO_CITTA);
+    setZonaUdsId(u.zonaUdsId != null ? String(u.zonaUdsId) : ALL_ZONE);
     setAttivo(u.attivo);
     setFormError(null);
     setIsFormOpen(true);
@@ -143,12 +162,19 @@ export default function Utenti() {
       : centroId === NO_CENTRO
         ? null
         : parseInt(centroId, 10);
+    const cittaIdValue = isCittaLocked
+      ? lockedCittaId
+      : cittaId === NO_CITTA
+        ? null
+        : parseInt(cittaId, 10);
+    const zonaUdsIdValue =
+      cittaIdValue == null || zonaUdsId === ALL_ZONE ? null : parseInt(zonaUdsId, 10);
 
     if (editing) {
       updateUtente.mutate(
         {
           id: editing.id,
-          data: { nome, cognome: cognome.trim() || null, matricola: matricola.trim() || null, ruoloId: ruoloIdValue, centroAscoltoId: centroIdValue, attivo },
+          data: { nome, cognome: cognome.trim() || null, matricola: matricola.trim() || null, ruoloId: ruoloIdValue, centroAscoltoId: centroIdValue, cittaId: cittaIdValue, zonaUdsId: zonaUdsIdValue, attivo },
         },
         {
           onSuccess: () => {
@@ -174,6 +200,8 @@ export default function Utenti() {
             password,
             ruoloId: ruoloIdValue,
             centroAscoltoId: centroIdValue,
+            cittaId: cittaIdValue,
+            zonaUdsId: zonaUdsIdValue,
             attivo,
           },
         },
@@ -279,6 +307,8 @@ export default function Utenti() {
                   <TableHead>{t("utenti.colMatricola")}</TableHead>
                   <TableHead>{t("utenti.colRuolo")}</TableHead>
                   <TableHead>{t("common.centro")}</TableHead>
+                  <TableHead>{t("utenti.colCitta")}</TableHead>
+                  <TableHead>{t("utenti.colZona")}</TableHead>
                   <TableHead>{t("common.status")}</TableHead>
                   <TableHead>{t("utenti.colUltimoAccesso")}</TableHead>
                   <TableHead className="w-10" />
@@ -293,6 +323,12 @@ export default function Utenti() {
                     <TableCell>{u.ruoloNome ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {u.centroAscoltoNome ?? t("common.centroComune")}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.cittaNome ?? t("utenti.cittaGlobale")}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.zonaUdsNome ?? t("utenti.tutteLeZone")}
                     </TableCell>
                     <TableCell>
                       {u.attivo ? (
@@ -345,7 +381,7 @@ export default function Utenti() {
                 {utenti?.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={10}
                       className="text-center text-muted-foreground py-8"
                     >
                       {t("utenti.emptyUsers")}
@@ -464,6 +500,49 @@ export default function Utenti() {
                   {t("common.centroLocked")}
                 </p>
               )}
+            </div>
+            <div className="space-y-2">
+              <Label>{t("utenti.colCitta")}</Label>
+              <Select
+                value={cittaId}
+                onValueChange={(v) => {
+                  setCittaId(v);
+                  setZonaUdsId(ALL_ZONE);
+                }}
+                disabled={isCittaLocked}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("utenti.selezionaCitta")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CITTA}>{t("utenti.cittaGlobale")}</SelectItem>
+                  {citta?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("utenti.colZona")}</Label>
+              <Select
+                value={zonaUdsId}
+                onValueChange={setZonaUdsId}
+                disabled={cittaId === NO_CITTA}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("utenti.selezionaZona")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_ZONE}>{t("utenti.tutteLeZone")}</SelectItem>
+                  {zoneUds?.map((z) => (
+                    <SelectItem key={z.id} value={String(z.id)}>
+                      {z.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="u-attivo">{t("utenti.accountAttivo")}</Label>
