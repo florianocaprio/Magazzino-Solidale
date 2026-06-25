@@ -3,6 +3,8 @@ import {
   db,
   trasferimentiTable,
   trasferimentoRigheTable,
+  scarichiTable,
+  scaricoRigheTable,
   magazziniTable,
   prodottiTable,
   lottiTable,
@@ -10,8 +12,9 @@ import {
   utentiTable,
   fornitoriTable,
 } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import trasferimentiRouter from "../src/routes/trasferimenti";
+import scarichiRouter from "../src/routes/scarichi";
 
 /**
  * Builds a minimal Express app that mounts the trasferimenti router with a stub
@@ -30,6 +33,21 @@ export function makeApp(userId: number): Express {
   return app;
 }
 
+/**
+ * Same as {@link makeApp} but mounts the scarichi router instead, so the
+ * discharge tests can exercise the FEFO/transaction handler in isolation.
+ */
+export function makeScarichiApp(userId: number): Express {
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    req.user = { id: userId } as NonNullable<typeof req.user>;
+    next();
+  });
+  app.use(scarichiRouter);
+  return app;
+}
+
 /** Tracks created rows so a test can wipe exactly what it inserted. */
 export interface SeedScope {
   magazzinoIds: number[];
@@ -37,6 +55,7 @@ export interface SeedScope {
   fornitoreIds: number[];
   utenteIds: number[];
   trasferimentoIds: number[];
+  scaricoIds: number[];
 }
 
 export function newScope(): SeedScope {
@@ -46,6 +65,7 @@ export function newScope(): SeedScope {
     fornitoreIds: [],
     utenteIds: [],
     trasferimentoIds: [],
+    scaricoIds: [],
   };
 }
 
@@ -140,6 +160,19 @@ export async function getMovimentiForTrasferimento(trasferimentoId: number) {
     .where(eq(movimentiTable.trasferimentoId, trasferimentoId));
 }
 
+/**
+ * Scarico movimenti carry no scaricoId column, so they are looked up by the
+ * warehouse + `tipoMovimento='scarico'` (tests use a dedicated warehouse).
+ */
+export async function getScaricoMovimentiForMagazzino(magazzinoId: number) {
+  return db
+    .select()
+    .from(movimentiTable)
+    .where(
+      and(eq(movimentiTable.magazzinoId, magazzinoId), eq(movimentiTable.tipoMovimento, "scarico")),
+    );
+}
+
 export async function getLottiInMagazzino(magazzinoId: number) {
   return db.select().from(lottiTable).where(eq(lottiTable.magazzinoId, magazzinoId));
 }
@@ -155,6 +188,12 @@ export async function cleanup(scope: SeedScope): Promise<void> {
       .delete(trasferimentoRigheTable)
       .where(inArray(trasferimentoRigheTable.trasferimentoId, scope.trasferimentoIds));
     await db.delete(trasferimentiTable).where(inArray(trasferimentiTable.id, scope.trasferimentoIds));
+  }
+  if (scope.scaricoIds.length > 0) {
+    await db
+      .delete(scaricoRigheTable)
+      .where(inArray(scaricoRigheTable.scaricoId, scope.scaricoIds));
+    await db.delete(scarichiTable).where(inArray(scarichiTable.id, scope.scaricoIds));
   }
   if (scope.prodottoIds.length > 0) {
     await db.delete(prodottiTable).where(inArray(prodottiTable.id, scope.prodottoIds));
