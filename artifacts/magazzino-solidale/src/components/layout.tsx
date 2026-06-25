@@ -40,7 +40,8 @@ import {
   SidebarMenuButton, 
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger
+  SidebarTrigger,
+  useSidebar
 } from "@/components/ui/sidebar";
 import {
   Collapsible,
@@ -116,6 +117,25 @@ function LanguageSelector() {
   );
 }
 
+function NavMenuLink({ item, isActive }: { item: (typeof NAV_ITEMS)[number]; isActive: boolean }) {
+  const { t } = useTranslation();
+  const { isMobile, setOpenMobile } = useSidebar();
+  return (
+    <SidebarMenuButton asChild isActive={isActive}>
+      <Link
+        href={item.url}
+        onClick={() => {
+          if (isMobile) setOpenMobile(false);
+        }}
+        className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors"
+      >
+        <item.icon className="h-4 w-4" />
+        <span>{t(`nav.items.${item.key}`)}</span>
+      </Link>
+    </SidebarMenuButton>
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, logout } = useAuth();
@@ -151,12 +171,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       <SidebarMenu>
                         {items.map((item) => (
                           <SidebarMenuItem key={item.url}>
-                            <SidebarMenuButton asChild isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}>
-                              <Link href={item.url} className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors">
-                                <item.icon className="h-4 w-4" />
-                                <span>{t(`nav.items.${item.key}`)}</span>
-                              </Link>
-                            </SidebarMenuButton>
+                            <NavMenuLink
+                              item={item}
+                              isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}
+                            />
                           </SidebarMenuItem>
                         ))}
                       </SidebarMenu>
