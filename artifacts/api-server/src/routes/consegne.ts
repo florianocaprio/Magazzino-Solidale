@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { consegneTable, beneficiariTable, magazziniTable, volontariTable, bolleTable } from "@workspace/db";
+import { consegneTable, beneficiariTable, magazziniTable, volontariTable, bolleTable, centriAscoltoTable } from "@workspace/db";
 import { eq, and, desc, inArray, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
@@ -58,12 +58,15 @@ router.get("/consegne", async (req, res) => {
       c: consegneTable,
       cognome: beneficiariTable.cognome,
       nome: beneficiariTable.nome,
+      centroAscoltoId: beneficiariTable.centroAscoltoId,
+      centroAscoltoNome: centriAscoltoTable.nome,
       magazzinoNome: magazziniTable.nome,
       volNome: volontariTable.nome,
       volCognome: volontariTable.cognome,
     })
     .from(consegneTable)
     .leftJoin(beneficiariTable, eq(consegneTable.beneficiarioId, beneficiariTable.id))
+    .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(magazziniTable, eq(consegneTable.magazzinoId, magazziniTable.id))
     .leftJoin(volontariTable, eq(consegneTable.volontarioId, volontariTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -86,6 +89,8 @@ router.get("/consegne", async (req, res) => {
       zona: r.c.zona ?? null,
       magazzinoId: r.c.magazzinoId,
       magazzinoNome: r.magazzinoNome ?? null,
+      centroAscoltoId: r.centroAscoltoId ?? null,
+      centroAscoltoNome: r.centroAscoltoNome ?? null,
       volontarioId: r.c.volontarioId ?? null,
       volontarioNome: r.volNome && r.volCognome ? `${r.volCognome} ${r.volNome}` : null,
       mezzoId: r.c.mezzoId ?? null,
@@ -237,12 +242,15 @@ async function dettaglioConsegna(id: number) {
       c: consegneTable,
       cognome: beneficiariTable.cognome,
       nome: beneficiariTable.nome,
+      centroAscoltoId: beneficiariTable.centroAscoltoId,
+      centroAscoltoNome: centriAscoltoTable.nome,
       magazzinoNome: magazziniTable.nome,
       volNome: volontariTable.nome,
       volCognome: volontariTable.cognome,
     })
     .from(consegneTable)
     .leftJoin(beneficiariTable, eq(consegneTable.beneficiarioId, beneficiariTable.id))
+    .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(magazziniTable, eq(consegneTable.magazzinoId, magazziniTable.id))
     .leftJoin(volontariTable, eq(consegneTable.volontarioId, volontariTable.id))
     .where(eq(consegneTable.id, id));
@@ -260,6 +268,8 @@ async function dettaglioConsegna(id: number) {
     zona: r.c.zona ?? null,
     magazzinoId: r.c.magazzinoId,
     magazzinoNome: r.magazzinoNome ?? null,
+    centroAscoltoId: r.centroAscoltoId ?? null,
+    centroAscoltoNome: r.centroAscoltoNome ?? null,
     volontarioId: r.c.volontarioId ?? null,
     volontarioNome: r.volNome && r.volCognome ? `${r.volCognome} ${r.volNome}` : null,
     mezzoId: r.c.mezzoId ?? null,

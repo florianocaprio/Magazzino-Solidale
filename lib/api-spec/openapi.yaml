@@ -3503,6 +3503,10 @@ components:
           type: integer
         magazzinoNome:
           type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
         volontarioId:
           type: ["integer", "null"]
         volontarioNome:
@@ -3597,6 +3601,10 @@ components:
         magazzinoId:
           type: integer
         magazzinoNome:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
           type: ["string", "null"]
         indirizzoConsegna:
           type: ["string", "null"]

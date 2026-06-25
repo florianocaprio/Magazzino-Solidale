@@ -41,6 +41,7 @@ export default function Consegne() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const [centroFilter, setCentroFilter] = useState("all");
   const [statoFilter, setStatoFilter] = useState("all");
   const [createCentroId, setCreateCentroId] = useState("all");
@@ -156,6 +157,7 @@ export default function Consegne() {
               { header: t("consegne.colDataPrevista"), accessor: (c) => c.dataPrevista ? new Date(c.dataPrevista).toLocaleDateString("it-IT") : "" },
               { header: t("consegne.colFasciaOraria"), accessor: (c) => c.fasciaOraria },
               { header: t("consegne.beneficiario"), accessor: (c) => c.beneficiarioNome },
+              { header: t("common.centro"), accessor: (c) => c.centroAscoltoNome ?? "" },
               { header: t("common.type"), accessor: (c) => c.tipoConsegna?.replace('_', ' ') },
               { header: t("common.address"), accessor: (c) => c.indirizzoConsegna },
               { header: t("consegne.zona"), accessor: (c) => c.zona },
@@ -175,15 +177,17 @@ export default function Consegne() {
         <CardHeader className="py-4 border-b">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={centroFilter} onValueChange={setCentroFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t("consegne.filterAllCenters")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("consegne.filterAllCenters")}</SelectItem>
-                {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            {isGlobal && (
+              <Select value={centroFilter} onValueChange={setCentroFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder={t("consegne.filterAllCenters")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("consegne.filterAllCenters")}</SelectItem>
+                  {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={statoFilter} onValueChange={setStatoFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder={t("consegne.filterAllStatuses")} />
@@ -215,6 +219,7 @@ export default function Consegne() {
                 <TableHead>{t("common.code")}</TableHead>
                 <TableHead>{t("consegne.thDataFascia")}</TableHead>
                 <TableHead>{t("consegne.beneficiario")}</TableHead>
+                {isGlobal && <TableHead>{t("common.centro")}</TableHead>}
                 <TableHead>{t("consegne.thDettagli")}</TableHead>
                 <TableHead>{t("consegne.thBolla")}</TableHead>
                 <TableHead className="text-center">{t("common.status")}</TableHead>
@@ -228,6 +233,7 @@ export default function Consegne() {
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
@@ -236,7 +242,7 @@ export default function Consegne() {
                 ))
               ) : consegne?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("consegne.emptyState")}</TableCell>
+                  <TableCell colSpan={isGlobal ? 8 : 7} className="h-32 text-center text-muted-foreground">{t("consegne.emptyState")}</TableCell>
                 </TableRow>
               ) : consegne?.map((c) => (
                 <TableRow key={c.id}>
@@ -246,6 +252,11 @@ export default function Consegne() {
                     <div className="text-xs text-muted-foreground">{c.fasciaOraria}</div>
                   </TableCell>
                   <TableCell className="font-medium">{c.beneficiarioNome}</TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm">
+                      {c.centroAscoltoNome ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm">
                       {c.tipoConsegna === 'domicilio' ? (

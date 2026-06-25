@@ -19,6 +19,10 @@ export interface Bolla {
   /** @nullable */
   magazzinoNome?: string | null;
   /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
   indirizzoConsegna?: string | null;
   /** @nullable */
   volontarioConsegnaId?: number | null;

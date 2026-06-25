@@ -710,6 +710,10 @@ export interface Consegna {
   /** @nullable */
   magazzinoNome?: string | null;
   /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
   volontarioId?: number | null;
   /** @nullable */
   volontarioNome?: string | null;
@@ -1016,6 +1020,10 @@ export interface Bolla {
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   /** @nullable */
   indirizzoConsegna?: string | null;
   /** @nullable */

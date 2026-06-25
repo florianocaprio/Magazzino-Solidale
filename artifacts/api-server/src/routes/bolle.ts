@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import {
   bolleTable, bollaRigheTable, beneficiariTable, magazziniTable,
   movimentiTable, lottiTable, prodottiTable, volontariTable, interventiTable,
-  consegneTable, utentiTable,
+  consegneTable, utentiTable, centriAscoltoTable,
 } from "@workspace/db";
 import { eq, and, desc, asc, gt, sum, type SQL } from "drizzle-orm";
 import {
@@ -347,12 +347,15 @@ router.get("/bolle", async (req, res) => {
       b: bolleTable,
       cognome: beneficiariTable.cognome,
       nome: beneficiariTable.nome,
+      centroAscoltoId: beneficiariTable.centroAscoltoId,
+      centroAscoltoNome: centriAscoltoTable.nome,
       magazzinoNome: magazziniTable.nome,
       operatoreMatricola: utentiTable.matricola,
       operatoreUsername: utentiTable.username,
     })
     .from(bolleTable)
     .leftJoin(beneficiariTable, eq(bolleTable.beneficiarioId, beneficiariTable.id))
+    .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(magazziniTable, eq(bolleTable.magazzinoId, magazziniTable.id))
     .leftJoin(utentiTable, eq(bolleTable.operatoreId, utentiTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -368,6 +371,8 @@ router.get("/bolle", async (req, res) => {
     consegnaId: r.b.consegnaId ?? null,
     magazzinoId: r.b.magazzinoId,
     magazzinoNome: r.magazzinoNome ?? null,
+    centroAscoltoId: r.centroAscoltoId ?? null,
+    centroAscoltoNome: r.centroAscoltoNome ?? null,
     indirizzoConsegna: r.b.indirizzoConsegna ?? null,
     volontarioConsegnaId: r.b.volontarioConsegnaId ?? null,
     trasportatoreNome: r.b.trasportatoreNome ?? null,

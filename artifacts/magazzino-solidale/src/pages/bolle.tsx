@@ -1125,6 +1125,7 @@ export default function Bolle() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
   const [filterCentroId, setFilterCentroId] = useState("all");
   const [filterStato, setFilterStato] = useState("all");
@@ -1242,20 +1243,22 @@ export default function Bolle() {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">{t("bolle.centroLabel")}</Label>
-          <Select value={filterCentroId} onValueChange={setFilterCentroId} disabled={isCentroLocked}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder={t("bolle.allCentriPlaceholder")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("bolle.allCentriPlaceholder")}</SelectItem>
-              {(centri ?? []).map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {isGlobal && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">{t("bolle.centroLabel")}</Label>
+            <Select value={filterCentroId} onValueChange={setFilterCentroId}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder={t("bolle.allCentriPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("bolle.allCentriPlaceholder")}</SelectItem>
+                {(centri ?? []).map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">{t("common.status")}</Label>
           <Select value={filterStato} onValueChange={setFilterStato}>
@@ -1291,6 +1294,7 @@ export default function Bolle() {
                 <TableHead>{t("common.date")}</TableHead>
                 <TableHead>{t("bolle.beneficiarioLabel")}</TableHead>
                 <TableHead>{t("bolle.magazzinoLabel")}</TableHead>
+                {isGlobal && <TableHead>{t("common.centro")}</TableHead>}
                 <TableHead className="text-center">{t("common.status")}</TableHead>
                 <TableHead />
               </TableRow>
@@ -1299,14 +1303,14 @@ export default function Bolle() {
               {loading ? (
                 Array(3).fill(0).map((_, i) => (
                   <TableRow key={i}>
-                    {Array(6).fill(0).map((__, j) => (
+                    {Array(isGlobal ? 7 : 6).fill(0).map((__, j) => (
                       <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={isGlobal ? 7 : 6} className="h-32 text-center text-muted-foreground">
                     {filtersActive
                       ? t("bolle.noDocFiltri")
                       : t("bolle.noBolle")}
@@ -1335,6 +1339,9 @@ export default function Bolle() {
                       <span>{causaleLabel(row.scar)}</span>
                     </div>
                   </TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm text-muted-foreground">{row.scar.centroAscoltoNome ?? "—"}</TableCell>
+                  )}
                   <TableCell className="text-center">
                     <Badge variant="secondary">{t("bolle.articoli", { count: row.scar.righe?.length ?? 0 })}</Badge>
                   </TableCell>
@@ -1367,6 +1374,9 @@ export default function Bolle() {
                   </TableCell>
                   <TableCell className="font-medium">{row.bolla.beneficiarioNome ?? "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{row.bolla.magazzinoNome ?? "—"}</TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm text-muted-foreground">{row.bolla.centroAscoltoNome ?? "—"}</TableCell>
+                  )}
                   <TableCell className="text-center">{statoBadge(row.bolla.stato)}</TableCell>
                   <TableCell className="text-right">
                     <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
@@ -1395,6 +1405,9 @@ export default function Bolle() {
                       <span>{row.trasf.magazzinoDestinoNome ?? "—"}</span>
                     </div>
                   </TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                  )}
                   <TableCell className="text-center">{trasferimentoStatoBadge(row.trasf.stato)}</TableCell>
                   <TableCell className="text-right">
                     <Button
