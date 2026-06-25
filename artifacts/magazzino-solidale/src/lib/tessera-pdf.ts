@@ -31,29 +31,30 @@ function imageSize(dataUrl: string): Promise<{ w: number; h: number }> {
   });
 }
 
-async function drawImageFit(
+async function drawImageRightBottom(
   doc: jsPDF,
   dataUrl: string,
-  x: number,
-  y: number,
+  rightX: number,
+  bottomY: number,
   maxW: number,
   maxH: number,
-): Promise<number> {
+): Promise<void> {
   const { w, h } = await imageSize(dataUrl);
-  if (!w || !h) return 0;
+  if (!w || !h) return;
   const ratio = Math.min(maxW / w, maxH / h);
   const drawW = w * ratio;
   const drawH = h * ratio;
+  const x = rightX - drawW;
+  const y = bottomY - drawH;
   try {
     doc.addImage(dataUrl, "PNG", x, y, drawW, drawH);
   } catch {
     try {
       doc.addImage(dataUrl, "JPEG", x, y, drawW, drawH);
     } catch {
-      return 0;
+      // ignore failures to keep the card generation resilient
     }
   }
-  return drawH;
 }
 
 function qrDataUrl(text: string): Promise<string | null> {
@@ -118,20 +119,16 @@ export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void>
   const leftX = 9;
   let y = 6;
 
-  // Logo + header
-  let headerTextX = leftX;
-  if (associationLogoDataUrl) {
-    const drawn = await drawImageFit(doc, associationLogoDataUrl, leftX, 4, 11, 11);
-    if (drawn) headerTextX = leftX + 13;
-  }
+  // Header — title + subtitle centered in the area left of the top-right QR
+  const headerCenterX = (5 + (W - 24)) / 2;
   doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2]);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text(labels.title, headerTextX, 8);
+  doc.text(labels.title, headerCenterX, 8, { align: "center" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(90, 90, 90);
-  doc.text(labels.subtitle, headerTextX, 12.5);
+  doc.text(labels.subtitle, headerCenterX, 12.5, { align: "center" });
 
   // Beneficiary details
   y = 22;
@@ -168,12 +165,17 @@ export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void>
     doc.addImage(bc, "PNG", leftX, 38, 48, 12);
   }
 
-  // Issue date (bottom-right)
+  // Issue date (right side, moved up to leave room for the logo below)
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.5);
   doc.setTextColor(110, 110, 110);
   const issued = `${labels.issuedLabel}: ${format(new Date(), "dd/MM/yyyy", { locale })}`;
-  doc.text(issued, W - 4, H - 3, { align: "right" });
+  doc.text(issued, W - 4, 29, { align: "right" });
+
+  // Association logo (bottom-right, below the issue date)
+  if (associationLogoDataUrl) {
+    await drawImageRightBottom(doc, associationLogoDataUrl, W - 4, H - 4, 22, 18);
+  }
 
   doc.save(`tessera-${b.codice}.pdf`);
 }
