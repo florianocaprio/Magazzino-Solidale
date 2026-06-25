@@ -119,6 +119,7 @@ router.get("/beneficiari/:id", async (req, res) => {
       descrizione: i.descrizione ?? null,
       esito: i.esito ?? null,
       prossimAzione: i.prossimAzione ?? null,
+      note: i.note ?? null,
       dataFollowup: i.dataFollowup ?? null,
       dataCreazione: i.dataCreazione.toISOString(),
     })),

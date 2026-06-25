@@ -18,6 +18,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil, Plus, Trash2, CreditCard } from "lucide-react";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
+import { SchedaExportButtons } from "@/components/scheda-export";
 import { loadAssociationLogo } from "@/lib/bolla-pdf";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -100,6 +101,7 @@ export default function BeneficiarioDettaglio() {
           >
             <CreditCard className="w-4 h-4" /> {t("tessera.generate")}
           </Button>
+          <SchedaExportButtons b={b} size="default" />
           <Button variant="outline" className="gap-2" onClick={() => setEditing(true)}>
             <Pencil className="w-4 h-4" /> {t("beneficiarioDettaglio.editAnagrafica")}
           </Button>

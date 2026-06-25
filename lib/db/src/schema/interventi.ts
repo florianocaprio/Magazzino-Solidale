@@ -13,6 +13,7 @@ export const interventiTable = pgTable("interventi", {
   descrizione: text("descrizione"),
   esito: text("esito"),
   prossimAzione: text("prossim_azione"),
+  note: text("note"),
   dataFollowup: date("data_followup"),
   scadenzaIsee: date("scadenza_isee"),
   scadenzaRinnovo: date("scadenza_rinnovo"),

@@ -13,6 +13,7 @@ export interface InterventoInput {
   descrizione?: string;
   esito?: string;
   prossimAzione?: string;
+  note?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;

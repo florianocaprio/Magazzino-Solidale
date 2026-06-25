@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
-import { useListInterventi, useCreateIntervento, useListBeneficiari, useListCentriAscolto, getListInterventiQueryKey } from "@workspace/api-client-react";
+import { useListInterventi, useCreateIntervento, useUpdateIntervento, useListBeneficiari, useListCentriAscolto, getListInterventiQueryKey, type Intervento } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, Filter, ClipboardList, Calendar } from "lucide-react";
+import { Plus, Filter, ClipboardList, Calendar, StickyNote } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -27,6 +29,7 @@ const formSchema = z.object({
   dataIntervento: z.string().min(1),
   descrizione: z.string().min(1),
   esito: z.string().optional(),
+  note: z.string().optional(),
   prossimAzione: z.string().optional(),
   dataFollowup: z.string().optional(),
   scadenzaIsee: z.string().optional(),
@@ -58,6 +61,23 @@ export default function Interventi() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const createIntervento = useCreateIntervento();
+  const updateIntervento = useUpdateIntervento();
+  const [noteEditing, setNoteEditing] = useState<Intervento | null>(null);
+  const [noteText, setNoteText] = useState("");
+
+  const saveNote = () => {
+    if (!noteEditing) return;
+    updateIntervento.mutate(
+      { id: noteEditing.id, data: { note: noteText } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListInterventiQueryKey() });
+          toast({ title: t("interventi.toastNoteSaved") });
+          setNoteEditing(null);
+        },
+      },
+    );
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -67,6 +87,7 @@ export default function Interventi() {
       dataIntervento: new Date().toISOString().substring(0, 10),
       descrizione: "",
       esito: "",
+      note: "",
       prossimAzione: "",
       dataFollowup: "",
       scadenzaIsee: "",
@@ -176,6 +197,7 @@ export default function Interventi() {
                 <TableHead>{t("common.description")}</TableHead>
                 <TableHead>{t("interventi.thScadenze")}</TableHead>
                 <TableHead>{t("interventi.thFollowup")}</TableHead>
+                <TableHead className="text-right">{t("interventi.thAzioni")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -189,11 +211,12 @@ export default function Interventi() {
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : interventi?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("interventi.emptyState")}</TableCell>
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">{t("interventi.emptyState")}</TableCell>
                 </TableRow>
               ) : interventi?.map((i) => (
                 <TableRow key={i.id}>
@@ -231,6 +254,17 @@ export default function Interventi() {
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant={i.note ? "secondary" : "ghost"}
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => { setNoteEditing(i); setNoteText(i.note ?? ""); }}
+                    >
+                      <StickyNote className="h-3.5 w-3.5" />
+                      {i.note ? t("interventi.editNote") : t("interventi.addNote")}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -286,6 +320,9 @@ export default function Interventi() {
                 <FormField control={form.control} name="esito" render={({ field }) => (
                   <FormItem><FormLabel>{t("interventi.esito")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
+                <FormField control={form.control} name="note" render={({ field }) => (
+                  <FormItem><FormLabel>{t("interventi.noteFormLabel")}</FormLabel><FormControl><Textarea rows={3} placeholder={t("interventi.notePlaceholder")} {...field} /></FormControl></FormItem>
+                )} />
                 
                 <div className="pt-4 border-t space-y-4">
                   <FormField control={form.control} name="prossimAzione" render={({ field }) => (
@@ -318,6 +355,29 @@ export default function Interventi() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={noteEditing != null} onOpenChange={(open) => !open && setNoteEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("interventi.noteDialogTitle")}</DialogTitle>
+          </DialogHeader>
+          {noteEditing && (
+            <p className="text-sm text-muted-foreground -mt-2">
+              {noteEditing.beneficiarioNome} · {format(new Date(noteEditing.dataIntervento), "dd/MM/yyyy")}
+            </p>
+          )}
+          <Textarea
+            rows={5}
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder={t("interventi.notePlaceholder")}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoteEditing(null)}>{t("common.cancel")}</Button>
+            <Button onClick={saveNote} disabled={updateIntervento.isPending}>{t("common.save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

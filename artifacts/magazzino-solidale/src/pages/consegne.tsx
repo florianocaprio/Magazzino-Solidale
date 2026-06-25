@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListCentriAscolto, getListConsegneQueryKey } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListCentriAscolto, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BollaDettaglio } from "@/pages/bolle";
-import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -75,6 +75,9 @@ export default function Consegne() {
   const [associatingId, setAssociatingId] = useState<number | null>(null);
   const [selectedBollaId, setSelectedBollaId] = useState<string>("");
   const [viewingBollaId, setViewingBollaId] = useState<number | null>(null);
+  const [ripianificando, setRipianificando] = useState<Consegna | null>(null);
+  const [riDate, setRiDate] = useState("");
+  const [riFascia, setRiFascia] = useState("Mattina");
 
   const { data: bolle } = useListBolle();
 
@@ -123,6 +126,36 @@ export default function Consegne() {
         toast({ title: t("consegne.toastConsegnaProgrammata") });
         setIsFormOpen(false);
       }
+    });
+  };
+
+  const openRipianifica = (c: Consegna) => {
+    setRipianificando(c);
+    setRiDate(new Date().toISOString().substring(0, 10));
+    setRiFascia(c.fasciaOraria || "Mattina");
+  };
+
+  const handleRipianifica = () => {
+    if (!ripianificando || !riDate) return;
+    const c = ripianificando;
+    const data = {
+      beneficiarioId: c.beneficiarioId,
+      tipoConsegna: c.tipoConsegna,
+      dataPrevista: riDate,
+      fasciaOraria: riFascia || undefined,
+      indirizzoConsegna: c.indirizzoConsegna ?? undefined,
+      zona: c.zona ?? undefined,
+      magazzinoId: c.magazzinoId,
+      volontarioId: c.volontarioId ?? undefined,
+      mezzoId: c.mezzoId ?? undefined,
+      noteOperative: c.noteOperative ?? undefined,
+    };
+    createConsegna.mutate({ data }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
+        toast({ title: t("consegne.toastRipianificata") });
+        setRipianificando(null);
+      },
     });
   };
 
@@ -320,11 +353,16 @@ export default function Consegne() {
                   </TableCell>
                   <TableCell className="text-right">
                     {c.stato === 'effettuata' ? (
-                      c.bollaId != null && (
-                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setViewingBollaId(c.bollaId!)}>
-                          <Download className="h-3.5 w-3.5" /> {t("consegne.btnBolla")}
+                      <div className="flex items-center justify-end gap-2">
+                        {c.bollaId != null && (
+                          <Button size="sm" variant="outline" className="gap-1" onClick={() => setViewingBollaId(c.bollaId!)}>
+                            <Download className="h-3.5 w-3.5" /> {t("consegne.btnBolla")}
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => openRipianifica(c)}>
+                          <CalendarClock className="h-3.5 w-3.5" /> {t("consegne.btnRipianifica")}
                         </Button>
-                      )
+                      </div>
                     ) : (
                       (c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') ? (
                         <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
@@ -474,6 +512,43 @@ export default function Consegne() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleCompleta} className="bg-green-600 hover:bg-green-700">{t("consegne.dialogCompletaConfirm")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={ripianificando != null} onOpenChange={(open) => !open && setRipianificando(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("consegne.ripianificaTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("consegne.ripianificaDesc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          {ripianificando && (
+            <div className="py-2 space-y-4">
+              <p className="text-sm font-medium">{ripianificando.beneficiarioNome}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t("common.date")}</Label>
+                  <Input type="date" value={riDate} onChange={(e) => setRiDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("consegne.formFascia")}</Label>
+                  <Select value={riFascia} onValueChange={setRiFascia}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Mattina">{t("consegne.fasciaMattina")}</SelectItem>
+                      <SelectItem value="Pomeriggio">{t("consegne.fasciaPomeriggio")}</SelectItem>
+                      <SelectItem value="Sera">{t("consegne.fasciaSera")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <Button disabled={!riDate || createConsegna.isPending} onClick={handleRipianifica}>
+              {t("consegne.btnRipianifica")}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

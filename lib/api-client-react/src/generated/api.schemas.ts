@@ -682,6 +682,8 @@ export interface Intervento {
   /** @nullable */
   prossimAzione?: string | null;
   /** @nullable */
+  note?: string | null;
+  /** @nullable */
   dataFollowup?: string | null;
   /** @nullable */
   scadenzaIsee?: string | null;
@@ -960,6 +962,7 @@ export interface InterventoInput {
   descrizione?: string;
   esito?: string;
   prossimAzione?: string;
+  note?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;
@@ -972,6 +975,7 @@ export interface InterventoUpdate {
   descrizione?: string;
   esito?: string;
   prossimAzione?: string;
+  note?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;

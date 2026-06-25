@@ -17,7 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, CreditCard } from "lucide-react";
+import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, CreditCard, FileDown } from "lucide-react";
+import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
 import { loadAssociationLogo } from "@/lib/bolla-pdf";
@@ -67,6 +68,7 @@ export default function Beneficiari() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [schedaId, setSchedaId] = useState<number | null>(null);
 
   const createBeneficiario = useCreateBeneficiario();
   const deleteBeneficiario = useDeleteBeneficiario();
@@ -269,6 +271,7 @@ export default function Beneficiari() {
                             });
                           }}
                         ><CreditCard className="mr-2 h-4 w-4" /> {t("tessera.generate")}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -350,6 +353,7 @@ export default function Beneficiari() {
       </Sheet>
 
       {editingId != null && <QuickEditBeneficiario id={editingId} onClose={() => setEditingId(null)} />}
+      {schedaId != null && <SchedaExportDialog id={schedaId} onClose={() => setSchedaId(null)} />}
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
