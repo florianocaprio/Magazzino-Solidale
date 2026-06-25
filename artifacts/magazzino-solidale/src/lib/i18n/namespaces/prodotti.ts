@@ -1,6 +1,10 @@
 export const prodotti = {
   it: {
     title: "Catalogo Prodotti",
+    exportBarcodes: "Codici a barre",
+    barcodeListTitle: "Catalogo Prodotti — Codici a Barre",
+    barcodeTipo: "Tipo",
+    barcodeUm: "UM",
     subtitle: "Gestisci i beni distribuiti dall'associazione.",
     newProduct: "Nuovo Prodotto",
     searchPlaceholder: "Cerca per nome o codice...",
@@ -89,6 +93,10 @@ export const prodotti = {
   },
   es: {
     title: "Catálogo de Productos",
+    exportBarcodes: "Códigos de barras",
+    barcodeListTitle: "Catálogo de Productos — Códigos de Barras",
+    barcodeTipo: "Tipo",
+    barcodeUm: "UM",
     subtitle: "Gestiona los bienes distribuidos por la asociación.",
     newProduct: "Nuevo Producto",
     searchPlaceholder: "Buscar por nombre o código...",
@@ -177,6 +185,10 @@ export const prodotti = {
   },
   en: {
     title: "Product Catalogue",
+    exportBarcodes: "Barcodes",
+    barcodeListTitle: "Product Catalogue — Barcodes",
+    barcodeTipo: "Type",
+    barcodeUm: "UM",
     subtitle: "Manage the goods distributed by the association.",
     newProduct: "New Product",
     searchPlaceholder: "Search by name or code...",
@@ -265,6 +277,10 @@ export const prodotti = {
   },
   fr: {
     title: "Catalogue de produits",
+    exportBarcodes: "Codes-barres",
+    barcodeListTitle: "Catalogue de produits — Codes-barres",
+    barcodeTipo: "Type",
+    barcodeUm: "UM",
     subtitle: "Gérez les biens distribués par l'association.",
     newProduct: "Nouveau produit",
     searchPlaceholder: "Rechercher par nom ou code...",
@@ -353,6 +369,10 @@ export const prodotti = {
   },
   de: {
     title: "Produktkatalog",
+    exportBarcodes: "Barcodes",
+    barcodeListTitle: "Produktkatalog — Barcodes",
+    barcodeTipo: "Typ",
+    barcodeUm: "ME",
     subtitle: "Verwalten Sie die vom Verein verteilten Güter.",
     newProduct: "Neues Produkt",
     searchPlaceholder: "Nach Name oder Code suchen...",
@@ -441,6 +461,10 @@ export const prodotti = {
   },
   ar: {
     title: "كتالوج المنتجات",
+    exportBarcodes: "الرموز الشريطية",
+    barcodeListTitle: "كتالوج المنتجات — الرموز الشريطية",
+    barcodeTipo: "النوع",
+    barcodeUm: "الوحدة",
     subtitle: "إدارة السلع الموزعة من قبل الجمعية.",
     newProduct: "منتج جديد",
     searchPlaceholder: "البحث بالاسم أو الرمز...",

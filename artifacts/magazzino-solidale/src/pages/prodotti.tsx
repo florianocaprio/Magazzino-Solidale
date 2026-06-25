@@ -30,7 +30,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus } from "lucide-react";
+import { generateProdottiBarcodePdf } from "@/lib/prodotti-barcode-pdf";
+import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus, Barcode } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -490,6 +491,28 @@ export default function Prodotti() {
             filename="prodotti"
             title={t("prodotti.title")}
           />
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={(prodotti ?? []).length === 0}
+            onClick={() =>
+              generateProdottiBarcodePdf(
+                (prodotti ?? []).map((p) => ({
+                  nome: p.nome,
+                  tipo: t(`prodotti.type_${p.tipoProdotto}`, p.tipoProdotto.replace("_", " ")),
+                  um: p.unitaMisura,
+                  code: p.codiceBarre || p.codice,
+                })),
+                {
+                  title: t("prodotti.barcodeListTitle"),
+                  tipoLabel: t("prodotti.barcodeTipo"),
+                  umLabel: t("prodotti.barcodeUm"),
+                },
+              )
+            }
+          >
+            <Barcode className="h-4 w-4" /> {t("prodotti.exportBarcodes")}
+          </Button>
           <Button onClick={handleCreate} className="gap-2">
             <Plus className="h-4 w-4" /> {t("prodotti.newProduct")}
           </Button>
