@@ -39,7 +39,8 @@ import {
   SidebarMenu, 
   SidebarMenuButton, 
   SidebarMenuItem,
-  SidebarProvider
+  SidebarProvider,
+  SidebarTrigger
 } from "@/components/ui/sidebar";
 import {
   Collapsible,
@@ -188,9 +189,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarFooter>
         </Sidebar>
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:hidden">
+            <SidebarTrigger
+              className="h-9 w-9"
+              aria-label={t("common.openMenu")}
+            />
+            <img src="/logo-aim.png" alt="Angeli in Moto" className="h-7 w-auto object-contain" />
+          </header>
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+        </div>
       </div>
     </SidebarProvider>
   );
