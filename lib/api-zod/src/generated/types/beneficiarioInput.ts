@@ -42,6 +42,7 @@ export interface BeneficiarioInput {
   cittaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
+  uds?: boolean;
   sesso?: string;
   areaProvenienza?: string;
 }

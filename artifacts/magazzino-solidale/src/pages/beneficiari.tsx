@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useListCentriAscolto, useGetBeneficiario, useCercaBeneficiariSimili, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useListCentriAscolto, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,11 +36,15 @@ const formSchema = z.object({
   numComponenti: z.coerce.number().min(1).default(1),
   priorita: z.string().default("media"),
   centroAscoltoId: z.string().optional(),
-  consegnaDomicilio: z.boolean().default(false)
+  consegnaDomicilio: z.boolean().default(false),
+  uds: z.boolean().default(false),
+  cittaId: z.string().optional(),
+  zonaUdsId: z.string().optional(),
 });
 
 const CENTRO_ALL = "__all__";
 const PRIORITA_ALL = "__all__";
+const NO_ZONE = "__none__";
 
 export default function Beneficiari() {
   const { t } = useTranslation();
@@ -62,7 +66,9 @@ export default function Beneficiari() {
     priorita: prioritaFilter !== PRIORITA_ALL ? prioritaFilter : undefined,
   });
   const { data: centri } = useListCentriAscolto();
-  
+  const isCittaGlobal = user?.cittaId == null;
+  const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -88,9 +94,19 @@ export default function Beneficiari() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       cognome: "", nome: "", comune: "", zonaMunicipio: "",
-      numComponenti: 1, priorita: "media", centroAscoltoId: "", consegnaDomicilio: false
+      numComponenti: 1, priorita: "media", centroAscoltoId: "", consegnaDomicilio: false,
+      uds: false, cittaId: "", zonaUdsId: ""
     }
   });
+
+  const watchUds = form.watch("uds");
+  const formCitta = isCittaGlobal
+    ? (form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined)
+    : (user?.cittaId ?? undefined);
+  const { data: udsZone } = useListZoneUds(
+    formCitta ? { cittaId: formCitta } : undefined,
+    { query: { queryKey: ["zoneUds", "benefForm", formCitta], enabled: watchUds && formCitta != null } },
+  );
 
   // Anti-duplicate fuzzy suggestions (città-scoped) while the create form is open.
   const [dupDismissed, setDupDismissed] = useState(false);
@@ -114,13 +130,24 @@ export default function Beneficiari() {
   const suggestions = dupMatches ?? [];
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    const { centroAscoltoId, codiceFiscale, ...rest } = data;
-    const payload = {
+    const { centroAscoltoId, codiceFiscale, cittaId, zonaUdsId, uds, ...rest } = data;
+    // A città-global admin must pin a città when flagging a person as UDS,
+    // mirroring the server-side hard-boundary guard.
+    if (uds && isCittaGlobal && !cittaId) {
+      form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
+      return;
+    }
+    const payload: Record<string, unknown> = {
       ...rest,
+      uds,
       centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
       codiceFiscale: codiceFiscale?.trim() ? codiceFiscale.trim().toUpperCase() : null,
     };
-    createBeneficiario.mutate({ data: payload }, {
+    if (uds) {
+      if (isCittaGlobal && cittaId) payload.cittaId = parseInt(cittaId);
+      if (zonaUdsId && zonaUdsId !== NO_ZONE) payload.zonaUdsId = parseInt(zonaUdsId);
+    }
+    createBeneficiario.mutate({ data: payload as never }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
         toast({ title: t("beneficiari.toastAdded") });
@@ -393,6 +420,49 @@ export default function Beneficiari() {
                     </Select>
                   </FormItem>
                 )} />
+
+                <div className="rounded-md border p-3 space-y-3">
+                  <FormField control={form.control} name="uds" render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <FormLabel className="!mt-0">{t("beneficiari.udsToggle")}</FormLabel>
+                        <p className="text-xs text-muted-foreground">{t("beneficiari.udsToggleHint")}</p>
+                      </div>
+                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                    </FormItem>
+                  )} />
+                  {watchUds && (
+                    <>
+                      {isCittaGlobal && (
+                        <FormField control={form.control} name="cittaId" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
+                            <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NO_ZONE); }}>
+                              <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                      )}
+                      <FormField control={form.control} name="zonaUdsId" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
+                          <Select value={field.value || NO_ZONE} onValueChange={field.onChange}>
+                            <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.allZone")} /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value={NO_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>
+                              {udsZone?.map(z => <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )} />
+                    </>
+                  )}
+                </div>
+
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
                   <Button type="submit" disabled={createBeneficiario.isPending}>{t("common.save")}</Button>

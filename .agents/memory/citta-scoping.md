@@ -28,7 +28,7 @@ A second scoping axis, **città**, sits above the per-Centro-di-Ascolto axis. It
 ## Zona UDS (soft axis) + canale persona + FE
 
 - **Zona UDS** (municipio, `zone_uds` FK `cittaId`) is a SOFT preference UNDER a città — the operator sees their zone first but can filter the whole città. It is NOT a hard cut (unlike città). `utenti.zonaUdsId` nullable = all zones of the città.
-- **Canale persona**: ONE person record, no separate UDS table. `centroAscoltoId` set = centro member; `zonaUdsId` set = UDS; both populated = visible to both staffs.
+- **Canale persona**: ONE person record, no separate UDS table. `centroAscoltoId` set = centro member; explicit `uds` boolean = UDS person (independent of zona); both = visible to both staffs. A `uds=true` person must always have a non-null città (hard-boundary invariant enforced on POST + PATCH).
 - `beneficiari` carry `cittaId` + `zonaUdsId` + `soprannome`; `centri_ascolto`/`magazzini` carry `cittaId`.
 - `/auth/me` exposes `cittaId/cittaNome/zonaUdsId/zonaUdsNome` so the FE can lock the città select for scoped users.
 - **FE Utenti form pattern**: Città select + DEPENDENT Zona UDS select. Zona query is `useListZoneUds({cittaId})` with the Orval `enabled`+`queryKey` pattern; "Tutte le zone" = null; reset zona to null whenever città changes; zona disabled until a città is chosen; `zonaUdsId` forced null when città is null. Admin CRUD pages `citta.tsx` + `zone-uds.tsx` live in area amministrazione.

@@ -1065,6 +1065,7 @@ export const ListBeneficiariQueryParams = zod.object({
   "centroAscoltoId": zod.coerce.number().optional(),
   "cittaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional(),
+  "uds": zod.coerce.boolean().optional(),
   "attivo": zod.coerce.boolean().optional()
 })
 
@@ -1090,6 +1091,7 @@ export const ListBeneficiariResponseItem = zod.object({
   "consegnaDomicilio": zod.boolean(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "uds": zod.boolean(),
   "attivo": zod.boolean(),
   "soprannome": zod.string().nullish(),
   "cittaId": zod.number().nullish(),
@@ -1134,6 +1136,7 @@ export const CreateBeneficiarioBody = zod.object({
   "soprannome": zod.string().optional(),
   "cittaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
+  "uds": zod.boolean().optional(),
   "sesso": zod.string().optional(),
   "areaProvenienza": zod.string().optional()
 })
@@ -1166,6 +1169,7 @@ export const CercaBeneficiariSimiliResponseItem = zod.object({
   "zonaUdsNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "uds": zod.boolean().optional(),
   "score": zod.number()
 })
 export const CercaBeneficiariSimiliResponse = zod.array(CercaBeneficiariSimiliResponseItem)
@@ -1206,6 +1210,7 @@ export const GetBeneficiarioResponse = zod.object({
   "motivoConsegnaDomicilio": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "uds": zod.boolean().optional(),
   "attivo": zod.boolean(),
   "dataPresaInCarico": zod.string().nullish(),
   "soprannome": zod.string().nullish(),
@@ -1305,6 +1310,7 @@ export const UpdateBeneficiarioBody = zod.object({
   "consegnaDomicilio": zod.boolean().optional(),
   "motivoConsegnaDomicilio": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
+  "uds": zod.boolean().optional(),
   "attivo": zod.boolean().optional(),
   "noteInterne": zod.string().optional(),
   "soprannome": zod.string().optional(),
@@ -1336,6 +1342,7 @@ export const UpdateBeneficiarioResponse = zod.object({
   "consegnaDomicilio": zod.boolean(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "uds": zod.boolean(),
   "attivo": zod.boolean(),
   "soprannome": zod.string().nullish(),
   "cittaId": zod.number().nullish(),

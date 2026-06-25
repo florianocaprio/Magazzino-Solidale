@@ -829,6 +829,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: uds
+          in: query
+          schema:
+            type: boolean
         - name: attivo
           in: query
           schema:
@@ -3235,6 +3239,8 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
+        uds:
+          type: boolean
         score:
           type: number
     Beneficiario:
@@ -3282,6 +3288,8 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
+        uds:
+          type: boolean
         attivo:
           type: boolean
         soprannome:
@@ -3298,7 +3306,7 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, uds, attivo, dataCreazione]
 
     BeneficiarioDettaglio:
       type: object
@@ -3363,6 +3371,8 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
+        uds:
+          type: boolean
         attivo:
           type: boolean
         dataPresaInCarico:
@@ -3460,6 +3470,8 @@ components:
           type: ["integer", "null"]
         zonaUdsId:
           type: ["integer", "null"]
+        uds:
+          type: boolean
         sesso:
           type: string
         areaProvenienza:
@@ -3519,6 +3531,8 @@ components:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
+        uds:
+          type: boolean
         attivo:
           type: boolean
         noteInterne:

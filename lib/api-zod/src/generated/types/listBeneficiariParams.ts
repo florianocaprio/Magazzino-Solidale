@@ -13,5 +13,6 @@ domicilio?: boolean;
 centroAscoltoId?: number;
 cittaId?: number;
 zonaUdsId?: number;
+uds?: boolean;
 attivo?: boolean;
 };

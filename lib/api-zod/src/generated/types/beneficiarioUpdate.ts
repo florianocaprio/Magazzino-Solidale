@@ -34,6 +34,7 @@ export interface BeneficiarioUpdate {
   motivoConsegnaDomicilio?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  uds?: boolean;
   attivo?: boolean;
   noteInterne?: string;
   soprannome?: string;

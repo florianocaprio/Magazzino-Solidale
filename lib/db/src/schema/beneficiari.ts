@@ -35,6 +35,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   consegnaDomicilio: boolean("consegna_domicilio").notNull().default(false),
   motivoConsegnaDomicilio: varchar("motivo_consegna_domicilio", { length: 60 }),
   centroAscoltoId: integer("centro_ascolto_id"),
+  uds: boolean("uds").notNull().default(false),
   cittaId: integer("citta_id").references(() => cittaTable.id),
   zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
   attivo: boolean("attivo").notNull().default(true),

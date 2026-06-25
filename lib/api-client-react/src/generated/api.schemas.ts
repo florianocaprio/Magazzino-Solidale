@@ -622,6 +622,7 @@ export interface BeneficiarioSimile {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  uds?: boolean;
   score: number;
 }
 
@@ -659,6 +660,7 @@ export interface Beneficiario {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  uds: boolean;
   attivo: boolean;
   /** @nullable */
   soprannome?: string | null;
@@ -820,6 +822,7 @@ export interface BeneficiarioDettaglio {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  uds?: boolean;
   attivo: boolean;
   /** @nullable */
   dataPresaInCarico?: string | null;
@@ -877,6 +880,7 @@ export interface BeneficiarioInput {
   cittaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
+  uds?: boolean;
   sesso?: string;
   areaProvenienza?: string;
 }
@@ -909,6 +913,7 @@ export interface BeneficiarioUpdate {
   motivoConsegnaDomicilio?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  uds?: boolean;
   attivo?: boolean;
   noteInterne?: string;
   soprannome?: string;
@@ -1601,6 +1606,7 @@ domicilio?: boolean;
 centroAscoltoId?: number;
 cittaId?: number;
 zonaUdsId?: number;
+uds?: boolean;
 attivo?: boolean;
 };
 

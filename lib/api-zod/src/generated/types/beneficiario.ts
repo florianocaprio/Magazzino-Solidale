@@ -40,6 +40,7 @@ export interface Beneficiario {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  uds: boolean;
   attivo: boolean;
   /** @nullable */
   soprannome?: string | null;

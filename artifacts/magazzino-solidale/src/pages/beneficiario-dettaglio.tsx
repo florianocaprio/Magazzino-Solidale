@@ -69,6 +69,20 @@ export default function BeneficiarioDettaglio() {
     );
   };
 
+  const onToggleUds = (next: boolean) => {
+    updateBeneficiario.mutate(
+      { id: numId, data: { uds: next } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) });
+          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+          toast({ title: t("beneficiarioDettaglio.toastUdsUpdated") });
+        },
+        onError: () => toast({ title: t("beneficiarioDettaglio.error"), description: t("beneficiarioDettaglio.errorUds"), variant: "destructive" }),
+      },
+    );
+  };
+
   if (isLoading) return <div className="p-6 space-y-6 max-w-7xl mx-auto"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
   if (!b) return <div className="p-6">{t("beneficiarioDettaglio.notFound")}</div>;
 
@@ -173,6 +187,14 @@ export default function BeneficiarioDettaglio() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1.5">{t("beneficiarioDettaglio.centroHelp")}</p>
+
+              <div className="flex items-center justify-between mt-4">
+                <div className="space-y-0.5 pr-3">
+                  <span className="text-sm font-medium">{t("beneficiarioDettaglio.udsLabel")}</span>
+                  <p className="text-xs text-muted-foreground">{t("beneficiarioDettaglio.udsHelp")}</p>
+                </div>
+                <Switch checked={b.uds} onCheckedChange={onToggleUds} disabled={updateBeneficiario.isPending} />
+              </div>
             </div>
 
             <div className="pt-4 border-t border-border mt-4">

@@ -58,6 +58,7 @@ export interface BeneficiarioDettaglio {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  uds?: boolean;
   attivo: boolean;
   /** @nullable */
   dataPresaInCarico?: string | null;

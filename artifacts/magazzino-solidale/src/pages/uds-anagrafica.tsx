@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Select,
@@ -52,9 +53,15 @@ function makeSchema(t: (k: string) => string, isGlobal: boolean) {
     nome: z.string().min(1, t("common.requiredField")),
     cognome: z.string().min(1, t("common.requiredField")),
     soprannome: z.string().optional(),
+    codiceFiscale: z.string().optional(),
     dataNascita: z.string().optional(),
     sesso: z.string().optional(),
     telefono: z.string().optional(),
+    comune: z.string().optional(),
+    zonaMunicipio: z.string().optional(),
+    numComponenti: z.string().optional(),
+    priorita: z.string().optional(),
+    consegnaDomicilio: z.boolean().optional(),
     zonaUdsId: z.string().optional(),
     cittaId: isGlobal
       ? z.string().min(1, t("common.requiredField"))
@@ -104,6 +111,7 @@ export default function UdsAnagrafica() {
   );
 
   const listParams = {
+    uds: true,
     ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
   };
@@ -125,9 +133,15 @@ export default function UdsAnagrafica() {
       nome: "",
       cognome: "",
       soprannome: "",
+      codiceFiscale: "",
       dataNascita: "",
       sesso: "",
       telefono: "",
+      comune: "",
+      zonaMunicipio: "",
+      numComponenti: "1",
+      priorita: "media",
+      consegnaDomicilio: false,
       zonaUdsId: user?.zonaUdsId != null ? String(user.zonaUdsId) : NO_ZONE,
       cittaId: "",
     },
@@ -141,9 +155,15 @@ export default function UdsAnagrafica() {
       nome: "",
       cognome: "",
       soprannome: "",
+      codiceFiscale: "",
       dataNascita: "",
       sesso: "",
       telefono: "",
+      comune: "",
+      zonaMunicipio: "",
+      numComponenti: "1",
+      priorita: "media",
+      consegnaDomicilio: false,
       zonaUdsId:
         filterZona !== ALL_ZONE
           ? filterZona
@@ -201,17 +221,13 @@ export default function UdsAnagrafica() {
     const zonaVal = form.getValues("zonaUdsId");
     const targetZona =
       zonaVal && zonaVal !== NO_ZONE ? parseInt(zonaVal) : user?.zonaUdsId ?? null;
-    if (s.zonaUdsId != null) {
+    if (s.uds) {
       toast({ title: t("udsAnagrafica.dupAlreadyUds") });
       setIsFormOpen(false);
       return;
     }
-    if (targetZona == null) {
-      toast({ title: t("udsAnagrafica.dupNeedZona"), variant: "destructive" });
-      return;
-    }
     updateBenef.mutate(
-      { id: s.id, data: { zonaUdsId: targetZona } as never },
+      { id: s.id, data: { uds: true, ...(targetZona != null ? { zonaUdsId: targetZona } : {}) } as never },
       {
         onSuccess: () => {
           invalidate();
@@ -233,12 +249,19 @@ export default function UdsAnagrafica() {
     const payload: Record<string, unknown> = {
       nome: data.nome,
       cognome: data.cognome,
+      uds: true,
       centroAscoltoId: null,
     };
     if (data.soprannome) payload.soprannome = data.soprannome;
+    if (data.codiceFiscale) payload.codiceFiscale = data.codiceFiscale;
     if (data.dataNascita) payload.dataNascita = data.dataNascita;
     if (data.sesso) payload.sesso = data.sesso;
     if (data.telefono) payload.telefono = data.telefono;
+    if (data.comune) payload.comune = data.comune;
+    if (data.zonaMunicipio) payload.zonaMunicipio = data.zonaMunicipio;
+    if (data.numComponenti) payload.numComponenti = parseInt(data.numComponenti);
+    if (data.priorita) payload.priorita = data.priorita;
+    payload.consegnaDomicilio = data.consegnaDomicilio ?? false;
     if (data.zonaUdsId && data.zonaUdsId !== NO_ZONE) {
       payload.zonaUdsId = parseInt(data.zonaUdsId);
     }
@@ -264,7 +287,7 @@ export default function UdsAnagrafica() {
   };
 
   const canale = (b: Beneficiario) => {
-    const uds = b.zonaUdsId != null;
+    const uds = b.uds;
     const centro = b.centroAscoltoId != null;
     if (uds && centro)
       return { label: t("udsAnagrafica.canaleEntrambi"), cls: "bg-purple-500/10 text-purple-700" };
@@ -428,7 +451,7 @@ export default function UdsAnagrafica() {
                     <p className="text-xs text-amber-700">{t("udsAnagrafica.dupHint")}</p>
                     <div className="space-y-2">
                       {suggestions.map((s) => {
-                        const isUds = s.zonaUdsId != null;
+                        const isUds = s.uds;
                         return (
                           <div key={s.id} className="flex items-center justify-between gap-2 rounded bg-white px-2 py-1.5 text-sm">
                             <div className="min-w-0">
@@ -477,6 +500,42 @@ export default function UdsAnagrafica() {
                 </div>
                 <FormField control={form.control} name="telefono" render={({ field }) => (
                   <FormItem><FormLabel>{t("udsAnagrafica.fTelefono")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="codiceFiscale" render={({ field }) => (
+                  <FormItem><FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel><FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="comune" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiari.comune")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="zonaMunicipio" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiari.zonaMunicipio")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="numComponenti" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiari.numComponenti")}</FormLabel><FormControl><Input type="number" min="1" {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="priorita" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("beneficiari.prioritaAssistenziale")}</FormLabel>
+                      <Select value={field.value || "media"} onValueChange={field.onChange}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="bassa">{t("beneficiari.prioBassa")}</SelectItem>
+                          <SelectItem value="media">{t("beneficiari.prioMedia")}</SelectItem>
+                          <SelectItem value="alta">{t("beneficiari.prioAlta")}</SelectItem>
+                          <SelectItem value="urgente">{t("beneficiari.prioUrgente")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="consegnaDomicilio" render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-md border p-3">
+                    <FormLabel className="!mt-0">{t("beneficiari.colDomicilio")}</FormLabel>
+                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  </FormItem>
                 )} />
                 {isGlobal && (
                   <FormField control={form.control} name="cittaId" render={({ field }) => (

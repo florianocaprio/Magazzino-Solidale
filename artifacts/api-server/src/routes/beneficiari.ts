@@ -15,6 +15,13 @@ import {
 
 const router: IRouter = Router();
 
+// Normalize a loosely-typed body flag to a real boolean so the città-boundary
+// guard checks the same value that gets persisted (avoids `uds:"true"` /
+// `uds:1` type-confusion bypasses on the unvalidated body).
+function toBool(v: unknown): boolean {
+  return v === true || v === "true" || v === "t" || v === "1" || v === 1 || v === "yes";
+}
+
 function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string | null) {
   return {
     id: r.id,
@@ -48,6 +55,7 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
     motivoConsegnaDomicilio: r.motivoConsegnaDomicilio ?? null,
     centroAscoltoId: r.centroAscoltoId ?? null,
     centroAscoltoNome: centroNome ?? null,
+    uds: r.uds,
     cittaId: r.cittaId ?? null,
     zonaUdsId: r.zonaUdsId ?? null,
     attivo: r.attivo,
@@ -58,7 +66,7 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
 }
 
 router.get("/beneficiari", async (req, res) => {
-  const { search, priorita, domicilio, centroAscoltoId, cittaId, zonaUdsId, attivo } = req.query as Record<string, string>;
+  const { search, priorita, domicilio, centroAscoltoId, cittaId, zonaUdsId, uds, attivo } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (search) {
     conditions.push(ilike(beneficiariTable.cognome, `%${search}%`));
@@ -71,6 +79,7 @@ router.get("/beneficiari", async (req, res) => {
   // whole città).
   if (cittaId) conditions.push(eq(beneficiariTable.cittaId, parseInt(cittaId)));
   if (zonaUdsId) conditions.push(eq(beneficiariTable.zonaUdsId, parseInt(zonaUdsId)));
+  if (uds === "true") conditions.push(eq(beneficiariTable.uds, true));
   const caller = callerCentroId(req);
   if (caller != null) {
     const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
@@ -98,8 +107,15 @@ router.post("/beneficiari", async (req, res) => {
   const cid = callerCittaId(req);
   const codice = body.codice || `BEN-${Date.now()}`;
   const values = { ...body, codice };
+  if ("uds" in values) values.uds = toBool(values.uds);
   if (caller != null) values.centroAscoltoId = caller;
   if (cid != null) values.cittaId = cid;
+  // Città is the HARD UDS boundary: a città-global caller must pin a città when
+  // creating a UDS person, otherwise the row would be visible across all cities.
+  if (values.uds === true && cid == null && values.cittaId == null) {
+    res.status(400).json({ error: "La città è obbligatoria per una persona UDS" });
+    return;
+  }
   const [row] = await db.insert(beneficiariTable).values(values).returning();
   res.status(201).json(fmtBenef(row));
 });
@@ -143,6 +159,7 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
         b.citta_id AS "cittaId", c.nome AS "cittaNome",
         b.zona_uds_id AS "zonaUdsId", z.nome AS "zonaUdsNome",
         b.centro_ascolto_id AS "centroAscoltoId", ca.nome AS "centroAscoltoNome",
+        b.uds AS "uds",
         (
           GREATEST(
             similarity(lower(coalesce(b.nome, '') || ' ' || coalesce(b.cognome, '')), ${full}),
@@ -179,6 +196,7 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
     zonaUdsNome: (r.zonaUdsNome as string | null) ?? null,
     centroAscoltoId: (r.centroAscoltoId as number | null) ?? null,
     centroAscoltoNome: (r.centroAscoltoNome as string | null) ?? null,
+    uds: Boolean(r.uds),
     score: Math.round(Number(r.score) * 100) / 100,
   })));
 });
@@ -251,8 +269,23 @@ router.patch("/beneficiari/:id", async (req, res) => {
     return;
   }
   const updates = { ...req.body, dataAggiornamento: new Date() };
+  if ("uds" in updates) updates.uds = toBool(updates.uds);
   if (caller != null) delete updates.centroAscoltoId;
   if (cid != null) delete updates.cittaId;
+  // Mirror the POST città-HARD-boundary guard: a UDS person must never end up
+  // with a null città (cross-città visibility leak). A scoped caller auto-pins
+  // their own città (even on legacy null-città rows); a global caller must
+  // supply one explicitly.
+  const resultingUds = "uds" in updates ? updates.uds === true : existing.uds === true;
+  const resultingCitta = "cittaId" in updates ? updates.cittaId : existing.cittaId;
+  if (resultingUds && resultingCitta == null) {
+    if (cid != null) {
+      updates.cittaId = cid;
+    } else {
+      res.status(400).json({ error: "La città è obbligatoria per una persona UDS" });
+      return;
+    }
+  }
   const [row] = await db.update(beneficiariTable).set(updates).where(eq(beneficiariTable.id, id)).returning();
   res.json(fmtBenef(row));
 });

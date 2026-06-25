@@ -29,5 +29,6 @@ export interface BeneficiarioSimile {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  uds?: boolean;
   score: number;
 }
