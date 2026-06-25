@@ -8,6 +8,7 @@ Gestionale per un magazzino solidale: tracciamento di prodotti/lotti (FEFO), CRM
 - `pnpm --filter @workspace/magazzino-solidale run dev` — run the frontend (port varies)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
+- `pnpm --filter @workspace/api-server run test` — run the API integration test suite (vitest). Also registered as the `test` validation step so it runs automatically as a quality gate alongside typecheck. Requires `DATABASE_URL` (tests run against the real DB and clean up after themselves).
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string; `SESSION_SECRET` — express-session signing secret
