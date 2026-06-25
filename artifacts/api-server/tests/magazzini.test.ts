@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 import { db, pool, magazziniTable } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { inArray, eq } from "drizzle-orm";
 import magazziniRouter from "../src/routes/magazzini";
 
 let app: Express;
@@ -95,5 +95,23 @@ describe("POST /magazzini — auto-generazione codice", () => {
     // Il prossimo auto-generato deve essere base + 1.
     const next = await createMagazzino({ nome: "Magazzino Successivo" });
     expect(next.codice).toBe(`MAG-${String(base + 1).padStart(3, "0")}`);
+  });
+});
+
+describe("POST /magazzini — codice duplicato", () => {
+  it("restituisce 409 (non 500) quando il codice fornito è già in uso", async () => {
+    const codice = `DUP-${Date.now()}`;
+    await createMagazzino({ nome: "Primo", codice });
+
+    const res = await request(app).post("/magazzini").send({ nome: "Secondo", codice });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBeTruthy();
+
+    // Nessun secondo record è stato creato con quel codice.
+    const rows = await db
+      .select({ id: magazziniTable.id })
+      .from(magazziniTable)
+      .where(eq(magazziniTable.codice, codice));
+    expect(rows.length).toBe(1);
   });
 });
