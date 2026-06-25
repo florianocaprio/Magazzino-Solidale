@@ -7277,7 +7277,7 @@ export const getReportUdsInterventiGiornalieriUrl = (params: ReportUdsInterventi
 }
 
 /**
- * @summary UDS street interventions for a single day, with per-person sequence number
+ * @summary UDS street interventions for a day or date range, with per-person sequence number
  */
 export const reportUdsInterventiGiornalieri = async (params: ReportUdsInterventiGiornalieriParams, options?: RequestInit): Promise<UdsInterventoGiornaliero[]> => {
 
@@ -7324,7 +7324,7 @@ export type ReportUdsInterventiGiornalieriQueryError = ErrorType<unknown>
 
 
 /**
- * @summary UDS street interventions for a single day, with per-person sequence number
+ * @summary UDS street interventions for a day or date range, with per-person sequence number
  */
 
 export function useReportUdsInterventiGiornalieri<TData = Awaited<ReturnType<typeof reportUdsInterventiGiornalieri>>, TError = ErrorType<unknown>>(

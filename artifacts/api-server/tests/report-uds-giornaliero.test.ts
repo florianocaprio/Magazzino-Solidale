@@ -49,11 +49,45 @@ afterAll(async () => {
 });
 
 describe("Report UDS — interventi-giornalieri", () => {
-  it("richiede il parametro data (400 se assente o invalido)", async () => {
+  it("richiede il parametro da (400 se assente o invalido)", async () => {
     expect((await request(appGlobal()).get("/report/uds/interventi-giornalieri")).status).toBe(400);
     expect(
-      (await request(appGlobal()).get("/report/uds/interventi-giornalieri?data=non-valida")).status,
+      (await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=non-valida")).status,
     ).toBe(400);
+    expect(
+      (await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-06-01&a=non-valida")).status,
+    ).toBe(400);
+  });
+
+  it("supporta un intervallo di date (da..a) e ordina per data", async () => {
+    const citta = await createCitta(scope);
+    const ben = await createBeneficiario(scope, null, { uds: true, cittaId: citta });
+    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-01" });
+    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-03" });
+
+    const range = await request(appGlobal()).get(
+      "/report/uds/interventi-giornalieri?da=2026-07-01&a=2026-07-03",
+    );
+    expect(range.status).toBe(200);
+    const mine = (range.body as Array<{ beneficiarioId: number; numeroIntervento: number; dataIntervento: string }>)
+      .filter((r) => r.beneficiarioId === ben);
+    expect(mine).toHaveLength(2);
+    expect(mine.map((r) => r.numeroIntervento)).toEqual([1, 2]);
+
+    // Reversed order (a < da) is normalized to the same range.
+    const reversed = await request(appGlobal()).get(
+      "/report/uds/interventi-giornalieri?da=2026-07-03&a=2026-07-01",
+    );
+    expect(reversed.status).toBe(200);
+    expect(
+      (reversed.body as Array<{ beneficiarioId: number }>).filter((r) => r.beneficiarioId === ben),
+    ).toHaveLength(2);
+
+    // A single day inside the range returns only that day.
+    const single = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-07-01");
+    expect(
+      (single.body as Array<{ beneficiarioId: number }>).filter((r) => r.beneficiarioId === ben),
+    ).toHaveLength(1);
   });
 
   it("numera gli interventi per persona e segna il primo come primoIntervento", async () => {
@@ -62,7 +96,7 @@ describe("Report UDS — interventi-giornalieri", () => {
     await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-06-01" });
     await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-06-02" });
 
-    const day1 = await request(appGlobal()).get("/report/uds/interventi-giornalieri?data=2026-06-01");
+    const day1 = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-06-01");
     expect(day1.status).toBe(200);
     const r1 = (day1.body as Array<{ beneficiarioId: number; numeroIntervento: number; primoIntervento: boolean }>)
       .find((r) => r.beneficiarioId === ben);
@@ -70,7 +104,7 @@ describe("Report UDS — interventi-giornalieri", () => {
     expect(r1!.numeroIntervento).toBe(1);
     expect(r1!.primoIntervento).toBe(true);
 
-    const day2 = await request(appGlobal()).get("/report/uds/interventi-giornalieri?data=2026-06-02");
+    const day2 = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-06-02");
     expect(day2.status).toBe(200);
     const r2 = (day2.body as Array<{ beneficiarioId: number; numeroIntervento: number; primoIntervento: boolean }>)
       .find((r) => r.beneficiarioId === ben);
@@ -84,7 +118,7 @@ describe("Report UDS — interventi-giornalieri", () => {
     const plain = await createBeneficiario(scope, null, { uds: false, cittaId: citta });
     await insertIntervento(scope, { beneficiarioId: plain, dataIntervento: "2026-06-03" });
 
-    const res = await request(appGlobal()).get("/report/uds/interventi-giornalieri?data=2026-06-03");
+    const res = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-06-03");
     expect(res.status).toBe(200);
     expect((res.body as Array<{ beneficiarioId: number }>).find((r) => r.beneficiarioId === plain)).toBeUndefined();
   });
@@ -99,7 +133,7 @@ describe("Report UDS — interventi-giornalieri", () => {
     await insertIntervento(scope, { beneficiarioId: benB, dataIntervento: "2026-06-04" });
 
     const res = await request(appGlobal()).get(
-      `/report/uds/interventi-giornalieri?data=2026-06-04&zonaUdsId=${zonaA.id}`,
+      `/report/uds/interventi-giornalieri?da=2026-06-04&zonaUdsId=${zonaA.id}`,
     );
     expect(res.status).toBe(200);
     const ids = (res.body as Array<{ beneficiarioId: number }>).map((r) => r.beneficiarioId);
@@ -113,11 +147,11 @@ describe("Report UDS — interventi-giornalieri", () => {
     const benB = await createBeneficiario(scope, null, { uds: true, cittaId: cittaB });
     await insertIntervento(scope, { beneficiarioId: benB, dataIntervento: "2026-06-05" });
 
-    const fromA = await request(appCitta(cittaA)).get("/report/uds/interventi-giornalieri?data=2026-06-05");
+    const fromA = await request(appCitta(cittaA)).get("/report/uds/interventi-giornalieri?da=2026-06-05");
     expect(fromA.status).toBe(200);
     expect((fromA.body as Array<{ beneficiarioId: number }>).find((r) => r.beneficiarioId === benB)).toBeUndefined();
 
-    const fromG = await request(appGlobal()).get("/report/uds/interventi-giornalieri?data=2026-06-05");
+    const fromG = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-06-05");
     expect((fromG.body as Array<{ beneficiarioId: number }>).find((r) => r.beneficiarioId === benB)).toBeDefined();
   });
 });

@@ -7,7 +7,14 @@
  */
 
 export type ReportUdsInterventiGiornalieriParams = {
-data: string;
+/**
+ * Start date (ISO YYYY-MM-DD). For a single day, omit "a".
+ */
+da: string;
+/**
+ * End date (ISO YYYY-MM-DD). Defaults to "da" (single day) when absent.
+ */
+a?: string;
 cittaId?: number;
 zonaUdsId?: number;
 };

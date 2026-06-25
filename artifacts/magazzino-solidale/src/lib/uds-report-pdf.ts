@@ -1,9 +1,11 @@
 import { jsPDF } from "jspdf";
 import autoTable, { type CellHookData } from "jspdf-autotable";
+import { loadAssociationLogo } from "@/lib/bolla-pdf";
 
 export type UdsReportPdfRow = {
   numeroIntervento: number;
   primoIntervento: boolean;
+  data: string;
   persona: string;
   zona: string;
   tipo: string;
@@ -13,6 +15,7 @@ export type UdsReportPdfRow = {
 
 export type UdsReportPdfLabels = {
   colN: string;
+  colData: string;
   colPersona: string;
   colZona: string;
   colTipo: string;
@@ -20,12 +23,16 @@ export type UdsReportPdfLabels = {
   colOperatore: string;
   legend: string;
   metaDate: string;
+  metaPeriod: string;
   metaCity: string;
   metaZone: string;
 };
 
 export type UdsReportPdfMeta = {
-  date: string;
+  /** Single day (formatted) — set this OR period. */
+  date?: string;
+  /** Range (formatted "dd/mm/yyyy – dd/mm/yyyy") — set this OR date. */
+  period?: string;
   city?: string;
   zone?: string;
 };
@@ -34,28 +41,63 @@ function timestamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function imageSize(dataUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => resolve({ w: 0, h: 0 });
+    img.src = dataUrl;
+  });
+}
+
 /**
- * Dedicated PDF for the UDS daily report: a tabular export where the per-person
+ * Dedicated PDF for the UDS report: a tabular export where the per-person
  * intervention number is printed in RED whenever it is that person's first-ever
  * intervention (primoIntervento). The generic exportToPdf cannot color cells, so
  * this uses autoTable's didParseCell hook to override the first column's text color.
+ * The association logo (public/logo-aim.png) is drawn at the top-right.
  */
-export function exportUdsReportGiornalieroPdf(opts: {
+export async function exportUdsReportGiornalieroPdf(opts: {
   filename: string;
   title: string;
   meta: UdsReportPdfMeta;
   labels: UdsReportPdfLabels;
   rows: UdsReportPdfRow[];
-}): void {
+}): Promise<void> {
   const { filename, title, meta, labels, rows } = opts;
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
   const marginX = 40;
+
+  // ---- Association logo (top-right) ----
+  const logo = await loadAssociationLogo();
+  if (logo) {
+    const { w, h } = await imageSize(logo);
+    if (w && h) {
+      const maxW = 90;
+      const maxH = 44;
+      const ratio = Math.min(maxW / w, maxH / h);
+      const drawW = w * ratio;
+      const drawH = h * ratio;
+      try {
+        doc.addImage(logo, "PNG", pageW - marginX - drawW, 26, drawW, drawH);
+      } catch {
+        try {
+          doc.addImage(logo, "JPEG", pageW - marginX - drawW, 26, drawW, drawH);
+        } catch {
+          /* ignore logo failure */
+        }
+      }
+    }
+  }
 
   doc.setFontSize(16);
   doc.setTextColor(20);
   doc.text(title, marginX, 48);
 
-  const metaParts = [`${labels.metaDate}: ${meta.date}`];
+  const metaParts: string[] = [];
+  if (meta.period) metaParts.push(`${labels.metaPeriod}: ${meta.period}`);
+  else if (meta.date) metaParts.push(`${labels.metaDate}: ${meta.date}`);
   if (meta.city) metaParts.push(`${labels.metaCity}: ${meta.city}`);
   if (meta.zone) metaParts.push(`${labels.metaZone}: ${meta.zone}`);
   doc.setFontSize(9);
@@ -73,6 +115,7 @@ export function exportUdsReportGiornalieroPdf(opts: {
     startY: 90,
     head: [[
       labels.colN,
+      labels.colData,
       labels.colPersona,
       labels.colZona,
       labels.colTipo,
@@ -81,6 +124,7 @@ export function exportUdsReportGiornalieroPdf(opts: {
     ]],
     body: rows.map((r) => [
       String(r.numeroIntervento),
+      r.data,
       r.persona,
       r.zona,
       r.tipo,
@@ -91,8 +135,9 @@ export function exportUdsReportGiornalieroPdf(opts: {
     headStyles: { fillColor: [51, 65, 85], textColor: 255 },
     alternateRowStyles: { fillColor: [241, 245, 249] },
     columnStyles: {
-      0: { halign: "center", cellWidth: 32, fontStyle: "bold" },
-      4: { cellWidth: 240 },
+      0: { halign: "center", cellWidth: 28, fontStyle: "bold" },
+      1: { cellWidth: 64 },
+      5: { cellWidth: 220 },
     },
     margin: { left: marginX, right: marginX },
     didParseCell: (data: CellHookData) => {

@@ -2602,10 +2602,11 @@ export const ReportUdsInterventiPerMeseResponse = zod.array(ReportUdsInterventiP
 
 
 /**
- * @summary UDS street interventions for a single day, with per-person sequence number
+ * @summary UDS street interventions for a day or date range, with per-person sequence number
  */
 export const ReportUdsInterventiGiornalieriQueryParams = zod.object({
-  "data": zod.coerce.string(),
+  "da": zod.coerce.string().describe('Start date (ISO YYYY-MM-DD). For a single day, omit \"a\".'),
+  "a": zod.coerce.string().optional().describe('End date (ISO YYYY-MM-DD). Defaults to \"da\" (single day) when absent.'),
   "cittaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional()
 })

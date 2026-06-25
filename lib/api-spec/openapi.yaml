@@ -2026,11 +2026,18 @@ paths:
     get:
       operationId: reportUdsInterventiGiornalieri
       tags: [report]
-      summary: UDS street interventions for a single day, with per-person sequence number
+      summary: UDS street interventions for a day or date range, with per-person sequence number
       parameters:
-        - name: data
+        - name: da
           in: query
           required: true
+          description: Start date (ISO YYYY-MM-DD). For a single day, omit "a".
+          schema:
+            type: string
+        - name: a
+          in: query
+          required: false
+          description: End date (ISO YYYY-MM-DD). Defaults to "da" (single day) when absent.
           schema:
             type: string
         - name: cittaId
@@ -2043,7 +2050,7 @@ paths:
             type: integer
       responses:
         "200":
-          description: UDS interventions of the day
+          description: UDS interventions for the day or range
           content:
             application/json:
               schema:

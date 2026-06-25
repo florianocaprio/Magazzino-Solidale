@@ -330,18 +330,27 @@ router.get("/report/uds/interventi-per-mese", async (req, res) => {
 });
 
 /**
- * Daily street-activity report: every UDS intervention on a single day, with the
- * per-person chronological sequence number (numeroIntervento). The window runs
- * over ALL of a person's interventions ordered by date+id, then we keep only the
- * rows landing on the requested day — so numeroIntervento=1 means it is that
- * person's first-ever intervention (primoIntervento, highlighted in red on the FE).
+ * Street-activity report over a day or date range: every UDS intervention in
+ * [da, a] (a defaults to da → single day), with the per-person chronological
+ * sequence number (numeroIntervento). The window runs over ALL of a person's
+ * interventions ordered by date+id, then we keep only the rows landing in the
+ * range — so numeroIntervento=1 means it is that person's first-ever intervention
+ * (primoIntervento, highlighted in red on the FE/PDF).
  */
 router.get("/report/uds/interventi-giornalieri", async (req, res) => {
-  const data = String(req.query.data ?? "");
-  if (!isValidIsoDate(data)) {
-    res.status(400).json({ message: "Parametro 'data' obbligatorio (YYYY-MM-DD)" });
+  const da = String(req.query.da ?? "");
+  if (!isValidIsoDate(da)) {
+    res.status(400).json({ message: "Parametro 'da' obbligatorio (YYYY-MM-DD)" });
     return;
   }
+  const aRaw = req.query.a == null || req.query.a === "" ? da : String(req.query.a);
+  if (!isValidIsoDate(aRaw)) {
+    res.status(400).json({ message: "Parametro 'a' non valido (YYYY-MM-DD)" });
+    return;
+  }
+  // Normalize so callers can pass the range in either order.
+  const from = da <= aRaw ? da : aRaw;
+  const to = da <= aRaw ? aRaw : da;
   const conds = udsScopeConds(req, callerCittaId(req));
   const where = sql.join(conds, sql` AND `);
 
@@ -371,8 +380,8 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
       LEFT JOIN utenti u ON u.id = i.operatore_id
       WHERE ${where}
     ) s
-    WHERE s.data_intervento::date = ${data}
-    ORDER BY s.zona_nome NULLS LAST, s.cognome, s.nome, s.id
+    WHERE s.data_intervento::date BETWEEN ${from} AND ${to}
+    ORDER BY s.data_intervento ASC, s.zona_nome NULLS LAST, s.cognome, s.nome, s.id
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
   res.json(rows.map((r) => {

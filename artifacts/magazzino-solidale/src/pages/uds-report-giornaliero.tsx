@@ -10,6 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { exportUdsReportGiornalieroPdf } from "@/lib/uds-report-pdf";
 
 const ALL = "all";
+type Mode = "day" | "range";
 
 export default function UdsReportGiornaliero() {
   const { t } = useTranslation();
@@ -26,7 +28,10 @@ export default function UdsReportGiornaliero() {
   const isGlobalCitta = (user?.cittaId ?? null) == null;
   const lockedZonaId = user?.zonaUdsId ?? null;
 
-  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  const [mode, setMode] = useState<Mode>("day");
+  const [da, setDa] = useState(today);
+  const [a, setA] = useState(today);
   const [cittaId, setCittaId] = useState<string>(ALL);
   const [zonaId, setZonaId] = useState<string>(lockedZonaId != null ? String(lockedZonaId) : ALL);
 
@@ -43,9 +48,10 @@ export default function UdsReportGiornaliero() {
   });
   const zonaParam = zonaId === ALL ? undefined : parseInt(zonaId);
 
-  const params = { data, cittaId: cittaParam, zonaUdsId: zonaParam };
+  const effectiveA = mode === "range" ? a : undefined;
+  const params = { da, a: effectiveA, cittaId: cittaParam, zonaUdsId: zonaParam };
   const { data: rows, isLoading } = useReportUdsInterventiGiornalieri(params, {
-    query: { queryKey: getReportUdsInterventiGiornalieriQueryKey(params), enabled: !!data },
+    query: { queryKey: getReportUdsInterventiGiornalieriQueryKey(params), enabled: !!da },
   });
 
   const tipoLabel = (tipo: string) => t(`udsReportGiornaliero.tipo_${tipo}`, { defaultValue: tipo });
@@ -62,13 +68,21 @@ export default function UdsReportGiornaliero() {
     : (user?.cittaNome ?? undefined);
   const selectedZonaNome = (zone ?? []).find((z) => z.id === zonaParam)?.nome;
 
+  const periodoLabel = mode === "range" ? `${formatIt(da)} – ${formatIt(a)}` : formatIt(da);
+
   const handleExportPdf = () => {
-    exportUdsReportGiornalieroPdf({
-      filename: `uds_report_giornaliero_${data}`,
+    void exportUdsReportGiornalieroPdf({
+      filename: `uds_report_${mode === "range" ? `${da}_${a}` : da}`,
       title: t("udsReportGiornaliero.pdfTitle"),
-      meta: { date: formatIt(data), city: selectedCittaNome, zone: selectedZonaNome },
+      meta: {
+        date: mode === "day" ? formatIt(da) : undefined,
+        period: mode === "range" ? `${formatIt(da)} – ${formatIt(a)}` : undefined,
+        city: selectedCittaNome,
+        zone: selectedZonaNome,
+      },
       labels: {
         colN: t("udsReportGiornaliero.colN"),
+        colData: t("udsReportGiornaliero.colData"),
         colPersona: t("udsReportGiornaliero.colPersona"),
         colZona: t("udsReportGiornaliero.colZona"),
         colTipo: t("udsReportGiornaliero.colTipo"),
@@ -76,12 +90,14 @@ export default function UdsReportGiornaliero() {
         colOperatore: t("udsReportGiornaliero.colOperatore"),
         legend: t("udsReportGiornaliero.legend"),
         metaDate: t("udsReportGiornaliero.pdfMetaDate"),
+        metaPeriod: t("udsReportGiornaliero.pdfMetaPeriod"),
         metaCity: t("udsReportGiornaliero.pdfMetaCity"),
         metaZone: t("udsReportGiornaliero.pdfMetaZone"),
       },
       rows: list.map((r) => ({
         numeroIntervento: r.numeroIntervento,
         primoIntervento: r.primoIntervento,
+        data: formatIt(r.dataIntervento),
         persona: personaLabel(r),
         zona: r.zonaNome ?? "—",
         tipo: tipoLabel(r.tipoIntervento),
@@ -99,18 +115,61 @@ export default function UdsReportGiornaliero() {
       </div>
 
       <Card>
-        <CardContent className="flex flex-col md:flex-row md:items-end gap-4 pt-6">
+        <CardContent className="flex flex-col md:flex-row md:items-end gap-4 pt-6 flex-wrap">
           <div className="space-y-1.5">
-            <Label htmlFor="data" className="text-xs">{t("udsReportGiornaliero.date")}</Label>
-            <Input
-              id="data"
-              type="date"
-              value={data}
-              max={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setData(e.target.value)}
-              className="w-44"
-            />
+            <Label className="text-xs">&nbsp;</Label>
+            <ToggleGroup
+              type="single"
+              value={mode}
+              onValueChange={(v) => v && setMode(v as Mode)}
+              variant="outline"
+              size="sm"
+            >
+              <ToggleGroupItem value="day">{t("udsReportGiornaliero.modeDay")}</ToggleGroupItem>
+              <ToggleGroupItem value="range">{t("udsReportGiornaliero.modeRange")}</ToggleGroupItem>
+            </ToggleGroup>
           </div>
+
+          {mode === "day" ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="da" className="text-xs">{t("udsReportGiornaliero.date")}</Label>
+              <Input
+                id="da"
+                type="date"
+                value={da}
+                max={today}
+                onChange={(e) => setDa(e.target.value)}
+                className="w-44"
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="da" className="text-xs">{t("udsReportGiornaliero.from")}</Label>
+                <Input
+                  id="da"
+                  type="date"
+                  value={da}
+                  max={a}
+                  onChange={(e) => setDa(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="a" className="text-xs">{t("udsReportGiornaliero.to")}</Label>
+                <Input
+                  id="a"
+                  type="date"
+                  value={a}
+                  min={da}
+                  max={today}
+                  onChange={(e) => setA(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+            </div>
+          )}
+
           {isGlobalCitta && (
             <div className="space-y-1.5">
               <Label className="text-xs">{t("udsReportGiornaliero.city")}</Label>
@@ -155,7 +214,7 @@ export default function UdsReportGiornaliero() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CalendarClock className="w-5 h-5 text-primary" /> {formatIt(data)}
+            <CalendarClock className="w-5 h-5 text-primary" /> {periodoLabel}
           </CardTitle>
           <CardDescription>
             {t("udsReportGiornaliero.countLabel", { count: list.length })} · {t("udsReportGiornaliero.legend")}
@@ -174,6 +233,7 @@ export default function UdsReportGiornaliero() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-14 text-center">{t("udsReportGiornaliero.colN")}</TableHead>
+                    {mode === "range" && <TableHead className="w-28">{t("udsReportGiornaliero.colData")}</TableHead>}
                     <TableHead>{t("udsReportGiornaliero.colPersona")}</TableHead>
                     <TableHead>{t("udsReportGiornaliero.colZona")}</TableHead>
                     <TableHead>{t("udsReportGiornaliero.colTipo")}</TableHead>
@@ -192,6 +252,7 @@ export default function UdsReportGiornaliero() {
                           {r.numeroIntervento}
                         </span>
                       </TableCell>
+                      {mode === "range" && <TableCell>{formatIt(r.dataIntervento)}</TableCell>}
                       <TableCell className="font-medium">{personaLabel(r)}</TableCell>
                       <TableCell>{r.zonaNome ?? "—"}</TableCell>
                       <TableCell>{tipoLabel(r.tipoIntervento)}</TableCell>
