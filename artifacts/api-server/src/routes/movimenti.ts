@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { movimentiTable, prodottiTable, magazziniTable } from "@workspace/db";
-import { eq, and, desc, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, desc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   visibleMagazzinoIds,
@@ -11,11 +11,14 @@ import {
 const router: IRouter = Router();
 
 router.get("/movimenti", async (req, res) => {
-  const { tipo, magazzinoId, prodottoId } = req.query as Record<string, string>;
+  const { tipo, magazzinoId, prodottoId, centroAscoltoId, da, a } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (tipo) conditions.push(eq(movimentiTable.tipoMovimento, tipo));
   if (magazzinoId) conditions.push(eq(movimentiTable.magazzinoId, parseInt(magazzinoId)));
   if (prodottoId) conditions.push(eq(movimentiTable.prodottoId, parseInt(prodottoId)));
+  if (centroAscoltoId) conditions.push(eq(magazziniTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  if (da) conditions.push(gte(movimentiTable.dataMovimento, da));
+  if (a) conditions.push(lte(movimentiTable.dataMovimento, a));
   const scope = magazzinoScopeFilter(movimentiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req)));
   if (scope) conditions.push(scope);
 

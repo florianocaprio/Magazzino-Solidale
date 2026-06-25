@@ -372,6 +372,18 @@ paths:
           in: query
           schema:
             type: integer
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
+        - name: da
+          in: query
+          schema:
+            type: string
+        - name: a
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: List of movements

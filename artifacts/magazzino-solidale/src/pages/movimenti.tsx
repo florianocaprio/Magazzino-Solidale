@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { useListMovimenti, useCreateMovimento, useListMagazzini, useListProdotti, getListMovimentiQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { useListMovimenti, useCreateMovimento, useListMagazzini, useListProdotti, useListCentriAscolto, getListMovimentiQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
+import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, ArrowDownRight, ArrowUpRight, Filter } from "lucide-react";
+import { Plus, ArrowDownRight, ArrowUpRight, Filter, ScanLine } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -33,16 +35,57 @@ const formSchema = z.object({
 
 export default function Movimenti() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
+
   const [tipoFilter, setTipoFilter] = useState("all");
-  const { data: movimenti, isLoading } = useListMovimenti({ tipo: tipoFilter !== "all" ? tipoFilter : undefined });
+  const [centroFilter, setCentroFilter] = useState(isCentroLocked ? String(lockedCentroId) : "all");
+  const [da, setDa] = useState("");
+  const [a, setA] = useState("");
+
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroFilter(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
+  const { data: movimenti, isLoading } = useListMovimenti({
+    tipo: tipoFilter !== "all" ? tipoFilter : undefined,
+    centroAscoltoId: centroFilter !== "all" ? parseInt(centroFilter) : undefined,
+    da: da || undefined,
+    a: a || undefined,
+  });
   const { data: magazzini } = useListMagazzini();
   const { data: prodotti } = useListProdotti();
-  
+  const { data: centri } = useListCentriAscolto();
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [scanProdotto, setScanProdotto] = useState("");
 
   const createMovimento = useCreateMovimento();
+
+  const handleScanProdotto = () => {
+    const code = scanProdotto.trim();
+    if (!code) return;
+    if (!prodotti) {
+      toast({ title: t("common.loading") });
+      return;
+    }
+    const lc = code.toLowerCase();
+    const p = prodotti.find(
+      x => (x.codiceBarre && x.codiceBarre.toLowerCase() === lc) || x.codice.toLowerCase() === lc,
+    );
+    if (!p) {
+      toast({ title: t("movimenti.scanNotFound"), variant: "destructive" });
+      return;
+    }
+    form.setValue("prodottoId", p.id);
+    if (p.unitaMisura) form.setValue("unitaMisura", p.unitaMisura);
+    setScanProdotto("");
+    toast({ title: t("movimenti.scanFound", { name: p.nome }) });
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,18 +152,45 @@ export default function Movimenti() {
 
       <Card>
         <CardHeader className="py-4 border-b">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={tipoFilter} onValueChange={setTipoFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder={t("movimenti.allMovements")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("movimenti.allMovements")}</SelectItem>
-                <SelectItem value="carico">{t("movimenti.onlyLoads")}</SelectItem>
-                <SelectItem value="scarico">{t("movimenti.onlyUnloads")}</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex items-center gap-2 self-center">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={tipoFilter} onValueChange={setTipoFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder={t("movimenti.allMovements")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("movimenti.allMovements")}</SelectItem>
+                  <SelectItem value="carico">{t("movimenti.onlyLoads")}</SelectItem>
+                  <SelectItem value="scarico">{t("movimenti.onlyUnloads")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">{t("movimenti.filterCentro")}</Label>
+              <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
+                <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("movimenti.allCentri")}</SelectItem>
+                  {centri?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">{t("movimenti.filterDa")}</Label>
+              <Input type="date" value={da} onChange={(e) => setDa(e.target.value)} className="w-[160px]" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">{t("movimenti.filterA")}</Label>
+              <Input type="date" value={a} onChange={(e) => setA(e.target.value)} className="w-[160px]" />
+            </div>
+            {(da || a || centroFilter !== "all") && !isCentroLocked && (
+              <Button variant="ghost" size="sm" onClick={() => { setDa(""); setA(""); setCentroFilter("all"); }}>
+                {t("movimenti.filterReset")}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -233,10 +303,25 @@ export default function Movimenti() {
                   </FormItem>
                 )} />
 
+                <div className="space-y-2">
+                  <Label>{t("movimenti.scanLabel")}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={scanProdotto}
+                      onChange={e => setScanProdotto(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleScanProdotto(); } }}
+                      placeholder={t("movimenti.scanPlaceholder")}
+                    />
+                    <Button type="button" variant="secondary" className="gap-2" onClick={handleScanProdotto} disabled={!scanProdotto.trim()}>
+                      <ScanLine className="h-4 w-4" /> {t("movimenti.scanButton")}
+                    </Button>
+                  </div>
+                </div>
+
                 <FormField control={form.control} name="prodottoId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("movimenti.fldProdotto")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
+                    <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
                       <FormControl><SelectTrigger><SelectValue placeholder={t("movimenti.phSeleziona")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {prodotti?.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}

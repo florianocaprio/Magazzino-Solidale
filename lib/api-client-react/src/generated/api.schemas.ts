@@ -1422,6 +1422,9 @@ export type ListMovimentiParams = {
 tipo?: string;
 magazzinoId?: number;
 prodottoId?: number;
+centroAscoltoId?: number;
+da?: string;
+a?: string;
 };
 
 export type ListGiacenzeParams = {

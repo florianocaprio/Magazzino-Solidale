@@ -405,7 +405,10 @@ export const UpdateLottoResponse = zod.object({
 export const ListMovimentiQueryParams = zod.object({
   "tipo": zod.coerce.string().optional(),
   "magazzinoId": zod.coerce.number().optional(),
-  "prodottoId": zod.coerce.number().optional()
+  "prodottoId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "da": zod.coerce.string().optional(),
+  "a": zod.coerce.string().optional()
 })
 
 export const ListMovimentiResponseItem = zod.object({
