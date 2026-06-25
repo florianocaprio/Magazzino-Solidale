@@ -18,6 +18,11 @@ description: Delivery (consegne) state values, how readiness derives from the li
 - Direct consegne use `tipoConsegna = 'diretta'`; the frontend renders a distinct "Consegna diretta dal centro di ascolto" label. Centro di ascolto is implicit via beneficiarioId (consegne GET joins beneficiari.centroAscoltoId for the centro filter).
 - **Why:** the two views (Bolle and Consegne) must never diverge — delivering from either side must update the other. The reverse path (`/consegne/:id/completa`) already marks the linked bolla `consegnato`.
 
+# Assigning a bolla to a planned consegna FROM the bolla detail
+- BollaDettaglio (confermato state) has an "Assegna a pianificazione consegne" picker that lists PLANNED consegne (`pianificata`, no bolla yet) and calls the same `associa-bolla` endpoint. The list is SCOPED by the bolla's Centro di Ascolto, but association is BENEFICIARY-level (the server requires same `beneficiarioId`) — so other-beneficiary rows in the centro are shown disabled with an "Altro beneficiario" badge, not hidden.
+- **Why:** the user asked to scope the picker "per centro", but the endpoint enforces same-beneficiario; surfacing the whole centro while disabling non-assignable rows satisfies both without 400s.
+- **How to apply:** `Consegna` has no `centroAscoltoId` field, so derive centro membership client-side by cross-referencing the loaded `beneficiari` list (`b.centroAscoltoId === bollaCentroId`, incl. the null-centro case). Gate the consegne query on `beneficiari` being loaded so a transient null centro never fetches an unscoped list.
+
 # Completing a consegna does NOT create its own intervento
 - `POST /consegne/:id/completa` requires a linked bolla in `confermato`/`consegnato`; it promotes a `confermato` bolla to `consegnato` and sets consegna `effettuata`+dataEffettuata.
 - The intervento is created by the existing `syncInterventoBolla` at bolla CONFERMA time, not at consegna completion. Completing must NOT create a second intervento — rely on the bolla-owned one to avoid duplicates.

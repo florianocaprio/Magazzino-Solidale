@@ -20,9 +20,12 @@ import {
   useGetImpostazioniStampa,
   useListTrasferimenti,
   useListScarichi,
+  useListConsegne,
+  useAssociaBolla,
   getListBolleQueryKey,
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
+  getListConsegneQueryKey,
   type Trasferimento,
   type Scarico,
 } from "@workspace/api-client-react";
@@ -43,7 +46,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowRightLeft, ScanLine } from "lucide-react";
+import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowRightLeft, ScanLine, CalendarClock } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { generateBollaPdf, loadAssociationLogo, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
@@ -575,6 +578,7 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
+  const [assegnaOpen, setAssegnaOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printTemplate, setPrintTemplate] = useState<BollaTemplate>("standard");
   const [printing, setPrinting] = useState(false);
@@ -588,9 +592,24 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
   const consegnaBolla = useConsegnaBolla();
   const annullaBolla = useAnnullaBolla();
   const updateBolla = useUpdateBolla();
+  const associaBolla = useAssociaBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  const bollaCentroId = beneficiari?.find((b) => b.id === bolla?.beneficiarioId)?.centroAscoltoId ?? null;
+  const consegneParams = bollaCentroId != null ? { centroAscoltoId: bollaCentroId } : {};
+  const { data: consegnePianificabili } = useListConsegne(consegneParams, {
+    query: { enabled: assegnaOpen && beneficiari != null, queryKey: getListConsegneQueryKey(consegneParams) },
+  });
+  // Beneficiari del centro della bolla (gestisce anche il caso centro nullo,
+  // dato che Consegna non espone centroAscoltoId): filtra le consegne lato client.
+  const centroBeneficiarioIds = new Set(
+    (beneficiari ?? []).filter((b) => (b.centroAscoltoId ?? null) === bollaCentroId).map((b) => b.id)
+  );
+  const pianificabili = (consegnePianificabili ?? []).filter(
+    (c) => c.stato === "pianificata" && c.bollaId == null && centroBeneficiarioIds.has(c.beneficiarioId)
+  );
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
@@ -641,6 +660,21 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
           setAnnullaOpen(false);
         },
         onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.annullaError")), variant: "destructive" }),
+      }
+    );
+  };
+
+  const onAssegna = (consegnaId: number) => {
+    associaBolla.mutate(
+      { id: consegnaId, data: { bollaId } },
+      {
+        onSuccess: () => {
+          invalidateAll();
+          queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
+          setAssegnaOpen(false);
+          toast({ title: t("bolle.bollaAssegnataTitle"), description: t("bolle.bollaAssegnataDesc") });
+        },
+        onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.assegnaError")), variant: "destructive" }),
       }
     );
   };
@@ -902,14 +936,27 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
               </Button>
             )}
             {isConfermato && (
-              <Button
-                className="w-full gap-2 bg-green-600 hover:bg-green-700"
-                onClick={onConsegna}
-                disabled={consegnaBolla.isPending}
-              >
-                <Truck className="h-4 w-4" />
-                {consegnaBolla.isPending ? t("bolle.registrazione") : t("bolle.segnaConsegnata")}
-              </Button>
+              <>
+                <Button
+                  className="w-full gap-2 bg-green-600 hover:bg-green-700"
+                  onClick={onConsegna}
+                  disabled={consegnaBolla.isPending}
+                >
+                  <Truck className="h-4 w-4" />
+                  {consegnaBolla.isPending ? t("bolle.registrazione") : t("bolle.segnaConsegnata")}
+                </Button>
+                {bolla.consegnaId != null && (
+                  <p className="text-xs text-muted-foreground text-center">{t("bolle.giaAssegnata")}</p>
+                )}
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => setAssegnaOpen(true)}
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  {t("bolle.assegnaPianificazione")}
+                </Button>
+              </>
             )}
             {/* Annulla */}
             <Button
@@ -978,6 +1025,54 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={assegnaOpen} onOpenChange={setAssegnaOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("bolle.assegnaPianificazioneTitle")}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t("bolle.assegnaPianificazioneDesc")}</p>
+          <div className="max-h-[50vh] overflow-y-auto space-y-2">
+            {pianificabili.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">{t("bolle.nessunaPianificata")}</p>
+            ) : (
+              pianificabili.map((c) => {
+                const assegnabile = c.beneficiarioId === bolla.beneficiarioId;
+                return (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{c.beneficiarioNome ?? c.codice}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.codice} · {format(new Date(c.dataPrevista), "dd/MM/yyyy", { locale: it })}
+                        {c.fasciaOraria ? ` · ${c.fasciaOraria}` : ""}
+                      </p>
+                    </div>
+                    {assegnabile ? (
+                      <Button
+                        size="sm"
+                        onClick={() => onAssegna(c.id)}
+                        disabled={associaBolla.isPending}
+                      >
+                        {t("bolle.assegna")}
+                      </Button>
+                    ) : (
+                      <Badge variant="secondary" className="shrink-0">{t("bolle.altroBeneficiario")}</Badge>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssegnaOpen(false)}>
+              {t("bolle.tornaIndietro")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={printOpen} onOpenChange={setPrintOpen}>
         <DialogContent>
