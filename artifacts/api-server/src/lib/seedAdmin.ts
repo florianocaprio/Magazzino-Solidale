@@ -48,4 +48,21 @@ export async function seedAdmin(): Promise<void> {
     });
     logger.info("Seeded admin user");
   }
+
+  // Provide a ready-to-assign "Operatore UDS" role so a street-unit operator can
+  // be created out of the box (admin can still edit/remove it). Idempotent.
+  const UDS_ROLE_NAME = "Operatore UDS";
+  const [udsRole] = await db
+    .select({ id: ruoliTable.id })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.nome, UDS_ROLE_NAME));
+  if (!udsRole) {
+    await db.insert(ruoliTable).values({
+      nome: UDS_ROLE_NAME,
+      descrizione: "Operatore Unità di Strada: anagrafica e interventi UDS",
+      aree: ["uds"],
+      isAdmin: false,
+    });
+    logger.info("Seeded UDS operator role");
+  }
 }

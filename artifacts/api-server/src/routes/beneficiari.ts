@@ -20,6 +20,7 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
     id: r.id,
     codice: r.codice,
     codiceFiscale: r.codiceFiscale ?? null,
+    soprannome: r.soprannome ?? null,
     cognome: r.cognome,
     nome: r.nome,
     dataNascita: r.dataNascita ?? null,
@@ -47,6 +48,8 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
     motivoConsegnaDomicilio: r.motivoConsegnaDomicilio ?? null,
     centroAscoltoId: r.centroAscoltoId ?? null,
     centroAscoltoNome: centroNome ?? null,
+    cittaId: r.cittaId ?? null,
+    zonaUdsId: r.zonaUdsId ?? null,
     attivo: r.attivo,
     dataPresaInCarico: r.dataPresaInCarico ?? null,
     noteInterne: r.noteInterne ?? null,
@@ -55,13 +58,19 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
 }
 
 router.get("/beneficiari", async (req, res) => {
-  const { search, priorita, domicilio, centroAscoltoId, attivo } = req.query as Record<string, string>;
+  const { search, priorita, domicilio, centroAscoltoId, cittaId, zonaUdsId, attivo } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (search) {
     conditions.push(ilike(beneficiariTable.cognome, `%${search}%`));
   }
   if (priorita) conditions.push(eq(beneficiariTable.priorita, priorita));
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
+  // Città is the HARD boundary (enforced below from the caller); an explicit
+  // cittaId param lets a global caller narrow to one city. zonaUdsId is the SOFT
+  // UDS preference filter (operator's zone by default; clearing it shows the
+  // whole città).
+  if (cittaId) conditions.push(eq(beneficiariTable.cittaId, parseInt(cittaId)));
+  if (zonaUdsId) conditions.push(eq(beneficiariTable.zonaUdsId, parseInt(zonaUdsId)));
   const caller = callerCentroId(req);
   if (caller != null) {
     const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);

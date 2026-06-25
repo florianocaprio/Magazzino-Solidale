@@ -40,6 +40,8 @@ import Utenti from "@/pages/utenti";
 import Ruoli from "@/pages/ruoli";
 import Citta from "@/pages/citta";
 import ZoneUds from "@/pages/zone-uds";
+import UdsAnagrafica from "@/pages/uds-anagrafica";
+import UdsInterventi from "@/pages/uds-interventi";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -163,6 +165,21 @@ function AppRoutes() {
           {() => (
             <Guard area="sociale">
               <Bolle />
+            </Guard>
+          )}
+        </Route>
+
+        <Route path="/uds/anagrafica">
+          {() => (
+            <Guard area="uds">
+              <UdsAnagrafica />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/uds/interventi">
+          {() => (
+            <Guard area="uds">
+              <UdsInterventi />
             </Guard>
           )}
         </Route>

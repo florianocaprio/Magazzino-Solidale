@@ -19,6 +19,8 @@ import {
   Building2,
   MapPin,
   Map,
+  Footprints,
+  HeartHandshake,
   Printer,
   ShieldCheck,
   UserCog,
@@ -70,7 +72,10 @@ const NAV_ITEMS = [
   { key: "consegne", url: "/consegne", icon: Truck, groupKey: "sociale", area: "sociale" },
   { key: "bolle", url: "/bolle", icon: FileText, groupKey: "sociale", area: "sociale" },
   { key: "scarichi", url: "/scarichi", icon: PackageMinus, groupKey: "sociale", area: "sociale" },
-  
+
+  { key: "udsAnagrafica", url: "/uds/anagrafica", icon: Footprints, groupKey: "uds", area: "uds" },
+  { key: "udsInterventi", url: "/uds/interventi", icon: HeartHandshake, groupKey: "uds", area: "uds" },
+
   { key: "volontari", url: "/volontari", icon: UsersRound, groupKey: "logistica", area: "logistica" },
   { key: "mezzi", url: "/mezzi", icon: Car, groupKey: "logistica", area: "logistica" },
   { key: "fornitori", url: "/fornitori", icon: Store, groupKey: "logistica", area: "logistica" },

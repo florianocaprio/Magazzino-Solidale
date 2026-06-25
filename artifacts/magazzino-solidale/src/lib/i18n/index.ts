@@ -16,6 +16,8 @@ import { zoneUds } from "./namespaces/zoneUds";
 import { beneficiari } from "./namespaces/beneficiari";
 import { beneficiarioDettaglio } from "./namespaces/beneficiarioDettaglio";
 import { interventi } from "./namespaces/interventi";
+import { udsAnagrafica } from "./namespaces/udsAnagrafica";
+import { udsInterventi } from "./namespaces/udsInterventi";
 import { consegne } from "./namespaces/consegne";
 import { bolle } from "./namespaces/bolle";
 import { volontari } from "./namespaces/volontari";
@@ -51,6 +53,8 @@ const PAGE_NAMESPACES = {
   beneficiari,
   beneficiarioDettaglio,
   interventi,
+  udsAnagrafica,
+  udsInterventi,
   consegne,
   bolle,
   volontari,

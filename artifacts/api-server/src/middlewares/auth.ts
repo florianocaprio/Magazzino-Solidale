@@ -150,11 +150,12 @@ export const requireAdmin: RequestHandler = (req, res, next) => {
  */
 export const areaGuard: RequestHandler = (req, res, next) => {
   const segment = req.path.split("/").filter(Boolean)[0];
-  const area = segment ? AREA_BY_SEGMENT[segment] : undefined;
-  if (!area) {
+  const mapped = segment ? AREA_BY_SEGMENT[segment] : undefined;
+  if (!mapped) {
     next();
     return;
   }
+  const areas = Array.isArray(mapped) ? mapped : [mapped];
   const user = req.user;
   if (!user) {
     res.status(401).json({ error: "Non autenticato" });
@@ -164,7 +165,9 @@ export const areaGuard: RequestHandler = (req, res, next) => {
     next();
     return;
   }
-  if (area === "amministrazione" || !user.aree.includes(area)) {
+  // "amministrazione" is reserved to admins; access is granted if the role has
+  // ANY of the areas governing this segment.
+  if (areas.includes("amministrazione") || !areas.some((a) => user.aree.includes(a))) {
     res.status(403).json({ error: "Area non consentita per il ruolo" });
     return;
   }
