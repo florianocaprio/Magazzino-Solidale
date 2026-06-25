@@ -25,6 +25,7 @@ The UDS (street-outreach) module does NOT have its own entities. It reuses the e
 - Default the zona filter from `user.zonaUdsId`; offer "tutta la città" to clear it. The città filter only appears for the global super-admin (`user.cittaId == null`).
 - A UDS person must NEVER have a null città (it would be visible across every città). Enforced for `uds=true` on BOTH POST and PATCH, for any path that can set the flag (UDS form, standard "anche UDS" toggle, detail toggle): scoped callers auto-pin their own città (incl. legacy null-città rows on PATCH); città-global callers must supply a città explicitly or get 400. Mirror this invariant on any future mutating path that can set `uds`.
 - Guarded pages only mount once `user` is loaded (the route Guard's `hasArea` returns false while `user` is null), so deriving initial filter state from `user` at first render is safe — no effect-sync needed.
+- **Cross-linking a UDS page to a shared person screen needs a multi-area FE guard.** The backend lets a `uds`-only operator reach beneficiari/interventi (via `AREA_BY_SEGMENT`), but the wouter route Guard checks ONE area. Any Link from a UDS page to a `sociale`-guarded route (e.g. `/beneficiari/:id` detail) silently 403s for uds-only users unless the Guard accepts BOTH areas. **Why:** nav-hiding/guards are area-keyed and easy to forget when the destination lives under another area. **How to apply:** give the Guard a `string | string[]` area (grant if ANY matches) and pass `["sociale","uds"]` to shared-person routes.
 
 ## Fuzzy anti-duplicate search
 

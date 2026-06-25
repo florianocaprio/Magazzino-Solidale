@@ -3,7 +3,10 @@ import {
   useListBeneficiari,
   useListInterventi,
   useCreateIntervento,
+  useListCitta,
+  useListZoneUds,
   getListInterventiQueryKey,
+  getListCittaQueryKey,
   type Beneficiario,
   type Intervento,
 } from "@workspace/api-client-react";
@@ -38,7 +41,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/lib/auth";
 
+const ALL_ZONE = "__all__";
 const TIPI = ["ascolto", "distribuzione", "orientamento", "salute", "altro"] as const;
 
 function tipoKeyToI18n(tipo: string): string {
@@ -85,14 +90,38 @@ function personLabel(b: Beneficiario): string {
 
 export default function UdsInterventi() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const schema = makeSchema(t);
 
+  const isGlobal = user?.cittaId == null;
   const [selectedPerson, setSelectedPerson] = useState<string>("");
+  const [filterCitta, setFilterCitta] = useState<string>("");
+  const [filterZona, setFilterZona] = useState<string>(
+    user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
+  );
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  const { data: persone } = useListBeneficiari();
+  const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isGlobal } });
+
+  const effectiveCitta = isGlobal
+    ? filterCitta
+      ? parseInt(filterCitta)
+      : undefined
+    : (user?.cittaId ?? undefined);
+
+  const { data: zoneList } = useListZoneUds(
+    effectiveCitta ? { cittaId: effectiveCitta } : undefined,
+    { query: { queryKey: ["zoneUds", "udsInt", effectiveCitta], enabled: effectiveCitta != null } },
+  );
+
+  const personeParams = {
+    uds: true,
+    ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
+    ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
+  };
+  const { data: persone } = useListBeneficiari(personeParams);
   const personId = selectedPerson ? parseInt(selectedPerson) : undefined;
 
   const { data: interventi, isLoading } = useListInterventi(
@@ -200,8 +229,45 @@ export default function UdsInterventi() {
       </div>
 
       <Card>
-        <CardContent className="p-4">
-          <div className="space-y-1 max-w-md">
+        <CardContent className="flex flex-wrap items-end gap-4 p-4">
+          {isGlobal && (
+            <div className="space-y-1">
+              <span className="text-sm font-medium">{t("udsAnagrafica.filterCitta")}</span>
+              <Select
+                value={filterCitta || ALL_ZONE}
+                onValueChange={(v) => {
+                  setFilterCitta(v === ALL_ZONE ? "" : v);
+                  setFilterZona(ALL_ZONE);
+                  setSelectedPerson("");
+                }}
+              >
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder={t("udsAnagrafica.allCitta")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allCitta")}</SelectItem>
+                  {cittaList?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1">
+            <span className="text-sm font-medium">{t("udsAnagrafica.filterZona")}</span>
+            <Select value={filterZona} onValueChange={(v) => { setFilterZona(v); setSelectedPerson(""); }}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder={t("udsAnagrafica.allZone")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>
+                {zoneList?.map((z) => (
+                  <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1 min-w-[220px] flex-1">
             <span className="text-sm font-medium">{t("udsInterventi.selectPerson")}</span>
             <Select value={selectedPerson} onValueChange={setSelectedPerson}>
               <SelectTrigger>

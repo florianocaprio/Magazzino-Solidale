@@ -6,12 +6,15 @@ import {
   useCercaBeneficiariSimili,
   useListCitta,
   useListZoneUds,
+  useListCentriAscolto,
   getListBeneficiariQueryKey,
   getListCittaQueryKey,
+  getGetBeneficiarioQueryKey,
   getCercaBeneficiariSimiliQueryKey,
   type Beneficiario,
   type BeneficiarioSimile,
 } from "@workspace/api-client-react";
+import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,26 +50,35 @@ import { useAuth } from "@/lib/auth";
 
 const ALL_ZONE = "__all__";
 const NO_ZONE = "__none__";
+const NO_CENTRO = "__nocentro__";
 
 function makeSchema(t: (k: string) => string, isGlobal: boolean) {
-  return z.object({
-    nome: z.string().min(1, t("common.requiredField")),
-    cognome: z.string().min(1, t("common.requiredField")),
-    soprannome: z.string().optional(),
-    codiceFiscale: z.string().optional(),
-    dataNascita: z.string().optional(),
-    sesso: z.string().optional(),
-    telefono: z.string().optional(),
-    comune: z.string().optional(),
-    zonaMunicipio: z.string().optional(),
-    numComponenti: z.string().optional(),
-    priorita: z.string().optional(),
-    consegnaDomicilio: z.boolean().optional(),
-    zonaUdsId: z.string().optional(),
-    cittaId: isGlobal
-      ? z.string().min(1, t("common.requiredField"))
-      : z.string().optional(),
-  });
+  return z
+    .object({
+      nome: z.string().min(1, t("common.requiredField")),
+      cognome: z.string().min(1, t("common.requiredField")),
+      soprannome: z.string().optional(),
+      codiceFiscale: z.string().optional(),
+      dataNascita: z.string().optional(),
+      sesso: z.string().optional(),
+      telefono: z.string().optional(),
+      comune: z.string().optional(),
+      zonaMunicipio: z.string().optional(),
+      numComponenti: z.string().optional(),
+      priorita: z.string().optional(),
+      consegnaDomicilio: z.boolean().optional(),
+      zonaUdsId: z.string().optional(),
+      cittaId: z.string().optional(),
+      centroAscoltoId: z.string().optional(),
+      uds: z.boolean().optional(),
+    })
+    .superRefine((data, ctx) => {
+      // A città-global operator must supply a città whenever the person is UDS:
+      // a uds=true row without a città would leak across every city.
+      if (isGlobal && (data.uds ?? true) && !data.cittaId) {
+        ctx.addIssue({ code: "custom", path: ["cittaId"], message: t("common.requiredField") });
+      }
+    });
 }
 
 type FormValues = z.infer<ReturnType<typeof makeSchema>>;
@@ -119,6 +131,20 @@ export default function UdsAnagrafica() {
 
   const createBenef = useCreateBeneficiario();
   const updateBenef = useUpdateBeneficiario();
+  const { data: centri } = useListCentriAscolto();
+
+  const toggleStatus = (b: { id: number; attivo: boolean }) => {
+    updateBenef.mutate(
+      { id: b.id, data: { attivo: !b.attivo } as never },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) });
+          toast({ title: b.attivo ? t("beneficiari.toastDisattivato") : t("beneficiari.toastAttivato") });
+        },
+      },
+    );
+  };
 
   // Anti-duplicate fuzzy suggestions: debounce the identity fields and query the
   // città-scoped cerca-simili endpoint while the create form is open.
@@ -144,6 +170,8 @@ export default function UdsAnagrafica() {
       consegnaDomicilio: false,
       zonaUdsId: user?.zonaUdsId != null ? String(user.zonaUdsId) : NO_ZONE,
       cittaId: "",
+      centroAscoltoId: "",
+      uds: true,
     },
   });
 
@@ -171,6 +199,8 @@ export default function UdsAnagrafica() {
             ? String(user.zonaUdsId)
             : NO_ZONE,
       cittaId: isGlobal && filterCitta ? filterCitta : "",
+      centroAscoltoId: "",
+      uds: true,
     });
     setDupDismissed(false);
     setDupParams({});
@@ -249,8 +279,11 @@ export default function UdsAnagrafica() {
     const payload: Record<string, unknown> = {
       nome: data.nome,
       cognome: data.cognome,
-      uds: true,
-      centroAscoltoId: null,
+      uds: data.uds ?? true,
+      centroAscoltoId:
+        data.centroAscoltoId && data.centroAscoltoId !== NO_CENTRO
+          ? parseInt(data.centroAscoltoId)
+          : null,
     };
     if (data.soprannome) payload.soprannome = data.soprannome;
     if (data.codiceFiscale) payload.codiceFiscale = data.codiceFiscale;
@@ -262,7 +295,7 @@ export default function UdsAnagrafica() {
     if (data.numComponenti) payload.numComponenti = parseInt(data.numComponenti);
     if (data.priorita) payload.priorita = data.priorita;
     payload.consegnaDomicilio = data.consegnaDomicilio ?? false;
-    if (data.zonaUdsId && data.zonaUdsId !== NO_ZONE) {
+    if (data.uds && data.zonaUdsId && data.zonaUdsId !== NO_ZONE) {
       payload.zonaUdsId = parseInt(data.zonaUdsId);
     }
     if (isGlobal && data.cittaId) payload.cittaId = parseInt(data.cittaId);
@@ -298,6 +331,7 @@ export default function UdsAnagrafica() {
     return { label: t("udsAnagrafica.canaleNd"), cls: "bg-muted text-muted-foreground" };
   };
 
+  const watchUds = form.watch("uds");
   const formCitta = isGlobal && form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : effectiveCitta;
   const { data: formZone } = useListZoneUds(
     formCitta ? { cittaId: formCitta } : undefined,
@@ -384,31 +418,32 @@ export default function UdsAnagrafica() {
                 <TableHead>{t("udsAnagrafica.colTelefono")}</TableHead>
                 <TableHead>{t("udsAnagrafica.colZona")}</TableHead>
                 <TableHead className="text-center">{t("udsAnagrafica.colCanale")}</TableHead>
+                <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array(4).fill(0).map((_, i) => (
                   <TableRow key={i}>
-                    {Array(6).fill(0).map((_, j) => (
+                    {Array(7).fill(0).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-5 w-24" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     {t("udsAnagrafica.noPersone")}
                   </TableCell>
                 </TableRow>
               ) : rows.map((b) => {
                 const c = canale(b);
                 return (
-                  <TableRow key={b.id}>
+                  <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
                     <TableCell>
-                      <div className="flex items-center gap-2 font-medium">
+                      <Link href={`/beneficiari/${b.id}`} className="flex items-center gap-2 font-medium text-primary hover:underline">
                         <Footprints className="h-4 w-4 text-muted-foreground" /> {b.cognome}
-                      </div>
+                      </Link>
                     </TableCell>
                     <TableCell>{b.nome}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{b.soprannome || "-"}</TableCell>
@@ -416,6 +451,15 @@ export default function UdsAnagrafica() {
                     <TableCell className="text-sm">{b.zonaUdsNome || "-"}</TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className={`border-none ${c.cls}`}>{c.label}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center">
+                        <Switch
+                          checked={b.attivo}
+                          onCheckedChange={() => toggleStatus(b)}
+                          aria-label={b.attivo ? t("beneficiari.disattiva") : t("beneficiari.attiva")}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -537,39 +581,73 @@ export default function UdsAnagrafica() {
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
                 )} />
-                {isGlobal && (
-                  <FormField control={form.control} name="cittaId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
-                      <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NO_ZONE); }}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {cittaList?.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                )}
-                <FormField control={form.control} name="zonaUdsId" render={({ field }) => (
+
+                <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
-                    <Select value={field.value || NO_ZONE} onValueChange={field.onChange}>
+                    <FormLabel>{t("beneficiari.centroRiferimento")}</FormLabel>
+                    <Select value={field.value || NO_CENTRO} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.allZone")} /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={NO_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>
-                        {formZone?.map((z) => (
-                          <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>
+                        <SelectItem value={NO_CENTRO}>{t("common.none")}</SelectItem>
+                        {centri?.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </FormItem>
                 )} />
+
+                <div className="rounded-md border p-3 space-y-3">
+                  <FormField control={form.control} name="uds" render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <FormLabel className="!mt-0">{t("beneficiari.udsToggle")}</FormLabel>
+                        <p className="text-xs text-muted-foreground">{t("beneficiari.udsToggleHint")}</p>
+                      </div>
+                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                    </FormItem>
+                  )} />
+                  {watchUds && (
+                    <>
+                      {isGlobal && (
+                        <FormField control={form.control} name="cittaId" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
+                            <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NO_ZONE); }}>
+                              <FormControl>
+                                <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {cittaList?.map((c) => (
+                                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                      )}
+                      <FormField control={form.control} name="zonaUdsId" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
+                          <Select value={field.value || NO_ZONE} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.allZone")} /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value={NO_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>
+                              {formZone?.map((z) => (
+                                <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )} />
+                    </>
+                  )}
+                </div>
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>

@@ -56,11 +56,12 @@ function Guard({
   area,
   children,
 }: {
-  area: string;
+  area: string | string[];
   children: React.ReactNode;
 }) {
   const { hasArea } = useAuth();
-  if (!hasArea(area)) return <NotAuthorized />;
+  const areas = Array.isArray(area) ? area : [area];
+  if (!areas.some((a) => hasArea(a))) return <NotAuthorized />;
   return <>{children}</>;
 }
 
@@ -142,7 +143,7 @@ function AppRoutes() {
         </Route>
         <Route path="/beneficiari/:id">
           {() => (
-            <Guard area="sociale">
+            <Guard area={["sociale", "uds"]}>
               <BeneficiarioDettaglio />
             </Guard>
           )}
