@@ -202,4 +202,16 @@ describe("Scoping per Centro di Ascolto", () => {
     createdIds.push(res.body.id);
     expect(res.body.centroAscoltoId).toBe(centroA);
   });
+
+  it("PATCH /magazzini/:id restituisce 403 per un magazzino fuori dal centro del caller", async () => {
+    const scopedApp = makeAppAs(centroA);
+    const res = await request(scopedApp).patch(`/magazzini/${magB}`).send({ nome: "Hack" });
+    expect(res.status).toBe(403);
+  });
+
+  it("DELETE /magazzini/:id restituisce 403 per un magazzino fuori dal centro del caller", async () => {
+    const scopedApp = makeAppAs(centroA);
+    const res = await request(scopedApp).delete(`/magazzini/${magB}`);
+    expect(res.status).toBe(403);
+  });
 });
