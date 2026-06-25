@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, cittaTable } from "@workspace/db";
+import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
 
@@ -26,10 +26,17 @@ function makeApp(user: { id: number; centroAscoltoId: number | null; cittaId: nu
 
 const beneficiarioIds: number[] = [];
 const cittaIds: number[] = [];
+const centroIds: number[] = [];
 
 async function createCitta(nome = `Citta ${rnd()}`): Promise<number> {
   const [c] = await db.insert(cittaTable).values({ nome }).returning({ id: cittaTable.id });
   cittaIds.push(c.id);
+  return c.id;
+}
+
+async function createCentro(cittaId: number, nome = `Centro ${rnd()}`): Promise<number> {
+  const [c] = await db.insert(centriAscoltoTable).values({ nome, cittaId }).returning({ id: centriAscoltoTable.id });
+  centroIds.push(c.id);
   return c.id;
 }
 
@@ -53,6 +60,9 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  if (centroIds.length > 0) {
+    await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds));
+  }
   if (cittaIds.length > 0) {
     await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds));
   }
@@ -165,5 +175,27 @@ describe("GET /beneficiari?uds", () => {
     const ids = idsOf(res.body);
     expect(ids).toContain(u.body.id);
     expect(ids).not.toContain(n.body.id);
+  });
+
+  it("mostra le persone uds+centro ma MAI le persone solo-centro", async () => {
+    const centro = await createCentro(cittaA);
+    // uds + centro → deve comparire
+    const both = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "UdsCentro", cognome: rnd(), uds: true, centroAscoltoId: centro });
+    // solo centro (uds=false) → non deve MAI comparire nell'anagrafica UDS
+    const centroOnly = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "SoloCentro", cognome: rnd(), uds: false, centroAscoltoId: centro });
+    beneficiarioIds.push(both.body.id, centroOnly.body.id);
+    expect(both.body.uds).toBe(true);
+    expect(both.body.centroAscoltoId).toBe(centro);
+    expect(centroOnly.body.uds).toBe(false);
+
+    const res = await request(appAs(cittaA)).get("/beneficiari").query({ uds: "true", cittaId: String(cittaA) });
+    expect(res.status).toBe(200);
+    const ids = idsOf(res.body);
+    expect(ids).toContain(both.body.id);
+    expect(ids).not.toContain(centroOnly.body.id);
   });
 });
