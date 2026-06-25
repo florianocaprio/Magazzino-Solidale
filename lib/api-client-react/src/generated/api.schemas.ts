@@ -722,6 +722,8 @@ export interface Intervento {
   /** @nullable */
   note?: string | null;
   /** @nullable */
+  noteUds?: string | null;
+  /** @nullable */
   dataFollowup?: string | null;
   /** @nullable */
   scadenzaIsee?: string | null;
@@ -1079,6 +1081,7 @@ export interface InterventoInput {
   esito?: string;
   prossimAzione?: string;
   note?: string;
+  noteUds?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;
@@ -1092,6 +1095,7 @@ export interface InterventoUpdate {
   esito?: string;
   prossimAzione?: string;
   note?: string;
+  noteUds?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;

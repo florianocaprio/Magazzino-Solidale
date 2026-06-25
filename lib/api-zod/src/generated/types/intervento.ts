@@ -28,6 +28,8 @@ export interface Intervento {
   /** @nullable */
   note?: string | null;
   /** @nullable */
+  noteUds?: string | null;
+  /** @nullable */
   dataFollowup?: string | null;
   /** @nullable */
   scadenzaIsee?: string | null;

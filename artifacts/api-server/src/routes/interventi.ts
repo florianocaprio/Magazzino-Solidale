@@ -68,6 +68,7 @@ router.get("/interventi", async (req, res) => {
     esito: r.i.esito ?? null,
     prossimAzione: r.i.prossimAzione ?? null,
     note: r.i.note ?? null,
+    noteUds: r.i.noteUds ?? null,
     dataFollowup: r.i.dataFollowup ?? null,
     scadenzaIsee: r.i.scadenzaIsee ?? null,
     scadenzaRinnovo: r.i.scadenzaRinnovo ?? null,

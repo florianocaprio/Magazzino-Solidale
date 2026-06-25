@@ -14,6 +14,7 @@ export interface InterventoInput {
   esito?: string;
   prossimAzione?: string;
   note?: string;
+  noteUds?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;

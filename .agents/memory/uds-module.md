@@ -9,6 +9,7 @@ The UDS (street-outreach) module does NOT have its own entities. It reuses the e
 
 - A "UDS person" is a `beneficiario` with an explicit `uds` boolean flag set (independent of zona/centro). A person can be UDS, Centro, or BOTH — one record, no duplication.
 - A "UDS intervento" is a normal `intervento` linked to that person; the UDS page maps bisogni → `descrizione` (free note) and materiale given → `note`. No UDS-specific intervento type table.
+- A separate UDS-only follow-up note lives in `interventi.noteUds` (col `note_uds`), distinct from `note` (which the UDS view already uses for Materiale). When adding ANY new field consumed by the UDS interventi list, the `GET /interventi` LIST mapper must explicitly emit it — the list hand-builds its response (does not spread the row), so a field added only to the schema/POST/PATCH/detail will silently be missing from the list and break list-driven UI state.
 
 **Why:** the whole feature brief is "one person record, shared anagrafica, lightweight UDS". Adding parallel tables would split the registry and break the anti-duplicate goal.
 

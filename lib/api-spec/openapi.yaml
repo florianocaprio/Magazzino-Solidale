@@ -3812,6 +3812,8 @@ components:
           type: ["string", "null"]
         note:
           type: ["string", "null"]
+        noteUds:
+          type: ["string", "null"]
         dataFollowup:
           type: ["string", "null"]
         scadenzaIsee:
@@ -3841,6 +3843,8 @@ components:
           type: string
         note:
           type: string
+        noteUds:
+          type: string
         dataFollowup:
           type: string
         scadenzaIsee:
@@ -3865,6 +3869,8 @@ components:
         prossimAzione:
           type: string
         note:
+          type: string
+        noteUds:
           type: string
         dataFollowup:
           type: string

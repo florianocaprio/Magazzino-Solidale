@@ -3,6 +3,7 @@ import {
   useListBeneficiari,
   useListInterventi,
   useCreateIntervento,
+  useUpdateIntervento,
   useListCitta,
   useListZoneUds,
   getListInterventiQueryKey,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -36,7 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, HeartHandshake } from "lucide-react";
+import { Plus, HeartHandshake, StickyNote, Pencil } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -102,6 +104,9 @@ export default function UdsInterventi() {
     user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
   );
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [noteEditing, setNoteEditing] = useState<Intervento | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isGlobal } });
 
@@ -135,6 +140,7 @@ export default function UdsInterventi() {
   );
 
   const createIntervento = useCreateIntervento();
+  const updateIntervento = useUpdateIntervento();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -154,6 +160,7 @@ export default function UdsInterventi() {
   };
 
   const handleCreate = () => {
+    setEditingId(null);
     form.reset({
       dataIntervento: new Date().toISOString().slice(0, 10),
       tipoIntervento: "ascolto",
@@ -163,29 +170,81 @@ export default function UdsInterventi() {
     setIsFormOpen(true);
   };
 
+  const handleEdit = (i: Intervento) => {
+    setEditingId(i.id);
+    form.reset({
+      dataIntervento: i.dataIntervento.slice(0, 10),
+      tipoIntervento: i.tipoIntervento,
+      descrizione: i.descrizione ?? "",
+      note: i.note ?? "",
+    });
+    setIsFormOpen(true);
+  };
+
+  const invalidateList = () => {
+    if (personId != null) {
+      queryClient.invalidateQueries({
+        queryKey: getListInterventiQueryKey({ beneficiarioId: personId }),
+      });
+    }
+  };
+
   const onSubmit = (data: FormValues) => {
     if (personId == null) return;
-    createIntervento.mutate(
-      {
-        data: {
-          beneficiarioId: personId,
-          dataIntervento: data.dataIntervento,
-          tipoIntervento: data.tipoIntervento,
-          descrizione: data.descrizione || undefined,
-          note: data.note || undefined,
-        } as never,
-      },
+    const payload = {
+      beneficiarioId: personId,
+      dataIntervento: data.dataIntervento,
+      tipoIntervento: data.tipoIntervento,
+      descrizione: data.descrizione || undefined,
+      note: data.note || undefined,
+    };
+    const onError = (err: unknown) => {
+      toast({
+        title: editingId != null ? t("udsInterventi.editTitle") : t("udsInterventi.newTitle"),
+        description: extractError(err, t("common.requiredField")),
+        variant: "destructive",
+      });
+    };
+    if (editingId != null) {
+      updateIntervento.mutate(
+        { id: editingId, data: payload as never },
+        {
+          onSuccess: () => {
+            invalidateList();
+            toast({ title: t("udsInterventi.toastUpdated") });
+            setIsFormOpen(false);
+          },
+          onError,
+        },
+      );
+    } else {
+      createIntervento.mutate(
+        { data: payload as never },
+        {
+          onSuccess: () => {
+            invalidateList();
+            toast({ title: t("udsInterventi.toastCreated") });
+            setIsFormOpen(false);
+          },
+          onError,
+        },
+      );
+    }
+  };
+
+  const saveNote = () => {
+    if (!noteEditing) return;
+    updateIntervento.mutate(
+      { id: noteEditing.id, data: { noteUds: noteText } as never },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({
-            queryKey: getListInterventiQueryKey({ beneficiarioId: personId }),
-          });
-          toast({ title: t("udsInterventi.toastCreated") });
-          setIsFormOpen(false);
+          invalidateList();
+          toast({ title: t("udsInterventi.toastNoteSaved") });
+          setNoteEditing(null);
         },
         onError: (err) => {
           toast({
-            title: t("udsInterventi.newTitle"),
+            title: t("udsInterventi.noteDialogTitle"),
             description: extractError(err, t("common.requiredField")),
             variant: "destructive",
           });
@@ -202,6 +261,7 @@ export default function UdsInterventi() {
       { header: t("udsInterventi.colTipo"), accessor: (i: Intervento) => tipoLabel(i.tipoIntervento) },
       { header: t("udsInterventi.colBisogni"), accessor: (i: Intervento) => i.descrizione ?? "" },
       { header: t("udsInterventi.colMateriale"), accessor: (i: Intervento) => i.note ?? "" },
+      { header: t("udsInterventi.colNote"), accessor: (i: Intervento) => i.noteUds ?? "" },
       { header: t("udsInterventi.colOperatore"), accessor: (i: Intervento) => i.operatoreCodice ?? "" },
     ],
     [t],
@@ -299,26 +359,28 @@ export default function UdsInterventi() {
                   <TableHead>{t("udsInterventi.colTipo")}</TableHead>
                   <TableHead>{t("udsInterventi.colBisogni")}</TableHead>
                   <TableHead>{t("udsInterventi.colMateriale")}</TableHead>
+                  <TableHead>{t("udsInterventi.colNote")}</TableHead>
                   <TableHead>{t("udsInterventi.colOperatore")}</TableHead>
+                  <TableHead className="text-right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array(3).fill(0).map((_, i) => (
                     <TableRow key={i}>
-                      {Array(5).fill(0).map((_, j) => (
+                      {Array(7).fill(0).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-5 w-24" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                       {t("udsInterventi.noIntervento")}
                     </TableCell>
                   </TableRow>
                 ) : rows.map((i) => (
-                  <TableRow key={i.id}>
+                  <TableRow key={i.id} className={i.noteUds ? "bg-amber-50/60" : ""}>
                     <TableCell className="text-sm">{i.dataIntervento}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="gap-1 border-none bg-amber-500/10 text-amber-700">
@@ -327,7 +389,33 @@ export default function UdsInterventi() {
                     </TableCell>
                     <TableCell className="text-sm max-w-xs whitespace-pre-wrap">{i.descrizione || "-"}</TableCell>
                     <TableCell className="text-sm max-w-xs whitespace-pre-wrap">{i.note || "-"}</TableCell>
+                    <TableCell className="text-sm max-w-xs">
+                      {i.noteUds ? (
+                        <div className="flex items-start gap-1 rounded-md bg-amber-100 px-2 py-1 text-amber-900 whitespace-pre-wrap">
+                          <StickyNote className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>{i.noteUds}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{i.operatoreCodice || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant={i.noteUds ? "secondary" : "ghost"}
+                          size="sm"
+                          className={`gap-1 ${i.noteUds ? "bg-amber-100 text-amber-900 hover:bg-amber-200" : ""}`}
+                          onClick={() => { setNoteEditing(i); setNoteText(i.noteUds ?? ""); }}
+                        >
+                          <StickyNote className="h-3.5 w-3.5" />
+                          {i.noteUds ? t("udsInterventi.editNote") : t("udsInterventi.addNote")}
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(i)} title={t("udsInterventi.editAction")}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -339,7 +427,7 @@ export default function UdsInterventi() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{t("udsInterventi.newTitle")}</SheetTitle>
+            <SheetTitle>{editingId != null ? t("udsInterventi.editTitle") : t("udsInterventi.newTitle")}</SheetTitle>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
@@ -380,13 +468,32 @@ export default function UdsInterventi() {
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createIntervento.isPending}>{t("common.save")}</Button>
+                  <Button type="submit" disabled={createIntervento.isPending || updateIntervento.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
             </Form>
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={noteEditing != null} onOpenChange={(o) => { if (!o) setNoteEditing(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("udsInterventi.noteDialogTitle")}</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            rows={5}
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder={t("udsInterventi.notePlaceholder")}
+            className="bg-amber-50"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoteEditing(null)}>{t("common.cancel")}</Button>
+            <Button onClick={saveNote} disabled={updateIntervento.isPending}>{t("common.save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
