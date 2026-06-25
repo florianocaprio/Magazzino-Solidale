@@ -156,6 +156,13 @@ describe("Bolle — scoping via beneficiario", () => {
     expect(ids).not.toContain(bB);
   });
 
+  it("lista: il caller globale vede tutto", async () => {
+    const bA = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magNull });
+    const bB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull });
+    const res = await request(appAs(bolleRouter, null)).get("/bolle");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([bA, bB]));
+  });
+
   it("GET /:id fuori centro → 403", async () => {
     const bB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull });
     const res = await request(appAs(bolleRouter, centroA)).get(`/bolle/${bB}`);
@@ -206,6 +213,13 @@ describe("Interventi — scoping via beneficiario", () => {
     expect(ids).toContain(iA);
     expect(ids).toContain(iNull);
     expect(ids).not.toContain(iB);
+  });
+
+  it("lista: il caller globale vede tutto", async () => {
+    const iA = await insertIntervento(scope, { beneficiarioId: benA });
+    const iB = await insertIntervento(scope, { beneficiarioId: benB });
+    const res = await request(appAs(interventiRouter, null)).get("/interventi");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([iA, iB]));
   });
 
   it("GET /:id fuori centro → 403", async () => {

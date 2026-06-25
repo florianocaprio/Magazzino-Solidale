@@ -141,6 +141,14 @@ describe("Trasferimenti — scoping via magazzini visibili (origine O destino)",
     expect(ids).not.toContain(tHidden);
   });
 
+  it("lista: il caller globale vede tutti i trasferimenti", async () => {
+    const magB2 = await createMagazzino(scope, centroB);
+    const tA = await insertTrasferimento(scope, { origineId: magA, destinoId: magNull });
+    const tB = await insertTrasferimento(scope, { origineId: magB, destinoId: magB2 });
+    const res = await request(appAs(trasferimentiRouter, null)).get("/trasferimenti");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([tA, tB]));
+  });
+
   it("GET /:id: 200 se tocca un magazzino visibile, 403 se tutto interno a un altro centro", async () => {
     const magB2 = await createMagazzino(scope, centroB);
     const tVisible = await insertTrasferimento(scope, { origineId: magA, destinoId: magNull });
@@ -229,6 +237,13 @@ describe("Movimenti — scoping via magazzino visibile", () => {
     expect(ids).toContain(mA);
     expect(ids).toContain(mNull);
     expect(ids).not.toContain(mB);
+  });
+
+  it("lista: il caller globale vede tutti i movimenti", async () => {
+    const mA = await insertMovimento(scope, { magazzinoId: magA, prodottoId: prod });
+    const mB = await insertMovimento(scope, { magazzinoId: magB, prodottoId: prod });
+    const res = await request(appAs(movimentiRouter, null)).get("/movimenti");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([mA, mB]));
   });
 
   it("POST: non può registrare un movimento su un magazzino di un altro centro → 403", async () => {

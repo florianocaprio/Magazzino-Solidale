@@ -139,6 +139,15 @@ describe("Volontari — scoping per centro", () => {
     expect(ids).not.toContain(vB);
   });
 
+  it("lista: il caller globale vede tutti", async () => {
+    const vA = await createVolontario(scope, centroA);
+    const vB = await createVolontario(scope, centroB);
+    const res = await request(
+      makeScopedApp(volontariRouter, { id: operatoreId, centroAscoltoId: null }),
+    ).get("/volontari");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([vA, vB]));
+  });
+
   it("GET /:id fuori centro → 403", async () => {
     const vB = await createVolontario(scope, centroB);
     const res = await request(
@@ -194,6 +203,15 @@ describe("Mezzi — scoping per centro", () => {
     expect(ids).toContain(mNull);
     expect(ids).not.toContain(mB);
     expect(ids).not.toContain(mVolB);
+  });
+
+  it("lista: il caller globale vede tutti", async () => {
+    const mA = await createMezzo(scope, { centroId: centroA });
+    const mB = await createMezzo(scope, { centroId: centroB });
+    const res = await request(
+      makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: null }),
+    ).get("/mezzi");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([mA, mB]));
   });
 
   it("GET /:id fuori centro → 403", async () => {
@@ -330,6 +348,15 @@ describe("Beneficiari — scoping per centro", () => {
     expect(ids).not.toContain(bB);
   });
 
+  it("lista: il caller globale vede tutti", async () => {
+    const bA = await createBeneficiario(scope, centroA);
+    const bB = await createBeneficiario(scope, centroB);
+    const res = await request(
+      makeScopedApp(beneficiariRouter, { id: operatoreId, centroAscoltoId: null }),
+    ).get("/beneficiari");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([bA, bB]));
+  });
+
   it("GET /:id fuori centro → 403", async () => {
     const bB = await createBeneficiario(scope, centroB);
     const res = await request(
@@ -392,6 +419,16 @@ describe("Scarichi — scoping per centro", () => {
     expect(ids).not.toContain(sB);
   });
 
+  it("lista: il caller globale vede tutti", async () => {
+    const mag = await createMagazzino(scope, null);
+    const sA = await insertScarico(scope, { magazzinoId: mag, centroId: centroA });
+    const sB = await insertScarico(scope, { magazzinoId: mag, centroId: centroB });
+    const res = await request(
+      makeScopedApp(scarichiRouter, { id: operatoreId, centroAscoltoId: null }),
+    ).get("/scarichi");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([sA, sB]));
+  });
+
   it("GET /:id fuori centro → 403", async () => {
     const mag = await createMagazzino(scope, null);
     const sB = await insertScarico(scope, { magazzinoId: mag, centroId: centroB });
@@ -435,6 +472,16 @@ describe("Approvvigionamenti — scoping per centro", () => {
     expect(ids).toContain(aA);
     expect(ids).toContain(aNull);
     expect(ids).not.toContain(aB);
+  });
+
+  it("lista: il caller globale vede tutti", async () => {
+    const mag = await createMagazzino(scope, null);
+    const aA = await insertApprovvigionamento(scope, { magazzinoId: mag, centroId: centroA });
+    const aB = await insertApprovvigionamento(scope, { magazzinoId: mag, centroId: centroB });
+    const res = await request(
+      makeScopedApp(approvvigionamentiRouter, { id: operatoreId, centroAscoltoId: null }),
+    ).get("/approvvigionamenti");
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([aA, aB]));
   });
 
   it("GET /:id fuori centro → 403", async () => {
