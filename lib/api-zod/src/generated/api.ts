@@ -2602,6 +2602,34 @@ export const ReportUdsInterventiPerMeseResponse = zod.array(ReportUdsInterventiP
 
 
 /**
+ * @summary UDS street interventions for a single day, with per-person sequence number
+ */
+export const ReportUdsInterventiGiornalieriQueryParams = zod.object({
+  "data": zod.coerce.string(),
+  "cittaId": zod.coerce.number().optional(),
+  "zonaUdsId": zod.coerce.number().optional()
+})
+
+export const ReportUdsInterventiGiornalieriResponseItem = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "soprannome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaNome": zod.string().nullish(),
+  "dataIntervento": zod.string(),
+  "tipoIntervento": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "noteUds": zod.string().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "numeroIntervento": zod.number(),
+  "primoIntervento": zod.boolean()
+})
+export const ReportUdsInterventiGiornalieriResponse = zod.array(ReportUdsInterventiGiornalieriResponseItem)
+
+
+/**
  * @summary UDS street interventions grouped by type
  */
 export const ReportUdsInterventiPerTipoQueryParams = zod.object({

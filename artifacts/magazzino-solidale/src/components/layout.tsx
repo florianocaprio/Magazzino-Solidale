@@ -21,6 +21,7 @@ import {
   Map,
   Footprints,
   HeartHandshake,
+  CalendarClock,
   Printer,
   ShieldCheck,
   UserCog,
@@ -75,6 +76,7 @@ const NAV_ITEMS = [
 
   { key: "udsAnagrafica", url: "/uds/anagrafica", icon: Footprints, groupKey: "uds", area: "uds" },
   { key: "udsInterventi", url: "/uds/interventi", icon: HeartHandshake, groupKey: "uds", area: "uds" },
+  { key: "udsReportGiornaliero", url: "/uds/report-giornaliero", icon: CalendarClock, groupKey: "uds", area: "uds" },
 
   { key: "volontari", url: "/volontari", icon: UsersRound, groupKey: "logistica", area: "logistica" },
   { key: "mezzi", url: "/mezzi", icon: Car, groupKey: "logistica", area: "logistica" },

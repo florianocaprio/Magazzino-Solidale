@@ -43,6 +43,7 @@ import Citta from "@/pages/citta";
 import ZoneUds from "@/pages/zone-uds";
 import UdsAnagrafica from "@/pages/uds-anagrafica";
 import UdsInterventi from "@/pages/uds-interventi";
+import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -182,6 +183,13 @@ function AppRoutes() {
           {() => (
             <Guard area="uds">
               <UdsInterventi />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/uds/report-giornaliero">
+          {() => (
+            <Guard area="uds">
+              <UdsReportGiornaliero />
             </Guard>
           )}
         </Route>

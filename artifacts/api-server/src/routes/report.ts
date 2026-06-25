@@ -329,6 +329,75 @@ router.get("/report/uds/interventi-per-mese", async (req, res) => {
   })));
 });
 
+/**
+ * Daily street-activity report: every UDS intervention on a single day, with the
+ * per-person chronological sequence number (numeroIntervento). The window runs
+ * over ALL of a person's interventions ordered by date+id, then we keep only the
+ * rows landing on the requested day — so numeroIntervento=1 means it is that
+ * person's first-ever intervention (primoIntervento, highlighted in red on the FE).
+ */
+router.get("/report/uds/interventi-giornalieri", async (req, res) => {
+  const data = String(req.query.data ?? "");
+  if (!isValidIsoDate(data)) {
+    res.status(400).json({ message: "Parametro 'data' obbligatorio (YYYY-MM-DD)" });
+    return;
+  }
+  const conds = udsScopeConds(req, callerCittaId(req));
+  const where = sql.join(conds, sql` AND `);
+
+  const result = await db.execute(sql`
+    SELECT * FROM (
+      SELECT i.id,
+             i.beneficiario_id,
+             be.cognome,
+             be.nome,
+             be.soprannome,
+             be.zona_uds_id,
+             z.nome AS zona_nome,
+             i.data_intervento::text AS data_intervento,
+             i.tipo_intervento,
+             i.descrizione,
+             i.note,
+             i.note_uds,
+             u.matricola AS operatore_matricola,
+             u.username AS operatore_username,
+             ROW_NUMBER() OVER (
+               PARTITION BY i.beneficiario_id
+               ORDER BY i.data_intervento ASC, i.id ASC
+             ) AS numero
+      FROM interventi i
+      JOIN beneficiari be ON be.id = i.beneficiario_id
+      LEFT JOIN zone_uds z ON z.id = be.zona_uds_id
+      LEFT JOIN utenti u ON u.id = i.operatore_id
+      WHERE ${where}
+    ) s
+    WHERE s.data_intervento::date = ${data}
+    ORDER BY s.zona_nome NULLS LAST, s.cognome, s.nome, s.id
+  `);
+  const rows = result.rows as Array<Record<string, unknown>>;
+  res.json(rows.map((r) => {
+    const numero = Number(r.numero);
+    const cognome = r.cognome as string | null;
+    const nome = r.nome as string | null;
+    return {
+      id: Number(r.id),
+      beneficiarioId: Number(r.beneficiario_id),
+      beneficiarioNome: cognome && nome ? `${cognome} ${nome}` : (cognome ?? nome ?? null),
+      soprannome: (r.soprannome as string | null) ?? null,
+      zonaUdsId: r.zona_uds_id === null || r.zona_uds_id === undefined ? null : Number(r.zona_uds_id),
+      zonaNome: (r.zona_nome as string | null) ?? null,
+      dataIntervento: r.data_intervento as string,
+      tipoIntervento: r.tipo_intervento as string,
+      descrizione: (r.descrizione as string | null) ?? null,
+      note: (r.note as string | null) ?? null,
+      noteUds: (r.note_uds as string | null) ?? null,
+      operatoreCodice: (r.operatore_matricola as string | null) ?? (r.operatore_username as string | null) ?? null,
+      numeroIntervento: numero,
+      primoIntervento: numero === 1,
+    };
+  }));
+});
+
 router.get("/report/uds/interventi-per-tipo", async (req, res) => {
   const range = parseDateRange(req);
   if (!range.ok) {

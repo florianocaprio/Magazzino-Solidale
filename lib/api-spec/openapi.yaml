@@ -2022,6 +2022,35 @@ paths:
                 items:
                   $ref: "#/components/schemas/UdsInterventiMeseReport"
 
+  /report/uds/interventi-giornalieri:
+    get:
+      operationId: reportUdsInterventiGiornalieri
+      tags: [report]
+      summary: UDS street interventions for a single day, with per-person sequence number
+      parameters:
+        - name: data
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: zonaUdsId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: UDS interventions of the day
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UdsInterventoGiornaliero"
+
   /report/uds/interventi-per-tipo:
     get:
       operationId: reportUdsInterventiPerTipo
@@ -4529,6 +4558,47 @@ components:
         totale:
           type: integer
       required: [centroNome, dirette, conVolontari, totale]
+
+    UdsInterventoGiornaliero:
+      type: object
+      properties:
+        id:
+          type: integer
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: string
+          nullable: true
+        soprannome:
+          type: string
+          nullable: true
+        zonaUdsId:
+          type: integer
+          nullable: true
+        zonaNome:
+          type: string
+          nullable: true
+        dataIntervento:
+          type: string
+        tipoIntervento:
+          type: string
+        descrizione:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        noteUds:
+          type: string
+          nullable: true
+        operatoreCodice:
+          type: string
+          nullable: true
+        numeroIntervento:
+          type: integer
+        primoIntervento:
+          type: boolean
+      required: [id, beneficiarioId, dataIntervento, tipoIntervento, numeroIntervento, primoIntervento]
 
     UdsInterventiMeseReport:
       type: object

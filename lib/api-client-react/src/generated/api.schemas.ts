@@ -1412,6 +1412,23 @@ export interface ConsegnePerCentroReport {
   totale: number;
 }
 
+export interface UdsInterventoGiornaliero {
+  id: number;
+  beneficiarioId: number;
+  beneficiarioNome?: string | null;
+  soprannome?: string | null;
+  zonaUdsId?: number | null;
+  zonaNome?: string | null;
+  dataIntervento: string;
+  tipoIntervento: string;
+  descrizione?: string | null;
+  note?: string | null;
+  noteUds?: string | null;
+  operatoreCodice?: string | null;
+  numeroIntervento: number;
+  primoIntervento: boolean;
+}
+
 export interface UdsInterventiMeseReport {
   mese: string;
   totInterventi: number;
@@ -1697,6 +1714,12 @@ anno?: number;
 export type ReportUdsInterventiPerMeseParams = {
 da?: string;
 a?: string;
+cittaId?: number;
+zonaUdsId?: number;
+};
+
+export type ReportUdsInterventiGiornalieriParams = {
+data: string;
 cittaId?: number;
 zonaUdsId?: number;
 };

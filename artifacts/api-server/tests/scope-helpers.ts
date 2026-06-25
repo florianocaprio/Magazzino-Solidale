@@ -407,14 +407,14 @@ export async function insertBollaRiga(
 
 export async function insertIntervento(
   scope: SeedScope,
-  opts: { beneficiarioId: number },
+  opts: { beneficiarioId: number; dataIntervento?: string; tipoIntervento?: string },
 ): Promise<number> {
   const [i] = await db
     .insert(interventiTable)
     .values({
       beneficiarioId: opts.beneficiarioId,
-      dataIntervento: "2026-06-01",
-      tipoIntervento: "pacco_alimentare",
+      dataIntervento: opts.dataIntervento ?? "2026-06-01",
+      tipoIntervento: opts.tipoIntervento ?? "pacco_alimentare",
     })
     .returning({ id: interventiTable.id });
   scope.interventoIds.push(i.id);

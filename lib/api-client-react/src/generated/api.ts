@@ -100,6 +100,7 @@ import type {
   ReportFsePlus,
   ReportFsePlusParams,
   ReportGiacenzePerMagazzinoParams,
+  ReportUdsInterventiGiornalieriParams,
   ReportUdsInterventiPerMeseParams,
   ReportUdsInterventiPerTipoParams,
   ReportUdsInterventiPerZonaParams,
@@ -116,6 +117,7 @@ import type {
   UdsInterventiMeseReport,
   UdsInterventiTipoReport,
   UdsInterventiZonaReport,
+  UdsInterventoGiornaliero,
   UdsPersonePerZonaReport,
   Utente,
   UtenteInput,
@@ -7247,6 +7249,90 @@ export function useReportUdsInterventiPerMese<TData = Awaited<ReturnType<typeof 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getReportUdsInterventiPerMeseQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReportUdsInterventiGiornalieriUrl = (params: ReportUdsInterventiGiornalieriParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/uds/interventi-giornalieri?${stringifiedParams}` : `/api/report/uds/interventi-giornalieri`
+}
+
+/**
+ * @summary UDS street interventions for a single day, with per-person sequence number
+ */
+export const reportUdsInterventiGiornalieri = async (params: ReportUdsInterventiGiornalieriParams, options?: RequestInit): Promise<UdsInterventoGiornaliero[]> => {
+
+  return customFetch<UdsInterventoGiornaliero[]>(getReportUdsInterventiGiornalieriUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportUdsInterventiGiornalieriQueryKey = (params?: ReportUdsInterventiGiornalieriParams,) => {
+    return [
+    `/api/report/uds/interventi-giornalieri`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getReportUdsInterventiGiornalieriQueryOptions = <TData = Awaited<ReturnType<typeof reportUdsInterventiGiornalieri>>, TError = ErrorType<unknown>>(params: ReportUdsInterventiGiornalieriParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiGiornalieri>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReportUdsInterventiGiornalieriQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportUdsInterventiGiornalieri>>> = ({ signal }) => reportUdsInterventiGiornalieri(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiGiornalieri>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReportUdsInterventiGiornalieriQueryResult = NonNullable<Awaited<ReturnType<typeof reportUdsInterventiGiornalieri>>>
+export type ReportUdsInterventiGiornalieriQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary UDS street interventions for a single day, with per-person sequence number
+ */
+
+export function useReportUdsInterventiGiornalieri<TData = Awaited<ReturnType<typeof reportUdsInterventiGiornalieri>>, TError = ErrorType<unknown>>(
+ params: ReportUdsInterventiGiornalieriParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiGiornalieri>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReportUdsInterventiGiornalieriQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

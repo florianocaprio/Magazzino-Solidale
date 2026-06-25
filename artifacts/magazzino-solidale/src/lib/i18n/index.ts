@@ -26,6 +26,7 @@ import { fornitori } from "./namespaces/fornitori";
 import { approvvigionamenti } from "./namespaces/approvvigionamenti";
 import { report } from "./namespaces/report";
 import { reportUds } from "./namespaces/reportUds";
+import { udsReportGiornaliero } from "./namespaces/udsReportGiornaliero";
 import { impostazioniStampa } from "./namespaces/impostazioniStampa";
 import { utenti } from "./namespaces/utenti";
 import { ruoli } from "./namespaces/ruoli";
@@ -64,6 +65,7 @@ const PAGE_NAMESPACES = {
   approvvigionamenti,
   report,
   reportUds,
+  udsReportGiornaliero,
   impostazioniStampa,
   utenti,
   ruoli,
