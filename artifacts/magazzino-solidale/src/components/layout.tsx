@@ -61,13 +61,13 @@ const NAV_ITEMS = [
   { key: "movimenti", url: "/movimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
   { key: "giacenze", url: "/giacenze", icon: TrendingUpDown, groupKey: "magazzino", area: "magazzino" },
   { key: "trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
-  { key: "scarichi", url: "/scarichi", icon: PackageMinus, groupKey: "magazzino", area: "magazzino" },
   
   { key: "centriAscolto", url: "/centri-ascolto", icon: Building2, groupKey: "sociale", area: "sociale" },
   { key: "beneficiari", url: "/beneficiari", icon: Users, groupKey: "sociale", area: "sociale" },
   { key: "interventi", url: "/interventi", icon: ClipboardList, groupKey: "sociale", area: "sociale" },
   { key: "consegne", url: "/consegne", icon: Truck, groupKey: "sociale", area: "sociale" },
   { key: "bolle", url: "/bolle", icon: FileText, groupKey: "sociale", area: "sociale" },
+  { key: "scarichi", url: "/scarichi", icon: PackageMinus, groupKey: "sociale", area: "sociale" },
   
   { key: "volontari", url: "/volontari", icon: UsersRound, groupKey: "logistica", area: "logistica" },
   { key: "mezzi", url: "/mezzi", icon: Car, groupKey: "logistica", area: "logistica" },

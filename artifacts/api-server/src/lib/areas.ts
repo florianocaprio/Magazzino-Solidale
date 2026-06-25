@@ -22,13 +22,13 @@ export const AREA_BY_SEGMENT: Record<string, string> = {
   movimenti: "magazzino",
   giacenze: "magazzino",
   trasferimenti: "magazzino",
-  scarichi: "magazzino",
 
   "centri-ascolto": "sociale",
   beneficiari: "sociale",
   interventi: "sociale",
   consegne: "sociale",
   bolle: "sociale",
+  scarichi: "sociale",
 
   volontari: "logistica",
   mezzi: "logistica",
