@@ -8,7 +8,7 @@ import {
   ResetUtentePasswordBody,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
-import { callerCentroId } from "../lib/centroScope";
+import { callerCentroId, callerCittaId, andScoped } from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -24,6 +24,7 @@ type UtenteRow = {
   ruoloNome: string | null;
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
+  cittaId: number | null;
   attivo: boolean;
   mustChangePassword: boolean;
   ultimoAccesso: Date | null;
@@ -58,6 +59,7 @@ const selectUtente = () =>
       ruoloNome: ruoliTable.nome,
       centroAscoltoId: utentiTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
+      cittaId: utentiTable.cittaId,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
       ultimoAccesso: utentiTable.ultimoAccesso,
@@ -106,8 +108,16 @@ async function roleIsAdmin(ruoloId: number | null): Promise<boolean> {
 
 router.get("/utenti", async (req, res): Promise<void> => {
   const caller = callerCentroId(req);
+  // STRICT città boundary on utenti: a città-bound admin sees ONLY users of
+  // their own città (no NULL/global users), mirroring the strict centro rule.
+  const cittaCaller = callerCittaId(req);
   const rows = await selectUtente()
-    .where(caller != null ? eq(utentiTable.centroAscoltoId, caller) : undefined)
+    .where(
+      andScoped(
+        caller != null ? eq(utentiTable.centroAscoltoId, caller) : undefined,
+        cittaCaller != null ? eq(utentiTable.cittaId, cittaCaller) : undefined,
+      ),
+    )
     .orderBy(utentiTable.username);
   res.json(rows.map(fmt));
 });
@@ -118,12 +128,16 @@ router.post("/utenti", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { username, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId } = parsed.data;
+  const { username, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId, cittaId } = parsed.data;
 
   // A centro-bound admin can only create users inside their own centro; the
   // caller's centro is auto-assigned and locked (any body value is ignored).
   const caller = callerCentroId(req);
   const finalCentroId = caller != null ? caller : (centroAscoltoId ?? null);
+  // Likewise a città-bound admin can only create users inside their own città;
+  // the caller's città is auto-assigned and locked (any body value is ignored).
+  const cittaCaller = callerCittaId(req);
+  const finalCittaId = cittaCaller != null ? cittaCaller : (cittaId ?? null);
 
   const [existing] = await db
     .select({ id: utentiTable.id })
@@ -149,6 +163,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
       matricola: finalMatricola,
       ruoloId: ruoloId ?? null,
       centroAscoltoId: finalCentroId,
+      cittaId: finalCittaId,
       attivo: attivo ?? true,
       mustChangePassword: true,
     })
@@ -171,6 +186,11 @@ router.get("/utenti/:id", async (req, res): Promise<void> => {
   const caller = callerCentroId(req);
   if (caller != null && row.centroAscoltoId !== caller) {
     res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
+    return;
+  }
+  const cittaCaller = callerCittaId(req);
+  if (cittaCaller != null && row.cittaId !== cittaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua città" });
     return;
   }
   res.json(fmt(row));
@@ -202,6 +222,11 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
     return;
   }
+  const cittaCaller = callerCittaId(req);
+  if (cittaCaller != null && target.cittaId !== cittaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua città" });
+    return;
+  }
 
   const wasActiveAdmin =
     target.attivo && (await roleIsAdmin(target.ruoloId));
@@ -228,6 +253,11 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   // admin may (re)assign the centro.
   if (caller == null && body.centroAscoltoId !== undefined) {
     updates.centroAscoltoId = body.centroAscoltoId;
+  }
+  // A città-bound admin cannot move users to another città; only a città-global
+  // admin may (re)assign the città.
+  if (cittaCaller == null && body.cittaId !== undefined) {
+    updates.cittaId = body.cittaId;
   }
 
   if (Object.keys(updates).length > 0) {
@@ -263,6 +293,11 @@ router.delete("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
     return;
   }
+  const cittaCaller = callerCittaId(req);
+  if (cittaCaller != null && target.cittaId !== cittaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua città" });
+    return;
+  }
 
   const isActiveAdmin =
     target.attivo && (await roleIsAdmin(target.ruoloId));
@@ -289,7 +324,7 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
   }
 
   const [target] = await db
-    .select({ id: utentiTable.id, centroAscoltoId: utentiTable.centroAscoltoId })
+    .select({ id: utentiTable.id, centroAscoltoId: utentiTable.centroAscoltoId, cittaId: utentiTable.cittaId })
     .from(utentiTable)
     .where(eq(utentiTable.id, id));
   if (!target) {
@@ -300,6 +335,11 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
   const caller = callerCentroId(req);
   if (caller != null && target.centroAscoltoId !== caller) {
     res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
+    return;
+  }
+  const cittaCaller = callerCittaId(req);
+  if (cittaCaller != null && target.cittaId !== cittaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua città" });
     return;
   }
 

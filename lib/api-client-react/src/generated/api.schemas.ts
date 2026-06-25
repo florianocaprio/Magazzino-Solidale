@@ -635,6 +635,16 @@ export interface Beneficiario {
   centroAscoltoNome?: string | null;
   attivo: boolean;
   /** @nullable */
+  soprannome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
+  /** @nullable */
   dataPresaInCarico?: string | null;
   dataCreazione: string;
 }
@@ -788,6 +798,16 @@ export interface BeneficiarioDettaglio {
   /** @nullable */
   dataPresaInCarico?: string | null;
   /** @nullable */
+  soprannome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
+  /** @nullable */
   noteInterne?: string | null;
   nucleo?: NucleoFamiliare[];
   interventi?: Intervento[];
@@ -826,6 +846,11 @@ export interface BeneficiarioInput {
   centroAscoltoId?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
+  soprannome?: string;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
   sesso?: string;
   areaProvenienza?: string;
 }
@@ -860,8 +885,68 @@ export interface BeneficiarioUpdate {
   centroAscoltoId?: number | null;
   attivo?: boolean;
   noteInterne?: string;
+  soprannome?: string;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
   sesso?: string;
   areaProvenienza?: string;
+}
+
+export interface Citta {
+  id: number;
+  nome: string;
+  /** @nullable */
+  provincia?: string | null;
+  attivo: boolean;
+  /** @nullable */
+  note?: string | null;
+  dataCreazione: string;
+}
+
+export interface CittaInput {
+  /** @minLength 1 */
+  nome: string;
+  provincia?: string;
+  attivo?: boolean;
+  note?: string;
+}
+
+export interface CittaUpdate {
+  /** @minLength 1 */
+  nome?: string;
+  provincia?: string;
+  attivo?: boolean;
+  note?: string;
+}
+
+export interface ZonaUds {
+  id: number;
+  cittaId: number;
+  /** @nullable */
+  cittaNome?: string | null;
+  nome: string;
+  attivo: boolean;
+  /** @nullable */
+  note?: string | null;
+  dataCreazione: string;
+}
+
+export interface ZonaUdsInput {
+  cittaId: number;
+  /** @minLength 1 */
+  nome: string;
+  attivo?: boolean;
+  note?: string;
+}
+
+export interface ZonaUdsUpdate {
+  cittaId?: number;
+  /** @minLength 1 */
+  nome?: string;
+  attivo?: boolean;
+  note?: string;
 }
 
 export interface CentroAscolto {
@@ -1313,6 +1398,14 @@ export interface AuthUser {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;
@@ -1348,6 +1441,14 @@ export interface Utente {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
   attivo: boolean;
   mustChangePassword: boolean;
   /** @nullable */
@@ -1370,6 +1471,10 @@ export interface UtenteInput {
   ruoloId?: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
   attivo?: boolean;
 }
 
@@ -1384,6 +1489,10 @@ export interface UtenteUpdate {
   ruoloId?: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
   attivo?: boolean;
 }
 
@@ -1464,6 +1573,8 @@ search?: string;
 priorita?: string;
 domicilio?: boolean;
 centroAscoltoId?: number;
+cittaId?: number;
+zonaUdsId?: number;
 attivo?: boolean;
 };
 
@@ -1484,6 +1595,10 @@ export type ListBolleParams = {
 stato?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
+};
+
+export type ListZoneUdsParams = {
+cittaId?: number;
 };
 
 export type ReportGiacenzePerMagazzinoParams = {

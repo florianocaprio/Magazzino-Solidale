@@ -29,6 +29,8 @@ tags:
   - name: utenti
   - name: ruoli
   - name: aree
+  - name: citta
+  - name: zone-uds
 
 paths:
   /healthz:
@@ -819,6 +821,14 @@ paths:
           in: query
           schema:
             type: integer
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: zonaUdsId
+          in: query
+          schema:
+            type: integer
         - name: attivo
           in: query
           schema:
@@ -1390,6 +1400,175 @@ paths:
                 $ref: "#/components/schemas/BollaDettaglio"
 
   # ─── CENTRI DI ASCOLTO ─────────────────────────────────────────────────────
+  /citta:
+    get:
+      operationId: listCitta
+      tags: [citta]
+      responses:
+        "200":
+          description: List of cities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Citta"
+    post:
+      operationId: createCitta
+      tags: [citta]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CittaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Citta"
+
+  /citta/{id}:
+    get:
+      operationId: getCitta
+      tags: [citta]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: City
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Citta"
+    patch:
+      operationId: updateCitta
+      tags: [citta]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CittaUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Citta"
+    delete:
+      operationId: deleteCitta
+      tags: [citta]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /zone-uds:
+    get:
+      operationId: listZoneUds
+      tags: [zone-uds]
+      parameters:
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of UDS zones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ZonaUds"
+    post:
+      operationId: createZonaUds
+      tags: [zone-uds]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZonaUdsInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZonaUds"
+
+  /zone-uds/{id}:
+    get:
+      operationId: getZonaUds
+      tags: [zone-uds]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: UDS zone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZonaUds"
+    patch:
+      operationId: updateZonaUds
+      tags: [zone-uds]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZonaUdsUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZonaUds"
+    delete:
+      operationId: deleteZonaUds
+      tags: [zone-uds]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /centri-ascolto:
     get:
       operationId: listCentriAscolto
@@ -3029,6 +3208,16 @@ components:
           type: ["string", "null"]
         attivo:
           type: boolean
+        soprannome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        zonaUdsId:
+          type: ["integer", "null"]
+        zonaUdsNome:
+          type: ["string", "null"]
         dataPresaInCarico:
           type: ["string", "null"]
         dataCreazione:
@@ -3101,6 +3290,16 @@ components:
         attivo:
           type: boolean
         dataPresaInCarico:
+          type: ["string", "null"]
+        soprannome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        zonaUdsId:
+          type: ["integer", "null"]
+        zonaUdsNome:
           type: ["string", "null"]
         noteInterne:
           type: ["string", "null"]
@@ -3179,6 +3378,12 @@ components:
           type: string
         noteInterne:
           type: string
+        soprannome:
+          type: string
+        cittaId:
+          type: ["integer", "null"]
+        zonaUdsId:
+          type: ["integer", "null"]
         sesso:
           type: string
         areaProvenienza:
@@ -3242,9 +3447,106 @@ components:
           type: boolean
         noteInterne:
           type: string
+        soprannome:
+          type: string
+        cittaId:
+          type: ["integer", "null"]
+        zonaUdsId:
+          type: ["integer", "null"]
         sesso:
           type: string
         areaProvenienza:
+          type: string
+
+    # ── Città / Zone UDS ─────────────────────────────────────────────────
+    Citta:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        provincia:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, nome, attivo, dataCreazione]
+
+    CittaInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        provincia:
+          type: string
+        attivo:
+          type: boolean
+        note:
+          type: string
+      required: [nome]
+
+    CittaUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        provincia:
+          type: string
+        attivo:
+          type: boolean
+        note:
+          type: string
+
+    ZonaUds:
+      type: object
+      properties:
+        id:
+          type: integer
+        cittaId:
+          type: integer
+        cittaNome:
+          type: ["string", "null"]
+        nome:
+          type: string
+        attivo:
+          type: boolean
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+      required: [id, cittaId, nome, attivo, dataCreazione]
+
+    ZonaUdsInput:
+      type: object
+      properties:
+        cittaId:
+          type: integer
+        nome:
+          type: string
+          minLength: 1
+        attivo:
+          type: boolean
+        note:
+          type: string
+      required: [cittaId, nome]
+
+    ZonaUdsUpdate:
+      type: object
+      properties:
+        cittaId:
+          type: integer
+        nome:
+          type: string
+          minLength: 1
+        attivo:
+          type: boolean
+        note:
           type: string
 
     # ── Centri di Ascolto ────────────────────────────────────────────────
@@ -4042,6 +4344,14 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        zonaUdsId:
+          type: ["integer", "null"]
+        zonaUdsNome:
+          type: ["string", "null"]
         isAdmin:
           type: boolean
         aree:
@@ -4095,6 +4405,14 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        zonaUdsId:
+          type: ["integer", "null"]
+        zonaUdsNome:
+          type: ["string", "null"]
         attivo:
           type: boolean
         mustChangePassword:
@@ -4126,6 +4444,10 @@ components:
           type: ["integer", "null"]
         centroAscoltoId:
           type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        zonaUdsId:
+          type: ["integer", "null"]
         attivo:
           type: boolean
       required: [username, password, nome, cognome]
@@ -4143,6 +4465,10 @@ components:
         ruoloId:
           type: ["integer", "null"]
         centroAscoltoId:
+          type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        zonaUdsId:
           type: ["integer", "null"]
         attivo:
           type: boolean

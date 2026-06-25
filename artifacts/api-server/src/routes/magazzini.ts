@@ -4,8 +4,12 @@ import { magazziniTable, centriAscoltoTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   centroScopeFilter,
+  cittaScopeFilter,
   canAccessCentro,
+  canAccessCitta,
+  andScoped,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
@@ -66,7 +70,12 @@ router.get("/magazzini", async (req, res) => {
       centriAscoltoTable,
       eq(magazziniTable.centroAscoltoId, centriAscoltoTable.id),
     )
-    .where(centroScopeFilter(magazziniTable.centroAscoltoId, callerCentroId(req)))
+    .where(
+      andScoped(
+        centroScopeFilter(magazziniTable.centroAscoltoId, callerCentroId(req)),
+        cittaScopeFilter(magazziniTable.cittaId, callerCittaId(req)),
+      ),
+    )
     .orderBy(magazziniTable.nome);
   res.json(rows.map((r) => fmt(r.m, r.centroNome)));
 });
@@ -74,7 +83,9 @@ router.get("/magazzini", async (req, res) => {
 router.post("/magazzini", async (req, res) => {
   const body = req.body;
   const caller = callerCentroId(req);
+  const cid = callerCittaId(req);
   const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
+  const cittaId = cid != null ? cid : (body.cittaId ?? null);
   const providedCodice = typeof body.codice === "string" ? body.codice.trim() : "";
   const values = {
     nome: body.nome,
@@ -85,6 +96,7 @@ router.post("/magazzini", async (req, res) => {
     telefono: body.telefono,
     email: body.email,
     centroAscoltoId,
+    cittaId,
     stato: body.stato ?? "attivo",
     note: body.note,
   };
@@ -134,21 +146,32 @@ router.get("/magazzini/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  if (!canAccessCitta(row.cittaId, callerCittaId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    return;
+  }
   res.json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
 });
 
 router.patch("/magazzini/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const caller = callerCentroId(req);
+  const cid = callerCittaId(req);
   const [existing] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  if (!canAccessCitta(existing.cittaId, cid)) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    return;
+  }
   const updates = { ...req.body };
   // Scoped users cannot reassign a record's centro.
   if (caller != null) delete updates.centroAscoltoId;
+  // Scoped users cannot move a record to another città.
+  if (cid != null) delete updates.cittaId;
   const [row] = await db.update(magazziniTable).set(updates).where(eq(magazziniTable.id, id)).returning();
   res.json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
 });
@@ -160,6 +183,10 @@ router.delete("/magazzini/:id", async (req, res) => {
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (!canAccessCitta(existing.cittaId, callerCittaId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
   await db.delete(magazziniTable).where(eq(magazziniTable.id, id));

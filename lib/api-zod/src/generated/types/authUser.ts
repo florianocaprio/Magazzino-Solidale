@@ -22,6 +22,14 @@ export interface AuthUser {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;

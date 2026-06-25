@@ -9,7 +9,7 @@ import {
   type Column,
   type SQL,
 } from "drizzle-orm";
-import { db, magazziniTable, beneficiariTable } from "@workspace/db";
+import { db, magazziniTable, beneficiariTable, centriAscoltoTable } from "@workspace/db";
 
 /**
  * Per-Centro-di-Ascolto data scoping.
@@ -59,15 +59,37 @@ export function canAccessCentro(
  */
 export async function visibleMagazzinoIds(
   centroId: number | null,
+  cittaId: number | null = null,
 ): Promise<number[] | null> {
-  if (centroId == null) return null;
+  if (centroId == null && cittaId == null) return null;
+  const cond = andScoped(
+    centroScopeFilter(magazziniTable.centroAscoltoId, centroId),
+    cittaScopeFilter(magazziniTable.cittaId, cittaId),
+  );
   const rows = await db
     .select({ id: magazziniTable.id })
     .from(magazziniTable)
+    .where(cond);
+  return rows.map((r) => r.id);
+}
+
+/**
+ * The set of centro ids visible to a caller scoped to `cittaId`: centri whose
+ * città equals the caller's OR is NULL (shared). Returns `null` for a città-global
+ * caller (no restriction). Used to scope centro-linked entities (fornitori,
+ * volontari, mezzi) by città when they carry no direct cittaId column.
+ */
+export async function visibleCentroIds(
+  cittaId: number | null,
+): Promise<number[] | null> {
+  if (cittaId == null) return null;
+  const rows = await db
+    .select({ id: centriAscoltoTable.id })
+    .from(centriAscoltoTable)
     .where(
       or(
-        eq(magazziniTable.centroAscoltoId, centroId),
-        isNull(magazziniTable.centroAscoltoId),
+        eq(centriAscoltoTable.cittaId, cittaId),
+        isNull(centriAscoltoTable.cittaId),
       ),
     );
   return rows.map((r) => r.id);
@@ -126,14 +148,18 @@ export async function beneficiarioCentroId(
 export async function canUseBeneficiario(
   beneficiarioId: number | null | undefined,
   centroId: number | null,
+  cittaId: number | null = null,
 ): Promise<boolean> {
   if (beneficiarioId == null) return true;
   const [b] = await db
-    .select({ c: beneficiariTable.centroAscoltoId })
+    .select({
+      c: beneficiariTable.centroAscoltoId,
+      ci: beneficiariTable.cittaId,
+    })
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId));
   if (!b) return false;
-  return canAccessCentro(b.c, centroId);
+  return canAccessCentro(b.c, centroId) && canAccessCitta(b.ci, cittaId);
 }
 
 /**
@@ -153,6 +179,104 @@ export async function canUseMagazzino(
     .where(eq(magazziniTable.id, magazzinoId));
   if (!m) return false;
   return canAccessCentro(m.c, centroId);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Per-Città (city) data scoping — HARD visibility boundary.
+ *
+ * A user bound to a città (`req.user.cittaId != null`) may only see rows of
+ * their own città plus città-unassigned (NULL) legacy/shared rows. They never
+ * see another città's data. A user with no città (null) is global across
+ * cities. This is ADDITIVE to the centro scoping above: an entity scoped by
+ * both must satisfy BOTH filters. The optional UDS zona is a SOFT preference
+ * (default view), not an enforcement boundary.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** The caller's città id, or null if the user is global across cities. */
+export function callerCittaId(req: Request): number | null {
+  return req.user?.cittaId ?? null;
+}
+
+/** The caller's preferred UDS zona id, or null = all zones of the città. */
+export function callerZonaUdsId(req: Request): number | null {
+  return req.user?.zonaUdsId ?? null;
+}
+
+/**
+ * HARD città boundary: rows whose città column equals the caller's città OR is
+ * NULL (unassigned/shared legacy data, so existing rows stay visible until a
+ * città is assigned). Returns `undefined` for a global caller (no filtering).
+ */
+export function cittaScopeFilter(
+  column: Column,
+  cittaId: number | null,
+): SQL | undefined {
+  if (cittaId == null) return undefined;
+  return or(eq(column, cittaId), isNull(column));
+}
+
+/** Whether a stored città value is visible to a caller scoped to `cittaId`. */
+export function canAccessCitta(
+  rowCittaId: number | null | undefined,
+  cittaId: number | null,
+): boolean {
+  if (cittaId == null) return true;
+  return rowCittaId == null || rowCittaId === cittaId;
+}
+
+/** The città of a beneficiario, used to scope indirect-link entities. */
+export async function beneficiarioCittaId(
+  beneficiarioId: number | null | undefined,
+): Promise<number | null> {
+  if (beneficiarioId == null) return null;
+  const [b] = await db
+    .select({ c: beneficiariTable.cittaId })
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, beneficiarioId));
+  return b?.c ?? null;
+}
+
+/**
+ * WHERE condition limiting an entity to rows whose (centro-like) column is in a
+ * visible id set OR is NULL (shared). `null` ids → no filtering; empty ids →
+ * only shared (NULL) rows. Used to scope centro-linked entities (fornitori,
+ * volontari, mezzi) by città via `visibleCentroIds`.
+ */
+export function idSetScopeFilter(
+  column: Column,
+  ids: number[] | null,
+): SQL | undefined {
+  if (ids == null) return undefined;
+  if (ids.length === 0) return isNull(column);
+  return or(inArray(column, ids), isNull(column));
+}
+
+/**
+ * Whether a centro-linked row (fornitore, volontario, mezzo) is visible to a
+ * caller restricted to a città's centro set (`visibleCentroIds`). A NULL centro
+ * is shared/visible. `null` set → città-global caller → always visible.
+ */
+export function inVisibleCentroSet(
+  centroAscoltoId: number | null | undefined,
+  cittaCentroIds: number[] | null,
+): boolean {
+  if (cittaCentroIds == null) return true;
+  return centroAscoltoId == null || cittaCentroIds.includes(centroAscoltoId);
+}
+
+/**
+ * Whether a caller (scoped by centro and/or città) may access a given magazzino.
+ * Global on both axes → always true. Otherwise the warehouse must be in the
+ * visible set computed from both axes.
+ */
+export async function canAccessMagazzino(
+  magazzinoId: number,
+  centroId: number | null,
+  cittaId: number | null = null,
+): Promise<boolean> {
+  if (centroId == null && cittaId == null) return true;
+  const ids = await visibleMagazzinoIds(centroId, cittaId);
+  return ids == null || ids.includes(magazzinoId);
 }
 
 /** Combine conditions, dropping undefined, returning undefined when none. */

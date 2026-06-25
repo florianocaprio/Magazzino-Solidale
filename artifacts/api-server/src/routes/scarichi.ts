@@ -13,9 +13,13 @@ import {
 import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   centroScopeFilter,
   canAccessCentro,
+  canAccessMagazzino,
   visibleMagazzinoIds,
+  magazzinoScopeFilter,
+  andScoped,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
@@ -138,10 +142,18 @@ async function scaricoFEFO(tx: Tx, opts: {
 }
 
 router.get("/scarichi", async (req, res) => {
+  // Centro is enforced via scarichi's own column; città is enforced via the
+  // scarico's magazzino (scarichi carry no direct cittaId).
+  const cittaMagazzini = await visibleMagazzinoIds(null, callerCittaId(req));
   const rows = await db
     .select()
     .from(scarichiTable)
-    .where(centroScopeFilter(scarichiTable.centroAscoltoId, callerCentroId(req)))
+    .where(
+      andScoped(
+        centroScopeFilter(scarichiTable.centroAscoltoId, callerCentroId(req)),
+        magazzinoScopeFilter(scarichiTable.magazzinoId, cittaMagazzini),
+      ),
+    )
     .orderBy(desc(scarichiTable.dataCreazione))
     .limit(100);
 
@@ -268,12 +280,9 @@ router.post("/scarichi", async (req, res) => {
   }
 
   const caller = callerCentroId(req);
-  if (caller != null) {
-    const visible = await visibleMagazzinoIds(caller);
-    if (visible != null && !visible.includes(body.magazzinoId)) {
-      res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
-      return;
-    }
+  if (!(await canAccessMagazzino(body.magazzinoId, caller, callerCittaId(req)))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
+    return;
   }
   const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
 
@@ -333,6 +342,10 @@ router.get("/scarichi/:id", async (req, res) => {
   }
   if (!canAccessCentro(result.centroAscoltoId, callerCentroId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (!(await canAccessMagazzino(result.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
   res.json(result);

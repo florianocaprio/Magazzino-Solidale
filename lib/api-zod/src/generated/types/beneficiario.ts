@@ -42,6 +42,16 @@ export interface Beneficiario {
   centroAscoltoNome?: string | null;
   attivo: boolean;
   /** @nullable */
+  soprannome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
+  /** @nullable */
   dataPresaInCarico?: string | null;
   dataCreazione: string;
 }

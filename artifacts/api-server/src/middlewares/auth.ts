@@ -1,6 +1,13 @@
 import type { RequestHandler } from "express";
 import { eq } from "drizzle-orm";
-import { db, utentiTable, ruoliTable, centriAscoltoTable } from "@workspace/db";
+import {
+  db,
+  utentiTable,
+  ruoliTable,
+  centriAscoltoTable,
+  cittaTable,
+  zoneUdsTable,
+} from "@workspace/db";
 import { AREA_BY_SEGMENT } from "../lib/areas";
 
 export interface SessionUser {
@@ -13,6 +20,10 @@ export interface SessionUser {
   ruoloNome: string | null;
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
+  cittaId: number | null;
+  cittaNome: string | null;
+  zonaUdsId: number | null;
+  zonaUdsNome: string | null;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;
@@ -49,6 +60,10 @@ export async function loadSessionUser(
       ruoloNome: ruoliTable.nome,
       centroAscoltoId: utentiTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
+      cittaId: utentiTable.cittaId,
+      cittaNome: cittaTable.nome,
+      zonaUdsId: utentiTable.zonaUdsId,
+      zonaUdsNome: zoneUdsTable.nome,
       isAdmin: ruoliTable.isAdmin,
       aree: ruoliTable.aree,
     })
@@ -58,6 +73,8 @@ export async function loadSessionUser(
       centriAscoltoTable,
       eq(utentiTable.centroAscoltoId, centriAscoltoTable.id),
     )
+    .leftJoin(cittaTable, eq(utentiTable.cittaId, cittaTable.id))
+    .leftJoin(zoneUdsTable, eq(utentiTable.zonaUdsId, zoneUdsTable.id))
     .where(eq(utentiTable.id, userId));
 
   if (!row || !row.attivo) return null;
@@ -72,6 +89,10 @@ export async function loadSessionUser(
     ruoloNome: row.ruoloNome ?? null,
     centroAscoltoId: row.centroAscoltoId ?? null,
     centroAscoltoNome: row.centroAscoltoNome ?? null,
+    cittaId: row.cittaId ?? null,
+    cittaNome: row.cittaNome ?? null,
+    zonaUdsId: row.zonaUdsId ?? null,
+    zonaUdsNome: row.zonaUdsNome ?? null,
     isAdmin: row.isAdmin ?? false,
     aree: row.aree ?? [],
     mustChangePassword: row.mustChangePassword,

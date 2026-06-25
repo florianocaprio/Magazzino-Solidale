@@ -4,6 +4,7 @@ import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTa
 import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   visibleMagazzinoIds,
   trasferimentoScopeFilter,
 } from "../lib/centroScope";
@@ -189,7 +190,7 @@ router.get("/trasferimenti", async (req, res) => {
   const scope = trasferimentoScopeFilter(
     trasferimentiTable.magazzinoOrigineId,
     trasferimentiTable.magazzinoDestinoId,
-    await visibleMagazzinoIds(callerCentroId(req)),
+    await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)),
   );
   if (scope) conditions.push(scope);
 
@@ -290,7 +291,7 @@ router.post("/trasferimenti", async (req, res) => {
     res.status(400).json({ error: "Origine e destinazione devono essere diverse" });
     return;
   }
-  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   if (visIds != null && (!visIds.includes(body.magazzinoOrigineId) || !visIds.includes(body.magazzinoDestinoId))) {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
     return;
@@ -337,7 +338,7 @@ router.post("/trasferimenti", async (req, res) => {
 router.get("/trasferimenti/:id", async (req, res) => {
   const result = await getTrasferimentoWithRighe(parseInt(req.params.id));
   if (!result) { res.status(404).json({ error: "Not found" }); return; }
-  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   if (visIds != null && !visIds.includes(result.magazzinoOrigineId) && !visIds.includes(result.magazzinoDestinoId)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -351,7 +352,7 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 
   const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
-  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -430,7 +431,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const id = parseInt(req.params.id);
   const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
-  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -500,7 +501,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
   const body = req.body ?? {};
   const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
-  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;

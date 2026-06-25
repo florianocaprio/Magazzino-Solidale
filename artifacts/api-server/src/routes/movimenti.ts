@@ -4,8 +4,10 @@ import { movimentiTable, prodottiTable, magazziniTable } from "@workspace/db";
 import { eq, and, gte, lte, desc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
+  canAccessMagazzino,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
@@ -19,7 +21,7 @@ router.get("/movimenti", async (req, res) => {
   if (centroAscoltoId) conditions.push(eq(magazziniTable.centroAscoltoId, parseInt(centroAscoltoId)));
   if (da) conditions.push(gte(movimentiTable.dataMovimento, da));
   if (a) conditions.push(lte(movimentiTable.dataMovimento, a));
-  const scope = magazzinoScopeFilter(movimentiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req)));
+  const scope = magazzinoScopeFilter(movimentiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
   if (scope) conditions.push(scope);
 
   const rows = await db
@@ -57,9 +59,8 @@ router.get("/movimenti", async (req, res) => {
 
 router.post("/movimenti", async (req, res) => {
   const body = req.body;
-  const ids = await visibleMagazzinoIds(callerCentroId(req));
-  if (ids != null && !ids.includes(body.magazzinoId)) {
-    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+  if (!(await canAccessMagazzino(body.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
   const [row] = await db.insert(movimentiTable).values({

@@ -41,6 +41,9 @@ import type {
   CentroAscoltoInput,
   CentroAscoltoUpdate,
   ChangePasswordInput,
+  Citta,
+  CittaInput,
+  CittaUpdate,
   ConfermaRicezione,
   Consegna,
   ConsegnaInput,
@@ -71,6 +74,7 @@ import type {
   ListMovimentiParams,
   ListProdottiParams,
   ListTrasferimentiParams,
+  ListZoneUdsParams,
   LoginInput,
   Lotto,
   LottoInput,
@@ -108,7 +112,10 @@ import type {
   UtenteUpdate,
   Volontario,
   VolontarioInput,
-  VolontarioUpdate
+  VolontarioUpdate,
+  ZonaUds,
+  ZonaUdsInput,
+  ZonaUdsUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -4914,6 +4921,687 @@ export const useConsegnaBolla = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getConsegnaBollaMutationOptions(options));
+    }
+
+export const getListCittaUrl = () => {
+
+
+
+
+  return `/api/citta`
+}
+
+export const listCitta = async ( options?: RequestInit): Promise<Citta[]> => {
+
+  return customFetch<Citta[]>(getListCittaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCittaQueryKey = () => {
+    return [
+    `/api/citta`
+    ] as const;
+    }
+
+
+export const getListCittaQueryOptions = <TData = Awaited<ReturnType<typeof listCitta>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCitta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCittaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCitta>>> = ({ signal }) => listCitta({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCitta>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCittaQueryResult = NonNullable<Awaited<ReturnType<typeof listCitta>>>
+export type ListCittaQueryError = ErrorType<unknown>
+
+
+
+export function useListCitta<TData = Awaited<ReturnType<typeof listCitta>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCitta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCittaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCittaUrl = () => {
+
+
+
+
+  return `/api/citta`
+}
+
+export const createCitta = async (cittaInput: CittaInput, options?: RequestInit): Promise<Citta> => {
+
+  return customFetch<Citta>(getCreateCittaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cittaInput,)
+  }
+);}
+
+
+
+
+export const getCreateCittaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCitta>>, TError,{data: BodyType<CittaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCitta>>, TError,{data: BodyType<CittaInput>}, TContext> => {
+
+const mutationKey = ['createCitta'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCitta>>, {data: BodyType<CittaInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCitta(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCittaMutationResult = NonNullable<Awaited<ReturnType<typeof createCitta>>>
+    export type CreateCittaMutationBody = BodyType<CittaInput>
+    export type CreateCittaMutationError = ErrorType<unknown>
+
+    export const useCreateCitta = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCitta>>, TError,{data: BodyType<CittaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCitta>>,
+        TError,
+        {data: BodyType<CittaInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCittaMutationOptions(options));
+    }
+
+export const getGetCittaUrl = (id: number,) => {
+
+
+
+
+  return `/api/citta/${id}`
+}
+
+export const getCitta = async (id: number, options?: RequestInit): Promise<Citta> => {
+
+  return customFetch<Citta>(getGetCittaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCittaQueryKey = (id: number,) => {
+    return [
+    `/api/citta/${id}`
+    ] as const;
+    }
+
+
+export const getGetCittaQueryOptions = <TData = Awaited<ReturnType<typeof getCitta>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCitta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCittaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCitta>>> = ({ signal }) => getCitta(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCitta>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCittaQueryResult = NonNullable<Awaited<ReturnType<typeof getCitta>>>
+export type GetCittaQueryError = ErrorType<unknown>
+
+
+
+export function useGetCitta<TData = Awaited<ReturnType<typeof getCitta>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCitta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCittaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateCittaUrl = (id: number,) => {
+
+
+
+
+  return `/api/citta/${id}`
+}
+
+export const updateCitta = async (id: number,
+    cittaUpdate: CittaUpdate, options?: RequestInit): Promise<Citta> => {
+
+  return customFetch<Citta>(getUpdateCittaUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cittaUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateCittaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCitta>>, TError,{id: number;data: BodyType<CittaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCitta>>, TError,{id: number;data: BodyType<CittaUpdate>}, TContext> => {
+
+const mutationKey = ['updateCitta'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCitta>>, {id: number;data: BodyType<CittaUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCitta(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCittaMutationResult = NonNullable<Awaited<ReturnType<typeof updateCitta>>>
+    export type UpdateCittaMutationBody = BodyType<CittaUpdate>
+    export type UpdateCittaMutationError = ErrorType<unknown>
+
+    export const useUpdateCitta = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCitta>>, TError,{id: number;data: BodyType<CittaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCitta>>,
+        TError,
+        {id: number;data: BodyType<CittaUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateCittaMutationOptions(options));
+    }
+
+export const getDeleteCittaUrl = (id: number,) => {
+
+
+
+
+  return `/api/citta/${id}`
+}
+
+export const deleteCitta = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCittaUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCittaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCitta>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCitta>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteCitta'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCitta>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteCitta(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCittaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCitta>>>
+
+    export type DeleteCittaMutationError = ErrorType<unknown>
+
+    export const useDeleteCitta = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCitta>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCitta>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteCittaMutationOptions(options));
+    }
+
+export const getListZoneUdsUrl = (params?: ListZoneUdsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/zone-uds?${stringifiedParams}` : `/api/zone-uds`
+}
+
+export const listZoneUds = async (params?: ListZoneUdsParams, options?: RequestInit): Promise<ZonaUds[]> => {
+
+  return customFetch<ZonaUds[]>(getListZoneUdsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListZoneUdsQueryKey = (params?: ListZoneUdsParams,) => {
+    return [
+    `/api/zone-uds`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListZoneUdsQueryOptions = <TData = Awaited<ReturnType<typeof listZoneUds>>, TError = ErrorType<unknown>>(params?: ListZoneUdsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listZoneUds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListZoneUdsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listZoneUds>>> = ({ signal }) => listZoneUds(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listZoneUds>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListZoneUdsQueryResult = NonNullable<Awaited<ReturnType<typeof listZoneUds>>>
+export type ListZoneUdsQueryError = ErrorType<unknown>
+
+
+
+export function useListZoneUds<TData = Awaited<ReturnType<typeof listZoneUds>>, TError = ErrorType<unknown>>(
+ params?: ListZoneUdsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listZoneUds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListZoneUdsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateZonaUdsUrl = () => {
+
+
+
+
+  return `/api/zone-uds`
+}
+
+export const createZonaUds = async (zonaUdsInput: ZonaUdsInput, options?: RequestInit): Promise<ZonaUds> => {
+
+  return customFetch<ZonaUds>(getCreateZonaUdsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      zonaUdsInput,)
+  }
+);}
+
+
+
+
+export const getCreateZonaUdsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createZonaUds>>, TError,{data: BodyType<ZonaUdsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createZonaUds>>, TError,{data: BodyType<ZonaUdsInput>}, TContext> => {
+
+const mutationKey = ['createZonaUds'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createZonaUds>>, {data: BodyType<ZonaUdsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createZonaUds(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateZonaUdsMutationResult = NonNullable<Awaited<ReturnType<typeof createZonaUds>>>
+    export type CreateZonaUdsMutationBody = BodyType<ZonaUdsInput>
+    export type CreateZonaUdsMutationError = ErrorType<unknown>
+
+    export const useCreateZonaUds = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createZonaUds>>, TError,{data: BodyType<ZonaUdsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createZonaUds>>,
+        TError,
+        {data: BodyType<ZonaUdsInput>},
+        TContext
+      > => {
+      return useMutation(getCreateZonaUdsMutationOptions(options));
+    }
+
+export const getGetZonaUdsUrl = (id: number,) => {
+
+
+
+
+  return `/api/zone-uds/${id}`
+}
+
+export const getZonaUds = async (id: number, options?: RequestInit): Promise<ZonaUds> => {
+
+  return customFetch<ZonaUds>(getGetZonaUdsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetZonaUdsQueryKey = (id: number,) => {
+    return [
+    `/api/zone-uds/${id}`
+    ] as const;
+    }
+
+
+export const getGetZonaUdsQueryOptions = <TData = Awaited<ReturnType<typeof getZonaUds>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZonaUds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetZonaUdsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getZonaUds>>> = ({ signal }) => getZonaUds(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getZonaUds>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetZonaUdsQueryResult = NonNullable<Awaited<ReturnType<typeof getZonaUds>>>
+export type GetZonaUdsQueryError = ErrorType<unknown>
+
+
+
+export function useGetZonaUds<TData = Awaited<ReturnType<typeof getZonaUds>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZonaUds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetZonaUdsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateZonaUdsUrl = (id: number,) => {
+
+
+
+
+  return `/api/zone-uds/${id}`
+}
+
+export const updateZonaUds = async (id: number,
+    zonaUdsUpdate: ZonaUdsUpdate, options?: RequestInit): Promise<ZonaUds> => {
+
+  return customFetch<ZonaUds>(getUpdateZonaUdsUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      zonaUdsUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateZonaUdsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateZonaUds>>, TError,{id: number;data: BodyType<ZonaUdsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateZonaUds>>, TError,{id: number;data: BodyType<ZonaUdsUpdate>}, TContext> => {
+
+const mutationKey = ['updateZonaUds'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateZonaUds>>, {id: number;data: BodyType<ZonaUdsUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateZonaUds(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateZonaUdsMutationResult = NonNullable<Awaited<ReturnType<typeof updateZonaUds>>>
+    export type UpdateZonaUdsMutationBody = BodyType<ZonaUdsUpdate>
+    export type UpdateZonaUdsMutationError = ErrorType<unknown>
+
+    export const useUpdateZonaUds = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateZonaUds>>, TError,{id: number;data: BodyType<ZonaUdsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateZonaUds>>,
+        TError,
+        {id: number;data: BodyType<ZonaUdsUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateZonaUdsMutationOptions(options));
+    }
+
+export const getDeleteZonaUdsUrl = (id: number,) => {
+
+
+
+
+  return `/api/zone-uds/${id}`
+}
+
+export const deleteZonaUds = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteZonaUdsUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteZonaUdsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteZonaUds'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteZonaUds>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteZonaUds(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteZonaUdsMutationResult = NonNullable<Awaited<ReturnType<typeof deleteZonaUds>>>
+
+    export type DeleteZonaUdsMutationError = ErrorType<unknown>
+
+    export const useDeleteZonaUds = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteZonaUds>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteZonaUdsMutationOptions(options));
     }
 
 export const getListCentriAscoltoUrl = () => {

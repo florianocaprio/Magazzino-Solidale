@@ -1,6 +1,8 @@
 import { pgTable, serial, varchar, text, boolean, timestamp, integer, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { cittaTable } from "./citta";
+import { zoneUdsTable } from "./zoneUds";
 
 export const beneficiariTable = pgTable("beneficiari", {
   id: serial("id").primaryKey(),
@@ -8,6 +10,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   codiceFiscale: varchar("codice_fiscale", { length: 16 }),
   cognome: varchar("cognome", { length: 80 }).notNull(),
   nome: varchar("nome", { length: 80 }).notNull(),
+  soprannome: varchar("soprannome", { length: 80 }),
   dataNascita: date("data_nascita"),
   sesso: varchar("sesso", { length: 1 }),
   cittadinanza: varchar("cittadinanza", { length: 60 }),
@@ -32,6 +35,8 @@ export const beneficiariTable = pgTable("beneficiari", {
   consegnaDomicilio: boolean("consegna_domicilio").notNull().default(false),
   motivoConsegnaDomicilio: varchar("motivo_consegna_domicilio", { length: 60 }),
   centroAscoltoId: integer("centro_ascolto_id"),
+  cittaId: integer("citta_id").references(() => cittaTable.id),
+  zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
   attivo: boolean("attivo").notNull().default(true),
   dataPresaInCarico: date("data_presa_in_carico"),
   noteInterne: text("note_interne"),

@@ -5,8 +5,10 @@ import { eq, and, lte, gt, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
+  canAccessMagazzino,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
@@ -16,7 +18,7 @@ router.get("/lotti", async (req, res) => {
   const conditions: SQL[] = [gt(lottiTable.quantitaResidua, "0")];
   if (prodottoId) conditions.push(eq(lottiTable.prodottoId, parseInt(prodottoId)));
   if (magazzinoId) conditions.push(eq(lottiTable.magazzinoId, parseInt(magazzinoId)));
-  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req)));
+  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
   if (scope) conditions.push(scope);
   if (inScadenza === "true") {
     const in30 = new Date();
@@ -60,9 +62,8 @@ router.get("/lotti", async (req, res) => {
 
 router.post("/lotti", async (req, res) => {
   const body = req.body;
-  const ids = await visibleMagazzinoIds(callerCentroId(req));
-  if (ids != null && !ids.includes(body.magazzinoId)) {
-    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+  if (!(await canAccessMagazzino(body.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
   const fsePlus = body.fsePlus ?? false;
@@ -93,9 +94,8 @@ router.post("/lotti", async (req, res) => {
 router.get("/lotti/:id", async (req, res) => {
   const [row] = await db.select().from(lottiTable).where(eq(lottiTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  const ids = await visibleMagazzinoIds(callerCentroId(req));
-  if (ids != null && !ids.includes(row.magazzinoId)) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+  if (!(await canAccessMagazzino(row.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;
   }
   res.json({ ...row, quantitaCaricata: parseFloat(row.quantitaCaricata), quantitaResidua: parseFloat(row.quantitaResidua), dataCreazione: row.dataCreazione.toISOString() });
@@ -106,14 +106,14 @@ router.patch("/lotti/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const [existing] = await db.select().from(lottiTable).where(eq(lottiTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  const ids = await visibleMagazzinoIds(callerCentroId(req));
+  const ids = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   if (ids != null && !ids.includes(existing.magazzinoId)) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;
   }
   if (ids != null && body.magazzinoId != null && body.magazzinoId !== existing.magazzinoId
       && !ids.includes(body.magazzinoId)) {
-    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
   const update: Record<string, unknown> = { ...body };

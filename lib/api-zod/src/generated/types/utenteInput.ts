@@ -21,5 +21,9 @@ export interface UtenteInput {
   ruoloId?: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
   attivo?: boolean;
 }

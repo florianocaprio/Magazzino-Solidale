@@ -1063,6 +1063,8 @@ export const ListBeneficiariQueryParams = zod.object({
   "priorita": zod.coerce.string().optional(),
   "domicilio": zod.coerce.boolean().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
+  "cittaId": zod.coerce.number().optional(),
+  "zonaUdsId": zod.coerce.number().optional(),
   "attivo": zod.coerce.boolean().optional()
 })
 
@@ -1089,6 +1091,11 @@ export const ListBeneficiariResponseItem = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "attivo": zod.boolean(),
+  "soprannome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
   "dataPresaInCarico": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
@@ -1124,6 +1131,9 @@ export const CreateBeneficiarioBody = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "dataPresaInCarico": zod.string().optional(),
   "noteInterne": zod.string().optional(),
+  "soprannome": zod.string().optional(),
+  "cittaId": zod.number().nullish(),
+  "zonaUdsId": zod.number().nullish(),
   "sesso": zod.string().optional(),
   "areaProvenienza": zod.string().optional()
 })
@@ -1166,6 +1176,11 @@ export const GetBeneficiarioResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "dataPresaInCarico": zod.string().nullish(),
+  "soprannome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
   "noteInterne": zod.string().nullish(),
   "nucleo": zod.array(zod.object({
   "id": zod.number(),
@@ -1260,6 +1275,9 @@ export const UpdateBeneficiarioBody = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "attivo": zod.boolean().optional(),
   "noteInterne": zod.string().optional(),
+  "soprannome": zod.string().optional(),
+  "cittaId": zod.number().nullish(),
+  "zonaUdsId": zod.number().nullish(),
   "sesso": zod.string().optional(),
   "areaProvenienza": zod.string().optional()
 })
@@ -1287,6 +1305,11 @@ export const UpdateBeneficiarioResponse = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "attivo": zod.boolean(),
+  "soprannome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
   "dataPresaInCarico": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
@@ -1979,6 +2002,143 @@ export const ConsegnaBollaResponse = zod.object({
 })
 
 
+export const ListCittaResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "provincia": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+export const ListCittaResponse = zod.array(ListCittaResponseItem)
+
+
+
+
+
+export const CreateCittaBody = zod.object({
+  "nome": zod.string().min(1),
+  "provincia": zod.string().optional(),
+  "attivo": zod.boolean().optional(),
+  "note": zod.string().optional()
+})
+
+
+export const GetCittaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCittaResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "provincia": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+export const UpdateCittaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateCittaBody = zod.object({
+  "nome": zod.string().min(1).optional(),
+  "provincia": zod.string().optional(),
+  "attivo": zod.boolean().optional(),
+  "note": zod.string().optional()
+})
+
+export const UpdateCittaResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "provincia": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+export const DeleteCittaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const ListZoneUdsQueryParams = zod.object({
+  "cittaId": zod.coerce.number().optional()
+})
+
+export const ListZoneUdsResponseItem = zod.object({
+  "id": zod.number(),
+  "cittaId": zod.number(),
+  "cittaNome": zod.string().nullish(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+export const ListZoneUdsResponse = zod.array(ListZoneUdsResponseItem)
+
+
+
+
+
+export const CreateZonaUdsBody = zod.object({
+  "cittaId": zod.number(),
+  "nome": zod.string().min(1),
+  "attivo": zod.boolean().optional(),
+  "note": zod.string().optional()
+})
+
+
+export const GetZonaUdsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetZonaUdsResponse = zod.object({
+  "id": zod.number(),
+  "cittaId": zod.number(),
+  "cittaNome": zod.string().nullish(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+export const UpdateZonaUdsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateZonaUdsBody = zod.object({
+  "cittaId": zod.number().optional(),
+  "nome": zod.string().min(1).optional(),
+  "attivo": zod.boolean().optional(),
+  "note": zod.string().optional()
+})
+
+export const UpdateZonaUdsResponse = zod.object({
+  "id": zod.number(),
+  "cittaId": zod.number(),
+  "cittaNome": zod.string().nullish(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+export const DeleteZonaUdsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const ListCentriAscoltoResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
@@ -2398,6 +2558,10 @@ export const LoginUserResponse = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
   "isAdmin": zod.boolean(),
   "aree": zod.array(zod.string()),
   "mustChangePassword": zod.boolean()
@@ -2414,6 +2578,10 @@ export const GetCurrentUserResponse = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
   "isAdmin": zod.boolean(),
   "aree": zod.array(zod.string()),
   "mustChangePassword": zod.boolean()
@@ -2513,6 +2681,10 @@ export const ListUtentiResponseItem = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
   "ultimoAccesso": zod.string().nullish(),
@@ -2536,6 +2708,8 @@ export const CreateUtenteBody = zod.object({
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "zonaUdsId": zod.number().nullish(),
   "attivo": zod.boolean().optional()
 })
 
@@ -2554,6 +2728,10 @@ export const GetUtenteResponse = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
   "ultimoAccesso": zod.string().nullish(),
@@ -2574,6 +2752,8 @@ export const UpdateUtenteBody = zod.object({
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "zonaUdsId": zod.number().nullish(),
   "attivo": zod.boolean().optional()
 })
 
@@ -2587,6 +2767,10 @@ export const UpdateUtenteResponse = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
   "ultimoAccesso": zod.string().nullish(),

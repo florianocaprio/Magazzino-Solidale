@@ -4,8 +4,13 @@ import { fornitoriTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   centroScopeFilter,
   canAccessCentro,
+  visibleCentroIds,
+  idSetScopeFilter,
+  inVisibleCentroSet,
+  andScoped,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
@@ -36,10 +41,16 @@ router.get("/fornitori", async (req, res) => {
   // chosen centro. Either way, fornitori "per tutti i centri" (null) are shown.
   const effectiveCentro =
     caller != null ? caller : centroAscoltoId ? parseInt(centroAscoltoId) : null;
+  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
   const rows = await db
     .select()
     .from(fornitoriTable)
-    .where(centroScopeFilter(fornitoriTable.centroAscoltoId, effectiveCentro))
+    .where(
+      andScoped(
+        centroScopeFilter(fornitoriTable.centroAscoltoId, effectiveCentro),
+        idSetScopeFilter(fornitoriTable.centroAscoltoId, cittaCentroIds),
+      ),
+    )
     .orderBy(fornitoriTable.nome);
   res.json(rows.map(fmt));
 });
@@ -48,6 +59,11 @@ router.post("/fornitori", async (req, res) => {
   const caller = callerCentroId(req);
   const values = { ...req.body };
   if (caller != null) values.centroAscoltoId = caller;
+  if (caller == null && values.centroAscoltoId != null
+      && !inVisibleCentroSet(values.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Centro non accessibile per la tua città" });
+    return;
+  }
   const [row] = await db.insert(fornitoriTable).values(values).returning();
   res.status(201).json(fmt(row));
 });
@@ -59,6 +75,10 @@ router.get("/fornitori/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  if (!inVisibleCentroSet(row.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    return;
+  }
   res.json(fmt(row));
 });
 
@@ -68,6 +88,10 @@ router.patch("/fornitori/:id", async (req, res) => {
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
   const updates = { ...req.body };
@@ -82,6 +106,10 @@ router.delete("/fornitori/:id", async (req, res) => {
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
   await db.delete(fornitoriTable).where(eq(fornitoriTable.id, parseInt(req.params.id)));

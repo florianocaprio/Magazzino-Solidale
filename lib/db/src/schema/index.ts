@@ -5,6 +5,8 @@ export * from "./lotti";
 export * from "./movimenti";
 export * from "./volontari";
 export * from "./mezzi";
+export * from "./citta";
+export * from "./zoneUds";
 export * from "./centri";
 export * from "./beneficiari";
 export * from "./interventi";

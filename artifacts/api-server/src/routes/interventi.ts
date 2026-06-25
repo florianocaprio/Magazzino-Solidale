@@ -4,9 +4,13 @@ import { interventiTable, beneficiariTable, utentiTable } from "@workspace/db";
 import { eq, and, desc, or, ilike, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   centroScopeFilter,
+  cittaScopeFilter,
   canAccessCentro,
+  canAccessCitta,
   beneficiarioCentroId,
+  beneficiarioCittaId,
   canUseBeneficiario,
 } from "../lib/centroScope";
 
@@ -23,6 +27,8 @@ router.get("/interventi", async (req, res) => {
   } else if (centroAscoltoId) {
     conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
   }
+  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
+  if (cittaFilter) conditions.push(cittaFilter);
   // tipoIntervento può essere una lista di etichette separate da virgola
   // (es. "pacco_alimentare,igiene"): il filtro deve trovare anche i valori multipli
   if (tipo) {
@@ -72,7 +78,8 @@ router.get("/interventi", async (req, res) => {
 
 router.post("/interventi", async (req, res) => {
   const caller = callerCentroId(req);
-  if (caller != null && !(await canUseBeneficiario(req.body.beneficiarioId, caller))) {
+  const cid = callerCittaId(req);
+  if ((caller != null || cid != null) && !(await canUseBeneficiario(req.body.beneficiarioId, caller, cid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
     return;
   }
@@ -83,7 +90,8 @@ router.post("/interventi", async (req, res) => {
 router.get("/interventi/:id", async (req, res) => {
   const [row] = await db.select().from(interventiTable).where(eq(interventiTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))) {
+  if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))
+      || !canAccessCitta(await beneficiarioCittaId(row.beneficiarioId), callerCittaId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -95,12 +103,14 @@ router.patch("/interventi/:id", async (req, res) => {
   const [existing] = await db.select().from(interventiTable).where(eq(interventiTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
-  if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)) {
+  const cid = callerCittaId(req);
+  if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)
+      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), cid)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (caller != null && req.body.beneficiarioId != null && req.body.beneficiarioId !== existing.beneficiarioId
-      && !(await canUseBeneficiario(req.body.beneficiarioId, caller))) {
+  if ((caller != null || cid != null) && req.body.beneficiarioId != null && req.body.beneficiarioId !== existing.beneficiarioId
+      && !(await canUseBeneficiario(req.body.beneficiarioId, caller, cid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
     return;
   }

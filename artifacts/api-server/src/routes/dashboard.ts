@@ -7,19 +7,41 @@ import {
 import { eq, and, count, lte, gt, gte, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   centroScopeFilter,
+  cittaScopeFilter,
   visibleMagazzinoIds,
+  visibleCentroIds,
   magazzinoScopeFilter,
+  idSetScopeFilter,
   trasferimentoScopeFilter,
   andScoped,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
 
-/** SQL scoping a beneficiario-keyed count to the caller's centro (own OR null). */
-function benScopeSql(beneficiarioCol: SQL, caller: number | null): SQL | undefined {
-  if (caller == null) return undefined;
-  return sql`${beneficiarioCol} IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
+/**
+ * SQL scoping a beneficiario-keyed count to the caller's centro (own OR null)
+ * AND città (own OR null). Both axes are additive.
+ */
+function benScopeSql(
+  beneficiarioCol: SQL,
+  caller: number | null,
+  citta: number | null,
+): SQL | undefined {
+  const parts: SQL[] = [];
+  if (caller != null) {
+    parts.push(
+      sql`${beneficiarioCol} IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`,
+    );
+  }
+  if (citta != null) {
+    parts.push(
+      sql`${beneficiarioCol} IN (SELECT id FROM beneficiari WHERE citta_id = ${citta} OR citta_id IS NULL)`,
+    );
+  }
+  if (parts.length === 0) return undefined;
+  return parts.length === 1 ? parts[0] : and(...parts);
 }
 
 router.get("/dashboard/stats", async (req, res) => {
@@ -30,17 +52,19 @@ router.get("/dashboard/stats", async (req, res) => {
   const in30str = in30.toISOString().split("T")[0];
 
   const caller = callerCentroId(req);
-  const magIds = await visibleMagazzinoIds(caller);
+  const citta = callerCittaId(req);
+  const magIds = await visibleMagazzinoIds(caller, citta);
+  const cittaCentroIds = await visibleCentroIds(citta);
 
-  const [magCount] = await db.select({ n: count() }).from(magazziniTable).where(andScoped(eq(magazziniTable.stato, "attivo"), centroScopeFilter(magazziniTable.centroAscoltoId, caller)));
+  const [magCount] = await db.select({ n: count() }).from(magazziniTable).where(andScoped(eq(magazziniTable.stato, "attivo"), centroScopeFilter(magazziniTable.centroAscoltoId, caller), cittaScopeFilter(magazziniTable.cittaId, citta)));
   const [prodCount] = await db.select({ n: count() }).from(prodottiTable).where(eq(prodottiTable.attivo, true));
-  const [benCount] = await db.select({ n: count() }).from(beneficiariTable).where(andScoped(eq(beneficiariTable.attivo, true), centroScopeFilter(beneficiariTable.centroAscoltoId, caller)));
-  const [volCount] = await db.select({ n: count() }).from(volontariTable).where(andScoped(eq(volontariTable.attivo, true), centroScopeFilter(volontariTable.centroAscoltoId, caller)));
-  const [consOggi] = await db.select({ n: count() }).from(consegneTable).where(andScoped(eq(consegneTable.dataPrevista, oggi), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller)));
-  const [consMese] = await db.select({ n: count() }).from(consegneTable).where(andScoped(gte(consegneTable.dataPrevista, inizioMese), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller)));
+  const [benCount] = await db.select({ n: count() }).from(beneficiariTable).where(andScoped(eq(beneficiariTable.attivo, true), centroScopeFilter(beneficiariTable.centroAscoltoId, caller), cittaScopeFilter(beneficiariTable.cittaId, citta)));
+  const [volCount] = await db.select({ n: count() }).from(volontariTable).where(andScoped(eq(volontariTable.attivo, true), centroScopeFilter(volontariTable.centroAscoltoId, caller), idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds)));
+  const [consOggi] = await db.select({ n: count() }).from(consegneTable).where(andScoped(eq(consegneTable.dataPrevista, oggi), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller, citta)));
+  const [consMese] = await db.select({ n: count() }).from(consegneTable).where(andScoped(gte(consegneTable.dataPrevista, inizioMese), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller, citta)));
   const [lottiScad] = await db.select({ n: count() }).from(lottiTable).where(andScoped(gt(lottiTable.quantitaResidua, "0"), lte(lottiTable.dataScadenza, in30str), magazzinoScopeFilter(lottiTable.magazzinoId, magIds)));
   const [trasCorso] = await db.select({ n: count() }).from(trasferimentiTable).where(andScoped(eq(trasferimentiTable.stato, "in_transito"), trasferimentoScopeFilter(trasferimentiTable.magazzinoOrigineId, trasferimentiTable.magazzinoDestinoId, magIds)));
-  const [intMese] = await db.select({ n: count() }).from(interventiTable).where(andScoped(gte(interventiTable.dataIntervento, inizioMese), benScopeSql(sql`${interventiTable.beneficiarioId}`, caller)));
+  const [intMese] = await db.select({ n: count() }).from(interventiTable).where(andScoped(gte(interventiTable.dataIntervento, inizioMese), benScopeSql(sql`${interventiTable.beneficiarioId}`, caller, citta)));
 
   res.json({
     totMagazzini: Number(magCount.n),
@@ -65,7 +89,7 @@ router.get("/dashboard/alerts", async (req, res) => {
   const in30str = in30.toISOString().split("T")[0];
 
   const caller = callerCentroId(req);
-  const magIds = await visibleMagazzinoIds(caller);
+  const magIds = await visibleMagazzinoIds(caller, callerCittaId(req));
 
   const alerts: Array<{ id: number; tipo: string; livello: string; messaggio: string; dettaglio: string | null; data: string }> = [];
   let alertId = 1;
@@ -90,7 +114,7 @@ router.get("/dashboard/alerts", async (req, res) => {
 });
 
 router.get("/dashboard/movimenti-recenti", async (req, res) => {
-  const magIds = await visibleMagazzinoIds(callerCentroId(req));
+  const magIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   const magScope = magIds == null
     ? sql``
     : magIds.length === 0

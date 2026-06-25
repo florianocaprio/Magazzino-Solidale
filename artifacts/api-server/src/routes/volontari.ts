@@ -4,8 +4,13 @@ import { volontariTable, centriAscoltoTable } from "@workspace/db";
 import { eq, getTableColumns } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   centroScopeFilter,
   canAccessCentro,
+  visibleCentroIds,
+  idSetScopeFilter,
+  inVisibleCentroSet,
+  andScoped,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
@@ -41,8 +46,14 @@ const selectVolontario = () =>
     .leftJoin(centriAscoltoTable, eq(volontariTable.centroAscoltoId, centriAscoltoTable.id));
 
 router.get("/volontari", async (req, res) => {
+  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
   const rows = await selectVolontario()
-    .where(centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)))
+    .where(
+      andScoped(
+        centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)),
+        idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds),
+      ),
+    )
     .orderBy(volontariTable.cognome);
   res.json(rows.map(fmt));
 });
@@ -51,6 +62,11 @@ router.post("/volontari", async (req, res) => {
   const caller = callerCentroId(req);
   const values = { ...req.body };
   if (caller != null) values.centroAscoltoId = caller;
+  if (caller == null && values.centroAscoltoId != null
+      && !inVisibleCentroSet(values.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Centro non accessibile per la tua città" });
+    return;
+  }
   const [created] = await db.insert(volontariTable).values(values).returning({ id: volontariTable.id });
   const [row] = await selectVolontario().where(eq(volontariTable.id, created.id));
   res.status(201).json(fmt(row));
@@ -63,6 +79,10 @@ router.get("/volontari/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  if (!inVisibleCentroSet(row.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    return;
+  }
   res.json(fmt(row));
 });
 
@@ -72,6 +92,10 @@ router.patch("/volontari/:id", async (req, res) => {
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
   const updates = { ...req.body };
@@ -87,6 +111,10 @@ router.delete("/volontari/:id", async (req, res) => {
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
   await db.delete(volontariTable).where(eq(volontariTable.id, parseInt(req.params.id)));

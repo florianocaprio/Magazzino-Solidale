@@ -4,6 +4,7 @@ import { lottiTable, prodottiTable, magazziniTable } from "@workspace/db";
 import { eq, and, gt, sum, count, min, sql as drizzleSql } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
 } from "../lib/centroScope";
@@ -16,7 +17,7 @@ router.get("/giacenze", async (req, res) => {
   const conditions = [gt(lottiTable.quantitaResidua, "0")];
   if (magazzinoId) conditions.push(eq(lottiTable.magazzinoId, parseInt(magazzinoId)));
   if (fsePlusOnly === "true") conditions.push(eq(lottiTable.fsePlus, true));
-  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req)));
+  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
   if (scope) conditions.push(scope);
 
   const rows = await db

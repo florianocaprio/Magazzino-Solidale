@@ -4,9 +4,14 @@ import { approvvigionamentiTable, approvvigionamentoRigheTable, fornitoriTable, 
 import { eq, and, desc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
+  callerCittaId,
   centroScopeFilter,
   canAccessCentro,
-  canUseMagazzino,
+  canAccessMagazzino,
+  visibleMagazzinoIds,
+  visibleCentroIds,
+  inVisibleCentroSet,
+  idSetScopeFilter,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
@@ -71,6 +76,13 @@ router.get("/approvvigionamenti", async (req, res) => {
   } else if (centroAscoltoId) {
     conditions.push(eq(approvvigionamentiTable.centroAscoltoId, parseInt(centroAscoltoId)));
   }
+  // Città axis: derived from the magazzino (approvvigionamenti carry no direct
+  // cittaId). magazzinoId is nullable, so NULL stays shared/visible.
+  const cittaFilter = idSetScopeFilter(
+    approvvigionamentiTable.magazzinoId,
+    await visibleMagazzinoIds(null, callerCittaId(req)),
+  );
+  if (cittaFilter) conditions.push(cittaFilter);
 
   const rows = await db
     .select({
@@ -108,8 +120,13 @@ router.get("/approvvigionamenti", async (req, res) => {
 router.post("/approvvigionamenti", async (req, res) => {
   const body = req.body;
   const caller = callerCentroId(req);
-  if (caller != null && !(await canUseMagazzino(body.magazzinoId, caller))) {
-    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+  if (body.magazzinoId != null && !(await canAccessMagazzino(body.magazzinoId, caller, callerCittaId(req)))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
+    return;
+  }
+  if (caller == null && body.centroAscoltoId != null
+      && !inVisibleCentroSet(body.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Centro non accessibile per la tua città" });
     return;
   }
   const codice = `APP-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
@@ -148,6 +165,10 @@ router.get("/approvvigionamenti/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  if (result.magazzinoId != null && !(await canAccessMagazzino(result.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    return;
+  }
   res.json(result);
 });
 
@@ -158,6 +179,10 @@ router.patch("/approvvigionamenti/:id", async (req, res) => {
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(current.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (current.magazzinoId != null && !(await canAccessMagazzino(current.magazzinoId, caller, callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
 
@@ -181,13 +206,18 @@ router.patch("/approvvigionamenti/:id", async (req, res) => {
     res.status(409).json({ error: "Ordine non modificabile: non è più in bozza" });
     return;
   }
-  if (caller != null && req.body.magazzinoId != null && req.body.magazzinoId !== current.magazzinoId
-      && !(await canUseMagazzino(req.body.magazzinoId, caller))) {
-    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+  if (req.body.magazzinoId != null && req.body.magazzinoId !== current.magazzinoId
+      && !(await canAccessMagazzino(req.body.magazzinoId, caller, callerCittaId(req)))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
   const updates = { ...req.body };
   if (caller != null) delete updates.centroAscoltoId;
+  if (caller == null && updates.centroAscoltoId != null && updates.centroAscoltoId !== current.centroAscoltoId
+      && !inVisibleCentroSet(updates.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
+    res.status(403).json({ error: "Centro non accessibile per la tua città" });
+    return;
+  }
   const [row] = await db.update(approvvigionamentiTable).set(updates).where(eq(approvvigionamentiTable.id, id)).returning();
   const result = await getWithRighe(row.id);
   res.json(result);
@@ -199,6 +229,10 @@ router.post("/approvvigionamenti/:id/sottometti", async (req, res) => {
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(current.centroAscoltoId, callerCentroId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (current.magazzinoId != null && !(await canAccessMagazzino(current.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
   if (current.stato !== "bozza") {

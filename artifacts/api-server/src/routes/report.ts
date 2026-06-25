@@ -1,18 +1,18 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
-import { callerCentroId } from "../lib/centroScope";
+import { callerCentroId, callerCittaId } from "../lib/centroScope";
 
 const router: IRouter = Router();
 
 /**
- * SQL restricting a beneficiario-keyed query to the caller's centro (own centro
- * OR shared/null), referencing the beneficiari alias' centro column. Returns
- * `undefined` for a global caller (no restriction).
+ * Generic "own value OR shared/null" SQL fragment for a scoping column. Used for
+ * both the centro axis and the città axis (pass the relevant column + caller id).
+ * Returns `undefined` for a global caller (no restriction on that axis).
  */
-function beneficiarioCentroSql(centroCol: SQL, caller: number | null): SQL | undefined {
+function ownOrNullSql(col: SQL, caller: number | null): SQL | undefined {
   if (caller == null) return undefined;
-  return sql`(${centroCol} = ${caller} OR ${centroCol} IS NULL)`;
+  return sql`(${col} = ${caller} OR ${col} IS NULL)`;
 }
 
 function parseIntParam(v: unknown): number | undefined {
@@ -45,11 +45,14 @@ function parseDateRange(req: { query: Record<string, unknown> }): DateRange {
 router.get("/report/giacenze-per-magazzino", async (req, res) => {
   const magazzinoId = parseIntParam(req.query.magazzinoId);
   const caller = callerCentroId(req);
+  const citta = callerCittaId(req);
 
   const conds: SQL[] = [];
   if (magazzinoId) conds.push(sql`mg.id = ${magazzinoId}`);
-  const centroCond = beneficiarioCentroSql(sql`mg.centro_ascolto_id`, caller);
+  const centroCond = ownOrNullSql(sql`mg.centro_ascolto_id`, caller);
   if (centroCond) conds.push(centroCond);
+  const cittaCond = ownOrNullSql(sql`mg.citta_id`, citta);
+  if (cittaCond) conds.push(cittaCond);
   const where = conds.length ? sql`WHERE ${sql.join(conds, sql` AND `)}` : sql``;
 
   const result1 = await db.execute(sql`
@@ -84,12 +87,15 @@ router.get("/report/consegne-per-mese", async (req, res) => {
   const magazzinoId = parseIntParam(req.query.magazzinoId);
   const centroAscoltoId = parseIntParam(req.query.centroAscoltoId);
   const caller = callerCentroId(req);
+  const citta = callerCittaId(req);
 
   const conds = [sql`c.data_prevista::date BETWEEN ${da} AND ${a}`];
   if (magazzinoId) conds.push(sql`c.magazzino_id = ${magazzinoId}`);
   if (centroAscoltoId) conds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
-  const centroCond = beneficiarioCentroSql(sql`be.centro_ascolto_id`, caller);
+  const centroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
   if (centroCond) conds.push(centroCond);
+  const cittaCond = ownOrNullSql(sql`be.citta_id`, citta);
+  if (cittaCond) conds.push(cittaCond);
   const where = sql.join(conds, sql` AND `);
 
   const result2 = await db.execute(sql`
@@ -121,8 +127,13 @@ router.get("/report/consegne-per-centro", async (req, res) => {
   }
   const { da, a } = range;
   const caller = callerCentroId(req);
-  const centroCond = beneficiarioCentroSql(sql`be.centro_ascolto_id`, caller);
-  const extraCentro = centroCond ? sql` AND ${centroCond}` : sql``;
+  const citta = callerCittaId(req);
+  const scopeConds: SQL[] = [];
+  const centroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
+  if (centroCond) scopeConds.push(centroCond);
+  const cittaCond = ownOrNullSql(sql`be.citta_id`, citta);
+  if (cittaCond) scopeConds.push(cittaCond);
+  const extraCentro = scopeConds.length ? sql` AND ${sql.join(scopeConds, sql` AND `)}` : sql``;
 
   const result = await db.execute(sql`
     SELECT be.centro_ascolto_id as centro_id,
@@ -157,9 +168,14 @@ router.get("/report/fse-plus", async (req, res) => {
   }
   const anno = parsedAnno;
   const caller = callerCentroId(req);
-  const centroCond = caller == null
+  const citta = callerCittaId(req);
+  const centroSub = caller == null
     ? sql``
     : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
+  const cittaSub = citta == null
+    ? sql``
+    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE citta_id = ${citta} OR citta_id IS NULL)`;
+  const centroCond = sql`${centroSub}${cittaSub}`;
 
   const prodRes = await db.execute(sql`
     SELECT p.id as prodotto_id,

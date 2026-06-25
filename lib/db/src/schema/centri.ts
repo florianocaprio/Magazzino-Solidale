@@ -1,10 +1,12 @@
-import { pgTable, serial, varchar, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { cittaTable } from "./citta";
 
 export const centriAscoltoTable = pgTable("centri_di_ascolto", {
   id: serial("id").primaryKey(),
   nome: varchar("nome", { length: 120 }).notNull(),
+  cittaId: integer("citta_id").references(() => cittaTable.id),
   logoUrl: text("logo_url"),
   indirizzo: varchar("indirizzo", { length: 200 }),
   comune: varchar("comune", { length: 80 }),

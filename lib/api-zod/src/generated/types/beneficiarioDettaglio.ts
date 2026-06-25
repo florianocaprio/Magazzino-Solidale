@@ -62,6 +62,16 @@ export interface BeneficiarioDettaglio {
   /** @nullable */
   dataPresaInCarico?: string | null;
   /** @nullable */
+  soprannome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
+  /** @nullable */
   noteInterne?: string | null;
   nucleo?: NucleoFamiliare[];
   interventi?: Intervento[];
