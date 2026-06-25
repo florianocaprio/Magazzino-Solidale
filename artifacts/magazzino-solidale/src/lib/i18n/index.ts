@@ -25,6 +25,7 @@ import { mezzi } from "./namespaces/mezzi";
 import { fornitori } from "./namespaces/fornitori";
 import { approvvigionamenti } from "./namespaces/approvvigionamenti";
 import { report } from "./namespaces/report";
+import { reportUds } from "./namespaces/reportUds";
 import { impostazioniStampa } from "./namespaces/impostazioniStampa";
 import { utenti } from "./namespaces/utenti";
 import { ruoli } from "./namespaces/ruoli";
@@ -62,6 +63,7 @@ const PAGE_NAMESPACES = {
   fornitori,
   approvvigionamenti,
   report,
+  reportUds,
   impostazioniStampa,
   utenti,
   ruoli,

@@ -82,6 +82,7 @@ const NAV_ITEMS = [
   { key: "approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, groupKey: "logistica", area: "logistica" },
   
   { key: "report", url: "/report", icon: BarChart3, groupKey: "analisi", area: "analisi" },
+  { key: "reportUds", url: "/report-uds", icon: Footprints, groupKey: "analisi", area: "analisi" },
 
   { key: "citta", url: "/citta", icon: MapPin, groupKey: "amministrazione", area: "amministrazione" },
   { key: "zoneUds", url: "/zone-uds", icon: Map, groupKey: "amministrazione", area: "amministrazione" },

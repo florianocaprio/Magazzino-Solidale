@@ -36,6 +36,7 @@ import Bolle from "@/pages/bolle";
 import ImpostazioniStampa from "@/pages/impostazioni-stampa";
 import Approvvigionamenti from "@/pages/approvvigionamenti";
 import Report from "@/pages/report";
+import ReportUds from "@/pages/report-uds";
 import Utenti from "@/pages/utenti";
 import Ruoli from "@/pages/ruoli";
 import Citta from "@/pages/citta";
@@ -218,6 +219,13 @@ function AppRoutes() {
           {() => (
             <Guard area="analisi">
               <Report />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/report-uds">
+          {() => (
+            <Guard area="analisi">
+              <ReportUds />
             </Guard>
           )}
         </Route>

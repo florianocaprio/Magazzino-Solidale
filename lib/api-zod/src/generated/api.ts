@@ -2584,6 +2584,76 @@ export const ReportFsePlusResponse = zod.object({
 })
 
 
+/**
+ * @summary UDS street interventions grouped by month
+ */
+export const ReportUdsInterventiPerMeseQueryParams = zod.object({
+  "da": zod.coerce.string().optional(),
+  "a": zod.coerce.string().optional(),
+  "cittaId": zod.coerce.number().optional(),
+  "zonaUdsId": zod.coerce.number().optional()
+})
+
+export const ReportUdsInterventiPerMeseResponseItem = zod.object({
+  "mese": zod.string(),
+  "totInterventi": zod.number()
+})
+export const ReportUdsInterventiPerMeseResponse = zod.array(ReportUdsInterventiPerMeseResponseItem)
+
+
+/**
+ * @summary UDS street interventions grouped by type
+ */
+export const ReportUdsInterventiPerTipoQueryParams = zod.object({
+  "da": zod.coerce.string().optional(),
+  "a": zod.coerce.string().optional(),
+  "cittaId": zod.coerce.number().optional(),
+  "zonaUdsId": zod.coerce.number().optional()
+})
+
+export const ReportUdsInterventiPerTipoResponseItem = zod.object({
+  "tipo": zod.string(),
+  "totInterventi": zod.number()
+})
+export const ReportUdsInterventiPerTipoResponse = zod.array(ReportUdsInterventiPerTipoResponseItem)
+
+
+/**
+ * @summary UDS street interventions grouped by zona
+ */
+export const ReportUdsInterventiPerZonaQueryParams = zod.object({
+  "da": zod.coerce.string().optional(),
+  "a": zod.coerce.string().optional(),
+  "cittaId": zod.coerce.number().optional(),
+  "zonaUdsId": zod.coerce.number().optional()
+})
+
+export const ReportUdsInterventiPerZonaResponseItem = zod.object({
+  "zonaId": zod.number().nullish(),
+  "zonaNome": zod.string(),
+  "totInterventi": zod.number()
+})
+export const ReportUdsInterventiPerZonaResponse = zod.array(ReportUdsInterventiPerZonaResponseItem)
+
+
+/**
+ * @summary UDS people grouped by zona and channel
+ */
+export const ReportUdsPersonePerZonaQueryParams = zod.object({
+  "cittaId": zod.coerce.number().optional(),
+  "zonaUdsId": zod.coerce.number().optional()
+})
+
+export const ReportUdsPersonePerZonaResponseItem = zod.object({
+  "zonaId": zod.number().nullish(),
+  "zonaNome": zod.string(),
+  "totale": zod.number(),
+  "soloUds": zod.number(),
+  "udsConCentro": zod.number()
+})
+export const ReportUdsPersonePerZonaResponse = zod.array(ReportUdsPersonePerZonaResponseItem)
+
+
 
 
 

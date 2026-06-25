@@ -100,6 +100,10 @@ import type {
   ReportFsePlus,
   ReportFsePlusParams,
   ReportGiacenzePerMagazzinoParams,
+  ReportUdsInterventiPerMeseParams,
+  ReportUdsInterventiPerTipoParams,
+  ReportUdsInterventiPerZonaParams,
+  ReportUdsPersonePerZonaParams,
   ResetPasswordInput,
   Ruolo,
   RuoloInput,
@@ -109,6 +113,10 @@ import type {
   Trasferimento,
   TrasferimentoInput,
   TrasferimentoUpdate,
+  UdsInterventiMeseReport,
+  UdsInterventiTipoReport,
+  UdsInterventiZonaReport,
+  UdsPersonePerZonaReport,
   Utente,
   UtenteInput,
   UtenteUpdate,
@@ -7155,6 +7163,342 @@ export function useReportFsePlus<TData = Awaited<ReturnType<typeof reportFsePlus
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getReportFsePlusQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReportUdsInterventiPerMeseUrl = (params?: ReportUdsInterventiPerMeseParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/uds/interventi-per-mese?${stringifiedParams}` : `/api/report/uds/interventi-per-mese`
+}
+
+/**
+ * @summary UDS street interventions grouped by month
+ */
+export const reportUdsInterventiPerMese = async (params?: ReportUdsInterventiPerMeseParams, options?: RequestInit): Promise<UdsInterventiMeseReport[]> => {
+
+  return customFetch<UdsInterventiMeseReport[]>(getReportUdsInterventiPerMeseUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportUdsInterventiPerMeseQueryKey = (params?: ReportUdsInterventiPerMeseParams,) => {
+    return [
+    `/api/report/uds/interventi-per-mese`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getReportUdsInterventiPerMeseQueryOptions = <TData = Awaited<ReturnType<typeof reportUdsInterventiPerMese>>, TError = ErrorType<unknown>>(params?: ReportUdsInterventiPerMeseParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerMese>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReportUdsInterventiPerMeseQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportUdsInterventiPerMese>>> = ({ signal }) => reportUdsInterventiPerMese(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerMese>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReportUdsInterventiPerMeseQueryResult = NonNullable<Awaited<ReturnType<typeof reportUdsInterventiPerMese>>>
+export type ReportUdsInterventiPerMeseQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary UDS street interventions grouped by month
+ */
+
+export function useReportUdsInterventiPerMese<TData = Awaited<ReturnType<typeof reportUdsInterventiPerMese>>, TError = ErrorType<unknown>>(
+ params?: ReportUdsInterventiPerMeseParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerMese>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReportUdsInterventiPerMeseQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReportUdsInterventiPerTipoUrl = (params?: ReportUdsInterventiPerTipoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/uds/interventi-per-tipo?${stringifiedParams}` : `/api/report/uds/interventi-per-tipo`
+}
+
+/**
+ * @summary UDS street interventions grouped by type
+ */
+export const reportUdsInterventiPerTipo = async (params?: ReportUdsInterventiPerTipoParams, options?: RequestInit): Promise<UdsInterventiTipoReport[]> => {
+
+  return customFetch<UdsInterventiTipoReport[]>(getReportUdsInterventiPerTipoUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportUdsInterventiPerTipoQueryKey = (params?: ReportUdsInterventiPerTipoParams,) => {
+    return [
+    `/api/report/uds/interventi-per-tipo`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getReportUdsInterventiPerTipoQueryOptions = <TData = Awaited<ReturnType<typeof reportUdsInterventiPerTipo>>, TError = ErrorType<unknown>>(params?: ReportUdsInterventiPerTipoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerTipo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReportUdsInterventiPerTipoQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportUdsInterventiPerTipo>>> = ({ signal }) => reportUdsInterventiPerTipo(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerTipo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReportUdsInterventiPerTipoQueryResult = NonNullable<Awaited<ReturnType<typeof reportUdsInterventiPerTipo>>>
+export type ReportUdsInterventiPerTipoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary UDS street interventions grouped by type
+ */
+
+export function useReportUdsInterventiPerTipo<TData = Awaited<ReturnType<typeof reportUdsInterventiPerTipo>>, TError = ErrorType<unknown>>(
+ params?: ReportUdsInterventiPerTipoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerTipo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReportUdsInterventiPerTipoQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReportUdsInterventiPerZonaUrl = (params?: ReportUdsInterventiPerZonaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/uds/interventi-per-zona?${stringifiedParams}` : `/api/report/uds/interventi-per-zona`
+}
+
+/**
+ * @summary UDS street interventions grouped by zona
+ */
+export const reportUdsInterventiPerZona = async (params?: ReportUdsInterventiPerZonaParams, options?: RequestInit): Promise<UdsInterventiZonaReport[]> => {
+
+  return customFetch<UdsInterventiZonaReport[]>(getReportUdsInterventiPerZonaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportUdsInterventiPerZonaQueryKey = (params?: ReportUdsInterventiPerZonaParams,) => {
+    return [
+    `/api/report/uds/interventi-per-zona`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getReportUdsInterventiPerZonaQueryOptions = <TData = Awaited<ReturnType<typeof reportUdsInterventiPerZona>>, TError = ErrorType<unknown>>(params?: ReportUdsInterventiPerZonaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerZona>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReportUdsInterventiPerZonaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportUdsInterventiPerZona>>> = ({ signal }) => reportUdsInterventiPerZona(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerZona>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReportUdsInterventiPerZonaQueryResult = NonNullable<Awaited<ReturnType<typeof reportUdsInterventiPerZona>>>
+export type ReportUdsInterventiPerZonaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary UDS street interventions grouped by zona
+ */
+
+export function useReportUdsInterventiPerZona<TData = Awaited<ReturnType<typeof reportUdsInterventiPerZona>>, TError = ErrorType<unknown>>(
+ params?: ReportUdsInterventiPerZonaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsInterventiPerZona>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReportUdsInterventiPerZonaQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReportUdsPersonePerZonaUrl = (params?: ReportUdsPersonePerZonaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/uds/persone-per-zona?${stringifiedParams}` : `/api/report/uds/persone-per-zona`
+}
+
+/**
+ * @summary UDS people grouped by zona and channel
+ */
+export const reportUdsPersonePerZona = async (params?: ReportUdsPersonePerZonaParams, options?: RequestInit): Promise<UdsPersonePerZonaReport[]> => {
+
+  return customFetch<UdsPersonePerZonaReport[]>(getReportUdsPersonePerZonaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportUdsPersonePerZonaQueryKey = (params?: ReportUdsPersonePerZonaParams,) => {
+    return [
+    `/api/report/uds/persone-per-zona`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getReportUdsPersonePerZonaQueryOptions = <TData = Awaited<ReturnType<typeof reportUdsPersonePerZona>>, TError = ErrorType<unknown>>(params?: ReportUdsPersonePerZonaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsPersonePerZona>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReportUdsPersonePerZonaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportUdsPersonePerZona>>> = ({ signal }) => reportUdsPersonePerZona(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof reportUdsPersonePerZona>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReportUdsPersonePerZonaQueryResult = NonNullable<Awaited<ReturnType<typeof reportUdsPersonePerZona>>>
+export type ReportUdsPersonePerZonaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary UDS people grouped by zona and channel
+ */
+
+export function useReportUdsPersonePerZona<TData = Awaited<ReturnType<typeof reportUdsPersonePerZona>>, TError = ErrorType<unknown>>(
+ params?: ReportUdsPersonePerZonaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportUdsPersonePerZona>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReportUdsPersonePerZonaQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

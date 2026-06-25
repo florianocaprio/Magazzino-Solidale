@@ -22,6 +22,8 @@ import {
   trasferimentiTable,
   trasferimentoRigheTable,
   movimentiTable,
+  cittaTable,
+  zoneUdsTable,
 } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 
@@ -37,14 +39,19 @@ import { inArray } from "drizzle-orm";
 /** Mounts `router` behind a stub auth middleware injecting the given caller. */
 export function makeScopedApp(
   router: Router,
-  user: { id: number; centroAscoltoId: number | null },
+  user: { id: number; centroAscoltoId: number | null; cittaId?: number | null },
 ): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as unknown as { user: { id: number; centroAscoltoId: number | null } }).user = {
+    (
+      req as unknown as {
+        user: { id: number; centroAscoltoId: number | null; cittaId: number | null };
+      }
+    ).user = {
       id: user.id,
       centroAscoltoId: user.centroAscoltoId,
+      cittaId: user.cittaId ?? null,
     };
     next();
   });
@@ -87,6 +94,8 @@ export interface SeedScope {
   bollaIds: number[];
   interventoIds: number[];
   trasferimentoIds: number[];
+  zonaIds: number[];
+  cittaIds: number[];
 }
 
 export function newScope(): SeedScope {
@@ -107,6 +116,8 @@ export function newScope(): SeedScope {
     bollaIds: [],
     interventoIds: [],
     trasferimentoIds: [],
+    zonaIds: [],
+    cittaIds: [],
   };
 }
 
@@ -150,6 +161,7 @@ export async function createMagazzinoRec(
 export async function createBeneficiario(
   scope: SeedScope,
   centroId: number | null,
+  opts: { uds?: boolean; cittaId?: number | null; zonaUdsId?: number | null } = {},
 ): Promise<number> {
   const [b] = await db
     .insert(beneficiariTable)
@@ -158,10 +170,32 @@ export async function createBeneficiario(
       cognome: "Test",
       nome: `Ben ${rnd()}`,
       centroAscoltoId: centroId,
+      uds: opts.uds ?? false,
+      cittaId: opts.cittaId ?? null,
+      zonaUdsId: opts.zonaUdsId ?? null,
     })
     .returning({ id: beneficiariTable.id });
   scope.beneficiarioIds.push(b.id);
   return b.id;
+}
+
+export async function createCitta(scope: SeedScope): Promise<number> {
+  const [c] = await db
+    .insert(cittaTable)
+    .values({ nome: `Citta ${rnd()}` })
+    .returning({ id: cittaTable.id });
+  scope.cittaIds.push(c.id);
+  return c.id;
+}
+
+export async function createZona(scope: SeedScope, cittaId: number): Promise<{ id: number; nome: string }> {
+  const nome = `Zona ${rnd()}`;
+  const [z] = await db
+    .insert(zoneUdsTable)
+    .values({ cittaId, nome })
+    .returning({ id: zoneUdsTable.id });
+  scope.zonaIds.push(z.id);
+  return { id: z.id, nome };
 }
 
 export async function createProdotto(scope: SeedScope): Promise<number> {
@@ -491,5 +525,11 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   }
   if (scope.centroIds.length > 0) {
     await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, scope.centroIds));
+  }
+  if (scope.zonaIds.length > 0) {
+    await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, scope.zonaIds));
+  }
+  if (scope.cittaIds.length > 0) {
+    await db.delete(cittaTable).where(inArray(cittaTable.id, scope.cittaIds));
   }
 }

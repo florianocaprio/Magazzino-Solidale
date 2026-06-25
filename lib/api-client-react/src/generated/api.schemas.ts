@@ -1412,6 +1412,32 @@ export interface ConsegnePerCentroReport {
   totale: number;
 }
 
+export interface UdsInterventiMeseReport {
+  mese: string;
+  totInterventi: number;
+}
+
+export interface UdsInterventiTipoReport {
+  tipo: string;
+  totInterventi: number;
+}
+
+export interface UdsInterventiZonaReport {
+  /** @nullable */
+  zonaId?: number | null;
+  zonaNome: string;
+  totInterventi: number;
+}
+
+export interface UdsPersonePerZonaReport {
+  /** @nullable */
+  zonaId?: number | null;
+  zonaNome: string;
+  totale: number;
+  soloUds: number;
+  udsConCentro: number;
+}
+
 export interface Area {
   key: string;
   label: string;
@@ -1666,5 +1692,31 @@ a?: string;
 
 export type ReportFsePlusParams = {
 anno?: number;
+};
+
+export type ReportUdsInterventiPerMeseParams = {
+da?: string;
+a?: string;
+cittaId?: number;
+zonaUdsId?: number;
+};
+
+export type ReportUdsInterventiPerTipoParams = {
+da?: string;
+a?: string;
+cittaId?: number;
+zonaUdsId?: number;
+};
+
+export type ReportUdsInterventiPerZonaParams = {
+da?: string;
+a?: string;
+cittaId?: number;
+zonaUdsId?: number;
+};
+
+export type ReportUdsPersonePerZonaParams = {
+cittaId?: number;
+zonaUdsId?: number;
 };
 

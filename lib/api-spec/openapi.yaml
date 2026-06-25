@@ -1990,6 +1990,126 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReportFsePlus"
 
+  /report/uds/interventi-per-mese:
+    get:
+      operationId: reportUdsInterventiPerMese
+      tags: [report]
+      summary: UDS street interventions grouped by month
+      parameters:
+        - name: da
+          in: query
+          schema:
+            type: string
+        - name: a
+          in: query
+          schema:
+            type: string
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: zonaUdsId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: UDS interventions per month
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UdsInterventiMeseReport"
+
+  /report/uds/interventi-per-tipo:
+    get:
+      operationId: reportUdsInterventiPerTipo
+      tags: [report]
+      summary: UDS street interventions grouped by type
+      parameters:
+        - name: da
+          in: query
+          schema:
+            type: string
+        - name: a
+          in: query
+          schema:
+            type: string
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: zonaUdsId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: UDS interventions per type
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UdsInterventiTipoReport"
+
+  /report/uds/interventi-per-zona:
+    get:
+      operationId: reportUdsInterventiPerZona
+      tags: [report]
+      summary: UDS street interventions grouped by zona
+      parameters:
+        - name: da
+          in: query
+          schema:
+            type: string
+        - name: a
+          in: query
+          schema:
+            type: string
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: zonaUdsId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: UDS interventions per zona
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UdsInterventiZonaReport"
+
+  /report/uds/persone-per-zona:
+    get:
+      operationId: reportUdsPersonePerZona
+      tags: [report]
+      summary: UDS people grouped by zona and channel
+      parameters:
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: zonaUdsId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: UDS people per zona
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UdsPersonePerZonaReport"
+
   /auth/login:
     post:
       operationId: loginUser
@@ -4409,6 +4529,50 @@ components:
         totale:
           type: integer
       required: [centroNome, dirette, conVolontari, totale]
+
+    UdsInterventiMeseReport:
+      type: object
+      properties:
+        mese:
+          type: string
+        totInterventi:
+          type: integer
+      required: [mese, totInterventi]
+
+    UdsInterventiTipoReport:
+      type: object
+      properties:
+        tipo:
+          type: string
+        totInterventi:
+          type: integer
+      required: [tipo, totInterventi]
+
+    UdsInterventiZonaReport:
+      type: object
+      properties:
+        zonaId:
+          type: ["integer", "null"]
+        zonaNome:
+          type: string
+        totInterventi:
+          type: integer
+      required: [zonaNome, totInterventi]
+
+    UdsPersonePerZonaReport:
+      type: object
+      properties:
+        zonaId:
+          type: ["integer", "null"]
+        zonaNome:
+          type: string
+        totale:
+          type: integer
+        soloUds:
+          type: integer
+        udsConCentro:
+          type: integer
+      required: [zonaNome, totale, soloUds, udsConCentro]
 
     Area:
       type: object

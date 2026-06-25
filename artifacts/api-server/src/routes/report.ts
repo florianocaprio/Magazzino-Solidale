@@ -284,4 +284,132 @@ router.get("/report/fse-plus", async (req, res) => {
   });
 });
 
+/* ────────────────────────────────────────────────────────────────────────
+ * UDS (Unità di Strada) reports. Street-outreach interventions / people.
+ * Always restricted to UDS persons (beneficiari.uds = true). Città is a HARD
+ * scope (caller's città OR NULL legacy), optionally narrowed via ?cittaId for a
+ * global caller; ?zonaUdsId is an optional soft filter.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+function udsScopeConds(req: { query: Record<string, unknown> }, caller: number | null): SQL[] {
+  const conds: SQL[] = [sql`be.uds = true`];
+  const cittaCond = ownOrNullSql(sql`be.citta_id`, caller);
+  if (cittaCond) conds.push(cittaCond);
+  const qCitta = parseIntParam(req.query.cittaId);
+  if (qCitta) conds.push(sql`be.citta_id = ${qCitta}`);
+  const qZona = parseIntParam(req.query.zonaUdsId);
+  if (qZona) conds.push(sql`be.zona_uds_id = ${qZona}`);
+  return conds;
+}
+
+router.get("/report/uds/interventi-per-mese", async (req, res) => {
+  const range = parseDateRange(req);
+  if (!range.ok) {
+    res.status(400).json({ message: range.message });
+    return;
+  }
+  const { da, a } = range;
+  const conds = udsScopeConds(req, callerCittaId(req));
+  conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
+  const where = sql.join(conds, sql` AND `);
+
+  const result = await db.execute(sql`
+    SELECT TO_CHAR(i.data_intervento::date, 'YYYY-MM') as mese,
+           COUNT(*) as tot_interventi
+    FROM interventi i
+    JOIN beneficiari be ON be.id = i.beneficiario_id
+    WHERE ${where}
+    GROUP BY mese
+    ORDER BY mese
+  `);
+  const rows = result.rows as Array<Record<string, unknown>>;
+  res.json(rows.map((r) => ({
+    mese: r.mese as string,
+    totInterventi: Number(r.tot_interventi),
+  })));
+});
+
+router.get("/report/uds/interventi-per-tipo", async (req, res) => {
+  const range = parseDateRange(req);
+  if (!range.ok) {
+    res.status(400).json({ message: range.message });
+    return;
+  }
+  const { da, a } = range;
+  const conds = udsScopeConds(req, callerCittaId(req));
+  conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
+  const where = sql.join(conds, sql` AND `);
+
+  const result = await db.execute(sql`
+    SELECT COALESCE(NULLIF(TRIM(i.tipo_intervento), ''), 'altro') as tipo,
+           COUNT(*) as tot_interventi
+    FROM interventi i
+    JOIN beneficiari be ON be.id = i.beneficiario_id
+    WHERE ${where}
+    GROUP BY tipo
+    ORDER BY tot_interventi DESC, tipo
+  `);
+  const rows = result.rows as Array<Record<string, unknown>>;
+  res.json(rows.map((r) => ({
+    tipo: r.tipo as string,
+    totInterventi: Number(r.tot_interventi),
+  })));
+});
+
+router.get("/report/uds/interventi-per-zona", async (req, res) => {
+  const range = parseDateRange(req);
+  if (!range.ok) {
+    res.status(400).json({ message: range.message });
+    return;
+  }
+  const { da, a } = range;
+  const conds = udsScopeConds(req, callerCittaId(req));
+  conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
+  const where = sql.join(conds, sql` AND `);
+
+  const result = await db.execute(sql`
+    SELECT be.zona_uds_id as zona_id,
+           COALESCE(z.nome, 'Senza zona') as zona_nome,
+           COUNT(*) as tot_interventi
+    FROM interventi i
+    JOIN beneficiari be ON be.id = i.beneficiario_id
+    LEFT JOIN zone_uds z ON z.id = be.zona_uds_id
+    WHERE ${where}
+    GROUP BY be.zona_uds_id, z.nome
+    ORDER BY tot_interventi DESC, zona_nome
+  `);
+  const rows = result.rows as Array<Record<string, unknown>>;
+  res.json(rows.map((r) => ({
+    zonaId: r.zona_id === null || r.zona_id === undefined ? null : Number(r.zona_id),
+    zonaNome: r.zona_nome as string,
+    totInterventi: Number(r.tot_interventi),
+  })));
+});
+
+router.get("/report/uds/persone-per-zona", async (req, res) => {
+  const conds = udsScopeConds(req, callerCittaId(req));
+  const where = sql.join(conds, sql` AND `);
+
+  const result = await db.execute(sql`
+    SELECT be.zona_uds_id as zona_id,
+           COALESCE(z.nome, 'Senza zona') as zona_nome,
+           COUNT(*) as totale,
+           COUNT(*) FILTER (WHERE be.centro_ascolto_id IS NULL) as solo_uds,
+           COUNT(*) FILTER (WHERE be.centro_ascolto_id IS NOT NULL) as uds_con_centro
+    FROM beneficiari be
+    LEFT JOIN zone_uds z ON z.id = be.zona_uds_id
+    WHERE ${where}
+    GROUP BY be.zona_uds_id, z.nome
+    ORDER BY totale DESC, zona_nome
+  `);
+  const rows = result.rows as Array<Record<string, unknown>>;
+  res.json(rows.map((r) => ({
+    zonaId: r.zona_id === null || r.zona_id === undefined ? null : Number(r.zona_id),
+    zonaNome: r.zona_nome as string,
+    totale: Number(r.totale),
+    soloUds: Number(r.solo_uds),
+    udsConCentro: Number(r.uds_con_centro),
+  })));
+});
+
 export default router;
