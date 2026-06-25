@@ -1139,6 +1139,38 @@ export const CreateBeneficiarioBody = zod.object({
 })
 
 
+/**
+ * @summary Fuzzy person-duplicate suggestions within the caller's città
+ */
+export const CercaBeneficiariSimiliQueryParams = zod.object({
+  "nome": zod.coerce.string().optional(),
+  "cognome": zod.coerce.string().optional(),
+  "soprannome": zod.coerce.string().optional(),
+  "telefono": zod.coerce.string().optional(),
+  "dataNascita": zod.coerce.string().optional(),
+  "cittaId": zod.coerce.number().optional(),
+  "excludeId": zod.coerce.number().optional()
+})
+
+export const CercaBeneficiariSimiliResponseItem = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "soprannome": zod.string().nullish(),
+  "dataNascita": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "zonaUdsNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "score": zod.number()
+})
+export const CercaBeneficiariSimiliResponse = zod.array(CercaBeneficiariSimiliResponseItem)
+
+
 export const GetBeneficiarioParams = zod.object({
   "id": zod.coerce.number()
 })

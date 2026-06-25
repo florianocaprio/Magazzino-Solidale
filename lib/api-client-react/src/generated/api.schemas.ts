@@ -599,6 +599,32 @@ export interface ApprovvigionamentoUpdate {
   note?: string;
 }
 
+export interface BeneficiarioSimile {
+  id: number;
+  codice: string;
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  soprannome?: string | null;
+  /** @nullable */
+  dataNascita?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  score: number;
+}
+
 export interface Beneficiario {
   id: number;
   codice: string;
@@ -1576,6 +1602,16 @@ centroAscoltoId?: number;
 cittaId?: number;
 zonaUdsId?: number;
 attivo?: boolean;
+};
+
+export type CercaBeneficiariSimiliParams = {
+nome?: string;
+cognome?: string;
+soprannome?: string;
+telefono?: string;
+dataNascita?: string;
+cittaId?: number;
+excludeId?: number;
 };
 
 export type ListInterventiParams = {

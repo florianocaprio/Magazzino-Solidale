@@ -24,3 +24,15 @@ The UDS (street-outreach) module does NOT have its own entities. It reuses the e
 - Default the zona filter from `user.zonaUdsId`; offer "tutta la città" to clear it. The città filter only appears for the global super-admin (`user.cittaId == null`).
 - On create, città must be set for the hard boundary to hold. For a global admin creating a person, REQUIRE a città selection (a null-città person would be invisible to every scoped operator and leak across boundaries). Scoped operators get città auto-assigned server-side.
 - Guarded pages only mount once `user` is loaded (the route Guard's `hasArea` returns false while `user` is null), so deriving initial filter state from `user` at first render is safe — no effect-sync needed.
+
+## Fuzzy anti-duplicate search
+
+`GET /beneficiari/cerca-simili` (pg_trgm) SUGGESTS possible existing people at insert time; it never merges. It must respect the SAME città hard boundary as everything else (scoped caller → own città OR NULL legacy rows; global caller may narrow with `?cittaId`) — a cross-città match would defeat the privacy boundary.
+
+**Why:** the brief's anti-duplicate goal ("Ammed Solin ≈ Hamed Saolin") only works because there's ONE person record per human; suggesting duplicates across città would both leak data and re-fragment the registry.
+
+**How to apply:**
+- The route MUST be registered before `/beneficiari/:id` or Express captures `cerca-simili` as an `:id`.
+- Raw SQL uses Drizzle `sql` tagged-template bindings (`${...}`) — never string-concatenate query input. Coerce numeric query params NaN-safely (return null, don't pass NaN into `::int`).
+- pg_trgm is enabled idempotently at startup, not via a migration file (the esbuild CJS bundle doesn't pick up extension SQL); see `lib/dbInit.ts`.
+- The two insert forms react differently to a hit: UDS attaches the person to the operator's zona (PATCH `zonaUdsId`); the standard centro form just links out to the existing person's detail. Both offer "continue as new".

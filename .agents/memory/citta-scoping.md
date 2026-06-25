@@ -23,7 +23,7 @@ A second scoping axis, **città**, sits above the per-Centro-di-Ascolto axis. It
 
 **Why:** the architect review caught exactly these (fornitori/volontari POST, utenti DELETE, approvvigionamenti POST/PATCH centroAscoltoId) after the read paths were already correct. Read-path correctness does not imply write-path correctness for a hard boundary.
 
-**Regression safety:** all helpers return `undefined`/`null`/`true` for a città-global caller, so existing global-user behavior is unchanged (the 118-test suite uses a stub req.user with no cittaId → all green).
+**Regression safety:** all helpers return `undefined`/`null`/`true` for a città-global caller, so existing global-user behavior is unchanged (scoping tests stub a `req.user` with no `cittaId`, exercising the global path).
 
 ## Zona UDS (soft axis) + canale persona + FE
 

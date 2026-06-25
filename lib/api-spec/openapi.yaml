@@ -859,6 +859,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/Beneficiario"
 
+  /beneficiari/cerca-simili:
+    get:
+      operationId: cercaBeneficiariSimili
+      tags: [beneficiari]
+      summary: Fuzzy person-duplicate suggestions within the caller's città
+      parameters:
+        - name: nome
+          in: query
+          schema:
+            type: string
+        - name: cognome
+          in: query
+          schema:
+            type: string
+        - name: soprannome
+          in: query
+          schema:
+            type: string
+        - name: telefono
+          in: query
+          schema:
+            type: string
+        - name: dataNascita
+          in: query
+          schema:
+            type: string
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: excludeId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Possible existing matches ordered by similarity score
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BeneficiarioSimile"
+
   /beneficiari/{id}:
     get:
       operationId: getBeneficiario
@@ -3161,6 +3205,38 @@ components:
       required: [prodottoId, quantitaRichiesta, unitaMisura]
 
     # ── Beneficiari ───────────────────────────────────────────────────────
+    BeneficiarioSimile:
+      type: object
+      required: [id, codice, nome, cognome, score]
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        nome:
+          type: string
+        cognome:
+          type: string
+        soprannome:
+          type: ["string", "null"]
+        dataNascita:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        zonaUdsId:
+          type: ["integer", "null"]
+        zonaUdsNome:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
+        score:
+          type: number
     Beneficiario:
       type: object
       properties:

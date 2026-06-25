@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable } from "@workspace/db";
-import { eq, and, ilike, type SQL } from "drizzle-orm";
+import { eq, and, ilike, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -102,6 +102,85 @@ router.post("/beneficiari", async (req, res) => {
   if (cid != null) values.cittaId = cid;
   const [row] = await db.insert(beneficiariTable).values(values).returning();
   res.status(201).json(fmtBenef(row));
+});
+
+// Fuzzy person-duplicate suggestion (pg_trgm). Scoped HARD to the caller's città
+// so a duplicate is never surfaced across cities. Returns candidates ordered by a
+// combined similarity score over name(+reversed), soprannome, telefono and an
+// exact birthdate boost. MUST stay registered before "/beneficiari/:id" so the
+// literal segment is not captured as an id.
+router.get("/beneficiari/cerca-simili", async (req, res) => {
+  const q = req.query as Record<string, string>;
+  const nome = (q.nome ?? "").trim();
+  const cognome = (q.cognome ?? "").trim();
+  const soprannome = (q.soprannome ?? "").trim().toLowerCase();
+  const telefono = (q.telefono ?? "").trim();
+  const dataNascita = (q.dataNascita ?? "").trim();
+  const full = `${nome} ${cognome}`.trim().toLowerCase();
+  const toIntOrNull = (v: string | undefined): number | null => {
+    if (!v) return null;
+    const n = parseInt(v);
+    return Number.isNaN(n) ? null : n;
+  };
+  const excludeId = toIntOrNull(q.excludeId);
+
+  // Nothing to match on → empty result (avoids returning the whole città).
+  if (!full && !soprannome && !telefono && !dataNascita) {
+    res.json([]);
+    return;
+  }
+
+  // Città is the HARD boundary: a scoped caller can only search their own città
+  // (or NULL/legacy rows); a global caller may narrow with ?cittaId.
+  const callerCitta = callerCittaId(req);
+  const cittaId = callerCitta != null ? callerCitta : toIntOrNull(q.cittaId);
+
+  const result = await db.execute(sql`
+    SELECT * FROM (
+      SELECT
+        b.id, b.codice, b.nome, b.cognome, b.soprannome,
+        b.data_nascita::text AS "dataNascita", b.telefono,
+        b.citta_id AS "cittaId", c.nome AS "cittaNome",
+        b.zona_uds_id AS "zonaUdsId", z.nome AS "zonaUdsNome",
+        b.centro_ascolto_id AS "centroAscoltoId", ca.nome AS "centroAscoltoNome",
+        (
+          GREATEST(
+            similarity(lower(coalesce(b.nome, '') || ' ' || coalesce(b.cognome, '')), ${full}),
+            similarity(lower(coalesce(b.cognome, '') || ' ' || coalesce(b.nome, '')), ${full})
+          )
+          + CASE WHEN ${soprannome} <> '' THEN similarity(lower(coalesce(b.soprannome, '')), ${soprannome}) * 0.5 ELSE 0 END
+          + CASE WHEN ${telefono} <> '' THEN (CASE WHEN b.telefono = ${telefono} THEN 0.5 ELSE similarity(coalesce(b.telefono, ''), ${telefono}) * 0.3 END) ELSE 0 END
+          + CASE WHEN ${dataNascita} <> '' AND b.data_nascita IS NOT NULL AND b.data_nascita::text = ${dataNascita} THEN 0.4 ELSE 0 END
+        )::float8 AS score
+      FROM beneficiari b
+      LEFT JOIN citta c ON c.id = b.citta_id
+      LEFT JOIN zone_uds z ON z.id = b.zona_uds_id
+      LEFT JOIN centri_di_ascolto ca ON ca.id = b.centro_ascolto_id
+      WHERE (${cittaId}::int IS NULL OR b.citta_id = ${cittaId}::int OR b.citta_id IS NULL)
+        AND (${excludeId}::int IS NULL OR b.id <> ${excludeId}::int)
+    ) s
+    WHERE s.score >= 0.2
+    ORDER BY s.score DESC
+    LIMIT 10
+  `);
+
+  const rows = result.rows as Array<Record<string, unknown>>;
+  res.json(rows.map(r => ({
+    id: r.id,
+    codice: r.codice,
+    nome: r.nome,
+    cognome: r.cognome,
+    soprannome: (r.soprannome as string | null) ?? null,
+    dataNascita: (r.dataNascita as string | null) ?? null,
+    telefono: (r.telefono as string | null) ?? null,
+    cittaId: (r.cittaId as number | null) ?? null,
+    cittaNome: (r.cittaNome as string | null) ?? null,
+    zonaUdsId: (r.zonaUdsId as number | null) ?? null,
+    zonaUdsNome: (r.zonaUdsNome as string | null) ?? null,
+    centroAscoltoId: (r.centroAscoltoId as number | null) ?? null,
+    centroAscoltoNome: (r.centroAscoltoNome as string | null) ?? null,
+    score: Math.round(Number(r.score) * 100) / 100,
+  })));
 });
 
 router.get("/beneficiari/:id", async (req, res) => {

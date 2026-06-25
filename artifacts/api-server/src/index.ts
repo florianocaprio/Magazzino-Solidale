@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdmin } from "./lib/seedAdmin";
 import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
+import { initDbExtensions } from "./lib/dbInit";
 
 const rawPort = process.env["PORT"];
 
@@ -24,6 +25,10 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  initDbExtensions().catch((err) => {
+    logger.error({ err }, "Failed to initialize DB extensions");
+  });
 
   seedAdmin().catch((err) => {
     logger.error({ err }, "Failed to seed admin user");

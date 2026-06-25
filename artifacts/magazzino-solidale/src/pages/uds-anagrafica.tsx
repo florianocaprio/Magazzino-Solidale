@@ -1,12 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useListBeneficiari,
   useCreateBeneficiario,
+  useUpdateBeneficiario,
+  useCercaBeneficiariSimili,
   useListCitta,
   useListZoneUds,
   getListBeneficiariQueryKey,
   getListCittaQueryKey,
+  getCercaBeneficiariSimiliQueryKey,
   type Beneficiario,
+  type BeneficiarioSimile,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,7 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, Footprints } from "lucide-react";
+import { Plus, Footprints, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -106,6 +110,14 @@ export default function UdsAnagrafica() {
   const { data: beneficiari, isLoading } = useListBeneficiari(listParams);
 
   const createBenef = useCreateBeneficiario();
+  const updateBenef = useUpdateBeneficiario();
+
+  // Anti-duplicate fuzzy suggestions: debounce the identity fields and query the
+  // città-scoped cerca-simili endpoint while the create form is open.
+  const [dupDismissed, setDupDismissed] = useState(false);
+  const [dupParams, setDupParams] = useState<{
+    nome?: string; cognome?: string; soprannome?: string; telefono?: string; dataNascita?: string;
+  }>({});
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -140,7 +152,81 @@ export default function UdsAnagrafica() {
             : NO_ZONE,
       cittaId: isGlobal && filterCitta ? filterCitta : "",
     });
+    setDupDismissed(false);
+    setDupParams({});
     setIsFormOpen(true);
+  };
+
+  // Debounce the watched identity fields into the query params (300ms).
+  const wNome = form.watch("nome");
+  const wCognome = form.watch("cognome");
+  const wSoprannome = form.watch("soprannome");
+  const wTelefono = form.watch("telefono");
+  const wDataNascita = form.watch("dataNascita");
+  useEffect(() => {
+    if (!isFormOpen) return;
+    const handle = setTimeout(() => {
+      setDupParams({
+        nome: (wNome ?? "").trim(),
+        cognome: (wCognome ?? "").trim(),
+        soprannome: (wSoprannome ?? "").trim(),
+        telefono: (wTelefono ?? "").trim(),
+        dataNascita: (wDataNascita ?? "").trim(),
+      });
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [isFormOpen, wNome, wCognome, wSoprannome, wTelefono, wDataNascita]);
+
+  // Need a real signal: full name (or soprannome/telefono) before querying.
+  const dupHasInput =
+    ((dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 3) ||
+    (dupParams.soprannome ?? "").length >= 3 ||
+    (dupParams.telefono ?? "").length >= 4;
+  const dupCitta = isGlobal && form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined;
+  const { data: dupMatches } = useCercaBeneficiariSimili(
+    { ...dupParams, ...(dupCitta != null ? { cittaId: dupCitta } : {}) },
+    {
+      query: {
+        queryKey: getCercaBeneficiariSimiliQueryKey({ ...dupParams, ...(dupCitta != null ? { cittaId: dupCitta } : {}) }),
+        enabled: isFormOpen && !dupDismissed && dupHasInput,
+      },
+    },
+  );
+  const suggestions = dupMatches ?? [];
+
+  // "Aggiungi a UDS": attach the chosen zona to an existing person (centro-only or
+  // unclassified) instead of creating a duplicate. If the person is already UDS,
+  // just acknowledge and close.
+  const linkToUds = (s: BeneficiarioSimile) => {
+    const zonaVal = form.getValues("zonaUdsId");
+    const targetZona =
+      zonaVal && zonaVal !== NO_ZONE ? parseInt(zonaVal) : user?.zonaUdsId ?? null;
+    if (s.zonaUdsId != null) {
+      toast({ title: t("udsAnagrafica.dupAlreadyUds") });
+      setIsFormOpen(false);
+      return;
+    }
+    if (targetZona == null) {
+      toast({ title: t("udsAnagrafica.dupNeedZona"), variant: "destructive" });
+      return;
+    }
+    updateBenef.mutate(
+      { id: s.id, data: { zonaUdsId: targetZona } as never },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: t("udsAnagrafica.dupLinked") });
+          setIsFormOpen(false);
+        },
+        onError: (err) => {
+          toast({
+            title: t("udsAnagrafica.newTitle"),
+            description: extractError(err, t("common.requiredField")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
   };
 
   const onSubmit = (data: FormValues) => {
@@ -332,6 +418,41 @@ export default function UdsAnagrafica() {
                     <FormItem><FormLabel>{t("udsAnagrafica.fCognome")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
+
+                {!dupDismissed && suggestions.length > 0 && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                      <AlertTriangle className="h-4 w-4" />
+                      {t("udsAnagrafica.dupTitle")}
+                    </div>
+                    <p className="text-xs text-amber-700">{t("udsAnagrafica.dupHint")}</p>
+                    <div className="space-y-2">
+                      {suggestions.map((s) => {
+                        const isUds = s.zonaUdsId != null;
+                        return (
+                          <div key={s.id} className="flex items-center justify-between gap-2 rounded bg-white px-2 py-1.5 text-sm">
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">
+                                {s.cognome} {s.nome}
+                                {s.soprannome ? ` (${s.soprannome})` : ""}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {[s.dataNascita, s.telefono, s.zonaUdsNome ?? s.centroAscoltoNome].filter(Boolean).join(" · ") || "—"}
+                              </div>
+                            </div>
+                            <Button type="button" size="sm" variant="outline" onClick={() => linkToUds(s)} disabled={updateBenef.isPending}>
+                              {isUds ? t("udsAnagrafica.dupOpen") : t("udsAnagrafica.dupAdd")}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <Button type="button" size="sm" variant="ghost" className="text-amber-800" onClick={() => setDupDismissed(true)}>
+                      {t("udsAnagrafica.dupContinueNew")}
+                    </Button>
+                  </div>
+                )}
+
                 <FormField control={form.control} name="soprannome" render={({ field }) => (
                   <FormItem><FormLabel>{t("udsAnagrafica.fSoprannome")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />

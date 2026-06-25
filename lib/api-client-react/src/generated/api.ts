@@ -30,6 +30,7 @@ import type {
   Beneficiario,
   BeneficiarioDettaglio,
   BeneficiarioInput,
+  BeneficiarioSimile,
   BeneficiarioUpdate,
   Bolla,
   BollaDettaglio,
@@ -40,6 +41,7 @@ import type {
   CentroAscolto,
   CentroAscoltoInput,
   CentroAscoltoUpdate,
+  CercaBeneficiariSimiliParams,
   ChangePasswordInput,
   Citta,
   CittaInput,
@@ -3103,6 +3105,90 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateBeneficiarioMutationOptions(options));
     }
+
+export const getCercaBeneficiariSimiliUrl = (params?: CercaBeneficiariSimiliParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/beneficiari/cerca-simili?${stringifiedParams}` : `/api/beneficiari/cerca-simili`
+}
+
+/**
+ * @summary Fuzzy person-duplicate suggestions within the caller's città
+ */
+export const cercaBeneficiariSimili = async (params?: CercaBeneficiariSimiliParams, options?: RequestInit): Promise<BeneficiarioSimile[]> => {
+
+  return customFetch<BeneficiarioSimile[]>(getCercaBeneficiariSimiliUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCercaBeneficiariSimiliQueryKey = (params?: CercaBeneficiariSimiliParams,) => {
+    return [
+    `/api/beneficiari/cerca-simili`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getCercaBeneficiariSimiliQueryOptions = <TData = Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError = ErrorType<unknown>>(params?: CercaBeneficiariSimiliParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCercaBeneficiariSimiliQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof cercaBeneficiariSimili>>> = ({ signal }) => cercaBeneficiariSimili(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CercaBeneficiariSimiliQueryResult = NonNullable<Awaited<ReturnType<typeof cercaBeneficiariSimili>>>
+export type CercaBeneficiariSimiliQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Fuzzy person-duplicate suggestions within the caller's città
+ */
+
+export function useCercaBeneficiariSimili<TData = Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError = ErrorType<unknown>>(
+ params?: CercaBeneficiariSimiliParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCercaBeneficiariSimiliQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetBeneficiarioUrl = (id: number,) => {
 

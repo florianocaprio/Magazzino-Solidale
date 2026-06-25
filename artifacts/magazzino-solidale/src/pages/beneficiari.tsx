@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useListCentriAscolto, useGetBeneficiario, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useListCentriAscolto, useGetBeneficiario, useCercaBeneficiariSimili, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, CreditCard, FileDown } from "lucide-react";
+import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, CreditCard, FileDown, AlertTriangle } from "lucide-react";
 import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
@@ -92,6 +92,27 @@ export default function Beneficiari() {
     }
   });
 
+  // Anti-duplicate fuzzy suggestions (città-scoped) while the create form is open.
+  const [dupDismissed, setDupDismissed] = useState(false);
+  const [dupParams, setDupParams] = useState<{ nome?: string; cognome?: string }>({});
+  const wNome = form.watch("nome");
+  const wCognome = form.watch("cognome");
+  useEffect(() => {
+    if (!isFormOpen) return;
+    const handle = setTimeout(() => {
+      setDupParams({ nome: (wNome ?? "").trim(), cognome: (wCognome ?? "").trim() });
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [isFormOpen, wNome, wCognome]);
+  const dupHasInput = (dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 3;
+  const { data: dupMatches } = useCercaBeneficiariSimili(dupParams, {
+    query: {
+      queryKey: getCercaBeneficiariSimiliQueryKey(dupParams),
+      enabled: isFormOpen && !dupDismissed && dupHasInput,
+    },
+  });
+  const suggestions = dupMatches ?? [];
+
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     const { centroAscoltoId, codiceFiscale, ...rest } = data;
     const payload = {
@@ -142,7 +163,7 @@ export default function Beneficiari() {
             title={t("beneficiari.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => { form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : ""); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
+          <Button onClick={() => { form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : ""); setDupDismissed(false); setDupParams({}); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
         </div>
       </div>
 
@@ -297,6 +318,36 @@ export default function Beneficiari() {
                     <FormItem><FormLabel>{t("common.surname")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
                 </div>
+
+                {!dupDismissed && suggestions.length > 0 && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                      <AlertTriangle className="h-4 w-4" />
+                      {t("beneficiari.dupTitle")}
+                    </div>
+                    <p className="text-xs text-amber-700">{t("beneficiari.dupHint")}</p>
+                    <div className="space-y-2">
+                      {suggestions.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between gap-2 rounded bg-white px-2 py-1.5 text-sm">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">
+                              {s.cognome} {s.nome}{s.soprannome ? ` (${s.soprannome})` : ""}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {[s.dataNascita, s.telefono, s.centroAscoltoNome ?? s.zonaUdsNome].filter(Boolean).join(" · ") || "—"}
+                            </div>
+                          </div>
+                          <Button asChild type="button" size="sm" variant="outline">
+                            <Link href={`/beneficiari/${s.id}`}>{t("beneficiari.dupOpen")}</Link>
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button type="button" size="sm" variant="ghost" className="text-amber-800" onClick={() => setDupDismissed(true)}>
+                      {t("beneficiari.dupContinueNew")}
+                    </Button>
+                  </div>
+                )}
 
                 <FormField control={form.control} name="codiceFiscale" render={({ field }) => (
                   <FormItem><FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel><FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl></FormItem>
