@@ -44,6 +44,7 @@ const formSchema = z.object({
 
 const CENTRO_ALL = "__all__";
 const PRIORITA_ALL = "__all__";
+const CITTA_ALL = "__all__";
 const NO_ZONE = "__none__";
 
 export default function Beneficiari() {
@@ -55,18 +56,20 @@ export default function Beneficiari() {
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState<string>(CENTRO_ALL);
   const [prioritaFilter, setPrioritaFilter] = useState<string>(PRIORITA_ALL);
+  const [cittaFilter, setCittaFilter] = useState<string>(CITTA_ALL);
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setCentroFilter(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
+  const isCittaGlobal = user?.cittaId == null;
   const { data: beneficiari, isLoading } = useListBeneficiari({
     search: search || undefined,
     centroAscoltoId: centroFilter !== CENTRO_ALL ? parseInt(centroFilter) : undefined,
     priorita: prioritaFilter !== PRIORITA_ALL ? prioritaFilter : undefined,
+    cittaId: isCittaGlobal && cittaFilter !== CITTA_ALL ? parseInt(cittaFilter) : undefined,
   });
   const { data: centri } = useListCentriAscolto();
-  const isCittaGlobal = user?.cittaId == null;
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
 
   const queryClient = useQueryClient();
@@ -219,6 +222,19 @@ export default function Beneficiari() {
                 </SelectContent>
               </Select>
             )}
+            {isCittaGlobal && (
+              <Select value={cittaFilter} onValueChange={setCittaFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder={t("beneficiari.allCitta")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CITTA_ALL}>{t("beneficiari.allCitta")}</SelectItem>
+                  {cittaList?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={prioritaFilter} onValueChange={setPrioritaFilter}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder={t("beneficiari.allPriorita")} />
@@ -274,6 +290,12 @@ export default function Beneficiari() {
                       <User className="h-4 w-4 text-muted-foreground" />
                       {b.cognome} {b.nome}
                     </Link>
+                    {b.uds && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">{t("beneficiari.udsLabel")}</Badge>
+                        {b.cittaNome && <span className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{b.cittaNome}</span>}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{b.codice}</TableCell>
                   <TableCell className="text-sm">

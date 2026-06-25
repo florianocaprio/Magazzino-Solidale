@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable } from "@workspace/db";
+import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable, cittaTable } from "@workspace/db";
 import { eq, and, ilike, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
@@ -22,7 +22,7 @@ function toBool(v: unknown): boolean {
   return v === true || v === "true" || v === "t" || v === "1" || v === 1 || v === "yes";
 }
 
-function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string | null) {
+function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string | null, cittaNome?: string | null) {
   return {
     id: r.id,
     codice: r.codice,
@@ -57,6 +57,7 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
     centroAscoltoNome: centroNome ?? null,
     uds: r.uds,
     cittaId: r.cittaId ?? null,
+    cittaNome: cittaNome ?? null,
     zonaUdsId: r.zonaUdsId ?? null,
     attivo: r.attivo,
     dataPresaInCarico: r.dataPresaInCarico ?? null,
@@ -93,12 +94,13 @@ router.get("/beneficiari", async (req, res) => {
   else if (attivo === "false") conditions.push(eq(beneficiariTable.attivo, false));
 
   const rows = await db
-    .select({ b: beneficiariTable, centroNome: centriAscoltoTable.nome })
+    .select({ b: beneficiariTable, centroNome: centriAscoltoTable.nome, cittaNome: cittaTable.nome })
     .from(beneficiariTable)
     .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(beneficiariTable.cognome);
-  res.json(rows.map(r => fmtBenef(r.b, r.centroNome)));
+  res.json(rows.map(r => fmtBenef(r.b, r.centroNome, r.cittaNome)));
 });
 
 router.post("/beneficiari", async (req, res) => {
