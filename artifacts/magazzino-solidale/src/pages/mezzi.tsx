@@ -31,6 +31,7 @@ export default function Mezzi() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const formSchema = z.object({
     codice: z.string().min(2, t("mezzi.valCodice")),
     tipo: z.string().min(1, t("mezzi.valTipo")),
@@ -50,6 +51,7 @@ export default function Mezzi() {
   const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [centroFilter, setCentroFilter] = useState<string>("all");
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -146,6 +148,10 @@ export default function Mezzi() {
     return diff < 30 * 24 * 60 * 60 * 1000;
   };
 
+  const filtered = mezzi?.filter(m =>
+    centroFilter === "all" || m.effectiveCentroId === parseInt(centroFilter)
+  );
+
   const tipoLabel = (tipo?: string | null) => tipo ? t(`mezzi.tipos.${tipo}`, { defaultValue: tipo.replace('_', ' ') }) : "";
   const proprietaLabel = (p?: string | null) => p ? t(`mezzi.proprietaOpts.${p}`, { defaultValue: p.replace('_', ' ') }) : "";
   const statoLabel = (s?: string | null) => s ? t(`mezzi.stati.${s}`, { defaultValue: s.replace('_', ' ') }) : "";
@@ -183,6 +189,21 @@ export default function Mezzi() {
       </div>
 
       <Card>
+        {isGlobal && (
+          <CardHeader className="py-4 border-b">
+            <Select value={centroFilter} onValueChange={setCentroFilter}>
+              <SelectTrigger className="w-full sm:w-64">
+                <SelectValue placeholder={t("common.tuttiCentri")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("common.tuttiCentri")}</SelectItem>
+                {centri?.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+        )}
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -190,7 +211,7 @@ export default function Mezzi() {
                 <TableHead className="w-[100px]">{t("common.code")}</TableHead>
                 <TableHead>{t("mezzi.thTipoTarga")}</TableHead>
                 <TableHead>{t("mezzi.proprieta")}</TableHead>
-                <TableHead>{t("common.centro")}</TableHead>
+                {isGlobal && <TableHead>{t("common.centro")}</TableHead>}
                 <TableHead>{t("mezzi.thCapacita")}</TableHead>
                 <TableHead>{t("mezzi.thScadenze")}</TableHead>
                 <TableHead className="text-center">{t("common.status")}</TableHead>
@@ -204,20 +225,20 @@ export default function Mezzi() {
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    {isGlobal && <TableCell><Skeleton className="h-5 w-24" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
-              ) : mezzi?.length === 0 ? (
+              ) : filtered?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={isGlobal ? 8 : 7} className="h-32 text-center text-muted-foreground">
                     {t("mezzi.empty")}
                   </TableCell>
                 </TableRow>
-              ) : mezzi?.map((m) => (
+              ) : filtered?.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-mono text-sm font-medium">{m.codice}</TableCell>
                   <TableCell>
@@ -228,9 +249,11 @@ export default function Mezzi() {
                     <div className="capitalize text-sm">{proprietaLabel(m.proprieta)}</div>
                     {m.proprietarioNome && <div className="text-xs text-muted-foreground">{m.proprietarioNome}</div>}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {m.effectiveCentroNome ?? t("common.centroComune")}
-                  </TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm text-muted-foreground">
+                      {m.effectiveCentroNome ?? t("common.centroComune")}
+                    </TableCell>
+                  )}
                   <TableCell className="text-sm text-muted-foreground">
                     {m.capacitaColli ? `${m.capacitaColli} ${t("mezzi.colliUnit")}` : '-'} / {m.capacitaKg ? `${m.capacitaKg} kg` : '-'}
                   </TableCell>

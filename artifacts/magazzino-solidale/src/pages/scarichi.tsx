@@ -345,6 +345,7 @@ export default function Scarichi() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const { data: scarichi, isLoading } = useListScarichi();
   const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
@@ -413,16 +414,18 @@ export default function Scarichi() {
           <p className="text-muted-foreground">{t("scarichi.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
-            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("scarichi.filterTuttiCentri")}</SelectItem>
-              <SelectItem value="none">{t("scarichi.senzaCentro")}</SelectItem>
-              {centri?.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isGlobal && (
+            <Select value={centroFilter} onValueChange={setCentroFilter}>
+              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("scarichi.filterTuttiCentri")}</SelectItem>
+                <SelectItem value="none">{t("scarichi.senzaCentro")}</SelectItem>
+                {centri?.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <ExportButtons
             rows={displayed}
             columns={[
@@ -457,7 +460,7 @@ export default function Scarichi() {
                   </button>
                 </TableHead>
                 <TableHead>{t("scarichi.colMagazzino")}</TableHead>
-                <TableHead>{t("scarichi.colCentro")}</TableHead>
+                {isGlobal && <TableHead>{t("scarichi.colCentro")}</TableHead>}
                 <TableHead>{t("scarichi.colCausale")}</TableHead>
                 <TableHead>{t("scarichi.colArticoli")}</TableHead>
                 <TableHead className="text-right w-[140px]">{t("scarichi.colAzione")}</TableHead>
@@ -470,7 +473,7 @@ export default function Scarichi() {
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                    {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
@@ -478,7 +481,7 @@ export default function Scarichi() {
                 ))
               ) : displayed.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("scarichi.emptyState")}</TableCell>
+                  <TableCell colSpan={isGlobal ? 7 : 6} className="h-32 text-center text-muted-foreground">{t("scarichi.emptyState")}</TableCell>
                 </TableRow>
               ) : displayed.map((s) => (
                 <TableRow key={s.id}>
@@ -487,9 +490,11 @@ export default function Scarichi() {
                     {format(new Date(s.dataScarico), "dd MMM yyyy", { locale: it })}
                   </TableCell>
                   <TableCell className="text-sm font-medium">{s.magazzinoNome}</TableCell>
-                  <TableCell className="text-sm">
-                    {s.centroAscoltoNome ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm">
+                      {s.centroAscoltoNome ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                       {causaleDisplay(s)}

@@ -63,6 +63,7 @@ export default function Approvvigionamenti() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
   const [filterCentroId, setFilterCentroId] = useState("all");
   const [filterStato, setFilterStato] = useState("all");
@@ -77,7 +78,7 @@ export default function Approvvigionamenti() {
   if (filterCentroId !== "all") listParams.centroAscoltoId = parseInt(filterCentroId);
   if (filterStato !== "all") listParams.stato = filterStato;
   const hasParams = Object.keys(listParams).length > 0;
-  const filtersActive = hasParams;
+  const filtersActive = filterMagazzinoId !== "all" || filterStato !== "all" || (isGlobal && filterCentroId !== "all");
 
   const { data: approvvigionamenti, isLoading } = useListApprovvigionamenti(hasParams ? listParams : undefined);
   const { data: fornitori } = useListFornitori();
@@ -231,18 +232,20 @@ export default function Approvvigionamenti() {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">{t("approvvigionamenti.centroAscolto")}</Label>
-          <Select value={filterCentroId} onValueChange={setFilterCentroId} disabled={isCentroLocked}>
-            <SelectTrigger className="w-[200px]"><SelectValue placeholder={t("approvvigionamenti.tuttiCentri")} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("approvvigionamenti.tuttiCentri")}</SelectItem>
-              {(centri ?? []).map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {isGlobal && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">{t("approvvigionamenti.centroAscolto")}</Label>
+            <Select value={filterCentroId} onValueChange={setFilterCentroId}>
+              <SelectTrigger className="w-[200px]"><SelectValue placeholder={t("approvvigionamenti.tuttiCentri")} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("approvvigionamenti.tuttiCentri")}</SelectItem>
+                {(centri ?? []).map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">{t("common.status")}</Label>
           <Select value={filterStato} onValueChange={setFilterStato}>
@@ -275,7 +278,7 @@ export default function Approvvigionamenti() {
                 <TableHead>{t("approvvigionamenti.dataRichiesta")}</TableHead>
                 <TableHead>{t("approvvigionamenti.fornitore")}</TableHead>
                 <TableHead>{t("approvvigionamenti.magazzino")}</TableHead>
-                <TableHead>{t("approvvigionamenti.centroAscolto")}</TableHead>
+                {isGlobal && <TableHead>{t("approvvigionamenti.centroAscolto")}</TableHead>}
                 <TableHead className="text-center">{t("common.status")}</TableHead>
                 <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
@@ -288,14 +291,14 @@ export default function Approvvigionamenti() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    {isGlobal && <TableCell><Skeleton className="h-5 w-32" /></TableCell>}
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : approvvigionamenti?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("approvvigionamenti.empty")}</TableCell>
+                  <TableCell colSpan={isGlobal ? 7 : 6} className="h-32 text-center text-muted-foreground">{t("approvvigionamenti.empty")}</TableCell>
                 </TableRow>
               ) : approvvigionamenti?.map((a) => (
                 <TableRow key={a.id}>
@@ -307,7 +310,9 @@ export default function Approvvigionamenti() {
                   <TableCell className="text-sm">{format(new Date(a.dataRichiesta), "dd MMM yyyy", { locale: it })}</TableCell>
                   <TableCell className="font-medium">{a.fornitoreNome || <span className="text-muted-foreground italic">-</span>}</TableCell>
                   <TableCell className="text-sm">{a.magazzinoNome || <span className="text-muted-foreground italic">-</span>}</TableCell>
-                  <TableCell className="text-sm">{a.centroAscoltoNome || <span className="text-muted-foreground italic">-</span>}</TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm">{a.centroAscoltoNome || <span className="text-muted-foreground italic">-</span>}</TableCell>
+                  )}
                   <TableCell className="text-center">{getStatusBadge(a.stato)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1.5">

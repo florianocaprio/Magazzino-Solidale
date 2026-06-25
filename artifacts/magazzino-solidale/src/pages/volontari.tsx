@@ -27,6 +27,7 @@ export default function Volontari() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const formSchema = z.object({
     nome: z.string().min(2, t("volontari.valNome")),
     cognome: z.string().min(2, t("volontari.valCognome")),
@@ -44,6 +45,7 @@ export default function Volontari() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [centroFilter, setCentroFilter] = useState<string>("all");
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -128,10 +130,13 @@ export default function Volontari() {
     });
   };
 
-  const filtered = volontari?.filter(v => 
-    v.nome.toLowerCase().includes(search.toLowerCase()) || 
-    v.cognome.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = volontari?.filter(v => {
+    const matchesSearch =
+      v.nome.toLowerCase().includes(search.toLowerCase()) ||
+      v.cognome.toLowerCase().includes(search.toLowerCase());
+    const matchesCentro = centroFilter === "all" || v.centroAscoltoId === parseInt(centroFilter);
+    return matchesSearch && matchesCentro;
+  });
 
   const roleLabel = (ruolo: string) => t(`volontari.roles.${ruolo}`, { defaultValue: ruolo.replace('_', ' ') });
 
@@ -167,19 +172,34 @@ export default function Volontari() {
 
       <Card>
         <CardHeader className="py-4 border-b">
-          <Input 
-            placeholder={t("volontari.searchPlaceholder")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <Input 
+              placeholder={t("volontari.searchPlaceholder")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            {isGlobal && (
+              <Select value={centroFilter} onValueChange={setCentroFilter}>
+                <SelectTrigger className="w-full sm:w-64">
+                  <SelectValue placeholder={t("common.tuttiCentri")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("common.tuttiCentri")}</SelectItem>
+                  {centri?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.name")}</TableHead>
-                <TableHead>{t("volontari.centroAscolto")}</TableHead>
+                {isGlobal && <TableHead>{t("volontari.centroAscolto")}</TableHead>}
                 <TableHead>{t("volontari.contatti")}</TableHead>
                 <TableHead>{t("volontari.ruolo")}</TableHead>
                 <TableHead className="text-center">{t("volontari.patente")}</TableHead>
@@ -193,7 +213,7 @@ export default function Volontari() {
                 Array(5).fill(0).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                    {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
@@ -204,7 +224,7 @@ export default function Volontari() {
                 ))
               ) : filtered?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={isGlobal ? 8 : 7} className="h-32 text-center text-muted-foreground">
                     {t("volontari.empty")}
                   </TableCell>
                 </TableRow>
@@ -213,9 +233,11 @@ export default function Volontari() {
                   <TableCell>
                     <div className="font-medium">{v.nome} {v.cognome}</div>
                   </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">{v.centroAscoltoNome ?? t("volontari.tuttiCentri")}</span>
-                  </TableCell>
+                  {isGlobal && (
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">{v.centroAscoltoNome ?? t("volontari.tuttiCentri")}</span>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                       {v.telefono && <div className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {v.telefono}</div>}

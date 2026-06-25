@@ -42,11 +42,13 @@ export default function Magazzini() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const { data: magazzini, isLoading } = useListMagazzini();
   const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [centroFilter, setCentroFilter] = useState<string>("all");
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -130,11 +132,14 @@ export default function Magazzini() {
     });
   };
 
-  const filtered = magazzini?.filter(m => 
-    m.nome.toLowerCase().includes(search.toLowerCase()) || 
-    m.codice.toLowerCase().includes(search.toLowerCase()) ||
-    m.comune?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = magazzini?.filter(m => {
+    const matchesSearch =
+      m.nome.toLowerCase().includes(search.toLowerCase()) ||
+      m.codice.toLowerCase().includes(search.toLowerCase()) ||
+      m.comune?.toLowerCase().includes(search.toLowerCase());
+    const matchesCentro = centroFilter === "all" || m.centroAscoltoId === parseInt(centroFilter);
+    return matchesSearch && matchesCentro;
+  });
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -169,13 +174,26 @@ export default function Magazzini() {
 
       <Card>
         <CardHeader className="py-4 border-b">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <Input 
               placeholder={t("magazzini.searchPlaceholder")} 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
             />
+            {isGlobal && (
+              <Select value={centroFilter} onValueChange={setCentroFilter}>
+                <SelectTrigger className="w-full sm:w-64">
+                  <SelectValue placeholder={t("common.tuttiCentri")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("common.tuttiCentri")}</SelectItem>
+                  {centri?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -186,7 +204,7 @@ export default function Magazzini() {
                 <TableHead>{t("common.name")}</TableHead>
                 <TableHead>{t("magazzini.colPlace")}</TableHead>
                 <TableHead>{t("magazzini.colResponsabile")}</TableHead>
-                <TableHead>{t("common.centro")}</TableHead>
+                {isGlobal && <TableHead>{t("common.centro")}</TableHead>}
                 <TableHead>{t("common.status")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -199,13 +217,14 @@ export default function Magazzini() {
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
               ) : filtered?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={isGlobal ? 7 : 6} className="h-32 text-center text-muted-foreground">
                     {t("magazzini.noWarehouses")}
                   </TableCell>
                 </TableRow>
@@ -242,9 +261,11 @@ export default function Magazzini() {
                       <span className="text-xs text-muted-foreground italic">{t("magazzini.notAssigned")}</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {magazzino.centroAscoltoNome ?? t("common.centroComune")}
-                  </TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm text-muted-foreground">
+                      {magazzino.centroAscoltoNome ?? t("common.centroComune")}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Badge variant={magazzino.stato === 'attivo' ? 'default' : 'secondary'} 
                            className={magazzino.stato === 'attivo' ? 'bg-green-500/10 text-green-700 hover:bg-green-500/20' : ''}>

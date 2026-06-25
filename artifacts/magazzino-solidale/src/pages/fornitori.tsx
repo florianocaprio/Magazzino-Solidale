@@ -42,6 +42,7 @@ export default function Fornitori() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const [centroFilter, setCentroFilter] = useState("all");
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
@@ -156,18 +157,20 @@ export default function Fornitori() {
         <CardHeader className="py-4 border-b">
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <Input placeholder={t("fornitori.searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder={t("fornitori.tuttiCentri")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("fornitori.tuttiCentri")}</SelectItem>
-                  {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {isGlobal && (
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={centroFilter} onValueChange={setCentroFilter}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder={t("fornitori.tuttiCentri")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("fornitori.tuttiCentri")}</SelectItem>
+                    {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -176,7 +179,7 @@ export default function Fornitori() {
               <TableRow>
                 <TableHead>{t("fornitori.nominativo")}</TableHead>
                 <TableHead>{t("common.type")}</TableHead>
-                <TableHead>{t("fornitori.centro")}</TableHead>
+                {isGlobal && <TableHead>{t("fornitori.centro")}</TableHead>}
                 <TableHead>{t("fornitori.contatti")}</TableHead>
                 <TableHead>{t("fornitori.referente")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -188,7 +191,7 @@ export default function Fornitori() {
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    {isGlobal && <TableCell><Skeleton className="h-5 w-24" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
@@ -205,11 +208,13 @@ export default function Fornitori() {
                       {t(`fornitori.tipi.${f.tipo}`)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm">
-                    {f.centroAscoltoId == null
-                      ? <span className="text-muted-foreground italic">{t("fornitori.tuttiCentri")}</span>
-                      : centroNome(f.centroAscoltoId)}
-                  </TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm">
+                      {f.centroAscoltoId == null
+                        ? <span className="text-muted-foreground italic">{t("fornitori.tuttiCentri")}</span>
+                        : centroNome(f.centroAscoltoId)}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                       {f.telefono && <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" /> {f.telefono}</div>}

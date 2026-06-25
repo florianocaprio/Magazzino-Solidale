@@ -46,6 +46,7 @@ export default function Beneficiari() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobal = !isCentroLocked;
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState<string>(CENTRO_ALL);
   const [prioritaFilter, setPrioritaFilter] = useState<string>(PRIORITA_ALL);
@@ -155,17 +156,19 @@ export default function Beneficiari() {
                 className="pl-9"
               />
             </div>
-            <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
-              <SelectTrigger className="w-full sm:w-64">
-                <SelectValue placeholder={t("beneficiari.allCentri")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={CENTRO_ALL}>{t("beneficiari.allCentri")}</SelectItem>
-                {centri?.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isGlobal && (
+              <Select value={centroFilter} onValueChange={setCentroFilter}>
+                <SelectTrigger className="w-full sm:w-64">
+                  <SelectValue placeholder={t("beneficiari.allCentri")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CENTRO_ALL}>{t("beneficiari.allCentri")}</SelectItem>
+                  {centri?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={prioritaFilter} onValueChange={setPrioritaFilter}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder={t("beneficiari.allPriorita")} />
@@ -187,6 +190,7 @@ export default function Beneficiari() {
                 <TableHead>{t("beneficiari.colNominativo")}</TableHead>
                 <TableHead>{t("common.code")}</TableHead>
                 <TableHead>{t("beneficiari.colZonaComune")}</TableHead>
+                {isGlobal && <TableHead>{t("beneficiari.centroAscolto")}</TableHead>}
                 <TableHead className="text-center">{t("beneficiari.colComponenti")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colDomicilio")}</TableHead>
@@ -201,6 +205,7 @@ export default function Beneficiari() {
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
@@ -210,7 +215,7 @@ export default function Beneficiari() {
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={isGlobal ? 9 : 8} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
                 <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
@@ -224,6 +229,11 @@ export default function Beneficiari() {
                   <TableCell className="text-sm">
                     {b.comune && <div className="flex items-center gap-1"><MapPin className="h-3 w-3 text-muted-foreground"/> {b.comune} {b.zonaMunicipio ? `(${b.zonaMunicipio})` : ''}</div>}
                   </TableCell>
+                  {isGlobal && (
+                    <TableCell className="text-sm text-muted-foreground">
+                      {b.centroAscoltoNome ?? <span className="italic">{t("common.none")}</span>}
+                    </TableCell>
+                  )}
                   <TableCell className="text-center font-medium">{b.numComponenti}</TableCell>
                   <TableCell className="text-center">{getPriorityBadge(b.priorita)}</TableCell>
                   <TableCell className="text-center">
