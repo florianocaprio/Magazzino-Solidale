@@ -219,7 +219,7 @@ export default function Interventi() {
                   <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">{t("interventi.emptyState")}</TableCell>
                 </TableRow>
               ) : interventi?.map((i) => (
-                <TableRow key={i.id}>
+                <TableRow key={i.id} className={i.note ? "bg-amber-50/60" : ""}>
                   <TableCell className="text-sm font-medium">
                     {format(new Date(i.dataIntervento), "dd/MM/yyyy")}
                   </TableCell>
@@ -259,7 +259,7 @@ export default function Interventi() {
                     <Button
                       variant={i.note ? "secondary" : "ghost"}
                       size="sm"
-                      className="gap-1"
+                      className={`gap-1 ${i.note ? "bg-amber-100 text-amber-900 hover:bg-amber-200" : ""}`}
                       onClick={() => { setNoteEditing(i); setNoteText(i.note ?? ""); }}
                     >
                       <StickyNote className="h-3.5 w-3.5" />
