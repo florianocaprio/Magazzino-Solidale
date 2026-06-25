@@ -11,6 +11,12 @@ import {
   utentiTable,
 } from "@workspace/db";
 import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+  visibleMagazzinoIds,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -131,10 +137,11 @@ async function scaricoFEFO(tx: Tx, opts: {
   }
 }
 
-router.get("/scarichi", async (_req, res) => {
+router.get("/scarichi", async (req, res) => {
   const rows = await db
     .select()
     .from(scarichiTable)
+    .where(centroScopeFilter(scarichiTable.centroAscoltoId, callerCentroId(req)))
     .orderBy(desc(scarichiTable.dataCreazione))
     .limit(100);
 
@@ -260,6 +267,16 @@ router.post("/scarichi", async (req, res) => {
     }
   }
 
+  const caller = callerCentroId(req);
+  if (caller != null) {
+    const visible = await visibleMagazzinoIds(caller);
+    if (visible != null && !visible.includes(body.magazzinoId)) {
+      res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+      return;
+    }
+  }
+  const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
+
   const codice = `SCAR-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
 
   const newId = await db.transaction(async (tx) => {
@@ -268,7 +285,7 @@ router.post("/scarichi", async (req, res) => {
       .values({
         codice,
         magazzinoId: body.magazzinoId,
-        centroAscoltoId: body.centroAscoltoId ?? null,
+        centroAscoltoId,
         dataScarico: body.dataScarico,
         causale: body.causale,
         causaleAltro: body.causale === "altro" ? body.causaleAltro ?? null : null,
@@ -312,6 +329,10 @@ router.get("/scarichi/:id", async (req, res) => {
   const result = await getScaricoWithRighe(parseInt(req.params.id));
   if (!result) {
     res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!canAccessCentro(result.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
   res.json(result);

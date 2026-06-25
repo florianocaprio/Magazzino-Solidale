@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useListMezzi, useCreateMezzo, useUpdateMezzo, useDeleteMezzo, getListMezziQueryKey } from "@workspace/api-client-react";
+import { useListMezzi, useCreateMezzo, useUpdateMezzo, useDeleteMezzo, useListVolontari, useListCentriAscolto, getListMezziQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,14 +23,22 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 
+const NO_CENTRO = "__none__";
+const NO_VOLONTARIO = "__none__";
+
 export default function Mezzi() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const formSchema = z.object({
     codice: z.string().min(2, t("mezzi.valCodice")),
     tipo: z.string().min(1, t("mezzi.valTipo")),
     targa: z.string().optional(),
     proprieta: z.string().default("associazione"),
     proprietarioNome: z.string().optional(),
+    volontarioId: z.string().optional(),
+    centroAscoltoId: z.string().optional(),
     capacitaColli: z.coerce.number().optional(),
     capacitaKg: z.coerce.number().optional(),
     scadenzaAssicurazione: z.string().optional(),
@@ -37,6 +46,8 @@ export default function Mezzi() {
     note: z.string().optional()
   });
   const { data: mezzi, isLoading } = useListMezzi();
+  const { data: volontari } = useListVolontari();
+  const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -51,9 +62,12 @@ export default function Mezzi() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      codice: "", tipo: "furgone", targa: "", proprieta: "associazione", proprietarioNome: "", note: ""
+      codice: "", tipo: "furgone", targa: "", proprieta: "associazione", proprietarioNome: "",
+      volontarioId: NO_VOLONTARIO, centroAscoltoId: NO_CENTRO, note: ""
     }
   });
+
+  const proprietaWatch = form.watch("proprieta");
 
   const handleEdit = (mezzo: any) => {
     setEditingId(mezzo.id);
@@ -63,6 +77,8 @@ export default function Mezzi() {
       targa: mezzo.targa || "",
       proprieta: mezzo.proprieta,
       proprietarioNome: mezzo.proprietarioNome || "",
+      volontarioId: mezzo.volontarioId != null ? String(mezzo.volontarioId) : NO_VOLONTARIO,
+      centroAscoltoId: mezzo.centroAscoltoId != null ? String(mezzo.centroAscoltoId) : NO_CENTRO,
       capacitaColli: mezzo.capacitaColli || 0,
       capacitaKg: mezzo.capacitaKg || 0,
       scadenzaAssicurazione: mezzo.scadenzaAssicurazione ? mezzo.scadenzaAssicurazione.substring(0, 10) : "",
@@ -75,14 +91,27 @@ export default function Mezzi() {
   const handleCreate = () => {
     setEditingId(null);
     form.reset({
-      codice: "", tipo: "furgone", targa: "", proprieta: "associazione", proprietarioNome: "", note: ""
+      codice: "", tipo: "furgone", targa: "", proprieta: "associazione", proprietarioNome: "",
+      volontarioId: NO_VOLONTARIO,
+      centroAscoltoId: isCentroLocked ? String(lockedCentroId) : NO_CENTRO, note: ""
     });
     setIsFormOpen(true);
   };
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
+    const { volontarioId: volStr, centroAscoltoId: centroStr, ...rest } = data;
+    const isVolontario = data.proprieta === "volontario";
+    const volontarioId = isVolontario && volStr && volStr !== NO_VOLONTARIO ? parseInt(volStr, 10) : null;
+    const centroAscoltoId = isVolontario
+      ? null
+      : isCentroLocked
+        ? lockedCentroId
+        : !centroStr || centroStr === NO_CENTRO
+          ? null
+          : parseInt(centroStr, 10);
+    const payload = { ...rest, volontarioId, centroAscoltoId };
     if (editingId) {
-      updateMezzo.mutate({ id: editingId, data }, {
+      updateMezzo.mutate({ id: editingId, data: payload }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
           toast({ title: t("mezzi.toastUpdated") });
@@ -90,7 +119,7 @@ export default function Mezzi() {
         }
       });
     } else {
-      createMezzo.mutate({ data }, {
+      createMezzo.mutate({ data: payload }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
           toast({ title: t("mezzi.toastCreated") });
@@ -161,6 +190,7 @@ export default function Mezzi() {
                 <TableHead className="w-[100px]">{t("common.code")}</TableHead>
                 <TableHead>{t("mezzi.thTipoTarga")}</TableHead>
                 <TableHead>{t("mezzi.proprieta")}</TableHead>
+                <TableHead>{t("common.centro")}</TableHead>
                 <TableHead>{t("mezzi.thCapacita")}</TableHead>
                 <TableHead>{t("mezzi.thScadenze")}</TableHead>
                 <TableHead className="text-center">{t("common.status")}</TableHead>
@@ -174,6 +204,7 @@ export default function Mezzi() {
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
@@ -182,7 +213,7 @@ export default function Mezzi() {
                 ))
               ) : mezzi?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     {t("mezzi.empty")}
                   </TableCell>
                 </TableRow>
@@ -196,6 +227,9 @@ export default function Mezzi() {
                   <TableCell>
                     <div className="capitalize text-sm">{proprietaLabel(m.proprieta)}</div>
                     {m.proprietarioNome && <div className="text-xs text-muted-foreground">{m.proprietarioNome}</div>}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {m.effectiveCentroNome ?? t("common.centroComune")}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {m.capacitaColli ? `${m.capacitaColli} ${t("mezzi.colliUnit")}` : '-'} / {m.capacitaKg ? `${m.capacitaKg} kg` : '-'}
@@ -294,6 +328,46 @@ export default function Mezzi() {
                   <FormField control={form.control} name="proprietarioNome" render={({ field }) => (
                     <FormItem><FormLabel>{t("mezzi.nomeProprietario")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                   )} />
+
+                  {proprietaWatch === "volontario" ? (
+                    <FormField control={form.control} name="volontarioId" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("mezzi.proprietaOpts.volontario")}</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value={NO_VOLONTARIO}>{t("common.centroComune")}</SelectItem>
+                            {volontari?.map((v) => (
+                              <SelectItem key={v.id} value={String(v.id)}>
+                                {[v.nome, v.cognome].filter(Boolean).join(" ")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">{t("mezzi.centroFromVolontario")}</p>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  ) : (
+                    <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("common.centro")}</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isCentroLocked}>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value={NO_CENTRO}>{t("common.centroComune")}</SelectItem>
+                            {centri?.map((c) => (
+                              <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {isCentroLocked && (
+                          <p className="text-xs text-muted-foreground">{t("common.centroLocked")}</p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">

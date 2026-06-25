@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/lib/auth";
 import { useListVolontari, useCreateVolontario, useUpdateVolontario, useDeleteVolontario, getListVolontariQueryKey, useListCentriAscolto } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -23,6 +24,9 @@ import { useTranslation } from "react-i18next";
 
 export default function Volontari() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const formSchema = z.object({
     nome: z.string().min(2, t("volontari.valNome")),
     cognome: z.string().min(2, t("volontari.valCognome")),
@@ -80,7 +84,7 @@ export default function Volontari() {
     form.reset({
       nome: "", cognome: "", telefono: "", email: "",
       ruolo: "magazziniere", patente: false, mezzoPersonale: false,
-      maxConsegneTurno: 5, centroAscoltoId: null, note: ""
+      maxConsegneTurno: 5, centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : null, note: ""
     });
     setIsFormOpen(true);
   };
@@ -323,6 +327,7 @@ export default function Volontari() {
                     <Select
                       onValueChange={(v) => field.onChange(v === "all" ? null : Number(v))}
                       value={field.value == null ? "all" : String(field.value)}
+                      disabled={isCentroLocked}
                     >
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>

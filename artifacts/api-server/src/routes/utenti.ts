@@ -1,13 +1,14 @@
 import { Router, type IRouter } from "express";
 import { and, eq, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, utentiTable, ruoliTable } from "@workspace/db";
+import { db, utentiTable, ruoliTable, centriAscoltoTable } from "@workspace/db";
 import {
   CreateUtenteBody,
   UpdateUtenteBody,
   ResetUtentePasswordBody,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
+import { callerCentroId } from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -21,6 +22,8 @@ type UtenteRow = {
   matricola: string | null;
   ruoloId: number | null;
   ruoloNome: string | null;
+  centroAscoltoId: number | null;
+  centroAscoltoNome: string | null;
   attivo: boolean;
   mustChangePassword: boolean;
   ultimoAccesso: Date | null;
@@ -35,6 +38,8 @@ const fmt = (r: UtenteRow) => ({
   matricola: r.matricola ?? null,
   ruoloId: r.ruoloId ?? null,
   ruoloNome: r.ruoloNome ?? null,
+  centroAscoltoId: r.centroAscoltoId ?? null,
+  centroAscoltoNome: r.centroAscoltoNome ?? null,
   attivo: r.attivo,
   mustChangePassword: r.mustChangePassword,
   ultimoAccesso: r.ultimoAccesso ? r.ultimoAccesso.toISOString() : null,
@@ -51,13 +56,16 @@ const selectUtente = () =>
       matricola: utentiTable.matricola,
       ruoloId: utentiTable.ruoloId,
       ruoloNome: ruoliTable.nome,
+      centroAscoltoId: utentiTable.centroAscoltoId,
+      centroAscoltoNome: centriAscoltoTable.nome,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
       ultimoAccesso: utentiTable.ultimoAccesso,
       dataCreazione: utentiTable.dataCreazione,
     })
     .from(utentiTable)
-    .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id));
+    .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
+    .leftJoin(centriAscoltoTable, eq(utentiTable.centroAscoltoId, centriAscoltoTable.id));
 
 async function otherActiveAdminExists(excludeId: number): Promise<boolean> {
   const rows = await db
@@ -96,8 +104,11 @@ async function roleIsAdmin(ruoloId: number | null): Promise<boolean> {
   return r?.isAdmin ?? false;
 }
 
-router.get("/utenti", async (_req, res): Promise<void> => {
-  const rows = await selectUtente().orderBy(utentiTable.username);
+router.get("/utenti", async (req, res): Promise<void> => {
+  const caller = callerCentroId(req);
+  const rows = await selectUtente()
+    .where(caller != null ? eq(utentiTable.centroAscoltoId, caller) : undefined)
+    .orderBy(utentiTable.username);
   res.json(rows.map(fmt));
 });
 
@@ -107,7 +118,12 @@ router.post("/utenti", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { username, password, nome, cognome, matricola, ruoloId, attivo } = parsed.data;
+  const { username, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId } = parsed.data;
+
+  // A centro-bound admin can only create users inside their own centro; the
+  // caller's centro is auto-assigned and locked (any body value is ignored).
+  const caller = callerCentroId(req);
+  const finalCentroId = caller != null ? caller : (centroAscoltoId ?? null);
 
   const [existing] = await db
     .select({ id: utentiTable.id })
@@ -132,6 +148,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
       cognome: cognomeTrim,
       matricola: finalMatricola,
       ruoloId: ruoloId ?? null,
+      centroAscoltoId: finalCentroId,
       attivo: attivo ?? true,
       mustChangePassword: true,
     })
@@ -149,6 +166,11 @@ router.get("/utenti/:id", async (req, res): Promise<void> => {
   const [row] = await selectUtente().where(eq(utentiTable.id, id));
   if (!row) {
     res.status(404).json({ error: "Utente non trovato" });
+    return;
+  }
+  const caller = callerCentroId(req);
+  if (caller != null && row.centroAscoltoId !== caller) {
+    res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
     return;
   }
   res.json(fmt(row));
@@ -175,6 +197,12 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const caller = callerCentroId(req);
+  if (caller != null && target.centroAscoltoId !== caller) {
+    res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
+    return;
+  }
+
   const wasActiveAdmin =
     target.attivo && (await roleIsAdmin(target.ruoloId));
   if (wasActiveAdmin) {
@@ -196,6 +224,11 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   if (body.matricola !== undefined) updates.matricola = body.matricola;
   if (body.ruoloId !== undefined) updates.ruoloId = body.ruoloId;
   if (body.attivo !== undefined) updates.attivo = body.attivo;
+  // A centro-bound admin cannot move users to another centro; only a global
+  // admin may (re)assign the centro.
+  if (caller == null && body.centroAscoltoId !== undefined) {
+    updates.centroAscoltoId = body.centroAscoltoId;
+  }
 
   if (Object.keys(updates).length > 0) {
     await db.update(utentiTable).set(updates).where(eq(utentiTable.id, id));
@@ -225,6 +258,12 @@ router.delete("/utenti/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const caller = callerCentroId(req);
+  if (caller != null && target.centroAscoltoId !== caller) {
+    res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
+    return;
+  }
+
   const isActiveAdmin =
     target.attivo && (await roleIsAdmin(target.ruoloId));
   if (isActiveAdmin && !(await otherActiveAdminExists(id))) {
@@ -250,11 +289,17 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
   }
 
   const [target] = await db
-    .select({ id: utentiTable.id })
+    .select({ id: utentiTable.id, centroAscoltoId: utentiTable.centroAscoltoId })
     .from(utentiTable)
     .where(eq(utentiTable.id, id));
   if (!target) {
     res.status(404).json({ error: "Utente non trovato" });
+    return;
+  }
+
+  const caller = callerCentroId(req);
+  if (caller != null && target.centroAscoltoId !== caller) {
+    res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
     return;
   }
 

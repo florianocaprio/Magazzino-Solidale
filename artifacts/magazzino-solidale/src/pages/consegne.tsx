@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListCentriAscolto, getListConsegneQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,18 @@ const formSchema = z.object({
 
 export default function Consegne() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const [centroFilter, setCentroFilter] = useState("all");
   const [statoFilter, setStatoFilter] = useState("all");
+  const [createCentroId, setCreateCentroId] = useState("all");
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroFilter(String(lockedCentroId));
+      setCreateCentroId(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
   const [dataFilter, setDataFilter] = useState("");
   const consegneParams: { centroAscoltoId?: number; stato?: string; data?: string } = {};
   if (centroFilter !== "all") consegneParams.centroAscoltoId = parseInt(centroFilter);
@@ -46,7 +57,6 @@ export default function Consegne() {
   const { data: consegne, isLoading } = useListConsegne(
     Object.keys(consegneParams).length > 0 ? consegneParams : undefined
   );
-  const [createCentroId, setCreateCentroId] = useState("all");
   const { data: beneficiari } = useListBeneficiari({
     attivo: true,
     ...(createCentroId !== "all" ? { centroAscoltoId: parseInt(createCentroId) } : {}),
@@ -337,7 +347,7 @@ export default function Consegne() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormItem>
                   <FormLabel>{t("consegne.centroFilterLabel")}</FormLabel>
-                  <Select value={createCentroId} onValueChange={(v) => { setCreateCentroId(v); form.setValue("beneficiarioId", 0); }}>
+                  <Select value={createCentroId} onValueChange={(v) => { setCreateCentroId(v); form.setValue("beneficiarioId", 0); }} disabled={isCentroLocked}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("consegne.allBeneficiari")}</SelectItem>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth";
 import {
   useListApprovvigionamenti,
   useCreateApprovvigionamento,
@@ -59,9 +60,17 @@ interface OrderRow {
 
 export default function Approvvigionamenti() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
   const [filterCentroId, setFilterCentroId] = useState("all");
   const [filterStato, setFilterStato] = useState("all");
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setFilterCentroId(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
 
   const listParams: { magazzinoId?: number; centroAscoltoId?: number; stato?: string } = {};
   if (filterMagazzinoId !== "all") listParams.magazzinoId = parseInt(filterMagazzinoId);
@@ -96,7 +105,7 @@ export default function Approvvigionamenti() {
 
   const openCreate = () => {
     setEditingId(null);
-    form.reset({ dataRichiesta: new Date().toISOString().substring(0, 10), note: "" });
+    form.reset({ dataRichiesta: new Date().toISOString().substring(0, 10), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
     setIsFormOpen(true);
   };
 
@@ -224,7 +233,7 @@ export default function Approvvigionamenti() {
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">{t("approvvigionamenti.centroAscolto")}</Label>
-          <Select value={filterCentroId} onValueChange={setFilterCentroId}>
+          <Select value={filterCentroId} onValueChange={setFilterCentroId} disabled={isCentroLocked}>
             <SelectTrigger className="w-[200px]"><SelectValue placeholder={t("approvvigionamenti.tuttiCentri")} /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("approvvigionamenti.tuttiCentri")}</SelectItem>
@@ -376,7 +385,7 @@ export default function Approvvigionamenti() {
                   <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("approvvigionamenti.centroAscolto")}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
+                      <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined} disabled={isCentroLocked}>
                         <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
                         <SelectContent>
                           {centri?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}

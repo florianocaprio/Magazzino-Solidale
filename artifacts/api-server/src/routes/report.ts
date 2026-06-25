@@ -1,8 +1,19 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
+import { callerCentroId } from "../lib/centroScope";
 
 const router: IRouter = Router();
+
+/**
+ * SQL restricting a beneficiario-keyed query to the caller's centro (own centro
+ * OR shared/null), referencing the beneficiari alias' centro column. Returns
+ * `undefined` for a global caller (no restriction).
+ */
+function beneficiarioCentroSql(centroCol: SQL, caller: number | null): SQL | undefined {
+  if (caller == null) return undefined;
+  return sql`(${centroCol} = ${caller} OR ${centroCol} IS NULL)`;
+}
 
 function parseIntParam(v: unknown): number | undefined {
   if (v === undefined || v === null || v === "") return undefined;
@@ -33,6 +44,13 @@ function parseDateRange(req: { query: Record<string, unknown> }): DateRange {
 
 router.get("/report/giacenze-per-magazzino", async (req, res) => {
   const magazzinoId = parseIntParam(req.query.magazzinoId);
+  const caller = callerCentroId(req);
+
+  const conds: SQL[] = [];
+  if (magazzinoId) conds.push(sql`mg.id = ${magazzinoId}`);
+  const centroCond = beneficiarioCentroSql(sql`mg.centro_ascolto_id`, caller);
+  if (centroCond) conds.push(centroCond);
+  const where = conds.length ? sql`WHERE ${sql.join(conds, sql` AND `)}` : sql``;
 
   const result1 = await db.execute(sql`
     SELECT mg.nome as magazzino_nome,
@@ -42,7 +60,7 @@ router.get("/report/giacenze-per-magazzino", async (req, res) => {
     FROM magazzini mg
     LEFT JOIN lotti l ON l.magazzino_id = mg.id AND l.quantita_residua::numeric > 0
     LEFT JOIN prodotti p ON l.prodotto_id = p.id
-    ${magazzinoId ? sql`WHERE mg.id = ${magazzinoId}` : sql``}
+    ${where}
     GROUP BY mg.id, mg.nome
     ORDER BY mg.nome
   `);
@@ -65,10 +83,13 @@ router.get("/report/consegne-per-mese", async (req, res) => {
   const { da, a } = range;
   const magazzinoId = parseIntParam(req.query.magazzinoId);
   const centroAscoltoId = parseIntParam(req.query.centroAscoltoId);
+  const caller = callerCentroId(req);
 
   const conds = [sql`c.data_prevista::date BETWEEN ${da} AND ${a}`];
   if (magazzinoId) conds.push(sql`c.magazzino_id = ${magazzinoId}`);
   if (centroAscoltoId) conds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
+  const centroCond = beneficiarioCentroSql(sql`be.centro_ascolto_id`, caller);
+  if (centroCond) conds.push(centroCond);
   const where = sql.join(conds, sql` AND `);
 
   const result2 = await db.execute(sql`
@@ -99,6 +120,9 @@ router.get("/report/consegne-per-centro", async (req, res) => {
     return;
   }
   const { da, a } = range;
+  const caller = callerCentroId(req);
+  const centroCond = beneficiarioCentroSql(sql`be.centro_ascolto_id`, caller);
+  const extraCentro = centroCond ? sql` AND ${centroCond}` : sql``;
 
   const result = await db.execute(sql`
     SELECT be.centro_ascolto_id as centro_id,
@@ -110,7 +134,7 @@ router.get("/report/consegne-per-centro", async (req, res) => {
     JOIN beneficiari be ON be.id = c.beneficiario_id
     LEFT JOIN centri_di_ascolto ca ON ca.id = be.centro_ascolto_id
     WHERE c.stato = 'effettuata'
-      AND c.data_prevista::date BETWEEN ${da} AND ${a}
+      AND c.data_prevista::date BETWEEN ${da} AND ${a}${extraCentro}
     GROUP BY be.centro_ascolto_id, ca.nome
     ORDER BY totale DESC, centro_nome
   `);
@@ -132,6 +156,10 @@ router.get("/report/fse-plus", async (req, res) => {
     return;
   }
   const anno = parsedAnno;
+  const caller = callerCentroId(req);
+  const centroCond = caller == null
+    ? sql``
+    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
 
   const prodRes = await db.execute(sql`
     SELECT p.id as prodotto_id,
@@ -145,7 +173,7 @@ router.get("/report/fse-plus", async (req, res) => {
     JOIN prodotti p ON br.prodotto_id = p.id
     WHERE l.fse_plus = true
       AND b.stato IN ('confermata', 'consegnata')
-      AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}
+      AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
     GROUP BY p.id, p.nome, p.unita_misura
     ORDER BY p.nome
   `);
@@ -158,7 +186,7 @@ router.get("/report/fse-plus", async (req, res) => {
     JOIN lotti l ON br.lotto_id = l.id
     WHERE l.fse_plus = true
       AND b.stato IN ('confermata', 'consegnata')
-      AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}
+      AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
   `);
   const beneficiariTotali = Number((famRes.rows[0] as Record<string, unknown>)?.tot ?? 0);
 
@@ -170,7 +198,7 @@ router.get("/report/fse-plus", async (req, res) => {
       JOIN lotti l ON br.lotto_id = l.id
       WHERE l.fse_plus = true
         AND b.stato IN ('confermata', 'consegnata')
-        AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}
+        AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
     ),
     persone AS (
       SELECT be.sesso, be.data_nascita, be.area_provenienza

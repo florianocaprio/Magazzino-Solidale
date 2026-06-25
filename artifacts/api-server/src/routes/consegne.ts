@@ -2,6 +2,14 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { consegneTable, beneficiariTable, magazziniTable, volontariTable, bolleTable } from "@workspace/db";
 import { eq, and, desc, inArray, type SQL } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+  beneficiarioCentroId,
+  canUseBeneficiario,
+  canUseMagazzino,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -37,7 +45,13 @@ router.get("/consegne", async (req, res) => {
   if (stato) conditions.push(eq(consegneTable.stato, stato));
   if (data) conditions.push(eq(consegneTable.dataPrevista, data));
   if (beneficiarioId) conditions.push(eq(consegneTable.beneficiarioId, parseInt(beneficiarioId)));
-  if (centroAscoltoId) conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  const caller = callerCentroId(req);
+  if (caller != null) {
+    const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
+    if (f) conditions.push(f);
+  } else if (centroAscoltoId) {
+    conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  }
 
   const rows = await db
     .select({
@@ -88,6 +102,15 @@ router.get("/consegne", async (req, res) => {
 
 router.post("/consegne", async (req, res) => {
   const body = req.body;
+  const caller = callerCentroId(req);
+  if (caller != null && !(await canUseBeneficiario(body.beneficiarioId, caller))) {
+    res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    return;
+  }
+  if (caller != null && !(await canUseMagazzino(body.magazzinoId, caller))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    return;
+  }
   const codice = `CON-${Date.now()}`;
   const [row] = await db.insert(consegneTable).values({ ...body, codice }).returning();
   res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
@@ -96,12 +119,33 @@ router.post("/consegne", async (req, res) => {
 router.get("/consegne/:id", async (req, res) => {
   const [row] = await db.select().from(consegneTable).where(eq(consegneTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
 router.patch("/consegne/:id", async (req, res) => {
-  const [row] = await db.update(consegneTable).set(req.body).where(eq(consegneTable.id, parseInt(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(consegneTable).where(eq(consegneTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  const caller = callerCentroId(req);
+  if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (caller != null && req.body.beneficiarioId != null && req.body.beneficiarioId !== existing.beneficiarioId
+      && !(await canUseBeneficiario(req.body.beneficiarioId, caller))) {
+    res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    return;
+  }
+  if (caller != null && req.body.magazzinoId != null && req.body.magazzinoId !== existing.magazzinoId
+      && !(await canUseMagazzino(req.body.magazzinoId, caller))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    return;
+  }
+  const [row] = await db.update(consegneTable).set(req.body).where(eq(consegneTable.id, id)).returning();
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
@@ -115,6 +159,10 @@ router.post("/consegne/:id/associa-bolla", async (req, res) => {
 
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Consegna non trovata" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
 
   // scollega: rimuovi il legame da tutte le bolle puntate a questa consegna
   if (bollaId == null) {
@@ -150,6 +198,10 @@ router.post("/consegne/:id/completa", async (req, res) => {
 
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (consegna.stato === "effettuata") {
     res.status(400).json({ error: "La consegna risulta già consegnata" });
     return;

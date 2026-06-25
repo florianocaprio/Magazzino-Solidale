@@ -22,6 +22,10 @@ export interface Magazzino {
   telefono?: string | null;
   /** @nullable */
   email?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   stato: string;
   /** @nullable */
   note?: string | null;

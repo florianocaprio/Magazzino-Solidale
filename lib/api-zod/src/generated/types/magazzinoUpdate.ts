@@ -14,6 +14,8 @@ export interface MagazzinoUpdate {
   responsabile?: string;
   telefono?: string;
   email?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   stato?: string;
   note?: string;
 }

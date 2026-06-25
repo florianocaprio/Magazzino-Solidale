@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useListCentriAscolto, getListFornitoriQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,15 @@ const formSchema = z.object({
 
 export default function Fornitori() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const [centroFilter, setCentroFilter] = useState("all");
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroFilter(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
   const { data: fornitori, isLoading } = useListFornitori(
     centroFilter !== "all" ? { centroAscoltoId: parseInt(centroFilter) } : undefined
   );
@@ -76,7 +85,7 @@ export default function Fornitori() {
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", centroAscoltoId: "all", noteOperative: "" });
+    form.reset({ nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all", noteOperative: "" });
     setIsFormOpen(true);
   };
 
@@ -149,7 +158,7 @@ export default function Fornitori() {
             <Input placeholder={t("fornitori.searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={centroFilter} onValueChange={setCentroFilter}>
+              <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder={t("fornitori.tuttiCentri")} />
                 </SelectTrigger>
@@ -262,7 +271,7 @@ export default function Fornitori() {
                 <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("fornitori.centroAscolto")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "all"}>
+                    <Select onValueChange={field.onChange} value={field.value || "all"} disabled={isCentroLocked}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="all">{t("fornitori.tuttiCentri")}</SelectItem>

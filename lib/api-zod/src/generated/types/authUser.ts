@@ -18,6 +18,10 @@ export interface AuthUser {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;

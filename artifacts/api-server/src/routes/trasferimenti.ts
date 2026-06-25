@@ -2,6 +2,11 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTable, lottiTable, movimentiTable, utentiTable, volontariTable } from "@workspace/db";
 import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
+import {
+  callerCentroId,
+  visibleMagazzinoIds,
+  trasferimentoScopeFilter,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -181,6 +186,12 @@ router.get("/trasferimenti", async (req, res) => {
   const { stato } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(trasferimentiTable.stato, stato));
+  const scope = trasferimentoScopeFilter(
+    trasferimentiTable.magazzinoOrigineId,
+    trasferimentiTable.magazzinoDestinoId,
+    await visibleMagazzinoIds(callerCentroId(req)),
+  );
+  if (scope) conditions.push(scope);
 
   const rows = await db
     .select()
@@ -279,6 +290,11 @@ router.post("/trasferimenti", async (req, res) => {
     res.status(400).json({ error: "Origine e destinazione devono essere diverse" });
     return;
   }
+  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  if (visIds != null && (!visIds.includes(body.magazzinoOrigineId) || !visIds.includes(body.magazzinoDestinoId))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    return;
+  }
   const righeInput: Array<{ quantita: number }> = body.righe ?? [];
   if (righeInput.some((r) => !(r.quantita > 0))) {
     res.status(400).json({ error: "Le quantità devono essere maggiori di zero" });
@@ -321,6 +337,11 @@ router.post("/trasferimenti", async (req, res) => {
 router.get("/trasferimenti/:id", async (req, res) => {
   const result = await getTrasferimentoWithRighe(parseInt(req.params.id));
   if (!result) { res.status(404).json({ error: "Not found" }); return; }
+  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  if (visIds != null && !visIds.includes(result.magazzinoOrigineId) && !visIds.includes(result.magazzinoDestinoId)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   res.json(result);
 });
 
@@ -330,6 +351,11 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 
   const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
 
   const updates: Partial<typeof trasferimentiTable.$inferInsert> = {};
   if ("stato" in body) updates.stato = body.stato;
@@ -404,6 +430,11 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const id = parseInt(req.params.id);
   const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (current.stato !== "richiesto" && current.stato !== "preparato") {
     res.status(400).json({ error: "Il trasferimento è già stato avviato" });
     return;
@@ -469,6 +500,11 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
   const body = req.body ?? {};
   const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  const visIds = await visibleMagazzinoIds(callerCentroId(req));
+  if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (current.stato !== "in_transito") {
     res.status(400).json({ error: "Solo un trasferimento in transito può essere confermato" });
     return;

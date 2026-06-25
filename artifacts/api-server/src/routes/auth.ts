@@ -22,6 +22,8 @@ function authUserResponse(u: SessionUser) {
     matricola: u.matricola,
     ruoloId: u.ruoloId,
     ruoloNome: u.ruoloNome,
+    centroAscoltoId: u.centroAscoltoId,
+    centroAscoltoNome: u.centroAscoltoNome,
     isAdmin: u.isAdmin,
     aree: u.aree,
     mustChangePassword: u.mustChangePassword,

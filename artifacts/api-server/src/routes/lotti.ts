@@ -3,6 +3,11 @@ import { db } from "@workspace/db";
 import { lottiTable, prodottiTable, magazziniTable, fornitoriTable } from "@workspace/db";
 import { eq, and, lte, gt, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import {
+  callerCentroId,
+  visibleMagazzinoIds,
+  magazzinoScopeFilter,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -11,6 +16,8 @@ router.get("/lotti", async (req, res) => {
   const conditions: SQL[] = [gt(lottiTable.quantitaResidua, "0")];
   if (prodottoId) conditions.push(eq(lottiTable.prodottoId, parseInt(prodottoId)));
   if (magazzinoId) conditions.push(eq(lottiTable.magazzinoId, parseInt(magazzinoId)));
+  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req)));
+  if (scope) conditions.push(scope);
   if (inScadenza === "true") {
     const in30 = new Date();
     in30.setDate(in30.getDate() + 30);
@@ -53,6 +60,11 @@ router.get("/lotti", async (req, res) => {
 
 router.post("/lotti", async (req, res) => {
   const body = req.body;
+  const ids = await visibleMagazzinoIds(callerCentroId(req));
+  if (ids != null && !ids.includes(body.magazzinoId)) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    return;
+  }
   const fsePlus = body.fsePlus ?? false;
   if (fsePlus && body.fornitoreId != null) {
     res.status(400).json({ error: "Un lotto FSE+ non può avere anche un fornitore" });
@@ -81,15 +93,32 @@ router.post("/lotti", async (req, res) => {
 router.get("/lotti/:id", async (req, res) => {
   const [row] = await db.select().from(lottiTable).where(eq(lottiTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const ids = await visibleMagazzinoIds(callerCentroId(req));
+  if (ids != null && !ids.includes(row.magazzinoId)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   res.json({ ...row, quantitaCaricata: parseFloat(row.quantitaCaricata), quantitaResidua: parseFloat(row.quantitaResidua), dataCreazione: row.dataCreazione.toISOString() });
 });
 
 router.patch("/lotti/:id", async (req, res) => {
   const body = req.body;
+  const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(lottiTable).where(eq(lottiTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  const ids = await visibleMagazzinoIds(callerCentroId(req));
+  if (ids != null && !ids.includes(existing.magazzinoId)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (ids != null && body.magazzinoId != null && body.magazzinoId !== existing.magazzinoId
+      && !ids.includes(body.magazzinoId)) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    return;
+  }
   const update: Record<string, unknown> = { ...body };
   if (body.quantitaResidua !== undefined) update.quantitaResidua = body.quantitaResidua.toString();
-  const [row] = await db.update(lottiTable).set(update).where(eq(lottiTable.id, parseInt(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const [row] = await db.update(lottiTable).set(update).where(eq(lottiTable.id, id)).returning();
   res.json({ ...row, quantitaCaricata: parseFloat(row.quantitaCaricata), quantitaResidua: parseFloat(row.quantitaResidua), dataCreazione: row.dataCreazione.toISOString() });
 });
 

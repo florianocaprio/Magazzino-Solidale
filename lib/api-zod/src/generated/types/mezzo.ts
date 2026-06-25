@@ -16,6 +16,16 @@ export interface Mezzo {
   /** @nullable */
   proprietarioNome?: string | null;
   /** @nullable */
+  volontarioId?: number | null;
+  /** @nullable */
+  volontarioNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  effectiveCentroId?: number | null;
+  /** @nullable */
+  effectiveCentroNome?: string | null;
+  /** @nullable */
   capacitaColli?: number | null;
   /** @nullable */
   capacitaKg?: number | null;

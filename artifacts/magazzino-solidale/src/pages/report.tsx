@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth";
 import {
   useReportGiacenzePerMagazzino,
   useReportConsegnePerMese,
@@ -27,12 +28,20 @@ const ALL = "all";
 
 export default function Report() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const currentYear = new Date().getFullYear();
   const [da, setDa] = useState(`${currentYear}-01-01`);
   const [a, setA] = useState(new Date().toISOString().slice(0, 10));
   const [magazzinoId, setMagazzinoId] = useState<string>(ALL);
   const [centroId, setCentroId] = useState<string>(ALL);
   const [fseAnno, setFseAnno] = useState(currentYear);
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroId(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
 
   const { data: magazzini } = useListMagazzini();
   const { data: centri } = useListCentriAscolto();
@@ -108,7 +117,7 @@ export default function Report() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">{t("report.listeningCentre")}</Label>
-            <Select value={centroId} onValueChange={setCentroId}>
+            <Select value={centroId} onValueChange={setCentroId} disabled={isCentroLocked}>
               <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t("report.allCentres")}</SelectItem>

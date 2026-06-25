@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListInterventi, useCreateIntervento, useListBeneficiari, useListCentriAscolto, getListInterventiQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,8 +36,16 @@ const formSchema = z.object({
 
 export default function Interventi() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const [tipoFilter, setTipoFilter] = useState("all");
   const [centroFilter, setCentroFilter] = useState("all");
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroFilter(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
   const { data: interventi, isLoading } = useListInterventi({
     tipo: tipoFilter !== "all" ? tipoFilter : undefined,
     centroAscoltoId: centroFilter !== "all" ? parseInt(centroFilter) : undefined,
@@ -145,7 +154,7 @@ export default function Interventi() {
                 <SelectItem value="orientamento">{t("interventi.orientamento")}</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={centroFilter} onValueChange={setCentroFilter}>
+            <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder={t("interventi.filterAllCenters")} />
               </SelectTrigger>

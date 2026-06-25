@@ -15,5 +15,7 @@ export interface UtenteUpdate {
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   attivo?: boolean;
 }

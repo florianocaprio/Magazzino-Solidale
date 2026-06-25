@@ -2,6 +2,12 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable } from "@workspace/db";
 import { eq, and, ilike, type SQL } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+  beneficiarioCentroId,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -52,7 +58,13 @@ router.get("/beneficiari", async (req, res) => {
   }
   if (priorita) conditions.push(eq(beneficiariTable.priorita, priorita));
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
-  if (centroAscoltoId) conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  const caller = callerCentroId(req);
+  if (caller != null) {
+    const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
+    if (f) conditions.push(f);
+  } else if (centroAscoltoId) {
+    conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  }
   if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
   else if (attivo === "false") conditions.push(eq(beneficiariTable.attivo, false));
 
@@ -67,8 +79,11 @@ router.get("/beneficiari", async (req, res) => {
 
 router.post("/beneficiari", async (req, res) => {
   const body = req.body;
+  const caller = callerCentroId(req);
   const codice = body.codice || `BEN-${Date.now()}`;
-  const [row] = await db.insert(beneficiariTable).values({ ...body, codice }).returning();
+  const values = { ...body, codice };
+  if (caller != null) values.centroAscoltoId = caller;
+  const [row] = await db.insert(beneficiariTable).values(values).returning();
   res.status(201).json(fmtBenef(row));
 });
 
@@ -76,6 +91,10 @@ router.get("/beneficiari/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const [row] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
 
   let centroNome: string | null = null;
   if (row.centroAscoltoId) {
@@ -118,30 +137,60 @@ router.get("/beneficiari/:id", async (req, res) => {
 
 router.patch("/beneficiari/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const [row] = await db.update(beneficiariTable).set({ ...req.body, dataAggiornamento: new Date() }).where(eq(beneficiariTable.id, id)).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const caller = callerCentroId(req);
+  const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  const updates = { ...req.body, dataAggiornamento: new Date() };
+  if (caller != null) delete updates.centroAscoltoId;
+  const [row] = await db.update(beneficiariTable).set(updates).where(eq(beneficiariTable.id, id)).returning();
   res.json(fmtBenef(row));
 });
 
 router.delete("/beneficiari/:id", async (req, res) => {
-  await db.delete(beneficiariTable).where(eq(beneficiariTable.id, parseInt(req.params.id)));
+  const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
+  if (!existing) { res.status(204).send(); return; }
+  if (!canAccessCentro(existing.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  await db.delete(beneficiariTable).where(eq(beneficiariTable.id, id));
   res.status(204).send();
 });
 
 router.get("/beneficiari/:id/nucleo", async (req, res) => {
-  const rows = await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, parseInt(req.params.id)));
+  const id = parseInt(req.params.id);
+  if (!canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  const rows = await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, id));
   res.json(rows.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, sesso: n.sesso ?? null, tagliaVestiti: n.tagliaVestiti ?? null, numeroScarpe: n.numeroScarpe ?? null })));
 });
 
 router.post("/beneficiari/:id/nucleo", async (req, res) => {
-  const [row] = await db.insert(nucleoFamiliareTable).values({ ...req.body, beneficiarioId: parseInt(req.params.id) }).returning();
+  const id = parseInt(req.params.id);
+  if (!canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  const [row] = await db.insert(nucleoFamiliareTable).values({ ...req.body, beneficiarioId: id }).returning();
   res.status(201).json(row);
 });
 
 router.delete("/beneficiari/:id/nucleo/:membroId", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   await db
     .delete(nucleoFamiliareTable)
-    .where(and(eq(nucleoFamiliareTable.id, parseInt(req.params.membroId)), eq(nucleoFamiliareTable.beneficiarioId, parseInt(req.params.id))));
+    .where(and(eq(nucleoFamiliareTable.id, parseInt(req.params.membroId)), eq(nucleoFamiliareTable.beneficiarioId, id)));
   res.status(204).send();
 });
 

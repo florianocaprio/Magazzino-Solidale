@@ -1,56 +1,208 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { mezziTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { mezziTable, volontariTable, centriAscoltoTable } from "@workspace/db";
+import { eq, sql, type SQL } from "drizzle-orm";
+import { callerCentroId, canAccessCentro } from "../lib/centroScope";
 
 const router: IRouter = Router();
 
-const fmt = (r: typeof mezziTable.$inferSelect) => ({
-  id: r.id,
-  codice: r.codice,
-  tipo: r.tipo,
-  targa: r.targa ?? null,
-  proprieta: r.proprieta,
-  proprietarioNome: r.proprietarioNome ?? null,
-  capacitaColli: r.capacitaColli ?? null,
-  capacitaKg: r.capacitaKg ? parseFloat(r.capacitaKg) : null,
-  stato: r.stato,
-  scadenzaAssicurazione: r.scadenzaAssicurazione ?? null,
-  scadenzaRevisione: r.scadenzaRevisione ?? null,
-  note: r.note ?? null,
-  dataCreazione: r.dataCreazione.toISOString(),
+type MezzoJoinRow = {
+  m: typeof mezziTable.$inferSelect;
+  volNome: string | null;
+  volCognome: string | null;
+  volCentroId: number | null;
+};
+
+/**
+ * Effective centro of a mezzo: the owning volontario's centro when the vehicle
+ * is volontario-owned (`volontarioId` set), otherwise the mezzo's own
+ * `centroAscoltoId`. NULL on either path = visible to all centri.
+ */
+function effectiveCentroOf(r: MezzoJoinRow): number | null {
+  return r.m.volontarioId != null ? (r.volCentroId ?? null) : (r.m.centroAscoltoId ?? null);
+}
+
+/** SQL expression mirroring effectiveCentroOf for use in WHERE clauses. */
+const effectiveCentroExpr = sql<number | null>`CASE WHEN ${mezziTable.volontarioId} IS NOT NULL THEN ${volontariTable.centroAscoltoId} ELSE ${mezziTable.centroAscoltoId} END`;
+
+function effectiveCentroFilter(centroId: number | null): SQL | undefined {
+  if (centroId == null) return undefined;
+  return sql`(${effectiveCentroExpr} IS NULL OR ${effectiveCentroExpr} = ${centroId})`;
+}
+
+const baseSelect = () =>
+  db
+    .select({
+      m: mezziTable,
+      volNome: volontariTable.nome,
+      volCognome: volontariTable.cognome,
+      volCentroId: volontariTable.centroAscoltoId,
+    })
+    .from(mezziTable)
+    .leftJoin(volontariTable, eq(mezziTable.volontarioId, volontariTable.id));
+
+const fmt = (r: MezzoJoinRow, centroNome: string | null) => {
+  const effectiveCentroId = effectiveCentroOf(r);
+  return {
+    id: r.m.id,
+    codice: r.m.codice,
+    tipo: r.m.tipo,
+    targa: r.m.targa ?? null,
+    proprieta: r.m.proprieta,
+    proprietarioNome: r.m.proprietarioNome ?? null,
+    volontarioId: r.m.volontarioId ?? null,
+    volontarioNome: r.volNome ? `${r.volNome} ${r.volCognome ?? ""}`.trim() : null,
+    centroAscoltoId: r.m.centroAscoltoId ?? null,
+    effectiveCentroId,
+    effectiveCentroNome: centroNome,
+    capacitaColli: r.m.capacitaColli ?? null,
+    capacitaKg: r.m.capacitaKg ? parseFloat(r.m.capacitaKg) : null,
+    stato: r.m.stato,
+    scadenzaAssicurazione: r.m.scadenzaAssicurazione ?? null,
+    scadenzaRevisione: r.m.scadenzaRevisione ?? null,
+    note: r.m.note ?? null,
+    dataCreazione: r.m.dataCreazione.toISOString(),
+  };
+};
+
+async function centroNomeOf(id: number | null): Promise<string | null> {
+  if (id == null) return null;
+  const [c] = await db
+    .select({ nome: centriAscoltoTable.nome })
+    .from(centriAscoltoTable)
+    .where(eq(centriAscoltoTable.id, id));
+  return c?.nome ?? null;
+}
+
+async function loadMezzo(id: number): Promise<ReturnType<typeof fmt> | null> {
+  const [r] = await baseSelect().where(eq(mezziTable.id, id));
+  if (!r) return null;
+  return fmt(r, await centroNomeOf(effectiveCentroOf(r)));
+}
+
+/** Centro of a volontario (for inheritance/validation), or null. */
+async function volontarioCentroId(volontarioId: number): Promise<number | null> {
+  const [v] = await db
+    .select({ c: volontariTable.centroAscoltoId })
+    .from(volontariTable)
+    .where(eq(volontariTable.id, volontarioId));
+  return v?.c ?? null;
+}
+
+router.get("/mezzi", async (req, res) => {
+  const caller = callerCentroId(req);
+  const rows = await baseSelect()
+    .where(effectiveCentroFilter(caller))
+    .orderBy(mezziTable.codice);
+  const centri = await db
+    .select({ id: centriAscoltoTable.id, nome: centriAscoltoTable.nome })
+    .from(centriAscoltoTable);
+  const centroMap = new Map(centri.map((c) => [c.id, c.nome]));
+  res.json(
+    rows.map((r) => {
+      const eff = effectiveCentroOf(r);
+      return fmt(r, eff != null ? (centroMap.get(eff) ?? null) : null);
+    }),
+  );
 });
 
-router.get("/mezzi", async (_req, res) => {
-  const rows = await db.select().from(mezziTable).orderBy(mezziTable.codice);
-  res.json(rows.map(fmt));
-});
+/**
+ * Resolves the own `centroAscoltoId` to persist and validates that the resulting
+ * effective centro is accessible to the caller. Returns the own centro to store,
+ * or a 403 error message string.
+ */
+async function resolveCentro(
+  body: { volontarioId?: number | null; centroAscoltoId?: number | null },
+  caller: number | null,
+): Promise<{ ownCentro: number | null } | { error: string }> {
+  let ownCentro: number | null = body.centroAscoltoId ?? null;
+  if (body.volontarioId != null) {
+    // Volontario-owned: own centro is ignored/derived from the volontario.
+    ownCentro = null;
+  } else if (caller != null) {
+    // Scoped, non-volontario-owned: lock to caller's centro.
+    ownCentro = caller;
+  }
+  const effective =
+    body.volontarioId != null ? await volontarioCentroId(body.volontarioId) : ownCentro;
+  if (!canAccessCentro(effective, caller)) {
+    return { error: "Mezzo non accessibile per il tuo centro" };
+  }
+  return { ownCentro };
+}
 
 router.post("/mezzi", async (req, res) => {
   const body = req.body;
-  const [row] = await db.insert(mezziTable).values({
-    ...body,
-    capacitaKg: body.capacitaKg?.toString(),
-  }).returning();
-  res.status(201).json(fmt(row));
+  const caller = callerCentroId(req);
+  const resolved = await resolveCentro(body, caller);
+  if ("error" in resolved) {
+    res.status(403).json({ error: resolved.error });
+    return;
+  }
+  const [created] = await db
+    .insert(mezziTable)
+    .values({
+      ...body,
+      centroAscoltoId: resolved.ownCentro,
+      capacitaKg: body.capacitaKg?.toString(),
+    })
+    .returning({ id: mezziTable.id });
+  res.status(201).json(await loadMezzo(created.id));
 });
 
 router.get("/mezzi/:id", async (req, res) => {
-  const [row] = await db.select().from(mezziTable).where(eq(mezziTable.id, parseInt(req.params.id)));
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(fmt(row));
+  const [r] = await baseSelect().where(eq(mezziTable.id, parseInt(req.params.id)));
+  if (!r) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(effectiveCentroOf(r), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  res.json(fmt(r, await centroNomeOf(effectiveCentroOf(r))));
 });
 
 router.patch("/mezzi/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const caller = callerCentroId(req);
+  const [existing] = await baseSelect().where(eq(mezziTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(effectiveCentroOf(existing), caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   const body = req.body;
-  const update = { ...body, capacitaKg: body.capacitaKg?.toString() };
-  const [row] = await db.update(mezziTable).set(update).where(eq(mezziTable.id, parseInt(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(fmt(row));
+  // Determine the post-update owner link to recompute the effective centro.
+  const volontarioId =
+    body.volontarioId !== undefined ? body.volontarioId : existing.m.volontarioId;
+  const resolved = await resolveCentro(
+    {
+      volontarioId,
+      centroAscoltoId:
+        body.centroAscoltoId !== undefined ? body.centroAscoltoId : existing.m.centroAscoltoId,
+    },
+    caller,
+  );
+  if ("error" in resolved) {
+    res.status(403).json({ error: resolved.error });
+    return;
+  }
+  const update = {
+    ...body,
+    centroAscoltoId: resolved.ownCentro,
+    capacitaKg: body.capacitaKg?.toString(),
+  };
+  await db.update(mezziTable).set(update).where(eq(mezziTable.id, id));
+  res.json(await loadMezzo(id));
 });
 
 router.delete("/mezzi/:id", async (req, res) => {
-  await db.delete(mezziTable).where(eq(mezziTable.id, parseInt(req.params.id)));
+  const id = parseInt(req.params.id);
+  const [existing] = await baseSelect().where(eq(mezziTable.id, id));
+  if (!existing) { res.status(204).send(); return; }
+  if (!canAccessCentro(effectiveCentroOf(existing), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  await db.delete(mezziTable).where(eq(mezziTable.id, id));
   res.status(204).send();
 });
 

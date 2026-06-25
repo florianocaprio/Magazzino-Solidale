@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { useAuth } from "@/lib/auth";
 import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useListCentriAscolto, useGetBeneficiario, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -42,9 +43,17 @@ const PRIORITA_ALL = "__all__";
 
 export default function Beneficiari() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState<string>(CENTRO_ALL);
   const [prioritaFilter, setPrioritaFilter] = useState<string>(PRIORITA_ALL);
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroFilter(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
   const { data: beneficiari, isLoading } = useListBeneficiari({
     search: search || undefined,
     centroAscoltoId: centroFilter !== CENTRO_ALL ? parseInt(centroFilter) : undefined,
@@ -130,7 +139,7 @@ export default function Beneficiari() {
             title={t("beneficiari.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
+          <Button onClick={() => { form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : ""); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
         </div>
       </div>
 
@@ -146,7 +155,7 @@ export default function Beneficiari() {
                 className="pl-9"
               />
             </div>
-            <Select value={centroFilter} onValueChange={setCentroFilter}>
+            <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
               <SelectTrigger className="w-full sm:w-64">
                 <SelectValue placeholder={t("beneficiari.allCentri")} />
               </SelectTrigger>
@@ -312,7 +321,7 @@ export default function Beneficiari() {
                 <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("beneficiari.centroRiferimento")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined} disabled={isCentroLocked}>
                       <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}

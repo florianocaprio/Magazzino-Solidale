@@ -1,7 +1,12 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { magazziniTable } from "@workspace/db";
+import { magazziniTable, centriAscoltoTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -27,26 +32,49 @@ async function nextMagCodice(): Promise<string> {
   return `MAG-${String(max + 1).padStart(3, "0")}`;
 }
 
-router.get("/magazzini", async (_req, res) => {
-  const rows = await db.select().from(magazziniTable).orderBy(magazziniTable.nome);
-  res.json(rows.map(r => ({
-    id: r.id,
-    codice: r.codice,
-    nome: r.nome,
-    indirizzo: r.indirizzo ?? null,
-    comune: r.comune ?? null,
-    zona: r.zona ?? null,
-    responsabile: r.responsabile ?? null,
-    telefono: r.telefono ?? null,
-    email: r.email ?? null,
-    stato: r.stato,
-    note: r.note ?? null,
-    dataCreazione: r.dataCreazione.toISOString(),
-  })));
+const fmt = (r: typeof magazziniTable.$inferSelect, centroNome?: string | null) => ({
+  id: r.id,
+  codice: r.codice,
+  nome: r.nome,
+  indirizzo: r.indirizzo ?? null,
+  comune: r.comune ?? null,
+  zona: r.zona ?? null,
+  responsabile: r.responsabile ?? null,
+  telefono: r.telefono ?? null,
+  email: r.email ?? null,
+  centroAscoltoId: r.centroAscoltoId ?? null,
+  centroAscoltoNome: centroNome ?? null,
+  stato: r.stato,
+  note: r.note ?? null,
+  dataCreazione: r.dataCreazione.toISOString(),
+});
+
+async function centroNomeOf(id: number | null): Promise<string | null> {
+  if (id == null) return null;
+  const [c] = await db
+    .select({ nome: centriAscoltoTable.nome })
+    .from(centriAscoltoTable)
+    .where(eq(centriAscoltoTable.id, id));
+  return c?.nome ?? null;
+}
+
+router.get("/magazzini", async (req, res) => {
+  const rows = await db
+    .select({ m: magazziniTable, centroNome: centriAscoltoTable.nome })
+    .from(magazziniTable)
+    .leftJoin(
+      centriAscoltoTable,
+      eq(magazziniTable.centroAscoltoId, centriAscoltoTable.id),
+    )
+    .where(centroScopeFilter(magazziniTable.centroAscoltoId, callerCentroId(req)))
+    .orderBy(magazziniTable.nome);
+  res.json(rows.map((r) => fmt(r.m, r.centroNome)));
 });
 
 router.post("/magazzini", async (req, res) => {
   const body = req.body;
+  const caller = callerCentroId(req);
+  const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
   const providedCodice = typeof body.codice === "string" ? body.codice.trim() : "";
   const values = {
     nome: body.nome,
@@ -56,6 +84,7 @@ router.post("/magazzini", async (req, res) => {
     responsabile: body.responsabile,
     telefono: body.telefono,
     email: body.email,
+    centroAscoltoId,
     stato: body.stato ?? "attivo",
     note: body.note,
   };
@@ -67,7 +96,7 @@ router.post("/magazzini", async (req, res) => {
         .insert(magazziniTable)
         .values({ ...values, codice: providedCodice })
         .returning();
-      res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
+      res.status(201).json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
     } catch (e) {
       if (isUniqueViolation(e)) {
         res.status(409).json({ error: `Codice "${providedCodice}" già in uso` });
@@ -84,7 +113,7 @@ router.post("/magazzini", async (req, res) => {
     const codice = await nextMagCodice();
     try {
       const [row] = await db.insert(magazziniTable).values({ ...values, codice }).returning();
-      res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
+      res.status(201).json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
       return;
     } catch (e) {
       if (isUniqueViolation(e) && attempt < MAX_ATTEMPTS - 1) continue;
@@ -101,18 +130,38 @@ router.get("/magazzini/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const [row] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
+  if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  res.json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
 });
 
 router.patch("/magazzini/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const [row] = await db.update(magazziniTable).set(req.body).where(eq(magazziniTable.id, id)).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
+  const caller = callerCentroId(req);
+  const [existing] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  const updates = { ...req.body };
+  // Scoped users cannot reassign a record's centro.
+  if (caller != null) delete updates.centroAscoltoId;
+  const [row] = await db.update(magazziniTable).set(updates).where(eq(magazziniTable.id, id)).returning();
+  res.json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
 });
 
 router.delete("/magazzini/:id", async (req, res) => {
   const id = parseInt(req.params.id);
+  const caller = callerCentroId(req);
+  const [existing] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
+  if (!existing) { res.status(204).send(); return; }
+  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   await db.delete(magazziniTable).where(eq(magazziniTable.id, id));
   res.status(204).send();
 });

@@ -12,6 +12,10 @@ export interface MezzoInput {
   targa?: string;
   proprieta: string;
   proprietarioNome?: string;
+  /** @nullable */
+  volontarioId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   capacitaColli?: number;
   capacitaKg?: number;
   scadenzaAssicurazione?: string;

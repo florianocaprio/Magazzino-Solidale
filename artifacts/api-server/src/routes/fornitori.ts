@@ -1,7 +1,12 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { fornitoriTable } from "@workspace/db";
-import { eq, or, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -26,33 +31,59 @@ const fmt = (r: typeof fornitoriTable.$inferSelect) => ({
 
 router.get("/fornitori", async (req, res) => {
   const { centroAscoltoId } = req.query as Record<string, string>;
-  // Un fornitore associato a un centro è visibile filtrando per quel centro;
-  // i fornitori "per tutti i centri" (centroAscoltoId null) sono sempre inclusi.
-  const where = centroAscoltoId
-    ? or(eq(fornitoriTable.centroAscoltoId, parseInt(centroAscoltoId)), isNull(fornitoriTable.centroAscoltoId))
-    : undefined;
-  const rows = await db.select().from(fornitoriTable).where(where).orderBy(fornitoriTable.nome);
+  const caller = callerCentroId(req);
+  // Scoped users are forced to their centro; global users may filter by a
+  // chosen centro. Either way, fornitori "per tutti i centri" (null) are shown.
+  const effectiveCentro =
+    caller != null ? caller : centroAscoltoId ? parseInt(centroAscoltoId) : null;
+  const rows = await db
+    .select()
+    .from(fornitoriTable)
+    .where(centroScopeFilter(fornitoriTable.centroAscoltoId, effectiveCentro))
+    .orderBy(fornitoriTable.nome);
   res.json(rows.map(fmt));
 });
 
 router.post("/fornitori", async (req, res) => {
-  const [row] = await db.insert(fornitoriTable).values(req.body).returning();
+  const caller = callerCentroId(req);
+  const values = { ...req.body };
+  if (caller != null) values.centroAscoltoId = caller;
+  const [row] = await db.insert(fornitoriTable).values(values).returning();
   res.status(201).json(fmt(row));
 });
 
 router.get("/fornitori/:id", async (req, res) => {
   const [row] = await db.select().from(fornitoriTable).where(eq(fornitoriTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   res.json(fmt(row));
 });
 
 router.patch("/fornitori/:id", async (req, res) => {
-  const [row] = await db.update(fornitoriTable).set(req.body).where(eq(fornitoriTable.id, parseInt(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const caller = callerCentroId(req);
+  const [existing] = await db.select().from(fornitoriTable).where(eq(fornitoriTable.id, parseInt(req.params.id)));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  const updates = { ...req.body };
+  if (caller != null) delete updates.centroAscoltoId;
+  const [row] = await db.update(fornitoriTable).set(updates).where(eq(fornitoriTable.id, parseInt(req.params.id))).returning();
   res.json(fmt(row));
 });
 
 router.delete("/fornitori/:id", async (req, res) => {
+  const caller = callerCentroId(req);
+  const [existing] = await db.select().from(fornitoriTable).where(eq(fornitoriTable.id, parseInt(req.params.id)));
+  if (!existing) { res.status(204).send(); return; }
+  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   await db.delete(fornitoriTable).where(eq(fornitoriTable.id, parseInt(req.params.id)));
   res.status(204).send();
 });

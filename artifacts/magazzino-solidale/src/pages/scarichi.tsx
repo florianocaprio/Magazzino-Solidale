@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth";
 import {
   useListScarichi,
   useCreateScarico,
@@ -175,12 +176,20 @@ function NuovoScaricoForm({
   onClose: () => void;
   onCreated: (s: Scarico) => void;
 }) {
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const [magazzinoId, setMagazzinoId] = useState("");
   const [centroAscoltoId, setCentroAscoltoId] = useState("");
   const [causale, setCausale] = useState("");
   const [causaleAltro, setCausaleAltro] = useState("");
   const [note, setNote] = useState("");
   const [righe, setRighe] = useState<RigaDraft[]>([newRiga()]);
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroAscoltoId(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
 
   const { t } = useTranslation();
   const { data: magazzini } = useListMagazzini();
@@ -196,7 +205,7 @@ function NuovoScaricoForm({
 
   const reset = () => {
     setMagazzinoId("");
-    setCentroAscoltoId("");
+    setCentroAscoltoId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "");
     setCausale("");
     setCausaleAltro("");
     setNote("");
@@ -271,7 +280,7 @@ function NuovoScaricoForm({
 
           <div className="space-y-2">
             <Label>{t("scarichi.centro")}</Label>
-            <Select value={centroAscoltoId || "none"} onValueChange={(v) => setCentroAscoltoId(v === "none" ? "" : v)}>
+            <Select value={centroAscoltoId || "none"} onValueChange={(v) => setCentroAscoltoId(v === "none" ? "" : v)} disabled={isCentroLocked}>
               <SelectTrigger><SelectValue placeholder={t("scarichi.selectCentro")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">{t("scarichi.nessunCentro")}</SelectItem>
@@ -333,6 +342,9 @@ function NuovoScaricoForm({
 
 export default function Scarichi() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const { data: scarichi, isLoading } = useListScarichi();
   const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
@@ -344,6 +356,11 @@ export default function Scarichi() {
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [centroFilter, setCentroFilter] = useState("all");
   const [sortAsc, setSortAsc] = useState(false);
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroFilter(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
 
   const displayed = (scarichi ?? [])
     .filter((s) =>
@@ -396,7 +413,7 @@ export default function Scarichi() {
           <p className="text-muted-foreground">{t("scarichi.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={centroFilter} onValueChange={setCentroFilter}>
+          <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
             <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("scarichi.filterTuttiCentri")}</SelectItem>

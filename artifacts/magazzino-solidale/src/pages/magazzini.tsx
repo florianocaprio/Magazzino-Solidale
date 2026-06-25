@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useListMagazzini, useCreateMagazzino, useUpdateMagazzino, useDeleteMagazzino, getListMagazziniQueryKey } from "@workspace/api-client-react";
+import { useListMagazzini, useCreateMagazzino, useUpdateMagazzino, useDeleteMagazzino, useListCentriAscolto, getListMagazziniQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,12 +31,19 @@ const formSchema = z.object({
   telefono: z.string().optional(),
   email: z.string().email("Email non valida").optional().or(z.literal("")),
   stato: z.string().default("attivo"),
+  centroAscoltoId: z.string().optional(),
   note: z.string().optional()
 });
 
+const NO_CENTRO = "__none__";
+
 export default function Magazzini() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const { data: magazzini, isLoading } = useListMagazzini();
+  const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -52,7 +60,7 @@ export default function Magazzini() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       codice: "", nome: "", indirizzo: "", comune: "", zona: "",
-      responsabile: "", telefono: "", email: "", stato: "attivo", note: ""
+      responsabile: "", telefono: "", email: "", stato: "attivo", centroAscoltoId: NO_CENTRO, note: ""
     }
   });
 
@@ -68,6 +76,7 @@ export default function Magazzini() {
       telefono: magazzino.telefono || "",
       email: magazzino.email || "",
       stato: magazzino.stato,
+      centroAscoltoId: magazzino.centroAscoltoId != null ? String(magazzino.centroAscoltoId) : NO_CENTRO,
       note: magazzino.note || ""
     });
     setIsFormOpen(true);
@@ -77,14 +86,22 @@ export default function Magazzini() {
     setEditingId(null);
     form.reset({
       codice: "", nome: "", indirizzo: "", comune: "", zona: "",
-      responsabile: "", telefono: "", email: "", stato: "attivo", note: ""
+      responsabile: "", telefono: "", email: "", stato: "attivo",
+      centroAscoltoId: isCentroLocked ? String(lockedCentroId) : NO_CENTRO, note: ""
     });
     setIsFormOpen(true);
   };
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
+    const { centroAscoltoId: centroStr, ...rest } = data;
+    const centroAscoltoId = isCentroLocked
+      ? lockedCentroId
+      : !centroStr || centroStr === NO_CENTRO
+        ? null
+        : parseInt(centroStr, 10);
+    const payload = { ...rest, centroAscoltoId };
     if (editingId) {
-      updateMagazzino.mutate({ id: editingId, data }, {
+      updateMagazzino.mutate({ id: editingId, data: payload }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMagazziniQueryKey() });
           toast({ title: t("magazzini.toastUpdated") });
@@ -92,7 +109,7 @@ export default function Magazzini() {
         }
       });
     } else {
-      createMagazzino.mutate({ data }, {
+      createMagazzino.mutate({ data: payload }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMagazziniQueryKey() });
           toast({ title: t("magazzini.toastCreated") });
@@ -169,6 +186,7 @@ export default function Magazzini() {
                 <TableHead>{t("common.name")}</TableHead>
                 <TableHead>{t("magazzini.colPlace")}</TableHead>
                 <TableHead>{t("magazzini.colResponsabile")}</TableHead>
+                <TableHead>{t("common.centro")}</TableHead>
                 <TableHead>{t("common.status")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -187,7 +205,7 @@ export default function Magazzini() {
                 ))
               ) : filtered?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     {t("magazzini.noWarehouses")}
                   </TableCell>
                 </TableRow>
@@ -223,6 +241,9 @@ export default function Magazzini() {
                     ) : (
                       <span className="text-xs text-muted-foreground italic">{t("magazzini.notAssigned")}</span>
                     )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {magazzino.centroAscoltoNome ?? t("common.centroComune")}
                   </TableCell>
                   <TableCell>
                     <Badge variant={magazzino.stato === 'attivo' ? 'default' : 'secondary'} 
@@ -295,7 +316,30 @@ export default function Magazzini() {
                     </FormItem>
                   )} />
                 </div>
-                
+
+                <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("common.centro")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isCentroLocked}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_CENTRO}>{t("common.centroComune")}</SelectItem>
+                        {centri?.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {isCentroLocked && (
+                      <p className="text-xs text-muted-foreground">{t("common.centroLocked")}</p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <FormField control={form.control} name="nome" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("common.name")}</FormLabel>

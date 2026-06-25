@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth";
 import {
   useListBolle,
   useCreateBolla,
@@ -61,12 +62,20 @@ function statoBadge(stato: string) {
 // ─── Form crea bolla ─────────────────────────────────────────────────────────
 
 function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const [beneficiarioId, setBeneficiarioId] = useState("");
   const [magazzinoId, setMagazzinoId] = useState("");
   const [centroId, setCentroId] = useState("all");
   const [trasportatore, setTrasportatore] = useState("");
   const [trasportatoreNome, setTrasportatoreNome] = useState("");
   const [scanCode, setScanCode] = useState("");
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroId(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
   const { data: centri } = useListCentriAscolto();
   const { data: beneficiari } = useListBeneficiari({
     attivo: true,
@@ -88,7 +97,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
       toast({ title: t("bolle.scanNotFound"), variant: "destructive" });
       return;
     }
-    setCentroId(b.centroAscoltoId ? String(b.centroAscoltoId) : "all");
+    setCentroId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : (b.centroAscoltoId ? String(b.centroAscoltoId) : "all"));
     setBeneficiarioId(String(b.id));
     setScanCode("");
     toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
@@ -115,7 +124,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
           toast({ title: t("bolle.bollaCreata") });
           setBeneficiarioId("");
           setMagazzinoId("");
-          setCentroId("all");
+          setCentroId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all");
           setTrasportatore("");
           setTrasportatoreNome("");
           onClose();
@@ -153,7 +162,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
           <div className="space-y-2">
             <Label>{t("bolle.centroFilterLabel")}</Label>
-            <Select value={centroId} onValueChange={(v) => { setCentroId(v); setBeneficiarioId(""); }}>
+            <Select value={centroId} onValueChange={(v) => { setCentroId(v); setBeneficiarioId(""); }} disabled={isCentroLocked}>
               <SelectTrigger><SelectValue placeholder={t("bolle.allCentriPlaceholder")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("bolle.allBeneficiari")}</SelectItem>
@@ -1018,9 +1027,17 @@ function trasferimentoStatoBadge(stato: string) {
 }
 
 export default function Bolle() {
+  const { user } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
   const [filterCentroId, setFilterCentroId] = useState("all");
   const [filterStato, setFilterStato] = useState("all");
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setFilterCentroId(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
 
   const bolleParams: { magazzinoId?: number; centroAscoltoId?: number; stato?: string } = {};
   if (filterMagazzinoId !== "all") bolleParams.magazzinoId = parseInt(filterMagazzinoId);
@@ -1132,7 +1149,7 @@ export default function Bolle() {
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">{t("bolle.centroLabel")}</Label>
-          <Select value={filterCentroId} onValueChange={setFilterCentroId}>
+          <Select value={filterCentroId} onValueChange={setFilterCentroId} disabled={isCentroLocked}>
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder={t("bolle.allCentriPlaceholder")} />
             </SelectTrigger>
@@ -1163,7 +1180,7 @@ export default function Bolle() {
           <Button
             variant="ghost"
             className="gap-1.5 text-muted-foreground"
-            onClick={() => { setFilterMagazzinoId("all"); setFilterCentroId("all"); setFilterStato("all"); }}
+            onClick={() => { setFilterMagazzinoId("all"); setFilterCentroId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all"); setFilterStato("all"); }}
           >
             <XCircle className="h-4 w-4" /> {t("bolle.azzeraFiltri")}
           </Button>

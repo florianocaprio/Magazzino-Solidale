@@ -18,6 +18,10 @@ export interface Utente {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   attivo: boolean;
   mustChangePassword: boolean;
   /** @nullable */

@@ -2,6 +2,13 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { interventiTable, beneficiariTable, utentiTable } from "@workspace/db";
 import { eq, and, desc, or, ilike, type SQL } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+  beneficiarioCentroId,
+  canUseBeneficiario,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -9,7 +16,13 @@ router.get("/interventi", async (req, res) => {
   const { beneficiarioId, tipo, centroAscoltoId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (beneficiarioId) conditions.push(eq(interventiTable.beneficiarioId, parseInt(beneficiarioId)));
-  if (centroAscoltoId) conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  const caller = callerCentroId(req);
+  if (caller != null) {
+    const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
+    if (f) conditions.push(f);
+  } else if (centroAscoltoId) {
+    conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  }
   // tipoIntervento può essere una lista di etichette separate da virgola
   // (es. "pacco_alimentare,igiene"): il filtro deve trovare anche i valori multipli
   if (tipo) {
@@ -57,6 +70,11 @@ router.get("/interventi", async (req, res) => {
 });
 
 router.post("/interventi", async (req, res) => {
+  const caller = callerCentroId(req);
+  if (caller != null && !(await canUseBeneficiario(req.body.beneficiarioId, caller))) {
+    res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    return;
+  }
   const [row] = await db.insert(interventiTable).values({ ...req.body, operatoreId: req.user!.id }).returning();
   res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
@@ -64,12 +82,28 @@ router.post("/interventi", async (req, res) => {
 router.get("/interventi/:id", async (req, res) => {
   const [row] = await db.select().from(interventiTable).where(eq(interventiTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
 router.patch("/interventi/:id", async (req, res) => {
-  const [row] = await db.update(interventiTable).set({ ...req.body, operatoreId: req.user!.id }).where(eq(interventiTable.id, parseInt(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(interventiTable).where(eq(interventiTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  const caller = callerCentroId(req);
+  if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (caller != null && req.body.beneficiarioId != null && req.body.beneficiarioId !== existing.beneficiarioId
+      && !(await canUseBeneficiario(req.body.beneficiarioId, caller))) {
+    res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    return;
+  }
+  const [row] = await db.update(interventiTable).set({ ...req.body, operatoreId: req.user!.id }).where(eq(interventiTable.id, id)).returning();
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 

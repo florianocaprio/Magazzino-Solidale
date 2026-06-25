@@ -6,6 +6,7 @@ import {
   useDeleteUtente,
   useResetUtentePassword,
   useListRuoli,
+  useListCentriAscolto,
   getListUtentiQueryKey,
   type Utente,
 } from "@workspace/api-client-react";
@@ -68,12 +69,16 @@ import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 
 const NO_ROLE = "none";
+const NO_CENTRO = "__none__";
 
 export default function Utenti() {
   const { t } = useTranslation();
   const { user: currentUser } = useAuth();
+  const lockedCentroId = currentUser?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const { data: utenti, isLoading } = useListUtenti();
   const { data: ruoli } = useListRuoli();
+  const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -93,6 +98,7 @@ export default function Utenti() {
   const [matricola, setMatricola] = useState("");
   const [password, setPassword] = useState("");
   const [ruoloId, setRuoloId] = useState<string>(NO_ROLE);
+  const [centroId, setCentroId] = useState<string>(NO_CENTRO);
   const [attivo, setAttivo] = useState(true);
   const [resetPwd, setResetPwd] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -108,6 +114,7 @@ export default function Utenti() {
     setMatricola("");
     setPassword("");
     setRuoloId(NO_ROLE);
+    setCentroId(isCentroLocked ? String(lockedCentroId) : NO_CENTRO);
     setAttivo(true);
     setFormError(null);
     setIsFormOpen(true);
@@ -121,6 +128,7 @@ export default function Utenti() {
     setMatricola(u.matricola ?? "");
     setPassword("");
     setRuoloId(u.ruoloId != null ? String(u.ruoloId) : NO_ROLE);
+    setCentroId(u.centroAscoltoId != null ? String(u.centroAscoltoId) : NO_CENTRO);
     setAttivo(u.attivo);
     setFormError(null);
     setIsFormOpen(true);
@@ -130,12 +138,17 @@ export default function Utenti() {
     e.preventDefault();
     setFormError(null);
     const ruoloIdValue = ruoloId === NO_ROLE ? null : parseInt(ruoloId, 10);
+    const centroIdValue = isCentroLocked
+      ? lockedCentroId
+      : centroId === NO_CENTRO
+        ? null
+        : parseInt(centroId, 10);
 
     if (editing) {
       updateUtente.mutate(
         {
           id: editing.id,
-          data: { nome, cognome: cognome.trim() || null, matricola: matricola.trim() || null, ruoloId: ruoloIdValue, attivo },
+          data: { nome, cognome: cognome.trim() || null, matricola: matricola.trim() || null, ruoloId: ruoloIdValue, centroAscoltoId: centroIdValue, attivo },
         },
         {
           onSuccess: () => {
@@ -160,6 +173,7 @@ export default function Utenti() {
             matricola: matricola.trim() || null,
             password,
             ruoloId: ruoloIdValue,
+            centroAscoltoId: centroIdValue,
             attivo,
           },
         },
@@ -264,6 +278,7 @@ export default function Utenti() {
                   <TableHead>{t("common.name")}</TableHead>
                   <TableHead>{t("utenti.colMatricola")}</TableHead>
                   <TableHead>{t("utenti.colRuolo")}</TableHead>
+                  <TableHead>{t("common.centro")}</TableHead>
                   <TableHead>{t("common.status")}</TableHead>
                   <TableHead>{t("utenti.colUltimoAccesso")}</TableHead>
                   <TableHead className="w-10" />
@@ -276,6 +291,9 @@ export default function Utenti() {
                     <TableCell>{[u.nome, u.cognome].filter(Boolean).join(" ")}</TableCell>
                     <TableCell>{u.matricola ?? "—"}</TableCell>
                     <TableCell>{u.ruoloNome ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.centroAscoltoNome ?? t("common.centroComune")}
+                    </TableCell>
                     <TableCell>
                       {u.attivo ? (
                         <Badge className="bg-emerald-500/10 text-emerald-700">
@@ -327,7 +345,7 @@ export default function Utenti() {
                 {utenti?.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="text-center text-muted-foreground py-8"
                     >
                       {t("utenti.emptyUsers")}
@@ -421,6 +439,31 @@ export default function Utenti() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("common.centro")}</Label>
+              <Select
+                value={centroId}
+                onValueChange={setCentroId}
+                disabled={isCentroLocked}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CENTRO}>{t("common.centroComune")}</SelectItem>
+                  {centri?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isCentroLocked && (
+                <p className="text-xs text-muted-foreground">
+                  {t("common.centroLocked")}
+                </p>
+              )}
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="u-attivo">{t("utenti.accountAttivo")}</Label>

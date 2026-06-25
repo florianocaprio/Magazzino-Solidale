@@ -2,6 +2,12 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { approvvigionamentiTable, approvvigionamentoRigheTable, fornitoriTable, prodottiTable, magazziniTable, centriAscoltoTable } from "@workspace/db";
 import { eq, and, desc, type SQL } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+  canUseMagazzino,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -58,7 +64,13 @@ router.get("/approvvigionamenti", async (req, res) => {
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(approvvigionamentiTable.stato, stato));
   if (magazzinoId) conditions.push(eq(approvvigionamentiTable.magazzinoId, parseInt(magazzinoId)));
-  if (centroAscoltoId) conditions.push(eq(approvvigionamentiTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  const caller = callerCentroId(req);
+  if (caller != null) {
+    const f = centroScopeFilter(approvvigionamentiTable.centroAscoltoId, caller);
+    if (f) conditions.push(f);
+  } else if (centroAscoltoId) {
+    conditions.push(eq(approvvigionamentiTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  }
 
   const rows = await db
     .select({
@@ -95,12 +107,17 @@ router.get("/approvvigionamenti", async (req, res) => {
 
 router.post("/approvvigionamenti", async (req, res) => {
   const body = req.body;
+  const caller = callerCentroId(req);
+  if (caller != null && !(await canUseMagazzino(body.magazzinoId, caller))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    return;
+  }
   const codice = `APP-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
   const [a] = await db.insert(approvvigionamentiTable).values({
     codice,
     fornitoreId: body.fornitoreId,
     magazzinoId: body.magazzinoId,
-    centroAscoltoId: body.centroAscoltoId,
+    centroAscoltoId: caller != null ? caller : body.centroAscoltoId,
     dataRichiesta: body.dataRichiesta,
     dataPrevista: body.dataPrevista,
     stato: "bozza",
@@ -127,13 +144,22 @@ router.post("/approvvigionamenti", async (req, res) => {
 router.get("/approvvigionamenti/:id", async (req, res) => {
   const result = await getWithRighe(parseInt(req.params.id));
   if (!result) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(result.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   res.json(result);
 });
 
 router.patch("/approvvigionamenti/:id", async (req, res) => {
   const id = parseInt(req.params.id);
+  const caller = callerCentroId(req);
   const [current] = await db.select().from(approvvigionamentiTable).where(eq(approvvigionamentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(current.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
 
   const targetStato: string | undefined = req.body?.stato;
   const isStatoChange = targetStato !== undefined && targetStato !== current.stato;
@@ -155,7 +181,14 @@ router.patch("/approvvigionamenti/:id", async (req, res) => {
     res.status(409).json({ error: "Ordine non modificabile: non è più in bozza" });
     return;
   }
-  const [row] = await db.update(approvvigionamentiTable).set(req.body).where(eq(approvvigionamentiTable.id, id)).returning();
+  if (caller != null && req.body.magazzinoId != null && req.body.magazzinoId !== current.magazzinoId
+      && !(await canUseMagazzino(req.body.magazzinoId, caller))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    return;
+  }
+  const updates = { ...req.body };
+  if (caller != null) delete updates.centroAscoltoId;
+  const [row] = await db.update(approvvigionamentiTable).set(updates).where(eq(approvvigionamentiTable.id, id)).returning();
   const result = await getWithRighe(row.id);
   res.json(result);
 });
@@ -164,6 +197,10 @@ router.post("/approvvigionamenti/:id/sottometti", async (req, res) => {
   const id = parseInt(req.params.id);
   const [current] = await db.select().from(approvvigionamentiTable).where(eq(approvvigionamentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(current.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (current.stato !== "bozza") {
     res.status(409).json({ error: "Solo gli ordini in bozza possono essere sottomessi" });
     return;

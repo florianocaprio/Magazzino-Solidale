@@ -19,4 +19,5 @@
 - [Utenti matricola autogen](utenti-matricola-autogen.md) — blank matricola on POST /utenti auto-generated as initial(nome)+initial(cognome)+ddyy uppercase (e.g. MR2426); server-side only, no collision handling.
 - [Full-GUI i18n](i18n-full-gui.md) — src/lib/i18n/ dir, single translation ns keyed per page; never call i18n.t() at module scope for schema messages (use makeXSchema(t)+useMemo); import i18n before App in main.tsx.
 - [Priority auto-downgrade job](priority-auto-downgrade.md) — daily job forces priorità='bassa' for beneficiari >2yr since registration; intentionally overrides manual priority bumps (known tradeoff).
+- [Centro di Ascolto scoping](centro-scoping.md) — server-side per-centro filter additive to aree RBAC; utenti is strict (no OR-NULL) by design; PATCH must re-validate post-update FK; report/dashboard scoped via SQL; prodotti stays global.
 - [API integration test harness](api-test-harness.md) — vitest+supertest in api-server; mount a router with a stub req.user middleware; run against real DATABASE_URL (no test DB) and clean up by tracked ids.

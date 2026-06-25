@@ -2,6 +2,11 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { volontariTable, centriAscoltoTable } from "@workspace/db";
 import { eq, getTableColumns } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -35,13 +40,18 @@ const selectVolontario = () =>
     .from(volontariTable)
     .leftJoin(centriAscoltoTable, eq(volontariTable.centroAscoltoId, centriAscoltoTable.id));
 
-router.get("/volontari", async (_req, res) => {
-  const rows = await selectVolontario().orderBy(volontariTable.cognome);
+router.get("/volontari", async (req, res) => {
+  const rows = await selectVolontario()
+    .where(centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)))
+    .orderBy(volontariTable.cognome);
   res.json(rows.map(fmt));
 });
 
 router.post("/volontari", async (req, res) => {
-  const [created] = await db.insert(volontariTable).values(req.body).returning({ id: volontariTable.id });
+  const caller = callerCentroId(req);
+  const values = { ...req.body };
+  if (caller != null) values.centroAscoltoId = caller;
+  const [created] = await db.insert(volontariTable).values(values).returning({ id: volontariTable.id });
   const [row] = await selectVolontario().where(eq(volontariTable.id, created.id));
   res.status(201).json(fmt(row));
 });
@@ -49,17 +59,36 @@ router.post("/volontari", async (req, res) => {
 router.get("/volontari/:id", async (req, res) => {
   const [row] = await selectVolontario().where(eq(volontariTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   res.json(fmt(row));
 });
 
 router.patch("/volontari/:id", async (req, res) => {
-  const [updated] = await db.update(volontariTable).set(req.body).where(eq(volontariTable.id, parseInt(req.params.id))).returning({ id: volontariTable.id });
-  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  const caller = callerCentroId(req);
+  const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, parseInt(req.params.id)));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  const updates = { ...req.body };
+  if (caller != null) delete updates.centroAscoltoId;
+  const [updated] = await db.update(volontariTable).set(updates).where(eq(volontariTable.id, parseInt(req.params.id))).returning({ id: volontariTable.id });
   const [row] = await selectVolontario().where(eq(volontariTable.id, updated.id));
   res.json(fmt(row));
 });
 
 router.delete("/volontari/:id", async (req, res) => {
+  const caller = callerCentroId(req);
+  const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, parseInt(req.params.id)));
+  if (!existing) { res.status(204).send(); return; }
+  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   await db.delete(volontariTable).where(eq(volontariTable.id, parseInt(req.params.id)));
   res.status(204).send();
 });

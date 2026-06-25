@@ -2166,6 +2166,10 @@ components:
           type: ["string", "null"]
         email:
           type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
         stato:
           type: string
         note:
@@ -2193,6 +2197,8 @@ components:
           type: string
         email:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
         stato:
           type: string
         note:
@@ -2216,6 +2222,8 @@ components:
           type: string
         email:
           type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
         stato:
           type: string
         note:
@@ -3853,6 +3861,16 @@ components:
           type: string
         proprietarioNome:
           type: ["string", "null"]
+        volontarioId:
+          type: ["integer", "null"]
+        volontarioNome:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        effectiveCentroId:
+          type: ["integer", "null"]
+        effectiveCentroNome:
+          type: ["string", "null"]
         capacitaColli:
           type: ["integer", "null"]
         capacitaKg:
@@ -3882,6 +3900,10 @@ components:
           type: string
         proprietarioNome:
           type: string
+        volontarioId:
+          type: ["integer", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
         capacitaColli:
           type: integer
         capacitaKg:
@@ -3905,6 +3927,10 @@ components:
           type: string
         proprietarioNome:
           type: string
+        volontarioId:
+          type: ["integer", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
         capacitaColli:
           type: integer
         capacitaKg:
@@ -3986,6 +4012,10 @@ components:
           type: ["integer", "null"]
         ruoloNome:
           type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
         isAdmin:
           type: boolean
         aree:
@@ -4035,6 +4065,10 @@ components:
           type: ["integer", "null"]
         ruoloNome:
           type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
         attivo:
           type: boolean
         mustChangePassword:
@@ -4064,6 +4098,8 @@ components:
           type: ["string", "null"]
         ruoloId:
           type: ["integer", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
         attivo:
           type: boolean
       required: [username, password, nome, cognome]
@@ -4079,6 +4115,8 @@ components:
         matricola:
           type: ["string", "null"]
         ruoloId:
+          type: ["integer", "null"]
+        centroAscoltoId:
           type: ["integer", "null"]
         attivo:
           type: boolean

@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { eq } from "drizzle-orm";
-import { db, utentiTable, ruoliTable } from "@workspace/db";
+import { db, utentiTable, ruoliTable, centriAscoltoTable } from "@workspace/db";
 import { AREA_BY_SEGMENT } from "../lib/areas";
 
 export interface SessionUser {
@@ -11,6 +11,8 @@ export interface SessionUser {
   matricola: string | null;
   ruoloId: number | null;
   ruoloNome: string | null;
+  centroAscoltoId: number | null;
+  centroAscoltoNome: string | null;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;
@@ -45,11 +47,17 @@ export async function loadSessionUser(
       mustChangePassword: utentiTable.mustChangePassword,
       ruoloId: utentiTable.ruoloId,
       ruoloNome: ruoliTable.nome,
+      centroAscoltoId: utentiTable.centroAscoltoId,
+      centroAscoltoNome: centriAscoltoTable.nome,
       isAdmin: ruoliTable.isAdmin,
       aree: ruoliTable.aree,
     })
     .from(utentiTable)
     .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
+    .leftJoin(
+      centriAscoltoTable,
+      eq(utentiTable.centroAscoltoId, centriAscoltoTable.id),
+    )
     .where(eq(utentiTable.id, userId));
 
   if (!row || !row.attivo) return null;
@@ -62,6 +70,8 @@ export async function loadSessionUser(
     matricola: row.matricola ?? null,
     ruoloId: row.ruoloId ?? null,
     ruoloNome: row.ruoloNome ?? null,
+    centroAscoltoId: row.centroAscoltoId ?? null,
+    centroAscoltoNome: row.centroAscoltoNome ?? null,
     isAdmin: row.isAdmin ?? false,
     aree: row.aree ?? [],
     mustChangePassword: row.mustChangePassword,

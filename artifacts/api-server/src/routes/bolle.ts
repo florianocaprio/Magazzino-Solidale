@@ -6,6 +6,14 @@ import {
   consegneTable, utentiTable,
 } from "@workspace/db";
 import { eq, and, desc, asc, gt, sum, type SQL } from "drizzle-orm";
+import {
+  callerCentroId,
+  centroScopeFilter,
+  canAccessCentro,
+  beneficiarioCentroId,
+  canUseBeneficiario,
+  visibleMagazzinoIds,
+} from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -324,7 +332,11 @@ router.get("/bolle", async (req, res) => {
     if (!Number.isInteger(mid)) { res.status(400).json({ error: "magazzinoId non valido" }); return; }
     conditions.push(eq(bolleTable.magazzinoId, mid));
   }
-  if (centroAscoltoId) {
+  const caller = callerCentroId(req);
+  if (caller != null) {
+    const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
+    if (f) conditions.push(f);
+  } else if (centroAscoltoId) {
     const cid = Number(centroAscoltoId);
     if (!Number.isInteger(cid)) { res.status(400).json({ error: "centroAscoltoId non valido" }); return; }
     conditions.push(eq(beneficiariTable.centroAscoltoId, cid));
@@ -374,6 +386,18 @@ router.get("/bolle", async (req, res) => {
 
 router.post("/bolle", async (req, res) => {
   const body = req.body;
+  const caller = callerCentroId(req);
+  if (caller != null && !(await canUseBeneficiario(body.beneficiarioId, caller))) {
+    res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    return;
+  }
+  if (caller != null && body.magazzinoId != null) {
+    const visibili = await visibleMagazzinoIds(caller);
+    if (visibili != null && !visibili.includes(body.magazzinoId)) {
+      res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+      return;
+    }
+  }
   if (body.volontarioConsegnaId != null && body.trasportatoreNome != null) {
     res.status(400).json({ error: "Indicare un volontario OPPURE un trasportatore esterno, non entrambi" });
     return;
@@ -394,6 +418,10 @@ router.post("/bolle", async (req, res) => {
 router.get("/bolle/:id", async (req, res) => {
   const det = await buildDettaglio(parseInt(req.params.id));
   if (!det) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(det.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   res.json(det);
 });
 
@@ -403,8 +431,18 @@ router.patch("/bolle/:id", async (req, res) => {
   const bollaId = parseInt(req.params.id);
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Not found" }); return; }
+  const caller = callerCentroId(req);
+  if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), caller)) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
 
   const body = { ...req.body };
+  if (caller != null && body.beneficiarioId != null && body.beneficiarioId !== bolla.beneficiarioId
+      && !(await canUseBeneficiario(body.beneficiarioId, caller))) {
+    res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    return;
+  }
 
   // i cambi di stato passano solo dagli endpoint dedicati (/conferma, /consegna, /annulla)
   // per garantire scarichi/storni e sincronizzazione dell'intervento collegato
@@ -426,6 +464,13 @@ router.patch("/bolle/:id", async (req, res) => {
   // Le righe esistenti fanno riferimento alle giacenze/lotti del vecchio magazzino,
   // quindi vengono rimosse: l'utente le ri-seleziona dal nuovo magazzino.
   if (body.magazzinoId && body.magazzinoId !== bolla.magazzinoId) {
+    if (caller != null) {
+      const visibili = await visibleMagazzinoIds(caller);
+      if (visibili != null && !visibili.includes(body.magazzinoId)) {
+        res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+        return;
+      }
+    }
     if (bolla.stato !== "bozza") {
       res.status(400).json({ error: "Il magazzino si può cambiare solo quando la bolla è in bozza" });
       return;
@@ -451,6 +496,10 @@ router.post("/bolle/:id/righe", async (req, res) => {
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (!STATI_MODIFICABILI.includes(bolla.stato)) {
     res.status(400).json({ error: "Non è possibile aggiungere prodotti a una bolla consegnata o annullata" });
     return;
@@ -560,6 +609,10 @@ router.delete("/bolle/:id/righe/:rigaId", async (req, res) => {
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (!STATI_MODIFICABILI.includes(bolla.stato)) {
     res.status(400).json({ error: "Non è possibile modificare una bolla consegnata o annullata" });
     return;
@@ -595,6 +648,10 @@ router.post("/bolle/:id/conferma", async (req, res) => {
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (bolla.stato !== "bozza") {
     res.status(400).json({ error: "La bolla non è in stato bozza" });
     return;
@@ -698,6 +755,10 @@ router.post("/bolle/:id/consegna", async (req, res) => {
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (bolla.stato !== "confermato") {
     res.status(400).json({ error: "La bolla deve essere in stato confermato per essere consegnata" });
     return;
@@ -726,6 +787,10 @@ router.post("/bolle/:id/annulla", async (req, res) => {
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
   if (bolla.stato === "consegnato") {
     res.status(400).json({ error: "Non è possibile annullare una bolla già consegnata" });
     return;

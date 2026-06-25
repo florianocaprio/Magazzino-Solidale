@@ -1,4 +1,5 @@
 import { pgTable, serial, varchar, boolean, timestamp, integer, jsonb, json, index } from "drizzle-orm/pg-core";
+import { centriAscoltoTable } from "./centri";
 
 export const ruoliTable = pgTable("ruoli", {
   id: serial("id").primaryKey(),
@@ -17,6 +18,7 @@ export const utentiTable = pgTable("utenti", {
   cognome: varchar("cognome", { length: 120 }),
   matricola: varchar("matricola", { length: 40 }),
   ruoloId: integer("ruolo_id").references(() => ruoliTable.id),
+  centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
   attivo: boolean("attivo").notNull().default(true),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   ultimoAccesso: timestamp("ultimo_accesso"),

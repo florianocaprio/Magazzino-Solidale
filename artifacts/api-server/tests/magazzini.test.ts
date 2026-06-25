@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, magazziniTable } from "@workspace/db";
+import { db, pool, magazziniTable, centriAscoltoTable } from "@workspace/db";
 import { inArray, eq } from "drizzle-orm";
 import magazziniRouter from "../src/routes/magazzini";
 
@@ -12,6 +12,20 @@ const createdIds: number[] = [];
 function makeApp(): Express {
   const a = express();
   a.use(express.json());
+  a.use(magazziniRouter);
+  return a;
+}
+
+/** Mounts the router behind a middleware injecting a caller scoped to `centroId`. */
+function makeAppAs(centroId: number | null): Express {
+  const a = express();
+  a.use(express.json());
+  a.use((req, _res, next) => {
+    (req as unknown as { user: { centroAscoltoId: number | null } }).user = {
+      centroAscoltoId: centroId,
+    };
+    next();
+  });
   a.use(magazziniRouter);
   return a;
 }
@@ -113,5 +127,79 @@ describe("POST /magazzini — codice duplicato", () => {
       .from(magazziniTable)
       .where(eq(magazziniTable.codice, codice));
     expect(rows.length).toBe(1);
+  });
+});
+
+describe("Scoping per Centro di Ascolto", () => {
+  let centroA: number;
+  let centroB: number;
+  let magA: number;
+  let magB: number;
+  let magComune: number;
+
+  beforeEach(async () => {
+    const [a, b] = await db
+      .insert(centriAscoltoTable)
+      .values([{ nome: `Test Centro A ${Date.now()}` }, { nome: `Test Centro B ${Date.now()}` }])
+      .returning({ id: centriAscoltoTable.id });
+    centroA = a.id;
+    centroB = b.id;
+
+    const suffix = Date.now() % 1_000_000;
+    const rows = await db
+      .insert(magazziniTable)
+      .values([
+        { codice: `SA-${suffix}`, nome: "Mag A", centroAscoltoId: centroA },
+        { codice: `SB-${suffix}`, nome: "Mag B", centroAscoltoId: centroB },
+        { codice: `SC-${suffix}`, nome: "Mag Comune", centroAscoltoId: null },
+      ])
+      .returning({ id: magazziniTable.id });
+    magA = rows[0].id;
+    magB = rows[1].id;
+    magComune = rows[2].id;
+    createdIds.push(magA, magB, magComune);
+  });
+
+  afterEach(async () => {
+    // Delete dependent magazzini before the referenced centri (FK has no cascade).
+    if (createdIds.length > 0) {
+      await db.delete(magazziniTable).where(inArray(magazziniTable.id, createdIds));
+      createdIds.length = 0;
+    }
+    await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centroA, centroB]));
+  });
+
+  it("un caller legato al centro A vede solo i magazzini del centro A e quelli comuni (NULL)", async () => {
+    const scopedApp = makeAppAs(centroA);
+    const res = await request(scopedApp).get("/magazzini");
+    expect(res.status).toBe(200);
+    const ids = (res.body as Array<{ id: number }>).map((m) => m.id);
+    expect(ids).toContain(magA);
+    expect(ids).toContain(magComune);
+    expect(ids).not.toContain(magB);
+  });
+
+  it("un caller globale (centro null) vede tutti i magazzini", async () => {
+    const globalApp = makeAppAs(null);
+    const res = await request(globalApp).get("/magazzini");
+    expect(res.status).toBe(200);
+    const ids = (res.body as Array<{ id: number }>).map((m) => m.id);
+    expect(ids).toEqual(expect.arrayContaining([magA, magB, magComune]));
+  });
+
+  it("GET /magazzini/:id restituisce 403 per un magazzino fuori dal centro del caller", async () => {
+    const scopedApp = makeAppAs(centroA);
+    const res = await request(scopedApp).get(`/magazzini/${magB}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("POST /magazzini auto-assegna e blocca il centro del caller", async () => {
+    const scopedApp = makeAppAs(centroA);
+    const res = await request(scopedApp)
+      .post("/magazzini")
+      .send({ nome: "Creato Scoped", centroAscoltoId: centroB });
+    expect(res.status).toBe(201);
+    createdIds.push(res.body.id);
+    expect(res.body.centroAscoltoId).toBe(centroA);
   });
 });

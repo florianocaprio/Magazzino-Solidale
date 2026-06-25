@@ -91,6 +91,10 @@ export interface Magazzino {
   telefono?: string | null;
   /** @nullable */
   email?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   stato: string;
   /** @nullable */
   note?: string | null;
@@ -106,6 +110,8 @@ export interface MagazzinoInput {
   responsabile?: string;
   telefono?: string;
   email?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   stato?: string;
   note?: string;
 }
@@ -118,6 +124,8 @@ export interface MagazzinoUpdate {
   responsabile?: string;
   telefono?: string;
   email?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   stato?: string;
   note?: string;
 }
@@ -1192,6 +1200,16 @@ export interface Mezzo {
   /** @nullable */
   proprietarioNome?: string | null;
   /** @nullable */
+  volontarioId?: number | null;
+  /** @nullable */
+  volontarioNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  effectiveCentroId?: number | null;
+  /** @nullable */
+  effectiveCentroNome?: string | null;
+  /** @nullable */
   capacitaColli?: number | null;
   /** @nullable */
   capacitaKg?: number | null;
@@ -1211,6 +1229,10 @@ export interface MezzoInput {
   targa?: string;
   proprieta: string;
   proprietarioNome?: string;
+  /** @nullable */
+  volontarioId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   capacitaColli?: number;
   capacitaKg?: number;
   scadenzaAssicurazione?: string;
@@ -1223,6 +1245,10 @@ export interface MezzoUpdate {
   targa?: string;
   proprieta?: string;
   proprietarioNome?: string;
+  /** @nullable */
+  volontarioId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   capacitaColli?: number;
   capacitaKg?: number;
   stato?: string;
@@ -1271,6 +1297,10 @@ export interface AuthUser {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;
@@ -1302,6 +1332,10 @@ export interface Utente {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
   attivo: boolean;
   mustChangePassword: boolean;
   /** @nullable */
@@ -1322,6 +1356,8 @@ export interface UtenteInput {
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   attivo?: boolean;
 }
 
@@ -1334,6 +1370,8 @@ export interface UtenteUpdate {
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   attivo?: boolean;
 }
 
