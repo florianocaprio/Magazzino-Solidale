@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
@@ -345,8 +346,8 @@ export default function Consegne() {
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormItem>
-                  <FormLabel>{t("consegne.centroFilterLabel")}</FormLabel>
+                <div className="space-y-2">
+                  <Label>{t("consegne.centroFilterLabel")}</Label>
                   <Select value={createCentroId} onValueChange={(v) => { setCreateCentroId(v); form.setValue("beneficiarioId", 0); }} disabled={isCentroLocked}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -354,7 +355,7 @@ export default function Consegne() {
                       {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                </FormItem>
+                </div>
 
                 <FormField control={form.control} name="beneficiarioId" render={({ field }) => (
                   <FormItem>
