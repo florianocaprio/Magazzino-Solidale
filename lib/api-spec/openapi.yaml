@@ -4141,6 +4141,8 @@ components:
           type: integer
         nome:
           type: string
+        cittaId:
+          type: ["integer", "null"]
         logoUrl:
           type: ["string", "null"]
         indirizzo:

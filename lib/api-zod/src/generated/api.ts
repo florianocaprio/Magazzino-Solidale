@@ -2381,6 +2381,7 @@ export const DeleteZonaUdsParams = zod.object({
 export const ListCentriAscoltoResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
+  "cittaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
@@ -2415,6 +2416,7 @@ export const GetCentroAscoltoParams = zod.object({
 export const GetCentroAscoltoResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
+  "cittaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
@@ -2447,6 +2449,7 @@ export const UpdateCentroAscoltoBody = zod.object({
 export const UpdateCentroAscoltoResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
+  "cittaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),

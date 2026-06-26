@@ -1104,6 +1104,8 @@ export interface CentroAscolto {
   id: number;
   nome: string;
   /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
   logoUrl?: string | null;
   /** @nullable */
   indirizzo?: string | null;
