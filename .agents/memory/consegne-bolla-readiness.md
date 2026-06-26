@@ -23,6 +23,11 @@ description: Delivery (consegne) state values, how readiness derives from the li
 - **Why:** the user asked to scope the picker "per centro", but the endpoint enforces same-beneficiario; surfacing the whole centro while disabling non-assignable rows satisfies both without 400s.
 - **How to apply:** `Consegna` has no `centroAscoltoId` field, so derive centro membership client-side by cross-referencing the loaded `beneficiari` list (`b.centroAscoltoId === bollaCentroId`, incl. the null-centro case). Gate the consegne query on `beneficiari` being loaded so a transient null centro never fetches an unscoped list.
 
+# Creating a bolla pre-linked to a consegna (Crea bolla from consegne row)
+- Linkage lives SOLELY on `bolle.consegnaId` (no `consegna.bollaId` column — it's derived). So sending `consegnaId` in the `POST /bolle` body auto-associates the new bolla — no separate associa-bolla call needed.
+- BUT `POST /bolle` spreads `...body` into the insert, so it MUST replicate associa-bolla's integrity checks when `consegnaId` is present: consegna exists, `consegna.beneficiarioId === body.beneficiarioId`, and no other non-`annullato` bolla already linked → else 400. Otherwise clients bypass the one-bolla-per-consegna + same-beneficiary invariants (IDOR-style cross-linking).
+- **How to apply:** the shared `CreaiBollaDialog` (exported from `pages/bolle.tsx`) takes `consegnaId`/`lockedBeneficiario`/`onCreated`; locked mode hides scan/centro/beneficiario selects. Reset draft state (magazzino/trasportatore) on dialog CLOSE, not only on submit, so reopening for a different consegna is clean.
+
 # Completing a consegna does NOT create its own intervento
 - `POST /consegne/:id/completa` requires a linked bolla in `confermato`/`consegnato`; it promotes a `confermato` bolla to `consegnato` and sets consegna `effettuata`+dataEffettuata.
 - The intervento is created by the existing `syncInterventoBolla` at bolla CONFERMA time, not at consegna completion. Completing must NOT create a second intervento — rely on the bolla-owned one to avoid duplicates.

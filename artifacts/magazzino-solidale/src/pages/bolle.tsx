@@ -65,7 +65,13 @@ function statoBadge(stato: string) {
 
 // ─── Form crea bolla ─────────────────────────────────────────────────────────
 
-function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario, onCreated }: {
+  open: boolean;
+  onClose: () => void;
+  consegnaId?: number;
+  lockedBeneficiario?: { id: number; nome: string } | null;
+  onCreated?: () => void;
+}) {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
@@ -80,6 +86,18 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
       setCentroId(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
+  useEffect(() => {
+    if (open && lockedBeneficiario) setBeneficiarioId(String(lockedBeneficiario.id));
+  }, [open, lockedBeneficiario]);
+  useEffect(() => {
+    if (!open) {
+      setMagazzinoId("");
+      setTrasportatore("");
+      setTrasportatoreNome("");
+      setScanCode("");
+      if (!lockedBeneficiario) setBeneficiarioId("");
+    }
+  }, [open, lockedBeneficiario]);
   const { data: centri } = useListCentriAscolto();
   const { data: beneficiari } = useListBeneficiari({
     attivo: true,
@@ -112,9 +130,11 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
     const data: {
       beneficiarioId: number;
       magazzinoId: number;
+      consegnaId?: number;
       volontarioConsegnaId?: number;
       trasportatoreNome?: string;
     } = { beneficiarioId: parseInt(beneficiarioId), magazzinoId: parseInt(magazzinoId) };
+    if (consegnaId != null) data.consegnaId = consegnaId;
     if (trasportatore === "__altro__") {
       data.trasportatoreNome = trasportatoreNome.trim() || "Ritiro presso il magazzino";
     } else if (trasportatore) {
@@ -131,6 +151,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
           setCentroId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all");
           setTrasportatore("");
           setTrasportatoreNome("");
+          onCreated?.();
           onClose();
         },
         onError: () => toast({ title: t("bolle.error"), description: t("bolle.createError"), variant: "destructive" }),
@@ -143,6 +164,12 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>{t("bolle.createTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
+          {lockedBeneficiario ? (
+            <div className="space-y-2">
+              <Label>{t("bolle.beneficiarioLabel")}</Label>
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">{lockedBeneficiario.nome}</div>
+            </div>
+          ) : (<>
           <div className="space-y-2">
             <Label>{t("bolle.scanLabel")}</Label>
             <div className="flex gap-2">
@@ -189,6 +216,7 @@ function CreaiBollaDialog({ open, onClose }: { open: boolean; onClose: () => voi
               </SelectContent>
             </Select>
           </div>
+          </>)}
           <div className="space-y-2">
             <Label>{t("bolle.magazzinoUscitaLabel")}</Label>
             <Select value={magazzinoId} onValueChange={setMagazzinoId}>

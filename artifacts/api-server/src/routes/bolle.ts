@@ -414,6 +414,22 @@ router.post("/bolle", async (req, res) => {
     res.status(400).json({ error: "Indicare un volontario OPPURE un trasportatore esterno, non entrambi" });
     return;
   }
+  if (body.consegnaId != null) {
+    const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, body.consegnaId));
+    if (!consegna) {
+      res.status(400).json({ error: "Consegna non trovata" });
+      return;
+    }
+    if (consegna.beneficiarioId !== body.beneficiarioId) {
+      res.status(400).json({ error: "La bolla deve appartenere allo stesso beneficiario della consegna" });
+      return;
+    }
+    const collegate = await db.select({ stato: bolleTable.stato }).from(bolleTable).where(eq(bolleTable.consegnaId, body.consegnaId));
+    if (collegate.some((b) => b.stato !== "annullato")) {
+      res.status(400).json({ error: "La consegna ha già una bolla associata" });
+      return;
+    }
+  }
   const anno = new Date().getFullYear();
   const existing = await db.select({ n: bolleTable.numeroBolla }).from(bolleTable).orderBy(desc(bolleTable.id)).limit(1);
   const lastNum = existing.length > 0 ? parseInt(existing[0].n.split("-").pop() ?? "0") : 0;

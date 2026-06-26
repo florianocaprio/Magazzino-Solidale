@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { BollaDettaglio } from "@/pages/bolle";
+import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
 import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -75,6 +75,7 @@ export default function Consegne() {
   const [associatingId, setAssociatingId] = useState<number | null>(null);
   const [selectedBollaId, setSelectedBollaId] = useState<string>("");
   const [viewingBollaId, setViewingBollaId] = useState<number | null>(null);
+  const [creatingBollaFor, setCreatingBollaFor] = useState<Consegna | null>(null);
   const [ripianificando, setRipianificando] = useState<Consegna | null>(null);
   const [riDate, setRiDate] = useState("");
   const [riFascia, setRiFascia] = useState("Mattina");
@@ -369,9 +370,16 @@ export default function Consegne() {
                           <CheckCircle2 className="h-3.5 w-3.5" /> {t("consegne.btnConsegnato")}
                         </Button>
                       ) : (
-                        <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}>
-                          <Link2 className="h-3.5 w-3.5" /> {t("consegne.btnAssociaBolla")}
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          {c.bollaId == null && (
+                            <Button size="sm" variant="outline" className="gap-1" onClick={() => setCreatingBollaFor(c)}>
+                              <Plus className="h-3.5 w-3.5" /> {t("consegne.btnCreaBolla")}
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}>
+                            <Link2 className="h-3.5 w-3.5" /> {t("consegne.btnAssociaBolla")}
+                          </Button>
+                        </div>
                       )
                     )}
                   </TableCell>
@@ -381,6 +389,14 @@ export default function Consegne() {
           </Table>
         </CardContent>
       </Card>
+
+      <CreaiBollaDialog
+        open={creatingBollaFor !== null}
+        onClose={() => setCreatingBollaFor(null)}
+        consegnaId={creatingBollaFor?.id}
+        lockedBeneficiario={creatingBollaFor ? { id: creatingBollaFor.beneficiarioId, nome: creatingBollaFor.beneficiarioNome ?? "" } : null}
+        onCreated={() => queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() })}
+      />
 
       <Sheet open={viewingBollaId !== null} onOpenChange={(open) => { if (!open) setViewingBollaId(null); }}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
