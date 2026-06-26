@@ -36,6 +36,7 @@ import { notAuthorized } from "./namespaces/notAuthorized";
 import { notFound } from "./namespaces/notFound";
 import { tessera } from "./namespaces/tessera";
 import { scheda } from "./namespaces/scheda";
+import { barcodeScanner } from "./namespaces/barcodeScanner";
 
 export { LANGUAGES, isRtl, applyDirection } from "./languages";
 export type { LanguageCode } from "./languages";
@@ -75,6 +76,7 @@ const PAGE_NAMESPACES = {
   notFound,
   tessera,
   scheda,
+  barcodeScanner,
 } as const;
 
 function buildResources() {

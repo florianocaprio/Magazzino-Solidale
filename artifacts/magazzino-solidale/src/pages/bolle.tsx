@@ -43,6 +43,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -384,8 +385,8 @@ function AggiungiProdottoDialog({
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  const handleScanProdotto = () => {
-    const code = scanProdotto.trim();
+  const handleScanProdotto = (codeOverride?: string) => {
+    const code = (codeOverride ?? scanProdotto).trim();
     if (!code) return;
     if (!prodotti) {
       toast({ title: t("common.loading") });
@@ -482,9 +483,10 @@ function AggiungiProdottoDialog({
                 placeholder={t("bolle.scanProdottoPlaceholder")}
                 autoFocus
               />
-              <Button type="button" variant="secondary" onClick={handleScanProdotto} disabled={!scanProdotto.trim()}>
+              <Button type="button" variant="secondary" onClick={() => handleScanProdotto()} disabled={!scanProdotto.trim()}>
                 {t("bolle.scanProdottoButton")}
               </Button>
+              <BarcodeScannerButton onScan={(v) => { setScanProdotto(v); handleScanProdotto(v); }} />
             </div>
           </div>
 

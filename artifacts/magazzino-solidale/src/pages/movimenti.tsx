@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { ExportButtons } from "@/components/export-buttons";
 import { Plus, ArrowDownRight, ArrowUpRight, Filter, ScanLine } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -66,8 +67,8 @@ export default function Movimenti() {
 
   const createMovimento = useCreateMovimento();
 
-  const handleScanProdotto = () => {
-    const code = scanProdotto.trim();
+  const handleScanProdotto = (codeOverride?: string) => {
+    const code = (codeOverride ?? scanProdotto).trim();
     if (!code) return;
     if (!prodotti) {
       toast({ title: t("common.loading") });
@@ -312,9 +313,10 @@ export default function Movimenti() {
                       onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleScanProdotto(); } }}
                       placeholder={t("movimenti.scanPlaceholder")}
                     />
-                    <Button type="button" variant="secondary" className="gap-2" onClick={handleScanProdotto} disabled={!scanProdotto.trim()}>
+                    <Button type="button" variant="secondary" className="gap-2" onClick={() => handleScanProdotto()} disabled={!scanProdotto.trim()}>
                       <ScanLine className="h-4 w-4" /> {t("movimenti.scanButton")}
                     </Button>
+                    <BarcodeScannerButton onScan={(v) => { setScanProdotto(v); handleScanProdotto(v); }} />
                   </div>
                 </div>
 

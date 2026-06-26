@@ -18,6 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -666,7 +667,10 @@ export default function Prodotti() {
                   <FormField control={form.control} name="codiceBarre" render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("prodotti.barcode")}</FormLabel>
-                      <FormControl><Input placeholder={t("prodotti.optional")} {...field} /></FormControl>
+                      <div className="flex gap-2">
+                        <FormControl><Input placeholder={t("prodotti.optional")} {...field} /></FormControl>
+                        <BarcodeScannerButton onScan={(v) => field.onChange(v)} />
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )} />

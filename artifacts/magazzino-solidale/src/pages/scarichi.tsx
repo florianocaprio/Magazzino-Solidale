@@ -6,6 +6,7 @@ import {
   useListMagazzini,
   useListCentriAscolto,
   useListGiacenze,
+  useListProdotti,
   useGetImpostazioniStampa,
   getListScarichiQueryKey,
   getListGiacenzeQueryKey,
@@ -26,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { Plus, Trash2, Download, CheckCircle, PackageMinus, ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -61,6 +63,8 @@ function RigheEditor({
     { magazzinoId },
     { query: { enabled: !!magazzinoId, queryKey: getListGiacenzeQueryKey({ magazzinoId }) } },
   );
+  const { data: prodotti } = useListProdotti();
+  const { toast } = useToast();
 
   const update = (key: string, patch: Partial<RigaDraft>) =>
     setRighe(righe.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -68,12 +72,44 @@ function RigheEditor({
 
   const usedIds = righe.map((r) => r.prodottoId).filter(Boolean);
 
+  const handleScanAdd = (code: string) => {
+    const lc = code.trim().toLowerCase();
+    if (!lc) return;
+    const p = prodotti?.find(
+      (x) => (x.codiceBarre && x.codiceBarre.toLowerCase() === lc) || x.codice.toLowerCase() === lc,
+    );
+    if (!p) {
+      toast({ title: t("scarichi.scanNotFound"), variant: "destructive" });
+      return;
+    }
+    const g = giacenze?.find((x) => x.prodottoId === p.id);
+    if (!g || g.quantitaTotale <= 0) {
+      toast({ title: t("scarichi.scanNoStock", { name: p.nome }), variant: "destructive" });
+      return;
+    }
+    if (righe.some((r) => r.prodottoId === String(p.id))) {
+      toast({ title: t("scarichi.scanAlready", { name: p.nome }) });
+      return;
+    }
+    setRighe([...righe, { ...newRiga(), prodottoId: String(p.id), unitaMisura: g.unitaMisura ?? "pz" }]);
+    toast({ title: t("scarichi.scanAdded", { name: p.nome }) });
+  };
+
   return (
     <div className="space-y-3">
       {(!giacenze || giacenze.length === 0) && (
         <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">
           {t("scarichi.noProdotti")}
         </p>
+      )}
+
+      {!!giacenze && giacenze.length > 0 && (
+        <BarcodeScannerButton
+          withLabel
+          variant="secondary"
+          className="w-full"
+          onScan={handleScanAdd}
+        />
       )}
 
       {righe.map((r) => {

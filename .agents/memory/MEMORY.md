@@ -26,3 +26,4 @@
 - [Città scoping (hard boundary)](citta-scoping.md) — second axis above centro: Città=HARD cross-city boundary, Zona UDS=SOFT preference; one person record (centro/uds/both); 4 patterns mirror centro; write paths (POST/DELETE/nullable-FK body) leak even when read paths are correct; FE città+dependent-zona select on Utenti.
 - [Barcode PDF scannability](barcode-pdf-scannability.md) — cap CODE128 printed module width ~0.5mm + generous quiet zone; encode `codiceBarre || codice` (what the in-app scanner matches).
 - [API integration test harness](api-test-harness.md) — vitest+supertest in api-server; mount a router with a stub req.user middleware; run against real DATABASE_URL (no test DB) and clean up by tracked ids.
+- [zxing camera barcode scanner](zxing-scanner.md) — one shared BarcodeScannerButton; pin @zxing/library to @zxing/browser's peer (0.22.x); camera needs HTTPS; wrap existing scan-button onClick in arrow after adding codeOverride param.
