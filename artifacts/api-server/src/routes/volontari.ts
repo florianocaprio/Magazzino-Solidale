@@ -1,6 +1,7 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { volontariTable, centriAscoltoTable } from "@workspace/db";
+import { runBulk } from "../lib/bulk";
 import { eq, getTableColumns } from "drizzle-orm";
 import {
   callerCentroId,
@@ -58,18 +59,41 @@ router.get("/volontari", async (req, res) => {
   res.json(rows.map(fmt));
 });
 
-router.post("/volontari", async (req, res) => {
+async function createVolontarioOne(
+  body: Record<string, unknown>,
+  req: Request,
+): Promise<{ id: number } | { error: string }> {
   const caller = callerCentroId(req);
-  const values = { ...req.body };
+  const values = { ...body };
   if (caller != null) values.centroAscoltoId = caller;
-  if (caller == null && values.centroAscoltoId != null
-      && !inVisibleCentroSet(values.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
-    res.status(403).json({ error: "Centro non accessibile per la tua città" });
-    return;
+  if (
+    caller == null &&
+    values.centroAscoltoId != null &&
+    !inVisibleCentroSet(values.centroAscoltoId as number, await visibleCentroIds(callerCittaId(req)))
+  ) {
+    return { error: "Centro non accessibile per la tua città" };
   }
-  const [created] = await db.insert(volontariTable).values(values).returning({ id: volontariTable.id });
-  const [row] = await selectVolontario().where(eq(volontariTable.id, created.id));
+  const [created] = await db
+    .insert(volontariTable)
+    .values(values as typeof volontariTable.$inferInsert)
+    .returning({ id: volontariTable.id });
+  return { id: created.id };
+}
+
+router.post("/volontari", async (req, res) => {
+  const r = await createVolontarioOne(req.body, req);
+  if ("error" in r) { res.status(403).json({ error: r.error }); return; }
+  const [row] = await selectVolontario().where(eq(volontariTable.id, r.id));
   res.status(201).json(fmt(row));
+});
+
+router.post("/volontari/bulk", async (req, res) => {
+  const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
+  const result = await runBulk(righe, async (row) => {
+    const r = await createVolontarioOne(row, req);
+    return "error" in r ? { error: r.error } : { ok: true };
+  });
+  res.json(result);
 });
 
 router.get("/volontari/:id", async (req, res) => {

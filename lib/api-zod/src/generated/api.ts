@@ -222,6 +222,38 @@ export const CreateProdottoBody = zod.object({
 })
 
 
+export const BulkProdottiBody = zod.object({
+  "righe": zod.array(zod.object({
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().optional(),
+  "tipoProdotto": zod.string(),
+  "unitaMisura": zod.string(),
+  "codiceBarre": zod.string().optional(),
+  "gestioneLotto": zod.boolean().optional(),
+  "gestioneScadenza": zod.boolean().optional(),
+  "fsePlus": zod.boolean().optional(),
+  "scortaMinima": zod.number().optional(),
+  "scortaConsigliata": zod.number().optional(),
+  "conservazione": zod.string().optional(),
+  "taglia": zod.string().optional(),
+  "genere": zod.string().optional(),
+  "stagione": zod.string().optional(),
+  "condizione": zod.string().optional(),
+  "note": zod.string().optional(),
+  "fornitoreId": zod.number().optional()
+}))
+})
+
+export const BulkProdottiResponse = zod.object({
+  "creati": zod.number(),
+  "errori": zod.array(zod.object({
+  "riga": zod.number(),
+  "messaggio": zod.string()
+}))
+})
+
+
 export const GetProdottoParams = zod.object({
   "id": zod.coerce.number()
 })
@@ -836,6 +868,33 @@ export const CreateFornitoreBody = zod.object({
 })
 
 
+export const BulkFornitoriBody = zod.object({
+  "righe": zod.array(zod.object({
+  "nome": zod.string(),
+  "tipo": zod.string(),
+  "partitaIva": zod.string().optional(),
+  "codiceFiscale": zod.string().optional(),
+  "indirizzo": zod.string().optional(),
+  "comune": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "email": zod.string().optional(),
+  "referente": zod.string().optional(),
+  "siteWeb": zod.string().optional(),
+  "centroAscoltoId": zod.number().nullish(),
+  "note": zod.string().optional(),
+  "noteOperative": zod.string().optional()
+}))
+})
+
+export const BulkFornitoriResponse = zod.object({
+  "creati": zod.number(),
+  "errori": zod.array(zod.object({
+  "riga": zod.number(),
+  "messaggio": zod.string()
+}))
+})
+
+
 export const GetFornitoreParams = zod.object({
   "id": zod.coerce.number()
 })
@@ -1173,6 +1232,54 @@ export const CercaBeneficiariSimiliResponseItem = zod.object({
   "score": zod.number()
 })
 export const CercaBeneficiariSimiliResponse = zod.array(CercaBeneficiariSimiliResponseItem)
+
+
+export const BulkBeneficiariBody = zod.object({
+  "righe": zod.array(zod.object({
+  "codice": zod.string().optional(),
+  "codiceFiscale": zod.string().nullish(),
+  "cognome": zod.string(),
+  "nome": zod.string(),
+  "dataNascita": zod.string().optional(),
+  "cittadinanza": zod.string().optional(),
+  "residenza": zod.string().optional(),
+  "domicilio": zod.string().optional(),
+  "comune": zod.string().optional(),
+  "zonaMunicipio": zod.string().optional(),
+  "telefono": zod.string().optional(),
+  "email": zod.string().optional(),
+  "statoCivile": zod.string().optional(),
+  "numComponenti": zod.number().optional(),
+  "numFigliMaschi": zod.number().optional(),
+  "numFiglieFemmine": zod.number().optional(),
+  "numMinori": zod.number().optional(),
+  "numAnziani": zod.number().optional(),
+  "numDisabili": zod.number().optional(),
+  "restrizioniAlimentari": zod.string().optional(),
+  "allergie": zod.string().optional(),
+  "notePaccoAlimentare": zod.string().optional(),
+  "priorita": zod.string().optional(),
+  "consegnaDomicilio": zod.boolean().optional(),
+  "motivoConsegnaDomicilio": zod.string().optional(),
+  "centroAscoltoId": zod.number().nullish(),
+  "dataPresaInCarico": zod.string().optional(),
+  "noteInterne": zod.string().optional(),
+  "soprannome": zod.string().optional(),
+  "cittaId": zod.number().nullish(),
+  "zonaUdsId": zod.number().nullish(),
+  "uds": zod.boolean().optional(),
+  "sesso": zod.string().optional(),
+  "areaProvenienza": zod.string().optional()
+}))
+})
+
+export const BulkBeneficiariResponse = zod.object({
+  "creati": zod.number(),
+  "errori": zod.array(zod.object({
+  "riga": zod.number(),
+  "messaggio": zod.string()
+}))
+})
 
 
 export const GetBeneficiarioParams = zod.object({
@@ -2332,6 +2439,30 @@ export const CreateVolontarioBody = zod.object({
 })
 
 
+export const BulkVolontariBody = zod.object({
+  "righe": zod.array(zod.object({
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "centroAscoltoId": zod.number().nullish(),
+  "telefono": zod.string().optional(),
+  "email": zod.string().optional(),
+  "ruolo": zod.string(),
+  "patente": zod.boolean().optional(),
+  "mezzoPersonale": zod.boolean().optional(),
+  "maxConsegneTurno": zod.number().optional(),
+  "note": zod.string().optional()
+}))
+})
+
+export const BulkVolontariResponse = zod.object({
+  "creati": zod.number(),
+  "errori": zod.array(zod.object({
+  "riga": zod.number(),
+  "messaggio": zod.string()
+}))
+})
+
+
 export const GetVolontarioParams = zod.object({
   "id": zod.coerce.number()
 })
@@ -2431,6 +2562,32 @@ export const CreateMezzoBody = zod.object({
   "scadenzaAssicurazione": zod.string().optional(),
   "scadenzaRevisione": zod.string().optional(),
   "note": zod.string().optional()
+})
+
+
+export const BulkMezziBody = zod.object({
+  "righe": zod.array(zod.object({
+  "codice": zod.string(),
+  "tipo": zod.string(),
+  "targa": zod.string().optional(),
+  "proprieta": zod.string(),
+  "proprietarioNome": zod.string().optional(),
+  "volontarioId": zod.number().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "capacitaColli": zod.number().optional(),
+  "capacitaKg": zod.number().optional(),
+  "scadenzaAssicurazione": zod.string().optional(),
+  "scadenzaRevisione": zod.string().optional(),
+  "note": zod.string().optional()
+}))
+})
+
+export const BulkMezziResponse = zod.object({
+  "creati": zod.number(),
+  "errori": zod.array(zod.object({
+  "riga": zod.number(),
+  "messaggio": zod.string()
+}))
 })
 
 

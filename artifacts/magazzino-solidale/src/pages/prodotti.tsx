@@ -7,6 +7,7 @@ import {
   useListMagazzini,
   useListLotti,
   useListFornitori,
+  useBulkProdotti,
   useCreateLotto,
   useCreateMovimento,
   getListProdottiQueryKey,
@@ -32,7 +33,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ExportButtons } from "@/components/export-buttons";
 import { generateProdottiBarcodePdf } from "@/lib/prodotti-barcode-pdf";
-import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus, Barcode } from "lucide-react";
+import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
+import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus, Barcode, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -390,6 +392,9 @@ export default function Prodotti() {
   const createProdotto = useCreateProdotto();
   const updateProdotto = useUpdateProdotto();
   const deleteProdotto = useDeleteProdotto();
+  const bulkProdotti = useBulkProdotti();
+  const { data: fornitori } = useListFornitori();
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const formSchema = makeFormSchema(t);
 
@@ -514,11 +519,77 @@ export default function Prodotti() {
           >
             <Barcode className="h-4 w-4" /> {t("prodotti.exportBarcodes")}
           </Button>
+          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" /> {t("bulkImport.button")}
+          </Button>
           <Button onClick={handleCreate} className="gap-2">
             <Plus className="h-4 w-4" /> {t("prodotti.newProduct")}
           </Button>
         </div>
       </div>
+
+      <BulkImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        entityLabel={t("prodotti.title")}
+        templateFilename="modello_prodotti"
+        columns={[
+          { key: "codice", header: t("common.code"), example: "PRD-001" },
+          { key: "nome", header: t("common.name"), example: "Pasta 500g" },
+          { key: "tipoProdotto", header: t("common.type"), example: "alimentare" },
+          { key: "unitaMisura", header: t("prodotti.colUm"), example: "pz" },
+          { key: "descrizione", header: t("common.description"), example: "" },
+          { key: "codiceBarre", header: t("prodotti.barcode"), example: "" },
+          { key: "gestioneLotto", header: t("prodotti.gestioneLotto"), example: "No" },
+          { key: "gestioneScadenza", header: t("prodotti.gestioneScadenza"), example: "No" },
+          { key: "fsePlus", header: "FSE+", example: "No" },
+          { key: "scortaMinima", header: t("prodotti.colScortaMinima"), example: 0 },
+          { key: "scortaConsigliata", header: t("prodotti.scortaConsigliata"), example: 0 },
+          { key: "fornitore", header: t("prodotti.fornitore"), example: "" },
+        ]}
+        mapRow={(r): MapRowResult<Record<string, unknown>> => {
+          if (!r.codice) return { error: t("bulkImport.requiredMissing", { field: t("common.code") }) };
+          if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("common.name") }) };
+          if (!r.tipoProdotto) return { error: t("bulkImport.requiredMissing", { field: t("common.type") }) };
+          if (!r.unitaMisura) return { error: t("bulkImport.requiredMissing", { field: t("prodotti.colUm") }) };
+          let fornitoreId: number | undefined;
+          if (r.fornitore) {
+            const f = matchByName(fornitori, r.fornitore, (x) => x.nome);
+            if (!f) return { error: t("bulkImport.unknownRef", { field: t("prodotti.fornitore"), value: r.fornitore }) };
+            fornitoreId = f.id;
+          }
+          let scortaMinima: number | undefined;
+          if (r.scortaMinima) {
+            const n = Number(r.scortaMinima);
+            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("prodotti.colScortaMinima") }) };
+            scortaMinima = n;
+          }
+          let scortaConsigliata: number | undefined;
+          if (r.scortaConsigliata) {
+            const n = Number(r.scortaConsigliata);
+            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("prodotti.scortaConsigliata") }) };
+            scortaConsigliata = n;
+          }
+          return {
+            data: {
+              codice: r.codice,
+              nome: r.nome,
+              tipoProdotto: r.tipoProdotto,
+              unitaMisura: r.unitaMisura,
+              descrizione: r.descrizione || undefined,
+              codiceBarre: r.codiceBarre || undefined,
+              gestioneLotto: parseBoolCell(r.gestioneLotto),
+              gestioneScadenza: parseBoolCell(r.gestioneScadenza),
+              fsePlus: parseBoolCell(r.fsePlus),
+              scortaMinima,
+              scortaConsigliata,
+              fornitoreId,
+            },
+          };
+        }}
+        onImport={async (righe) => bulkProdotti.mutateAsync({ data: { righe: righe as never } })}
+        onDone={() => queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() })}
+      />
 
       <Card>
         <CardHeader className="py-4 border-b">

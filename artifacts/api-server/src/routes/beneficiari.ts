@@ -1,6 +1,7 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable, cittaTable } from "@workspace/db";
+import { runBulk } from "../lib/bulk";
 import { eq, and, ilike, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
@@ -103,23 +104,41 @@ router.get("/beneficiari", async (req, res) => {
   res.json(rows.map(r => fmtBenef(r.b, r.centroNome, r.cittaNome)));
 });
 
-router.post("/beneficiari", async (req, res) => {
-  const body = req.body;
+async function createBeneficiarioOne(
+  body: Record<string, unknown>,
+  req: Request,
+): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string }> {
+  const b = body as Record<string, any>;
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
-  const codice = body.codice || `BEN-${Date.now()}`;
-  const values = { ...body, codice };
+  // Timestamp + random suffix keeps codes unique even within a tight bulk loop.
+  const codice = b.codice || `BEN-${Date.now()}${Math.floor(Math.random() * 46656).toString(36).padStart(3, "0")}`;
+  const values: Record<string, any> = { ...b, codice };
   if ("uds" in values) values.uds = toBool(values.uds);
   if (caller != null) values.centroAscoltoId = caller;
   if (cid != null) values.cittaId = cid;
   // Città is the HARD UDS boundary: a città-global caller must pin a città when
   // creating a UDS person, otherwise the row would be visible across all cities.
   if (values.uds === true && cid == null && values.cittaId == null) {
-    res.status(400).json({ error: "La città è obbligatoria per una persona UDS" });
-    return;
+    return { error: "La città è obbligatoria per una persona UDS" };
   }
-  const [row] = await db.insert(beneficiariTable).values(values).returning();
-  res.status(201).json(fmtBenef(row));
+  const [row] = await db.insert(beneficiariTable).values(values as typeof beneficiariTable.$inferInsert).returning();
+  return { row };
+}
+
+router.post("/beneficiari", async (req, res) => {
+  const r = await createBeneficiarioOne(req.body, req);
+  if ("error" in r) { res.status(400).json({ error: r.error }); return; }
+  res.status(201).json(fmtBenef(r.row));
+});
+
+router.post("/beneficiari/bulk", async (req, res) => {
+  const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
+  const result = await runBulk(righe, async (row) => {
+    const r = await createBeneficiarioOne(row, req);
+    return "error" in r ? { error: r.error } : { ok: true };
+  });
+  res.json(result);
 });
 
 // Fuzzy person-duplicate suggestion (pg_trgm). Scoped HARD to the caller's città

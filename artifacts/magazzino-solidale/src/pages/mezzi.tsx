@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useListMezzi, useCreateMezzo, useUpdateMezzo, useDeleteMezzo, useListVolontari, useListCentriAscolto, getListMezziQueryKey } from "@workspace/api-client-react";
+import { useListMezzi, useCreateMezzo, useUpdateMezzo, useDeleteMezzo, useBulkMezzi, useListVolontari, useListCentriAscolto, getListMezziQueryKey } from "@workspace/api-client-react";
+import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Calendar } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Trash2, Calendar, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -60,6 +61,8 @@ export default function Mezzi() {
   const createMezzo = useCreateMezzo();
   const updateMezzo = useUpdateMezzo();
   const deleteMezzo = useDeleteMezzo();
+  const bulkMezzi = useBulkMezzi();
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -182,11 +185,82 @@ export default function Mezzi() {
             title={t("mezzi.exportTitle")}
             orientation="landscape"
           />
+          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" /> {t("bulkImport.button")}
+          </Button>
           <Button onClick={handleCreate} className="gap-2">
             <Plus className="h-4 w-4" /> {t("mezzi.newMezzo")}
           </Button>
         </div>
       </div>
+
+      <BulkImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        entityLabel={t("mezzi.title")}
+        templateFilename="modello_mezzi"
+        columns={[
+          { key: "codice", header: t("common.code"), example: "FUR-01" },
+          { key: "tipo", header: t("common.type"), example: "furgone" },
+          { key: "targa", header: t("mezzi.targa"), example: "AB123CD" },
+          { key: "proprieta", header: t("mezzi.proprieta"), example: "associazione" },
+          { key: "proprietarioNome", header: t("mezzi.proprietario"), example: "" },
+          { key: "volontario", header: t("mezzi.proprietaOpts.volontario"), example: "" },
+          { key: "centro", header: t("common.centro"), example: "" },
+          { key: "capacitaColli", header: t("mezzi.capacitaColli"), example: 20 },
+          { key: "capacitaKg", header: t("mezzi.capacitaKg"), example: 800 },
+          { key: "scadenzaAssicurazione", header: t("mezzi.scadAssicurazione"), example: "2026-12-31" },
+          { key: "scadenzaRevisione", header: t("mezzi.scadRevisione"), example: "2027-06-30" },
+          { key: "note", header: t("common.notes"), example: "" },
+        ]}
+        mapRow={(r): MapRowResult<Record<string, unknown>> => {
+          if (!r.codice) return { error: t("bulkImport.requiredMissing", { field: t("common.code") }) };
+          if (!r.tipo) return { error: t("bulkImport.requiredMissing", { field: t("common.type") }) };
+          if (!r.proprieta) return { error: t("bulkImport.requiredMissing", { field: t("mezzi.proprieta") }) };
+          let volontarioId: number | null = null;
+          if (r.volontario) {
+            const v = matchByName(volontari, r.volontario, (x) => [x.nome, x.cognome].filter(Boolean).join(" "));
+            if (!v) return { error: t("bulkImport.unknownRef", { field: t("mezzi.proprietaOpts.volontario"), value: r.volontario }) };
+            volontarioId = v.id;
+          }
+          let centroAscoltoId: number | null = null;
+          if (r.centro) {
+            const c = matchByName(centri, r.centro, (x) => x.nome);
+            if (!c) return { error: t("bulkImport.unknownRef", { field: t("common.centro"), value: r.centro }) };
+            centroAscoltoId = c.id;
+          }
+          let capacitaColli: number | undefined;
+          if (r.capacitaColli) {
+            const n = Number(r.capacitaColli);
+            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("mezzi.capacitaColli") }) };
+            capacitaColli = n;
+          }
+          let capacitaKg: number | undefined;
+          if (r.capacitaKg) {
+            const n = Number(r.capacitaKg);
+            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("mezzi.capacitaKg") }) };
+            capacitaKg = n;
+          }
+          return {
+            data: {
+              codice: r.codice,
+              tipo: r.tipo,
+              targa: r.targa || undefined,
+              proprieta: r.proprieta,
+              proprietarioNome: r.proprietarioNome || undefined,
+              volontarioId,
+              centroAscoltoId,
+              capacitaColli,
+              capacitaKg,
+              scadenzaAssicurazione: r.scadenzaAssicurazione || undefined,
+              scadenzaRevisione: r.scadenzaRevisione || undefined,
+              note: r.note || undefined,
+            },
+          };
+        }}
+        onImport={async (righe) => bulkMezzi.mutateAsync({ data: { righe: righe as never } })}
+        onDone={() => queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() })}
+      />
 
       <Card>
         {isGlobal && (

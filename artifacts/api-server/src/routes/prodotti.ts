@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { prodottiTable } from "@workspace/db";
+import { runBulk } from "../lib/bulk";
 import { eq, ilike, and, type SQL } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -38,30 +39,46 @@ router.get("/prodotti", async (req, res) => {
   })));
 });
 
-router.post("/prodotti", async (req, res) => {
-  const body = req.body;
+async function createProdottoOne(
+  body: Record<string, unknown>,
+): Promise<{ row: typeof prodottiTable.$inferSelect }> {
+  const b = body as Record<string, any>;
   const [row] = await db.insert(prodottiTable).values({
-    codice: body.codice,
-    nome: body.nome,
-    descrizione: body.descrizione,
-    tipoProdotto: body.tipoProdotto,
-    unitaMisura: body.unitaMisura,
-    codiceBarre: body.codiceBarre,
-    gestioneLotto: body.gestioneLotto ?? false,
-    gestioneScadenza: body.gestioneScadenza ?? false,
-    fsePlus: body.fsePlus ?? false,
-    scortaMinima: body.scortaMinima?.toString() ?? "0",
-    scortaConsigliata: body.scortaConsigliata?.toString() ?? "0",
-    conservazione: body.conservazione,
-    taglia: body.taglia,
-    genere: body.genere,
-    stagione: body.stagione,
-    condizione: body.condizione,
-    attivo: body.attivo ?? true,
-    note: body.note,
-    fornitoreId: body.fornitoreId,
+    codice: b.codice,
+    nome: b.nome,
+    descrizione: b.descrizione,
+    tipoProdotto: b.tipoProdotto,
+    unitaMisura: b.unitaMisura,
+    codiceBarre: b.codiceBarre,
+    gestioneLotto: b.gestioneLotto ?? false,
+    gestioneScadenza: b.gestioneScadenza ?? false,
+    fsePlus: b.fsePlus ?? false,
+    scortaMinima: b.scortaMinima?.toString() ?? "0",
+    scortaConsigliata: b.scortaConsigliata?.toString() ?? "0",
+    conservazione: b.conservazione,
+    taglia: b.taglia,
+    genere: b.genere,
+    stagione: b.stagione,
+    condizione: b.condizione,
+    attivo: b.attivo ?? true,
+    note: b.note,
+    fornitoreId: b.fornitoreId,
   }).returning();
+  return { row };
+}
+
+router.post("/prodotti", async (req, res) => {
+  const { row } = await createProdottoOne(req.body);
   res.status(201).json({ ...row, scortaMinima: parseFloat(row.scortaMinima ?? "0"), scortaConsigliata: parseFloat(row.scortaConsigliata ?? "0"), dataCreazione: row.dataCreazione.toISOString() });
+});
+
+router.post("/prodotti/bulk", async (req, res) => {
+  const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
+  const result = await runBulk(righe, async (row) => {
+    await createProdottoOne(row);
+    return { ok: true };
+  });
+  res.json(result);
 });
 
 router.get("/prodotti/:id", async (req, res) => {

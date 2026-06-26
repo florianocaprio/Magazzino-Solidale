@@ -37,6 +37,7 @@ import { notFound } from "./namespaces/notFound";
 import { tessera } from "./namespaces/tessera";
 import { scheda } from "./namespaces/scheda";
 import { barcodeScanner } from "./namespaces/barcodeScanner";
+import { bulkImport } from "./namespaces/bulkImport";
 
 export { LANGUAGES, isRtl, applyDirection } from "./languages";
 export type { LanguageCode } from "./languages";
@@ -77,6 +78,7 @@ const PAGE_NAMESPACES = {
   tessera,
   scheda,
   barcodeScanner,
+  bulkImport,
 } as const;
 
 function buildResources() {

@@ -220,6 +220,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Prodotto"
 
+  /prodotti/bulk:
+    post:
+      operationId: bulkProdotti
+      tags: [prodotti]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProdottiBulkInput"
+      responses:
+        "200":
+          description: Bulk import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
   /prodotti/{id}:
     get:
       operationId: getProdotto
@@ -644,6 +662,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Fornitore"
 
+  /fornitori/bulk:
+    post:
+      operationId: bulkFornitori
+      tags: [fornitori]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FornitoriBulkInput"
+      responses:
+        "200":
+          description: Bulk import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
   /fornitori/{id}:
     get:
       operationId: getFornitore
@@ -906,6 +942,24 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/BeneficiarioSimile"
+
+  /beneficiari/bulk:
+    post:
+      operationId: bulkBeneficiari
+      tags: [beneficiari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeneficiariBulkInput"
+      responses:
+        "200":
+          description: Bulk import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
 
   /beneficiari/{id}:
     get:
@@ -1757,6 +1811,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Volontario"
 
+  /volontari/bulk:
+    post:
+      operationId: bulkVolontari
+      tags: [volontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VolontariBulkInput"
+      responses:
+        "200":
+          description: Bulk import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
   /volontari/{id}:
     get:
       operationId: getVolontario
@@ -1839,6 +1911,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Mezzo"
+
+  /mezzi/bulk:
+    post:
+      operationId: bulkMezzi
+      tags: [mezzi]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MezziBulkInput"
+      responses:
+        "200":
+          description: Bulk import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
 
   /mezzi/{id}:
     get:
@@ -2572,6 +2662,68 @@ components:
         dataCreazione:
           type: string
       required: [id, codice, nome, stato, dataCreazione]
+
+    VolontariBulkInput:
+      type: object
+      required: [righe]
+      properties:
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolontarioInput"
+
+    MezziBulkInput:
+      type: object
+      required: [righe]
+      properties:
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/MezzoInput"
+
+    FornitoriBulkInput:
+      type: object
+      required: [righe]
+      properties:
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/FornitoreInput"
+
+    ProdottiBulkInput:
+      type: object
+      required: [righe]
+      properties:
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProdottoInput"
+
+    BeneficiariBulkInput:
+      type: object
+      required: [righe]
+      properties:
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/BeneficiarioInput"
+
+    BulkImportResult:
+      type: object
+      required: [creati, errori]
+      properties:
+        creati:
+          type: integer
+        errori:
+          type: array
+          items:
+            type: object
+            required: [riga, messaggio]
+            properties:
+              riga:
+                type: integer
+              messaggio:
+                type: string
 
     MagazzinoInput:
       type: object

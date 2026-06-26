@@ -1,6 +1,7 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { mezziTable, volontariTable, centriAscoltoTable } from "@workspace/db";
+import { runBulk } from "../lib/bulk";
 import { eq, sql, inArray, or, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
@@ -162,24 +163,39 @@ async function resolveCentro(
   return { ownCentro };
 }
 
-router.post("/mezzi", async (req, res) => {
-  const body = req.body;
+async function createMezzoOne(
+  body: Record<string, unknown>,
+  req: Request,
+): Promise<{ id: number } | { error: string }> {
+  const b = body as Record<string, any>;
   const caller = callerCentroId(req);
   const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
-  const resolved = await resolveCentro(body, caller, cittaCentroIds);
-  if ("error" in resolved) {
-    res.status(403).json({ error: resolved.error });
-    return;
-  }
+  const resolved = await resolveCentro(b, caller, cittaCentroIds);
+  if ("error" in resolved) return { error: resolved.error };
   const [created] = await db
     .insert(mezziTable)
     .values({
-      ...body,
+      ...(b as typeof mezziTable.$inferInsert),
       centroAscoltoId: resolved.ownCentro,
-      capacitaKg: body.capacitaKg?.toString(),
+      capacitaKg: b.capacitaKg?.toString(),
     })
     .returning({ id: mezziTable.id });
-  res.status(201).json(await loadMezzo(created.id));
+  return { id: created.id };
+}
+
+router.post("/mezzi", async (req, res) => {
+  const r = await createMezzoOne(req.body, req);
+  if ("error" in r) { res.status(403).json({ error: r.error }); return; }
+  res.status(201).json(await loadMezzo(r.id));
+});
+
+router.post("/mezzi/bulk", async (req, res) => {
+  const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
+  const result = await runBulk(righe, async (row) => {
+    const r = await createMezzoOne(row, req);
+    return "error" in r ? { error: r.error } : { ok: true };
+  });
+  res.json(result);
 });
 
 router.get("/mezzi/:id", async (req, res) => {

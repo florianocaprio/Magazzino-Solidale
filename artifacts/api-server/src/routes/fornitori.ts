@@ -1,6 +1,7 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { fornitoriTable } from "@workspace/db";
+import { runBulk } from "../lib/bulk";
 import { eq } from "drizzle-orm";
 import {
   callerCentroId,
@@ -55,17 +56,37 @@ router.get("/fornitori", async (req, res) => {
   res.json(rows.map(fmt));
 });
 
-router.post("/fornitori", async (req, res) => {
+async function createFornitoreOne(
+  body: Record<string, unknown>,
+  req: Request,
+): Promise<{ row: typeof fornitoriTable.$inferSelect } | { error: string }> {
   const caller = callerCentroId(req);
-  const values = { ...req.body };
+  const values = { ...body };
   if (caller != null) values.centroAscoltoId = caller;
-  if (caller == null && values.centroAscoltoId != null
-      && !inVisibleCentroSet(values.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
-    res.status(403).json({ error: "Centro non accessibile per la tua città" });
-    return;
+  if (
+    caller == null &&
+    values.centroAscoltoId != null &&
+    !inVisibleCentroSet(values.centroAscoltoId as number, await visibleCentroIds(callerCittaId(req)))
+  ) {
+    return { error: "Centro non accessibile per la tua città" };
   }
-  const [row] = await db.insert(fornitoriTable).values(values).returning();
-  res.status(201).json(fmt(row));
+  const [row] = await db.insert(fornitoriTable).values(values as typeof fornitoriTable.$inferInsert).returning();
+  return { row };
+}
+
+router.post("/fornitori", async (req, res) => {
+  const r = await createFornitoreOne(req.body, req);
+  if ("error" in r) { res.status(403).json({ error: r.error }); return; }
+  res.status(201).json(fmt(r.row));
+});
+
+router.post("/fornitori/bulk", async (req, res) => {
+  const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
+  const result = await runBulk(righe, async (row) => {
+    const r = await createFornitoreOne(row, req);
+    return "error" in r ? { error: r.error } : { ok: true };
+  });
+  res.json(result);
 });
 
 router.get("/fornitori/:id", async (req, res) => {

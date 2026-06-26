@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useListCentriAscolto, getListFornitoriQueryKey } from "@workspace/api-client-react";
+import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useBulkFornitori, useListCentriAscolto, getListFornitoriQueryKey } from "@workspace/api-client-react";
+import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, Building, Filter } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, Building, Filter, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -64,6 +65,8 @@ export default function Fornitori() {
   const createFornitore = useCreateFornitore();
   const updateFornitore = useUpdateFornitore();
   const deleteFornitore = useDeleteFornitore();
+  const bulkFornitori = useBulkFornitori();
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -149,9 +152,59 @@ export default function Fornitori() {
             filename="fornitori"
             title={t("fornitori.exportTitle")}
           />
+          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" /> {t("bulkImport.button")}
+          </Button>
           <Button onClick={handleCreate} className="gap-2"><Plus className="h-4 w-4" /> {t("fornitori.newFornitore")}</Button>
         </div>
       </div>
+
+      <BulkImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        entityLabel={t("fornitori.title")}
+        templateFilename="modello_fornitori"
+        columns={[
+          { key: "nome", header: t("fornitori.nominativo"), example: "Supermercato Rossi" },
+          { key: "tipo", header: t("common.type"), example: "commerciale" },
+          { key: "partitaIva", header: "Partita IVA", example: "" },
+          { key: "codiceFiscale", header: "Codice Fiscale", example: "" },
+          { key: "indirizzo", header: t("common.address"), example: "" },
+          { key: "comune", header: t("fornitori.comune"), example: "Milano" },
+          { key: "telefono", header: t("common.phone"), example: "021234567" },
+          { key: "email", header: t("common.email"), example: "info@example.com" },
+          { key: "referente", header: t("fornitori.referente"), example: "" },
+          { key: "centro", header: t("fornitori.centro"), example: "" },
+          { key: "noteOperative", header: t("fornitori.noteOperative"), example: "" },
+        ]}
+        mapRow={(r): MapRowResult<Record<string, unknown>> => {
+          if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("fornitori.nominativo") }) };
+          if (!r.tipo) return { error: t("bulkImport.requiredMissing", { field: t("common.type") }) };
+          let centroAscoltoId: number | null = null;
+          if (r.centro) {
+            const c = matchByName(centri, r.centro, (x) => x.nome);
+            if (!c) return { error: t("bulkImport.unknownRef", { field: t("fornitori.centro"), value: r.centro }) };
+            centroAscoltoId = c.id;
+          }
+          return {
+            data: {
+              nome: r.nome,
+              tipo: r.tipo,
+              partitaIva: r.partitaIva || undefined,
+              codiceFiscale: r.codiceFiscale || undefined,
+              indirizzo: r.indirizzo || undefined,
+              comune: r.comune || undefined,
+              telefono: r.telefono || undefined,
+              email: r.email || undefined,
+              referente: r.referente || undefined,
+              centroAscoltoId,
+              noteOperative: r.noteOperative || undefined,
+            },
+          };
+        }}
+        onImport={async (righe) => bulkFornitori.mutateAsync({ data: { righe: righe as never } })}
+        onDone={() => queryClient.invalidateQueries({ queryKey: getListFornitoriQueryKey() })}
+      />
 
       <Card>
         <CardHeader className="py-4 border-b">

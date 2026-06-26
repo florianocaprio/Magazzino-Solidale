@@ -101,6 +101,146 @@ export interface Magazzino {
   dataCreazione: string;
 }
 
+export interface VolontarioInput {
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  telefono?: string;
+  email?: string;
+  ruolo: string;
+  patente?: boolean;
+  mezzoPersonale?: boolean;
+  maxConsegneTurno?: number;
+  note?: string;
+}
+
+export interface VolontariBulkInput {
+  righe: VolontarioInput[];
+}
+
+export interface MezzoInput {
+  codice: string;
+  tipo: string;
+  targa?: string;
+  proprieta: string;
+  proprietarioNome?: string;
+  /** @nullable */
+  volontarioId?: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  capacitaColli?: number;
+  capacitaKg?: number;
+  scadenzaAssicurazione?: string;
+  scadenzaRevisione?: string;
+  note?: string;
+}
+
+export interface MezziBulkInput {
+  righe: MezzoInput[];
+}
+
+export interface FornitoreInput {
+  nome: string;
+  tipo: string;
+  partitaIva?: string;
+  codiceFiscale?: string;
+  indirizzo?: string;
+  comune?: string;
+  telefono?: string;
+  email?: string;
+  referente?: string;
+  siteWeb?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  note?: string;
+  noteOperative?: string;
+}
+
+export interface FornitoriBulkInput {
+  righe: FornitoreInput[];
+}
+
+export interface ProdottoInput {
+  codice: string;
+  nome: string;
+  descrizione?: string;
+  tipoProdotto: string;
+  unitaMisura: string;
+  codiceBarre?: string;
+  gestioneLotto?: boolean;
+  gestioneScadenza?: boolean;
+  fsePlus?: boolean;
+  scortaMinima?: number;
+  scortaConsigliata?: number;
+  conservazione?: string;
+  taglia?: string;
+  genere?: string;
+  stagione?: string;
+  condizione?: string;
+  note?: string;
+  fornitoreId?: number;
+}
+
+export interface ProdottiBulkInput {
+  righe: ProdottoInput[];
+}
+
+export interface BeneficiarioInput {
+  codice?: string;
+  /** @nullable */
+  codiceFiscale?: string | null;
+  cognome: string;
+  nome: string;
+  dataNascita?: string;
+  cittadinanza?: string;
+  residenza?: string;
+  domicilio?: string;
+  comune?: string;
+  zonaMunicipio?: string;
+  telefono?: string;
+  email?: string;
+  statoCivile?: string;
+  numComponenti?: number;
+  numFigliMaschi?: number;
+  numFiglieFemmine?: number;
+  numMinori?: number;
+  numAnziani?: number;
+  numDisabili?: number;
+  restrizioniAlimentari?: string;
+  allergie?: string;
+  notePaccoAlimentare?: string;
+  priorita?: string;
+  consegnaDomicilio?: boolean;
+  motivoConsegnaDomicilio?: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  dataPresaInCarico?: string;
+  noteInterne?: string;
+  soprannome?: string;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  uds?: boolean;
+  sesso?: string;
+  areaProvenienza?: string;
+}
+
+export interface BeneficiariBulkInput {
+  righe: BeneficiarioInput[];
+}
+
+export type BulkImportResultErroriItem = {
+  riga: number;
+  messaggio: string;
+};
+
+export interface BulkImportResult {
+  creati: number;
+  errori: BulkImportResultErroriItem[];
+}
+
 export interface MagazzinoInput {
   codice?: string;
   nome: string;
@@ -161,27 +301,6 @@ export interface Prodotto {
   dataCreazione: string;
   /** @nullable */
   fornitoreId?: number | null;
-}
-
-export interface ProdottoInput {
-  codice: string;
-  nome: string;
-  descrizione?: string;
-  tipoProdotto: string;
-  unitaMisura: string;
-  codiceBarre?: string;
-  gestioneLotto?: boolean;
-  gestioneScadenza?: boolean;
-  fsePlus?: boolean;
-  scortaMinima?: number;
-  scortaConsigliata?: number;
-  conservazione?: string;
-  taglia?: string;
-  genere?: string;
-  stagione?: string;
-  condizione?: string;
-  note?: string;
-  fornitoreId?: number;
 }
 
 export interface ProdottoUpdate {
@@ -495,23 +614,6 @@ export interface Fornitore {
   /** @nullable */
   noteOperative?: string | null;
   dataCreazione: string;
-}
-
-export interface FornitoreInput {
-  nome: string;
-  tipo: string;
-  partitaIva?: string;
-  codiceFiscale?: string;
-  indirizzo?: string;
-  comune?: string;
-  telefono?: string;
-  email?: string;
-  referente?: string;
-  siteWeb?: string;
-  /** @nullable */
-  centroAscoltoId?: number | null;
-  note?: string;
-  noteOperative?: string;
 }
 
 export interface FornitoreUpdate {
@@ -844,47 +946,6 @@ export interface BeneficiarioDettaglio {
   interventi?: Intervento[];
   consegne?: Consegna[];
   dataCreazione: string;
-}
-
-export interface BeneficiarioInput {
-  codice?: string;
-  /** @nullable */
-  codiceFiscale?: string | null;
-  cognome: string;
-  nome: string;
-  dataNascita?: string;
-  cittadinanza?: string;
-  residenza?: string;
-  domicilio?: string;
-  comune?: string;
-  zonaMunicipio?: string;
-  telefono?: string;
-  email?: string;
-  statoCivile?: string;
-  numComponenti?: number;
-  numFigliMaschi?: number;
-  numFiglieFemmine?: number;
-  numMinori?: number;
-  numAnziani?: number;
-  numDisabili?: number;
-  restrizioniAlimentari?: string;
-  allergie?: string;
-  notePaccoAlimentare?: string;
-  priorita?: string;
-  consegnaDomicilio?: boolean;
-  motivoConsegnaDomicilio?: string;
-  /** @nullable */
-  centroAscoltoId?: number | null;
-  dataPresaInCarico?: string;
-  noteInterne?: string;
-  soprannome?: string;
-  /** @nullable */
-  cittaId?: number | null;
-  /** @nullable */
-  zonaUdsId?: number | null;
-  uds?: boolean;
-  sesso?: string;
-  areaProvenienza?: string;
 }
 
 export interface BeneficiarioUpdate {
@@ -1299,20 +1360,6 @@ export interface Volontario {
   dataCreazione: string;
 }
 
-export interface VolontarioInput {
-  nome: string;
-  cognome: string;
-  /** @nullable */
-  centroAscoltoId?: number | null;
-  telefono?: string;
-  email?: string;
-  ruolo: string;
-  patente?: boolean;
-  mezzoPersonale?: boolean;
-  maxConsegneTurno?: number;
-  note?: string;
-}
-
 export interface VolontarioUpdate {
   nome?: string;
   cognome?: string;
@@ -1359,23 +1406,6 @@ export interface Mezzo {
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
-}
-
-export interface MezzoInput {
-  codice: string;
-  tipo: string;
-  targa?: string;
-  proprieta: string;
-  proprietarioNome?: string;
-  /** @nullable */
-  volontarioId?: number | null;
-  /** @nullable */
-  centroAscoltoId?: number | null;
-  capacitaColli?: number;
-  capacitaKg?: number;
-  scadenzaAssicurazione?: string;
-  scadenzaRevisione?: string;
-  note?: string;
 }
 
 export interface MezzoUpdate {

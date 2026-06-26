@@ -27,6 +27,7 @@ import type {
   Area,
   AssociaBollaInput,
   AuthUser,
+  BeneficiariBulkInput,
   Beneficiario,
   BeneficiarioDettaglio,
   BeneficiarioInput,
@@ -38,6 +39,7 @@ import type {
   BollaRiga,
   BollaRigaInput,
   BollaUpdate,
+  BulkImportResult,
   CentroAscolto,
   CentroAscoltoInput,
   CentroAscoltoUpdate,
@@ -57,6 +59,7 @@ import type {
   Fornitore,
   FornitoreInput,
   FornitoreUpdate,
+  FornitoriBulkInput,
   Giacenza,
   GiacenzaMagazzinoReport,
   HealthStatus,
@@ -84,6 +87,7 @@ import type {
   Magazzino,
   MagazzinoInput,
   MagazzinoUpdate,
+  MezziBulkInput,
   Mezzo,
   MezzoInput,
   MezzoUpdate,
@@ -92,6 +96,7 @@ import type {
   MovimentoSummary,
   NucleoFamiliare,
   NucleoFamiliareInput,
+  ProdottiBulkInput,
   Prodotto,
   ProdottoInput,
   ProdottoUpdate,
@@ -122,6 +127,7 @@ import type {
   Utente,
   UtenteInput,
   UtenteUpdate,
+  VolontariBulkInput,
   Volontario,
   VolontarioInput,
   VolontarioUpdate,
@@ -946,6 +952,71 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCreateProdottoMutationOptions(options));
+    }
+
+export const getBulkProdottiUrl = () => {
+
+
+
+
+  return `/api/prodotti/bulk`
+}
+
+export const bulkProdotti = async (prodottiBulkInput: ProdottiBulkInput, options?: RequestInit): Promise<BulkImportResult> => {
+
+  return customFetch<BulkImportResult>(getBulkProdottiUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      prodottiBulkInput,)
+  }
+);}
+
+
+
+
+export const getBulkProdottiMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkProdotti>>, TError,{data: BodyType<ProdottiBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkProdotti>>, TError,{data: BodyType<ProdottiBulkInput>}, TContext> => {
+
+const mutationKey = ['bulkProdotti'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkProdotti>>, {data: BodyType<ProdottiBulkInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkProdotti(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkProdottiMutationResult = NonNullable<Awaited<ReturnType<typeof bulkProdotti>>>
+    export type BulkProdottiMutationBody = BodyType<ProdottiBulkInput>
+    export type BulkProdottiMutationError = ErrorType<unknown>
+
+    export const useBulkProdotti = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkProdotti>>, TError,{data: BodyType<ProdottiBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkProdotti>>,
+        TError,
+        {data: BodyType<ProdottiBulkInput>},
+        TContext
+      > => {
+      return useMutation(getBulkProdottiMutationOptions(options));
     }
 
 export const getGetProdottoUrl = (id: number,) => {
@@ -2422,6 +2493,71 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getCreateFornitoreMutationOptions(options));
     }
 
+export const getBulkFornitoriUrl = () => {
+
+
+
+
+  return `/api/fornitori/bulk`
+}
+
+export const bulkFornitori = async (fornitoriBulkInput: FornitoriBulkInput, options?: RequestInit): Promise<BulkImportResult> => {
+
+  return customFetch<BulkImportResult>(getBulkFornitoriUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fornitoriBulkInput,)
+  }
+);}
+
+
+
+
+export const getBulkFornitoriMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkFornitori>>, TError,{data: BodyType<FornitoriBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkFornitori>>, TError,{data: BodyType<FornitoriBulkInput>}, TContext> => {
+
+const mutationKey = ['bulkFornitori'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkFornitori>>, {data: BodyType<FornitoriBulkInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkFornitori(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkFornitoriMutationResult = NonNullable<Awaited<ReturnType<typeof bulkFornitori>>>
+    export type BulkFornitoriMutationBody = BodyType<FornitoriBulkInput>
+    export type BulkFornitoriMutationError = ErrorType<unknown>
+
+    export const useBulkFornitori = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkFornitori>>, TError,{data: BodyType<FornitoriBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkFornitori>>,
+        TError,
+        {data: BodyType<FornitoriBulkInput>},
+        TContext
+      > => {
+      return useMutation(getBulkFornitoriMutationOptions(options));
+    }
+
 export const getGetFornitoreUrl = (id: number,) => {
 
 
@@ -3199,6 +3335,71 @@ export function useCercaBeneficiariSimili<TData = Awaited<ReturnType<typeof cerc
 
 
 
+
+export const getBulkBeneficiariUrl = () => {
+
+
+
+
+  return `/api/beneficiari/bulk`
+}
+
+export const bulkBeneficiari = async (beneficiariBulkInput: BeneficiariBulkInput, options?: RequestInit): Promise<BulkImportResult> => {
+
+  return customFetch<BulkImportResult>(getBulkBeneficiariUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      beneficiariBulkInput,)
+  }
+);}
+
+
+
+
+export const getBulkBeneficiariMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkBeneficiari>>, TError,{data: BodyType<BeneficiariBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkBeneficiari>>, TError,{data: BodyType<BeneficiariBulkInput>}, TContext> => {
+
+const mutationKey = ['bulkBeneficiari'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkBeneficiari>>, {data: BodyType<BeneficiariBulkInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkBeneficiari(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkBeneficiariMutationResult = NonNullable<Awaited<ReturnType<typeof bulkBeneficiari>>>
+    export type BulkBeneficiariMutationBody = BodyType<BeneficiariBulkInput>
+    export type BulkBeneficiariMutationError = ErrorType<unknown>
+
+    export const useBulkBeneficiari = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkBeneficiari>>, TError,{data: BodyType<BeneficiariBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkBeneficiari>>,
+        TError,
+        {data: BodyType<BeneficiariBulkInput>},
+        TContext
+      > => {
+      return useMutation(getBulkBeneficiariMutationOptions(options));
+    }
 
 export const getGetBeneficiarioUrl = (id: number,) => {
 
@@ -6309,6 +6510,71 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getCreateVolontarioMutationOptions(options));
     }
 
+export const getBulkVolontariUrl = () => {
+
+
+
+
+  return `/api/volontari/bulk`
+}
+
+export const bulkVolontari = async (volontariBulkInput: VolontariBulkInput, options?: RequestInit): Promise<BulkImportResult> => {
+
+  return customFetch<BulkImportResult>(getBulkVolontariUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariBulkInput,)
+  }
+);}
+
+
+
+
+export const getBulkVolontariMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkVolontari>>, TError,{data: BodyType<VolontariBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkVolontari>>, TError,{data: BodyType<VolontariBulkInput>}, TContext> => {
+
+const mutationKey = ['bulkVolontari'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkVolontari>>, {data: BodyType<VolontariBulkInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkVolontari(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkVolontariMutationResult = NonNullable<Awaited<ReturnType<typeof bulkVolontari>>>
+    export type BulkVolontariMutationBody = BodyType<VolontariBulkInput>
+    export type BulkVolontariMutationError = ErrorType<unknown>
+
+    export const useBulkVolontari = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkVolontari>>, TError,{data: BodyType<VolontariBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkVolontari>>,
+        TError,
+        {data: BodyType<VolontariBulkInput>},
+        TContext
+      > => {
+      return useMutation(getBulkVolontariMutationOptions(options));
+    }
+
 export const getGetVolontarioUrl = (id: number,) => {
 
 
@@ -6644,6 +6910,71 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCreateMezzoMutationOptions(options));
+    }
+
+export const getBulkMezziUrl = () => {
+
+
+
+
+  return `/api/mezzi/bulk`
+}
+
+export const bulkMezzi = async (mezziBulkInput: MezziBulkInput, options?: RequestInit): Promise<BulkImportResult> => {
+
+  return customFetch<BulkImportResult>(getBulkMezziUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mezziBulkInput,)
+  }
+);}
+
+
+
+
+export const getBulkMezziMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkMezzi>>, TError,{data: BodyType<MezziBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkMezzi>>, TError,{data: BodyType<MezziBulkInput>}, TContext> => {
+
+const mutationKey = ['bulkMezzi'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkMezzi>>, {data: BodyType<MezziBulkInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkMezzi(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkMezziMutationResult = NonNullable<Awaited<ReturnType<typeof bulkMezzi>>>
+    export type BulkMezziMutationBody = BodyType<MezziBulkInput>
+    export type BulkMezziMutationError = ErrorType<unknown>
+
+    export const useBulkMezzi = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkMezzi>>, TError,{data: BodyType<MezziBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkMezzi>>,
+        TError,
+        {data: BodyType<MezziBulkInput>},
+        TContext
+      > => {
+      return useMutation(getBulkMezziMutationOptions(options));
     }
 
 export const getGetMezzoUrl = (id: number,) => {

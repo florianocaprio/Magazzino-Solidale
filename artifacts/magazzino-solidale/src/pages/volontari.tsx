@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useListVolontari, useCreateVolontario, useUpdateVolontario, useDeleteVolontario, getListVolontariQueryKey, useListCentriAscolto } from "@workspace/api-client-react";
+import { useListVolontari, useCreateVolontario, useUpdateVolontario, useDeleteVolontario, useBulkVolontari, getListVolontariQueryKey, useListCentriAscolto } from "@workspace/api-client-react";
+import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, CheckCircle2, XCircle } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, CheckCircle2, XCircle, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -54,6 +55,8 @@ export default function Volontari() {
   const createVolontario = useCreateVolontario();
   const updateVolontario = useUpdateVolontario();
   const deleteVolontario = useDeleteVolontario();
+  const bulkVolontari = useBulkVolontari();
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -164,11 +167,66 @@ export default function Volontari() {
             title={t("volontari.exportTitle")}
             orientation="landscape"
           />
+          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" /> {t("bulkImport.button")}
+          </Button>
           <Button onClick={handleCreate} className="gap-2">
             <Plus className="h-4 w-4" /> {t("volontari.newVolontario")}
           </Button>
         </div>
       </div>
+
+      <BulkImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        entityLabel={t("volontari.title")}
+        templateFilename="modello_volontari"
+        columns={[
+          { key: "nome", header: t("common.name"), example: "Mario" },
+          { key: "cognome", header: t("common.surname"), example: "Rossi" },
+          { key: "ruolo", header: t("volontari.ruolo"), example: "magazziniere" },
+          { key: "telefono", header: t("common.phone"), example: "3331234567" },
+          { key: "email", header: t("common.email"), example: "mario.rossi@example.com" },
+          { key: "patente", header: t("volontari.patente"), example: "No" },
+          { key: "mezzoPersonale", header: t("volontari.mezzoPersonale"), example: "No" },
+          { key: "maxConsegneTurno", header: t("volontari.maxConsegne"), example: 5 },
+          { key: "centro", header: t("volontari.centroAscolto"), example: "" },
+          { key: "note", header: t("common.notes"), example: "" },
+        ]}
+        mapRow={(r): MapRowResult<Record<string, unknown>> => {
+          if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("common.name") }) };
+          if (!r.cognome) return { error: t("bulkImport.requiredMissing", { field: t("common.surname") }) };
+          if (!r.ruolo) return { error: t("bulkImport.requiredMissing", { field: t("volontari.ruolo") }) };
+          let centroAscoltoId: number | null = null;
+          if (r.centro) {
+            const c = matchByName(centri, r.centro, (x) => x.nome);
+            if (!c) return { error: t("bulkImport.unknownRef", { field: t("volontari.centroAscolto"), value: r.centro }) };
+            centroAscoltoId = c.id;
+          }
+          let maxConsegneTurno: number | undefined;
+          if (r.maxConsegneTurno) {
+            const n = Number(r.maxConsegneTurno);
+            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("volontari.maxConsegne") }) };
+            maxConsegneTurno = n;
+          }
+          return {
+            data: {
+              nome: r.nome,
+              cognome: r.cognome,
+              ruolo: r.ruolo,
+              telefono: r.telefono || undefined,
+              email: r.email || undefined,
+              patente: parseBoolCell(r.patente),
+              mezzoPersonale: parseBoolCell(r.mezzoPersonale),
+              maxConsegneTurno,
+              centroAscoltoId,
+              note: r.note || undefined,
+            },
+          };
+        }}
+        onImport={async (righe) => bulkVolontari.mutateAsync({ data: { righe: righe as never } })}
+        onDone={() => queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() })}
+      />
 
       <Card>
         <CardHeader className="py-4 border-b">

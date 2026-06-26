@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useListCentriAscolto, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey } from "@workspace/api-client-react";
+import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, CreditCard, FileDown, AlertTriangle } from "lucide-react";
+import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, CreditCard, FileDown, AlertTriangle, Upload } from "lucide-react";
 import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
@@ -83,6 +84,8 @@ export default function Beneficiari() {
   const createBeneficiario = useCreateBeneficiario();
   const deleteBeneficiario = useDeleteBeneficiario();
   const updateBeneficiario = useUpdateBeneficiario();
+  const bulkBeneficiari = useBulkBeneficiari();
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const toggleStatus = (b: { id: number; attivo: boolean }) => {
     updateBeneficiario.mutate({ id: b.id, data: { attivo: !b.attivo } }, {
@@ -194,9 +197,79 @@ export default function Beneficiari() {
             title={t("beneficiari.exportTitle")}
             orientation="landscape"
           />
+          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" /> {t("bulkImport.button")}
+          </Button>
           <Button onClick={() => { form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : ""); setDupDismissed(false); setDupParams({}); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
         </div>
       </div>
+
+      <BulkImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        entityLabel={t("beneficiari.title")}
+        templateFilename="modello_beneficiari"
+        columns={[
+          { key: "cognome", header: t("common.surname"), example: "Rossi" },
+          { key: "nome", header: t("common.name"), example: "Maria" },
+          { key: "codice", header: t("common.code"), example: "" },
+          { key: "codiceFiscale", header: "Codice Fiscale", example: "" },
+          { key: "dataNascita", header: t("beneficiarioDettaglio.dataNascita"), example: "1985-04-12" },
+          { key: "sesso", header: t("beneficiarioDettaglio.sesso"), example: "F" },
+          { key: "cittadinanza", header: t("beneficiarioDettaglio.cittadinanza"), example: "" },
+          { key: "telefono", header: t("common.phone"), example: "3331234567" },
+          { key: "email", header: t("common.email"), example: "" },
+          { key: "comune", header: t("beneficiari.comune"), example: "Milano" },
+          { key: "numComponenti", header: t("beneficiari.numComponenti"), example: 1 },
+          { key: "priorita", header: t("beneficiari.colPriorita"), example: "media" },
+          { key: "areaProvenienza", header: t("beneficiarioDettaglio.areaProvenienza"), example: "UE" },
+          { key: "centro", header: t("beneficiari.centroAscolto"), example: "" },
+          ...(isCittaGlobal ? [{ key: "citta", header: t("nav.citta"), example: "" }] : []),
+        ]}
+        mapRow={(r): MapRowResult<Record<string, unknown>> => {
+          if (!r.cognome) return { error: t("bulkImport.requiredMissing", { field: t("common.surname") }) };
+          if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("common.name") }) };
+          let centroAscoltoId: number | null = null;
+          if (r.centro) {
+            const c = matchByName(centri, r.centro, (x) => x.nome);
+            if (!c) return { error: t("bulkImport.unknownRef", { field: t("beneficiari.centroAscolto"), value: r.centro }) };
+            centroAscoltoId = c.id;
+          }
+          let cittaId: number | undefined;
+          if (isCittaGlobal && r.citta) {
+            const ci = matchByName(cittaList, r.citta, (x) => x.nome);
+            if (!ci) return { error: t("bulkImport.unknownRef", { field: t("nav.citta"), value: r.citta }) };
+            cittaId = ci.id;
+          }
+          let numComponenti: number | undefined;
+          if (r.numComponenti) {
+            const n = Number(r.numComponenti);
+            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("beneficiari.numComponenti") }) };
+            numComponenti = n;
+          }
+          return {
+            data: {
+              cognome: r.cognome,
+              nome: r.nome,
+              codice: r.codice || undefined,
+              codiceFiscale: r.codiceFiscale ? r.codiceFiscale.trim().toUpperCase() : undefined,
+              dataNascita: r.dataNascita || undefined,
+              sesso: r.sesso || undefined,
+              cittadinanza: r.cittadinanza || undefined,
+              telefono: r.telefono || undefined,
+              email: r.email || undefined,
+              comune: r.comune || undefined,
+              numComponenti,
+              priorita: r.priorita || undefined,
+              areaProvenienza: r.areaProvenienza || undefined,
+              centroAscoltoId,
+              cittaId,
+            },
+          };
+        }}
+        onImport={async (righe) => bulkBeneficiari.mutateAsync({ data: { righe: righe as never } })}
+        onDone={() => queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() })}
+      />
 
       <Card>
         <CardHeader className="py-4 border-b">
