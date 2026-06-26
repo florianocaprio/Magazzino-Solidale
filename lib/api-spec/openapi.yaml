@@ -1195,6 +1195,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: dataInizio
+          in: query
+          schema:
+            type: string
+        - name: dataFine
+          in: query
+          schema:
+            type: string
         - name: beneficiarioId
           in: query
           schema:

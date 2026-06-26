@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { consegneTable, beneficiariTable, magazziniTable, volontariTable, bolleTable, centriAscoltoTable } from "@workspace/db";
-import { eq, and, desc, inArray, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, desc, inArray, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -40,14 +40,19 @@ async function bollePerConsegne(consegnaIds: number[]) {
 }
 
 router.get("/consegne", async (req, res) => {
-  const { stato, data, beneficiarioId, centroAscoltoId } = req.query as Record<string, string>;
-  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
-    res.status(400).json({ error: "Parametro 'data' non valido (formato atteso: YYYY-MM-DD)" });
-    return;
+  const { stato, data, dataInizio, dataFine, beneficiarioId, centroAscoltoId } = req.query as Record<string, string>;
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  for (const [name, val] of [["data", data], ["dataInizio", dataInizio], ["dataFine", dataFine]] as const) {
+    if (val && !dateRe.test(val)) {
+      res.status(400).json({ error: `Parametro '${name}' non valido (formato atteso: YYYY-MM-DD)` });
+      return;
+    }
   }
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(consegneTable.stato, stato));
   if (data) conditions.push(eq(consegneTable.dataPrevista, data));
+  if (dataInizio) conditions.push(gte(consegneTable.dataPrevista, dataInizio));
+  if (dataFine) conditions.push(lte(consegneTable.dataPrevista, dataFine));
   if (beneficiarioId) conditions.push(eq(consegneTable.beneficiarioId, parseInt(beneficiarioId)));
   const caller = callerCentroId(req);
   if (caller != null) {

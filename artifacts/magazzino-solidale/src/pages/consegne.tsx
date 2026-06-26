@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,7 +20,7 @@ import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format } from "date-fns";
+import { format, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 
@@ -53,11 +53,20 @@ export default function Consegne() {
       setCreateCentroId(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
-  const [dataFilter, setDataFilter] = useState("");
-  const consegneParams: { centroAscoltoId?: number; stato?: string; data?: string } = {};
+  const lastMonthRange = useMemo(() => {
+    const oggi = new Date();
+    return {
+      inizio: format(subMonths(oggi, 1), "yyyy-MM-dd"),
+      fine: format(oggi, "yyyy-MM-dd"),
+    };
+  }, []);
+  const [dataInizio, setDataInizio] = useState(lastMonthRange.inizio);
+  const [dataFine, setDataFine] = useState(lastMonthRange.fine);
+  const consegneParams: { centroAscoltoId?: number; stato?: string; dataInizio?: string; dataFine?: string } = {};
   if (centroFilter !== "all") consegneParams.centroAscoltoId = parseInt(centroFilter);
   if (statoFilter !== "all") consegneParams.stato = statoFilter;
-  if (dataFilter) consegneParams.data = dataFilter;
+  if (dataInizio) consegneParams.dataInizio = dataInizio;
+  if (dataFine) consegneParams.dataFine = dataFine;
   const { data: consegne, isLoading } = useListConsegne(
     Object.keys(consegneParams).length > 0 ? consegneParams : undefined
   );
@@ -272,13 +281,22 @@ export default function Consegne() {
             </Select>
             <Input
               type="date"
-              value={dataFilter}
-              onChange={(e) => setDataFilter(e.target.value)}
-              className="w-[170px]"
-              aria-label={t("consegne.filterByDate")}
+              value={dataInizio}
+              onChange={(e) => setDataInizio(e.target.value)}
+              className="w-[160px]"
+              aria-label={t("consegne.filterDateFrom")}
+              title={t("consegne.filterDateFrom")}
             />
-            {dataFilter && (
-              <Button variant="ghost" size="sm" onClick={() => setDataFilter("")}>
+            <Input
+              type="date"
+              value={dataFine}
+              onChange={(e) => setDataFine(e.target.value)}
+              className="w-[160px]"
+              aria-label={t("consegne.filterDateTo")}
+              title={t("consegne.filterDateTo")}
+            />
+            {(dataInizio || dataFine) && (
+              <Button variant="ghost" size="sm" onClick={() => { setDataInizio(""); setDataFine(""); }}>
                 {t("consegne.clearDate")}
               </Button>
             )}
