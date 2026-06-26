@@ -11,6 +11,8 @@ export interface Citta {
   nome: string;
   /** @nullable */
   provincia?: string | null;
+  /** @nullable */
+  sigla?: string | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;

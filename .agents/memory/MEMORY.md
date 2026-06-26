@@ -17,7 +17,7 @@
 - [FSE+ asterisk on documents](fse-plus-asterisk.md) — riga.fsePlus = lotto.fse_plus if lottoId else prodotto.fse_plus; marked with "*" on all 3 PDFs + bolla on-screen table; derive in BOTH detail and list route builders.
 - [shadcn FormLabel crashes outside FormField](shadcn-formlabel-crash.md) — FormLabel/FormControl/etc throw outside FormField+FormItem; no error boundary → whole app goes white. Use plain Label for non-field headings.
 - [Volontari centro scoping](volontari-centro-scoping.md) — volontario.centroAscoltoId null=universal; delivery pickers show null OR match the SELECTED BENEFICIARY's centro (not the UI centro filter).
-- [Utenti matricola autogen](utenti-matricola-autogen.md) — blank matricola on POST /utenti auto-generated as initial(nome)+initial(cognome)+ddyy uppercase (e.g. MR2426); server-side only, no collision handling.
+- [Utenti matricola autogen](utenti-matricola-autogen.md) — blank matricola → IN+IC+yy-SIGLA-random6 (città sigla or first-2-of-name, OO for global); collision → first digit becomes a letter; read-before-write, not DB-unique (low-concurrency); bonifica:matricole regenerates all.
 - [Full-GUI i18n](i18n-full-gui.md) — src/lib/i18n/ dir, single translation ns keyed per page; never call i18n.t() at module scope for schema messages (use makeXSchema(t)+useMemo); import i18n before App in main.tsx.
 - [Priority auto-downgrade job](priority-auto-downgrade.md) — daily job forces priorità='bassa' for beneficiari >2yr since registration; intentionally overrides manual priority bumps (known tradeoff).
 - [Beneficiario detail caps nested lists](beneficiario-detail-list-caps.md) — GET /beneficiari/:id truncates nested interventi/consegne (limit 20); use useListInterventi({beneficiarioId}) for full exports.

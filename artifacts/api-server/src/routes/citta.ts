@@ -20,6 +20,7 @@ function fmt(r: typeof cittaTable.$inferSelect) {
     id: r.id,
     nome: r.nome,
     provincia: r.provincia ?? null,
+    sigla: r.sigla ?? null,
     attivo: r.attivo,
     note: r.note ?? null,
     dataCreazione: r.dataCreazione.toISOString(),
@@ -57,6 +58,7 @@ router.get("/citta/:id", async (req, res) => {
 
 router.post("/citta", requireAdmin, async (req, res) => {
   const parsed = CreateCittaBody.parse(req.body);
+  if (parsed.sigla) parsed.sigla = parsed.sigla.toUpperCase();
   const [row] = await db.insert(cittaTable).values(parsed).returning();
   res.status(201).json(fmt(row));
 });
@@ -64,6 +66,7 @@ router.post("/citta", requireAdmin, async (req, res) => {
 router.patch("/citta/:id", requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
   const parsed = UpdateCittaBody.parse(req.body);
+  if (parsed.sigla) parsed.sigla = parsed.sigla.toUpperCase();
   const [row] = await db
     .update(cittaTable)
     .set(parsed)

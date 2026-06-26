@@ -3714,6 +3714,8 @@ components:
           type: string
         provincia:
           type: ["string", "null"]
+        sigla:
+          type: ["string", "null"]
         attivo:
           type: boolean
         note:
@@ -3730,6 +3732,9 @@ components:
           minLength: 1
         provincia:
           type: string
+        sigla:
+          type: string
+          maxLength: 2
         attivo:
           type: boolean
         note:
@@ -3744,6 +3749,9 @@ components:
           minLength: 1
         provincia:
           type: string
+        sigla:
+          type: string
+          maxLength: 2
         attivo:
           type: boolean
         note:

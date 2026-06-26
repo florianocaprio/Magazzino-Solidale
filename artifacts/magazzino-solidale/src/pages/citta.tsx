@@ -24,6 +24,7 @@ function makeSchema(t: (k: string) => string) {
   return z.object({
     nome: z.string().min(1, t("common.requiredField")),
     provincia: z.string().optional(),
+    sigla: z.string().max(2).optional(),
     attivo: z.boolean().default(true),
     note: z.string().optional(),
   });
@@ -57,20 +58,20 @@ export default function Citta() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { nome: "", provincia: "", attivo: true, note: "" },
+    defaultValues: { nome: "", provincia: "", sigla: "", attivo: true, note: "" },
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListCittaQueryKey() });
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", provincia: "", attivo: true, note: "" });
+    form.reset({ nome: "", provincia: "", sigla: "", attivo: true, note: "" });
     setIsFormOpen(true);
   };
 
   const handleEdit = (c: any) => {
     setEditingId(c.id);
-    form.reset({ nome: c.nome, provincia: c.provincia || "", attivo: c.attivo, note: c.note || "" });
+    form.reset({ nome: c.nome, provincia: c.provincia || "", sigla: c.sigla || "", attivo: c.attivo, note: c.note || "" });
     setIsFormOpen(true);
   };
 
@@ -215,6 +216,9 @@ export default function Citta() {
                 )} />
                 <FormField control={form.control} name="provincia" render={({ field }) => (
                   <FormItem><FormLabel>{t("citta.provincia")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="sigla" render={({ field }) => (
+                  <FormItem><FormLabel>{t("citta.sigla")}</FormLabel><FormControl><Input {...field} maxLength={2} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="note" render={({ field }) => (
                   <FormItem><FormLabel>{t("common.notes")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>

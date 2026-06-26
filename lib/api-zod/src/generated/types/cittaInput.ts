@@ -10,6 +10,8 @@ export interface CittaInput {
   /** @minLength 1 */
   nome: string;
   provincia?: string;
+  /** @maxLength 2 */
+  sigla?: string;
   attivo?: boolean;
   note?: string;
 }

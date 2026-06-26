@@ -6,6 +6,7 @@ export const cittaTable = pgTable("citta", {
   id: serial("id").primaryKey(),
   nome: varchar("nome", { length: 120 }).notNull(),
   provincia: varchar("provincia", { length: 80 }),
+  sigla: varchar("sigla", { length: 2 }),
   attivo: boolean("attivo").notNull().default(true),
   note: text("note"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),

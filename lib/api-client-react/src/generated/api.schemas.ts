@@ -932,6 +932,8 @@ export interface Citta {
   nome: string;
   /** @nullable */
   provincia?: string | null;
+  /** @nullable */
+  sigla?: string | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;
@@ -942,6 +944,8 @@ export interface CittaInput {
   /** @minLength 1 */
   nome: string;
   provincia?: string;
+  /** @maxLength 2 */
+  sigla?: string;
   attivo?: boolean;
   note?: string;
 }
@@ -950,6 +954,8 @@ export interface CittaUpdate {
   /** @minLength 1 */
   nome?: string;
   provincia?: string;
+  /** @maxLength 2 */
+  sigla?: string;
   attivo?: boolean;
   note?: string;
 }

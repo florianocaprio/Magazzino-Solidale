@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, utentiTable, ruoliTable, centriAscoltoTable } from "@workspace/db";
+import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable } from "@workspace/db";
 import {
   CreateUtenteBody,
   UpdateUtenteBody,
@@ -85,16 +85,64 @@ async function otherActiveAdminExists(excludeId: number): Promise<boolean> {
 }
 
 /**
- * Generates a matricola from the initials of nome + cognome followed by the
- * current day-of-month and 2-digit year (ddyy). Example: Mario Rossi on
- * 24 June 2026 → "MR2426".
+ * Operator matricola format: <InitialNome><InitialCognome><yy>-<SIGLA>-<NNNNNN>
+ * e.g. Mario Rossi inserted in 2026, città Milano (sigla MI) → "MR26-MI-482910".
+ * The città sigla is the città's `sigla` (or first 2 letters of its name as a
+ * fallback); "OO" for global users (no città). The 6-digit number is random; on
+ * a full-matricola collision the first digit becomes a letter (A, B, C, ...).
  */
-function generateMatricola(nome: string, cognome: string): string {
+function cittaSigla(sigla: string | null, nome: string | null): string {
+  const s = (sigla ?? "").trim().toUpperCase();
+  if (s.length >= 2) return s.slice(0, 2);
+  const fromName = (nome ?? "").replace(/[^A-Za-z]/g, "").toUpperCase();
+  return (fromName.slice(0, 2) || "XX").padEnd(2, "X");
+}
+
+function buildMatricola(
+  nome: string,
+  cognome: string,
+  yy: string,
+  sigla: string,
+  tail: string,
+): string {
   const initials = `${nome.trim().charAt(0)}${cognome.trim().charAt(0)}`.toUpperCase();
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const yy = String(now.getFullYear()).slice(-2);
-  return `${initials}${dd}${yy}`;
+  return `${initials}${yy}-${sigla}-${tail}`;
+}
+
+async function matricolaExists(m: string): Promise<boolean> {
+  const [hit] = await db
+    .select({ id: utentiTable.id })
+    .from(utentiTable)
+    .where(eq(utentiTable.matricola, m));
+  return !!hit;
+}
+
+async function generateMatricola(
+  nome: string,
+  cognome: string,
+  cittaId: number | null,
+): Promise<string> {
+  const yy = String(new Date().getFullYear()).slice(-2);
+  let sigla = "OO";
+  if (cittaId != null) {
+    const [c] = await db
+      .select({ sigla: cittaTable.sigla, nome: cittaTable.nome })
+      .from(cittaTable)
+      .where(eq(cittaTable.id, cittaId));
+    sigla = cittaSigla(c?.sigla ?? null, c?.nome ?? null);
+  }
+  for (let i = 0; i < 50; i++) {
+    const num = String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
+    let candidate = buildMatricola(nome, cognome, yy, sigla, num);
+    if (!(await matricolaExists(candidate))) return candidate;
+    // Collision: the first digit of the number becomes a letter (A, B, C, ...).
+    for (let a = 0; a < 26; a++) {
+      candidate = buildMatricola(nome, cognome, yy, sigla, String.fromCharCode(65 + a) + num.slice(1));
+      if (!(await matricolaExists(candidate))) return candidate;
+    }
+  }
+  // Extremely unlikely fallback.
+  return buildMatricola(nome, cognome, yy, sigla, String(Date.now()).slice(-6));
 }
 
 async function roleIsAdmin(ruoloId: number | null): Promise<boolean> {
@@ -150,7 +198,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
 
   const nomeTrim = nome.trim();
   const cognomeTrim = cognome.trim();
-  const finalMatricola = matricola?.trim() || generateMatricola(nomeTrim, cognomeTrim);
+  const finalMatricola = matricola?.trim() || (await generateMatricola(nomeTrim, cognomeTrim, finalCittaId));
 
   const passwordHash = await bcrypt.hash(password, 10);
   const [created] = await db

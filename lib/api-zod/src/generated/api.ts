@@ -2051,6 +2051,7 @@ export const ListCittaResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
+  "sigla": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -2059,11 +2060,14 @@ export const ListCittaResponse = zod.array(ListCittaResponseItem)
 
 
 
+export const createCittaBodySiglaMax = 2;
+
 
 
 export const CreateCittaBody = zod.object({
   "nome": zod.string().min(1),
   "provincia": zod.string().optional(),
+  "sigla": zod.string().max(createCittaBodySiglaMax).optional(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional()
 })
@@ -2077,6 +2081,7 @@ export const GetCittaResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
+  "sigla": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -2088,11 +2093,14 @@ export const UpdateCittaParams = zod.object({
 })
 
 
+export const updateCittaBodySiglaMax = 2;
+
 
 
 export const UpdateCittaBody = zod.object({
   "nome": zod.string().min(1).optional(),
   "provincia": zod.string().optional(),
+  "sigla": zod.string().max(updateCittaBodySiglaMax).optional(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional()
 })
@@ -2101,6 +2109,7 @@ export const UpdateCittaResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
+  "sigla": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
