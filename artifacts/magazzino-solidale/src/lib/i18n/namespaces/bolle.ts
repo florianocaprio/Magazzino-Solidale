@@ -140,6 +140,7 @@ export const bolle = {
     bollaBtn: "Bolla",
     trasferimentoInterno: "Trasferimento Interno",
     dettaglioBolla: "Dettaglio Bolla",
+    tornaAlleBolle: "Torna alle bolle",
     genBollaError: "Impossibile generare la bolla.",
   },
   es: {
@@ -283,6 +284,7 @@ export const bolle = {
     bollaBtn: "Albarán",
     trasferimentoInterno: "Transferencia Interna",
     dettaglioBolla: "Detalle del Albarán",
+    tornaAlleBolle: "Volver a los albaranes",
     genBollaError: "No se pudo generar el albarán.",
   },
   en: {
@@ -426,6 +428,7 @@ export const bolle = {
     bollaBtn: "Note",
     trasferimentoInterno: "Internal Transfer",
     dettaglioBolla: "Delivery Note Detail",
+    tornaAlleBolle: "Back to delivery notes",
     genBollaError: "Unable to generate the note.",
   },
   fr: {
@@ -569,6 +572,7 @@ export const bolle = {
     bollaBtn: "Bon",
     trasferimentoInterno: "Transfert interne",
     dettaglioBolla: "Détail du bon de livraison",
+    tornaAlleBolle: "Retour aux bons",
     genBollaError: "Impossible de générer le bon.",
   },
   de: {
@@ -712,6 +716,7 @@ export const bolle = {
     bollaBtn: "Lieferschein",
     trasferimentoInterno: "Interner Transfer",
     dettaglioBolla: "Lieferschein-Detail",
+    tornaAlleBolle: "Zurück zu den Lieferscheinen",
     genBollaError: "Lieferschein konnte nicht erstellt werden.",
   },
   ar: {
@@ -855,6 +860,7 @@ export const bolle = {
     bollaBtn: "إشعار",
     trasferimentoInterno: "تحويل داخلي",
     dettaglioBolla: "تفاصيل الإشعار",
+    tornaAlleBolle: "العودة إلى الإشعارات",
     genBollaError: "تعذر إنشاء الإشعار.",
   },
 } as const;

@@ -47,7 +47,7 @@ import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowRightLeft, ScanLine, CalendarClock } from "lucide-react";
+import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowLeft, ArrowRightLeft, ScanLine, CalendarClock } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { generateBollaPdf, loadAssociationLogo, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
@@ -604,7 +604,7 @@ function AggiungiProdottoDialog({
 
 // ─── Dettaglio bolla ─────────────────────────────────────────────────────────
 
-export function BollaDettaglio({ bollaId }: { bollaId: number }) {
+export function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose?: () => void }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
@@ -1012,6 +1012,15 @@ export function BollaDettaglio({ bollaId }: { bollaId: number }) {
         <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
           {t("bolle.bollaAnnullataInfo")}
         </div>
+      )}
+
+      {onClose && (
+        <>
+          <Separator />
+          <Button variant="outline" className="w-full gap-2" onClick={onClose}>
+            <ArrowLeft className="h-4 w-4" /> {t("bolle.tornaAlleBolle")}
+          </Button>
+        </>
       )}
 
       {addOpen && bolla.magazzinoId && (
@@ -1465,7 +1474,7 @@ export default function Bolle() {
             <SheetTitle>{t("bolle.dettaglioBolla")}</SheetTitle>
           </SheetHeader>
           {selectedBollaId !== null && (
-            <BollaDettaglio bollaId={selectedBollaId} />
+            <BollaDettaglio bollaId={selectedBollaId} onClose={() => setSelectedBollaId(null)} />
           )}
         </SheetContent>
       </Sheet>
