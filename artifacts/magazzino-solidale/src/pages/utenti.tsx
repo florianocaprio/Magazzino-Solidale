@@ -395,7 +395,7 @@ export default function Utenti() {
       </Card>
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <SheetContent>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
               {editing ? t("utenti.editUser") : t("utenti.nuovoUtente")}
