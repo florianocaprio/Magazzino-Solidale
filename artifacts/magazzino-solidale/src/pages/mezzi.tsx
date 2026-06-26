@@ -34,7 +34,7 @@ export default function Mezzi() {
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
   const formSchema = z.object({
-    codice: z.string().min(2, t("mezzi.valCodice")),
+    codice: z.string().optional(),
     tipo: z.string().min(1, t("mezzi.valTipo")),
     targa: z.string().optional(),
     proprieta: z.string().default("associazione"),
@@ -200,7 +200,7 @@ export default function Mezzi() {
         entityLabel={t("mezzi.title")}
         templateFilename="modello_mezzi"
         columns={[
-          { key: "codice", header: t("common.code"), example: "FUR-01" },
+          { key: "codice", header: t("common.code"), example: "" },
           { key: "tipo", header: t("common.type"), example: "furgone" },
           { key: "targa", header: t("mezzi.targa"), example: "AB123CD" },
           { key: "proprieta", header: t("mezzi.proprieta"), example: "associazione" },
@@ -214,7 +214,6 @@ export default function Mezzi() {
           { key: "note", header: t("common.notes"), example: "" },
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
-          if (!r.codice) return { error: t("bulkImport.requiredMissing", { field: t("common.code") }) };
           if (!r.tipo) return { error: t("bulkImport.requiredMissing", { field: t("common.type") }) };
           if (!r.proprieta) return { error: t("bulkImport.requiredMissing", { field: t("mezzi.proprieta") }) };
           let volontarioId: number | null = null;
@@ -243,7 +242,7 @@ export default function Mezzi() {
           }
           return {
             data: {
-              codice: r.codice,
+              codice: r.codice || undefined,
               tipo: r.tipo,
               targa: r.targa || undefined,
               proprieta: r.proprieta,
@@ -388,7 +387,7 @@ export default function Mezzi() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="codice" render={({ field }) => (
-                    <FormItem><FormLabel>{t("common.code")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("common.code")}</FormLabel><FormControl><Input placeholder={t("mezzi.codicePlaceholder")} {...field} /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="targa" render={({ field }) => (
                     <FormItem><FormLabel>{t("mezzi.targa")}</FormLabel><FormControl><Input className="uppercase" {...field} /></FormControl></FormItem>

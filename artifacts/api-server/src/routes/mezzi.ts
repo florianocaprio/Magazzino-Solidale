@@ -14,6 +14,28 @@ import {
 
 const router: IRouter = Router();
 
+/** True when an error is a Postgres unique-constraint violation (SQLSTATE 23505).
+ * Drizzle wraps driver errors, so the pg error may be nested under `.cause`. */
+function isUniqueViolation(e: unknown): boolean {
+  let cur: unknown = e;
+  for (let depth = 0; cur != null && depth < 5; depth++) {
+    if (typeof cur === "object" && (cur as { code?: string }).code === "23505") return true;
+    cur = typeof cur === "object" ? (cur as { cause?: unknown }).cause : undefined;
+  }
+  return false;
+}
+
+/** Computes the next sequential MEZ-NNN codice from the current max in the table. */
+async function nextMezCodice(): Promise<string> {
+  const rows = await db.select({ codice: mezziTable.codice }).from(mezziTable);
+  let max = 0;
+  for (const r of rows) {
+    const m = /^MEZ-(\d+)$/.exec(r.codice);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `MEZ-${String(max + 1).padStart(3, "0")}`;
+}
+
 type MezzoJoinRow = {
   m: typeof mezziTable.$inferSelect;
   volNome: string | null;
@@ -166,26 +188,55 @@ async function resolveCentro(
 async function createMezzoOne(
   body: Record<string, unknown>,
   req: Request,
-): Promise<{ id: number } | { error: string }> {
+): Promise<{ id: number } | { error: string; status?: number }> {
   const b = body as Record<string, any>;
   const caller = callerCentroId(req);
   const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
   const resolved = await resolveCentro(b, caller, cittaCentroIds);
-  if ("error" in resolved) return { error: resolved.error };
-  const [created] = await db
-    .insert(mezziTable)
-    .values({
-      ...(b as typeof mezziTable.$inferInsert),
-      centroAscoltoId: resolved.ownCentro,
-      capacitaKg: b.capacitaKg?.toString(),
-    })
-    .returning({ id: mezziTable.id });
-  return { id: created.id };
+  if ("error" in resolved) return { error: resolved.error, status: 403 };
+  const baseValues = {
+    ...(b as typeof mezziTable.$inferInsert),
+    centroAscoltoId: resolved.ownCentro,
+    capacitaKg: b.capacitaKg?.toString(),
+  };
+  const providedCodice = typeof b.codice === "string" ? b.codice.trim() : "";
+
+  // Caller-provided codice: a duplicate is a clear client error, not a 500.
+  if (providedCodice) {
+    try {
+      const [created] = await db
+        .insert(mezziTable)
+        .values({ ...baseValues, codice: providedCodice })
+        .returning({ id: mezziTable.id });
+      return { id: created.id };
+    } catch (e) {
+      if (isUniqueViolation(e)) return { error: `Codice "${providedCodice}" già in uso`, status: 409 };
+      throw e;
+    }
+  }
+
+  // Empty codice: auto-generate MEZ-NNN, retrying on collision under concurrency.
+  const MAX_ATTEMPTS = 5;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const codice = await nextMezCodice();
+    try {
+      const [created] = await db
+        .insert(mezziTable)
+        .values({ ...baseValues, codice })
+        .returning({ id: mezziTable.id });
+      return { id: created.id };
+    } catch (e) {
+      if (isUniqueViolation(e) && attempt < MAX_ATTEMPTS - 1) continue;
+      if (isUniqueViolation(e)) return { error: "Impossibile generare un codice univoco per il mezzo, riprova", status: 409 };
+      throw e;
+    }
+  }
+  return { error: "Impossibile generare un codice univoco per il mezzo, riprova", status: 409 };
 }
 
 router.post("/mezzi", async (req, res) => {
   const r = await createMezzoOne(req.body, req);
-  if ("error" in r) { res.status(403).json({ error: r.error }); return; }
+  if ("error" in r) { res.status(r.status ?? 403).json({ error: r.error }); return; }
   res.status(201).json(await loadMezzo(r.id));
 });
 

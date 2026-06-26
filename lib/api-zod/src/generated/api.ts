@@ -2550,7 +2550,7 @@ export const ListMezziResponse = zod.array(ListMezziResponseItem)
 
 
 export const CreateMezzoBody = zod.object({
-  "codice": zod.string(),
+  "codice": zod.string().optional(),
   "tipo": zod.string(),
   "targa": zod.string().optional(),
   "proprieta": zod.string(),
@@ -2567,7 +2567,7 @@ export const CreateMezzoBody = zod.object({
 
 export const BulkMezziBody = zod.object({
   "righe": zod.array(zod.object({
-  "codice": zod.string(),
+  "codice": zod.string().optional(),
   "tipo": zod.string(),
   "targa": zod.string().optional(),
   "proprieta": zod.string(),

@@ -34,6 +34,7 @@ export const mezzi = {
     toastCreated: "Mezzo creato",
     toastDeleted: "Mezzo eliminato",
     valCodice: "Codice obbligatorio",
+    codicePlaceholder: "Lascia vuoto per generarlo (es. MEZ-001)",
     valTipo: "Tipo obbligatorio",
   },
   es: {
@@ -71,6 +72,7 @@ export const mezzi = {
     toastCreated: "Vehículo creado",
     toastDeleted: "Vehículo eliminado",
     valCodice: "Código obligatorio",
+    codicePlaceholder: "Dejar vacío para generarlo (ej. MEZ-001)",
     valTipo: "Tipo obligatorio",
   },
   en: {
@@ -108,6 +110,7 @@ export const mezzi = {
     toastCreated: "Vehicle created",
     toastDeleted: "Vehicle deleted",
     valCodice: "Code required",
+    codicePlaceholder: "Leave empty to auto-generate (e.g. MEZ-001)",
     valTipo: "Type required",
   },
   fr: {
@@ -145,6 +148,7 @@ export const mezzi = {
     toastCreated: "Véhicule créé",
     toastDeleted: "Véhicule supprimé",
     valCodice: "Code obligatoire",
+    codicePlaceholder: "Laisser vide pour générer (ex. MEZ-001)",
     valTipo: "Type obligatoire",
   },
   de: {
@@ -182,6 +186,7 @@ export const mezzi = {
     toastCreated: "Fahrzeug erstellt",
     toastDeleted: "Fahrzeug gelöscht",
     valCodice: "Code erforderlich",
+    codicePlaceholder: "Leer lassen zum Generieren (z. B. MEZ-001)",
     valTipo: "Typ erforderlich",
   },
   ar: {
@@ -219,6 +224,7 @@ export const mezzi = {
     toastCreated: "تم إنشاء المركبة",
     toastDeleted: "تم حذف المركبة",
     valCodice: "الرمز مطلوب",
+    codicePlaceholder: "اتركه فارغًا للتوليد التلقائي (مثل MEZ-001)",
     valTipo: "النوع مطلوب",
   },
 } as const;

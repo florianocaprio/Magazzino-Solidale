@@ -7,7 +7,7 @@
  */
 
 export interface MezzoInput {
-  codice: string;
+  codice?: string;
   tipo: string;
   targa?: string;
   proprieta: string;

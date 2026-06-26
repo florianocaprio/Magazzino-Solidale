@@ -4654,7 +4654,7 @@ components:
           type: string
         note:
           type: string
-      required: [codice, tipo, proprieta]
+      required: [tipo, proprieta]
 
     MezzoUpdate:
       type: object
