@@ -604,7 +604,7 @@ function AggiungiProdottoDialog({
 
 // ─── Dettaglio bolla ─────────────────────────────────────────────────────────
 
-export function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose?: () => void }) {
+export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaActions }: { bollaId: number; onClose?: () => void; onCloseLabel?: string; hideConsegnaActions?: boolean }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
@@ -965,7 +965,7 @@ export function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose?
                 {confermaBolla.isPending ? t("bolle.confermaInCorso") : t("bolle.confermaBolla")}
               </Button>
             )}
-            {isConfermato && (
+            {isConfermato && !hideConsegnaActions && (
               <>
                 <Button
                   className="w-full gap-2 bg-green-600 hover:bg-green-700"
@@ -1018,7 +1018,7 @@ export function BollaDettaglio({ bollaId, onClose }: { bollaId: number; onClose?
         <>
           <Separator />
           <Button variant="outline" className="w-full gap-2" onClick={onClose}>
-            <ArrowLeft className="h-4 w-4" /> {t("bolle.tornaAlleBolle")}
+            <ArrowLeft className="h-4 w-4" /> {onCloseLabel ?? t("bolle.tornaAlleBolle")}
           </Button>
         </>
       )}

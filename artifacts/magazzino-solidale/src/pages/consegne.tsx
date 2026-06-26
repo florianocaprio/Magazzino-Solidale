@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -189,7 +189,6 @@ export default function Consegne() {
         queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
         toast({ title: t("consegne.toastConsegnaRegistrata"), description: t("consegne.toastConsegnaRegistrataDesc") });
         setCompletingId(null);
-        setViewingBollaId(null);
       },
       onError: (e: unknown) => {
         const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -203,9 +202,6 @@ export default function Consegne() {
     setViewingBollaId(null);
     queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
   };
-  const viewingConsegna = consegne?.find((c) => c.bollaId === viewingBollaId) ?? null;
-  const viewingBolla = (bolle ?? []).find((b) => b.id === viewingBollaId) ?? null;
-  const viewingBollaReady = viewingBolla?.stato === "confermato" || viewingBolla?.stato === "consegnato";
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -459,18 +455,13 @@ export default function Consegne() {
       <Sheet open={viewingBollaId !== null} onOpenChange={(open) => { if (!open) closeViewingBolla(); }}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader><SheetTitle>{t("consegne.bollaConsegnaTitle")}</SheetTitle></SheetHeader>
-          {viewingBollaId !== null && <BollaDettaglio bollaId={viewingBollaId} />}
-          {viewingConsegna != null && viewingConsegna.stato !== "effettuata" && (
-            <SheetFooter className="mt-6 flex-row justify-end gap-2">
-              <Button variant="outline" className="gap-1" onClick={closeViewingBolla}>
-                <CalendarClock className="h-3.5 w-3.5" /> {t("consegne.btnTornaPianificazione")}
-              </Button>
-              {viewingBollaReady && (
-                <Button className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(viewingConsegna.id)}>
-                  <CheckCircle2 className="h-3.5 w-3.5" /> {t("consegne.btnConsegnato")}
-                </Button>
-              )}
-            </SheetFooter>
+          {viewingBollaId !== null && (
+            <BollaDettaglio
+              bollaId={viewingBollaId}
+              hideConsegnaActions
+              onClose={closeViewingBolla}
+              onCloseLabel={t("consegne.btnTornaPianificazione")}
+            />
           )}
         </SheetContent>
       </Sheet>
