@@ -121,8 +121,9 @@ async function generateMatricola(
   nome: string,
   cognome: string,
   cittaId: number | null,
+  year?: number,
 ): Promise<string> {
-  const yy = String(new Date().getFullYear()).slice(-2);
+  const yy = String(year ?? new Date().getFullYear()).slice(-2);
   let sigla = "OO";
   if (cittaId != null) {
     const [c] = await db
@@ -306,6 +307,26 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   // admin may (re)assign the città.
   if (cittaCaller == null && body.cittaId !== undefined) {
     updates.cittaId = body.cittaId;
+  }
+
+  // If the user would be left without a matricola (legacy record, or the edit
+  // cleared it), auto-generate one per the matricola rules — using the user's
+  // ORIGINAL insertion year (yy) and the effective città after this update.
+  const resultingMatricola =
+    updates.matricola !== undefined ? updates.matricola : target.matricola;
+  if (!(resultingMatricola ?? "").trim()) {
+    const genNome = updates.nome !== undefined ? updates.nome : target.nome;
+    const genCognome =
+      (updates.cognome !== undefined ? updates.cognome : target.cognome) ?? "";
+    const genCittaId =
+      updates.cittaId !== undefined ? (updates.cittaId ?? null) : target.cittaId;
+    const genYear = new Date(target.dataCreazione).getFullYear();
+    updates.matricola = await generateMatricola(
+      genNome,
+      genCognome,
+      genCittaId,
+      genYear,
+    );
   }
 
   if (Object.keys(updates).length > 0) {

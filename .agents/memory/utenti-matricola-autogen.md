@@ -14,6 +14,8 @@ Users (`utenti`) capture `nome` and `cognome` separately (`cognome` is a nullabl
 
 Example: Mario Rossi inserted 2026, città Milano (sigla MI) → `MR26-MI-482910`.
 
+**Also on edit (`PATCH /utenti/:id`):** if after applying the update the matricola would be empty (legacy null-matricola record, or the edit cleared it), one is auto-generated. An explicitly-provided non-empty matricola is respected, and an already-present matricola is never overwritten. The PATCH path passes `generateMatricola` an explicit `year` = the user's ORIGINAL insertion year (`target.dataCreazione`), NOT the current year, and uses the effective post-update città for the SIGLA. `generateMatricola(nome, cognome, cittaId, year?)` defaults `year` to the current year (so POST is unchanged).
+
 **Why:** the previous format (`MR2426`, day+year, no uniqueness) wasn't unique and carried no città context. The città sigla + random number make codes city-scoped and collision-safe.
 
 **How to apply:** generation is server-side only and async (it queries `cittaTable` for the sigla and checks `matricolaExists` for uniqueness). nome/cognome are trimmed before generating initials. The seed admin has only `nome` (cognome null → single initial, fine).
