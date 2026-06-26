@@ -413,9 +413,13 @@ export default function Consegne() {
                         </Button>
                       ) : (
                         <div className="flex items-center justify-end gap-2">
-                          {c.bollaId == null && (
+                          {c.bollaId == null ? (
                             <Button size="sm" variant="outline" className="gap-1" onClick={() => setCreatingBollaFor(c)}>
                               <Plus className="h-3.5 w-3.5" /> {t("consegne.btnCreaBolla")}
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" className="gap-1" onClick={() => setViewingBollaId(c.bollaId!)}>
+                              <FileText className="h-3.5 w-3.5" /> {t("consegne.btnCompilaBolla")}
                             </Button>
                           )}
                           <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}>
@@ -437,10 +441,13 @@ export default function Consegne() {
         onClose={() => setCreatingBollaFor(null)}
         consegnaId={creatingBollaFor?.id}
         lockedBeneficiario={creatingBollaFor ? { id: creatingBollaFor.beneficiarioId, nome: creatingBollaFor.beneficiarioNome ?? "" } : null}
-        onCreated={() => queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() })}
+        onCreated={(bollaId) => {
+          queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
+          if (bollaId != null) setViewingBollaId(bollaId);
+        }}
       />
 
-      <Sheet open={viewingBollaId !== null} onOpenChange={(open) => { if (!open) setViewingBollaId(null); }}>
+      <Sheet open={viewingBollaId !== null} onOpenChange={(open) => { if (!open) { setViewingBollaId(null); queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() }); } }}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader><SheetTitle>{t("consegne.bollaConsegnaTitle")}</SheetTitle></SheetHeader>
           {viewingBollaId !== null && <BollaDettaglio bollaId={viewingBollaId} />}

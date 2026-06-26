@@ -70,7 +70,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   onClose: () => void;
   consegnaId?: number;
   lockedBeneficiario?: { id: number; nome: string } | null;
-  onCreated?: () => void;
+  onCreated?: (bollaId?: number) => void;
 }) {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
@@ -143,7 +143,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
     createBolla.mutate(
       { data },
       {
-        onSuccess: () => {
+        onSuccess: (created) => {
           queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
           toast({ title: t("bolle.bollaCreata") });
           setBeneficiarioId("");
@@ -151,7 +151,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
           setCentroId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all");
           setTrasportatore("");
           setTrasportatoreNome("");
-          onCreated?.();
+          onCreated?.((created as { id?: number } | undefined)?.id);
           onClose();
         },
         onError: () => toast({ title: t("bolle.error"), description: t("bolle.createError"), variant: "destructive" }),
