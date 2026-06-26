@@ -2484,6 +2484,7 @@ export const ListCentriAscoltoResponse = zod.array(ListCentriAscoltoResponseItem
 
 export const CreateCentroAscoltoBody = zod.object({
   "nome": zod.string(),
+  "cittaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
@@ -2522,6 +2523,7 @@ export const UpdateCentroAscoltoParams = zod.object({
 
 export const UpdateCentroAscoltoBody = zod.object({
   "nome": zod.string().optional(),
+  "cittaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),

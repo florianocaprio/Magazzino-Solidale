@@ -4366,6 +4366,8 @@ components:
       properties:
         nome:
           type: string
+        cittaId:
+          type: ["integer", "null"]
         logoUrl:
           type: ["string", "null"]
         indirizzo:
@@ -4389,6 +4391,8 @@ components:
       properties:
         nome:
           type: string
+        cittaId:
+          type: ["integer", "null"]
         logoUrl:
           type: ["string", "null"]
         indirizzo:

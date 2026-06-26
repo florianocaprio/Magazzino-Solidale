@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useListCentriAscolto, useCreateCentroAscolto, useUpdateCentroAscolto, useDeleteCentroAscolto, getListCentriAscoltoQueryKey } from "@workspace/api-client-react";
+import { useListCentriAscolto, useCreateCentroAscolto, useUpdateCentroAscolto, useDeleteCentroAscolto, useListCitta, getListCentriAscoltoQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -20,8 +22,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useTranslation } from "react-i18next";
 
+const NO_CITTA = "__none__";
+
 const formSchema = z.object({
   nome: z.string().min(2, "Nome obbligatorio"),
+  cittaId: z.string().optional(),
   logoUrl: z.string().optional(),
   indirizzo: z.string().optional(),
   comune: z.string().optional(),
@@ -43,7 +48,11 @@ function fileToDataUrl(file: File): Promise<string> {
 
 export default function CentriAscolto() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const isCittaGlobal = user?.cittaId == null;
   const { data: centri, isLoading } = useListCentriAscolto();
+  const { data: cittaList } = useListCitta();
+  const cittaMap = new Map((cittaList ?? []).map((c) => [c.id, c.nome]));
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -58,13 +67,13 @@ export default function CentriAscolto() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: "", logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: ""
+      nome: "", cittaId: NO_CITTA, logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: ""
     }
   });
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: "" });
+    form.reset({ nome: "", cittaId: NO_CITTA, logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: "" });
     setIsFormOpen(true);
   };
 
@@ -72,6 +81,7 @@ export default function CentriAscolto() {
     setEditingId(c.id);
     form.reset({
       nome: c.nome,
+      cittaId: c.cittaId != null ? String(c.cittaId) : NO_CITTA,
       logoUrl: c.logoUrl || "",
       indirizzo: c.indirizzo || "",
       comune: c.comune || "",
@@ -84,7 +94,12 @@ export default function CentriAscolto() {
     setIsFormOpen(true);
   };
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = (formData: z.infer<typeof formSchema>) => {
+    const { cittaId: cittaIdRaw, ...rest } = formData;
+    const data = {
+      ...rest,
+      cittaId: cittaIdRaw && cittaIdRaw !== NO_CITTA ? parseInt(cittaIdRaw, 10) : null,
+    };
     if (editingId) {
       updateCentro.mutate({ id: editingId, data }, {
         onSuccess: () => {
@@ -149,6 +164,7 @@ export default function CentriAscolto() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("centriAscolto.cittaCol")}</TableHead>
                 <TableHead>{t("centriAscolto.comune")}</TableHead>
                 <TableHead>{t("centriAscolto.responsabile")}</TableHead>
                 <TableHead>{t("centriAscolto.contatti")}</TableHead>
@@ -164,6 +180,7 @@ export default function CentriAscolto() {
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16 mx-auto rounded-full" /></TableCell>
@@ -172,7 +189,7 @@ export default function CentriAscolto() {
                 ))
               ) : centri?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     {t("centriAscolto.noCentri")}
                   </TableCell>
                 </TableRow>
@@ -184,6 +201,7 @@ export default function CentriAscolto() {
                     </div>
                     {c.indirizzo && <div className="text-xs text-muted-foreground ml-6">{c.indirizzo}</div>}
                   </TableCell>
+                  <TableCell className="text-sm">{c.cittaId != null ? (cittaMap.get(c.cittaId) ?? '-') : '-'}</TableCell>
                   <TableCell className="text-sm">{c.comune || '-'}</TableCell>
                   <TableCell className="text-sm">{c.responsabile || '-'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -237,6 +255,25 @@ export default function CentriAscolto() {
                 <FormField control={form.control} name="nome" render={({ field }) => (
                   <FormItem><FormLabel>{t("common.name")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+                {isCittaGlobal && (
+                  <FormField control={form.control} name="cittaId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("centriAscolto.cittaLabel")}</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NO_CITTA}>{t("centriAscolto.nessunaCitta")}</SelectItem>
+                          {(cittaList ?? []).map((c) => (
+                            <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
                 <FormField control={form.control} name="logoUrl" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("centriAscolto.logoLabel")}</FormLabel>

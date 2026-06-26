@@ -1165,6 +1165,8 @@ export interface CentroAscolto {
 export interface CentroAscoltoInput {
   nome: string;
   /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
   logoUrl?: string | null;
   indirizzo?: string;
   comune?: string;
@@ -1177,6 +1179,8 @@ export interface CentroAscoltoInput {
 
 export interface CentroAscoltoUpdate {
   nome?: string;
+  /** @nullable */
+  cittaId?: number | null;
   /** @nullable */
   logoUrl?: string | null;
   indirizzo?: string;
