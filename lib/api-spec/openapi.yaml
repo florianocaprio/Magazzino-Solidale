@@ -1591,6 +1591,72 @@ paths:
         "204":
           description: Deleted
 
+  /tipi-intervento:
+    get:
+      operationId: listTipiIntervento
+      tags: [tipiIntervento]
+      responses:
+        "200":
+          description: List of intervention types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TipoIntervento"
+    post:
+      operationId: createTipoIntervento
+      tags: [tipiIntervento]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TipoInterventoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TipoIntervento"
+
+  /tipi-intervento/{id}:
+    patch:
+      operationId: updateTipoIntervento
+      tags: [tipiIntervento]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TipoInterventoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TipoIntervento"
+    delete:
+      operationId: deleteTipoIntervento
+      tags: [tipiIntervento]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /citta:
     get:
       operationId: listCitta
@@ -4026,6 +4092,38 @@ components:
       required: [nome]
 
     RuoloVolontarioUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        attivo:
+          type: boolean
+
+    TipoIntervento:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        attivo:
+          type: boolean
+        dataCreazione:
+          type: string
+      required: [id, nome, attivo, dataCreazione]
+
+    TipoInterventoInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        attivo:
+          type: boolean
+      required: [nome]
+
+    TipoInterventoUpdate:
       type: object
       properties:
         nome:

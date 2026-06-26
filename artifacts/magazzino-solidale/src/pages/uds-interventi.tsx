@@ -6,6 +6,7 @@ import {
   useUpdateIntervento,
   useListCitta,
   useListZoneUds,
+  useListTipiIntervento,
   getListInterventiQueryKey,
   getListCittaQueryKey,
   type Beneficiario,
@@ -46,24 +47,6 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 
 const ALL_ZONE = "__all__";
-const TIPI = ["ascolto", "distribuzione", "orientamento", "salute", "altro"] as const;
-
-function tipoKeyToI18n(tipo: string): string {
-  switch (tipo) {
-    case "ascolto":
-      return "udsInterventi.tipoAscolto";
-    case "distribuzione":
-      return "udsInterventi.tipoDistribuzione";
-    case "orientamento":
-      return "udsInterventi.tipoOrientamento";
-    case "salute":
-      return "udsInterventi.tipoSalute";
-    case "altro":
-      return "udsInterventi.tipoAltro";
-    default:
-      return "";
-  }
-}
 
 function makeSchema(t: (k: string) => string) {
   return z.object({
@@ -141,6 +124,7 @@ export default function UdsInterventi() {
 
   const createIntervento = useCreateIntervento();
   const updateIntervento = useUpdateIntervento();
+  const { data: tipiIntervento } = useListTipiIntervento();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -154,16 +138,19 @@ export default function UdsInterventi() {
 
   const selectedBenef = persone?.find((p) => p.id === personId);
 
-  const tipoLabel = (tipo: string) => {
-    const key = tipoKeyToI18n(tipo);
-    return key ? t(key) : tipo;
-  };
+  // Built-in type keys are translated; admin-added custom names display as typed.
+  const tipoLabel = (tipo: string) => t(`tipiIntervento.opt.${tipo}`, { defaultValue: tipo.replace(/_/g, " ") });
+
+  const defaultTipo =
+    tipiIntervento?.find((tp) => tp.attivo && tp.nome === "ascolto")?.nome ??
+    tipiIntervento?.find((tp) => tp.attivo)?.nome ??
+    "ascolto";
 
   const handleCreate = () => {
     setEditingId(null);
     form.reset({
       dataIntervento: new Date().toISOString().slice(0, 10),
-      tipoIntervento: "ascolto",
+      tipoIntervento: defaultTipo,
       descrizione: "",
       note: "",
     });
@@ -444,8 +431,8 @@ export default function UdsInterventi() {
                           <SelectTrigger><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {TIPI.map((tp) => (
-                            <SelectItem key={tp} value={tp}>{t(tipoKeyToI18n(tp))}</SelectItem>
+                          {tipiIntervento?.filter((tp) => tp.attivo || (editingId != null && tp.nome === field.value)).map((tp) => (
+                            <SelectItem key={tp.id} value={tp.nome}>{tipoLabel(tp.nome)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

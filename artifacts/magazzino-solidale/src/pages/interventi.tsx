@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListInterventi, useCreateIntervento, useUpdateIntervento, useListBeneficiari, useListCentriAscolto, getListInterventiQueryKey, type Intervento } from "@workspace/api-client-react";
+import { useListInterventi, useCreateIntervento, useUpdateIntervento, useListBeneficiari, useListCentriAscolto, useListTipiIntervento, getListInterventiQueryKey, type Intervento } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -55,6 +55,15 @@ export default function Interventi() {
   });
   const { data: beneficiari } = useListBeneficiari();
   const { data: centri } = useListCentriAscolto();
+  const { data: tipiIntervento } = useListTipiIntervento();
+
+  // Built-in type keys are translated; admin-added custom names display as typed.
+  const tipoLabel = (nome: string) => t(`tipiIntervento.opt.${nome}`, { defaultValue: nome.replace(/_/g, " ") });
+
+  const defaultTipo =
+    tipiIntervento?.find((tp) => tp.attivo && tp.nome === "colloquio")?.nome ??
+    tipiIntervento?.find((tp) => tp.attivo)?.nome ??
+    "colloquio";
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -155,7 +164,7 @@ export default function Interventi() {
             title={t("interventi.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("interventi.registerIntervention")}</Button>
+          <Button onClick={() => { form.setValue("tipoIntervento", defaultTipo); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("interventi.registerIntervention")}</Button>
         </div>
       </div>
 
@@ -169,10 +178,9 @@ export default function Interventi() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("interventi.filterAllTypes")}</SelectItem>
-                <SelectItem value="colloquio">{t("interventi.colloqui")}</SelectItem>
-                <SelectItem value="pacco_alimentare">{t("interventi.paccoAlimentare")}</SelectItem>
-                <SelectItem value="vestiario">{t("interventi.vestiario")}</SelectItem>
-                <SelectItem value="orientamento">{t("interventi.orientamento")}</SelectItem>
+                {tipiIntervento?.filter((tp) => tp.attivo).map((tp) => (
+                  <SelectItem key={tp.id} value={tp.nome}>{tipoLabel(tp.nome)}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
@@ -297,14 +305,12 @@ export default function Interventi() {
                   <FormField control={form.control} name="tipoIntervento" render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("common.type")}</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value="colloquio">{t("interventi.colloquio")}</SelectItem>
-                          <SelectItem value="pacco_alimentare">{t("interventi.paccoAlimentare")}</SelectItem>
-                          <SelectItem value="vestiario">{t("interventi.vestiario")}</SelectItem>
-                          <SelectItem value="orientamento">{t("interventi.orientamento")}</SelectItem>
-                          <SelectItem value="altro">{t("interventi.optAltro")}</SelectItem>
+                          {tipiIntervento?.filter((tp) => tp.attivo).map((tp) => (
+                            <SelectItem key={tp.id} value={tp.nome}>{tipoLabel(tp.nome)}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </FormItem>

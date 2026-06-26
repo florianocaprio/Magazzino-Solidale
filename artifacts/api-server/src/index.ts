@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdmin } from "./lib/seedAdmin";
 import { seedRuoliVolontari } from "./lib/seedRuoliVolontari";
+import { seedTipiIntervento } from "./lib/seedTipiIntervento";
 import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
 import { initDbExtensions } from "./lib/dbInit";
 
@@ -37,6 +38,10 @@ app.listen(port, (err) => {
 
   seedRuoliVolontari().catch((err) => {
     logger.error({ err }, "Failed to seed volunteer roles");
+  });
+
+  seedTipiIntervento().catch((err) => {
+    logger.error({ err }, "Failed to seed intervention types");
   });
 
   schedulePriorityDowngrade();

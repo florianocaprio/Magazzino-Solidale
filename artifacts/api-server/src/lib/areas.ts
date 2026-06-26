@@ -40,6 +40,10 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   // mapped to "amministrazione" would auto-deny every non-admin in areaGuard, so it
   // must NOT be listed here. Mutations are admin-gated with requireAdmin in the route.
   "ruoli-volontari": "logistica",
+  // Read by sociale + uds staff to populate the interventi type selects; mutations
+  // are admin-gated with requireAdmin in the route. Must NOT be "amministrazione"
+  // (that would auto-deny every non-admin in areaGuard).
+  "tipi-intervento": ["sociale", "uds"],
   mezzi: "logistica",
   fornitori: "logistica",
   approvvigionamenti: "logistica",

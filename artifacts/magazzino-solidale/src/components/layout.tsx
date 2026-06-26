@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   UserCog,
   Contact,
+  ListChecks,
   Languages,
   ChevronDown,
   LogOut
@@ -96,6 +97,7 @@ const NAV_ITEMS = [
   { key: "utenti", url: "/utenti", icon: UserCog, groupKey: "amministrazione", area: "amministrazione" },
   { key: "ruoli", url: "/ruoli", icon: ShieldCheck, groupKey: "amministrazione", area: "amministrazione" },
   { key: "ruoliVolontari", url: "/ruoli-volontari", icon: Contact, groupKey: "amministrazione", area: "amministrazione" },
+  { key: "tipiIntervento", url: "/tipi-intervento", icon: ListChecks, groupKey: "amministrazione", area: "amministrazione" },
   { key: "impostazioniStampa", url: "/impostazioni-stampa", icon: Printer, groupKey: "amministrazione", area: "amministrazione" },
 ];
 

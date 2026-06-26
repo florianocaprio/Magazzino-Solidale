@@ -1039,6 +1039,25 @@ export interface RuoloVolontarioUpdate {
   attivo?: boolean;
 }
 
+export interface TipoIntervento {
+  id: number;
+  nome: string;
+  attivo: boolean;
+  dataCreazione: string;
+}
+
+export interface TipoInterventoInput {
+  /** @minLength 1 */
+  nome: string;
+  attivo?: boolean;
+}
+
+export interface TipoInterventoUpdate {
+  /** @minLength 1 */
+  nome?: string;
+  attivo?: boolean;
+}
+
 export interface Citta {
   id: number;
   nome: string;

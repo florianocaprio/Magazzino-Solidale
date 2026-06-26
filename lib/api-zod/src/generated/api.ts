@@ -2232,6 +2232,49 @@ export const DeleteRuoloVolontarioParams = zod.object({
 })
 
 
+export const ListTipiInterventoResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+export const ListTipiInterventoResponse = zod.array(ListTipiInterventoResponseItem)
+
+
+
+
+
+export const CreateTipoInterventoBody = zod.object({
+  "nome": zod.string().min(1),
+  "attivo": zod.boolean().optional()
+})
+
+
+export const UpdateTipoInterventoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateTipoInterventoBody = zod.object({
+  "nome": zod.string().min(1).optional(),
+  "attivo": zod.boolean().optional()
+})
+
+export const UpdateTipoInterventoResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+
+
+export const DeleteTipoInterventoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const ListCittaResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),

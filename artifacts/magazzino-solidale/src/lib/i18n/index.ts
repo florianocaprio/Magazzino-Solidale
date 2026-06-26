@@ -23,6 +23,7 @@ import { consegne } from "./namespaces/consegne";
 import { bolle } from "./namespaces/bolle";
 import { volontari } from "./namespaces/volontari";
 import { ruoliVolontari } from "./namespaces/ruoliVolontari";
+import { tipiIntervento } from "./namespaces/tipiIntervento";
 import { mezzi } from "./namespaces/mezzi";
 import { fornitori } from "./namespaces/fornitori";
 import { approvvigionamenti } from "./namespaces/approvvigionamenti";
@@ -66,6 +67,7 @@ const PAGE_NAMESPACES = {
   bolle,
   volontari,
   ruoliVolontari,
+  tipiIntervento,
   mezzi,
   fornitori,
   approvvigionamenti,

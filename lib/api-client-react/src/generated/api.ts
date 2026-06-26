@@ -121,6 +121,9 @@ import type {
   RuoloVolontarioUpdate,
   Scarico,
   ScaricoInput,
+  TipoIntervento,
+  TipoInterventoInput,
+  TipoInterventoUpdate,
   Trasferimento,
   TrasferimentoInput,
   TrasferimentoUpdate,
@@ -5573,6 +5576,272 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteRuoloVolontarioMutationOptions(options));
+    }
+
+export const getListTipiInterventoUrl = () => {
+
+
+
+
+  return `/api/tipi-intervento`
+}
+
+export const listTipiIntervento = async ( options?: RequestInit): Promise<TipoIntervento[]> => {
+
+  return customFetch<TipoIntervento[]>(getListTipiInterventoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTipiInterventoQueryKey = () => {
+    return [
+    `/api/tipi-intervento`
+    ] as const;
+    }
+
+
+export const getListTipiInterventoQueryOptions = <TData = Awaited<ReturnType<typeof listTipiIntervento>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTipiIntervento>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTipiInterventoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTipiIntervento>>> = ({ signal }) => listTipiIntervento({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTipiIntervento>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTipiInterventoQueryResult = NonNullable<Awaited<ReturnType<typeof listTipiIntervento>>>
+export type ListTipiInterventoQueryError = ErrorType<unknown>
+
+
+
+export function useListTipiIntervento<TData = Awaited<ReturnType<typeof listTipiIntervento>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTipiIntervento>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTipiInterventoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateTipoInterventoUrl = () => {
+
+
+
+
+  return `/api/tipi-intervento`
+}
+
+export const createTipoIntervento = async (tipoInterventoInput: TipoInterventoInput, options?: RequestInit): Promise<TipoIntervento> => {
+
+  return customFetch<TipoIntervento>(getCreateTipoInterventoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tipoInterventoInput,)
+  }
+);}
+
+
+
+
+export const getCreateTipoInterventoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTipoIntervento>>, TError,{data: BodyType<TipoInterventoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTipoIntervento>>, TError,{data: BodyType<TipoInterventoInput>}, TContext> => {
+
+const mutationKey = ['createTipoIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTipoIntervento>>, {data: BodyType<TipoInterventoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTipoIntervento(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTipoInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof createTipoIntervento>>>
+    export type CreateTipoInterventoMutationBody = BodyType<TipoInterventoInput>
+    export type CreateTipoInterventoMutationError = ErrorType<unknown>
+
+    export const useCreateTipoIntervento = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTipoIntervento>>, TError,{data: BodyType<TipoInterventoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTipoIntervento>>,
+        TError,
+        {data: BodyType<TipoInterventoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTipoInterventoMutationOptions(options));
+    }
+
+export const getUpdateTipoInterventoUrl = (id: number,) => {
+
+
+
+
+  return `/api/tipi-intervento/${id}`
+}
+
+export const updateTipoIntervento = async (id: number,
+    tipoInterventoUpdate: TipoInterventoUpdate, options?: RequestInit): Promise<TipoIntervento> => {
+
+  return customFetch<TipoIntervento>(getUpdateTipoInterventoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tipoInterventoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateTipoInterventoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTipoIntervento>>, TError,{id: number;data: BodyType<TipoInterventoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTipoIntervento>>, TError,{id: number;data: BodyType<TipoInterventoUpdate>}, TContext> => {
+
+const mutationKey = ['updateTipoIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTipoIntervento>>, {id: number;data: BodyType<TipoInterventoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTipoIntervento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTipoInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof updateTipoIntervento>>>
+    export type UpdateTipoInterventoMutationBody = BodyType<TipoInterventoUpdate>
+    export type UpdateTipoInterventoMutationError = ErrorType<unknown>
+
+    export const useUpdateTipoIntervento = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTipoIntervento>>, TError,{id: number;data: BodyType<TipoInterventoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTipoIntervento>>,
+        TError,
+        {id: number;data: BodyType<TipoInterventoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTipoInterventoMutationOptions(options));
+    }
+
+export const getDeleteTipoInterventoUrl = (id: number,) => {
+
+
+
+
+  return `/api/tipi-intervento/${id}`
+}
+
+export const deleteTipoIntervento = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteTipoInterventoUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteTipoInterventoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTipoIntervento>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTipoIntervento>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteTipoIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTipoIntervento>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteTipoIntervento(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTipoInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTipoIntervento>>>
+
+    export type DeleteTipoInterventoMutationError = ErrorType<unknown>
+
+    export const useDeleteTipoIntervento = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTipoIntervento>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTipoIntervento>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteTipoInterventoMutationOptions(options));
     }
 
 export const getListCittaUrl = () => {

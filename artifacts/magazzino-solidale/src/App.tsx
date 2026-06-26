@@ -43,6 +43,7 @@ import Ruoli from "@/pages/ruoli";
 import Citta from "@/pages/citta";
 import ZoneUds from "@/pages/zone-uds";
 import RuoliVolontari from "@/pages/ruoli-volontari";
+import TipiIntervento from "@/pages/tipi-intervento";
 import UdsAnagrafica from "@/pages/uds-anagrafica";
 import UdsInterventi from "@/pages/uds-interventi";
 import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
@@ -264,6 +265,13 @@ function AppRoutes() {
           {() => (
             <Guard area="amministrazione">
               <RuoliVolontari />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/tipi-intervento">
+          {() => (
+            <Guard area="amministrazione">
+              <TipiIntervento />
             </Guard>
           )}
         </Route>
