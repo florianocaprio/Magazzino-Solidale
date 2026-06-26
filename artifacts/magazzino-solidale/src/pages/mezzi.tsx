@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Calendar, Upload } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Trash2, Calendar, Upload, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -145,11 +145,30 @@ export default function Mezzi() {
     });
   };
 
-  const isExpiringSoon = (dateStr?: string | null) => {
-    if (!dateStr) return false;
-    const diff = new Date(dateStr).getTime() - new Date().getTime();
-    return diff < 30 * 24 * 60 * 60 * 1000;
+  type ExpiryStatus = "expired" | "soon" | null;
+  const expiryStatus = (dateStr?: string | null): ExpiryStatus => {
+    if (!dateStr) return null;
+    // Parse the date-only part as a LOCAL calendar day so the comparison is
+    // day-based (a vehicle stays valid through its whole expiry day) and immune
+    // to timezone drift from `new Date("YYYY-MM-DD")` being parsed as UTC.
+    const [y, mo, d] = dateStr.substring(0, 10).split("-").map(Number);
+    if (!y || !mo || !d) return null;
+    const expiry = new Date(y, mo - 1, d);
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round((expiry.getTime() - startOfToday.getTime()) / (24 * 60 * 60 * 1000));
+    if (diffDays < 0) return "expired"; // strictly before today
+    if (diffDays <= 30) return "soon"; // today through 30 days ahead
+    return null;
   };
+  const rowExpiryStatus = (m: { scadenzaAssicurazione?: string | null; scadenzaRevisione?: string | null }): ExpiryStatus => {
+    const states = [expiryStatus(m.scadenzaAssicurazione), expiryStatus(m.scadenzaRevisione)];
+    if (states.includes("expired")) return "expired";
+    if (states.includes("soon")) return "soon";
+    return null;
+  };
+  const expiryTextClass = (st: ExpiryStatus) =>
+    st === "expired" ? "text-red-600 font-semibold" : st === "soon" ? "text-orange-500 font-medium" : "text-muted-foreground";
 
   const filtered = mezzi?.filter(m =>
     centroFilter === "all" || m.effectiveCentroId === parseInt(centroFilter)
@@ -312,7 +331,16 @@ export default function Mezzi() {
                   </TableCell>
                 </TableRow>
               ) : filtered?.map((m) => (
-                <TableRow key={m.id}>
+                <TableRow
+                  key={m.id}
+                  className={
+                    rowExpiryStatus(m) === "expired"
+                      ? "bg-red-500/5 hover:bg-red-500/10"
+                      : rowExpiryStatus(m) === "soon"
+                        ? "bg-orange-400/5 hover:bg-orange-400/10"
+                        : undefined
+                  }
+                >
                   <TableCell className="font-mono text-sm font-medium">{m.codice}</TableCell>
                   <TableCell>
                     <div className="font-medium capitalize">{tipoLabel(m.tipo)}</div>
@@ -332,16 +360,22 @@ export default function Mezzi() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 text-xs">
-                      {m.scadenzaAssicurazione && (
-                        <div className={`flex items-center gap-1 ${isExpiringSoon(m.scadenzaAssicurazione) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                          <Calendar className="h-3 w-3" /> {t("mezzi.assicShort")} {format(new Date(m.scadenzaAssicurazione), "dd/MM/yy")}
-                        </div>
-                      )}
-                      {m.scadenzaRevisione && (
-                        <div className={`flex items-center gap-1 ${isExpiringSoon(m.scadenzaRevisione) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                          <Calendar className="h-3 w-3" /> {t("mezzi.revisShort")} {format(new Date(m.scadenzaRevisione), "dd/MM/yy")}
-                        </div>
-                      )}
+                      {m.scadenzaAssicurazione && (() => {
+                        const st = expiryStatus(m.scadenzaAssicurazione);
+                        return (
+                          <div className={`flex items-center gap-1 ${expiryTextClass(st)}`} title={st === "expired" ? t("mezzi.scaduto") : st === "soon" ? t("mezzi.inScadenza") : undefined}>
+                            {st ? <AlertTriangle className="h-3 w-3" /> : <Calendar className="h-3 w-3" />} {t("mezzi.assicShort")} {format(new Date(m.scadenzaAssicurazione), "dd/MM/yy")}
+                          </div>
+                        );
+                      })()}
+                      {m.scadenzaRevisione && (() => {
+                        const st = expiryStatus(m.scadenzaRevisione);
+                        return (
+                          <div className={`flex items-center gap-1 ${expiryTextClass(st)}`} title={st === "expired" ? t("mezzi.scaduto") : st === "soon" ? t("mezzi.inScadenza") : undefined}>
+                            {st ? <AlertTriangle className="h-3 w-3" /> : <Calendar className="h-3 w-3" />} {t("mezzi.revisShort")} {format(new Date(m.scadenzaRevisione), "dd/MM/yy")}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
