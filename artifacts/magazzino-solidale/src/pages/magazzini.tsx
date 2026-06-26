@@ -54,6 +54,7 @@ export default function Magazzini() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState<string>("all");
+  const [cittaFilter, setCittaFilter] = useState<string>("all");
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -150,7 +151,8 @@ export default function Magazzini() {
       m.codice.toLowerCase().includes(search.toLowerCase()) ||
       m.comune?.toLowerCase().includes(search.toLowerCase());
     const matchesCentro = centroFilter === "all" || m.centroAscoltoId === parseInt(centroFilter);
-    return matchesSearch && matchesCentro;
+    const matchesCitta = cittaFilter === "all" || m.cittaId === parseInt(cittaFilter);
+    return matchesSearch && matchesCentro && matchesCitta;
   });
 
   return (
@@ -193,19 +195,34 @@ export default function Magazzini() {
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
             />
-            {isGlobal && (
-              <Select value={centroFilter} onValueChange={setCentroFilter}>
-                <SelectTrigger className="w-full sm:w-64">
-                  <SelectValue placeholder={t("common.tuttiCentri")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("common.tuttiCentri")}</SelectItem>
-                  {centri?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              {!isCittaLocked && (
+                <Select value={cittaFilter} onValueChange={setCittaFilter}>
+                  <SelectTrigger className="w-full sm:w-56">
+                    <SelectValue placeholder={t("common.tutteCitta")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("common.tutteCitta")}</SelectItem>
+                    {citta?.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {isGlobal && (
+                <Select value={centroFilter} onValueChange={setCentroFilter}>
+                  <SelectTrigger className="w-full sm:w-56">
+                    <SelectValue placeholder={t("common.tuttiCentri")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("common.tuttiCentri")}</SelectItem>
+                    {centri?.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
