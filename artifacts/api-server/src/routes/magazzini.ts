@@ -48,6 +48,7 @@ const fmt = (r: typeof magazziniTable.$inferSelect, centroNome?: string | null) 
   email: r.email ?? null,
   centroAscoltoId: r.centroAscoltoId ?? null,
   centroAscoltoNome: centroNome ?? null,
+  cittaId: r.cittaId ?? null,
   stato: r.stato,
   note: r.note ?? null,
   dataCreazione: r.dataCreazione.toISOString(),

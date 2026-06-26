@@ -21,6 +21,7 @@ import Magazzini from "@/pages/magazzini";
 import Prodotti from "@/pages/prodotti";
 import Lotti from "@/pages/lotti";
 import Giacenze from "@/pages/giacenze";
+import PreparazioneConsegne from "@/pages/preparazione-consegne";
 import Volontari from "@/pages/volontari";
 import Mezzi from "@/pages/mezzi";
 import Fornitori from "@/pages/fornitori";
@@ -119,6 +120,13 @@ function AppRoutes() {
           {() => (
             <Guard area="magazzino">
               <Trasferimenti />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/preparazione-consegne">
+          {() => (
+            <Guard area="magazzino">
+              <PreparazioneConsegne />
             </Guard>
           )}
         </Route>

@@ -60,6 +60,7 @@ import type {
   FornitoreInput,
   FornitoreUpdate,
   FornitoriBulkInput,
+  GetPreparazioneConsegneParams,
   Giacenza,
   GiacenzaMagazzinoReport,
   HealthStatus,
@@ -96,6 +97,7 @@ import type {
   MovimentoSummary,
   NucleoFamiliare,
   NucleoFamiliareInput,
+  PreparazioneConsegne,
   ProdottiBulkInput,
   Prodotto,
   ProdottoInput,
@@ -1712,6 +1714,90 @@ export function useListGiacenze<TData = Awaited<ReturnType<typeof listGiacenze>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListGiacenzeQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPreparazioneConsegneUrl = (params?: GetPreparazioneConsegneParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/preparazione-consegne?${stringifiedParams}` : `/api/preparazione-consegne`
+}
+
+/**
+ * @summary Goods to prepare for planned deliveries of a warehouse
+ */
+export const getPreparazioneConsegne = async (params?: GetPreparazioneConsegneParams, options?: RequestInit): Promise<PreparazioneConsegne> => {
+
+  return customFetch<PreparazioneConsegne>(getGetPreparazioneConsegneUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPreparazioneConsegneQueryKey = (params?: GetPreparazioneConsegneParams,) => {
+    return [
+    `/api/preparazione-consegne`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPreparazioneConsegneQueryOptions = <TData = Awaited<ReturnType<typeof getPreparazioneConsegne>>, TError = ErrorType<unknown>>(params?: GetPreparazioneConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPreparazioneConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPreparazioneConsegneQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPreparazioneConsegne>>> = ({ signal }) => getPreparazioneConsegne(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPreparazioneConsegne>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPreparazioneConsegneQueryResult = NonNullable<Awaited<ReturnType<typeof getPreparazioneConsegne>>>
+export type GetPreparazioneConsegneQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Goods to prepare for planned deliveries of a warehouse
+ */
+
+export function useGetPreparazioneConsegne<TData = Awaited<ReturnType<typeof getPreparazioneConsegne>>, TError = ErrorType<unknown>>(
+ params?: GetPreparazioneConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPreparazioneConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPreparazioneConsegneQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

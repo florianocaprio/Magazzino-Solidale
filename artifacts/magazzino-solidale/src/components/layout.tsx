@@ -5,6 +5,7 @@ import {
   Package, 
   PackageMinus,
   Boxes, 
+  PackageCheck,
   ArrowRightLeft, 
   TrendingUpDown,
   Users,
@@ -69,6 +70,7 @@ const NAV_ITEMS = [
   { key: "movimenti", url: "/movimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
   { key: "giacenze", url: "/giacenze", icon: TrendingUpDown, groupKey: "magazzino", area: "magazzino" },
   { key: "trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
+  { key: "preparazioneConsegne", url: "/preparazione-consegne", icon: PackageCheck, groupKey: "magazzino", area: "magazzino" },
   
   { key: "centriAscolto", url: "/centri-ascolto", icon: Building2, groupKey: "sociale", area: "sociale" },
   { key: "beneficiari", url: "/beneficiari", icon: Users, groupKey: "sociale", area: "sociale" },

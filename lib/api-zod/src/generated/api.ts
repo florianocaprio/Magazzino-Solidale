@@ -78,6 +78,7 @@ export const ListMagazziniResponseItem = zod.object({
   "email": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -119,6 +120,7 @@ export const GetMagazzinoResponse = zod.object({
   "email": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -154,6 +156,7 @@ export const UpdateMagazzinoResponse = zod.object({
   "email": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -502,6 +505,38 @@ export const ListGiacenzeResponseItem = zod.object({
   "prossimaScadenza": zod.string().nullish()
 })
 export const ListGiacenzeResponse = zod.array(ListGiacenzeResponseItem)
+
+
+/**
+ * @summary Goods to prepare for planned deliveries of a warehouse
+ */
+export const GetPreparazioneConsegneQueryParams = zod.object({
+  "cittaId": zod.coerce.number().optional(),
+  "magazzinoId": zod.coerce.number().optional()
+})
+
+export const GetPreparazioneConsegneResponse = zod.object({
+  "righe": zod.array(zod.object({
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string(),
+  "prodottoCodice": zod.string().nullish(),
+  "unitaMisura": zod.string(),
+  "quantitaRichiesta": zod.number(),
+  "numConsegne": zod.number(),
+  "quantitaDisponibile": zod.number(),
+  "sufficiente": zod.boolean()
+})),
+  "consegne": zod.array(zod.object({
+  "consegnaId": zod.number(),
+  "codice": zod.string().nullish(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "dataPrevista": zod.string().nullish(),
+  "tipoConsegna": zod.string(),
+  "bollaId": zod.number(),
+  "bollaNumero": zod.string()
+}))
+})
 
 
 export const ListTrasferimentiQueryParams = zod.object({

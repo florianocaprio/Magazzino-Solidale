@@ -25,6 +25,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   movimenti: "magazzino",
   giacenze: "magazzino",
   trasferimenti: "magazzino",
+  "preparazione-consegne": "magazzino",
 
   "centri-ascolto": "sociale",
   beneficiari: ["sociale", "uds"],

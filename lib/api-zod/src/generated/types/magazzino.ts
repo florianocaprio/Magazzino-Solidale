@@ -26,6 +26,8 @@ export interface Magazzino {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
   stato: string;
   /** @nullable */
   note?: string | null;

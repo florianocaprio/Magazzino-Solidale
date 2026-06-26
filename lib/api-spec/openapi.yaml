@@ -458,6 +458,29 @@ paths:
                 items:
                   $ref: "#/components/schemas/Giacenza"
 
+  # ─── PREPARAZIONE CONSEGNE ───────────────────────────────────────────────────
+  /preparazione-consegne:
+    get:
+      operationId: getPreparazioneConsegne
+      tags: [preparazione-consegne]
+      summary: Goods to prepare for planned deliveries of a warehouse
+      parameters:
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: magazzinoId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Aggregated goods to prepare + included deliveries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreparazioneConsegne"
+
   # ─── TRASFERIMENTI ───────────────────────────────────────────────────────────
   /trasferimenti:
     get:
@@ -2721,6 +2744,8 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
         stato:
           type: string
         note:
@@ -3144,6 +3169,60 @@ components:
         prossimaScadenza:
           type: ["string", "null"]
       required: [prodottoId, prodottoNome, prodottoCodice, tipoProdotto, unitaMisura, magazzinoId, magazzinoNome, quantitaTotale, scortaMinima, scortaConsigliata, sottoscorta, lottiAttivi]
+
+    # ── Preparazione Consegne ─────────────────────────────────────────────
+    PreparazioneRiga:
+      type: object
+      properties:
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: string
+        prodottoCodice:
+          type: ["string", "null"]
+        unitaMisura:
+          type: string
+        quantitaRichiesta:
+          type: number
+        numConsegne:
+          type: integer
+        quantitaDisponibile:
+          type: number
+        sufficiente:
+          type: boolean
+      required: [prodottoId, prodottoNome, unitaMisura, quantitaRichiesta, numConsegne, quantitaDisponibile, sufficiente]
+    PreparazioneConsegnaRef:
+      type: object
+      properties:
+        consegnaId:
+          type: integer
+        codice:
+          type: ["string", "null"]
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: string
+        dataPrevista:
+          type: ["string", "null"]
+        tipoConsegna:
+          type: string
+        bollaId:
+          type: integer
+        bollaNumero:
+          type: string
+      required: [consegnaId, beneficiarioId, beneficiarioNome, tipoConsegna, bollaId, bollaNumero]
+    PreparazioneConsegne:
+      type: object
+      properties:
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/PreparazioneRiga"
+        consegne:
+          type: array
+          items:
+            $ref: "#/components/schemas/PreparazioneConsegnaRef"
+      required: [righe, consegne]
 
     # ── Trasferimenti ─────────────────────────────────────────────────────
     Trasferimento:

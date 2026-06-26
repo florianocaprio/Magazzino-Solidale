@@ -8,6 +8,7 @@ import { prodotti } from "./namespaces/prodotti";
 import { lotti } from "./namespaces/lotti";
 import { movimenti } from "./namespaces/movimenti";
 import { giacenze } from "./namespaces/giacenze";
+import { preparazioneConsegne } from "./namespaces/preparazioneConsegne";
 import { trasferimenti } from "./namespaces/trasferimenti";
 import { scarichi } from "./namespaces/scarichi";
 import { centriAscolto } from "./namespaces/centriAscolto";
@@ -50,6 +51,7 @@ const PAGE_NAMESPACES = {
   lotti,
   movimenti,
   giacenze,
+  preparazioneConsegne,
   trasferimenti,
   scarichi,
   centriAscolto,

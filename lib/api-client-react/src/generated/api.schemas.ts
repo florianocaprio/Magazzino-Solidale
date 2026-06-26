@@ -95,6 +95,8 @@ export interface Magazzino {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
   stato: string;
   /** @nullable */
   note?: string | null;
@@ -427,6 +429,36 @@ export interface Giacenza {
   lottiAttivi: number;
   /** @nullable */
   prossimaScadenza?: string | null;
+}
+
+export interface PreparazioneRiga {
+  prodottoId: number;
+  prodottoNome: string;
+  /** @nullable */
+  prodottoCodice?: string | null;
+  unitaMisura: string;
+  quantitaRichiesta: number;
+  numConsegne: number;
+  quantitaDisponibile: number;
+  sufficiente: boolean;
+}
+
+export interface PreparazioneConsegnaRef {
+  consegnaId: number;
+  /** @nullable */
+  codice?: string | null;
+  beneficiarioId: number;
+  beneficiarioNome: string;
+  /** @nullable */
+  dataPrevista?: string | null;
+  tipoConsegna: string;
+  bollaId: number;
+  bollaNumero: string;
+}
+
+export interface PreparazioneConsegne {
+  righe: PreparazioneRiga[];
+  consegne: PreparazioneConsegnaRef[];
 }
 
 export interface TrasferimentoRiga {
@@ -1685,6 +1717,11 @@ export type ListGiacenzeParams = {
 magazzinoId?: number;
 sottoscortaOnly?: boolean;
 fsePlusOnly?: boolean;
+};
+
+export type GetPreparazioneConsegneParams = {
+cittaId?: number;
+magazzinoId?: number;
 };
 
 export type ListTrasferimentiParams = {
