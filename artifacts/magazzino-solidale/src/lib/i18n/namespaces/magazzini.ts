@@ -27,6 +27,8 @@ export const magazzini = {
     toastUpdated: "Magazzino aggiornato",
     toastCreated: "Magazzino creato",
     toastDeleted: "Magazzino eliminato",
+    citta: "Città",
+    nessunaCitta: "Nessuna città",
   },
   es: {
     title: "Almacenes",
@@ -56,6 +58,8 @@ export const magazzini = {
     toastUpdated: "Almacén actualizado",
     toastCreated: "Almacén creado",
     toastDeleted: "Almacén eliminado",
+    citta: "Ciudad",
+    nessunaCitta: "Sin ciudad",
   },
   en: {
     title: "Warehouses",
@@ -85,6 +89,8 @@ export const magazzini = {
     toastUpdated: "Warehouse updated",
     toastCreated: "Warehouse created",
     toastDeleted: "Warehouse deleted",
+    citta: "City",
+    nessunaCitta: "No city",
   },
   fr: {
     title: "Entrepôts",
@@ -114,6 +120,8 @@ export const magazzini = {
     toastUpdated: "Entrepôt mis à jour",
     toastCreated: "Entrepôt créé",
     toastDeleted: "Entrepôt supprimé",
+    citta: "Ville",
+    nessunaCitta: "Aucune ville",
   },
   de: {
     title: "Lager",
@@ -143,6 +151,8 @@ export const magazzini = {
     toastUpdated: "Lager aktualisiert",
     toastCreated: "Lager erstellt",
     toastDeleted: "Lager gelöscht",
+    citta: "Stadt",
+    nessunaCitta: "Keine Stadt",
   },
   ar: {
     title: "المستودعات",
@@ -172,5 +182,7 @@ export const magazzini = {
     toastUpdated: "تم تحديث المستودع",
     toastCreated: "تم إنشاء المستودع",
     toastDeleted: "تم حذف المستودع",
+    citta: "المدينة",
+    nessunaCitta: "بدون مدينة",
   },
 } as const;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListMagazzini, useCreateMagazzino, useUpdateMagazzino, useDeleteMagazzino, useListCentriAscolto, getListMagazziniQueryKey } from "@workspace/api-client-react";
+import { useListMagazzini, useCreateMagazzino, useUpdateMagazzino, useDeleteMagazzino, useListCentriAscolto, useListCitta, getListMagazziniQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,10 +32,12 @@ const formSchema = z.object({
   email: z.string().email("Email non valida").optional().or(z.literal("")),
   stato: z.string().default("attivo"),
   centroAscoltoId: z.string().optional(),
+  cittaId: z.string().optional(),
   note: z.string().optional()
 });
 
 const NO_CENTRO = "__none__";
+const NO_CITTA = "__nocitta__";
 
 export default function Magazzini() {
   const { t } = useTranslation();
@@ -43,8 +45,11 @@ export default function Magazzini() {
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
+  const lockedCittaId = user?.cittaId ?? null;
+  const isCittaLocked = lockedCittaId != null;
   const { data: magazzini, isLoading } = useListMagazzini();
   const { data: centri } = useListCentriAscolto();
+  const { data: citta } = useListCitta();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -62,7 +67,7 @@ export default function Magazzini() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       codice: "", nome: "", indirizzo: "", comune: "", zona: "",
-      responsabile: "", telefono: "", email: "", stato: "attivo", centroAscoltoId: NO_CENTRO, note: ""
+      responsabile: "", telefono: "", email: "", stato: "attivo", centroAscoltoId: NO_CENTRO, cittaId: NO_CITTA, note: ""
     }
   });
 
@@ -79,6 +84,7 @@ export default function Magazzini() {
       email: magazzino.email || "",
       stato: magazzino.stato,
       centroAscoltoId: magazzino.centroAscoltoId != null ? String(magazzino.centroAscoltoId) : NO_CENTRO,
+      cittaId: magazzino.cittaId != null ? String(magazzino.cittaId) : NO_CITTA,
       note: magazzino.note || ""
     });
     setIsFormOpen(true);
@@ -89,19 +95,25 @@ export default function Magazzini() {
     form.reset({
       codice: "", nome: "", indirizzo: "", comune: "", zona: "",
       responsabile: "", telefono: "", email: "", stato: "attivo",
-      centroAscoltoId: isCentroLocked ? String(lockedCentroId) : NO_CENTRO, note: ""
+      centroAscoltoId: isCentroLocked ? String(lockedCentroId) : NO_CENTRO,
+      cittaId: isCittaLocked ? String(lockedCittaId) : NO_CITTA, note: ""
     });
     setIsFormOpen(true);
   };
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    const { centroAscoltoId: centroStr, ...rest } = data;
+    const { centroAscoltoId: centroStr, cittaId: cittaStr, ...rest } = data;
     const centroAscoltoId = isCentroLocked
       ? lockedCentroId
       : !centroStr || centroStr === NO_CENTRO
         ? null
         : parseInt(centroStr, 10);
-    const payload = { ...rest, centroAscoltoId };
+    const cittaId = isCittaLocked
+      ? lockedCittaId
+      : !cittaStr || cittaStr === NO_CITTA
+        ? null
+        : parseInt(cittaStr, 10);
+    const payload = { ...rest, centroAscoltoId, cittaId };
     if (editingId) {
       updateMagazzino.mutate({ id: editingId, data: payload }, {
         onSuccess: () => {
@@ -357,6 +369,26 @@ export default function Magazzini() {
                     {isCentroLocked && (
                       <p className="text-xs text-muted-foreground">{t("common.centroLocked")}</p>
                     )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="cittaId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("magazzini.citta")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isCittaLocked}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_CITTA}>{t("magazzini.nessunaCitta")}</SelectItem>
+                        {citta?.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
