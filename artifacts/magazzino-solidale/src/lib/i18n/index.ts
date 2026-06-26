@@ -21,6 +21,7 @@ import { udsInterventi } from "./namespaces/udsInterventi";
 import { consegne } from "./namespaces/consegne";
 import { bolle } from "./namespaces/bolle";
 import { volontari } from "./namespaces/volontari";
+import { ruoliVolontari } from "./namespaces/ruoliVolontari";
 import { mezzi } from "./namespaces/mezzi";
 import { fornitori } from "./namespaces/fornitori";
 import { approvvigionamenti } from "./namespaces/approvvigionamenti";
@@ -62,6 +63,7 @@ const PAGE_NAMESPACES = {
   consegne,
   bolle,
   volontari,
+  ruoliVolontari,
   mezzi,
   fornitori,
   approvvigionamenti,

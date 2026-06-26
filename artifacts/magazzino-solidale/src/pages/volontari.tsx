@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useListVolontari, useCreateVolontario, useUpdateVolontario, useDeleteVolontario, useBulkVolontari, getListVolontariQueryKey, useListCentriAscolto } from "@workspace/api-client-react";
+import { useListVolontari, useCreateVolontario, useUpdateVolontario, useDeleteVolontario, useBulkVolontari, getListVolontariQueryKey, useListCentriAscolto, useListRuoliVolontari } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -43,6 +43,7 @@ export default function Volontari() {
   });
   const { data: volontari, isLoading } = useListVolontari();
   const { data: centri } = useListCentriAscolto();
+  const { data: ruoliVolontari } = useListRuoliVolontari();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -391,10 +392,11 @@ export default function Volontari() {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="magazziniere">{t("volontari.roles.magazziniere")}</SelectItem>
-                        <SelectItem value="autista">{t("volontari.roles.autista")}</SelectItem>
-                        <SelectItem value="operatore_sportello">{t("volontari.roles.operatore_sportello")}</SelectItem>
-                        <SelectItem value="coordinatore">{t("volontari.roles.coordinatore")}</SelectItem>
+                        {ruoliVolontari
+                          ?.filter((r) => r.attivo || r.nome === field.value)
+                          .map((r) => (
+                            <SelectItem key={r.id} value={r.nome}>{roleLabel(r.nome)}</SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

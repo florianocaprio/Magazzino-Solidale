@@ -2154,6 +2154,49 @@ export const ConsegnaBollaResponse = zod.object({
 })
 
 
+export const ListRuoliVolontariResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+export const ListRuoliVolontariResponse = zod.array(ListRuoliVolontariResponseItem)
+
+
+
+
+
+export const CreateRuoloVolontarioBody = zod.object({
+  "nome": zod.string().min(1),
+  "attivo": zod.boolean().optional()
+})
+
+
+export const UpdateRuoloVolontarioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateRuoloVolontarioBody = zod.object({
+  "nome": zod.string().min(1).optional(),
+  "attivo": zod.boolean().optional()
+})
+
+export const UpdateRuoloVolontarioResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+
+
+export const DeleteRuoloVolontarioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const ListCittaResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),

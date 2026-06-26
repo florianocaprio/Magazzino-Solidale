@@ -34,6 +34,11 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   scarichi: "sociale",
 
   volontari: "logistica",
+  // Mapped to "logistica" so non-admin logistica staff can READ the list to
+  // populate the volontari form (admins always pass via isAdmin). Note: a segment
+  // mapped to "amministrazione" would auto-deny every non-admin in areaGuard, so it
+  // must NOT be listed here. Mutations are admin-gated with requireAdmin in the route.
+  "ruoli-volontari": "logistica",
   mezzi: "logistica",
   fornitori: "logistica",
   approvvigionamenti: "logistica",

@@ -988,6 +988,25 @@ export interface BeneficiarioUpdate {
   areaProvenienza?: string;
 }
 
+export interface RuoloVolontario {
+  id: number;
+  nome: string;
+  attivo: boolean;
+  dataCreazione: string;
+}
+
+export interface RuoloVolontarioInput {
+  /** @minLength 1 */
+  nome: string;
+  attivo?: boolean;
+}
+
+export interface RuoloVolontarioUpdate {
+  /** @minLength 1 */
+  nome?: string;
+  attivo?: boolean;
+}
+
 export interface Citta {
   id: number;
   nome: string;

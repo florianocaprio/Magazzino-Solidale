@@ -1502,6 +1502,72 @@ paths:
                 $ref: "#/components/schemas/BollaDettaglio"
 
   # ─── CENTRI DI ASCOLTO ─────────────────────────────────────────────────────
+  /ruoli-volontari:
+    get:
+      operationId: listRuoliVolontari
+      tags: [ruoliVolontari]
+      responses:
+        "200":
+          description: List of volunteer roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RuoloVolontario"
+    post:
+      operationId: createRuoloVolontario
+      tags: [ruoliVolontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuoloVolontarioInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuoloVolontario"
+
+  /ruoli-volontari/{id}:
+    patch:
+      operationId: updateRuoloVolontario
+      tags: [ruoliVolontari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuoloVolontarioUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuoloVolontario"
+    delete:
+      operationId: deleteRuoloVolontario
+      tags: [ruoliVolontari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /citta:
     get:
       operationId: listCitta
@@ -3855,6 +3921,39 @@ components:
           type: string
         areaProvenienza:
           type: string
+
+    # ── Ruoli Volontari ──────────────────────────────────────────────────
+    RuoloVolontario:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        attivo:
+          type: boolean
+        dataCreazione:
+          type: string
+      required: [id, nome, attivo, dataCreazione]
+
+    RuoloVolontarioInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        attivo:
+          type: boolean
+      required: [nome]
+
+    RuoloVolontarioUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        attivo:
+          type: boolean
 
     # ── Città / Zone UDS ─────────────────────────────────────────────────
     Citta:
