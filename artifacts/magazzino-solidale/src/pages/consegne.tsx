@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
-import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -293,18 +293,27 @@ export default function Consegne() {
                   )}
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm">
-                      {c.tipoConsegna === 'domicilio' ? (
-                        <div className="flex items-center gap-1 text-blue-600">
-                          <MapPin className="h-3 w-3" /> {c.indirizzoConsegna || t("consegne.domicilioFallback")} {c.zona ? `(${c.zona})` : ''}
-                        </div>
-                      ) : c.tipoConsegna === 'diretta' ? (
+                      {c.tipoConsegna === 'diretta' ? (
                         <div className="flex items-center gap-1 text-emerald-600">
                           <Truck className="h-3 w-3" /> {t("consegne.consegnaDiretta")}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 text-purple-600">
-                          <Truck className="h-3 w-3" /> {t("consegne.ritiroIn", { magazzino: c.magazzinoNome })}
-                        </div>
+                        <>
+                          {c.tipoConsegna === 'domicilio' ? (
+                            <div className="flex items-center gap-1 text-blue-600">
+                              <MapPin className="h-3 w-3" /> {c.indirizzoConsegna || t("consegne.domicilioFallback")} {c.zona ? `(${c.zona})` : ''}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-purple-600">
+                              <Building2 className="h-3 w-3" /> {t("consegne.ritiroCentro")}
+                            </div>
+                          )}
+                          {c.magazzinoNome && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Package className="h-3 w-3" /> {t("consegne.preparazionePresso", { magazzino: c.magazzinoNome })}
+                            </div>
+                          )}
+                        </>
                       )}
                       {c.volontarioNome && <div className="text-xs text-muted-foreground">{t("consegne.volontarioPrefix", { name: c.volontarioNome })}</div>}
                     </div>
