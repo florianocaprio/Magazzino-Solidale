@@ -1657,6 +1657,72 @@ paths:
         "204":
           description: Deleted
 
+  /tipologie-fornitore:
+    get:
+      operationId: listTipologieFornitore
+      tags: [tipologieFornitore]
+      responses:
+        "200":
+          description: List of supplier types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TipologiaFornitore"
+    post:
+      operationId: createTipologiaFornitore
+      tags: [tipologieFornitore]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TipologiaFornitoreInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TipologiaFornitore"
+
+  /tipologie-fornitore/{id}:
+    patch:
+      operationId: updateTipologiaFornitore
+      tags: [tipologieFornitore]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TipologiaFornitoreUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TipologiaFornitore"
+    delete:
+      operationId: deleteTipologiaFornitore
+      tags: [tipologieFornitore]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /citta:
     get:
       operationId: listCitta
@@ -4124,6 +4190,38 @@ components:
       required: [nome]
 
     TipoInterventoUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        attivo:
+          type: boolean
+
+    TipologiaFornitore:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        attivo:
+          type: boolean
+        dataCreazione:
+          type: string
+      required: [id, nome, attivo, dataCreazione]
+
+    TipologiaFornitoreInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        attivo:
+          type: boolean
+      required: [nome]
+
+    TipologiaFornitoreUpdate:
       type: object
       properties:
         nome:

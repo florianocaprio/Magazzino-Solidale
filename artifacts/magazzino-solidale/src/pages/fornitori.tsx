@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useBulkFornitori, useListCentriAscolto, getListFornitoriQueryKey } from "@workspace/api-client-react";
+import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useBulkFornitori, useListCentriAscolto, useListTipologieFornitore, getListFornitoriQueryKey } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -54,6 +54,13 @@ export default function Fornitori() {
     centroFilter !== "all" ? { centroAscoltoId: parseInt(centroFilter) } : undefined
   );
   const { data: centri } = useListCentriAscolto();
+  const { data: tipologie } = useListTipologieFornitore();
+
+  // Built-in type keys keep their translated label; admin-added custom names show
+  // as typed. fornitori.tipo stays free text (no FK), so removing a type never
+  // breaks existing suppliers.
+  const tipoLabel = (nome: string) => t(`fornitori.tipi.${nome}`, { defaultValue: nome.replace(/_/g, " ") });
+  const defaultTipo = () => tipologie?.find((tp) => tp.attivo)?.nome ?? "commerciale";
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -89,7 +96,7 @@ export default function Fornitori() {
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all", noteOperative: "" });
+    form.reset({ nome: "", tipo: defaultTipo(), telefono: "", email: "", referente: "", comune: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all", noteOperative: "" });
     setIsFormOpen(true);
   };
 
@@ -141,7 +148,7 @@ export default function Fornitori() {
             rows={fornitori ?? []}
             columns={[
               { header: t("fornitori.nominativo"), accessor: (f) => f.nome },
-              { header: t("common.type"), accessor: (f) => f.tipo ? t(`fornitori.tipi.${f.tipo}`) : "" },
+              { header: t("common.type"), accessor: (f) => f.tipo ? tipoLabel(f.tipo) : "" },
               { header: t("fornitori.comune"), accessor: (f) => f.comune },
               { header: t("common.phone"), accessor: (f) => f.telefono },
               { header: t("common.email"), accessor: (f) => f.email },
@@ -258,7 +265,7 @@ export default function Fornitori() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`capitalize ${tipoColors[f.tipo] || tipoColors.altro}`}>
-                      {t(`fornitori.tipi.${f.tipo}`)}
+                      {tipoLabel(f.tipo)}
                     </Badge>
                   </TableCell>
                   {isGlobal && (
@@ -306,11 +313,15 @@ export default function Fornitori() {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="commerciale">{t("fornitori.tipi.commerciale")}</SelectItem>
-                        <SelectItem value="donatore_privato">{t("fornitori.tipi.donatore_privato")}</SelectItem>
-                        <SelectItem value="banco_alimentare">{t("fornitori.tipi.banco_alimentare")}</SelectItem>
-                        <SelectItem value="ente_pubblico">{t("fornitori.tipi.ente_pubblico")}</SelectItem>
-                        <SelectItem value="altro">{t("fornitori.tipi.altro")}</SelectItem>
+                        {tipologie
+                          ?.filter((tp) => tp.attivo || tp.nome === field.value)
+                          .map((tp) => (
+                            <SelectItem key={tp.id} value={tp.nome}>{tipoLabel(tp.nome)}</SelectItem>
+                          ))}
+                        {/* Preserve a supplier's current type even if it was deleted from the lookup (free-text value). */}
+                        {field.value && !tipologie?.some((tp) => tp.nome === field.value) && (
+                          <SelectItem value={field.value}>{tipoLabel(field.value)}</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </FormItem>

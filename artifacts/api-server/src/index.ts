@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { seedAdmin } from "./lib/seedAdmin";
 import { seedRuoliVolontari } from "./lib/seedRuoliVolontari";
 import { seedTipiIntervento } from "./lib/seedTipiIntervento";
+import { seedTipologieFornitore } from "./lib/seedTipologieFornitore";
 import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
 import { initDbExtensions } from "./lib/dbInit";
 
@@ -42,6 +43,10 @@ app.listen(port, (err) => {
 
   seedTipiIntervento().catch((err) => {
     logger.error({ err }, "Failed to seed intervention types");
+  });
+
+  seedTipologieFornitore().catch((err) => {
+    logger.error({ err }, "Failed to seed supplier types");
   });
 
   schedulePriorityDowngrade();

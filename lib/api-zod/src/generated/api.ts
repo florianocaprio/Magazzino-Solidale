@@ -2275,6 +2275,49 @@ export const DeleteTipoInterventoParams = zod.object({
 })
 
 
+export const ListTipologieFornitoreResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+export const ListTipologieFornitoreResponse = zod.array(ListTipologieFornitoreResponseItem)
+
+
+
+
+
+export const CreateTipologiaFornitoreBody = zod.object({
+  "nome": zod.string().min(1),
+  "attivo": zod.boolean().optional()
+})
+
+
+export const UpdateTipologiaFornitoreParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateTipologiaFornitoreBody = zod.object({
+  "nome": zod.string().min(1).optional(),
+  "attivo": zod.boolean().optional()
+})
+
+export const UpdateTipologiaFornitoreResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.string()
+})
+
+
+export const DeleteTipologiaFornitoreParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
 export const ListCittaResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),

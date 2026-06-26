@@ -6,6 +6,7 @@ export * from "./movimenti";
 export * from "./volontari";
 export * from "./ruoliVolontari";
 export * from "./tipiIntervento";
+export * from "./tipologieFornitore";
 export * from "./mezzi";
 export * from "./citta";
 export * from "./zoneUds";

@@ -1058,6 +1058,25 @@ export interface TipoInterventoUpdate {
   attivo?: boolean;
 }
 
+export interface TipologiaFornitore {
+  id: number;
+  nome: string;
+  attivo: boolean;
+  dataCreazione: string;
+}
+
+export interface TipologiaFornitoreInput {
+  /** @minLength 1 */
+  nome: string;
+  attivo?: boolean;
+}
+
+export interface TipologiaFornitoreUpdate {
+  /** @minLength 1 */
+  nome?: string;
+  attivo?: boolean;
+}
+
 export interface Citta {
   id: number;
   nome: string;

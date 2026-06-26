@@ -124,6 +124,9 @@ import type {
   TipoIntervento,
   TipoInterventoInput,
   TipoInterventoUpdate,
+  TipologiaFornitore,
+  TipologiaFornitoreInput,
+  TipologiaFornitoreUpdate,
   Trasferimento,
   TrasferimentoInput,
   TrasferimentoUpdate,
@@ -5842,6 +5845,272 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteTipoInterventoMutationOptions(options));
+    }
+
+export const getListTipologieFornitoreUrl = () => {
+
+
+
+
+  return `/api/tipologie-fornitore`
+}
+
+export const listTipologieFornitore = async ( options?: RequestInit): Promise<TipologiaFornitore[]> => {
+
+  return customFetch<TipologiaFornitore[]>(getListTipologieFornitoreUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTipologieFornitoreQueryKey = () => {
+    return [
+    `/api/tipologie-fornitore`
+    ] as const;
+    }
+
+
+export const getListTipologieFornitoreQueryOptions = <TData = Awaited<ReturnType<typeof listTipologieFornitore>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTipologieFornitore>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTipologieFornitoreQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTipologieFornitore>>> = ({ signal }) => listTipologieFornitore({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTipologieFornitore>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTipologieFornitoreQueryResult = NonNullable<Awaited<ReturnType<typeof listTipologieFornitore>>>
+export type ListTipologieFornitoreQueryError = ErrorType<unknown>
+
+
+
+export function useListTipologieFornitore<TData = Awaited<ReturnType<typeof listTipologieFornitore>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTipologieFornitore>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTipologieFornitoreQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateTipologiaFornitoreUrl = () => {
+
+
+
+
+  return `/api/tipologie-fornitore`
+}
+
+export const createTipologiaFornitore = async (tipologiaFornitoreInput: TipologiaFornitoreInput, options?: RequestInit): Promise<TipologiaFornitore> => {
+
+  return customFetch<TipologiaFornitore>(getCreateTipologiaFornitoreUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tipologiaFornitoreInput,)
+  }
+);}
+
+
+
+
+export const getCreateTipologiaFornitoreMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTipologiaFornitore>>, TError,{data: BodyType<TipologiaFornitoreInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTipologiaFornitore>>, TError,{data: BodyType<TipologiaFornitoreInput>}, TContext> => {
+
+const mutationKey = ['createTipologiaFornitore'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTipologiaFornitore>>, {data: BodyType<TipologiaFornitoreInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTipologiaFornitore(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTipologiaFornitoreMutationResult = NonNullable<Awaited<ReturnType<typeof createTipologiaFornitore>>>
+    export type CreateTipologiaFornitoreMutationBody = BodyType<TipologiaFornitoreInput>
+    export type CreateTipologiaFornitoreMutationError = ErrorType<unknown>
+
+    export const useCreateTipologiaFornitore = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTipologiaFornitore>>, TError,{data: BodyType<TipologiaFornitoreInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTipologiaFornitore>>,
+        TError,
+        {data: BodyType<TipologiaFornitoreInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTipologiaFornitoreMutationOptions(options));
+    }
+
+export const getUpdateTipologiaFornitoreUrl = (id: number,) => {
+
+
+
+
+  return `/api/tipologie-fornitore/${id}`
+}
+
+export const updateTipologiaFornitore = async (id: number,
+    tipologiaFornitoreUpdate: TipologiaFornitoreUpdate, options?: RequestInit): Promise<TipologiaFornitore> => {
+
+  return customFetch<TipologiaFornitore>(getUpdateTipologiaFornitoreUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tipologiaFornitoreUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateTipologiaFornitoreMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTipologiaFornitore>>, TError,{id: number;data: BodyType<TipologiaFornitoreUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTipologiaFornitore>>, TError,{id: number;data: BodyType<TipologiaFornitoreUpdate>}, TContext> => {
+
+const mutationKey = ['updateTipologiaFornitore'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTipologiaFornitore>>, {id: number;data: BodyType<TipologiaFornitoreUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTipologiaFornitore(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTipologiaFornitoreMutationResult = NonNullable<Awaited<ReturnType<typeof updateTipologiaFornitore>>>
+    export type UpdateTipologiaFornitoreMutationBody = BodyType<TipologiaFornitoreUpdate>
+    export type UpdateTipologiaFornitoreMutationError = ErrorType<unknown>
+
+    export const useUpdateTipologiaFornitore = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTipologiaFornitore>>, TError,{id: number;data: BodyType<TipologiaFornitoreUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTipologiaFornitore>>,
+        TError,
+        {id: number;data: BodyType<TipologiaFornitoreUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTipologiaFornitoreMutationOptions(options));
+    }
+
+export const getDeleteTipologiaFornitoreUrl = (id: number,) => {
+
+
+
+
+  return `/api/tipologie-fornitore/${id}`
+}
+
+export const deleteTipologiaFornitore = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteTipologiaFornitoreUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteTipologiaFornitoreMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTipologiaFornitore>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTipologiaFornitore>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteTipologiaFornitore'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTipologiaFornitore>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteTipologiaFornitore(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTipologiaFornitoreMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTipologiaFornitore>>>
+
+    export type DeleteTipologiaFornitoreMutationError = ErrorType<unknown>
+
+    export const useDeleteTipologiaFornitore = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTipologiaFornitore>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTipologiaFornitore>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteTipologiaFornitoreMutationOptions(options));
     }
 
 export const getListCittaUrl = () => {

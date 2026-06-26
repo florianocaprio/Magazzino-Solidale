@@ -46,6 +46,10 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   "tipi-intervento": ["sociale", "uds"],
   mezzi: "logistica",
   fornitori: "logistica",
+  // Read by logistica staff to populate the fornitori type select; mutations are
+  // admin-gated with requireAdmin in the route. Must NOT be "amministrazione"
+  // (that would auto-deny every non-admin in areaGuard).
+  "tipologie-fornitore": "logistica",
   approvvigionamenti: "logistica",
 
   report: "analisi",
