@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: magazzino-postgres
+    environment:
+      POSTGRES_DB: magazzino
+      POSTGRES_USER: magazzino
+      POSTGRES_PASSWORD: magazzino_password_change_me
+    volumes:
+      - magazzino_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U magazzino -d magazzino"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    platform: linux/amd64
+    container_name: magazzino-api
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      PORT: 8080
+      COOKIE_SAMESITE: lax
+      COOKIE_SECURE: "false"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('net').connect(8080, '127.0.0.1').on('connect', function(){process.exit(0)}).on('error', function(){process.exit(1)})\""]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    platform: linux/amd64
+    container_name: magazzino-web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8082:80"
+    restart: unless-stopped
+
+volumes:
+  magazzino_pgdata:

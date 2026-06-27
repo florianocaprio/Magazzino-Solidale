@@ -1,0 +1,30 @@
+FROM --platform=linux/amd64 node:24-slim
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable
+RUN corepack prepare pnpm@10 --activate
+
+COPY . .
+
+RUN node docker-patch-local.mjs
+
+RUN pnpm install --frozen-lockfile
+
+RUN pnpm --filter @workspace/api-server run build
+
+ENV NODE_ENV=production
+ENV PORT=8080
+ENV COOKIE_SAMESITE=lax
+ENV COOKIE_SECURE=false
+
+EXPOSE 8080
+
+COPY docker-entrypoint-api.sh /app/docker-entrypoint-api.sh
+RUN chmod +x /app/docker-entrypoint-api.sh
+
+CMD ["/app/docker-entrypoint-api.sh"]

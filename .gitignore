@@ -1,54 +1,47 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# compiled output
-dist
-tmp
-out-tsc
-*.tsbuildinfo
-.expo
-.expo-shared
-
-# dependencies
-node_modules
-
-# IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# IDE - VSCode
-.vscode/*
+!.env.example
+!.vscode/extensions.json
+!.vscode/launch.json
 !.vscode/settings.json
 !.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# misc
+.c9/
+.cache/
+.classpath
+.cursor/rules/nx-rules.mdc
+.DS_Store
+.env
+.env.*
+.env.docker
+.expo
+.expo-shared
+.github/instructions/nx.instructions.md
+.local/
+.project
+.settings/
+.vscode/*
+*.launch
+*.sublime-workspace
+*.tsbuildinfo
+/.idea
 /.sass-cache
 /connect.lock
 /coverage
 /libpeerconnection.log
-npm-debug.log
-yarn-error.log
-testem.log
 /typings
-
+# compiled output
+# dependencies
 # Environment variables / secrets
-.env
-.env.*
-!.env.example
-
-# System Files
-.DS_Store
-Thumbs.db
-
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
-
+# IDE - VSCode
+# IDEs and editors
+# misc
 # Replit
-.cache/
-.local/
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# System Files
+dist
+node_modules
+npm-debug.log
+out-tsc
+testem.log
+Thumbs.db
+tmp
+yarn-error.log
