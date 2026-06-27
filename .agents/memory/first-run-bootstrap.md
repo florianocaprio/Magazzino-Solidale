@@ -15,3 +15,7 @@ During bootstrap an unauthenticated visitor gets a synthetic admin (`BOOTSTRAP_A
 
 ## requireAuth runs twice — it short-circuits on req.user
 `requireAuth` is applied globally (routes/index.ts, sees the full path e.g. `/utenti`) AND again inside the admin routers via `router.use("/utenti", requireAuth, requireAdmin)`. The inner `router.use(prefix, ...)` STRIPS the prefix, so the inner pass sees `req.path === "/"` and could never authorize a bootstrap request. Fix: `requireAuth` returns early if `req.user` is already set (only ever assigned inside requireAuth — no untrusted source), making the inner pass idempotent. The real bootstrap boundary is therefore the GLOBAL pass which sees the full path.
+
+## Password change is intentionally currentPassword-free
+`POST /auth/change-password` does NOT verify (or accept) the old/current password — by deliberate user request. Behind `requireAuth`, an authenticated session sets a new password if it is ≥8 chars (confirm-match is client-side only). `ChangePasswordInput` requires only `newPassword` (minLength 8); no `currentPassword` field exists in the contract.
+**Why:** the user explicitly wanted the simplest possible reset for forced first-login change. Do not "restore" a current-password check thinking it's a missing guard.

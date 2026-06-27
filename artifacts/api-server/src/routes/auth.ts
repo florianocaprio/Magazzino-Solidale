@@ -116,7 +116,7 @@ router.post(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
-    const { currentPassword, newPassword } = parsed.data;
+    const { newPassword } = parsed.data;
 
     const [row] = await db
       .select()
@@ -125,12 +125,6 @@ router.post(
 
     if (!row) {
       res.status(401).json({ error: "Non autenticato" });
-      return;
-    }
-
-    const ok = await bcrypt.compare(currentPassword, row.passwordHash);
-    if (!ok) {
-      res.status(400).json({ error: "Password attuale non corretta" });
       return;
     }
 

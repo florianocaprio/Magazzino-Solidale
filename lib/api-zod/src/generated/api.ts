@@ -3074,13 +3074,11 @@ export const GetBootstrapStatusResponse = zod.object({
 })
 
 
-
-export const changePasswordBodyNewPasswordMin = 6;
+export const changePasswordBodyNewPasswordMin = 8;
 
 
 
 export const ChangePasswordBody = zod.object({
-  "currentPassword": zod.string().min(1),
   "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
 })
 

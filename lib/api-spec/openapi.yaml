@@ -5280,13 +5280,10 @@ components:
     ChangePasswordInput:
       type: object
       properties:
-        currentPassword:
-          type: string
-          minLength: 1
         newPassword:
           type: string
-          minLength: 6
-      required: [currentPassword, newPassword]
+          minLength: 8
+      required: [newPassword]
 
     Utente:
       type: object

@@ -1632,9 +1632,7 @@ export interface LoginInput {
 }
 
 export interface ChangePasswordInput {
-  /** @minLength 1 */
-  currentPassword: string;
-  /** @minLength 6 */
+  /** @minLength 8 */
   newPassword: string;
 }
 

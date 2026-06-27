@@ -16,7 +16,6 @@ export default function ChangePassword() {
   const { toast } = useToast();
   const forced = user?.mustChangePassword ?? false;
 
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,14 +32,14 @@ export default function ChangePassword() {
       return;
     }
     changePassword.mutate(
-      { data: { currentPassword, newPassword } },
+      { data: { newPassword } },
       {
         onSuccess: () => {
           toast({ title: t("changePassword.toastUpdated") });
           refresh();
         },
         onError: () => {
-          setError(t("changePassword.errorCurrentWrong"));
+          setError(t("changePassword.errorGeneric"));
         },
       },
     );
@@ -62,18 +61,6 @@ export default function ChangePassword() {
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="current">{t("changePassword.currentPassword")}</Label>
-              <Input
-                id="current"
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="new">{t("changePassword.newPassword")}</Label>
               <Input
                 id="new"
@@ -82,6 +69,7 @@ export default function ChangePassword() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
+                autoFocus
               />
             </div>
             <div className="space-y-2">
