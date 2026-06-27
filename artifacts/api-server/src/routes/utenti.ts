@@ -214,7 +214,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
       centroAscoltoId: finalCentroId,
       cittaId: finalCittaId,
       attivo: attivo ?? true,
-      mustChangePassword: true,
+      mustChangePassword: false,
     })
     .returning({ id: utentiTable.id });
 
