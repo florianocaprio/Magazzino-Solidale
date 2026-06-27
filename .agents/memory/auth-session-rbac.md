@@ -8,9 +8,13 @@ description: Durable decisions for the session-cookie auth + area-based RBAC in 
 Session-cookie internal auth (express-session + connect-pg-simple), area-based RBAC. Areas: generale/magazzino/sociale/logistica/analisi/amministrazione. Roles carry `aree` + `isAdmin`; admin = all areas.
 
 ## Cross-site iframe cookie + CSRF (linked tradeoff)
-The session cookie MUST be `SameSite=None;Secure` with `trust proxy 1` to survive the cross-site Replit preview iframe — a normal `SameSite=Lax/Strict` cookie is dropped there.
+On Replit the session cookie MUST be `SameSite=None;Secure` with `trust proxy 1` to survive the cross-site preview iframe — a normal `SameSite=Lax/Strict` cookie is dropped there.
 **Why:** the preview is a cross-site iframe, so the cookie is third-party.
 **How to apply:** because `SameSite=None` re-opens CSRF, pair it with an Origin/Referer allowlist guard for every non-GET/HEAD `/api` request, built from `REPLIT_DOMAINS` + `REPLIT_DEV_DOMAIN`. The two changes are a package — never relax one without the other. Guard falls back to Referer (browsers send it same-origin even when Origin is omitted) and fails open only if no domain env is set. Consequence: server-to-server / curl POSTs must send a matching `Origin` header or get 403.
+
+## Cookie config is env-aware (Replit vs self-host) — do not hardcode Secure
+`Secure;SameSite=None` is correct ONLY behind HTTPS. On plain HTTP (self-host on `http://localhost`) the browser silently REJECTS a `Secure` cookie, so login "succeeds" (200 + the FE shows the user from the login response, never re-checking `/auth/me`) yet the cookie never persists → every later mutation is 401 "Non autenticato". Setup/bootstrap still works because it needs no session, which masks the problem.
+**How to apply:** `app.ts` auto-detects Replit via `REPLIT_DOMAINS`/`REPLIT_DEV_DOMAIN` → `cookieSecure`; else non-Secure + `SameSite=Lax` and `trust proxy false`. Override with `COOKIE_SECURE=true|false`; add self-host CSRF origins via `APP_ORIGINS` (comma-separated full origins). Verify the server itself with curl by sending `-H "X-Forwarded-Proto: https"` (express-session won't emit a Secure cookie otherwise, so a plain-HTTP curl gets NO Set-Cookie even when code is correct).
 
 ## connect-pg-simple session table is not auto-created
 The library's bundled `table.sql` is NOT included by the esbuild CJS bundle, so `createTableIfMissing:true` fails at runtime.

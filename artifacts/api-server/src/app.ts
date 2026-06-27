@@ -38,10 +38,27 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Behind the Replit reverse proxy: trust X-Forwarded-Proto so Secure cookies
-// are issued, and use SameSite=None so the session cookie is sent inside the
-// cross-site preview iframe.
-app.set("trust proxy", 1);
+// Session cookie / proxy configuration adapts to the runtime environment:
+// - On Replit the app is served over HTTPS behind a reverse proxy and rendered
+//   inside a cross-site preview iframe, so the cookie must be Secure +
+//   SameSite=None and we must trust the proxy's X-Forwarded-Proto header.
+// - When self-hosted over plain HTTP (e.g. http://localhost:8082) a Secure /
+//   SameSite=None cookie is rejected by the browser, so the session would never
+//   persist and every request looks unauthenticated. In that case fall back to
+//   a non-Secure, SameSite=Lax cookie (works fine for same-origin self-hosting).
+// Override the auto-detection with COOKIE_SECURE=true|false (e.g. set it to
+// "true" when self-hosting behind your own HTTPS reverse proxy).
+const onReplit = Boolean(
+  process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN,
+);
+const cookieSecure =
+  process.env.COOKIE_SECURE != null
+    ? process.env.COOKIE_SECURE === "true"
+    : onReplit;
+// SameSite=None is only valid alongside Secure; otherwise use Lax.
+const cookieSameSite: "none" | "lax" = cookieSecure ? "none" : "lax";
+
+app.set("trust proxy", cookieSecure ? 1 : false);
 app.use(
   session({
     store: new PgSession({
@@ -53,15 +70,15 @@ app.use(
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    proxy: true,
+    proxy: cookieSecure,
     // Idle timeout: the session expires 15 minutes after the last request.
     // `rolling` resets that countdown on every request, so active use keeps the
     // session alive while inactivity (no requests) lets it lapse.
     rolling: true,
     cookie: {
       httpOnly: true,
-      sameSite: "none",
-      secure: true,
+      sameSite: cookieSameSite,
+      secure: cookieSecure,
       maxAge: 1000 * 60 * 15,
     },
   }),
@@ -82,6 +99,13 @@ function allowedOrigins(): Set<string> {
   for (const d of domains) set.add(`https://${d}`);
   const dev = process.env.REPLIT_DEV_DOMAIN;
   if (dev) set.add(`https://${dev}`);
+  // Extra origins for self-hosting: comma-separated full origins, e.g.
+  // "https://magazzino.example.org,http://localhost:8082".
+  const extra = (process.env.APP_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  for (const o of extra) set.add(o);
   return set;
 }
 
@@ -91,9 +115,17 @@ app.use("/api", (req, res, next) => {
     return;
   }
   const allow = allowedOrigins();
-  // If we cannot determine our own domains, fail open to avoid lockout.
   if (allow.size === 0) {
-    next();
+    // No allowlist configured. Failing open is only safe when the session
+    // cookie is SameSite=Lax (the browser already refuses to send it on
+    // cross-site mutating requests). With a SameSite=None cookie an empty
+    // allowlist would leave mutations CSRF-exposed, so reject instead — set
+    // APP_ORIGINS (or REPLIT_DOMAINS) to allow them.
+    if (cookieSameSite !== "none") {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "Origine non consentita" });
     return;
   }
   const origin = req.get("origin");
