@@ -27,6 +27,7 @@ export * from './bollaInput';
 export * from './bollaRiga';
 export * from './bollaRigaInput';
 export * from './bollaUpdate';
+export * from './bootstrapStatus';
 export * from './bulkImportResult';
 export * from './bulkImportResultErroriItem';
 export * from './centroAscolto';

@@ -3069,6 +3069,11 @@ export const GetCurrentUserResponse = zod.object({
 })
 
 
+export const GetBootstrapStatusResponse = zod.object({
+  "bootstrap": zod.boolean()
+})
+
+
 
 export const changePasswordBodyNewPasswordMin = 6;
 

@@ -8,7 +8,8 @@ import {
   cittaTable,
   zoneUdsTable,
 } from "@workspace/db";
-import { AREA_BY_SEGMENT } from "../lib/areas";
+import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
+import { isBootstrapMode } from "../lib/bootstrap";
 
 export interface SessionUser {
   id: number;
@@ -99,19 +100,88 @@ export async function loadSessionUser(
   };
 }
 
+/**
+ * First-run bootstrap synthetic admin.
+ *
+ * While the system is in bootstrap mode (no admin user exists yet) and the
+ * request is unauthenticated, this synthetic admin is injected so the setup
+ * screen can create the initial users. It is NOT persisted and never has a real
+ * session — it only exists for the duration of a single whitelisted request.
+ */
+const BOOTSTRAP_ADMIN: SessionUser = {
+  id: 0,
+  username: "__bootstrap__",
+  nome: "Configurazione iniziale",
+  cognome: null,
+  matricola: null,
+  ruoloId: null,
+  ruoloNome: null,
+  centroAscoltoId: null,
+  centroAscoltoNome: null,
+  cittaId: null,
+  cittaNome: null,
+  zonaUdsId: null,
+  zonaUdsNome: null,
+  isAdmin: true,
+  aree: ALL_AREA_KEYS,
+  mustChangePassword: false,
+};
+
+/**
+ * Minimal set of requests reachable during first-run bootstrap WITHOUT
+ * authentication. Deliberately NOT a whole-segment whitelist: bootstrap visitors
+ * may ONLY do what the setup screen needs — read the available roles, read the
+ * users already created, and create a new user. Everything else (PATCH/DELETE
+ * users, any role mutation, etc.) stays behind authentication even on a fresh
+ * install, so the open setup surface cannot be abused for full admin CRUD.
+ */
+export function isBootstrapAllowedRequest(method: string, path: string): boolean {
+  // Normalize a trailing slash so "/utenti/" matches "/utenti".
+  const normalized = path.replace(/\/+$/, "") || "/";
+  if (method === "GET" && (normalized === "/ruoli" || normalized === "/utenti")) {
+    return true; // read the roles list + the users already created
+  }
+  if (method === "POST" && normalized === "/utenti") {
+    return true; // create a system user
+  }
+  return false;
+}
+
 export const requireAuth: RequestHandler = async (req, res, next) => {
+  // requireAuth is applied both globally (routes/index.ts) and again inside the
+  // admin routers (utenti/ruoli). When it runs again the user is already
+  // resolved; short-circuit so the inner pass is idempotent. This also matters
+  // for bootstrap: the inner `router.use("/utenti", requireAuth)` strips the
+  // mount prefix (req.path becomes "/"), so only the GLOBAL pass — which sees
+  // the full path — can correctly authorize the bootstrap request.
+  if (req.user) {
+    next();
+    return;
+  }
+
   const userId = req.session?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Non autenticato" });
+  if (userId) {
+    const user = await loadSessionUser(userId);
+    if (user) {
+      req.user = user;
+      next();
+      return;
+    }
+  }
+
+  // No valid session. On a fresh install (no admin user yet) allow a synthetic
+  // bootstrap admin, but ONLY for the minimal setup requests (read roles, read
+  // users, create a user) — never the full user/role CRUD surface.
+  if (
+    isBootstrapAllowedRequest(req.method, req.path) &&
+    (await isBootstrapMode())
+  ) {
+    req.user = BOOTSTRAP_ADMIN;
+    next();
     return;
   }
-  const user = await loadSessionUser(userId);
-  if (!user) {
-    res.status(401).json({ error: "Non autenticato" });
-    return;
-  }
-  req.user = user;
-  next();
+
+  res.status(401).json({ error: "Non autenticato" });
 };
 
 /**

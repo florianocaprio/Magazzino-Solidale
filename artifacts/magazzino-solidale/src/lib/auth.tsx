@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetCurrentUser,
   getGetCurrentUserQueryKey,
+  useGetBootstrapStatus,
+  getGetBootstrapStatusQueryKey,
   useLogoutUser,
   type AuthUser,
 } from "@workspace/api-client-react";
@@ -10,6 +12,9 @@ import {
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
+  bootstrap: boolean;
+  bootstrapLoading: boolean;
+  refreshBootstrap: () => void;
   hasArea: (area: string) => boolean;
   setUser: (user: AuthUser) => void;
   refresh: () => void;
@@ -19,6 +24,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const CURRENT_USER_KEY = getGetCurrentUserQueryKey();
+const BOOTSTRAP_KEY = getGetBootstrapStatusQueryKey();
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -29,9 +35,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       staleTime: 5 * 60 * 1000,
     },
   });
+  const { data: bootstrapData, isLoading: bootstrapLoading } =
+    useGetBootstrapStatus({
+      query: {
+        queryKey: BOOTSTRAP_KEY,
+        retry: false,
+        staleTime: 0,
+      },
+    });
   const logoutMutation = useLogoutUser();
 
   const user = isError ? null : (data ?? null);
+  const bootstrap = bootstrapData?.bootstrap ?? false;
 
   const hasArea = (area: string): boolean => {
     if (!user) return false;
@@ -48,6 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries({ queryKey: CURRENT_USER_KEY });
   };
 
+  const refreshBootstrap = () => {
+    queryClient.invalidateQueries({ queryKey: BOOTSTRAP_KEY });
+  };
+
   const logout = () => {
     logoutMutation.mutate(undefined, {
       onSettled: () => {
@@ -58,7 +77,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, hasArea, setUser, refresh, logout }}
+      value={{
+        user,
+        isLoading,
+        bootstrap,
+        bootstrapLoading,
+        refreshBootstrap,
+        hasArea,
+        setUser,
+        refresh,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

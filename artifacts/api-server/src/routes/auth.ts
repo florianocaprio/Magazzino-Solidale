@@ -8,10 +8,18 @@ import {
   requireAuth,
   type SessionUser,
 } from "../middlewares/auth";
+import { isBootstrapMode } from "../lib/bootstrap";
 
 const router: IRouter = Router();
 
 const SESSION_COOKIE = "magazzino.sid";
+
+// Public: tells the frontend whether the system still needs first-run setup
+// (no administrator exists yet). When true, the app shows the setup screen
+// instead of the login screen.
+router.get("/auth/bootstrap-status", async (_req, res): Promise<void> => {
+  res.json({ bootstrap: await isBootstrapMode() });
+});
 
 function authUserResponse(u: SessionUser) {
   return {

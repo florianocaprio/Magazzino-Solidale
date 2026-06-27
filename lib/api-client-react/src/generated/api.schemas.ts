@@ -1591,6 +1591,10 @@ export interface Area {
   label: string;
 }
 
+export interface BootstrapStatus {
+  bootstrap: boolean;
+}
+
 export interface AuthUser {
   id: number;
   username: string;

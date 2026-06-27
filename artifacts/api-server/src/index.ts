@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedAdmin } from "./lib/seedAdmin";
+import { seedRoles } from "./lib/seedRoles";
 import { seedRuoliVolontari } from "./lib/seedRuoliVolontari";
 import { seedTipiIntervento } from "./lib/seedTipiIntervento";
 import { seedTipologieFornitore } from "./lib/seedTipologieFornitore";
@@ -33,8 +33,8 @@ app.listen(port, (err) => {
     logger.error({ err }, "Failed to initialize DB extensions");
   });
 
-  seedAdmin().catch((err) => {
-    logger.error({ err }, "Failed to seed admin user");
+  seedRoles().catch((err) => {
+    logger.error({ err }, "Failed to seed default roles");
   });
 
   seedRuoliVolontari().catch((err) => {

@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import NotAuthorized from "@/pages/not-authorized";
 import Login from "@/pages/login";
 import ChangePassword from "@/pages/change-password";
+import Setup from "@/pages/setup";
 import { AppLayout } from "@/components/layout";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useIdleLogout } from "@/lib/use-idle-logout";
@@ -313,7 +314,8 @@ function AppRoutes() {
 }
 
 function AuthGate() {
-  const { user, isLoading, logout, refresh } = useAuth();
+  const { user, isLoading, bootstrap, bootstrapLoading, logout, refresh } =
+    useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
 
@@ -332,7 +334,7 @@ function AuthGate() {
     },
   });
 
-  if (isLoading) {
+  if (isLoading || bootstrapLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -340,7 +342,13 @@ function AuthGate() {
     );
   }
 
-  if (!user) return <Login />;
+  if (!user) {
+    // First-run: no administrator exists yet. Anyone may create the system
+    // users (one of which must be an admin) until an admin exists, after which
+    // the app locks down to the normal login.
+    if (bootstrap) return <Setup />;
+    return <Login />;
+  }
   if (user.mustChangePassword) return <ChangePassword />;
 
   return <AppRoutes />;

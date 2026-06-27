@@ -2507,6 +2507,18 @@ paths:
         "401":
           description: Not authenticated
 
+  /auth/bootstrap-status:
+    get:
+      operationId: getBootstrapStatus
+      tags: [auth]
+      responses:
+        "200":
+          description: Whether the system still needs first-run setup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BootstrapStatus"
+
   /auth/change-password:
     post:
       operationId: changePassword
@@ -5207,6 +5219,13 @@ components:
         label:
           type: string
       required: [key, label]
+
+    BootstrapStatus:
+      type: object
+      properties:
+        bootstrap:
+          type: boolean
+      required: [bootstrap]
 
     AuthUser:
       type: object

@@ -35,6 +35,7 @@ import { impostazioniStampa } from "./namespaces/impostazioniStampa";
 import { utenti } from "./namespaces/utenti";
 import { ruoli } from "./namespaces/ruoli";
 import { login } from "./namespaces/login";
+import { setup } from "./namespaces/setup";
 import { changePassword } from "./namespaces/changePassword";
 import { notAuthorized } from "./namespaces/notAuthorized";
 import { notFound } from "./namespaces/notFound";
@@ -80,6 +81,7 @@ const PAGE_NAMESPACES = {
   utenti,
   ruoli,
   login,
+  setup,
   changePassword,
   notAuthorized,
   notFound,
