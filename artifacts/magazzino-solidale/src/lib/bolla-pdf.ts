@@ -97,7 +97,9 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 14;
-  const accent = ACCENT[template];
+  const isAnnullato = bolla.stato === "annullato";
+  const RED: RGB = [220, 38, 38]; // red-600
+  const accent: RGB = isAnnullato ? RED : ACCENT[template];
 
   let y = margin;
 
@@ -165,6 +167,19 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     } else {
       y += 4;
     }
+  }
+
+  // ---- Banner ANNULLATA (storno): merce restituita a magazzino ----
+  if (isAnnullato) {
+    doc.setFillColor(RED[0], RED[1], RED[2]);
+    doc.rect(margin, y, pageW - 2 * margin, 9, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("DOCUMENTO ANNULLATO — MERCE RESTITUITA A MAGAZZINO", pageW / 2, y + 6, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    y += 13;
   }
 
   // ---- Centro di ascolto: trasportatore (se presente) + operatore ----

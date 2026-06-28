@@ -22,6 +22,7 @@ import {
   useListScarichi,
   useListConsegne,
   useAssociaBolla,
+  getBolla,
   getListBolleQueryKey,
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
@@ -44,6 +45,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -61,6 +63,38 @@ function statoBadge(stato: string) {
   if (stato === "confermato") return <Badge className="border-blue-300 text-blue-700 bg-blue-50">{i18n.t("bolle.statoConfermato")}</Badge>;
   if (stato === "annullato") return <Badge variant="destructive">{i18n.t("bolle.statoAnnullato")}</Badge>;
   return <Badge variant="secondary">{i18n.t("bolle.statoBozza")}</Badge>;
+}
+
+// ─── Helper download PDF bolla (riusabile da bolle + consegne) ───────────────
+
+type CentroLite = { id: number; nome: string; indirizzo?: string | null; comune?: string | null; logoUrl?: string | null };
+type BeneficiarioLite = { id: number; centroAscoltoId?: number | null };
+
+export async function downloadBollaPdf(
+  bollaId: number,
+  opts: {
+    beneficiari?: BeneficiarioLite[];
+    centri?: CentroLite[];
+    footer?: string | null;
+    template?: BollaTemplate;
+  },
+): Promise<void> {
+  const bolla = await getBolla(bollaId);
+  if (!bolla) throw new Error("bolla non trovata");
+  const benef = opts.beneficiari?.find((b) => b.id === bolla.beneficiarioId);
+  const centro = benef?.centroAscoltoId
+    ? opts.centri?.find((c) => c.id === benef.centroAscoltoId)
+    : undefined;
+  const associationLogoDataUrl = await loadAssociationLogo();
+  await generateBollaPdf({
+    bolla,
+    centro: centro
+      ? { nome: centro.nome, indirizzo: centro.indirizzo, comune: centro.comune, logoUrl: centro.logoUrl }
+      : null,
+    footer: opts.footer ?? null,
+    template: opts.template ?? "standard",
+    associationLogoDataUrl,
+  });
 }
 
 // ─── Form crea bolla ─────────────────────────────────────────────────────────
@@ -125,8 +159,13 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
     toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
   };
 
+  const selectedBenef = allBeneficiari?.find(b => String(b.id) === beneficiarioId);
+  const requiresTrasportatore = selectedBenef?.consegnaDomicilio === true;
+  const hasVolontario = trasportatore !== "" && trasportatore !== "__altro__";
+  const trasportatoreMissing = requiresTrasportatore && !hasVolontario;
+
   const onSubmit = () => {
-    if (!beneficiarioId || !magazzinoId) return;
+    if (!beneficiarioId || !magazzinoId || trasportatoreMissing) return;
     const data: {
       beneficiarioId: number;
       magazzinoId: number;
@@ -205,16 +244,13 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
           </div>
           <div className="space-y-2">
             <Label>{t("bolle.beneficiarioLabel")}</Label>
-            <Select value={beneficiarioId} onValueChange={setBeneficiarioId}>
-              <SelectTrigger><SelectValue placeholder={t("bolle.beneficiarioPlaceholder")} /></SelectTrigger>
-              <SelectContent>
-                {beneficiari?.length === 0 ? (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">{t("bolle.noBeneficiarioForCentro")}</div>
-                ) : beneficiari?.map(b => (
-                  <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BeneficiarioCombobox
+              items={(beneficiari ?? []).map(b => ({ id: b.id, nome: b.nome, cognome: b.cognome, codice: b.codice }))}
+              value={beneficiarioId}
+              onChange={setBeneficiarioId}
+              placeholder={t("bolle.beneficiarioPlaceholder")}
+              emptyText={t("bolle.noBeneficiarioForCentro")}
+            />
           </div>
           </>)}
           <div className="space-y-2">
@@ -251,11 +287,14 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
                 onChange={(e) => setTrasportatoreNome(e.target.value)}
               />
             )}
+            {trasportatoreMissing && (
+              <p className="text-sm text-destructive">{t("bolle.trasportatoreObbligatorioDomicilio")}</p>
+            )}
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-          <Button onClick={onSubmit} disabled={!beneficiarioId || !magazzinoId || createBolla.isPending}>
+          <Button onClick={onSubmit} disabled={!beneficiarioId || !magazzinoId || trasportatoreMissing || createBolla.isPending}>
             {t("bolle.createBolla")}
           </Button>
         </DialogFooter>
@@ -686,6 +725,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
       {
         onSuccess: () => {
           invalidateAll();
+          queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
           toast({ title: t("bolle.bollaAnnullataTitle"), description: t("bolle.bollaAnnullataDesc") });
           setAnnullaOpen(false);
         },
@@ -941,7 +981,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
       </div>
 
       {/* Azioni stato */}
-      {modificabile && (
+      {!isAnnullato && (
         <>
           <Separator />
           <div className="space-y-2">
@@ -1048,9 +1088,11 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
           <AlertDialogHeader>
             <AlertDialogTitle>{t("bolle.annullareTitle", { numero: bolla.numeroBolla })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {isConfermato
-                ? t("bolle.annullaDescConfermato")
-                : t("bolle.annullaDescBozza")}
+              {isConsegnato
+                ? t("bolle.annullaDescConsegnato")
+                : isConfermato
+                  ? t("bolle.annullaDescConfermato")
+                  : t("bolle.annullaDescBozza")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

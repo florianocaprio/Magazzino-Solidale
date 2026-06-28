@@ -827,21 +827,26 @@ router.post("/bolle/:id/annulla", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (bolla.stato === "consegnato") {
-    res.status(400).json({ error: "Non è possibile annullare una bolla già consegnata" });
-    return;
-  }
   if (bolla.stato === "annullato") {
     res.status(400).json({ error: "La bolla è già annullata" });
     return;
   }
 
-  // se confermata: storna tutti gli scarichi (uno per riga)
-  if (bolla.stato === "confermato") {
+  // se confermata o consegnata: la merce è già stata scaricata dal magazzino,
+  // quindi va stornata (ripristino lotti + cancellazione movimenti) per riga.
+  if (bolla.stato === "confermato" || bolla.stato === "consegnato") {
     const righe = await db.select().from(bollaRigheTable).where(eq(bollaRigheTable.bollaId, bollaId));
     for (const riga of righe) {
       await stornoRiga(riga, bollaId);
     }
+  }
+
+  // se era consegnata e collegata a una consegna effettuata, riportiamo la
+  // consegna a "pianificata" così i dati restano coerenti dopo lo storno.
+  if (bolla.stato === "consegnato" && bolla.consegnaId != null) {
+    await db.update(consegneTable)
+      .set({ stato: "pianificata", dataEffettuata: null })
+      .where(and(eq(consegneTable.id, bolla.consegnaId), eq(consegneTable.stato, "effettuata")));
   }
 
   await db.update(bolleTable).set({ stato: "annullato", operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));

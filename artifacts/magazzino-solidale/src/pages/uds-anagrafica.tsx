@@ -637,17 +637,6 @@ export default function UdsAnagrafica() {
                     </FormItem>
                   )} />
                 </div>
-                <FormField control={form.control} name="consegnaDomicilio" render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-md border p-3">
-                    <FormLabel className="!mt-0">{t("beneficiari.colDomicilio")}</FormLabel>
-                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                  </FormItem>
-                )} />
-                {form.watch("consegnaDomicilio") && (
-                  <FormField control={form.control} name="motivoConsegnaDomicilio" render={({ field }) => (
-                    <FormItem><FormLabel>{t("beneficiarioDettaglio.motivoConsegna")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
-                  )} />
-                )}
                 <FormField control={form.control} name="restrizioniAlimentari" render={({ field }) => (
                   <FormItem><FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
                 )} />
