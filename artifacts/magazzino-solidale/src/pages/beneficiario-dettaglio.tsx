@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, getListBeneficiariQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getListCittaQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ExportButtons } from "@/components/export-buttons";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil, Plus, Trash2, CreditCard } from "lucide-react";
@@ -324,7 +325,7 @@ const makeEditSchema = (t: (k: string) => string) => z.object({
   dataNascita: z.string().optional(),
   sesso: z.string().optional(),
   cittadinanza: z.string().optional(),
-  areaProvenienza: z.string().optional(),
+  areaProvenienza: z.string().min(1, t("beneficiarioDettaglio.required")),
   residenza: z.string().optional(),
   domicilio: z.string().optional(),
   comune: z.string().optional(),
@@ -336,6 +337,9 @@ const makeEditSchema = (t: (k: string) => string) => z.object({
   consegnaDomicilio: z.boolean(),
   motivoConsegnaDomicilio: z.string().optional(),
   restrizioniAlimentari: z.string().optional(),
+  uds: z.boolean().default(false),
+  cittaId: z.string().optional(),
+  zonaUdsId: z.string().optional(),
 });
 
 type EditValues = z.infer<ReturnType<typeof makeEditSchema>>;
@@ -345,6 +349,9 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   const updateBeneficiario = useUpdateBeneficiario();
   const { toast } = useToast();
   const editSchema = useMemo(() => makeEditSchema(t), [t]);
+  const { user } = useAuth();
+  const isCittaGlobal = user?.cittaId == null;
+  const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
 
   const form = useForm<EditValues>({
     resolver: zodResolver(editSchema),
@@ -367,19 +374,42 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       consegnaDomicilio: b.consegnaDomicilio ?? false,
       motivoConsegnaDomicilio: b.motivoConsegnaDomicilio ?? "",
       restrizioniAlimentari: b.restrizioniAlimentari ?? "",
+      uds: b.uds ?? false,
+      cittaId: b.cittaId != null ? String(b.cittaId) : "",
+      zonaUdsId: b.zonaUdsId != null ? String(b.zonaUdsId) : "",
     },
   });
 
+  const watchUds = form.watch("uds");
+  const formCitta = isCittaGlobal
+    ? (form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined)
+    : (user?.cittaId ?? undefined);
+  const { data: udsZone } = useListZoneUds(
+    formCitta ? { cittaId: formCitta } : undefined,
+    { query: { queryKey: ["zoneUds", "editBenefForm", formCitta], enabled: watchUds && formCitta != null } },
+  );
+
   const onSubmit = (data: EditValues) => {
-    const payload = {
-      ...data,
+    const { uds, cittaId, zonaUdsId, ...rest } = data;
+    // A città-global admin must pin a città when flagging a person as UDS.
+    if (uds && isCittaGlobal && !cittaId) {
+      form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
+      return;
+    }
+    const payload: Record<string, unknown> = {
+      ...rest,
+      uds,
       dataNascita: data.dataNascita || undefined,
       sesso: data.sesso || undefined,
       areaProvenienza: data.areaProvenienza || undefined,
       codiceFiscale: data.codiceFiscale?.trim() ? data.codiceFiscale.trim().toUpperCase() : null,
     };
+    if (uds) {
+      if (isCittaGlobal && cittaId) payload.cittaId = parseInt(cittaId);
+      payload.zonaUdsId = zonaUdsId && zonaUdsId !== NONE_VALUE ? parseInt(zonaUdsId) : null;
+    }
     updateBeneficiario.mutate(
-      { id: b.id, data: payload },
+      { id: b.id, data: payload as never },
       {
         onSuccess: () => onSaved(),
         onError: () => toast({ title: t("beneficiarioDettaglio.error"), description: t("beneficiarioDettaglio.errorSave"), variant: "destructive" }),
@@ -431,7 +461,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 )} />
                 <FormField control={form.control} name="areaProvenienza" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("beneficiarioDettaglio.areaProvenienza")}</FormLabel>
+                    <FormLabel>{t("beneficiarioDettaglio.areaProvenienza")} *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -439,6 +469,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                         <SelectItem value="Extra-UE">Extra-UE</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )} />
               </div>
@@ -503,6 +534,48 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 <FormItem><FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
               )} />
 
+              <div className="rounded-md border p-3 space-y-3">
+                <FormField control={form.control} name="uds" render={({ field }) => (
+                  <FormItem className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <FormLabel className="!mt-0">{t("beneficiari.udsToggle")}</FormLabel>
+                      <p className="text-xs text-muted-foreground">{t("beneficiari.udsToggleHint")}</p>
+                    </div>
+                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  </FormItem>
+                )} />
+                {watchUds && (
+                  <>
+                    {isCittaGlobal && (
+                      <FormField control={form.control} name="cittaId" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
+                          <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NONE_VALUE); }}>
+                            <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
+                    <FormField control={form.control} name="zonaUdsId" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
+                        <Select value={field.value || NONE_VALUE} onValueChange={field.onChange}>
+                          <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.allZone")} /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value={NONE_VALUE}>{t("udsAnagrafica.allZone")}</SelectItem>
+                            {udsZone?.map(z => <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )} />
+                  </>
+                )}
+              </div>
+
               <div className="pt-6 flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
                 <Button type="submit" disabled={updateBeneficiario.isPending}>{t("common.save")}</Button>
@@ -521,6 +594,8 @@ const makeMembroSchema = (t: (k: string) => string) => z.object({
   relazione: z.string().optional(),
   dataNascita: z.string().optional(),
   sesso: z.string().optional(),
+  areaProvenienza: z.string().optional(),
+  note: z.string().optional(),
 });
 type MembroValues = z.infer<ReturnType<typeof makeMembroSchema>>;
 
@@ -534,7 +609,7 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
 
   const form = useForm<MembroValues>({
     resolver: zodResolver(membroSchema),
-    defaultValues: { nome: "", cognome: "", relazione: "", dataNascita: "", sesso: "" },
+    defaultValues: { nome: "", cognome: "", relazione: "", dataNascita: "", sesso: "", areaProvenienza: "", note: "" },
   });
 
   const onAdd = (data: MembroValues) => {
@@ -547,6 +622,8 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
           relazione: data.relazione || undefined,
           dataNascita: data.dataNascita || undefined,
           sesso: data.sesso || undefined,
+          areaProvenienza: data.areaProvenienza || undefined,
+          note: data.note || undefined,
         },
       },
       {
@@ -599,6 +676,7 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
                     <div className="font-medium flex items-center gap-2">
                       {m.nome} {m.cognome}
                       {m.sesso && <Badge variant="outline" className="text-[10px]">{SESSO_LABEL[m.sesso] ?? m.sesso}</Badge>}
+                      {m.areaProvenienza && <Badge variant="outline" className="text-[10px]">{m.areaProvenienza}</Badge>}
                     </div>
                     <div className="text-xs text-muted-foreground flex gap-3">
                       <span>{t("beneficiarioDettaglio.relazione")}: {m.relazione || '-'}</span>
@@ -662,6 +740,21 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
                   </FormItem>
                 )} />
               </div>
+              <FormField control={form.control} name="areaProvenienza" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("beneficiarioDettaglio.areaProvenienza")}</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="UE">UE</SelectItem>
+                      <SelectItem value="Extra-UE">Extra-UE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="note" render={({ field }) => (
+                <FormItem><FormLabel>{t("common.notes")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
+              )} />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => { setAdding(false); form.reset(); }}>{t("common.cancel")}</Button>
                 <Button type="submit" disabled={addMembro.isPending}>{t("common.add")}</Button>

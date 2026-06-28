@@ -11,6 +11,7 @@ export interface NucleoFamiliareInput {
   cognome?: string;
   dataNascita?: string;
   sesso?: string;
+  areaProvenienza?: string;
   relazione?: string;
   tagliaVestiti?: string;
   numeroScarpe?: string;

@@ -52,6 +52,7 @@ export const nucleoFamiliareTable = pgTable("nucleo_familiare", {
   cognome: varchar("cognome", { length: 80 }),
   dataNascita: date("data_nascita"),
   sesso: varchar("sesso", { length: 1 }),
+  areaProvenienza: varchar("area_provenienza", { length: 10 }),
   relazione: varchar("relazione", { length: 60 }),
   tagliaVestiti: varchar("taglia_vestiti", { length: 20 }),
   numeroScarpe: varchar("numero_scarpe", { length: 10 }),

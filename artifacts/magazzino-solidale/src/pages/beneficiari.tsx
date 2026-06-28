@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey } from "@workspace/api-client-react";
@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -29,20 +30,32 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-const formSchema = z.object({
+const makeFormSchema = (t: (k: string) => string) => z.object({
   cognome: z.string().min(2),
   nome: z.string().min(2),
+  soprannome: z.string().optional(),
   codiceFiscale: z.string().optional(),
+  dataNascita: z.string().optional(),
+  sesso: z.string().optional(),
+  cittadinanza: z.string().optional(),
+  areaProvenienza: z.string().min(1, t("common.requiredField")),
+  residenza: z.string().optional(),
+  domicilio: z.string().optional(),
   comune: z.string().optional(),
   zonaMunicipio: z.string().optional(),
+  telefono: z.string().optional(),
+  email: z.string().optional(),
   numComponenti: z.coerce.number().min(1).default(1),
   priorita: z.string().default("media"),
   centroAscoltoId: z.string().optional(),
   consegnaDomicilio: z.boolean().default(false),
+  motivoConsegnaDomicilio: z.string().optional(),
+  restrizioniAlimentari: z.string().optional(),
   uds: z.boolean().default(false),
   cittaId: z.string().optional(),
   zonaUdsId: z.string().optional(),
 });
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 const CENTRO_ALL = "__all__";
 const PRIORITA_ALL = "__all__";
@@ -97,11 +110,14 @@ export default function Beneficiari() {
     });
   };
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const formSchema = useMemo(() => makeFormSchema(t), [t]);
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      cognome: "", nome: "", comune: "", zonaMunicipio: "",
-      numComponenti: 1, priorita: "media", centroAscoltoId: "", consegnaDomicilio: false,
+      cognome: "", nome: "", soprannome: "", codiceFiscale: "", dataNascita: "", sesso: "",
+      cittadinanza: "", areaProvenienza: "", residenza: "", domicilio: "", comune: "", zonaMunicipio: "",
+      telefono: "", email: "", numComponenti: 1, priorita: "media", centroAscoltoId: "",
+      consegnaDomicilio: false, motivoConsegnaDomicilio: "", restrizioniAlimentari: "",
       uds: false, cittaId: "", zonaUdsId: ""
     }
   });
@@ -136,7 +152,9 @@ export default function Beneficiari() {
   });
   const suggestions = dupMatches ?? [];
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const resetDup = () => { setDupDismissed(false); setDupParams({}); };
+
+  const onSubmit = (data: FormValues) => {
     const { centroAscoltoId, codiceFiscale, cittaId, zonaUdsId, uds, ...rest } = data;
     // A città-global admin must pin a città when flagging a person as UDS,
     // mirroring the server-side hard-boundary guard.
@@ -147,6 +165,8 @@ export default function Beneficiari() {
     const payload: Record<string, unknown> = {
       ...rest,
       uds,
+      dataNascita: rest.dataNascita || undefined,
+      sesso: rest.sesso || undefined,
       centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
       codiceFiscale: codiceFiscale?.trim() ? codiceFiscale.trim().toUpperCase() : null,
     };
@@ -159,6 +179,8 @@ export default function Beneficiari() {
         queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
         toast({ title: t("beneficiari.toastAdded") });
         setIsFormOpen(false);
+        resetDup();
+        form.reset();
       }
     });
   };
@@ -430,7 +452,7 @@ export default function Beneficiari() {
         </CardContent>
       </Card>
 
-      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Sheet open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { resetDup(); form.reset(); } }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader><SheetTitle>{t("beneficiari.newBeneficiario")}</SheetTitle></SheetHeader>
           <div className="mt-6">
@@ -475,9 +497,67 @@ export default function Beneficiari() {
                   </div>
                 )}
 
-                <FormField control={form.control} name="codiceFiscale" render={({ field }) => (
-                  <FormItem><FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel><FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl></FormItem>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="codiceFiscale" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel><FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="soprannome" render={({ field }) => (
+                    <FormItem><FormLabel>{t("udsAnagrafica.fSoprannome")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="dataNascita" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiarioDettaglio.dataNascita")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="sesso" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("beneficiarioDettaglio.sesso")}</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="M">{t("beneficiarioDettaglio.maschio")}</SelectItem>
+                          <SelectItem value="F">{t("beneficiarioDettaglio.femmina")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="cittadinanza" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiarioDettaglio.cittadinanza")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="areaProvenienza" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("beneficiarioDettaglio.areaProvenienza")} *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="UE">UE</SelectItem>
+                          <SelectItem value="Extra-UE">Extra-UE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                <FormField control={form.control} name="residenza" render={({ field }) => (
+                  <FormItem><FormLabel>{t("beneficiarioDettaglio.residenza")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
+                <FormField control={form.control} name="domicilio" render={({ field }) => (
+                  <FormItem><FormLabel>{t("beneficiarioDettaglio.domicilio")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="telefono" render={({ field }) => (
+                    <FormItem><FormLabel>{t("common.phone")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="email" render={({ field }) => (
+                    <FormItem><FormLabel>{t("common.email")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="comune" render={({ field }) => (
@@ -518,6 +598,21 @@ export default function Beneficiari() {
                       </SelectContent>
                     </Select>
                   </FormItem>
+                )} />
+
+                <FormField control={form.control} name="consegnaDomicilio" render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <FormLabel className="mb-0">{t("beneficiarioDettaglio.consegnaDomicilio")}</FormLabel>
+                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  </FormItem>
+                )} />
+                {form.watch("consegnaDomicilio") && (
+                  <FormField control={form.control} name="motivoConsegnaDomicilio" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiarioDettaglio.motivoConsegna")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
+                  )} />
+                )}
+                <FormField control={form.control} name="restrizioniAlimentari" render={({ field }) => (
+                  <FormItem><FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
                 )} />
 
                 <div className="rounded-md border p-3 space-y-3">
@@ -563,7 +658,7 @@ export default function Beneficiari() {
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); resetDup(); form.reset(); }}>{t("common.cancel")}</Button>
                   <Button type="submit" disabled={createBeneficiario.isPending}>{t("common.save")}</Button>
                 </div>
               </form>

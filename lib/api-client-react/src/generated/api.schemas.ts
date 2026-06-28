@@ -825,6 +825,8 @@ export interface NucleoFamiliare {
   /** @nullable */
   sesso?: string | null;
   /** @nullable */
+  areaProvenienza?: string | null;
+  /** @nullable */
   relazione?: string | null;
   /** @nullable */
   tagliiaVestiti?: string | null;
@@ -1230,6 +1232,7 @@ export interface NucleoFamiliareInput {
   cognome?: string;
   dataNascita?: string;
   sesso?: string;
+  areaProvenienza?: string;
   relazione?: string;
   tagliaVestiti?: string;
   numeroScarpe?: string;

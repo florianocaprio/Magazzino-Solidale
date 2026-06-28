@@ -45,7 +45,7 @@ export const beneficiarioDettaglio = {
     sesso: "Sesso",
     maschio: "Maschio",
     femmina: "Femmina",
-    cittadinanza: "Cittadinanza",
+    cittadinanza: "Nazionalità",
     areaProvenienza: "Area provenienza",
     residenza: "Residenza",
     domicilio: "Domicilio",

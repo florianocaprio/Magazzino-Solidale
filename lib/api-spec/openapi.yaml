@@ -4466,6 +4466,8 @@ components:
           type: ["string", "null"]
         sesso:
           type: ["string", "null"]
+        areaProvenienza:
+          type: ["string", "null"]
         relazione:
           type: ["string", "null"]
         tagliiaVestiti:
@@ -4488,6 +4490,8 @@ components:
         dataNascita:
           type: string
         sesso:
+          type: string
+        areaProvenienza:
           type: string
         relazione:
           type: string

@@ -19,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -61,12 +62,19 @@ function makeSchema(t: (k: string) => string, isGlobal: boolean) {
       codiceFiscale: z.string().optional(),
       dataNascita: z.string().optional(),
       sesso: z.string().optional(),
+      cittadinanza: z.string().optional(),
+      areaProvenienza: z.string().min(1, t("common.requiredField")),
+      residenza: z.string().optional(),
+      domicilio: z.string().optional(),
       telefono: z.string().optional(),
+      email: z.string().optional(),
       comune: z.string().optional(),
       zonaMunicipio: z.string().optional(),
       numComponenti: z.string().optional(),
       priorita: z.string().optional(),
       consegnaDomicilio: z.boolean().optional(),
+      motivoConsegnaDomicilio: z.string().optional(),
+      restrizioniAlimentari: z.string().optional(),
       zonaUdsId: z.string().optional(),
       cittaId: z.string().optional(),
       centroAscoltoId: z.string().optional(),
@@ -162,12 +170,19 @@ export default function UdsAnagrafica() {
       codiceFiscale: "",
       dataNascita: "",
       sesso: "",
+      cittadinanza: "",
+      areaProvenienza: "",
+      residenza: "",
+      domicilio: "",
       telefono: "",
+      email: "",
       comune: "",
       zonaMunicipio: "",
       numComponenti: "1",
       priorita: "media",
       consegnaDomicilio: false,
+      motivoConsegnaDomicilio: "",
+      restrizioniAlimentari: "",
       zonaUdsId: user?.zonaUdsId != null ? String(user.zonaUdsId) : NO_ZONE,
       cittaId: "",
       centroAscoltoId: "",
@@ -186,12 +201,19 @@ export default function UdsAnagrafica() {
       codiceFiscale: "",
       dataNascita: "",
       sesso: "",
+      cittadinanza: "",
+      areaProvenienza: "",
+      residenza: "",
+      domicilio: "",
       telefono: "",
+      email: "",
       comune: "",
       zonaMunicipio: "",
       numComponenti: "1",
       priorita: "media",
       consegnaDomicilio: false,
+      motivoConsegnaDomicilio: "",
+      restrizioniAlimentari: "",
       zonaUdsId:
         filterZona !== ALL_ZONE
           ? filterZona
@@ -254,6 +276,8 @@ export default function UdsAnagrafica() {
     if (s.uds) {
       toast({ title: t("udsAnagrafica.dupAlreadyUds") });
       setIsFormOpen(false);
+      setDupDismissed(false);
+      setDupParams({});
       return;
     }
     updateBenef.mutate(
@@ -263,6 +287,8 @@ export default function UdsAnagrafica() {
           invalidate();
           toast({ title: t("udsAnagrafica.dupLinked") });
           setIsFormOpen(false);
+          setDupDismissed(false);
+          setDupParams({});
         },
         onError: (err) => {
           toast({
@@ -289,12 +315,19 @@ export default function UdsAnagrafica() {
     if (data.codiceFiscale) payload.codiceFiscale = data.codiceFiscale;
     if (data.dataNascita) payload.dataNascita = data.dataNascita;
     if (data.sesso) payload.sesso = data.sesso;
+    if (data.cittadinanza) payload.cittadinanza = data.cittadinanza;
+    if (data.areaProvenienza) payload.areaProvenienza = data.areaProvenienza;
+    if (data.residenza) payload.residenza = data.residenza;
+    if (data.domicilio) payload.domicilio = data.domicilio;
     if (data.telefono) payload.telefono = data.telefono;
+    if (data.email) payload.email = data.email;
     if (data.comune) payload.comune = data.comune;
     if (data.zonaMunicipio) payload.zonaMunicipio = data.zonaMunicipio;
     if (data.numComponenti) payload.numComponenti = parseInt(data.numComponenti);
     if (data.priorita) payload.priorita = data.priorita;
     payload.consegnaDomicilio = data.consegnaDomicilio ?? false;
+    if (data.motivoConsegnaDomicilio) payload.motivoConsegnaDomicilio = data.motivoConsegnaDomicilio;
+    if (data.restrizioniAlimentari) payload.restrizioniAlimentari = data.restrizioniAlimentari;
     if (data.uds && data.zonaUdsId && data.zonaUdsId !== NO_ZONE) {
       payload.zonaUdsId = parseInt(data.zonaUdsId);
     }
@@ -307,6 +340,8 @@ export default function UdsAnagrafica() {
           invalidate();
           toast({ title: t("udsAnagrafica.toastCreated") });
           setIsFormOpen(false);
+          setDupDismissed(false);
+          setDupParams({});
         },
         onError: (err) => {
           toast({
@@ -469,7 +504,7 @@ export default function UdsAnagrafica() {
         </CardContent>
       </Card>
 
-      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Sheet open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setDupDismissed(false); setDupParams({}); } }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{t("udsAnagrafica.newTitle")}</SheetTitle>
@@ -545,8 +580,35 @@ export default function UdsAnagrafica() {
                 <FormField control={form.control} name="telefono" render={({ field }) => (
                   <FormItem><FormLabel>{t("udsAnagrafica.fTelefono")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem><FormLabel>{t("common.email")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
                 <FormField control={form.control} name="codiceFiscale" render={({ field }) => (
                   <FormItem><FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel><FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="cittadinanza" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiarioDettaglio.cittadinanza")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="areaProvenienza" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("beneficiarioDettaglio.areaProvenienza")} *</FormLabel>
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="UE">UE</SelectItem>
+                          <SelectItem value="Extra-UE">Extra-UE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="residenza" render={({ field }) => (
+                  <FormItem><FormLabel>{t("beneficiarioDettaglio.residenza")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="domicilio" render={({ field }) => (
+                  <FormItem><FormLabel>{t("beneficiarioDettaglio.domicilio")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="comune" render={({ field }) => (
@@ -580,6 +642,14 @@ export default function UdsAnagrafica() {
                     <FormLabel className="!mt-0">{t("beneficiari.colDomicilio")}</FormLabel>
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
+                )} />
+                {form.watch("consegnaDomicilio") && (
+                  <FormField control={form.control} name="motivoConsegnaDomicilio" render={({ field }) => (
+                    <FormItem><FormLabel>{t("beneficiarioDettaglio.motivoConsegna")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
+                  )} />
+                )}
+                <FormField control={form.control} name="restrizioniAlimentari" render={({ field }) => (
+                  <FormItem><FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
                 )} />
 
                 <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
@@ -650,7 +720,7 @@ export default function UdsAnagrafica() {
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setDupDismissed(false); setDupParams({}); }}>{t("common.cancel")}</Button>
                   <Button type="submit" disabled={createBenef.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
