@@ -1230,6 +1230,7 @@ export default function Bolle() {
   const { data: beneficiari } = useListBeneficiari();
   const { data: impostazioni } = useGetImpostazioniStampa();
   const consegnaBolla = useConsegnaBolla();
+  const annullaBolla = useAnnullaBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -1239,6 +1240,7 @@ export default function Bolle() {
   const [downloadingScarId, setDownloadingScarId] = useState<number | null>(null);
   const [downloadingBollaId, setDownloadingBollaId] = useState<number | null>(null);
   const [consegnandoBollaId, setConsegnandoBollaId] = useState<number | null>(null);
+  const [stornaTarget, setStornaTarget] = useState<{ id: number; numeroBolla: string; stato: string } | null>(null);
 
   const downloadBolla = async (e: React.MouseEvent, bollaId: number) => {
     e.stopPropagation();
@@ -1271,6 +1273,23 @@ export default function Bolle() {
         },
         onError: () => toast({ title: t("bolle.error"), description: t("bolle.consegnaError"), variant: "destructive" }),
         onSettled: () => setConsegnandoBollaId(null),
+      }
+    );
+  };
+
+  const confirmStorna = () => {
+    if (!stornaTarget) return;
+    annullaBolla.mutate(
+      { id: stornaTarget.id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
+          toast({ title: t("bolle.bollaAnnullataTitle"), description: t("bolle.bollaAnnullataDesc") });
+          setStornaTarget(null);
+        },
+        onError: () => toast({ title: t("bolle.error"), description: t("bolle.annullaError"), variant: "destructive" }),
       }
     );
   };
@@ -1513,6 +1532,17 @@ export default function Bolle() {
                           {t("bolle.segnaConsegnata")}
                         </Button>
                       )}
+                      {(row.bolla.stato === "confermato" || row.bolla.stato === "consegnato") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); setStornaTarget({ id: row.bolla.id, numeroBolla: row.bolla.numeroBolla, stato: row.bolla.stato }); }}
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          {t("bolle.storna")}
+                        </Button>
+                      )}
                       {(row.bolla.stato === "confermato" || row.bolla.stato === "consegnato" || row.bolla.stato === "annullato") && (
                         <Button
                           size="sm"
@@ -1586,6 +1616,29 @@ export default function Bolle() {
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={stornaTarget !== null} onOpenChange={open => { if (!open) setStornaTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("bolle.annullareTitle", { numero: stornaTarget?.numeroBolla ?? "" })}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {stornaTarget?.stato === "consegnato"
+                ? t("bolle.annullaDescConsegnato")
+                : t("bolle.annullaDescConfermato")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmStorna}
+              disabled={annullaBolla.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("bolle.annullaBolla")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
