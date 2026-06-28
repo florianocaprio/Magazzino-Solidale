@@ -28,6 +28,7 @@ import { tipologieFornitore } from "./namespaces/tipologieFornitore";
 import { mezzi } from "./namespaces/mezzi";
 import { fornitori } from "./namespaces/fornitori";
 import { approvvigionamenti } from "./namespaces/approvvigionamenti";
+import { turni } from "./namespaces/turni";
 import { report } from "./namespaces/report";
 import { reportUds } from "./namespaces/reportUds";
 import { udsReportGiornaliero } from "./namespaces/udsReportGiornaliero";
@@ -74,6 +75,7 @@ const PAGE_NAMESPACES = {
   mezzi,
   fornitori,
   approvvigionamenti,
+  turni,
   report,
   reportUds,
   udsReportGiornaliero,

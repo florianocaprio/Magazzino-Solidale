@@ -32,3 +32,4 @@
 - [areaGuard amministrazione auto-deny](areaguard-amministrazione-deny.md) — putting "amministrazione" in an AREA_BY_SEGMENT array makes the segment admin-only (denies non-admins even with another mapped area); map to the non-admin area + per-handler requireAdmin instead.
 - [Configurable volontari roles](configurable-volontari-roles.md) — volontari.ruolo stays free-text role NAME (no FK); ruoli_volontari table is just a configurable picklist seeded with legacy keys; delete only retires the option.
 - [zxing camera barcode scanner](zxing-scanner.md) — one shared BarcodeScannerButton; pin @zxing/library to @zxing/browser's peer (0.22.x); camera needs HTTPS; wrap existing scan-button onClick in arrow after adding codeOverride param.
+- [Turni assignment endpoint](turni-pianificazione.md) — PUT /turni replaces volunteer set; validate each volontarioId against turno centro (null OR same) or GET-join leaks names cross-scope; dedupe + tx replace.

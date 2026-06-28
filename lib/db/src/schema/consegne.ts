@@ -14,6 +14,7 @@ export const consegneTable = pgTable("consegne", {
   magazzinoId: integer("magazzino_id").notNull(),
   volontarioId: integer("volontario_id"),
   mezzoId: integer("mezzo_id"),
+  mezzoAltro: boolean("mezzo_altro").notNull().default(false),
   stato: varchar("stato", { length: 20 }).notNull().default("pianificata"),
   motivo_mancata: text("motivo_mancata"),
   noteOperative: text("note_operative"),

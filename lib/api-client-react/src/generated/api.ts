@@ -83,6 +83,7 @@ import type {
   ListMovimentiParams,
   ListProdottiParams,
   ListTrasferimentiParams,
+  ListTurniParams,
   ListZoneUdsParams,
   LoginInput,
   Lotto,
@@ -133,6 +134,8 @@ import type {
   Trasferimento,
   TrasferimentoInput,
   TrasferimentoUpdate,
+  Turno,
+  TurnoInput,
   UdsInterventiMeseReport,
   UdsInterventiTipoReport,
   UdsInterventiZonaReport,
@@ -3205,6 +3208,219 @@ export const useSubmitApprovvigionamento = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSubmitApprovvigionamentoMutationOptions(options));
+    }
+
+export const getListTurniUrl = (params?: ListTurniParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/turni?${stringifiedParams}` : `/api/turni`
+}
+
+export const listTurni = async (params?: ListTurniParams, options?: RequestInit): Promise<Turno[]> => {
+
+  return customFetch<Turno[]>(getListTurniUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTurniQueryKey = (params?: ListTurniParams,) => {
+    return [
+    `/api/turni`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListTurniQueryOptions = <TData = Awaited<ReturnType<typeof listTurni>>, TError = ErrorType<unknown>>(params?: ListTurniParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTurni>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTurniQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTurni>>> = ({ signal }) => listTurni(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTurni>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTurniQueryResult = NonNullable<Awaited<ReturnType<typeof listTurni>>>
+export type ListTurniQueryError = ErrorType<unknown>
+
+
+
+export function useListTurni<TData = Awaited<ReturnType<typeof listTurni>>, TError = ErrorType<unknown>>(
+ params?: ListTurniParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTurni>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTurniQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpsertTurnoUrl = () => {
+
+
+
+
+  return `/api/turni`
+}
+
+/**
+ * @summary Create or replace a shift (centro+data+fascia) and its volunteers
+ */
+export const upsertTurno = async (turnoInput: TurnoInput, options?: RequestInit): Promise<Turno> => {
+
+  return customFetch<Turno>(getUpsertTurnoUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      turnoInput,)
+  }
+);}
+
+
+
+
+export const getUpsertTurnoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertTurno>>, TError,{data: BodyType<TurnoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertTurno>>, TError,{data: BodyType<TurnoInput>}, TContext> => {
+
+const mutationKey = ['upsertTurno'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertTurno>>, {data: BodyType<TurnoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertTurno(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertTurnoMutationResult = NonNullable<Awaited<ReturnType<typeof upsertTurno>>>
+    export type UpsertTurnoMutationBody = BodyType<TurnoInput>
+    export type UpsertTurnoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create or replace a shift (centro+data+fascia) and its volunteers
+ */
+export const useUpsertTurno = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertTurno>>, TError,{data: BodyType<TurnoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertTurno>>,
+        TError,
+        {data: BodyType<TurnoInput>},
+        TContext
+      > => {
+      return useMutation(getUpsertTurnoMutationOptions(options));
+    }
+
+export const getDeleteTurnoUrl = (id: number,) => {
+
+
+
+
+  return `/api/turni/${id}`
+}
+
+export const deleteTurno = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteTurnoUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteTurnoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteTurno'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTurno>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteTurno(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTurnoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTurno>>>
+
+    export type DeleteTurnoMutationError = ErrorType<unknown>
+
+    export const useDeleteTurno = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTurno>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteTurnoMutationOptions(options));
     }
 
 export const getListBeneficiariUrl = (params?: ListBeneficiariParams,) => {

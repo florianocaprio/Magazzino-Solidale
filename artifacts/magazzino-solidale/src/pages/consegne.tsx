@@ -36,6 +36,7 @@ const formSchema = z.object({
   magazzinoId: z.coerce.number().min(1),
   volontarioId: z.coerce.number().optional(),
   mezzoId: z.coerce.number().optional(),
+  mezzoAltro: z.boolean().optional(),
   noteOperative: z.string().optional()
 });
 
@@ -169,6 +170,7 @@ export default function Consegne() {
     const data = { ...raw };
     if (!data.volontarioId) delete data.volontarioId;
     if (!data.mezzoId) delete data.mezzoId;
+    data.mezzoAltro = !!data.mezzoAltro && !data.mezzoId;
     createConsegna.mutate({ data }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
@@ -215,6 +217,7 @@ export default function Consegne() {
       magazzinoId: c.magazzinoId,
       volontarioId: c.volontarioId ?? undefined,
       mezzoId: c.mezzoId ?? undefined,
+      mezzoAltro: c.mezzoAltro ?? false,
       noteOperative: c.noteOperative ?? undefined,
     };
     createConsegna.mutate({ data }, {
@@ -628,7 +631,7 @@ export default function Consegne() {
                     <FormField control={form.control} name="volontarioId" render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t("consegne.formVolontario")}</FormLabel>
-                        <Select onValueChange={(v) => { field.onChange(v); form.setValue("mezzoId", 0); }} defaultValue={field.value ? String(field.value) : undefined}>
+                        <Select onValueChange={(v) => { field.onChange(v); form.setValue("mezzoId", 0); form.setValue("mezzoAltro", false); }} defaultValue={field.value ? String(field.value) : undefined}>
                           <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="0">{t("common.none")}</SelectItem>
@@ -648,12 +651,18 @@ export default function Consegne() {
                         </Select>
                       </FormItem>
                     )} />
-                    {!!form.watch("volontarioId") && (
-                      <FormField control={form.control} name="mezzoId" render={({ field }) => (
+                    {(() => {
+                      const selVol = volontari?.find(v => v.id === Number(form.watch("volontarioId")));
+                      if (!selVol?.patente) return null;
+                      const mezzoVal = form.watch("mezzoAltro") ? "altro" : (form.watch("mezzoId") ? String(form.watch("mezzoId")) : "0");
+                      return (
                         <FormItem>
                           <FormLabel>{t("consegne.formMezzo")}</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value ? String(field.value) : "0"}>
-                            <FormControl><SelectTrigger><SelectValue placeholder={t("consegne.mezzoPlaceholder")} /></SelectTrigger></FormControl>
+                          <Select value={mezzoVal} onValueChange={(v) => {
+                            if (v === "altro") { form.setValue("mezzoId", 0); form.setValue("mezzoAltro", true); }
+                            else { form.setValue("mezzoId", Number(v)); form.setValue("mezzoAltro", false); }
+                          }}>
+                            <SelectTrigger><SelectValue placeholder={t("consegne.mezzoPlaceholder")} /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="0">{t("common.none")}</SelectItem>
                               {mezzi?.filter(m => {
@@ -666,11 +675,12 @@ export default function Consegne() {
                                   {m.codice}{m.targa ? ` (${m.targa})` : ""} — {m.tipo}
                                 </SelectItem>
                               ))}
+                              <SelectItem value="altro">{t("consegne.mezzoAltro")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormItem>
-                      )} />
-                    )}
+                      );
+                    })()}
                   </div>
                 )}
 

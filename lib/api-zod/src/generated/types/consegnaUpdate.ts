@@ -14,6 +14,7 @@ export interface ConsegnaUpdate {
   zona?: string;
   volontarioId?: number;
   mezzoId?: number;
+  mezzoAltro?: boolean;
   stato?: string;
   noteOperative?: string;
 }

@@ -23,6 +23,7 @@ import {
   Footprints,
   HeartHandshake,
   CalendarClock,
+  CalendarDays,
   Printer,
   ShieldCheck,
   UserCog,
@@ -78,6 +79,7 @@ const NAV_ITEMS = [
   { key: "interventi", url: "/interventi", icon: ClipboardList, groupKey: "sociale", area: "sociale" },
   { key: "consegne", url: "/consegne", icon: Truck, groupKey: "sociale", area: "sociale" },
   { key: "bolle", url: "/bolle", icon: FileText, groupKey: "sociale", area: "sociale" },
+  { key: "turni", url: "/turni", icon: CalendarDays, groupKey: "sociale", area: "sociale" },
   { key: "scarichi", url: "/scarichi", icon: PackageMinus, groupKey: "sociale", area: "sociale" },
 
   { key: "udsAnagrafica", url: "/uds/anagrafica", icon: Footprints, groupKey: "uds", area: "uds" },

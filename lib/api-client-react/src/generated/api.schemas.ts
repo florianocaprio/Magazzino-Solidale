@@ -735,6 +735,36 @@ export interface ApprovvigionamentoUpdate {
   note?: string;
 }
 
+export interface TurnoVolontario {
+  volontarioId: number;
+  /** @nullable */
+  volontarioNome?: string | null;
+  /** @nullable */
+  ruolo?: string | null;
+}
+
+export interface Turno {
+  id: number;
+  centroAscoltoId: number;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  data: string;
+  fascia: string;
+  volontari: TurnoVolontario[];
+}
+
+export interface TurnoVolontarioInput {
+  volontarioId: number;
+  ruolo?: string;
+}
+
+export interface TurnoInput {
+  centroAscoltoId: number;
+  data: string;
+  fascia: string;
+  volontari: TurnoVolontarioInput[];
+}
+
 export interface BeneficiarioSimile {
   id: number;
   codice: string;
@@ -899,6 +929,7 @@ export interface Consegna {
   volontarioNome?: string | null;
   /** @nullable */
   mezzoId?: number | null;
+  mezzoAltro?: boolean;
   stato: string;
   /** @nullable */
   bollaId?: number | null;
@@ -1284,6 +1315,7 @@ export interface ConsegnaInput {
   magazzinoId: number;
   volontarioId?: number;
   mezzoId?: number;
+  mezzoAltro?: boolean;
   noteOperative?: string;
 }
 
@@ -1295,6 +1327,7 @@ export interface ConsegnaUpdate {
   zona?: string;
   volontarioId?: number;
   mezzoId?: number;
+  mezzoAltro?: boolean;
   stato?: string;
   noteOperative?: string;
 }
@@ -1323,6 +1356,7 @@ export interface Bolla {
   trasportatoreNome?: string | null;
   /** @nullable */
   mezzoId?: number | null;
+  mezzoAltro?: boolean;
   stato: string;
   /** @nullable */
   noteConsegna?: string | null;
@@ -1383,6 +1417,7 @@ export interface BollaDettaglio {
   trasportatoreNome?: string | null;
   /** @nullable */
   mezzoId?: number | null;
+  mezzoAltro?: boolean;
   stato: string;
   /** @nullable */
   noteConsegna?: string | null;
@@ -1418,6 +1453,7 @@ export interface BollaInput {
   volontarioConsegnaId?: number;
   trasportatoreNome?: string;
   mezzoId?: number;
+  mezzoAltro?: boolean;
   noteConsegna?: string;
 }
 
@@ -1431,6 +1467,7 @@ export interface BollaUpdate {
   trasportatoreNome?: string | null;
   /** @nullable */
   mezzoId?: number | null;
+  mezzoAltro?: boolean;
   indirizzoConsegna?: string;
   /** @nullable */
   noteConsegna?: string | null;
@@ -1792,6 +1829,12 @@ centroAscoltoId?: number;
 export type ListApprovvigionamentiParams = {
 stato?: string;
 magazzinoId?: number;
+centroAscoltoId?: number;
+};
+
+export type ListTurniParams = {
+da?: string;
+a?: string;
 centroAscoltoId?: number;
 };
 

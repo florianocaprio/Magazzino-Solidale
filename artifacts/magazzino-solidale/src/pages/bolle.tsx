@@ -174,6 +174,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   const selectedBenef = allBeneficiari?.find(b => String(b.id) === beneficiarioId);
   const requiresTrasportatore = selectedBenef?.consegnaDomicilio === true;
   const hasVolontario = trasportatore !== "" && trasportatore !== "__altro__";
+  const selVolPatente = hasVolontario && (volontari?.find(v => String(v.id) === trasportatore)?.patente ?? false);
   const trasportatoreMissing = requiresTrasportatore && !hasVolontario;
 
   const onSubmit = () => {
@@ -185,13 +186,15 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
       volontarioConsegnaId?: number;
       trasportatoreNome?: string;
       mezzoId?: number;
+      mezzoAltro?: boolean;
     } = { beneficiarioId: parseInt(beneficiarioId), magazzinoId: parseInt(magazzinoId) };
     if (consegnaId != null) data.consegnaId = consegnaId;
     if (trasportatore === "__altro__") {
       data.trasportatoreNome = trasportatoreNome.trim() || "Ritiro presso il magazzino";
     } else if (trasportatore) {
       data.volontarioConsegnaId = parseInt(trasportatore);
-      if (mezzoId && mezzoId !== "__none__") data.mezzoId = parseInt(mezzoId);
+      if (mezzoId === "__altro__") data.mezzoAltro = true;
+      else if (mezzoId && mezzoId !== "__none__") data.mezzoId = parseInt(mezzoId);
     }
     createBolla.mutate(
       { data },
@@ -311,7 +314,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
               <p className="text-sm text-destructive">{t("bolle.trasportatoreObbligatorioDomicilio")}</p>
             )}
           </div>
-          {hasVolontario && (
+          {hasVolontario && selVolPatente && (
             <div className="space-y-2">
               <Label>{t("bolle.mezzoLabel")}</Label>
               <Select value={mezzoId} onValueChange={setMezzoId}>
@@ -328,6 +331,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
                       {m.codice}{m.targa ? ` (${m.targa})` : ""} — {m.tipo}
                     </SelectItem>
                   ))}
+                  <SelectItem value="__altro__">{t("bolle.mezzoAltro")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -23,6 +23,7 @@ import bolleRouter from "./bolle";
 import trasferimentiRouter from "./trasferimenti";
 import scarichiRouter from "./scarichi";
 import approvvigionamentiRouter from "./approvvigionamenti";
+import turniRouter from "./turni";
 import impostazioniStampaRouter from "./impostazioni-stampa";
 import reportRouter from "./report";
 import authRouter from "./auth";
@@ -70,6 +71,7 @@ router.use(bolleRouter);
 router.use(trasferimentiRouter);
 router.use(scarichiRouter);
 router.use(approvvigionamentiRouter);
+router.use(turniRouter);
 router.use(impostazioniStampaRouter);
 router.use(reportRouter);
 

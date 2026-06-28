@@ -18,5 +18,6 @@ export * from "./bolle";
 export * from "./trasferimenti";
 export * from "./scarichi";
 export * from "./approvvigionamenti";
+export * from "./turni";
 export * from "./impostazioni";
 export * from "./auth";

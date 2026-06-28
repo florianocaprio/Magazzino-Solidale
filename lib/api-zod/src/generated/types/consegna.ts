@@ -33,6 +33,7 @@ export interface Consegna {
   volontarioNome?: string | null;
   /** @nullable */
   mezzoId?: number | null;
+  mezzoAltro?: boolean;
   stato: string;
   /** @nullable */
   bollaId?: number | null;

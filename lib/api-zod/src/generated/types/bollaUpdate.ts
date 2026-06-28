@@ -16,6 +16,7 @@ export interface BollaUpdate {
   trasportatoreNome?: string | null;
   /** @nullable */
   mezzoId?: number | null;
+  mezzoAltro?: boolean;
   indirizzoConsegna?: string;
   /** @nullable */
   noteConsegna?: string | null;

@@ -35,6 +35,7 @@ import BeneficiarioDettaglio from "@/pages/beneficiario-dettaglio";
 import Interventi from "@/pages/interventi";
 import Consegne from "@/pages/consegne";
 import Bolle from "@/pages/bolle";
+import Turni from "@/pages/turni";
 import ImpostazioniStampa from "@/pages/impostazioni-stampa";
 import Approvvigionamenti from "@/pages/approvvigionamenti";
 import Report from "@/pages/report";
@@ -180,6 +181,13 @@ function AppRoutes() {
           {() => (
             <Guard area="sociale">
               <Bolle />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/turni">
+          {() => (
+            <Guard area="sociale">
+              <Turni />
             </Guard>
           )}
         </Route>

@@ -33,6 +33,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   consegne: "sociale",
   bolle: "sociale",
   scarichi: "sociale",
+  turni: "sociale",
 
   volontari: "logistica",
   // Mapped to "logistica" so non-admin logistica staff can READ the list to

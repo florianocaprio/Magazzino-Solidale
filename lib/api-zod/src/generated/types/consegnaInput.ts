@@ -16,5 +16,6 @@ export interface ConsegnaInput {
   magazzinoId: number;
   volontarioId?: number;
   mezzoId?: number;
+  mezzoAltro?: boolean;
   noteOperative?: string;
 }

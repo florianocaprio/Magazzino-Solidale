@@ -15,6 +15,7 @@ export const bolleTable = pgTable("bolle", {
   volontarioConsegnaId: integer("volontario_consegna_id"),
   trasportatoreNome: varchar("trasportatore_nome", { length: 120 }),
   mezzoId: integer("mezzo_id"),
+  mezzoAltro: boolean("mezzo_altro").notNull().default(false),
   stato: varchar("stato", { length: 20 }).notNull().default("bozza"),
   noteConsegna: text("note_consegna"),
   confermaRicezione: boolean("conferma_ricezione").notNull().default(false),

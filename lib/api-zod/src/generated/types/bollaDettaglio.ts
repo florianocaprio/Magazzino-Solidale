@@ -37,6 +37,7 @@ export interface BollaDettaglio {
   trasportatoreNome?: string | null;
   /** @nullable */
   mezzoId?: number | null;
+  mezzoAltro?: boolean;
   stato: string;
   /** @nullable */
   noteConsegna?: string | null;
