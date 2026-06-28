@@ -1,30 +1,9 @@
-// Uses the Replit Gmail connector (integration id: google-mail) via the
-// connectors-sdk proxy. The SDK injects OAuth2 auth and refreshes tokens.
-import { ReplitConnectors } from "@replit/connectors-sdk";
-import { logger } from "./logger.js";
+// Builds and sends the procurement order email via the shared email service
+// (Gmail connector by default, or custom SMTP — configured in Impostazioni).
+import { sendEmail, getEmailSettings } from "./emailService.js";
 
+// Default recipient when no adminEmail is configured in Impostazioni Email.
 export const AMMINISTRAZIONE_EMAIL = "amministrazione@angeliinmoto.it";
-// Sending account connected via the Gmail connector.
-const MITTENTE_EMAIL = "info@angeliinmoto.it";
-
-const connectors = new ReplitConnectors();
-
-function encodeMimeWord(value: string): string {
-  return `=?UTF-8?B?${Buffer.from(value, "utf-8").toString("base64")}?=`;
-}
-
-// RFC 2045: base64 body lines must not exceed 76 chars; fold with CRLF.
-function foldBase64(value: string): string {
-  return value.replace(/.{1,76}/g, "$&\r\n").trimEnd();
-}
-
-function toBase64Url(buf: Buffer): string {
-  return buf
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
 
 export interface ApprovvigionamentoEmailData {
   codice: string;
@@ -68,44 +47,14 @@ export function buildApprovvigionamentoEmail(order: ApprovvigionamentoEmailData)
 }
 
 /**
- * Sends the procurement order email to amministrazione via the Gmail connector.
- * Builds an RFC 2822 message and posts it to the Gmail API messages.send endpoint
- * through the connectors proxy (handles OAuth2 token injection + refresh).
- * Throws on failure; the caller wraps this in try/catch so submission never fails.
+ * Sends the procurement order email to amministrazione via the configured
+ * provider (Gmail connector by default, or custom SMTP). Recipient is the
+ * adminEmail from Impostazioni Email, falling back to AMMINISTRAZIONE_EMAIL.
+ * Throws on failure; callers wrap this in try/catch when submission must not fail.
  */
 export async function sendApprovvigionamentoEmail(order: ApprovvigionamentoEmailData): Promise<void> {
   const { subject, text } = buildApprovvigionamentoEmail(order);
-
-  const mime = [
-    `From: ${MITTENTE_EMAIL}`,
-    `To: ${AMMINISTRAZIONE_EMAIL}`,
-    `Subject: ${encodeMimeWord(subject)}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset="UTF-8"`,
-    `Content-Transfer-Encoding: base64`,
-    ``,
-    foldBase64(Buffer.from(text, "utf-8").toString("base64")),
-  ].join("\r\n");
-
-  const raw = toBase64Url(Buffer.from(mime, "utf-8"));
-
-  const response = await connectors.proxy("google-mail", "/gmail/v1/users/me/messages/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ raw }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    logger.error(
-      { to: AMMINISTRAZIONE_EMAIL, subject, codice: order.codice, status: response.status, detail },
-      "Invio email approvvigionamento fallito",
-    );
-    throw new Error(`Gmail send failed with status ${response.status}`);
-  }
-
-  logger.info(
-    { to: AMMINISTRAZIONE_EMAIL, subject, codice: order.codice },
-    "Email approvvigionamento inviata",
-  );
+  const settings = await getEmailSettings();
+  const to = settings.adminEmail?.trim() || AMMINISTRAZIONE_EMAIL;
+  await sendEmail({ to, subject, text });
 }

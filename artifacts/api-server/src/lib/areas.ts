@@ -56,6 +56,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   report: "analisi",
 
   "impostazioni-stampa": "amministrazione",
+  "impostazioni-email": "amministrazione",
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",

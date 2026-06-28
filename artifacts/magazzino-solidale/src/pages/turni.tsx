@@ -11,7 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +30,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Truck } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ExportButtons } from "@/components/export-buttons";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Truck, Users } from "lucide-react";
 
 const FASCE = [
   { key: "09-13", labelKey: "fasciaMattina", time: "09:00–13:00" },
@@ -111,17 +121,48 @@ export default function Turni() {
     { query: { enabled: effectiveCentro != null, queryKey: getListTurniQueryKey({ da, a, centroAscoltoId: effectiveCentro ?? undefined }) } },
   );
 
+  // All turni visible to the caller for this week (no centro filter) — used for the
+  // allocation views and the cross-centro mezzo conflict detection. For a centro-scoped
+  // caller the server still limits this to their own centro.
+  const { data: allTurni } = useListTurni(
+    { da, a },
+    { query: { queryKey: getListTurniQueryKey({ da, a }) } },
+  );
+
   const turnoMap = useMemo(() => {
     const m = new Map<string, NonNullable<typeof turni>[number]>();
     for (const turno of turni ?? []) m.set(`${turno.data}|${turno.fascia}`, turno);
     return m;
   }, [turni]);
 
+  // key `data|fascia` → set of mezzoId already booked by ANOTHER centro in that slot.
+  const bookedElsewhere = useMemo(() => {
+    const m = new Map<string, Set<number>>();
+    for (const turno of allTurni ?? []) {
+      if (turno.mezzoId == null) continue;
+      if (turno.centroAscoltoId === effectiveCentro) continue;
+      const k = `${turno.data}|${turno.fascia}`;
+      const s = m.get(k) ?? new Set<number>();
+      s.add(turno.mezzoId);
+      m.set(k, s);
+    }
+    return m;
+  }, [allTurni, effectiveCentro]);
+
   const upsert = useUpsertTurno();
 
   const [dialog, setDialog] = useState<{ data: string; fascia: string } | null>(null);
   const [rows, setRows] = useState<VolRow[]>([]);
   const [mezzoId, setMezzoId] = useState<number | null>(null);
+
+  // Mezzi selectable for the open cell: hide those already booked by another centro
+  // in this exact data+fascia, but always keep the currently selected mezzo visible.
+  const mezziDisponibili = useMemo(() => {
+    if (!dialog) return mezziCentro;
+    const booked = bookedElsewhere.get(`${dialog.data}|${dialog.fascia}`);
+    if (!booked) return mezziCentro;
+    return mezziCentro.filter((m) => !booked.has(m.id) || m.id === mezzoId);
+  }, [mezziCentro, bookedElsewhere, dialog, mezzoId]);
 
   function openCell(dataISO: string, fascia: string) {
     if (effectiveCentro == null) return;
@@ -148,7 +189,13 @@ export default function Turni() {
           toast({ description: t("turni.saved") });
           setDialog(null);
         },
-        onError: () => toast({ variant: "destructive", description: t("turni.error") }),
+        onError: (err: unknown) => {
+          const status = (err as { response?: { status?: number } })?.response?.status;
+          toast({
+            variant: "destructive",
+            description: status === 409 ? t("turni.mezzoBookedElsewhere") : t("turni.error"),
+          });
+        },
       },
     );
   }
@@ -157,6 +204,56 @@ export default function Turni() {
     const f = FASCE.find((x) => x.key === key);
     return f ? `${t(`turni.${f.labelKey}`)} (${f.time})` : key;
   };
+
+  const fasciaShort = (key: string) => {
+    const f = FASCE.find((x) => x.key === key);
+    return f ? t(`turni.${f.labelKey}`) : key;
+  };
+
+  // Allocazione mezzi: per mezzo, le fasce/centri usati in ciascun giorno della settimana.
+  const mezziAlloc = useMemo(() => {
+    const map = new Map<
+      number,
+      { codice: string; tipo: string | null; byDay: Map<string, { fascia: string; centroNome: string | null }[]> }
+    >();
+    for (const turno of allTurni ?? []) {
+      if (turno.mezzoId == null) continue;
+      let m = map.get(turno.mezzoId);
+      if (!m) {
+        m = { codice: turno.mezzoCodice ?? `#${turno.mezzoId}`, tipo: turno.mezzoTipo ?? null, byDay: new Map() };
+        map.set(turno.mezzoId, m);
+      }
+      const arr = m.byDay.get(turno.data) ?? [];
+      arr.push({ fascia: turno.fascia, centroNome: turno.centroAscoltoNome ?? null });
+      m.byDay.set(turno.data, arr);
+    }
+    return [...map.entries()]
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((x, y) => x.codice.localeCompare(y.codice));
+  }, [allTurni]);
+
+  // Allocazione volontari per centro: turni, assegnazioni totali e volontari distinti.
+  const volPerCentro = useMemo(() => {
+    const map = new Map<
+      number,
+      { centroNome: string; turni: number; assegnazioni: number; distinti: Set<number> }
+    >();
+    for (const turno of allTurni ?? []) {
+      let c = map.get(turno.centroAscoltoId);
+      if (!c) {
+        c = { centroNome: turno.centroAscoltoNome ?? `#${turno.centroAscoltoId}`, turni: 0, assegnazioni: 0, distinti: new Set() };
+        map.set(turno.centroAscoltoId, c);
+      }
+      c.turni += 1;
+      for (const v of turno.volontari) {
+        c.assegnazioni += 1;
+        c.distinti.add(v.volontarioId);
+      }
+    }
+    return [...map.entries()]
+      .map(([id, v]) => ({ centroId: id, centroNome: v.centroNome, turni: v.turni, assegnazioni: v.assegnazioni, distinti: v.distinti.size }))
+      .sort((x, y) => x.centroNome.localeCompare(y.centroNome));
+  }, [allTurni]);
 
   return (
     <div className="space-y-6">
@@ -203,69 +300,182 @@ export default function Turni() {
         </span>
       </div>
 
-      {effectiveCentro == null ? (
-        <Card>
-          <CardContent className="text-muted-foreground py-12 text-center text-sm">
-            {t("turni.selectCentroFirst")}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="overflow-x-auto">
-          <div className="grid min-w-[900px] grid-cols-[140px_repeat(7,1fr)] gap-px rounded-lg border bg-border">
-            <div className="bg-muted p-2" />
-            {days.map((d) => {
-              const isToday = toISODate(d) === toISODate(new Date());
-              return (
-                <div key={d.toISOString()} className={`bg-muted p-2 text-center text-xs font-medium ${isToday ? "text-primary" : ""}`}>
-                  {d.toLocaleDateString(i18n.language, { weekday: "short" })}
-                  <div className="text-sm">{d.getDate()}</div>
-                </div>
-              );
-            })}
+      <Tabs defaultValue="pianificazione">
+        <TabsList>
+          <TabsTrigger value="pianificazione">{t("turni.tabPianificazione")}</TabsTrigger>
+          <TabsTrigger value="allocazione">{t("turni.tabAllocazione")}</TabsTrigger>
+        </TabsList>
 
-            {FASCE.map((f) => (
-              <div key={f.key} className="contents">
-                <div className="bg-background p-2 text-xs">
-                  <div className="font-medium">{t(`turni.${f.labelKey}`)}</div>
-                  <div className="text-muted-foreground">{f.time}</div>
-                </div>
+        <TabsContent value="pianificazione" className="mt-4">
+          {effectiveCentro == null ? (
+            <Card>
+              <CardContent className="text-muted-foreground py-12 text-center text-sm">
+                {t("turni.selectCentroFirst")}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="grid min-w-[900px] grid-cols-[140px_repeat(7,1fr)] gap-px rounded-lg border bg-border">
+                <div className="bg-muted p-2" />
                 {days.map((d) => {
-                  const iso = toISODate(d);
-                  const turno = turnoMap.get(`${iso}|${f.key}`);
+                  const isToday = toISODate(d) === toISODate(new Date());
                   return (
-                    <button
-                      key={`${iso}|${f.key}`}
-                      onClick={() => openCell(iso, f.key)}
-                      className="bg-background hover:bg-accent min-h-[72px] p-1.5 text-left align-top transition-colors"
-                    >
-                      {turno && turno.volontari.length ? (
-                        <div className="space-y-1">
-                          {turno.volontari.map((v) => (
-                            <div key={v.volontarioId} className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[11px] leading-tight">
-                              <div className="truncate font-medium">{v.volontarioNome ?? `#${v.volontarioId}`}</div>
-                              {v.ruolo && <div className="truncate opacity-80">{v.ruolo}</div>}
-                            </div>
-                          ))}
-                          {turno.mezzoCodice && (
-                            <div className="flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] leading-tight text-amber-700 dark:text-amber-400">
-                              <Truck className="h-3 w-3 shrink-0" />
-                              <span className="truncate font-medium">{turno.mezzoCodice}</span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px]">
-                          <Plus className="h-3 w-3" /> {t("turni.emptySlot")}
-                        </span>
-                      )}
-                    </button>
+                    <div key={d.toISOString()} className={`bg-muted p-2 text-center text-xs font-medium ${isToday ? "text-primary" : ""}`}>
+                      {d.toLocaleDateString(i18n.language, { weekday: "short" })}
+                      <div className="text-sm">{d.getDate()}</div>
+                    </div>
                   );
                 })}
+
+                {FASCE.map((f) => (
+                  <div key={f.key} className="contents">
+                    <div className="bg-background p-2 text-xs">
+                      <div className="font-medium">{t(`turni.${f.labelKey}`)}</div>
+                      <div className="text-muted-foreground">{f.time}</div>
+                    </div>
+                    {days.map((d) => {
+                      const iso = toISODate(d);
+                      const turno = turnoMap.get(`${iso}|${f.key}`);
+                      return (
+                        <button
+                          key={`${iso}|${f.key}`}
+                          onClick={() => openCell(iso, f.key)}
+                          className="bg-background hover:bg-accent min-h-[72px] p-1.5 text-left align-top transition-colors"
+                        >
+                          {turno && turno.volontari.length ? (
+                            <div className="space-y-1">
+                              {turno.volontari.map((v) => (
+                                <div key={v.volontarioId} className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[11px] leading-tight">
+                                  <div className="truncate font-medium">{v.volontarioNome ?? `#${v.volontarioId}`}</div>
+                                  {v.ruolo && <div className="truncate opacity-80">{v.ruolo}</div>}
+                                </div>
+                              ))}
+                              {turno.mezzoCodice && (
+                                <div className="flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] leading-tight text-amber-700 dark:text-amber-400">
+                                  <Truck className="h-3 w-3 shrink-0" />
+                                  <span className="truncate font-medium">{turno.mezzoCodice}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px]">
+                              <Plus className="h-3 w-3" /> {t("turni.emptySlot")}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="allocazione" className="mt-4 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-primary" /> {t("turni.allocMezziTitle")}
+              </CardTitle>
+              <CardDescription>{t("turni.allocMezziDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {mezziAlloc.length === 0 ? (
+                <p className="text-muted-foreground py-6 text-center text-sm">{t("turni.nessunMezzoAllocato")}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <div className="grid min-w-[900px] grid-cols-[160px_repeat(7,1fr)] gap-px rounded-lg border bg-border">
+                    <div className="bg-muted p-2 text-xs font-medium">{t("turni.colMezzo")}</div>
+                    {days.map((d) => {
+                      const isToday = toISODate(d) === toISODate(new Date());
+                      return (
+                        <div key={d.toISOString()} className={`bg-muted p-2 text-center text-xs font-medium ${isToday ? "text-primary" : ""}`}>
+                          {d.toLocaleDateString(i18n.language, { weekday: "short" })}
+                          <div className="text-sm">{d.getDate()}</div>
+                        </div>
+                      );
+                    })}
+                    {mezziAlloc.map((m) => (
+                      <div key={m.id} className="contents">
+                        <div className="bg-background p-2 text-xs">
+                          <div className="font-medium">{m.codice}</div>
+                          {m.tipo && <div className="text-muted-foreground">{m.tipo}</div>}
+                        </div>
+                        {days.map((d) => {
+                          const iso = toISODate(d);
+                          const entries = (m.byDay.get(iso) ?? []).slice().sort((x, y) => x.fascia.localeCompare(y.fascia));
+                          return (
+                            <div key={`${m.id}|${iso}`} className="bg-background min-h-[56px] p-1.5">
+                              <div className="space-y-1">
+                                {entries.map((e, i) => (
+                                  <div key={i} className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] leading-tight text-amber-700 dark:text-amber-400">
+                                    <div className="font-medium">{fasciaShort(e.fascia)}</div>
+                                    {e.centroNome && <div className="truncate opacity-80">{e.centroNome}</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" /> {t("turni.allocVolontariTitle")}
+                </CardTitle>
+                <CardDescription>{t("turni.allocVolontariDesc")}</CardDescription>
+              </div>
+              <ExportButtons
+                rows={volPerCentro}
+                columns={[
+                  { header: t("turni.colCentro"), accessor: (r) => r.centroNome },
+                  { header: t("turni.colTurni"), accessor: (r) => r.turni },
+                  { header: t("turni.colAssegnazioni"), accessor: (r) => r.assegnazioni },
+                  { header: t("turni.colVolontariDistinti"), accessor: (r) => r.distinti },
+                ]}
+                filename={`volontari_per_centro_${da}_${a}`}
+                title={t("turni.allocVolontariTitle")}
+                subtitle={`${da} – ${a}`}
+              />
+            </CardHeader>
+            <CardContent>
+              {volPerCentro.length === 0 ? (
+                <p className="text-muted-foreground py-6 text-center text-sm">{t("turni.nessunaAllocazione")}</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("turni.colCentro")}</TableHead>
+                      <TableHead className="text-right">{t("turni.colTurni")}</TableHead>
+                      <TableHead className="text-right">{t("turni.colAssegnazioni")}</TableHead>
+                      <TableHead className="text-right">{t("turni.colVolontariDistinti")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {volPerCentro.map((r) => (
+                      <TableRow key={r.centroId}>
+                        <TableCell className="font-medium">{r.centroNome}</TableCell>
+                        <TableCell className="text-right">{r.turni}</TableCell>
+                        <TableCell className="text-right">{r.assegnazioni}</TableCell>
+                        <TableCell className="text-right">{r.distinti}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={dialog != null} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent>
@@ -348,7 +558,7 @@ export default function Turni() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">{t("turni.nessunMezzo")}</SelectItem>
-                  {mezziCentro.map((m) => (
+                  {mezziDisponibili.map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>
                       {m.codice}
                       {m.tipo ? ` · ${m.tipo}` : ""}

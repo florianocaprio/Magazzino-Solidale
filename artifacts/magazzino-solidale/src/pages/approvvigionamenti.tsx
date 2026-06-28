@@ -5,6 +5,7 @@ import {
   useCreateApprovvigionamento,
   useUpdateApprovvigionamento,
   useSubmitApprovvigionamento,
+  useSendApprovvigionamentoEmail,
   useListFornitori,
   useListMagazzini,
   useListCentriAscolto,
@@ -24,7 +25,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, ShoppingCart, Pencil, Send, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, ShoppingCart, Pencil, Send, CheckCircle2, XCircle, Mail } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -93,6 +94,7 @@ export default function Approvvigionamenti() {
   const createApprovvigionamento = useCreateApprovvigionamento();
   const updateApprovvigionamento = useUpdateApprovvigionamento();
   const submitApprovvigionamento = useSubmitApprovvigionamento();
+  const sendEmail = useSendApprovvigionamentoEmail();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -103,6 +105,33 @@ export default function Approvvigionamenti() {
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListApprovvigionamentiQueryKey() });
+
+  const selectedFornitoreId = form.watch("fornitoreId");
+  const selectedFornitore = (fornitori ?? []).find((f) => f.id === Number(selectedFornitoreId));
+  const fornitoreCittaId = selectedFornitore?.cittaId ?? null;
+  const matchesCitta = (cittaId?: number | null) =>
+    fornitoreCittaId == null || cittaId == null || cittaId === fornitoreCittaId;
+  const filteredMagazzini = (magazzini ?? []).filter((m) => matchesCitta(m.cittaId));
+  const filteredCentri = (centri ?? []).filter((c) => matchesCitta(c.cittaId));
+
+  const handleFornitoreChange = (val: string) => {
+    form.setValue("fornitoreId", Number(val));
+    const f = (fornitori ?? []).find((x) => x.id === Number(val));
+    const cid = f?.cittaId ?? null;
+    if (cid == null) return;
+    const magId = form.getValues("magazzinoId");
+    if (magId != null) {
+      const m = (magazzini ?? []).find((x) => x.id === Number(magId));
+      if (m && m.cittaId != null && m.cittaId !== cid) form.setValue("magazzinoId", undefined);
+    }
+    if (!isCentroLocked) {
+      const cenId = form.getValues("centroAscoltoId");
+      if (cenId != null) {
+        const c = (centri ?? []).find((x) => x.id === Number(cenId));
+        if (c && c.cittaId != null && c.cittaId !== cid) form.setValue("centroAscoltoId", undefined);
+      }
+    }
+  };
 
   const openCreate = () => {
     setEditingId(null);
@@ -169,6 +198,22 @@ export default function Approvvigionamenti() {
           invalidate();
           toast({ title: t("approvvigionamenti.toastCompleted") });
         },
+      },
+    );
+  };
+
+  const handleInviaEmail = (a: OrderRow) => {
+    sendEmail.mutate(
+      { id: a.id },
+      {
+        onSuccess: (res) => {
+          if (res.sent) {
+            toast({ title: t("approvvigionamenti.toastEmailSent") });
+          } else {
+            toast({ title: t("approvvigionamenti.toastEmailError"), description: res.error ?? undefined, variant: "destructive" });
+          }
+        },
+        onError: () => toast({ title: t("approvvigionamenti.toastEmailError"), variant: "destructive" }),
       },
     );
   };
@@ -332,15 +377,26 @@ export default function Approvvigionamenti() {
                         </>
                       )}
                       {a.stato === "sottomesso" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
-                          disabled={updateApprovvigionamento.isPending}
-                          onClick={() => handleCompleta(a)}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> {t("approvvigionamenti.completatoBtn")}
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1.5"
+                            disabled={sendEmail.isPending}
+                            onClick={() => handleInviaEmail(a)}
+                          >
+                            <Mail className="h-3.5 w-3.5" /> {t("approvvigionamenti.inviaEmail")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
+                            disabled={updateApprovvigionamento.isPending}
+                            onClick={() => handleCompleta(a)}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" /> {t("approvvigionamenti.completatoBtn")}
+                          </Button>
+                        </>
                       )}
                     </div>
                   </TableCell>
@@ -367,7 +423,7 @@ export default function Approvvigionamenti() {
                 <FormField control={form.control} name="fornitoreId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("approvvigionamenti.fornitoreDonatore")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
+                    <Select onValueChange={handleFornitoreChange} value={field.value ? String(field.value) : undefined}>
                       <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {fornitori?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
@@ -382,7 +438,7 @@ export default function Approvvigionamenti() {
                       <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
                         <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
                         <SelectContent>
-                          {magazzini?.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
+                          {filteredMagazzini.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -393,7 +449,7 @@ export default function Approvvigionamenti() {
                       <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined} disabled={isCentroLocked}>
                         <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
                         <SelectContent>
-                          {centri?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                          {filteredCentri.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </FormItem>

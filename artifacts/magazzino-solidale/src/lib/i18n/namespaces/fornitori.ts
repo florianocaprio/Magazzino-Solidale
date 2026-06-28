@@ -12,6 +12,8 @@ export const fornitori = {
     contatti: "Contatti",
     noteOperative: "Note Operative",
     tuttiCentri: "Tutti i centri",
+    citta: "Città",
+    tutteCitta: "Tutte le città",
     tipi: {
       commerciale: "Azienda Commerciale",
       donatore_privato: "Donatore Privato",
@@ -43,6 +45,8 @@ export const fornitori = {
     contatti: "Contactos",
     noteOperative: "Notas Operativas",
     tuttiCentri: "Todos los centros",
+    citta: "Ciudad",
+    tutteCitta: "Todas las ciudades",
     tipi: {
       commerciale: "Empresa Comercial",
       donatore_privato: "Donante Privado",
@@ -74,6 +78,8 @@ export const fornitori = {
     contatti: "Contacts",
     noteOperative: "Operational Notes",
     tuttiCentri: "All centres",
+    citta: "City",
+    tutteCitta: "All cities",
     tipi: {
       commerciale: "Commercial Company",
       donatore_privato: "Private Donor",
@@ -105,6 +111,8 @@ export const fornitori = {
     contatti: "Contacts",
     noteOperative: "Notes opérationnelles",
     tuttiCentri: "Tous les centres",
+    citta: "Ville",
+    tutteCitta: "Toutes les villes",
     tipi: {
       commerciale: "Entreprise commerciale",
       donatore_privato: "Donateur privé",
@@ -136,6 +144,8 @@ export const fornitori = {
     contatti: "Kontakte",
     noteOperative: "Operative Notizen",
     tuttiCentri: "Alle Zentren",
+    citta: "Stadt",
+    tutteCitta: "Alle Städte",
     tipi: {
       commerciale: "Handelsunternehmen",
       donatore_privato: "Privater Spender",
@@ -167,6 +177,8 @@ export const fornitori = {
     contatti: "جهات الاتصال",
     noteOperative: "ملاحظات تشغيلية",
     tuttiCentri: "جميع المراكز",
+    citta: "المدينة",
+    tutteCitta: "كل المدن",
     tipi: {
       commerciale: "شركة تجارية",
       donatore_privato: "متبرع خاص",

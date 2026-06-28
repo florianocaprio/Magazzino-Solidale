@@ -27,7 +27,9 @@ export interface Fornitore {
   /** @nullable */
   siteWeb?: string | null;
   /** @nullable */
-  centroAscoltoId?: number | null;
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;

@@ -1,4 +1,5 @@
 - [Gmail connector send](gmail-connector-send.md) — send email via google-mail connector + connectors-sdk proxy (raw=base64url RFC2822); install SDK per-package not root; keep sends best-effort in caller try/catch.
+- [Email service + ICS](email-service-and-ics.md) — all senders go through emailService.sendEmail (provider connector|smtp from impostazioni_email singleton; smtpPassword write-only); consegne reminders attach all-day RFC5545 ICS; best-effort {sent,error?}.
 - [Orval query enabled pattern](orval-query-enabled.md) — when using `enabled` in Orval-generated hooks, must also pass `queryKey` in the query options object.
 - [Drizzle db.execute() returns QueryResult](drizzle-execute-rows.md) — `db.execute(sql\`...\`)` returns a QueryResult with a `.rows` property, not a plain array; cast `result.rows as Array<Record<string, unknown>>`.
 - [DB lib typecheck:libs before API routes](db-lib-rebuild.md) — after adding new schema files, run `pnpm run typecheck:libs` before checking the API server or the new table exports will be missing.

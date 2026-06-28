@@ -15,6 +15,8 @@ import {
   canAccessMagazzino,
 } from "../lib/centroScope";
 import { volontarioOverLimit } from "../lib/volontarioCarico";
+import { sendEmail } from "../lib/emailService";
+import { buildIcs } from "../lib/ics";
 
 const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
 
@@ -317,5 +319,112 @@ async function dettaglioConsegna(id: number) {
     dataCreazione: r.c.dataCreazione.toISOString(),
   };
 }
+
+// ─── REMINDER EMAIL (con ICS) ────────────────────────────────────────────────
+type EmailDestinatario = "beneficiario" | "volontario";
+
+async function caricaConsegnaPerEmail(consegnaId: number) {
+  const [r] = await db
+    .select({
+      c: consegneTable,
+      benNome: beneficiariTable.nome,
+      benCognome: beneficiariTable.cognome,
+      benEmail: beneficiariTable.email,
+      magazzinoNome: magazziniTable.nome,
+      magazzinoIndirizzo: magazziniTable.indirizzo,
+      volNome: volontariTable.nome,
+      volCognome: volontariTable.cognome,
+      volEmail: volontariTable.email,
+    })
+    .from(consegneTable)
+    .leftJoin(beneficiariTable, eq(consegneTable.beneficiarioId, beneficiariTable.id))
+    .leftJoin(magazziniTable, eq(consegneTable.magazzinoId, magazziniTable.id))
+    .leftJoin(volontariTable, eq(consegneTable.volontarioId, volontariTable.id))
+    .where(eq(consegneTable.id, consegnaId));
+  return r ?? null;
+}
+
+function luogoConsegna(r: NonNullable<Awaited<ReturnType<typeof caricaConsegnaPerEmail>>>): string {
+  if (r.c.tipoConsegna === "domicilio") {
+    return r.c.indirizzoConsegna?.trim() || "Domicilio del beneficiario";
+  }
+  return [r.magazzinoNome, r.magazzinoIndirizzo].filter(Boolean).join(" — ") || "Magazzino";
+}
+
+async function inviaReminderConsegna(req: import("express").Request, res: import("express").Response, destinatario: EmailDestinatario) {
+  const consegnaId = parseInt(req.params.id as string);
+  const r = await caricaConsegnaPerEmail(consegnaId);
+  if (!r) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(r.c.beneficiarioId), callerCentroId(req))
+      || !canAccessCitta(await beneficiarioCittaId(r.c.beneficiarioId), callerCittaId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+
+  const benNomeCompleto = r.benNome && r.benCognome ? `${r.benCognome} ${r.benNome}` : "il beneficiario";
+  const volNomeCompleto = r.volNome && r.volCognome ? `${r.volCognome} ${r.volNome}` : null;
+  const luogo = luogoConsegna(r);
+  const fascia = r.c.fasciaOraria?.trim();
+  const dataFmt = r.c.dataPrevista;
+
+  let to: string | null;
+  let subject: string;
+  let text: string;
+  if (destinatario === "beneficiario") {
+    to = r.benEmail?.trim() || null;
+    if (!to) { res.json({ sent: false, error: "Il beneficiario non ha un indirizzo email" }); return; }
+    subject = `Promemoria consegna — ${dataFmt}`;
+    text = [
+      `Gentile ${benNomeCompleto},`,
+      ``,
+      `le ricordiamo la consegna prevista per il giorno ${dataFmt}${fascia ? ` (${fascia})` : ""}.`,
+      `Luogo: ${luogo}.`,
+      ``,
+      `In allegato trova l'evento da aggiungere al suo calendario.`,
+      ``,
+      `Magazzino Solidale AIM`,
+    ].join("\n");
+  } else {
+    to = r.volEmail?.trim() || null;
+    if (r.c.volontarioId == null) { res.json({ sent: false, error: "Nessun volontario assegnato a questa consegna" }); return; }
+    if (!to) { res.json({ sent: false, error: "Il volontario non ha un indirizzo email" }); return; }
+    subject = `Promemoria consegna da effettuare — ${dataFmt}`;
+    text = [
+      `Ciao ${volNomeCompleto ?? ""},`.trim(),
+      ``,
+      `ti ricordiamo la consegna assegnata per il giorno ${dataFmt}${fascia ? ` (${fascia})` : ""}.`,
+      `Beneficiario: ${benNomeCompleto}.`,
+      `Luogo: ${luogo}.`,
+      ``,
+      `In allegato trovi l'evento da aggiungere al tuo calendario.`,
+      ``,
+      `Magazzino Solidale AIM`,
+    ].join("\n");
+  }
+
+  const ics = buildIcs({
+    uid: `consegna-${consegnaId}-${destinatario}@magazzino-solidale`,
+    date: dataFmt,
+    summary: destinatario === "beneficiario" ? "Consegna prevista" : `Consegna a ${benNomeCompleto}`,
+    description: fascia ? `Fascia oraria: ${fascia}` : undefined,
+    location: luogo,
+  });
+
+  try {
+    await sendEmail({
+      to,
+      subject,
+      text,
+      attachments: [{ filename: "consegna.ics", content: ics, contentType: "text/calendar; charset=utf-8" }],
+    });
+    res.json({ sent: true, error: null });
+  } catch (err) {
+    req.log.error({ err }, `Invio email consegna (${destinatario}) fallito`);
+    res.json({ sent: false, error: err instanceof Error ? err.message : "Invio fallito" });
+  }
+}
+
+router.post("/consegne/:id/invia-email-beneficiario", (req, res) => inviaReminderConsegna(req, res, "beneficiario"));
+router.post("/consegne/:id/invia-email-volontario", (req, res) => inviaReminderConsegna(req, res, "volontario"));
 
 export default router;

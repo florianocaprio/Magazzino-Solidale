@@ -33,6 +33,7 @@ import { report } from "./namespaces/report";
 import { reportUds } from "./namespaces/reportUds";
 import { udsReportGiornaliero } from "./namespaces/udsReportGiornaliero";
 import { impostazioniStampa } from "./namespaces/impostazioniStampa";
+import { impostazioniEmail } from "./namespaces/impostazioniEmail";
 import { utenti } from "./namespaces/utenti";
 import { ruoli } from "./namespaces/ruoli";
 import { login } from "./namespaces/login";
@@ -80,6 +81,7 @@ const PAGE_NAMESPACES = {
   reportUds,
   udsReportGiornaliero,
   impostazioniStampa,
+  impostazioniEmail,
   utenti,
   ruoli,
   login,

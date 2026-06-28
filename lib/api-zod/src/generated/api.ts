@@ -862,7 +862,7 @@ export const GetScaricoResponse = zod.object({
 
 
 export const ListFornitoriQueryParams = zod.object({
-  "centroAscoltoId": zod.coerce.number().optional()
+  "cittaId": zod.coerce.number().optional()
 })
 
 export const ListFornitoriResponseItem = zod.object({
@@ -877,7 +877,8 @@ export const ListFornitoriResponseItem = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
-  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
@@ -897,7 +898,7 @@ export const CreateFornitoreBody = zod.object({
   "email": zod.string().optional(),
   "referente": zod.string().optional(),
   "siteWeb": zod.string().optional(),
-  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
   "note": zod.string().optional(),
   "noteOperative": zod.string().optional()
 })
@@ -915,7 +916,7 @@ export const BulkFornitoriBody = zod.object({
   "email": zod.string().optional(),
   "referente": zod.string().optional(),
   "siteWeb": zod.string().optional(),
-  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
   "note": zod.string().optional(),
   "noteOperative": zod.string().optional()
 }))
@@ -946,7 +947,8 @@ export const GetFornitoreResponse = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
-  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
@@ -969,7 +971,7 @@ export const UpdateFornitoreBody = zod.object({
   "email": zod.string().optional(),
   "referente": zod.string().optional(),
   "siteWeb": zod.string().optional(),
-  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional(),
   "noteOperative": zod.string().optional()
@@ -987,7 +989,8 @@ export const UpdateFornitoreResponse = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
-  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
@@ -1149,6 +1152,19 @@ export const SubmitApprovvigionamentoResponse = zod.object({
   "note": zod.string().nullish()
 })).optional(),
   "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Manually (re)send the order email to amministrazione
+ */
+export const SendApprovvigionamentoEmailParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SendApprovvigionamentoEmailResponse = zod.object({
+  "sent": zod.boolean(),
+  "error": zod.string().nullish()
 })
 
 
@@ -1882,6 +1898,32 @@ export const CompletaConsegnaResponse = zod.object({
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Send a delivery reminder email (with ICS) to the beneficiary
+ */
+export const InviaEmailConsegnaBeneficiarioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const InviaEmailConsegnaBeneficiarioResponse = zod.object({
+  "sent": zod.boolean(),
+  "error": zod.string().nullish()
+})
+
+
+/**
+ * @summary Send a delivery reminder email (with ICS) to the assigned volunteer
+ */
+export const InviaEmailConsegnaVolontarioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const InviaEmailConsegnaVolontarioResponse = zod.object({
+  "sent": zod.boolean(),
+  "error": zod.string().nullish()
 })
 
 
@@ -2652,6 +2694,46 @@ export const UpdateImpostazioniStampaBody = zod.object({
 export const UpdateImpostazioniStampaResponse = zod.object({
   "templateBolla": zod.enum(['standard', 'moderno', 'minimal']),
   "footerBolla": zod.string().nullish(),
+  "dataAggiornamento": zod.string().optional()
+})
+
+
+export const GetImpostazioniEmailResponse = zod.object({
+  "provider": zod.enum(['connector', 'smtp']),
+  "mittenteEmail": zod.string().nullish(),
+  "mittenteNome": zod.string().nullish(),
+  "adminEmail": zod.string().nullish(),
+  "smtpHost": zod.string().nullish(),
+  "smtpPort": zod.number().nullish(),
+  "smtpSecure": zod.boolean(),
+  "smtpUser": zod.string().nullish(),
+  "hasPassword": zod.boolean(),
+  "dataAggiornamento": zod.string().optional()
+})
+
+
+export const UpdateImpostazioniEmailBody = zod.object({
+  "provider": zod.enum(['connector', 'smtp']).optional(),
+  "mittenteEmail": zod.string().nullish(),
+  "mittenteNome": zod.string().nullish(),
+  "adminEmail": zod.string().nullish(),
+  "smtpHost": zod.string().nullish(),
+  "smtpPort": zod.number().nullish(),
+  "smtpSecure": zod.boolean().optional(),
+  "smtpUser": zod.string().nullish(),
+  "smtpPassword": zod.string().nullish()
+})
+
+export const UpdateImpostazioniEmailResponse = zod.object({
+  "provider": zod.enum(['connector', 'smtp']),
+  "mittenteEmail": zod.string().nullish(),
+  "mittenteNome": zod.string().nullish(),
+  "adminEmail": zod.string().nullish(),
+  "smtpHost": zod.string().nullish(),
+  "smtpPort": zod.number().nullish(),
+  "smtpSecure": zod.boolean(),
+  "smtpUser": zod.string().nullish(),
+  "hasPassword": zod.boolean(),
   "dataAggiornamento": zod.string().optional()
 })
 

@@ -18,6 +18,7 @@ import {
   createMagazzino,
   createProdotto,
   createBeneficiario,
+  createCitta,
   createFornitore,
   createVolontario,
   createMezzo,
@@ -39,6 +40,8 @@ let bootScope: SeedScope;
 let operatoreId: number;
 let centroA: number;
 let centroB: number;
+let cittaA: number;
+let cittaB: number;
 
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 
@@ -51,6 +54,8 @@ beforeEach(async () => {
   scope = newScope();
   centroA = await createCentro(scope);
   centroB = await createCentro(scope);
+  cittaA = await createCitta(scope);
+  cittaB = await createCitta(scope);
 });
 
 afterEach(async () => {
@@ -62,13 +67,13 @@ afterAll(async () => {
   await pool.end();
 });
 
-describe("Fornitori — scoping per centro", () => {
-  it("lista: il caller del centro A vede A + comuni (NULL), non B", async () => {
-    const fA = await createFornitore(scope, centroA);
-    const fB = await createFornitore(scope, centroB);
+describe("Fornitori — scoping per città", () => {
+  it("lista: il caller della città A vede A + comuni (NULL), non B", async () => {
+    const fA = await createFornitore(scope, cittaA);
+    const fB = await createFornitore(scope, cittaB);
     const fNull = await createFornitore(scope, null);
     const res = await request(
-      makeScopedApp(fornitoriRouter, { id: operatoreId, centroAscoltoId: centroA }),
+      makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA }),
     ).get("/fornitori");
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
@@ -78,47 +83,47 @@ describe("Fornitori — scoping per centro", () => {
   });
 
   it("lista: il caller globale vede tutti", async () => {
-    const fA = await createFornitore(scope, centroA);
-    const fB = await createFornitore(scope, centroB);
+    const fA = await createFornitore(scope, cittaA);
+    const fB = await createFornitore(scope, cittaB);
     const res = await request(
-      makeScopedApp(fornitoriRouter, { id: operatoreId, centroAscoltoId: null }),
+      makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: null }),
     ).get("/fornitori");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([fA, fB]));
   });
 
-  it("GET /:id fuori centro → 403", async () => {
-    const fB = await createFornitore(scope, centroB);
+  it("GET /:id fuori città → 403", async () => {
+    const fB = await createFornitore(scope, cittaB);
     const res = await request(
-      makeScopedApp(fornitoriRouter, { id: operatoreId, centroAscoltoId: centroA }),
+      makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA }),
     ).get(`/fornitori/${fB}`);
     expect(res.status).toBe(403);
   });
 
-  it("POST auto-assegna e blocca il centro del caller", async () => {
+  it("POST auto-assegna e blocca la città del caller", async () => {
     const res = await request(
-      makeScopedApp(fornitoriRouter, { id: operatoreId, centroAscoltoId: centroA }),
+      makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA }),
     )
       .post("/fornitori")
-      .send({ nome: "Fornitore X", tipo: "azienda", centroAscoltoId: centroB });
+      .send({ nome: "Fornitore X", tipo: "azienda", cittaId: cittaB });
     expect(res.status).toBe(201);
     scope.fornitoreIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.body.cittaId).toBe(cittaA);
   });
 
-  it("PATCH /:id fuori centro → 403", async () => {
-    const fB = await createFornitore(scope, centroB);
+  it("PATCH /:id fuori città → 403", async () => {
+    const fB = await createFornitore(scope, cittaB);
     const res = await request(
-      makeScopedApp(fornitoriRouter, { id: operatoreId, centroAscoltoId: centroA }),
+      makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA }),
     )
       .patch(`/fornitori/${fB}`)
       .send({ nome: "Hack" });
     expect(res.status).toBe(403);
   });
 
-  it("DELETE /:id fuori centro → 403", async () => {
-    const fB = await createFornitore(scope, centroB);
+  it("DELETE /:id fuori città → 403", async () => {
+    const fB = await createFornitore(scope, cittaB);
     const res = await request(
-      makeScopedApp(fornitoriRouter, { id: operatoreId, centroAscoltoId: centroA }),
+      makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA }),
     ).delete(`/fornitori/${fB}`);
     expect(res.status).toBe(403);
   });

@@ -655,7 +655,7 @@ paths:
       operationId: listFornitori
       tags: [fornitori]
       parameters:
-        - name: centroAscoltoId
+        - name: cittaId
           in: query
           schema:
             type: integer
@@ -857,6 +857,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Approvvigionamento"
+
+  /approvvigionamenti/{id}/invia-email:
+    post:
+      operationId: sendApprovvigionamentoEmail
+      tags: [approvvigionamenti]
+      summary: Manually (re)send the order email to amministrazione
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSendResult"
 
   # ─── TURNI (Pianificazione Turni Sociale) ──────────────────────────────────
   /turni:
@@ -1354,6 +1373,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consegna"
+
+  /consegne/{id}/invia-email-beneficiario:
+    post:
+      operationId: inviaEmailConsegnaBeneficiario
+      tags: [consegne]
+      summary: Send a delivery reminder email (with ICS) to the beneficiary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email send result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSendResult"
+
+  /consegne/{id}/invia-email-volontario:
+    post:
+      operationId: inviaEmailConsegnaVolontario
+      tags: [consegne]
+      summary: Send a delivery reminder email (with ICS) to the assigned volunteer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email send result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSendResult"
 
   /consegne/{id}/associa-bolla:
     post:
@@ -2068,6 +2125,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImpostazioniStampa"
+
+  /impostazioni-email:
+    get:
+      operationId: getImpostazioniEmail
+      tags: [impostazioni-email]
+      responses:
+        "200":
+          description: Email settings (password never returned)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImpostazioniEmail"
+    put:
+      operationId: updateImpostazioniEmail
+      tags: [impostazioni-email]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImpostazioniEmailUpdate"
+      responses:
+        "200":
+          description: Updated email settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImpostazioniEmail"
 
   /volontari:
     get:
@@ -3774,8 +3859,10 @@ components:
           type: ["string", "null"]
         siteWeb:
           type: ["string", "null"]
-        centroAscoltoId:
+        cittaId:
           type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
         attivo:
           type: boolean
         note:
@@ -3809,7 +3896,7 @@ components:
           type: string
         siteWeb:
           type: string
-        centroAscoltoId:
+        cittaId:
           type: ["integer", "null"]
         note:
           type: string
@@ -3840,7 +3927,7 @@ components:
           type: string
         siteWeb:
           type: string
-        centroAscoltoId:
+        cittaId:
           type: ["integer", "null"]
         attivo:
           type: boolean
@@ -4656,6 +4743,64 @@ components:
           enum: [standard, moderno, minimal]
         footerBolla:
           type: ["string", "null"]
+
+    ImpostazioniEmail:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: [connector, smtp]
+        mittenteEmail:
+          type: ["string", "null"]
+        mittenteNome:
+          type: ["string", "null"]
+        adminEmail:
+          type: ["string", "null"]
+        smtpHost:
+          type: ["string", "null"]
+        smtpPort:
+          type: ["integer", "null"]
+        smtpSecure:
+          type: boolean
+        smtpUser:
+          type: ["string", "null"]
+        hasPassword:
+          type: boolean
+        dataAggiornamento:
+          type: string
+      required: [provider, smtpSecure, hasPassword]
+
+    ImpostazioniEmailUpdate:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: [connector, smtp]
+        mittenteEmail:
+          type: ["string", "null"]
+        mittenteNome:
+          type: ["string", "null"]
+        adminEmail:
+          type: ["string", "null"]
+        smtpHost:
+          type: ["string", "null"]
+        smtpPort:
+          type: ["integer", "null"]
+        smtpSecure:
+          type: boolean
+        smtpUser:
+          type: ["string", "null"]
+        smtpPassword:
+          type: ["string", "null"]
+
+    EmailSendResult:
+      type: object
+      properties:
+        sent:
+          type: boolean
+        error:
+          type: ["string", "null"]
+      required: [sent]
 
     NucleoFamiliare:
       type: object

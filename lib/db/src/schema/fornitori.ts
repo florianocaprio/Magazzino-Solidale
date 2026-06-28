@@ -14,6 +14,9 @@ export const fornitoriTable = pgTable("fornitori", {
   email: varchar("email", { length: 120 }),
   referente: varchar("referente", { length: 120 }),
   siteWeb: varchar("site_web", { length: 200 }),
+  // Fornitore/Donatore is scoped by Città ("Area"). NULL = valido per tutte le città.
+  // The legacy centroAscoltoId column is kept for back-compat but no longer used for scoping.
+  cittaId: integer("citta_id"),
   centroAscoltoId: integer("centro_ascolto_id"),
   attivo: boolean("attivo").notNull().default(true),
   note: text("note"),

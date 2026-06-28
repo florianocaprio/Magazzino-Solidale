@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListFornitoriParams = {
-cittaId?: number;
-};
+export interface EmailSendResult {
+  sent: boolean;
+  /** @nullable */
+  error?: string | null;
+}

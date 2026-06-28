@@ -112,7 +112,7 @@ export default function ReportUds() {
               </Select>
             </div>
           )}
-          {(!isGlobalCitta || cittaParam != null) && (
+          {!isGlobalCitta || cittaParam != null ? (
             <div className="space-y-1.5">
               <Label className="text-xs">{t("reportUds.zone")}</Label>
               <Select value={zonaId} onValueChange={setZonaId} disabled={lockedZonaId != null}>
@@ -123,6 +123,16 @@ export default function ReportUds() {
                     <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>
                   ))}
                 </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t("reportUds.zone")}</Label>
+              <Select disabled>
+                <SelectTrigger className="w-52">
+                  <SelectValue placeholder={t("reportUds.selectCityFirst")} />
+                </SelectTrigger>
+                <SelectContent />
               </Select>
             </div>
           )}

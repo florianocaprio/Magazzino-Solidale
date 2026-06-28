@@ -156,7 +156,7 @@ export interface FornitoreInput {
   referente?: string;
   siteWeb?: string;
   /** @nullable */
-  centroAscoltoId?: number | null;
+  cittaId?: number | null;
   note?: string;
   noteOperative?: string;
 }
@@ -641,7 +641,9 @@ export interface Fornitore {
   /** @nullable */
   siteWeb?: string | null;
   /** @nullable */
-  centroAscoltoId?: number | null;
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;
@@ -662,7 +664,7 @@ export interface FornitoreUpdate {
   referente?: string;
   siteWeb?: string;
   /** @nullable */
-  centroAscoltoId?: number | null;
+  cittaId?: number | null;
   attivo?: boolean;
   note?: string;
   noteOperative?: string;
@@ -1266,6 +1268,66 @@ export interface ImpostazioniStampaUpdate {
   footerBolla?: string | null;
 }
 
+export type ImpostazioniEmailProvider = typeof ImpostazioniEmailProvider[keyof typeof ImpostazioniEmailProvider];
+
+
+export const ImpostazioniEmailProvider = {
+  connector: 'connector',
+  smtp: 'smtp',
+} as const;
+
+export interface ImpostazioniEmail {
+  provider: ImpostazioniEmailProvider;
+  /** @nullable */
+  mittenteEmail?: string | null;
+  /** @nullable */
+  mittenteNome?: string | null;
+  /** @nullable */
+  adminEmail?: string | null;
+  /** @nullable */
+  smtpHost?: string | null;
+  /** @nullable */
+  smtpPort?: number | null;
+  smtpSecure: boolean;
+  /** @nullable */
+  smtpUser?: string | null;
+  hasPassword: boolean;
+  dataAggiornamento?: string;
+}
+
+export type ImpostazioniEmailUpdateProvider = typeof ImpostazioniEmailUpdateProvider[keyof typeof ImpostazioniEmailUpdateProvider];
+
+
+export const ImpostazioniEmailUpdateProvider = {
+  connector: 'connector',
+  smtp: 'smtp',
+} as const;
+
+export interface ImpostazioniEmailUpdate {
+  provider?: ImpostazioniEmailUpdateProvider;
+  /** @nullable */
+  mittenteEmail?: string | null;
+  /** @nullable */
+  mittenteNome?: string | null;
+  /** @nullable */
+  adminEmail?: string | null;
+  /** @nullable */
+  smtpHost?: string | null;
+  /** @nullable */
+  smtpPort?: number | null;
+  smtpSecure?: boolean;
+  /** @nullable */
+  smtpUser?: string | null;
+  /** @nullable */
+  smtpPassword?: string | null;
+}
+
+export interface EmailSendResult {
+  sent: boolean;
+  /** @nullable */
+  error?: string | null;
+}
+
 export interface NucleoFamiliareInput {
   nome?: string;
   cognome?: string;
@@ -1855,7 +1917,7 @@ stato?: string;
 };
 
 export type ListFornitoriParams = {
-centroAscoltoId?: number;
+cittaId?: number;
 };
 
 export type ListApprovvigionamentiParams = {

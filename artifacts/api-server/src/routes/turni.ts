@@ -152,6 +152,25 @@ router.put("/turni", async (req, res) => {
       res.status(403).json({ error: "Mezzo non assegnabile a questo centro" });
       return;
     }
+    // Anti-doppia-prenotazione: lo stesso mezzo non può essere usato in due turni
+    // nella stessa data + fascia (anche se di centri diversi). Il turno che si sta
+    // aggiornando è quello con stesso (centro, data, fascia), quindi un conflitto è
+    // un QUALSIASI altro turno con quel mezzo nello slot — lo individuo per centro
+    // diverso (lo slot è unico per centro+data+fascia).
+    const sameSlot = await db
+      .select({ id: turniTable.id, centroAscoltoId: turniTable.centroAscoltoId })
+      .from(turniTable)
+      .where(
+        and(
+          eq(turniTable.data, body.data!),
+          eq(turniTable.fascia, body.fascia!),
+          eq(turniTable.mezzoId, mezzoId),
+        ),
+      );
+    if (sameSlot.some((s) => s.centroAscoltoId !== centroAscoltoId)) {
+      res.status(409).json({ error: "Mezzo già assegnato a un altro turno in questa data e fascia" });
+      return;
+    }
   }
   const rawVolontari = Array.isArray(body.volontari) ? body.volontari : [];
   // Dedupe by volontarioId (last ruolo wins) so the same volunteer can't be

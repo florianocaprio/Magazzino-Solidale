@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -18,7 +18,8 @@ import { ExportButtons } from "@/components/export-buttons";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
-import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -123,6 +124,8 @@ export default function Consegne() {
   const createConsegna = useCreateConsegna();
   const completaConsegna = useCompletaConsegna();
   const associaBolla = useAssociaBolla();
+  const inviaEmailBeneficiario = useInviaEmailConsegnaBeneficiario();
+  const inviaEmailVolontario = useInviaEmailConsegnaVolontario();
 
   const associatingConsegna = consegne?.find(c => c.id === associatingId) ?? null;
   // bolle selezionabili: stesso beneficiario, non annullate, non già consegnate, non già legate ad altra consegna
@@ -242,6 +245,20 @@ export default function Consegne() {
         toast({ title: t("consegne.toastImpossibileCompletare"), description: msg ?? t("consegne.toastErrore"), variant: "destructive" });
         setCompletingId(null);
       },
+    });
+  };
+
+  const handleInviaEmail = (id: number, destinatario: "beneficiario" | "volontario") => {
+    const mutation = destinatario === "beneficiario" ? inviaEmailBeneficiario : inviaEmailVolontario;
+    mutation.mutate({ id }, {
+      onSuccess: (res) => {
+        if (res.sent) {
+          toast({ title: t("consegne.toastEmailInviata") });
+        } else {
+          toast({ title: t("consegne.toastEmailErrore"), description: res.error ?? undefined, variant: "destructive" });
+        }
+      },
+      onError: () => toast({ title: t("consegne.toastEmailErrore"), variant: "destructive" }),
     });
   };
 
@@ -468,26 +485,43 @@ export default function Consegne() {
                         </Button>
                       </div>
                     ) : (
-                      (c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') ? (
-                        <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
-                          <CheckCircle2 className="h-3.5 w-3.5" /> {t("consegne.btnConsegnato")}
-                        </Button>
-                      ) : (
-                        <div className="flex items-center justify-end gap-2">
-                          {c.bollaId == null ? (
-                            <Button size="sm" variant="outline" className="gap-1" onClick={() => setCreatingBollaFor(c)}>
-                              <Plus className="h-3.5 w-3.5" /> {t("consegne.btnCreaBolla")}
-                            </Button>
-                          ) : (
-                            <Button size="sm" variant="outline" className="gap-1" onClick={() => setViewingBollaId(c.bollaId!)}>
-                              <FileText className="h-3.5 w-3.5" /> {t("consegne.btnCompilaBolla")}
-                            </Button>
-                          )}
-                          <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}>
-                            <Link2 className="h-3.5 w-3.5" /> {t("consegne.btnAssociaBolla")}
+                      <div className="flex items-center justify-end gap-2">
+                        {(c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') ? (
+                          <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
+                            <CheckCircle2 className="h-3.5 w-3.5" /> {t("consegne.btnConsegnato")}
                           </Button>
-                        </div>
-                      )
+                        ) : (
+                          <>
+                            {c.bollaId == null ? (
+                              <Button size="sm" variant="outline" className="gap-1" onClick={() => setCreatingBollaFor(c)}>
+                                <Plus className="h-3.5 w-3.5" /> {t("consegne.btnCreaBolla")}
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" className="gap-1" onClick={() => setViewingBollaId(c.bollaId!)}>
+                                <FileText className="h-3.5 w-3.5" /> {t("consegne.btnCompilaBolla")}
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAssociatingId(c.id); setSelectedBollaId(c.bollaId ? String(c.bollaId) : ""); }}>
+                              <Link2 className="h-3.5 w-3.5" /> {t("consegne.btnAssociaBolla")}
+                            </Button>
+                          </>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" className="gap-1" disabled={inviaEmailBeneficiario.isPending || inviaEmailVolontario.isPending}>
+                              <Mail className="h-3.5 w-3.5" /> {t("consegne.btnReminder")} <ChevronDown className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleInviaEmail(c.id, "beneficiario")}>
+                              <Mail className="h-3.5 w-3.5 mr-2" /> {t("consegne.reminderBeneficiario")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled={c.volontarioId == null} onClick={() => handleInviaEmail(c.id, "volontario")}>
+                              <Truck className="h-3.5 w-3.5 mr-2" /> {t("consegne.reminderVolontario")}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>

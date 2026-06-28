@@ -18,9 +18,6 @@ import {
   canUseBeneficiario,
   visibleMagazzinoIds,
 } from "../lib/centroScope";
-import { volontarioOverLimit } from "../lib/volontarioCarico";
-
-const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
 
 const router: IRouter = Router();
 
@@ -441,12 +438,6 @@ router.post("/bolle", async (req, res) => {
   const numeroBolla = `BOLLA-${anno}-${String(lastNum + 1).padStart(4, "0")}`;
   const dataBolla = body.dataBolla ?? new Date().toISOString().split("T")[0];
 
-  if (body.volontarioConsegnaId != null && body.consegnaId == null
-      && await volontarioOverLimit(body.volontarioConsegnaId, dataBolla)) {
-    res.status(400).json({ error: LIMITE_TURNO_MSG });
-    return;
-  }
-
   const [row] = await db.insert(bolleTable).values({ ...body, numeroBolla, dataBolla, operatoreId: req.user!.id }).returning();
   const det = await buildDettaglio(row.id);
   res.status(201).json(det);
@@ -499,14 +490,6 @@ router.patch("/bolle/:id", async (req, res) => {
   const nextTrasportatore = body.trasportatoreNome !== undefined ? body.trasportatoreNome : bolla.trasportatoreNome;
   if (nextVolontario != null && nextTrasportatore != null) {
     res.status(400).json({ error: "Indicare un volontario OPPURE un trasportatore esterno, non entrambi" });
-    return;
-  }
-
-  const nextConsegna = body.consegnaId !== undefined ? body.consegnaId : bolla.consegnaId;
-  const nextData = body.dataBolla !== undefined ? body.dataBolla : bolla.dataBolla;
-  if (nextVolontario != null && nextConsegna == null && nextData
-      && await volontarioOverLimit(nextVolontario, nextData, { excludeBollaId: bollaId })) {
-    res.status(400).json({ error: LIMITE_TURNO_MSG });
     return;
   }
 

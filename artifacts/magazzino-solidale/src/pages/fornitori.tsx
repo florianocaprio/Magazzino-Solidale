@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useBulkFornitori, useListCentriAscolto, useListTipologieFornitore, getListFornitoriQueryKey } from "@workspace/api-client-react";
+import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useBulkFornitori, useListCitta, useListTipologieFornitore, getListFornitoriQueryKey } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,7 +33,7 @@ const formSchema = z.object({
   telefono: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   referente: z.string().optional(),
-  centroAscoltoId: z.string().optional(),
+  cittaId: z.string().optional(),
   note: z.string().optional(),
   noteOperative: z.string().optional()
 });
@@ -41,19 +41,19 @@ const formSchema = z.object({
 export default function Fornitori() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const lockedCentroId = user?.centroAscoltoId ?? null;
-  const isCentroLocked = lockedCentroId != null;
-  const isGlobal = !isCentroLocked;
-  const [centroFilter, setCentroFilter] = useState("all");
+  const lockedCittaId = user?.cittaId ?? null;
+  const isCittaLocked = lockedCittaId != null;
+  const isGlobal = !isCittaLocked;
+  const [cittaFilter, setCittaFilter] = useState("all");
   useEffect(() => {
-    if (isCentroLocked && lockedCentroId != null) {
-      setCentroFilter(String(lockedCentroId));
+    if (isCittaLocked && lockedCittaId != null) {
+      setCittaFilter(String(lockedCittaId));
     }
-  }, [isCentroLocked, lockedCentroId]);
+  }, [isCittaLocked, lockedCittaId]);
   const { data: fornitori, isLoading } = useListFornitori(
-    centroFilter !== "all" ? { centroAscoltoId: parseInt(centroFilter) } : undefined
+    cittaFilter !== "all" ? { cittaId: parseInt(cittaFilter) } : undefined
   );
-  const { data: centri } = useListCentriAscolto();
+  const { data: citta } = useListCitta();
   const { data: tipologie } = useListTipologieFornitore();
 
   // Built-in type keys keep their translated label; admin-added custom names show
@@ -64,7 +64,7 @@ export default function Fornitori() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -78,7 +78,7 @@ export default function Fornitori() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", centroAscoltoId: "all", noteOperative: ""
+      nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", cittaId: "all", noteOperative: ""
     }
   });
 
@@ -86,9 +86,9 @@ export default function Fornitori() {
     setEditingId(f.id);
     form.reset({
       nome: f.nome, tipo: f.tipo, partitaIva: f.partitaIva || "", codiceFiscale: f.codiceFiscale || "",
-      indirizzo: f.indirizzo || "", comune: f.comune || "", telefono: f.telefono || "", 
+      indirizzo: f.indirizzo || "", comune: f.comune || "", telefono: f.telefono || "",
       email: f.email || "", referente: f.referente || "", note: f.note || "",
-      centroAscoltoId: f.centroAscoltoId != null ? String(f.centroAscoltoId) : "all",
+      cittaId: f.cittaId != null ? String(f.cittaId) : "all",
       noteOperative: f.noteOperative || ""
     });
     setIsFormOpen(true);
@@ -96,15 +96,15 @@ export default function Fornitori() {
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", tipo: defaultTipo(), telefono: "", email: "", referente: "", comune: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all", noteOperative: "" });
+    form.reset({ nome: "", tipo: defaultTipo(), telefono: "", email: "", referente: "", comune: "", cittaId: isCittaLocked && lockedCittaId != null ? String(lockedCittaId) : "all", noteOperative: "" });
     setIsFormOpen(true);
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const { centroAscoltoId, ...rest } = values;
+    const { cittaId, ...rest } = values;
     const data = {
       ...rest,
-      centroAscoltoId: centroAscoltoId && centroAscoltoId !== "all" ? parseInt(centroAscoltoId) : null,
+      cittaId: cittaId && cittaId !== "all" ? parseInt(cittaId) : null,
     };
     if (editingId) {
       updateFornitore.mutate({ id: editingId, data }, {
@@ -126,7 +126,7 @@ export default function Fornitori() {
   };
 
   const filtered = fornitori?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase()));
-  const centroNome = (id: number | null | undefined) => id != null ? (centri?.find(c => c.id === id)?.nome ?? "-") : "Tutti i centri";
+  const cittaNome = (id: number | null | undefined) => id != null ? (citta?.find(c => c.id === id)?.nome ?? "-") : t("fornitori.tutteCitta");
 
   const tipoColors: Record<string, string> = {
     commerciale: "bg-blue-500/10 text-blue-700",
@@ -153,7 +153,7 @@ export default function Fornitori() {
               { header: t("common.phone"), accessor: (f) => f.telefono },
               { header: t("common.email"), accessor: (f) => f.email },
               { header: t("fornitori.referente"), accessor: (f) => f.referente },
-              { header: t("fornitori.centro"), accessor: (f) => f.centroAscoltoId == null ? t("fornitori.tuttiCentri") : centroNome(f.centroAscoltoId) },
+              { header: t("fornitori.citta"), accessor: (f) => f.cittaId == null ? t("fornitori.tutteCitta") : (f.cittaNome ?? cittaNome(f.cittaId)) },
               { header: t("fornitori.noteOperative"), accessor: (f) => f.noteOperative },
             ]}
             filename="fornitori"
@@ -181,17 +181,17 @@ export default function Fornitori() {
           { key: "telefono", header: t("common.phone"), example: "021234567" },
           { key: "email", header: t("common.email"), example: "info@example.com" },
           { key: "referente", header: t("fornitori.referente"), example: "" },
-          { key: "centro", header: t("fornitori.centro"), example: "" },
+          { key: "citta", header: t("fornitori.citta"), example: "" },
           { key: "noteOperative", header: t("fornitori.noteOperative"), example: "" },
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
           if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("fornitori.nominativo") }) };
           if (!r.tipo) return { error: t("bulkImport.requiredMissing", { field: t("common.type") }) };
-          let centroAscoltoId: number | null = null;
-          if (r.centro) {
-            const c = matchByName(centri, r.centro, (x) => x.nome);
-            if (!c) return { error: t("bulkImport.unknownRef", { field: t("fornitori.centro"), value: r.centro }) };
-            centroAscoltoId = c.id;
+          let cittaId: number | null = null;
+          if (r.citta) {
+            const c = matchByName(citta, r.citta, (x) => x.nome);
+            if (!c) return { error: t("bulkImport.unknownRef", { field: t("fornitori.citta"), value: r.citta }) };
+            cittaId = c.id;
           }
           return {
             data: {
@@ -204,7 +204,7 @@ export default function Fornitori() {
               telefono: r.telefono || undefined,
               email: r.email || undefined,
               referente: r.referente || undefined,
-              centroAscoltoId,
+              cittaId,
               noteOperative: r.noteOperative || undefined,
             },
           };
@@ -220,13 +220,13 @@ export default function Fornitori() {
             {isGlobal && (
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={centroFilter} onValueChange={setCentroFilter}>
+                <Select value={cittaFilter} onValueChange={setCittaFilter}>
                   <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder={t("fornitori.tuttiCentri")} />
+                    <SelectValue placeholder={t("fornitori.tutteCitta")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{t("fornitori.tuttiCentri")}</SelectItem>
-                    {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                    <SelectItem value="all">{t("fornitori.tutteCitta")}</SelectItem>
+                    {citta?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -239,7 +239,7 @@ export default function Fornitori() {
               <TableRow>
                 <TableHead>{t("fornitori.nominativo")}</TableHead>
                 <TableHead>{t("common.type")}</TableHead>
-                {isGlobal && <TableHead>{t("fornitori.centro")}</TableHead>}
+                {isGlobal && <TableHead>{t("fornitori.citta")}</TableHead>}
                 <TableHead>{t("fornitori.contatti")}</TableHead>
                 <TableHead>{t("fornitori.referente")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -270,9 +270,9 @@ export default function Fornitori() {
                   </TableCell>
                   {isGlobal && (
                     <TableCell className="text-sm">
-                      {f.centroAscoltoId == null
-                        ? <span className="text-muted-foreground italic">{t("fornitori.tuttiCentri")}</span>
-                        : centroNome(f.centroAscoltoId)}
+                      {f.cittaId == null
+                        ? <span className="text-muted-foreground italic">{t("fornitori.tutteCitta")}</span>
+                        : (f.cittaNome ?? cittaNome(f.cittaId))}
                     </TableCell>
                   )}
                   <TableCell>
@@ -337,14 +337,14 @@ export default function Fornitori() {
                 <FormField control={form.control} name="referente" render={({ field }) => (
                   <FormItem><FormLabel>{t("fornitori.personaRiferimento")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
-                <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                <FormField control={form.control} name="cittaId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("fornitori.centroAscolto")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "all"} disabled={isCentroLocked}>
+                    <FormLabel>{t("fornitori.citta")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "all"} disabled={isCittaLocked}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="all">{t("fornitori.tuttiCentri")}</SelectItem>
-                        {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                        <SelectItem value="all">{t("fornitori.tutteCitta")}</SelectItem>
+                        {citta?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </FormItem>

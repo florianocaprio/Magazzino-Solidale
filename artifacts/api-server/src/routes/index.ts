@@ -25,6 +25,7 @@ import scarichiRouter from "./scarichi";
 import approvvigionamentiRouter from "./approvvigionamenti";
 import turniRouter from "./turni";
 import impostazioniStampaRouter from "./impostazioni-stampa";
+import impostazioniEmailRouter from "./impostazioni-email";
 import reportRouter from "./report";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
@@ -73,6 +74,7 @@ router.use(scarichiRouter);
 router.use(approvvigionamentiRouter);
 router.use(turniRouter);
 router.use(impostazioniStampaRouter);
+router.use(impostazioniEmailRouter);
 router.use(reportRouter);
 
 // Admin-only management endpoints.

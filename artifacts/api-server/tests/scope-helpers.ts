@@ -234,11 +234,11 @@ export async function createProdotto(scope: SeedScope): Promise<number> {
 
 export async function createFornitore(
   scope: SeedScope,
-  centroId: number | null,
+  cittaId: number | null,
 ): Promise<number> {
   const [f] = await db
     .insert(fornitoriTable)
-    .values({ nome: `Fornitore ${rnd()}`, tipo: "azienda", centroAscoltoId: centroId })
+    .values({ nome: `Fornitore ${rnd()}`, tipo: "azienda", cittaId })
     .returning({ id: fornitoriTable.id });
   scope.fornitoreIds.push(f.id);
   return f.id;

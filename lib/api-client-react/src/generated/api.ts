@@ -58,6 +58,7 @@ import type {
   ConsegneMeseReport,
   ConsegnePerCentroReport,
   DashboardStats,
+  EmailSendResult,
   Fornitore,
   FornitoreInput,
   FornitoreUpdate,
@@ -68,6 +69,8 @@ import type {
   Giacenza,
   GiacenzaMagazzinoReport,
   HealthStatus,
+  ImpostazioniEmail,
+  ImpostazioniEmailUpdate,
   ImpostazioniStampa,
   ImpostazioniStampaUpdate,
   Intervento,
@@ -3212,6 +3215,76 @@ export const useSubmitApprovvigionamento = <TError = ErrorType<unknown>,
       return useMutation(getSubmitApprovvigionamentoMutationOptions(options));
     }
 
+export const getSendApprovvigionamentoEmailUrl = (id: number,) => {
+
+
+
+
+  return `/api/approvvigionamenti/${id}/invia-email`
+}
+
+/**
+ * @summary Manually (re)send the order email to amministrazione
+ */
+export const sendApprovvigionamentoEmail = async (id: number, options?: RequestInit): Promise<EmailSendResult> => {
+
+  return customFetch<EmailSendResult>(getSendApprovvigionamentoEmailUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSendApprovvigionamentoEmailMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendApprovvigionamentoEmail>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendApprovvigionamentoEmail>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['sendApprovvigionamentoEmail'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendApprovvigionamentoEmail>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  sendApprovvigionamentoEmail(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendApprovvigionamentoEmailMutationResult = NonNullable<Awaited<ReturnType<typeof sendApprovvigionamentoEmail>>>
+
+    export type SendApprovvigionamentoEmailMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Manually (re)send the order email to amministrazione
+ */
+export const useSendApprovvigionamentoEmail = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendApprovvigionamentoEmail>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendApprovvigionamentoEmail>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSendApprovvigionamentoEmailMutationOptions(options));
+    }
+
 export const getListTurniUrl = (params?: ListTurniParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -4749,6 +4822,146 @@ export const useCompletaConsegna = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCompletaConsegnaMutationOptions(options));
+    }
+
+export const getInviaEmailConsegnaBeneficiarioUrl = (id: number,) => {
+
+
+
+
+  return `/api/consegne/${id}/invia-email-beneficiario`
+}
+
+/**
+ * @summary Send a delivery reminder email (with ICS) to the beneficiary
+ */
+export const inviaEmailConsegnaBeneficiario = async (id: number, options?: RequestInit): Promise<EmailSendResult> => {
+
+  return customFetch<EmailSendResult>(getInviaEmailConsegnaBeneficiarioUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getInviaEmailConsegnaBeneficiarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviaEmailConsegnaBeneficiario>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviaEmailConsegnaBeneficiario>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['inviaEmailConsegnaBeneficiario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviaEmailConsegnaBeneficiario>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  inviaEmailConsegnaBeneficiario(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviaEmailConsegnaBeneficiarioMutationResult = NonNullable<Awaited<ReturnType<typeof inviaEmailConsegnaBeneficiario>>>
+
+    export type InviaEmailConsegnaBeneficiarioMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a delivery reminder email (with ICS) to the beneficiary
+ */
+export const useInviaEmailConsegnaBeneficiario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviaEmailConsegnaBeneficiario>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviaEmailConsegnaBeneficiario>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getInviaEmailConsegnaBeneficiarioMutationOptions(options));
+    }
+
+export const getInviaEmailConsegnaVolontarioUrl = (id: number,) => {
+
+
+
+
+  return `/api/consegne/${id}/invia-email-volontario`
+}
+
+/**
+ * @summary Send a delivery reminder email (with ICS) to the assigned volunteer
+ */
+export const inviaEmailConsegnaVolontario = async (id: number, options?: RequestInit): Promise<EmailSendResult> => {
+
+  return customFetch<EmailSendResult>(getInviaEmailConsegnaVolontarioUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getInviaEmailConsegnaVolontarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviaEmailConsegnaVolontario>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviaEmailConsegnaVolontario>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['inviaEmailConsegnaVolontario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviaEmailConsegnaVolontario>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  inviaEmailConsegnaVolontario(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviaEmailConsegnaVolontarioMutationResult = NonNullable<Awaited<ReturnType<typeof inviaEmailConsegnaVolontario>>>
+
+    export type InviaEmailConsegnaVolontarioMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a delivery reminder email (with ICS) to the assigned volunteer
+ */
+export const useInviaEmailConsegnaVolontario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviaEmailConsegnaVolontario>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviaEmailConsegnaVolontario>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getInviaEmailConsegnaVolontarioMutationOptions(options));
     }
 
 export const getAssociaBollaUrl = (id: number,) => {
@@ -7486,6 +7699,142 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateImpostazioniStampaMutationOptions(options));
+    }
+
+export const getGetImpostazioniEmailUrl = () => {
+
+
+
+
+  return `/api/impostazioni-email`
+}
+
+export const getImpostazioniEmail = async ( options?: RequestInit): Promise<ImpostazioniEmail> => {
+
+  return customFetch<ImpostazioniEmail>(getGetImpostazioniEmailUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetImpostazioniEmailQueryKey = () => {
+    return [
+    `/api/impostazioni-email`
+    ] as const;
+    }
+
+
+export const getGetImpostazioniEmailQueryOptions = <TData = Awaited<ReturnType<typeof getImpostazioniEmail>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniEmail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetImpostazioniEmailQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getImpostazioniEmail>>> = ({ signal }) => getImpostazioniEmail({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniEmail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetImpostazioniEmailQueryResult = NonNullable<Awaited<ReturnType<typeof getImpostazioniEmail>>>
+export type GetImpostazioniEmailQueryError = ErrorType<unknown>
+
+
+
+export function useGetImpostazioniEmail<TData = Awaited<ReturnType<typeof getImpostazioniEmail>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniEmail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetImpostazioniEmailQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateImpostazioniEmailUrl = () => {
+
+
+
+
+  return `/api/impostazioni-email`
+}
+
+export const updateImpostazioniEmail = async (impostazioniEmailUpdate: ImpostazioniEmailUpdate, options?: RequestInit): Promise<ImpostazioniEmail> => {
+
+  return customFetch<ImpostazioniEmail>(getUpdateImpostazioniEmailUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      impostazioniEmailUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateImpostazioniEmailMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniEmail>>, TError,{data: BodyType<ImpostazioniEmailUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniEmail>>, TError,{data: BodyType<ImpostazioniEmailUpdate>}, TContext> => {
+
+const mutationKey = ['updateImpostazioniEmail'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateImpostazioniEmail>>, {data: BodyType<ImpostazioniEmailUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateImpostazioniEmail(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateImpostazioniEmailMutationResult = NonNullable<Awaited<ReturnType<typeof updateImpostazioniEmail>>>
+    export type UpdateImpostazioniEmailMutationBody = BodyType<ImpostazioniEmailUpdate>
+    export type UpdateImpostazioniEmailMutationError = ErrorType<unknown>
+
+    export const useUpdateImpostazioniEmail = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniEmail>>, TError,{data: BodyType<ImpostazioniEmailUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateImpostazioniEmail>>,
+        TError,
+        {data: BodyType<ImpostazioniEmailUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateImpostazioniEmailMutationOptions(options));
     }
 
 export const getListVolontariUrl = () => {

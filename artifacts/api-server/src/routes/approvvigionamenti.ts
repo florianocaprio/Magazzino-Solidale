@@ -259,4 +259,28 @@ router.post("/approvvigionamenti/:id/sottometti", async (req, res) => {
   res.json(result);
 });
 
+// Manually (re)send the order email to amministrazione. Returns {sent, error?}
+// instead of failing, so the UI can show a precise outcome toast.
+router.post("/approvvigionamenti/:id/invia-email", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const result = await getWithRighe(id);
+  if (!result) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(result.centroAscoltoId, callerCentroId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (result.magazzinoId != null && !(await canAccessMagazzino(result.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    return;
+  }
+  try {
+    const { sendApprovvigionamentoEmail } = await import("../lib/orderEmail.js");
+    await sendApprovvigionamentoEmail(result);
+    res.json({ sent: true, error: null });
+  } catch (err) {
+    req.log.error({ err }, "Invio email approvvigionamento (manuale) fallito");
+    res.json({ sent: false, error: err instanceof Error ? err.message : "Invio fallito" });
+  }
+});
+
 export default router;
