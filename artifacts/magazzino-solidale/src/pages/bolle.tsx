@@ -1227,13 +1227,53 @@ export default function Bolle() {
   const { data: scarichi, isLoading: loadingScar } = useListScarichi();
   const { data: centri } = useListCentriAscolto();
   const { data: magazzini } = useListMagazzini();
+  const { data: beneficiari } = useListBeneficiari();
   const { data: impostazioni } = useGetImpostazioniStampa();
+  const consegnaBolla = useConsegnaBolla();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedBollaId, setSelectedBollaId] = useState<number | null>(null);
   const [downloadingTrasfId, setDownloadingTrasfId] = useState<number | null>(null);
   const [downloadingScarId, setDownloadingScarId] = useState<number | null>(null);
+  const [downloadingBollaId, setDownloadingBollaId] = useState<number | null>(null);
+  const [consegnandoBollaId, setConsegnandoBollaId] = useState<number | null>(null);
+
+  const downloadBolla = async (e: React.MouseEvent, bollaId: number) => {
+    e.stopPropagation();
+    setDownloadingBollaId(bollaId);
+    try {
+      await downloadBollaPdf(bollaId, {
+        beneficiari,
+        centri,
+        footer: impostazioni?.footerBolla ?? null,
+        template: (impostazioni?.templateBolla as BollaTemplate) ?? "standard",
+      });
+    } catch {
+      toast({ title: t("bolle.error"), description: t("bolle.genBollaError"), variant: "destructive" });
+    } finally {
+      setDownloadingBollaId(null);
+    }
+  };
+
+  const markConsegnato = (e: React.MouseEvent, bollaId: number) => {
+    e.stopPropagation();
+    setConsegnandoBollaId(bollaId);
+    consegnaBolla.mutate(
+      { id: bollaId },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
+          toast({ title: t("bolle.consegnaCompletata") });
+        },
+        onError: () => toast({ title: t("bolle.error"), description: t("bolle.consegnaError"), variant: "destructive" }),
+        onSettled: () => setConsegnandoBollaId(null),
+      }
+    );
+  };
 
   const downloadTrasf = async (e: React.MouseEvent, trasf: Trasferimento) => {
     e.stopPropagation();
@@ -1460,7 +1500,33 @@ export default function Bolle() {
                   )}
                   <TableCell className="text-center">{statoBadge(row.bolla.stato)}</TableCell>
                   <TableCell className="text-right">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
+                    <div className="flex items-center justify-end gap-1">
+                      {row.bolla.stato === "confermato" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1.5 text-green-700 border-green-300 hover:bg-green-50 hover:text-green-700"
+                          onClick={(e) => markConsegnato(e, row.bolla.id)}
+                          disabled={consegnandoBollaId === row.bolla.id}
+                        >
+                          <Truck className="h-3.5 w-3.5" />
+                          {t("bolle.segnaConsegnata")}
+                        </Button>
+                      )}
+                      {(row.bolla.stato === "confermato" || row.bolla.stato === "consegnato" || row.bolla.stato === "annullato") && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          title={t("common.exportPdf")}
+                          onClick={(e) => downloadBolla(e, row.bolla.id)}
+                          disabled={downloadingBollaId === row.bolla.id}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (

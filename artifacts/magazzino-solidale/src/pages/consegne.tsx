@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
 import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -74,6 +76,7 @@ export default function Consegne() {
     attivo: true,
     ...(createCentroId !== "all" ? { centroAscoltoId: parseInt(createCentroId) } : {}),
   });
+  const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
   const { data: centri } = useListCentriAscolto();
@@ -110,6 +113,7 @@ export default function Consegne() {
   const [ripianificando, setRipianificando] = useState<Consegna | null>(null);
   const [riDate, setRiDate] = useState("");
   const [riFascia, setRiFascia] = useState("Mattina");
+  const [scanCode, setScanCode] = useState("");
 
   const { data: bolle } = useListBolle();
 
@@ -159,6 +163,20 @@ export default function Consegne() {
         setIsFormOpen(false);
       }
     });
+  };
+
+  const handleScan = (codeOverride?: string) => {
+    const code = (codeOverride ?? scanCode).trim();
+    if (!code) return;
+    const b = allBeneficiari?.find((x) => x.codice.toLowerCase() === code.toLowerCase());
+    if (!b) {
+      toast({ title: t("consegne.scanNotFound"), variant: "destructive" });
+      return;
+    }
+    setCreateCentroId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : (b.centroAscoltoId ? String(b.centroAscoltoId) : "all"));
+    form.setValue("beneficiarioId", b.id);
+    setScanCode("");
+    toast({ title: t("consegne.scanFound", { name: `${b.cognome} ${b.nome}` }) });
   };
 
   const openRipianifica = (c: Consegna) => {
@@ -513,17 +531,40 @@ export default function Consegne() {
                   </Select>
                 </div>
 
+                <div className="space-y-2">
+                  <Label>{t("consegne.scanLabel")}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder={t("consegne.scanPlaceholder")}
+                      value={scanCode}
+                      onChange={(e) => setScanCode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleScan();
+                        }
+                      }}
+                      className="font-mono"
+                    />
+                    <BarcodeScannerButton onScan={(value) => handleScan(value)} />
+                  </div>
+                </div>
+
                 <FormField control={form.control} name="beneficiarioId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("consegne.beneficiario")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={t("consegne.selectPlaceholder")} /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {beneficiari?.length === 0 ? (
-                          <div className="px-2 py-1.5 text-sm text-muted-foreground">{t("consegne.noBeneficiarioForCentro")}</div>
-                        ) : beneficiari?.map(b => <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <BeneficiarioCombobox
+                      items={(beneficiari ?? []).map(b => ({ id: b.id, nome: b.nome, cognome: b.cognome, codice: b.codice }))}
+                      value={field.value ? String(field.value) : ""}
+                      onChange={(id) => field.onChange(Number(id))}
+                      placeholder={t("consegne.selectPlaceholder")}
+                      emptyText={t("consegne.noBeneficiarioForCentro")}
+                      selectedLabelFallback={(() => {
+                        const sel = allBeneficiari?.find(b => b.id === field.value);
+                        return sel ? `${sel.cognome} ${sel.nome}` : null;
+                      })()}
+                    />
+                    <FormMessage />
                   </FormItem>
                 )} />
 
