@@ -1,0 +1,102 @@
+Bug Applicazione
+
+Per tutti i codici inseriti dall’utente in ogni sezione devi controllare sempre che siano univoci, se già esistono devi dare errore e suggerire un codice univoco. 
+
+#Menù Mezzi
+Nella scheda di caricamento dei mezzi è necessario inserire anche una descrizione del mezzo e la capacità di carico in kg.
+
+# sezione SOCIALE 
+Inseriamo anche una pianificazione dei turni del centro di ascolto in modo da poter assegnare i volontari per fascia di orario (compatibili con quelle delle consegne mattina 9-13, pomeriggio 14-18, sera 18-20) cosi è possibile sapere per ogni centro chi sarà presente. Fallo usando un calendario stile outlook sul quale ci sono già le fasce orarie pre impostate e cliccando sopra posso aggiungere uno o più volontari anche nello stesso ruolo o ruoli differenti. Deve essere possibile esportare la pianificazione in PDF.
+
+#Menù Fornitore
+Il Fornitore e Donatore deve essere associato ad un Area e non ad un centro di ascolto, se non selezionata allora vale per tutte le aree
+
+#Menù Ordini ed Approviggionamenti
+Quando selezione il Fornitore & Donatore allora in automatico devo selezionare solo i magazzini che fanno parte dell’area di appartenenza del Fornitore, di conseguenza i centri di ascolto che si devono mostrare sono solo quelli dell’area del Fornitore & Donatore.
+
+Il messaggio di notifica per le operazioni di inserimento deve restare sullo schermo per 2 secondi
+
+#Menu Anagrafica UDS
+BUG Quando faccio modifica dell’anagrafica non mi da modo di assegnare un’area ed una Zona UDS.
+
+BUG Quando inserisco il numero di componenti del nucleo familiare devo chiedere per ciascuno di loro almeno, sesso, nome cognome data di nascita Area di provenienza eventuali note.
+
+BUG Nella tabella di inserimento dei Beneficiari Se il nome inserito è simile ad un altro anche dopo aver premuto SALVA e chiuso la finestra se provo ad inserire uno nuovo mi ridà l’ultimo nome inserito. Se cambio menù e poi ritorno nell’anagrafica dei Beneficiari allora scompare.
+
+BUG Quando inseriamo l’anagrafica dei beneficiari nella schermata mancano i campi per Sesso, cittadinanza Area di provenienza (che deve essere obbligatorio), Consegna a Domicio e tutti gli altri che invece appaiono quando uso la funzione di Modifica anagrafica. 
+
+BUG, Anche quando modifico l’anagrafica di un beneficiario o quando la inserisco devo poter indicare se è del’UDS
+BUG l’etichetta Residenza nella medesima interfaccia di inserimentp va cambiata in Nazionalità
+
+BUG Il menu di inserimento anagrafica UDS e modifica Anagrafica UDS deve essere uguale ad inserimento e modifica anagrafica beneficiri (una volta sistemata), l’unica differenza che per l’anagrafica UDS viene settato di default il flag anche Utente UDS.
+
+
+#Menù Pianificazione Consegne
+Nell’inserimento della pianficazione nella selezione del beneficirio dobbiamo mettere la possibilità di cercarlo per codice a barre con un boze dedicato  o per nome dove messe le prime lettere o parte del nome appare solo la lista dei nomi che hanno quella sequenza di lettere.
+
+BUG Una volta painificata la consegna mi deve mostrare la bolla nella riga del benficiario che ho pianficato esattamente come mi appare dopo che ho cliccato su CONSEGNATO 
+
+BUG il menu delle pianificazioni deve sempre mettere in alto in cima le ultimi pianificazioni e ripianificazione in ordine cronologico di inserimento
+
+
+#Menù bolla di cosnegne
+BUG In fase di inserimento bolla nel campo “chi effettua la consegna” devono apparire solo i volotnari trasportatori dell’area di appartenenza del centro
+
+BUG nel menù bolle accanto ad ogni riga deve sempre essere possibile scaricare la BOLLA sia in stato confermato che consegnato
+
+BUG esattamente come nel menù piaficazioni il pulsante di conferma per CONSEGANTO deve essere anche su ogni riga 
+
+BUG per una bolla consegnata quindi chiusa devo comunque prevedere la possibilità di STORNARE (se c’è stato un errore umano che hanno detto di aver consegnato lamerce il benefirio non è mai venuto a prenderle) allora con la funzione storno la fattura va in uno stato di annullata ed il materiale ritorna come disponibilità in magazzino.  Comunque deve essere possibile scaricare la bolla stornata. Il template in pdf della bolla stornata deve essere in ROSSO come per tutte le bolle deve rispettare il colore dello stato esattamente come quando fai la bolla della merce deteriorata negli scarichi manuali.
+
+BUG Il logo dell’associazione messo in basso a destra sulle bolle deve essere più grande esattamente del doppio.
+
+#menu scarichi
+Quando selezioni un magazzino in automatico, siccoem appartiene da un’area faccio vedere i centri di ascolto di quell’area. Ricorda che in tutto il programma la visibilità dei Volontari, dei beneficiari, dei magazzini, dei centri di ascolto, dei mezzi, delle zone di Uds  è sempre vincolata all’area. Quindi in qualsiasi punto del codice dove seleziono uno di questi elementi gli altri devo ereditare la visibilità in base all’area. Se uno di questi elementi non ha un’area sseganta allora è visibile sempre.
+
+#Menù Bolle di consegna
+Devi ordinare l’eleco delle bolle in ordine di inserimento. Gli inserimenti più recenti devono stare in cima. Quindi ogni nuovo inserimento prende il primo posto in cima.
+
+#Interventi UDS
+Nel menù interventi UDS oltre alal possibilità di selezionare la persona in base ad area e zona mi devi mettere anche un pulsante nella schermata eventualmente per inserire direttaemtne da li una nuova utenza. Nel qual caso mi ritrovo compilato già i dati di UDS relativa ad Area e Zona compilo gli altri dati ed appena salvo l’anagrafica mi va subito nella schermata di nuovo intervento e posso compilare i dati
+
+#report unità di strada
+BUG Nel menù di selezione se il campo area non è selezionato non devi mostrare nessuna zona. L’udente deve prima selezionare l’area e poi la sua zona per generare il report.
+Sotto al report Esportato devi sempre mettere la dicitura Report generato da: e metti il nome e cognome dell’operatore che ha fatto il report.
+
+#Menù Volontari
+Nell’anagrafica Volontari deve essere obbligatorio inserimento delle matrica del volontario fornita dall’associazione. Ogni volontario deve avere la sua matricola.
+
+#Bolle di consegna e Pianificazione Interventi
+Nell’anagrafica dei messi devi considerare il concetto di Area, Un mezzo è sempre assegnato ad u’area e poi può essere specifico di un centro di ascolto o essere comune per tutta l’area.
+Quando seleziono un Volontario per la cosegna deve apparirmi se il volontario usa un mezzo proprio o un mezzo dell’associaizone. Se mette un mezzo proprio deve uscire l’elenco dei mezzi propri registrati realtivi a quel area e/o a quel centro di ascolto da cui parte se non è in elenco deve poter mettere altro. Se mette un mezzo dell’assocaizione o a a noleggio deve apparire semrpe le lista relativa alla scelta fatta ed all’area di appartenenza.
+Importante prima di seggnare un mezzo devo verificare che non sia impegnato da altro volontario. Se è occupato sempre dallo stesso volontario so che devo scalare il numero di consegne che può ancora fare quel volontario (valore impostato a 5 di default ma modificale in anagrafica) se è arrivato a zero tale numero allora si deve segnalare che il volontari per quel giorno non ha più possibilità di fare consegne. 
+
+#Logistica
+Dobbiamo quindi inserire nella logistica il report di allocazione dei mezzi che deve indicare per ogni mezzo in modo grafico quando è impegnato e per quale delle tre fasce orarie è impegnato.
+Se un mezzo è impegnato da un volontario non può essere mostrato nella lista ad un altro volotnario per l’utilizzo nello stesso giorno e fascia oraria
+
+#Bolle di consegna
+Quando faccio una nuova bolla di consegna seleziono il centro che rientra nella mia area come utente registrao. Di conseguenza la lista dei magazzini che vedo sotto devono essere solo quelli relativi a quel centro di ascolto. Anche qui per il beneficiario oltre al codice a barre mettiamo un sistema di ricerca agevolato che scritte le prime iniziali mi da modo di avere una lista filtrata e ridotta.
+
+Inoltre devi richiedere il trasportatore solo se l’utenza selezionata ha la consegna a domicilio.
+In questo caso puoi selezionara tra i volotnari del centro ma non puoi assegnare un mezzo  ne scalare il contatore consegne. Se la bolla verrà assegnata ad una pianficzione allorare è possibile editarla ed assegnare un mezzo al volotnario in base alle disponibiltià e fare i conteggio delle consegne massime per volotnario. In caso contrario è gestito in modo flessibile dal centro in base alle disponibilità sul posto.
+
+#Ordini ed approviggionamenti
+Quando ho inserito una nuova richiesta di approviggionamento con tutti i dati mi devi mettere un pulsante per poter inviare una mail direttamente dal programma
+Nel menù impostazioni mi devi mettere un menù per poter configurare il servizio di invio mail richiedendo i parametri manuali o mettendo una mail di riferimento per l’invio ed il programma riconosce il dominio e utilizza le impostazioni del dominio (deve funzionare bene con gli account google e workspace quindi lo devi testare bene).
+
+#Pianificazione consegne
+Nel menù pianificazione consegne una volta pianificata o ripianificata una consegna dobbiamo chiedere all’operatore se vuol mandare una mail di remainder all’utente con relativo calendar. 
+Se nella piaificazione consegne è coinvolto un volotnario allora si deve poter inviare mail anche al volotnario con il calender della consegna ed i dati del destinatario.
+Quindi in questo caso due pulsati Invia mail a beneficiario, Invia mail a volontario
+
+#Report
+BUG Il report del fondo FSE+ non funziona non prendere i dati dele cose cosnegate e non icrocia i dati. Fai delle verifiche puntuali anche inserendo altri dati durante il test.
+Il menuù di analisi report deve dare il modo di selezionare prima di tutto L’area poi il magazzino se serve e/o il centro di ascolto. Tutto parte dall’area. Se non viene selezionata l’area non è possibile selezionare un centro di ascolto o un magazzino significa che il reporto è complessivo di tutte le sedi.
+
+
+
+
+
+
+
