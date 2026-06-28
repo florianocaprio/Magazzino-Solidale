@@ -2222,6 +2222,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Report data
@@ -2257,6 +2261,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Deliveries per month
@@ -2281,6 +2289,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Deliveries per centro
@@ -2298,6 +2310,10 @@ paths:
       summary: FSE+ annual distribution report
       parameters:
         - name: anno
+          in: query
+          schema:
+            type: integer
+        - name: cittaId
           in: query
           schema:
             type: integer

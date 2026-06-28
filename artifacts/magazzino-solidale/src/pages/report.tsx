@@ -56,25 +56,27 @@ export default function Report() {
 
   const magParam = magazzinoId === ALL ? undefined : parseInt(magazzinoId);
   const centroParam = centroId === ALL ? undefined : parseInt(centroId);
+  const cittaQuery = cittaParam ?? undefined;
 
-  const consegneParams = { da, a, magazzinoId: magParam, centroAscoltoId: centroParam };
+  const consegneParams = { da, a, magazzinoId: magParam, centroAscoltoId: centroParam, cittaId: cittaQuery };
   const { data: consegne, isLoading: isLoadingConsegne } = useReportConsegnePerMese(consegneParams, {
     query: { queryKey: getReportConsegnePerMeseQueryKey(consegneParams) },
   });
 
-  const giacenzeParams = { magazzinoId: magParam };
+  const giacenzeParams = { magazzinoId: magParam, cittaId: cittaQuery };
   const { data: giacenze, isLoading: isLoadingGiacenze } = useReportGiacenzePerMagazzino(giacenzeParams, {
     query: { queryKey: getReportGiacenzePerMagazzinoQueryKey(giacenzeParams) },
   });
 
-  const perCentroParams = { da, a };
+  const perCentroParams = { da, a, cittaId: cittaQuery };
   const { data: perCentro, isLoading: isLoadingPerCentro } = useReportConsegnePerCentro(perCentroParams, {
     query: { queryKey: getReportConsegnePerCentroQueryKey(perCentroParams) },
   });
 
+  const fseParams = { anno: fseAnno, cittaId: cittaQuery };
   const { data: fse, isLoading: isLoadingFse } = useReportFsePlus(
-    { anno: fseAnno },
-    { query: { queryKey: getReportFsePlusQueryKey({ anno: fseAnno }) } },
+    fseParams,
+    { query: { queryKey: getReportFsePlusQueryKey(fseParams) } },
   );
 
   const anniDisponibili = Array.from({ length: 6 }, (_, i) => currentYear - i);

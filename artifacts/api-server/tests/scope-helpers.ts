@@ -135,10 +135,11 @@ export async function createCentro(scope: SeedScope, nome = `Centro ${rnd()}`): 
 export async function createMagazzino(
   scope: SeedScope,
   centroId: number | null,
+  opts: { cittaId?: number | null } = {},
 ): Promise<number> {
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `MAG-${rnd()}`, nome: `Mag ${rnd()}`, centroAscoltoId: centroId })
+    .values({ codice: `MAG-${rnd()}`, nome: `Mag ${rnd()}`, centroAscoltoId: centroId, cittaId: opts.cittaId ?? null })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
   return m.id;
@@ -148,11 +149,12 @@ export async function createMagazzino(
 export async function createMagazzinoRec(
   scope: SeedScope,
   centroId: number | null,
+  opts: { cittaId?: number | null } = {},
 ): Promise<{ id: number; nome: string }> {
   const nome = `Mag ${rnd()}`;
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `MAG-${rnd()}`, nome, centroAscoltoId: centroId })
+    .values({ codice: `MAG-${rnd()}`, nome, centroAscoltoId: centroId, cittaId: opts.cittaId ?? null })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
   return { id: m.id, nome };

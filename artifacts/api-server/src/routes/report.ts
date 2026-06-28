@@ -53,6 +53,8 @@ router.get("/report/giacenze-per-magazzino", async (req, res) => {
   if (centroCond) conds.push(centroCond);
   const cittaCond = ownOrNullSql(sql`mg.citta_id`, citta);
   if (cittaCond) conds.push(cittaCond);
+  const qCitta = parseIntParam(req.query.cittaId);
+  if (qCitta) conds.push(sql`mg.citta_id = ${qCitta}`);
   const where = conds.length ? sql`WHERE ${sql.join(conds, sql` AND `)}` : sql``;
 
   const result1 = await db.execute(sql`
@@ -96,6 +98,8 @@ router.get("/report/consegne-per-mese", async (req, res) => {
   if (centroCond) conds.push(centroCond);
   const cittaCond = ownOrNullSql(sql`be.citta_id`, citta);
   if (cittaCond) conds.push(cittaCond);
+  const qCitta = parseIntParam(req.query.cittaId);
+  if (qCitta) conds.push(sql`be.citta_id = ${qCitta}`);
   const where = sql.join(conds, sql` AND `);
 
   const result2 = await db.execute(sql`
@@ -133,6 +137,8 @@ router.get("/report/consegne-per-centro", async (req, res) => {
   if (centroCond) scopeConds.push(centroCond);
   const cittaCond = ownOrNullSql(sql`be.citta_id`, citta);
   if (cittaCond) scopeConds.push(cittaCond);
+  const qCitta = parseIntParam(req.query.cittaId);
+  if (qCitta) scopeConds.push(sql`be.citta_id = ${qCitta}`);
   const extraCentro = scopeConds.length ? sql` AND ${sql.join(scopeConds, sql` AND `)}` : sql``;
 
   const result = await db.execute(sql`
@@ -175,7 +181,11 @@ router.get("/report/fse-plus", async (req, res) => {
   const cittaSub = citta == null
     ? sql``
     : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE citta_id = ${citta} OR citta_id IS NULL)`;
-  const centroCond = sql`${centroSub}${cittaSub}`;
+  const qCitta = parseIntParam(req.query.cittaId);
+  const cittaQSub = qCitta == null
+    ? sql``
+    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE citta_id = ${qCitta})`;
+  const centroCond = sql`${centroSub}${cittaSub}${cittaQSub}`;
 
   const prodRes = await db.execute(sql`
     SELECT p.id as prodotto_id,

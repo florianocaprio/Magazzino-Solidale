@@ -25,6 +25,8 @@ A second scoping axis, **città**, sits above the per-Centro-di-Ascolto axis. It
 
 **Regression safety:** all helpers return `undefined`/`null`/`true` for a città-global caller, so existing global-user behavior is unchanged (scoping tests stub a `req.user` with no `cittaId`, exercising the global path).
 
+**Global-admin `?cittaId` report narrowing:** the global reports accept an optional `?cittaId` so a città-global admin can drill into one città. It is ANDed ON TOP of the existing own-città-or-null scope (never replacing it), so a *scoped* caller passing another città's id can only shrink results to zero — never leak. Mirror UDS reports' `udsScopeConds` pattern: parse the query param, push an extra `col = qCitta` condition alongside `ownOrNullSql`. **Why:** a separate query filter must never bypass the hard boundary; it is purely additive.
+
 ## Zona UDS (soft axis) + canale persona + FE
 
 - **Zona UDS** (municipio, `zone_uds` FK `cittaId`) is a SOFT preference UNDER a città — the operator sees their zone first but can filter the whole città. It is NOT a hard cut (unlike città). `utenti.zonaUdsId` nullable = all zones of the città.

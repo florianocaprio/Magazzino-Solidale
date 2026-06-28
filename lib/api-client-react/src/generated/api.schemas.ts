@@ -1843,6 +1843,7 @@ cittaId?: number;
 
 export type ReportGiacenzePerMagazzinoParams = {
 magazzinoId?: number;
+cittaId?: number;
 };
 
 export type ReportConsegnePerMeseParams = {
@@ -1851,15 +1852,18 @@ da?: string;
 a?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
+cittaId?: number;
 };
 
 export type ReportConsegnePerCentroParams = {
 da?: string;
 a?: string;
+cittaId?: number;
 };
 
 export type ReportFsePlusParams = {
 anno?: number;
+cittaId?: number;
 };
 
 export type ReportUdsInterventiPerMeseParams = {
