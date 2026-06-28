@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { mezziTable, volontariTable, centriAscoltoTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, sql, inArray, or, type SQL } from "drizzle-orm";
+import { eq, sql, inArray, or, desc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -144,7 +144,7 @@ router.get("/mezzi", async (req, res) => {
         effectiveCittaFilter(cittaCentroIds),
       ),
     )
-    .orderBy(mezziTable.codice);
+    .orderBy(desc(mezziTable.id));
   const centri = await db
     .select({ id: centriAscoltoTable.id, nome: centriAscoltoTable.nome })
     .from(centriAscoltoTable);

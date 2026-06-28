@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable } from "@workspace/db";
 import {
@@ -167,7 +167,7 @@ router.get("/utenti", async (req, res): Promise<void> => {
         cittaCaller != null ? eq(utentiTable.cittaId, cittaCaller) : undefined,
       ),
     )
-    .orderBy(utentiTable.username);
+    .orderBy(desc(utentiTable.id));
   res.json(rows.map(fmt));
 });
 

@@ -4,6 +4,9 @@ Gestionale per un magazzino solidale: tracciamento prodotti/lotti (FEFO), CRM be
 
 > Comunicare con l'utente in **italiano**.
 
+## Preferenze utente
+- **Nuovi record in cima**: ogni nuovo record (beneficiario, persona UDS e qualsiasi nuova entità) deve comparire in TESTA alla lista a schermo (ordinamento dal più recente). Implementato server-side con `orderBy(desc(...id/dataCreazione))` sulle anagrafiche operative.
+
 ## Indice
 - [Run & Operate](#run--operate) · [Stack](#stack) · [Dove stanno le cose](#dove-stanno-le-cose)
 - [Decisioni architetturali](#decisioni-architetturali)

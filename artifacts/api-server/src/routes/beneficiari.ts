@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable, cittaTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, and, ilike, sql, type SQL } from "drizzle-orm";
+import { eq, and, ilike, sql, desc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -100,7 +100,7 @@ router.get("/beneficiari", async (req, res) => {
     .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(beneficiariTable.cognome);
+    .orderBy(desc(beneficiariTable.dataCreazione), desc(beneficiariTable.id));
   res.json(rows.map(r => fmtBenef(r.b, r.centroNome, r.cittaNome)));
 });
 

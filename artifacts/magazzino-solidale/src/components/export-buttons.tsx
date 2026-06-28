@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/lib/auth";
 import { exportToXlsx, exportToPdf, type ExportColumn } from "@/lib/export";
 
 type ExportButtonsProps<T> = {
@@ -35,6 +36,8 @@ export function ExportButtons<T>({
   variant = "outline",
 }: ExportButtonsProps<T>) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const generatedBy = user ? `${user.nome ?? ""} ${user.cognome ?? ""}`.trim() || user.username : undefined;
   const empty = disabled || rows.length === 0;
   return (
     <DropdownMenu>
@@ -51,7 +54,7 @@ export function ExportButtons<T>({
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() =>
-            exportToPdf({ filename, title, subtitle, rows, columns, orientation })
+            exportToPdf({ filename, title, subtitle, rows, columns, orientation, generatedBy })
           }
         >
           <FileText className="h-4 w-4 mr-2 text-red-600" /> {t("common.exportPdf")}

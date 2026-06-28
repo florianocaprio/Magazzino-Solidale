@@ -9,7 +9,8 @@ The report serves EU social-fund (FSE+) end-of-year rendicontazione: products di
 
 ## What counts as "delivered FSE+"
 - Provenance is on the **lot**: `lotti.fse_plus = true` (joined via `bolla_righe.lottoId`).
-- A delivery counts only when its bolla `stato IN ('confermata','consegnata')` and the bolla's year (`EXTRACT(YEAR FROM data_bolla)`) matches `anno`.
+- A delivery counts only when its bolla `stato IN ('confermato','consegnato')` and the bolla's year (`EXTRACT(YEAR FROM data_bolla)`) matches `anno`.
+- **Gotcha:** the bolle stato enum is MASCULINE (`bozza`/`confermato`/`consegnato`/`annullato`). Feminine literals (`confermata`/`consegnata`) silently match nothing — this caused FSE+ to report zero delivered data, and a test that encoded the same feminine literal masked it. Always use the masculine forms in SQL and tests.
 - Product weight in kg = sum of `bolla_righe.quantita` only for products whose `unita_misura = 'kg'`; `pesoTotaleKg` sums those.
 
 ## Persons reached

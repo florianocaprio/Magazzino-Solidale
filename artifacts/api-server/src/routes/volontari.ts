@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { volontariTable, centriAscoltoTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, getTableColumns } from "drizzle-orm";
+import { eq, getTableColumns, desc } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -56,7 +56,7 @@ router.get("/volontari", async (req, res) => {
         idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds),
       ),
     )
-    .orderBy(volontariTable.cognome);
+    .orderBy(desc(volontariTable.id));
   res.json(rows.map(fmt));
 });
 

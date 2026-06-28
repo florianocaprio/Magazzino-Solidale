@@ -206,10 +206,10 @@ describe("Report — scoping via beneficiario", () => {
     const beforeA = (await request(appAs(reportRouter, centroA)).get(q)).body.beneficiariTotali as number;
     const beforeG = (await request(appAs(reportRouter, null)).get(q)).body.beneficiariTotali as number;
 
-    // One delivered (confermata) FSE+ bolla for a centro-B beneficiary, year 2026.
+    // One delivered (confermato) FSE+ bolla for a centro-B beneficiary, year 2026.
     const benB = await createBeneficiario(scope, centroB);
     const lotB = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 5, fsePlus: true });
-    const bolB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull, stato: "confermata" });
+    const bolB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull, stato: "confermato" });
     await insertBollaRiga(scope, { bollaId: bolB, prodottoId: prod, lottoId: lotB, quantita: 5 });
 
     const afterA = (await request(appAs(reportRouter, centroA)).get(q)).body.beneficiariTotali as number;

@@ -7,6 +7,7 @@ import {
   useReportFsePlus,
   useListMagazzini,
   useListCentriAscolto,
+  useListCitta,
   getReportGiacenzePerMagazzinoQueryKey,
   getReportConsegnePerMeseQueryKey,
   getReportConsegnePerCentroQueryKey,
@@ -31,9 +32,11 @@ export default function Report() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isGlobalCitta = (user?.cittaId ?? null) == null;
   const currentYear = new Date().getFullYear();
   const [da, setDa] = useState(`${currentYear}-01-01`);
   const [a, setA] = useState(new Date().toISOString().slice(0, 10));
+  const [cittaId, setCittaId] = useState<string>(ALL);
   const [magazzinoId, setMagazzinoId] = useState<string>(ALL);
   const [centroId, setCentroId] = useState<string>(ALL);
   const [fseAnno, setFseAnno] = useState(currentYear);
@@ -43,8 +46,13 @@ export default function Report() {
     }
   }, [isCentroLocked, lockedCentroId]);
 
+  const { data: citta } = useListCitta();
   const { data: magazzini } = useListMagazzini();
   const { data: centri } = useListCentriAscolto();
+
+  const cittaParam = cittaId === ALL ? null : parseInt(cittaId);
+  const magazziniVisibili = (magazzini ?? []).filter((m) => cittaParam == null || m.cittaId === cittaParam);
+  const centriVisibili = (centri ?? []).filter((c) => cittaParam == null || c.cittaId === cittaParam);
 
   const magParam = magazzinoId === ALL ? undefined : parseInt(magazzinoId);
   const centroParam = centroId === ALL ? undefined : parseInt(centroId);
@@ -103,13 +111,34 @@ export default function Report() {
               <Input id="a" type="date" value={a} min={da} onChange={(e) => setA(e.target.value)} className="w-40" />
             </div>
           </div>
+          {isGlobalCitta && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t("report.area")}</Label>
+              <Select
+                value={cittaId}
+                onValueChange={(v) => {
+                  setCittaId(v);
+                  setMagazzinoId(ALL);
+                  if (!isCentroLocked) setCentroId(ALL);
+                }}
+              >
+                <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>{t("report.allAreas")}</SelectItem>
+                  {(citta ?? []).map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label className="text-xs">{t("report.warehouse")}</Label>
             <Select value={magazzinoId} onValueChange={setMagazzinoId}>
               <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t("report.allWarehouses")}</SelectItem>
-                {(magazzini ?? []).map((m) => (
+                {magazziniVisibili.map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                 ))}
               </SelectContent>
@@ -121,7 +150,7 @@ export default function Report() {
               <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t("report.allCentres")}</SelectItem>
-                {(centri ?? []).map((c) => (
+                {centriVisibili.map((c) => (
                   <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                 ))}
               </SelectContent>

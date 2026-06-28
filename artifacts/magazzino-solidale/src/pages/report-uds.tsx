@@ -112,18 +112,20 @@ export default function ReportUds() {
               </Select>
             </div>
           )}
-          <div className="space-y-1.5">
-            <Label className="text-xs">{t("reportUds.zone")}</Label>
-            <Select value={zonaId} onValueChange={setZonaId} disabled={lockedZonaId != null}>
-              <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>{t("reportUds.allZones")}</SelectItem>
-                {(zone ?? []).map((z) => (
-                  <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {(!isGlobalCitta || cittaParam != null) && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t("reportUds.zone")}</Label>
+              <Select value={zonaId} onValueChange={setZonaId} disabled={lockedZonaId != null}>
+                <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>{t("reportUds.allZones")}</SelectItem>
+                  {(zone ?? []).map((z) => (
+                    <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -49,8 +49,9 @@ export function exportToPdf<T>(opts: {
   rows: T[];
   columns: ExportColumn<T>[];
   orientation?: "portrait" | "landscape";
+  generatedBy?: string;
 }): void {
-  const { filename, title, subtitle, rows, columns, orientation = "portrait" } = opts;
+  const { filename, title, subtitle, rows, columns, orientation = "portrait", generatedBy } = opts;
   const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
   const marginX = 40;
 
@@ -61,8 +62,9 @@ export function exportToPdf<T>(opts: {
   doc.setFontSize(9);
   doc.setTextColor(120);
   const meta = subtitle ? `${subtitle}  •  ` : "";
+  const by = generatedBy ? `  •  Report generato da: ${generatedBy}` : "";
   doc.text(
-    `${meta}Generato il ${new Date().toLocaleString("it-IT")}  •  ${rows.length} righe`,
+    `${meta}Generato il ${new Date().toLocaleString("it-IT")}  •  ${rows.length} righe${by}`,
     marginX,
     64,
   );
