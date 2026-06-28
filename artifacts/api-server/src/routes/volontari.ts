@@ -1,8 +1,8 @@
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { volontariTable, centriAscoltoTable } from "@workspace/db";
+import { volontariTable, centriAscoltoTable, consegneTable, bolleTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, getTableColumns, desc } from "drizzle-orm";
+import { eq, and, ne, isNull, getTableColumns, desc } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -105,6 +105,64 @@ router.post("/volontari/bulk", async (req, res) => {
     return "error" in r ? { error: r.error } : { ok: true };
   });
   res.json(result);
+});
+
+// Carico per volontario in un turno (= un giorno): consegne assegnate per quella
+// data + bolle assegnate per quella data non collegate a una consegna (no doppioni),
+// escluse le bolle annullate. Usato dalla UI per disabilitare i volontari al limite.
+router.get("/volontari/carico", async (req, res) => {
+  const { data, excludeConsegnaId, excludeBollaId } = req.query as Record<string, string>;
+  if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    res.status(400).json({ error: "Parametro 'data' non valido (formato atteso: YYYY-MM-DD)" });
+    return;
+  }
+  const exclConsegna = excludeConsegnaId != null ? parseInt(excludeConsegnaId) : NaN;
+  const exclBolla = excludeBollaId != null ? parseInt(excludeBollaId) : NaN;
+  const counts = new Map<number, number>();
+
+  // I conteggi restano GLOBALI: il limite di un volontario è giornaliero su tutti
+  // i centri (un volontario universale consegna ovunque), quindi il carico va
+  // sommato senza scoping per ottenere un limite corretto.
+  const consegneConds = [eq(consegneTable.dataPrevista, data)];
+  if (Number.isInteger(exclConsegna)) consegneConds.push(ne(consegneTable.id, exclConsegna));
+  const cons = await db
+    .select({ volontarioId: consegneTable.volontarioId })
+    .from(consegneTable)
+    .where(and(...consegneConds));
+  for (const r of cons) {
+    if (r.volontarioId != null) counts.set(r.volontarioId, (counts.get(r.volontarioId) ?? 0) + 1);
+  }
+
+  const bolleConds = [eq(bolleTable.dataBolla, data), isNull(bolleTable.consegnaId), ne(bolleTable.stato, "annullato")];
+  if (Number.isInteger(exclBolla)) bolleConds.push(ne(bolleTable.id, exclBolla));
+  const bol = await db
+    .select({ volontarioId: bolleTable.volontarioConsegnaId })
+    .from(bolleTable)
+    .where(and(...bolleConds));
+  for (const r of bol) {
+    if (r.volontarioId != null) counts.set(r.volontarioId, (counts.get(r.volontarioId) ?? 0) + 1);
+  }
+
+  // Le RIGHE restituite sono però limitate ai volontari visibili al chiamante
+  // (confine centro + città HARD): il conteggio resta globale, ma non si espone
+  // l'attività di volontari fuori perimetro.
+  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
+  const visibili = await db
+    .select({ id: volontariTable.id })
+    .from(volontariTable)
+    .where(
+      andScoped(
+        centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)),
+        idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds),
+      ),
+    );
+  const visibileSet = new Set(visibili.map((v) => v.id));
+
+  res.json(
+    [...counts.entries()]
+      .filter(([volontarioId]) => visibileSet.has(volontarioId))
+      .map(([volontarioId, count]) => ({ volontarioId, count })),
+  );
 });
 
 router.get("/volontari/:id", async (req, res) => {

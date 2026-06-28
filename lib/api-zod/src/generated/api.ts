@@ -2640,6 +2640,22 @@ export const BulkVolontariResponse = zod.object({
 })
 
 
+/**
+ * @summary Carico (numero consegne assegnate) per volontario in un turno/giorno
+ */
+export const GetVolontariCaricoQueryParams = zod.object({
+  "data": zod.coerce.string().describe('Data del turno (YYYY-MM-DD)'),
+  "excludeConsegnaId": zod.coerce.number().optional(),
+  "excludeBollaId": zod.coerce.number().optional()
+})
+
+export const GetVolontariCaricoResponseItem = zod.object({
+  "volontarioId": zod.number(),
+  "count": zod.number()
+})
+export const GetVolontariCaricoResponse = zod.array(GetVolontariCaricoResponseItem)
+
+
 export const GetVolontarioParams = zod.object({
   "id": zod.coerce.number()
 })

@@ -17,6 +17,9 @@ import {
   useListLotti,
   useListProdotti,
   useListVolontari,
+  useListMezzi,
+  useGetVolontariCarico,
+  getGetVolontariCaricoQueryKey,
   useGetImpostazioniStampa,
   useListTrasferimenti,
   useListScarichi,
@@ -114,6 +117,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   const [centroId, setCentroId] = useState("all");
   const [trasportatore, setTrasportatore] = useState("");
   const [trasportatoreNome, setTrasportatoreNome] = useState("");
+  const [mezzoId, setMezzoId] = useState("");
   const [scanCode, setScanCode] = useState("");
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
@@ -128,6 +132,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
       setMagazzinoId("");
       setTrasportatore("");
       setTrasportatoreNome("");
+      setMezzoId("");
       setScanCode("");
       if (!lockedBeneficiario) setBeneficiarioId("");
     }
@@ -140,6 +145,13 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
+  const { data: mezzi } = useListMezzi();
+  const oggi = new Date().toISOString().split("T")[0];
+  const { data: caricoTurno } = useGetVolontariCarico(
+    { data: oggi },
+    { query: { queryKey: getGetVolontariCaricoQueryKey({ data: oggi }) } },
+  );
+  const caricoMap = new Map((caricoTurno ?? []).map((c) => [c.volontarioId, c.count]));
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -172,12 +184,14 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
       consegnaId?: number;
       volontarioConsegnaId?: number;
       trasportatoreNome?: string;
+      mezzoId?: number;
     } = { beneficiarioId: parseInt(beneficiarioId), magazzinoId: parseInt(magazzinoId) };
     if (consegnaId != null) data.consegnaId = consegnaId;
     if (trasportatore === "__altro__") {
       data.trasportatoreNome = trasportatoreNome.trim() || "Ritiro presso il magazzino";
     } else if (trasportatore) {
       data.volontarioConsegnaId = parseInt(trasportatore);
+      if (mezzoId && mezzoId !== "__none__") data.mezzoId = parseInt(mezzoId);
     }
     createBolla.mutate(
       { data },
@@ -190,6 +204,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
           setCentroId(isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all");
           setTrasportatore("");
           setTrasportatoreNome("");
+          setMezzoId("");
           onCreated?.((created as { id?: number } | undefined)?.id);
           onClose();
         },
@@ -266,7 +281,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
           </div>
           <div className="space-y-2">
             <Label>{t("bolle.trasportatoreLabel")}</Label>
-            <Select value={trasportatore} onValueChange={setTrasportatore}>
+            <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); setMezzoId(""); }}>
               <SelectTrigger><SelectValue placeholder={t("bolle.trasportatorePlaceholder")} /></SelectTrigger>
               <SelectContent>
                 {volontari?.filter(v => {
@@ -274,9 +289,14 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
                   if (v.centroAscoltoId == null) return true;
                   const benefCentro = allBeneficiari?.find(b => String(b.id) === beneficiarioId)?.centroAscoltoId ?? null;
                   return benefCentro != null && v.centroAscoltoId === benefCentro;
-                }).map(v => (
-                  <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
-                ))}
+                }).map(v => {
+                  const overLimit = v.maxConsegneTurno > 0 && (caricoMap.get(v.id) ?? 0) >= v.maxConsegneTurno;
+                  return (
+                    <SelectItem key={v.id} value={String(v.id)} disabled={overLimit}>
+                      {v.cognome} {v.nome}{overLimit ? ` — ${t("bolle.limiteRaggiunto")}` : ""}
+                    </SelectItem>
+                  );
+                })}
                 <SelectItem value="__altro__">{t("bolle.altroRitiro")}</SelectItem>
               </SelectContent>
             </Select>
@@ -291,6 +311,27 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
               <p className="text-sm text-destructive">{t("bolle.trasportatoreObbligatorioDomicilio")}</p>
             )}
           </div>
+          {hasVolontario && (
+            <div className="space-y-2">
+              <Label>{t("bolle.mezzoLabel")}</Label>
+              <Select value={mezzoId} onValueChange={setMezzoId}>
+                <SelectTrigger><SelectValue placeholder={t("bolle.mezzoPlaceholder")} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t("bolle.mezzoNessuno")}</SelectItem>
+                  {mezzi?.filter(m => {
+                    if (m.stato !== "disponibile") return false;
+                    if (m.effectiveCentroId == null) return true;
+                    const benefCentro = allBeneficiari?.find(b => String(b.id) === beneficiarioId)?.centroAscoltoId ?? null;
+                    return benefCentro != null && m.effectiveCentroId === benefCentro;
+                  }).map(m => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.codice}{m.targa ? ` (${m.targa})` : ""} — {m.tipo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>

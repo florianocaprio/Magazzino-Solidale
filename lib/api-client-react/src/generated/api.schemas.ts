@@ -1841,6 +1841,20 @@ export type ListZoneUdsParams = {
 cittaId?: number;
 };
 
+export type GetVolontariCaricoParams = {
+/**
+ * Data del turno (YYYY-MM-DD)
+ */
+data: string;
+excludeConsegnaId?: number;
+excludeBollaId?: number;
+};
+
+export type GetVolontariCarico200Item = {
+  volontarioId: number;
+  count: number;
+};
+
 export type ReportGiacenzePerMagazzinoParams = {
 magazzinoId?: number;
 cittaId?: number;

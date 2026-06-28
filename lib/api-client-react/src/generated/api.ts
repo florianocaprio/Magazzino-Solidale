@@ -62,6 +62,8 @@ import type {
   FornitoreUpdate,
   FornitoriBulkInput,
   GetPreparazioneConsegneParams,
+  GetVolontariCarico200Item,
+  GetVolontariCaricoParams,
   Giacenza,
   GiacenzaMagazzinoReport,
   HealthStatus,
@@ -7468,6 +7470,90 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getBulkVolontariMutationOptions(options));
     }
+
+export const getGetVolontariCaricoUrl = (params: GetVolontariCaricoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/volontari/carico?${stringifiedParams}` : `/api/volontari/carico`
+}
+
+/**
+ * @summary Carico (numero consegne assegnate) per volontario in un turno/giorno
+ */
+export const getVolontariCarico = async (params: GetVolontariCaricoParams, options?: RequestInit): Promise<GetVolontariCarico200Item[]> => {
+
+  return customFetch<GetVolontariCarico200Item[]>(getGetVolontariCaricoUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVolontariCaricoQueryKey = (params?: GetVolontariCaricoParams,) => {
+    return [
+    `/api/volontari/carico`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetVolontariCaricoQueryOptions = <TData = Awaited<ReturnType<typeof getVolontariCarico>>, TError = ErrorType<unknown>>(params: GetVolontariCaricoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolontariCarico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVolontariCaricoQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVolontariCarico>>> = ({ signal }) => getVolontariCarico(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVolontariCarico>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVolontariCaricoQueryResult = NonNullable<Awaited<ReturnType<typeof getVolontariCarico>>>
+export type GetVolontariCaricoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Carico (numero consegne assegnate) per volontario in un turno/giorno
+ */
+
+export function useGetVolontariCarico<TData = Awaited<ReturnType<typeof getVolontariCarico>>, TError = ErrorType<unknown>>(
+ params: GetVolontariCaricoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolontariCarico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVolontariCaricoQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetVolontarioUrl = (id: number,) => {
 

@@ -2058,6 +2058,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/BulkImportResult"
 
+  /volontari/carico:
+    get:
+      operationId: getVolontariCarico
+      tags: [volontari]
+      summary: Carico (numero consegne assegnate) per volontario in un turno/giorno
+      parameters:
+        - name: data
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Data del turno (YYYY-MM-DD)
+        - name: excludeConsegnaId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: excludeBollaId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Carico per volontario
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    volontarioId:
+                      type: integer
+                    count:
+                      type: integer
+                  required: [volontarioId, count]
+
   /volontari/{id}:
     get:
       operationId: getVolontario

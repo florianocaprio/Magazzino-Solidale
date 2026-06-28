@@ -51,6 +51,8 @@ export * from './fornitoreInput';
 export * from './fornitoreUpdate';
 export * from './fornitoriBulkInput';
 export * from './getPreparazioneConsegneParams';
+export * from './getVolontariCarico200Item';
+export * from './getVolontariCaricoParams';
 export * from './giacenza';
 export * from './giacenzaMagazzinoReport';
 export * from './healthStatus';

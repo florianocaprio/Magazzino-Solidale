@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -35,6 +35,7 @@ const formSchema = z.object({
   zona: z.string().optional(),
   magazzinoId: z.coerce.number().min(1),
   volontarioId: z.coerce.number().optional(),
+  mezzoId: z.coerce.number().optional(),
   noteOperative: z.string().optional()
 });
 
@@ -79,6 +80,7 @@ export default function Consegne() {
   const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
+  const { data: mezzi } = useListMezzi();
   const { data: centri } = useListCentriAscolto();
   const { data: cittaList } = useListCitta({
     query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal },
@@ -155,13 +157,28 @@ export default function Consegne() {
     }
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const dataPrevistaWatch = form.watch("dataPrevista");
+  const validData = /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? "");
+  const { data: caricoTurno } = useGetVolontariCarico(
+    { data: dataPrevistaWatch },
+    { query: { queryKey: getGetVolontariCaricoQueryKey({ data: dataPrevistaWatch }), enabled: validData } },
+  );
+  const caricoMap = new Map((caricoTurno ?? []).map((c) => [c.volontarioId, c.count]));
+
+  const onSubmit = (raw: z.infer<typeof formSchema>) => {
+    const data = { ...raw };
+    if (!data.volontarioId) delete data.volontarioId;
+    if (!data.mezzoId) delete data.mezzoId;
     createConsegna.mutate({ data }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
         toast({ title: t("consegne.toastConsegnaProgrammata") });
         setIsFormOpen(false);
-      }
+      },
+      onError: (e: unknown) => {
+        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        toast({ title: t("consegne.toastOpFallita"), description: msg ?? t("consegne.toastErrore"), variant: "destructive" });
+      },
     });
   };
 
@@ -611,7 +628,7 @@ export default function Consegne() {
                     <FormField control={form.control} name="volontarioId" render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t("consegne.formVolontario")}</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
+                        <Select onValueChange={(v) => { field.onChange(v); form.setValue("mezzoId", 0); }} defaultValue={field.value ? String(field.value) : undefined}>
                           <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="0">{t("common.none")}</SelectItem>
@@ -619,11 +636,41 @@ export default function Consegne() {
                               if (v.centroAscoltoId == null) return true;
                               const benefCentro = beneficiari?.find(b => b.id === form.watch("beneficiarioId"))?.centroAscoltoId ?? null;
                               return benefCentro != null && v.centroAscoltoId === benefCentro;
-                            }).map(v => <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>)}
+                            }).map(v => {
+                              const overLimit = v.maxConsegneTurno > 0 && (caricoMap.get(v.id) ?? 0) >= v.maxConsegneTurno;
+                              return (
+                                <SelectItem key={v.id} value={String(v.id)} disabled={overLimit}>
+                                  {v.nome} {v.cognome}{overLimit ? ` — ${t("consegne.limiteRaggiunto")}` : ""}
+                                </SelectItem>
+                              );
+                            })}
                           </SelectContent>
                         </Select>
                       </FormItem>
                     )} />
+                    {!!form.watch("volontarioId") && (
+                      <FormField control={form.control} name="mezzoId" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("consegne.formMezzo")}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value ? String(field.value) : "0"}>
+                            <FormControl><SelectTrigger><SelectValue placeholder={t("consegne.mezzoPlaceholder")} /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="0">{t("common.none")}</SelectItem>
+                              {mezzi?.filter(m => {
+                                if (m.stato !== "disponibile") return false;
+                                if (m.effectiveCentroId == null) return true;
+                                const benefCentro = beneficiari?.find(b => b.id === form.watch("beneficiarioId"))?.centroAscoltoId ?? null;
+                                return benefCentro != null && m.effectiveCentroId === benefCentro;
+                              }).map(m => (
+                                <SelectItem key={m.id} value={String(m.id)}>
+                                  {m.codice}{m.targa ? ` (${m.targa})` : ""} — {m.tipo}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )} />
+                    )}
                   </div>
                 )}
 

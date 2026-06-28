@@ -14,6 +14,9 @@ import {
   canUseBeneficiario,
   canAccessMagazzino,
 } from "../lib/centroScope";
+import { volontarioOverLimit } from "../lib/volontarioCarico";
+
+const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
 
 const router: IRouter = Router();
 
@@ -129,6 +132,11 @@ router.post("/consegne", async (req, res) => {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
     return;
   }
+  if (body.volontarioId != null && body.dataPrevista
+      && await volontarioOverLimit(body.volontarioId, body.dataPrevista)) {
+    res.status(400).json({ error: LIMITE_TURNO_MSG });
+    return;
+  }
   const codice = `CON-${Date.now()}`;
   const [row] = await db.insert(consegneTable).values({ ...body, codice }).returning();
   res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
@@ -164,6 +172,13 @@ router.patch("/consegne/:id", async (req, res) => {
   if ((caller != null || cid != null) && req.body.magazzinoId != null && req.body.magazzinoId !== existing.magazzinoId
       && !(await canAccessMagazzino(req.body.magazzinoId, caller, cid))) {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
+    return;
+  }
+  const nextVol = req.body.volontarioId !== undefined ? req.body.volontarioId : existing.volontarioId;
+  const nextData = req.body.dataPrevista !== undefined ? req.body.dataPrevista : existing.dataPrevista;
+  if (nextVol != null && nextData
+      && await volontarioOverLimit(nextVol, nextData, { excludeConsegnaId: id })) {
+    res.status(400).json({ error: LIMITE_TURNO_MSG });
     return;
   }
   const [row] = await db.update(consegneTable).set(req.body).where(eq(consegneTable.id, id)).returning();
