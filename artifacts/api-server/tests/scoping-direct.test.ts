@@ -161,7 +161,7 @@ describe("Volontari — scoping per centro", () => {
       makeScopedApp(volontariRouter, { id: operatoreId, centroAscoltoId: centroA }),
     )
       .post("/volontari")
-      .send({ nome: "Mario", cognome: "Rossi", ruolo: "autista", centroAscoltoId: centroB });
+      .send({ nome: "Mario", cognome: "Rossi", matricola: "MR-001", ruolo: "autista", centroAscoltoId: centroB });
     expect(res.status).toBe(201);
     scope.volontarioIds.push(res.body.id);
     expect(res.body.centroAscoltoId).toBe(centroA);

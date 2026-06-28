@@ -18,6 +18,7 @@ export interface MezzoInput {
   centroAscoltoId?: number | null;
   capacitaColli?: number;
   capacitaKg?: number;
+  descrizione?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;

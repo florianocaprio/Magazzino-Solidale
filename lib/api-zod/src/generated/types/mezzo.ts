@@ -29,6 +29,8 @@ export interface Mezzo {
   capacitaColli?: number | null;
   /** @nullable */
   capacitaKg?: number | null;
+  /** @nullable */
+  descrizione?: string | null;
   stato: string;
   /** @nullable */
   scadenzaAssicurazione?: string | null;

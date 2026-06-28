@@ -101,6 +101,7 @@ const fmt = (r: MezzoJoinRow, centroNome: string | null) => {
     effectiveCentroNome: centroNome,
     capacitaColli: r.m.capacitaColli ?? null,
     capacitaKg: r.m.capacitaKg ? parseFloat(r.m.capacitaKg) : null,
+    descrizione: r.m.descrizione ?? null,
     stato: r.m.stato,
     scadenzaAssicurazione: r.m.scadenzaAssicurazione ?? null,
     scadenzaRevisione: r.m.scadenzaRevisione ?? null,

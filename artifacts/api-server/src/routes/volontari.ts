@@ -24,6 +24,7 @@ const fmt = (r: VolontarioRow) => ({
   id: r.id,
   nome: r.nome,
   cognome: r.cognome,
+  matricola: r.matricola ?? null,
   centroAscoltoId: r.centroAscoltoId ?? null,
   centroAscoltoNome: r.centroAscoltoNome ?? null,
   telefono: r.telefono ?? null,
@@ -59,12 +60,19 @@ router.get("/volontari", async (req, res) => {
   res.json(rows.map(fmt));
 });
 
+function normalizeMatricola(v: unknown): string | undefined {
+  return typeof v === "string" ? v.trim() : undefined;
+}
+
 async function createVolontarioOne(
   body: Record<string, unknown>,
   req: Request,
 ): Promise<{ id: number } | { error: string }> {
   const caller = callerCentroId(req);
   const values = { ...body };
+  const matricola = normalizeMatricola(values.matricola);
+  if (!matricola) return { error: "Matricola obbligatoria" };
+  values.matricola = matricola;
   if (caller != null) values.centroAscoltoId = caller;
   if (
     caller == null &&
@@ -82,7 +90,10 @@ async function createVolontarioOne(
 
 router.post("/volontari", async (req, res) => {
   const r = await createVolontarioOne(req.body, req);
-  if ("error" in r) { res.status(403).json({ error: r.error }); return; }
+  if ("error" in r) {
+    res.status(r.error === "Matricola obbligatoria" ? 400 : 403).json({ error: r.error });
+    return;
+  }
   const [row] = await selectVolontario().where(eq(volontariTable.id, r.id));
   res.status(201).json(fmt(row));
 });
@@ -123,6 +134,11 @@ router.patch("/volontari/:id", async (req, res) => {
     return;
   }
   const updates = { ...req.body };
+  if ("matricola" in updates) {
+    const matricola = normalizeMatricola(updates.matricola);
+    if (!matricola) { res.status(400).json({ error: "Matricola obbligatoria" }); return; }
+    updates.matricola = matricola;
+  }
   if (caller != null) delete updates.centroAscoltoId;
   const [updated] = await db.update(volontariTable).set(updates).where(eq(volontariTable.id, parseInt(req.params.id))).returning({ id: volontariTable.id });
   const [row] = await selectVolontario().where(eq(volontariTable.id, updated.id));

@@ -4910,6 +4910,8 @@ components:
           type: string
         cognome:
           type: string
+        matricola:
+          type: ["string", "null"]
         centroAscoltoId:
           type: ["integer", "null"]
         centroAscoltoNome:
@@ -4941,6 +4943,8 @@ components:
           type: string
         cognome:
           type: string
+        matricola:
+          type: string
         centroAscoltoId:
           type: ["integer", "null"]
         telefono:
@@ -4957,7 +4961,7 @@ components:
           type: integer
         note:
           type: string
-      required: [nome, cognome, ruolo]
+      required: [nome, cognome, matricola, ruolo]
 
     VolontarioUpdate:
       type: object
@@ -4965,6 +4969,8 @@ components:
         nome:
           type: string
         cognome:
+          type: string
+        matricola:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
@@ -5015,6 +5021,8 @@ components:
           type: ["integer", "null"]
         capacitaKg:
           type: ["number", "null"]
+        descrizione:
+          type: ["string", "null"]
         stato:
           type: string
         scadenzaAssicurazione:
@@ -5048,6 +5056,8 @@ components:
           type: integer
         capacitaKg:
           type: number
+        descrizione:
+          type: string
         scadenzaAssicurazione:
           type: string
         scadenzaRevisione:
@@ -5075,6 +5085,8 @@ components:
           type: integer
         capacitaKg:
           type: number
+        descrizione:
+          type: string
         stato:
           type: string
         scadenzaAssicurazione:

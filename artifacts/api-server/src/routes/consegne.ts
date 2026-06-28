@@ -81,7 +81,7 @@ router.get("/consegne", async (req, res) => {
     .leftJoin(magazziniTable, eq(consegneTable.magazzinoId, magazziniTable.id))
     .leftJoin(volontariTable, eq(consegneTable.volontarioId, volontariTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(consegneTable.dataPrevista))
+    .orderBy(desc(consegneTable.dataCreazione), desc(consegneTable.id))
     .limit(200);
 
   const bolle = await bollePerConsegne(rows.map(r => r.c.id));

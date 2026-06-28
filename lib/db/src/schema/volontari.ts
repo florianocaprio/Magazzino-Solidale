@@ -7,6 +7,7 @@ export const volontariTable = pgTable("volontari", {
   id: serial("id").primaryKey(),
   nome: varchar("nome", { length: 80 }).notNull(),
   cognome: varchar("cognome", { length: 80 }).notNull(),
+  matricola: varchar("matricola", { length: 40 }),
   centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
   telefono: varchar("telefono", { length: 20 }),
   email: varchar("email", { length: 120 }),

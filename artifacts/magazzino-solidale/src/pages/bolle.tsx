@@ -1246,9 +1246,9 @@ export default function Bolle() {
     : [];
 
   const rows: Row[] = [
-    ...(bolle ?? []).map((b): Row => ({ kind: "bolla", date: b.dataBolla, bolla: b })),
-    ...trasfFiltered.map((t): Row => ({ kind: "trasf", date: t.dataRichiesta, trasf: t })),
-    ...scarFiltered.map((s): Row => ({ kind: "scar", date: s.dataScarico, scar: s })),
+    ...(bolle ?? []).map((b): Row => ({ kind: "bolla", date: b.dataCreazione, bolla: b })),
+    ...trasfFiltered.map((t): Row => ({ kind: "trasf", date: t.dataCreazione, trasf: t })),
+    ...scarFiltered.map((s): Row => ({ kind: "scar", date: s.dataCreazione, scar: s })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const filtersActive = filterMagazzinoId !== "all" || filterCentroId !== "all" || filterStato !== "all";

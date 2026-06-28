@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -43,6 +44,7 @@ export default function Mezzi() {
     centroAscoltoId: z.string().optional(),
     capacitaColli: z.coerce.number().optional(),
     capacitaKg: z.coerce.number().optional(),
+    descrizione: z.string().optional(),
     scadenzaAssicurazione: z.string().optional(),
     scadenzaRevisione: z.string().optional(),
     note: z.string().optional()
@@ -68,7 +70,8 @@ export default function Mezzi() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       codice: "", tipo: "furgone", targa: "", proprieta: "associazione", proprietarioNome: "",
-      volontarioId: NO_VOLONTARIO, centroAscoltoId: NO_CENTRO, note: ""
+      volontarioId: NO_VOLONTARIO, centroAscoltoId: NO_CENTRO,
+      capacitaColli: 0, capacitaKg: 0, descrizione: "", note: ""
     }
   });
 
@@ -86,6 +89,7 @@ export default function Mezzi() {
       centroAscoltoId: mezzo.centroAscoltoId != null ? String(mezzo.centroAscoltoId) : NO_CENTRO,
       capacitaColli: mezzo.capacitaColli || 0,
       capacitaKg: mezzo.capacitaKg || 0,
+      descrizione: mezzo.descrizione || "",
       scadenzaAssicurazione: mezzo.scadenzaAssicurazione ? mezzo.scadenzaAssicurazione.substring(0, 10) : "",
       scadenzaRevisione: mezzo.scadenzaRevisione ? mezzo.scadenzaRevisione.substring(0, 10) : "",
       note: mezzo.note || ""
@@ -98,7 +102,8 @@ export default function Mezzi() {
     form.reset({
       codice: "", tipo: "furgone", targa: "", proprieta: "associazione", proprietarioNome: "",
       volontarioId: NO_VOLONTARIO,
-      centroAscoltoId: isCentroLocked ? String(lockedCentroId) : NO_CENTRO, note: ""
+      centroAscoltoId: isCentroLocked ? String(lockedCentroId) : NO_CENTRO,
+      capacitaColli: 0, capacitaKg: 0, descrizione: "", note: ""
     });
     setIsFormOpen(true);
   };
@@ -499,6 +504,19 @@ export default function Mezzi() {
                     )} />
                   )}
                 </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <FormField control={form.control} name="capacitaColli" render={({ field }) => (
+                    <FormItem><FormLabel>{t("mezzi.capacitaColli")}</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="capacitaKg" render={({ field }) => (
+                    <FormItem><FormLabel>{t("mezzi.capacitaKg")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+
+                <FormField control={form.control} name="descrizione" render={({ field }) => (
+                  <FormItem><FormLabel>{t("mezzi.descrizione")}</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <FormField control={form.control} name="scadenzaAssicurazione" render={({ field }) => (

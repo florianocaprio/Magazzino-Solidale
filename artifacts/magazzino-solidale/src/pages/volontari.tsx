@@ -32,6 +32,7 @@ export default function Volontari() {
   const formSchema = z.object({
     nome: z.string().min(2, t("volontari.valNome")),
     cognome: z.string().min(2, t("volontari.valCognome")),
+    matricola: z.string().min(1, t("volontari.valMatricola")),
     telefono: z.string().optional(),
     email: z.string().email(t("volontari.valEmail")).optional().or(z.literal("")),
     ruolo: z.string().min(1, t("volontari.valRuolo")),
@@ -62,7 +63,7 @@ export default function Volontari() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: "", cognome: "", telefono: "", email: "",
+      nome: "", cognome: "", matricola: "", telefono: "", email: "",
       ruolo: "magazziniere", patente: false, mezzoPersonale: false,
       maxConsegneTurno: 5, centroAscoltoId: null, note: ""
     }
@@ -73,6 +74,7 @@ export default function Volontari() {
     form.reset({
       nome: volontario.nome,
       cognome: volontario.cognome,
+      matricola: volontario.matricola || "",
       telefono: volontario.telefono || "",
       email: volontario.email || "",
       ruolo: volontario.ruolo,
@@ -88,7 +90,7 @@ export default function Volontari() {
   const handleCreate = () => {
     setEditingId(null);
     form.reset({
-      nome: "", cognome: "", telefono: "", email: "",
+      nome: "", cognome: "", matricola: "", telefono: "", email: "",
       ruolo: "magazziniere", patente: false, mezzoPersonale: false,
       maxConsegneTurno: 5, centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : null, note: ""
     });
@@ -185,6 +187,7 @@ export default function Volontari() {
         columns={[
           { key: "nome", header: t("common.name"), example: "Mario" },
           { key: "cognome", header: t("common.surname"), example: "Rossi" },
+          { key: "matricola", header: t("volontari.matricola"), example: "MR-001" },
           { key: "ruolo", header: t("volontari.ruolo"), example: "magazziniere" },
           { key: "telefono", header: t("common.phone"), example: "3331234567" },
           { key: "email", header: t("common.email"), example: "mario.rossi@example.com" },
@@ -197,6 +200,7 @@ export default function Volontari() {
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
           if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("common.name") }) };
           if (!r.cognome) return { error: t("bulkImport.requiredMissing", { field: t("common.surname") }) };
+          if (!r.matricola) return { error: t("bulkImport.requiredMissing", { field: t("volontari.matricola") }) };
           if (!r.ruolo) return { error: t("bulkImport.requiredMissing", { field: t("volontari.ruolo") }) };
           let centroAscoltoId: number | null = null;
           if (r.centro) {
@@ -214,6 +218,7 @@ export default function Volontari() {
             data: {
               nome: r.nome,
               cognome: r.cognome,
+              matricola: r.matricola,
               ruolo: r.ruolo,
               telefono: r.telefono || undefined,
               email: r.email || undefined,
@@ -368,6 +373,14 @@ export default function Volontari() {
                     </FormItem>
                   )} />
                 </div>
+
+                <FormField control={form.control} name="matricola" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("volontari.matricola")}</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="telefono" render={({ field }) => (

@@ -9,6 +9,7 @@
 export interface VolontarioUpdate {
   nome?: string;
   cognome?: string;
+  matricola?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;

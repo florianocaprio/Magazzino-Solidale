@@ -11,6 +11,8 @@ export interface Volontario {
   nome: string;
   cognome: string;
   /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;

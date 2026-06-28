@@ -17,6 +17,7 @@ export interface MezzoUpdate {
   centroAscoltoId?: number | null;
   capacitaColli?: number;
   capacitaKg?: number;
+  descrizione?: string;
   stato?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;

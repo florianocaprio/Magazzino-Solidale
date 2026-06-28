@@ -15,6 +15,7 @@ export const mezziTable = pgTable("mezzi", {
   centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
   capacitaColli: integer("capacita_colli"),
   capacitaKg: decimal("capacita_kg", { precision: 8, scale: 2 }),
+  descrizione: text("descrizione"),
   stato: varchar("stato", { length: 20 }).notNull().default("disponibile"),
   scadenzaAssicurazione: date("scadenza_assicurazione"),
   scadenzaRevisione: date("scadenza_revisione"),

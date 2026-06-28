@@ -303,15 +303,18 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   doc.setLineWidth(0.3);
   doc.line(margin, footerY - 4, pageW - margin, footerY - 4);
 
-  let footerTextX = margin;
+  const footerTextX = margin;
+  let footerTextRightPad = margin;
   if (associationLogoDataUrl) {
-    const drawn = await drawImageFit(doc, associationLogoDataUrl, margin, footerY - 2, 12, 10);
-    if (drawn) footerTextX = margin + 16;
+    const logoW = 24;
+    const logoH = 20;
+    const drawn = await drawImageFit(doc, associationLogoDataUrl, pageW - margin - logoW, footerY - 10, logoW, logoH);
+    if (drawn) footerTextRightPad = margin + logoW + 4;
   }
   if (footer) {
     doc.setFontSize(8);
     doc.setTextColor(110, 110, 110);
-    const lines = doc.splitTextToSize(footer, pageW - footerTextX - margin);
+    const lines = doc.splitTextToSize(footer, pageW - footerTextX - footerTextRightPad);
     doc.text(lines, footerTextX, footerY + 1);
   }
 

@@ -106,6 +106,7 @@ export interface Magazzino {
 export interface VolontarioInput {
   nome: string;
   cognome: string;
+  matricola: string;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
@@ -133,6 +134,7 @@ export interface MezzoInput {
   centroAscoltoId?: number | null;
   capacitaColli?: number;
   capacitaKg?: number;
+  descrizione?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;
@@ -1438,6 +1440,8 @@ export interface Volontario {
   nome: string;
   cognome: string;
   /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
@@ -1458,6 +1462,7 @@ export interface Volontario {
 export interface VolontarioUpdate {
   nome?: string;
   cognome?: string;
+  matricola?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
@@ -1493,6 +1498,8 @@ export interface Mezzo {
   capacitaColli?: number | null;
   /** @nullable */
   capacitaKg?: number | null;
+  /** @nullable */
+  descrizione?: string | null;
   stato: string;
   /** @nullable */
   scadenzaAssicurazione?: string | null;
@@ -1514,6 +1521,7 @@ export interface MezzoUpdate {
   centroAscoltoId?: number | null;
   capacitaColli?: number;
   capacitaKg?: number;
+  descrizione?: string;
   stato?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
