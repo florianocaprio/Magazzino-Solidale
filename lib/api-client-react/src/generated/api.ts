@@ -21,6 +21,7 @@ import type {
 
 import type {
   Alert,
+  AllocazioneMezziReport,
   Approvvigionamento,
   ApprovvigionamentoInput,
   ApprovvigionamentoUpdate,
@@ -106,6 +107,7 @@ import type {
   Prodotto,
   ProdottoInput,
   ProdottoUpdate,
+  ReportAllocazioneMezziParams,
   ReportConsegnePerCentroParams,
   ReportConsegnePerMeseParams,
   ReportFsePlus,
@@ -8608,6 +8610,90 @@ export function useReportConsegnePerCentro<TData = Awaited<ReturnType<typeof rep
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getReportConsegnePerCentroQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReportAllocazioneMezziUrl = (params?: ReportAllocazioneMezziParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/allocazione-mezzi?${stringifiedParams}` : `/api/report/allocazione-mezzi`
+}
+
+/**
+ * @summary Vehicle allocation report (deliveries + direct scheduler assignments)
+ */
+export const reportAllocazioneMezzi = async (params?: ReportAllocazioneMezziParams, options?: RequestInit): Promise<AllocazioneMezziReport> => {
+
+  return customFetch<AllocazioneMezziReport>(getReportAllocazioneMezziUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportAllocazioneMezziQueryKey = (params?: ReportAllocazioneMezziParams,) => {
+    return [
+    `/api/report/allocazione-mezzi`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getReportAllocazioneMezziQueryOptions = <TData = Awaited<ReturnType<typeof reportAllocazioneMezzi>>, TError = ErrorType<unknown>>(params?: ReportAllocazioneMezziParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportAllocazioneMezzi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReportAllocazioneMezziQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof reportAllocazioneMezzi>>> = ({ signal }) => reportAllocazioneMezzi(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof reportAllocazioneMezzi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReportAllocazioneMezziQueryResult = NonNullable<Awaited<ReturnType<typeof reportAllocazioneMezzi>>>
+export type ReportAllocazioneMezziQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Vehicle allocation report (deliveries + direct scheduler assignments)
+ */
+
+export function useReportAllocazioneMezzi<TData = Awaited<ReturnType<typeof reportAllocazioneMezzi>>, TError = ErrorType<unknown>>(
+ params?: ReportAllocazioneMezziParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof reportAllocazioneMezzi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReportAllocazioneMezziQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

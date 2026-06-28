@@ -25,6 +25,9 @@ export const turni = {
     remove: "Rimuovi",
     saved: "Turno salvato",
     deleted: "Turno eliminato",
+    mezzo: "Mezzo",
+    mezzoPlaceholder: "Seleziona un mezzo",
+    nessunMezzo: "Nessun mezzo",
     error: "Operazione non riuscita",
   },
   es: {
@@ -53,6 +56,9 @@ export const turni = {
     remove: "Quitar",
     saved: "Turno guardado",
     deleted: "Turno eliminado",
+    mezzo: "Vehículo",
+    mezzoPlaceholder: "Selecciona un vehículo",
+    nessunMezzo: "Ningún vehículo",
     error: "Operación fallida",
   },
   en: {
@@ -81,6 +87,9 @@ export const turni = {
     remove: "Remove",
     saved: "Shift saved",
     deleted: "Shift deleted",
+    mezzo: "Vehicle",
+    mezzoPlaceholder: "Select a vehicle",
+    nessunMezzo: "No vehicle",
     error: "Operation failed",
   },
   fr: {
@@ -109,6 +118,9 @@ export const turni = {
     remove: "Retirer",
     saved: "Créneau enregistré",
     deleted: "Créneau supprimé",
+    mezzo: "Véhicule",
+    mezzoPlaceholder: "Sélectionnez un véhicule",
+    nessunMezzo: "Aucun véhicule",
     error: "Échec de l'opération",
   },
   de: {
@@ -137,6 +149,9 @@ export const turni = {
     remove: "Entfernen",
     saved: "Schicht gespeichert",
     deleted: "Schicht gelöscht",
+    mezzo: "Fahrzeug",
+    mezzoPlaceholder: "Fahrzeug auswählen",
+    nessunMezzo: "Kein Fahrzeug",
     error: "Vorgang fehlgeschlagen",
   },
   ar: {
@@ -165,6 +180,9 @@ export const turni = {
     remove: "إزالة",
     saved: "تم حفظ المناوبة",
     deleted: "تم حذف المناوبة",
+    mezzo: "مركبة",
+    mezzoPlaceholder: "اختر مركبة",
+    nessunMezzo: "بدون مركبة",
     error: "فشلت العملية",
   },
 } as const;

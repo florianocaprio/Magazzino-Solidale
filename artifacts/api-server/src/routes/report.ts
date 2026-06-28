@@ -166,6 +166,120 @@ router.get("/report/consegne-per-centro", async (req, res) => {
   })));
 });
 
+router.get("/report/allocazione-mezzi", async (req, res) => {
+  const range = parseDateRange(req);
+  if (!range.ok) {
+    res.status(400).json({ message: range.message });
+    return;
+  }
+  const { da, a } = range;
+  const centroAscoltoId = parseIntParam(req.query.centroAscoltoId);
+  const caller = callerCentroId(req);
+  const citta = callerCittaId(req);
+  const qCitta = parseIntParam(req.query.cittaId);
+
+  // ── Per-mezzo usage ──────────────────────────────────────────────────────
+  // Scope mezzi by their own centro (own OR universal/NULL) and, for the città
+  // axis, by their centro's città (derived via centri_di_ascolto; NULL = a
+  // universal mezzo or a centro without città, kept visible like magazzini).
+  const mezzoConds: SQL[] = [];
+  if (centroAscoltoId) mezzoConds.push(sql`m.centro_ascolto_id = ${centroAscoltoId}`);
+  const mCentroCond = ownOrNullSql(sql`m.centro_ascolto_id`, caller);
+  if (mCentroCond) mezzoConds.push(mCentroCond);
+  const mCittaCond = ownOrNullSql(sql`ca.citta_id`, citta);
+  if (mCittaCond) mezzoConds.push(mCittaCond);
+  if (qCitta) mezzoConds.push(sql`ca.citta_id = ${qCitta}`);
+  const mezzoWhere = mezzoConds.length ? sql`WHERE ${sql.join(mezzoConds, sql` AND `)}` : sql``;
+
+  // Records counted per mezzo must respect the caller's perimeter too: otherwise
+  // a visible mezzo (especially a universal one, centro_ascolto_id NULL) would
+  // leak aggregate usage from centri/città the caller can't see. consegne/bolle
+  // scope via beneficiario (same as the other reports); turni scope via their
+  // own centro_ascolto_id and that centro's città.
+  const beScopeConds: SQL[] = [];
+  if (centroAscoltoId) beScopeConds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
+  const beCentroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
+  if (beCentroCond) beScopeConds.push(beCentroCond);
+  const beCittaCond = ownOrNullSql(sql`be.citta_id`, citta);
+  if (beCittaCond) beScopeConds.push(beCittaCond);
+  if (qCitta) beScopeConds.push(sql`be.citta_id = ${qCitta}`);
+  const beScope = beScopeConds.length ? sql` AND ${sql.join(beScopeConds, sql` AND `)}` : sql``;
+
+  const turniScopeConds: SQL[] = [];
+  if (centroAscoltoId) turniScopeConds.push(sql`tu.centro_ascolto_id = ${centroAscoltoId}`);
+  const tuCentroCond = ownOrNullSql(sql`tu.centro_ascolto_id`, caller);
+  if (tuCentroCond) turniScopeConds.push(tuCentroCond);
+  const tuCittaCond = ownOrNullSql(sql`tca.citta_id`, citta);
+  if (tuCittaCond) turniScopeConds.push(tuCittaCond);
+  if (qCitta) turniScopeConds.push(sql`tca.citta_id = ${qCitta}`);
+  const turniScope = turniScopeConds.length ? sql` AND ${sql.join(turniScopeConds, sql` AND `)}` : sql``;
+
+  const mezziResult = await db.execute(sql`
+    SELECT m.id as mezzo_id,
+           m.codice as mezzo_codice,
+           m.tipo as mezzo_tipo,
+           m.centro_ascolto_id as centro_id,
+           ca.nome as centro_nome,
+           (SELECT COUNT(*) FROM consegne c
+              JOIN beneficiari be ON be.id = c.beneficiario_id
+              WHERE c.mezzo_id = m.id
+                AND c.data_prevista::date BETWEEN ${da} AND ${a}${beScope}) as consegne,
+           (SELECT COUNT(*) FROM bolle b
+              JOIN beneficiari be ON be.id = b.beneficiario_id
+              WHERE b.mezzo_id = m.id
+                AND b.data_bolla::date BETWEEN ${da} AND ${a}${beScope}) as bolle,
+           (SELECT COUNT(*) FROM turni tu
+              LEFT JOIN centri_di_ascolto tca ON tca.id = tu.centro_ascolto_id
+              WHERE tu.mezzo_id = m.id
+                AND tu.data BETWEEN ${da} AND ${a}${turniScope}) as turni
+    FROM mezzi m
+    LEFT JOIN centri_di_ascolto ca ON ca.id = m.centro_ascolto_id
+    ${mezzoWhere}
+    ORDER BY m.codice
+  `);
+  const mezziRows = mezziResult.rows as Array<Record<string, unknown>>;
+
+  // ── External transport ("altro") ─────────────────────────────────────────
+  // Free-text/external transport (mezzo_altro flag) on consegne + bolle, scoped
+  // via beneficiario (centro + città) — reuses the per-record beScope above.
+  const altroConsResult = await db.execute(sql`
+    SELECT COUNT(*) as n
+    FROM consegne c
+    JOIN beneficiari be ON be.id = c.beneficiario_id
+    WHERE c.mezzo_altro = true
+      AND c.data_prevista::date BETWEEN ${da} AND ${a}${beScope}
+  `);
+  const altroBolleResult = await db.execute(sql`
+    SELECT COUNT(*) as n
+    FROM bolle b
+    JOIN beneficiari be ON be.id = b.beneficiario_id
+    WHERE b.mezzo_altro = true
+      AND b.data_bolla::date BETWEEN ${da} AND ${a}${beScope}
+  `);
+  const altroConsegne = Number((altroConsResult.rows as Array<Record<string, unknown>>)[0]?.n ?? 0);
+  const altroBolle = Number((altroBolleResult.rows as Array<Record<string, unknown>>)[0]?.n ?? 0);
+
+  res.json({
+    mezzi: mezziRows.map((r: Record<string, unknown>) => {
+      const consegne = Number(r.consegne);
+      const bolle = Number(r.bolle);
+      const turni = Number(r.turni);
+      return {
+        mezzoId: Number(r.mezzo_id),
+        mezzoCodice: r.mezzo_codice as string,
+        mezzoTipo: (r.mezzo_tipo as string) ?? "",
+        centroId: r.centro_id === null || r.centro_id === undefined ? null : Number(r.centro_id),
+        centroNome: (r.centro_nome as string) ?? null,
+        consegne,
+        bolle,
+        turni,
+        totale: consegne + bolle + turni,
+      };
+    }),
+    altro: { consegne: altroConsegne, bolle: altroBolle },
+  });
+});
+
 router.get("/report/fse-plus", async (req, res) => {
   const parsedAnno = req.query.anno ? parseInt(req.query.anno as string, 10) : new Date().getFullYear();
   if (Number.isNaN(parsedAnno) || parsedAnno < 2000 || parsedAnno > 2100) {

@@ -14,5 +14,11 @@ export interface Turno {
   centroAscoltoNome?: string | null;
   data: string;
   fascia: string;
+  /** @nullable */
+  mezzoId?: number | null;
+  /** @nullable */
+  mezzoCodice?: string | null;
+  /** @nullable */
+  mezzoTipo?: string | null;
   volontari: TurnoVolontario[];
 }

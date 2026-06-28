@@ -5,6 +5,7 @@ import {
   turniVolontariTable,
   volontariTable,
   centriAscoltoTable,
+  mezziTable,
 } from "@workspace/db";
 import { eq, and, gte, lte, inArray, asc, type SQL } from "drizzle-orm";
 import {
@@ -23,9 +24,15 @@ type VolInput = { volontarioId: number; ruolo?: string | null };
 
 async function buildTurno(id: number) {
   const [t] = await db
-    .select({ t: turniTable, centroNome: centriAscoltoTable.nome })
+    .select({
+      t: turniTable,
+      centroNome: centriAscoltoTable.nome,
+      mezzoCodice: mezziTable.codice,
+      mezzoTipo: mezziTable.tipo,
+    })
     .from(turniTable)
     .leftJoin(centriAscoltoTable, eq(turniTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(mezziTable, eq(turniTable.mezzoId, mezziTable.id))
     .where(eq(turniTable.id, id));
   if (!t) return null;
   const vols = await db
@@ -39,6 +46,9 @@ async function buildTurno(id: number) {
     centroAscoltoNome: t.centroNome ?? null,
     data: t.t.data,
     fascia: t.t.fascia,
+    mezzoId: t.t.mezzoId ?? null,
+    mezzoCodice: t.mezzoCodice ?? null,
+    mezzoTipo: t.mezzoTipo ?? null,
     volontari: vols.map((r) => ({
       volontarioId: r.v.volontarioId,
       volontarioNome: r.nome && r.cognome ? `${r.cognome} ${r.nome}` : null,
@@ -68,9 +78,15 @@ router.get("/turni", async (req, res) => {
   if (cittaFilter) conditions.push(cittaFilter);
 
   const turni = await db
-    .select({ t: turniTable, centroNome: centriAscoltoTable.nome })
+    .select({
+      t: turniTable,
+      centroNome: centriAscoltoTable.nome,
+      mezzoCodice: mezziTable.codice,
+      mezzoTipo: mezziTable.tipo,
+    })
     .from(turniTable)
     .leftJoin(centriAscoltoTable, eq(turniTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(mezziTable, eq(turniTable.mezzoId, mezziTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(turniTable.data));
 
@@ -90,6 +106,9 @@ router.get("/turni", async (req, res) => {
       centroAscoltoNome: r.centroNome ?? null,
       data: r.t.data,
       fascia: r.t.fascia,
+      mezzoId: r.t.mezzoId ?? null,
+      mezzoCodice: r.mezzoCodice ?? null,
+      mezzoTipo: r.mezzoTipo ?? null,
       volontari: vols
         .filter((x) => x.v.turnoId === r.t.id)
         .map((x) => ({
@@ -106,6 +125,7 @@ router.put("/turni", async (req, res) => {
     centroAscoltoId?: number;
     data?: string;
     fascia?: string;
+    mezzoId?: number | null;
     volontari?: VolInput[];
   };
   const caller = callerCentroId(req);
@@ -118,6 +138,20 @@ router.put("/turni", async (req, res) => {
       && !inVisibleCentroSet(centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
     res.status(403).json({ error: "Centro non accessibile per la tua città" });
     return;
+  }
+  const mezzoId = Number.isInteger(body.mezzoId) ? (body.mezzoId as number) : null;
+  // IDOR guard: the assigned mezzo must be universal (centroAscoltoId NULL) OR
+  // belong to the turno's centro — mirror the volontari guard so a scoped caller
+  // can't attach an out-of-scope vehicle and read its codice/tipo back via GET.
+  if (mezzoId != null) {
+    const [m] = await db
+      .select({ id: mezziTable.id, centroAscoltoId: mezziTable.centroAscoltoId })
+      .from(mezziTable)
+      .where(eq(mezziTable.id, mezzoId));
+    if (!m || (m.centroAscoltoId != null && m.centroAscoltoId !== centroAscoltoId)) {
+      res.status(403).json({ error: "Mezzo non assegnabile a questo centro" });
+      return;
+    }
   }
   const rawVolontari = Array.isArray(body.volontari) ? body.volontari : [];
   // Dedupe by volontarioId (last ruolo wins) so the same volunteer can't be
@@ -166,10 +200,11 @@ router.put("/turni", async (req, res) => {
     let id: number;
     if (existing) {
       id = existing.id;
+      await tx.update(turniTable).set({ mezzoId }).where(eq(turniTable.id, id));
     } else {
       const [created] = await tx
         .insert(turniTable)
-        .values({ centroAscoltoId, data: body.data!, fascia: body.fascia! })
+        .values({ centroAscoltoId, data: body.data!, fascia: body.fascia!, mezzoId })
         .returning();
       id = created.id;
     }
@@ -201,6 +236,9 @@ router.put("/turni", async (req, res) => {
     centroAscoltoNome: centro?.nome ?? null,
     data: body.data,
     fascia: body.fascia,
+    mezzoId: null,
+    mezzoCodice: null,
+    mezzoTipo: null,
     volontari: [],
   });
 });

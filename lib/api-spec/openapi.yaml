@@ -2400,6 +2400,36 @@ paths:
                 items:
                   $ref: "#/components/schemas/ConsegnePerCentroReport"
 
+  /report/allocazione-mezzi:
+    get:
+      operationId: reportAllocazioneMezzi
+      tags: [report]
+      summary: Vehicle allocation report (deliveries + direct scheduler assignments)
+      parameters:
+        - name: da
+          in: query
+          schema:
+            type: string
+        - name: a
+          in: query
+          schema:
+            type: string
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vehicle allocation report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllocazioneMezziReport"
+
   /report/fse-plus:
     get:
       operationId: reportFsePlus
@@ -3940,6 +3970,12 @@ components:
           type: string
         fascia:
           type: string
+        mezzoId:
+          type: ["integer", "null"]
+        mezzoCodice:
+          type: ["string", "null"]
+        mezzoTipo:
+          type: ["string", "null"]
         volontari:
           type: array
           items:
@@ -3966,6 +4002,8 @@ components:
           type: string
         fascia:
           type: string
+        mezzoId:
+          type: ["integer", "null"]
         volontari:
           type: array
           items:
@@ -5323,6 +5361,46 @@ components:
         totale:
           type: integer
       required: [centroNome, dirette, conVolontari, totale]
+
+    AllocazioneMezziRiga:
+      type: object
+      properties:
+        mezzoId:
+          type: integer
+        mezzoCodice:
+          type: string
+        mezzoTipo:
+          type: string
+        centroId:
+          type: ["integer", "null"]
+        centroNome:
+          type: ["string", "null"]
+        consegne:
+          type: integer
+        bolle:
+          type: integer
+        turni:
+          type: integer
+        totale:
+          type: integer
+      required: [mezzoId, mezzoCodice, mezzoTipo, consegne, bolle, turni, totale]
+
+    AllocazioneMezziReport:
+      type: object
+      properties:
+        mezzi:
+          type: array
+          items:
+            $ref: "#/components/schemas/AllocazioneMezziRiga"
+        altro:
+          type: object
+          properties:
+            consegne:
+              type: integer
+            bolle:
+              type: integer
+          required: [consegne, bolle]
+      required: [mezzi, altro]
 
     UdsInterventoGiornaliero:
       type: object

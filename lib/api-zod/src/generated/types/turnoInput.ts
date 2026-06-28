@@ -11,5 +11,7 @@ export interface TurnoInput {
   centroAscoltoId: number;
   data: string;
   fascia: string;
+  /** @nullable */
+  mezzoId?: number | null;
   volontari: TurnoVolontarioInput[];
 }

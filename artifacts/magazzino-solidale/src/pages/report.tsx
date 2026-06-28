@@ -4,6 +4,7 @@ import {
   useReportGiacenzePerMagazzino,
   useReportConsegnePerMese,
   useReportConsegnePerCentro,
+  useReportAllocazioneMezzi,
   useReportFsePlus,
   useListMagazzini,
   useListCentriAscolto,
@@ -11,6 +12,7 @@ import {
   getReportGiacenzePerMagazzinoQueryKey,
   getReportConsegnePerMeseQueryKey,
   getReportConsegnePerCentroQueryKey,
+  getReportAllocazioneMezziQueryKey,
   getReportFsePlusQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -22,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ExportButtons } from "@/components/export-buttons";
-import { Package, Users, Weight, Building2, HeartHandshake } from "lucide-react";
+import { Package, Users, Weight, Building2, HeartHandshake, Truck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const ALL = "all";
@@ -71,6 +73,11 @@ export default function Report() {
   const perCentroParams = { da, a, cittaId: cittaQuery };
   const { data: perCentro, isLoading: isLoadingPerCentro } = useReportConsegnePerCentro(perCentroParams, {
     query: { queryKey: getReportConsegnePerCentroQueryKey(perCentroParams) },
+  });
+
+  const allocazioneParams = { da, a, centroAscoltoId: centroParam, cittaId: cittaQuery };
+  const { data: allocazione, isLoading: isLoadingAllocazione } = useReportAllocazioneMezzi(allocazioneParams, {
+    query: { queryKey: getReportAllocazioneMezziQueryKey(allocazioneParams) },
   });
 
   const fseParams = { anno: fseAnno, cittaId: cittaQuery };
@@ -283,6 +290,76 @@ export default function Report() {
                 </Table>
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Allocazione Mezzi: uso per mezzo (consegne/bolle/turni) + trasporto esterno */}
+      <Card>
+        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Truck className="w-5 h-5 text-primary" /> {t("report.allocazioneTitle")}
+            </CardTitle>
+            <CardDescription>{t("report.allocazioneDesc", { periodo: periodoLabel })}</CardDescription>
+          </div>
+          <ExportButtons
+            rows={allocazione?.mezzi ?? []}
+            columns={[
+              { header: t("report.mezzo"), accessor: (m) => m.mezzoCodice },
+              { header: t("report.mezzoTipo"), accessor: (m) => m.mezzoTipo },
+              { header: t("report.centro"), accessor: (m) => m.centroNome ?? "" },
+              { header: t("report.consegne"), accessor: (m) => m.consegne },
+              { header: t("report.bolle"), accessor: (m) => m.bolle },
+              { header: t("report.turni"), accessor: (m) => m.turni },
+              { header: t("common.total"), accessor: (m) => m.totale },
+            ]}
+            filename={`allocazione_mezzi_${da}_${a}`}
+            title={t("report.allocazioneTitle")}
+            subtitle={t("report.periodoSubtitle", { periodo: periodoLabel })}
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoadingAllocazione ? (
+            <Skeleton className="h-[300px] w-full" />
+          ) : (allocazione?.mezzi.length ?? 0) === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg">{t("report.allocazioneEmpty")}</p>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("report.mezzo")}</TableHead>
+                    <TableHead>{t("report.centro")}</TableHead>
+                    <TableHead className="text-right">{t("report.consegne")}</TableHead>
+                    <TableHead className="text-right">{t("report.bolle")}</TableHead>
+                    <TableHead className="text-right">{t("report.turni")}</TableHead>
+                    <TableHead className="text-right">{t("common.total")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(allocazione?.mezzi ?? []).map((m) => (
+                    <TableRow key={m.mezzoId}>
+                      <TableCell className="font-medium flex items-center gap-2">
+                        <Truck className="w-4 h-4 text-muted-foreground" />
+                        {m.mezzoCodice}
+                        {m.mezzoTipo ? <span className="text-muted-foreground">· {m.mezzoTipo}</span> : null}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{m.centroNome ?? t("report.mezzoUniversale")}</TableCell>
+                      <TableCell className="text-right">{m.consegne}</TableCell>
+                      <TableCell className="text-right">{m.bolle}</TableCell>
+                      <TableCell className="text-right">{m.turni}</TableCell>
+                      <TableCell className="text-right font-medium">{m.totale}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          {allocazione && (allocazione.altro.consegne > 0 || allocazione.altro.bolle > 0) && (
+            <p className="text-sm text-muted-foreground">
+              {t("report.allocazioneAltro", { consegne: allocazione.altro.consegne, bolle: allocazione.altro.bolle })}
+            </p>
           )}
         </CardContent>
       </Card>

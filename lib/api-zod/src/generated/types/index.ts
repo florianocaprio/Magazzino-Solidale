@@ -7,6 +7,9 @@
  */
 
 export * from './alert';
+export * from './allocazioneMezziReport';
+export * from './allocazioneMezziReportAltro';
+export * from './allocazioneMezziRiga';
 export * from './approvvigionamento';
 export * from './approvvigionamentoInput';
 export * from './approvvigionamentoRiga';
@@ -99,6 +102,7 @@ export * from './prodottiBulkInput';
 export * from './prodotto';
 export * from './prodottoInput';
 export * from './prodottoUpdate';
+export * from './reportAllocazioneMezziParams';
 export * from './reportConsegnePerCentroParams';
 export * from './reportConsegnePerMeseParams';
 export * from './reportFsePlus';

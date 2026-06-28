@@ -7,6 +7,7 @@ import {
   useUpsertTurno,
   useListCentriAscolto,
   useListVolontari,
+  useListMezzi,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -29,7 +30,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Truck } from "lucide-react";
 
 const FASCE = [
   { key: "09-13", labelKey: "fasciaMattina", time: "09:00–13:00" },
@@ -93,6 +94,18 @@ export default function Turni() {
     [volontari, effectiveCentro],
   );
 
+  const { data: mezzi } = useListMezzi();
+  const mezziCentro = useMemo(
+    () =>
+      (mezzi ?? []).filter(
+        (m) =>
+          m.centroAscoltoId == null ||
+          effectiveCentro == null ||
+          m.centroAscoltoId === effectiveCentro,
+      ),
+    [mezzi, effectiveCentro],
+  );
+
   const { data: turni } = useListTurni(
     { da, a, ...(effectiveCentro != null ? { centroAscoltoId: effectiveCentro } : {}) },
     { query: { enabled: effectiveCentro != null, queryKey: getListTurniQueryKey({ da, a, centroAscoltoId: effectiveCentro ?? undefined }) } },
@@ -108,6 +121,7 @@ export default function Turni() {
 
   const [dialog, setDialog] = useState<{ data: string; fascia: string } | null>(null);
   const [rows, setRows] = useState<VolRow[]>([]);
+  const [mezzoId, setMezzoId] = useState<number | null>(null);
 
   function openCell(dataISO: string, fascia: string) {
     if (effectiveCentro == null) return;
@@ -117,6 +131,7 @@ export default function Turni() {
         ? existing.volontari.map((v) => ({ volontarioId: v.volontarioId, ruolo: v.ruolo ?? "" }))
         : [{ volontarioId: "", ruolo: "" }],
     );
+    setMezzoId(existing?.mezzoId ?? null);
     setDialog({ data: dataISO, fascia });
   }
 
@@ -126,7 +141,7 @@ export default function Turni() {
       .filter((r) => r.volontarioId !== "")
       .map((r) => ({ volontarioId: Number(r.volontarioId), ruolo: r.ruolo.trim() || undefined }));
     upsert.mutate(
-      { data: { centroAscoltoId: effectiveCentro, data: dialog.data, fascia: dialog.fascia, volontari } },
+      { data: { centroAscoltoId: effectiveCentro, data: dialog.data, fascia: dialog.fascia, mezzoId, volontari } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListTurniQueryKey() });
@@ -231,6 +246,12 @@ export default function Turni() {
                               {v.ruolo && <div className="truncate opacity-80">{v.ruolo}</div>}
                             </div>
                           ))}
+                          {turno.mezzoCodice && (
+                            <div className="flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] leading-tight text-amber-700 dark:text-amber-400">
+                              <Truck className="h-3 w-3 shrink-0" />
+                              <span className="truncate font-medium">{turno.mezzoCodice}</span>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px]">
@@ -315,6 +336,27 @@ export default function Turni() {
             >
               <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontario")}
             </Button>
+
+            <div className="border-t pt-3">
+              <Label className="text-xs">{t("turni.mezzo")}</Label>
+              <Select
+                value={mezzoId != null ? String(mezzoId) : "none"}
+                onValueChange={(v) => setMezzoId(v === "none" ? null : Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("turni.mezzoPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("turni.nessunMezzo")}</SelectItem>
+                  {mezziCentro.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.codice}
+                      {m.tipo ? ` · ${m.tipo}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter>

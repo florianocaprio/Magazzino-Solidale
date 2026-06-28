@@ -7,6 +7,7 @@ export const turniTable = pgTable("turni", {
   centroAscoltoId: integer("centro_ascolto_id").notNull(),
   data: date("data").notNull(),
   fascia: varchar("fascia", { length: 20 }).notNull(),
+  mezzoId: integer("mezzo_id"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 

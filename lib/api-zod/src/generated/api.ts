@@ -1164,6 +1164,9 @@ export const ListTurniResponseItem = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "data": zod.string(),
   "fascia": zod.string(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoCodice": zod.string().nullish(),
+  "mezzoTipo": zod.string().nullish(),
   "volontari": zod.array(zod.object({
   "volontarioId": zod.number(),
   "volontarioNome": zod.string().nullish(),
@@ -1180,6 +1183,7 @@ export const UpsertTurnoBody = zod.object({
   "centroAscoltoId": zod.number(),
   "data": zod.string(),
   "fascia": zod.string(),
+  "mezzoId": zod.number().nullish(),
   "volontari": zod.array(zod.object({
   "volontarioId": zod.number(),
   "ruolo": zod.string().optional()
@@ -1192,6 +1196,9 @@ export const UpsertTurnoResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "data": zod.string(),
   "fascia": zod.string(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoCodice": zod.string().nullish(),
+  "mezzoTipo": zod.string().nullish(),
   "volontari": zod.array(zod.object({
   "volontarioId": zod.number(),
   "volontarioNome": zod.string().nullish(),
@@ -2986,6 +2993,35 @@ export const ReportConsegnePerCentroResponseItem = zod.object({
   "totale": zod.number()
 })
 export const ReportConsegnePerCentroResponse = zod.array(ReportConsegnePerCentroResponseItem)
+
+
+/**
+ * @summary Vehicle allocation report (deliveries + direct scheduler assignments)
+ */
+export const ReportAllocazioneMezziQueryParams = zod.object({
+  "da": zod.coerce.string().optional(),
+  "a": zod.coerce.string().optional(),
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "cittaId": zod.coerce.number().optional()
+})
+
+export const ReportAllocazioneMezziResponse = zod.object({
+  "mezzi": zod.array(zod.object({
+  "mezzoId": zod.number(),
+  "mezzoCodice": zod.string(),
+  "mezzoTipo": zod.string(),
+  "centroId": zod.number().nullish(),
+  "centroNome": zod.string().nullish(),
+  "consegne": zod.number(),
+  "bolle": zod.number(),
+  "turni": zod.number(),
+  "totale": zod.number()
+})),
+  "altro": zod.object({
+  "consegne": zod.number(),
+  "bolle": zod.number()
+})
+})
 
 
 /**

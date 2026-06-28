@@ -750,6 +750,12 @@ export interface Turno {
   centroAscoltoNome?: string | null;
   data: string;
   fascia: string;
+  /** @nullable */
+  mezzoId?: number | null;
+  /** @nullable */
+  mezzoCodice?: string | null;
+  /** @nullable */
+  mezzoTipo?: string | null;
   volontari: TurnoVolontario[];
 }
 
@@ -762,6 +768,8 @@ export interface TurnoInput {
   centroAscoltoId: number;
   data: string;
   fascia: string;
+  /** @nullable */
+  mezzoId?: number | null;
   volontari: TurnoVolontarioInput[];
 }
 
@@ -1591,6 +1599,30 @@ export interface ConsegnePerCentroReport {
   totale: number;
 }
 
+export interface AllocazioneMezziRiga {
+  mezzoId: number;
+  mezzoCodice: string;
+  mezzoTipo: string;
+  /** @nullable */
+  centroId?: number | null;
+  /** @nullable */
+  centroNome?: string | null;
+  consegne: number;
+  bolle: number;
+  turni: number;
+  totale: number;
+}
+
+export type AllocazioneMezziReportAltro = {
+  consegne: number;
+  bolle: number;
+};
+
+export interface AllocazioneMezziReport {
+  mezzi: AllocazioneMezziRiga[];
+  altro: AllocazioneMezziReportAltro;
+}
+
 export interface UdsInterventoGiornaliero {
   id: number;
   beneficiarioId: number;
@@ -1915,6 +1947,13 @@ cittaId?: number;
 export type ReportConsegnePerCentroParams = {
 da?: string;
 a?: string;
+cittaId?: number;
+};
+
+export type ReportAllocazioneMezziParams = {
+da?: string;
+a?: string;
+centroAscoltoId?: number;
 cittaId?: number;
 };
 

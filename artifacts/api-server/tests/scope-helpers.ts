@@ -22,6 +22,7 @@ import {
   trasferimentiTable,
   trasferimentoRigheTable,
   movimentiTable,
+  turniTable,
   cittaTable,
   zoneUdsTable,
 } from "@workspace/db";
@@ -94,6 +95,7 @@ export interface SeedScope {
   bollaIds: number[];
   interventoIds: number[];
   trasferimentoIds: number[];
+  turnoIds: number[];
   zonaIds: number[];
   cittaIds: number[];
 }
@@ -116,6 +118,7 @@ export function newScope(): SeedScope {
     bollaIds: [],
     interventoIds: [],
     trasferimentoIds: [],
+    turnoIds: [],
     zonaIds: [],
     cittaIds: [],
   };
@@ -130,6 +133,20 @@ export async function createCentro(scope: SeedScope, nome = `Centro ${rnd()}`): 
     .returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return c.id;
+}
+
+/** Like {@link createCentro} but accepts a città and returns id + nome. */
+export async function createCentroRec(
+  scope: SeedScope,
+  opts: { cittaId?: number | null; nome?: string } = {},
+): Promise<{ id: number; nome: string }> {
+  const nome = opts.nome ?? `Centro ${rnd()}`;
+  const [c] = await db
+    .insert(centriAscoltoTable)
+    .values({ nome, cittaId: opts.cittaId ?? null })
+    .returning({ id: centriAscoltoTable.id });
+  scope.centroIds.push(c.id);
+  return { id: c.id, nome };
 }
 
 export async function createMagazzino(
@@ -353,7 +370,14 @@ export async function insertApprovvigionamento(
 
 export async function insertConsegna(
   scope: SeedScope,
-  opts: { beneficiarioId: number; magazzinoId: number; stato?: string },
+  opts: {
+    beneficiarioId: number;
+    magazzinoId: number;
+    stato?: string;
+    dataPrevista?: string;
+    mezzoId?: number | null;
+    mezzoAltro?: boolean;
+  },
 ): Promise<number> {
   const [c] = await db
     .insert(consegneTable)
@@ -361,9 +385,11 @@ export async function insertConsegna(
       codice: `CON-${rnd()}`,
       beneficiarioId: opts.beneficiarioId,
       tipoConsegna: "domicilio",
-      dataPrevista: "2026-06-01",
+      dataPrevista: opts.dataPrevista ?? "2026-06-01",
       magazzinoId: opts.magazzinoId,
       ...(opts.stato ? { stato: opts.stato } : {}),
+      ...(opts.mezzoId != null ? { mezzoId: opts.mezzoId } : {}),
+      ...(opts.mezzoAltro ? { mezzoAltro: true } : {}),
     })
     .returning({ id: consegneTable.id });
   scope.consegnaIds.push(c.id);
@@ -372,7 +398,14 @@ export async function insertConsegna(
 
 export async function insertBolla(
   scope: SeedScope,
-  opts: { beneficiarioId: number; magazzinoId: number; stato?: string; dataBolla?: string },
+  opts: {
+    beneficiarioId: number;
+    magazzinoId: number;
+    stato?: string;
+    dataBolla?: string;
+    mezzoId?: number | null;
+    mezzoAltro?: boolean;
+  },
 ): Promise<number> {
   const [b] = await db
     .insert(bolleTable)
@@ -382,10 +415,29 @@ export async function insertBolla(
       beneficiarioId: opts.beneficiarioId,
       magazzinoId: opts.magazzinoId,
       ...(opts.stato ? { stato: opts.stato } : {}),
+      ...(opts.mezzoId != null ? { mezzoId: opts.mezzoId } : {}),
+      ...(opts.mezzoAltro ? { mezzoAltro: true } : {}),
     })
     .returning({ id: bolleTable.id });
   scope.bollaIds.push(b.id);
   return b.id;
+}
+
+export async function insertTurno(
+  scope: SeedScope,
+  opts: { centroAscoltoId: number; data?: string; fascia?: string; mezzoId?: number | null },
+): Promise<number> {
+  const [t] = await db
+    .insert(turniTable)
+    .values({
+      centroAscoltoId: opts.centroAscoltoId,
+      data: opts.data ?? "2026-06-01",
+      fascia: opts.fascia ?? "mattina",
+      mezzoId: opts.mezzoId ?? null,
+    })
+    .returning({ id: turniTable.id });
+  scope.turnoIds.push(t.id);
+  return t.id;
 }
 
 /** Inserts a bolla riga (cleaned up with its bolla in {@link cleanup}). */
@@ -476,6 +528,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   }
   if (scope.interventoIds.length > 0) {
     await db.delete(interventiTable).where(inArray(interventiTable.id, scope.interventoIds));
+  }
+  if (scope.turnoIds.length > 0) {
+    await db.delete(turniTable).where(inArray(turniTable.id, scope.turnoIds));
   }
   if (scope.bollaIds.length > 0) {
     await db.delete(bollaRigheTable).where(inArray(bollaRigheTable.bollaId, scope.bollaIds));
