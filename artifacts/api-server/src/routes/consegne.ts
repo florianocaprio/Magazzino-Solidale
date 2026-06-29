@@ -188,6 +188,23 @@ router.patch("/consegne/:id", async (req, res) => {
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
+// ─── ANNULLA (ELIMINA) PIANIFICAZIONE ────────────────────────────────────────
+// Annulla un'intera pianificazione di consegna: scollega le eventuali bolle
+// (il documento merce resta in archivio) ed elimina la riga consegna.
+router.delete("/consegne/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(consegneTable).where(eq(consegneTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), callerCentroId(req))
+      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), callerCittaId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  await db.update(bolleTable).set({ consegnaId: null }).where(eq(bolleTable.consegnaId, id));
+  await db.delete(consegneTable).where(eq(consegneTable.id, id));
+  res.status(204).end();
+});
+
 // ─── ASSOCIA / DISSOCIA BOLLA ────────────────────────────────────────────────
 // Collega una bolla alla consegna (o la scollega passando bollaId null).
 // La "prontezza" della consegna deriva dallo stato della bolla:

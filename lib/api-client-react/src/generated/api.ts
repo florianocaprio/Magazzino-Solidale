@@ -4754,6 +4754,76 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getUpdateConsegnaMutationOptions(options));
     }
 
+export const getDeleteConsegnaUrl = (id: number,) => {
+
+
+
+
+  return `/api/consegne/${id}`
+}
+
+/**
+ * @summary Annulla (elimina) un'intera pianificazione di consegna
+ */
+export const deleteConsegna = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteConsegnaUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteConsegnaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteConsegna>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteConsegna>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteConsegna'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteConsegna>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteConsegna(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteConsegnaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteConsegna>>>
+
+    export type DeleteConsegnaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Annulla (elimina) un'intera pianificazione di consegna
+ */
+export const useDeleteConsegna = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteConsegna>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteConsegna>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteConsegnaMutationOptions(options));
+    }
+
 export const getCompletaConsegnaUrl = (id: number,) => {
 
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
-import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -118,11 +118,13 @@ export default function Consegne() {
   const [riDate, setRiDate] = useState("");
   const [riFascia, setRiFascia] = useState("Mattina");
   const [scanCode, setScanCode] = useState("");
+  const [annullandoId, setAnnullandoId] = useState<number | null>(null);
 
   const { data: bolle } = useListBolle();
 
   const createConsegna = useCreateConsegna();
   const completaConsegna = useCompletaConsegna();
+  const deleteConsegna = useDeleteConsegna();
   const associaBolla = useAssociaBolla();
   const inviaEmailBeneficiario = useInviaEmailConsegnaBeneficiario();
   const inviaEmailVolontario = useInviaEmailConsegnaVolontario();
@@ -145,6 +147,21 @@ export default function Consegne() {
         toast({ title: bollaId ? t("consegne.toastBollaAssociata") : t("consegne.toastBollaScollegata") });
         setAssociatingId(null);
         setSelectedBollaId("");
+      },
+      onError: (e: unknown) => {
+        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        toast({ title: t("consegne.toastOpFallita"), description: msg ?? t("consegne.toastErrore"), variant: "destructive" });
+      },
+    });
+  };
+
+  const handleAnnulla = () => {
+    if (annullandoId == null) return;
+    deleteConsegna.mutate({ id: annullandoId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
+        toast({ title: t("consegne.toastAnnullata") });
+        setAnnullandoId(null);
       },
       onError: (e: unknown) => {
         const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -521,6 +538,9 @@ export default function Consegne() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        <Button size="sm" variant="ghost" className="gap-1 text-destructive hover:text-destructive" onClick={() => setAnnullandoId(c.id)}>
+                          <Trash2 className="h-3.5 w-3.5" /> {t("consegne.btnAnnulla")}
+                        </Button>
                       </div>
                     )}
                   </TableCell>
@@ -690,8 +710,8 @@ export default function Consegne() {
                       if (!selVol?.patente) return null;
                       const mezzoVal = form.watch("mezzoAltro") ? "altro" : (form.watch("mezzoId") ? String(form.watch("mezzoId")) : "0");
                       return (
-                        <FormItem>
-                          <FormLabel>{t("consegne.formMezzo")}</FormLabel>
+                        <div className="space-y-2">
+                          <Label>{t("consegne.formMezzo")}</Label>
                           <Select value={mezzoVal} onValueChange={(v) => {
                             if (v === "altro") { form.setValue("mezzoId", 0); form.setValue("mezzoAltro", true); }
                             else { form.setValue("mezzoId", Number(v)); form.setValue("mezzoAltro", false); }
@@ -712,7 +732,7 @@ export default function Consegne() {
                               <SelectItem value="altro">{t("consegne.mezzoAltro")}</SelectItem>
                             </SelectContent>
                           </Select>
-                        </FormItem>
+                        </div>
                       );
                     })()}
                   </div>
@@ -751,6 +771,21 @@ export default function Consegne() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleCompleta} className="bg-green-600 hover:bg-green-700">{t("consegne.dialogCompletaConfirm")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={annullandoId != null} onOpenChange={(open) => !open && setAnnullandoId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("consegne.annullaTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("consegne.annullaDesc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAnnulla} disabled={deleteConsegna.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {t("consegne.annullaConfirm")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

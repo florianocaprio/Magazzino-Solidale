@@ -17,6 +17,7 @@ import {
   useListLotti,
   useListProdotti,
   useListVolontari,
+  useListMezzi,
   useGetImpostazioniStampa,
   useListTrasferimenti,
   useListScarichi,
@@ -113,6 +114,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   const [magazzinoId, setMagazzinoId] = useState("");
   const [centroId, setCentroId] = useState("all");
   const [trasportatore, setTrasportatore] = useState("");
+  const [mezzo, setMezzo] = useState("");
   const [scanCode, setScanCode] = useState("");
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
@@ -126,6 +128,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
     if (!open) {
       setMagazzinoId("");
       setTrasportatore("");
+      setMezzo("");
       setScanCode("");
       if (!lockedBeneficiario) setBeneficiarioId("");
     }
@@ -138,6 +141,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
+  const { data: mezzi } = useListMezzi();
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -171,10 +175,14 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
       magazzinoId: number;
       consegnaId?: number;
       volontarioConsegnaId?: number;
+      mezzoId?: number;
+      mezzoAltro?: boolean;
     } = { beneficiarioId: parseInt(beneficiarioId), magazzinoId: parseInt(magazzinoId) };
     if (consegnaId != null) data.consegnaId = consegnaId;
     if (requiresTrasportatore && trasportatore) {
       data.volontarioConsegnaId = parseInt(trasportatore);
+      if (mezzo === "altro") data.mezzoAltro = true;
+      else if (mezzo) data.mezzoId = parseInt(mezzo);
     }
     createBolla.mutate(
       { data },
@@ -263,7 +271,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
           {requiresTrasportatore ? (
             <div className="space-y-2">
               <Label>{t("bolle.trasportatoreLabel")}</Label>
-              <Select value={trasportatore} onValueChange={setTrasportatore}>
+              <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); setMezzo(""); }}>
                 <SelectTrigger><SelectValue placeholder={t("bolle.trasportatorePlaceholder")} /></SelectTrigger>
                 <SelectContent>
                   {volontari?.filter(v => {
@@ -280,6 +288,28 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
               </Select>
               {trasportatoreMissing && (
                 <p className="text-sm text-destructive">{t("bolle.trasportatoreObbligatorioDomicilio")}</p>
+              )}
+              {trasportatore && (
+                <div className="space-y-2 pt-2">
+                  <Label>{t("bolle.mezzoLabel")}</Label>
+                  <Select value={mezzo || "0"} onValueChange={(v) => setMezzo(v === "0" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder={t("bolle.mezzoPlaceholder")} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">{t("common.none")}</SelectItem>
+                      {mezzi?.filter(m => {
+                        if (m.stato !== "disponibile") return false;
+                        if (m.effectiveCentroId == null) return true;
+                        const benefCentro = allBeneficiari?.find(b => String(b.id) === beneficiarioId)?.centroAscoltoId ?? null;
+                        return benefCentro != null && m.effectiveCentroId === benefCentro;
+                      }).map(m => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.codice}{m.targa ? ` (${m.targa})` : ""} — {m.tipo}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="altro">{t("bolle.mezzoAltro")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
             </div>
           ) : (

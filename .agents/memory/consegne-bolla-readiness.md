@@ -8,6 +8,11 @@ description: Delivery (consegne) state values, how readiness derives from the li
 - `report.ts` counts delivered consegne with `stato = 'effettuata'`. Keep the internal value `effettuata`; only the UI label says "Consegnata".
 - **How to apply:** when touching consegne stato, use `pianificata`/`effettuata` in code and map to display labels "Pianificata"/"Consegnata".
 
+# Cancelling a whole pianificazione = hard delete + unlink bolle
+- There is NO `annullata` consegna state. "Annulla pianificazione" is `DELETE /consegne/:id`: it sets `bolle.consegnaId = null` for any linked bolle (the merce document stays in archive) then deletes the consegna row, returning 204.
+- **Why:** consegne carry only `pianificata`/`effettuata`; a soft "annullata" would need a new state + filtering everywhere. Unlinking (not deleting) bolle preserves the delivery document.
+- **How to apply:** apply the same centro+città IDOR guard as the rest of the router (via beneficiario), and surface the action only on non-`effettuata` rows behind an AlertDialog confirm.
+
 # Bolla ↔ consegna readiness (no separate state column)
 - A consegna's "bolla readiness" is DERIVED from the linked bolla via `bolle.consegnaId` (one bolla per consegna; route unlinks others on associate). Mapping: bolla `bozza` = "in preparazione", `confermato` = "pronta", `consegnato` = "consegnata". No new schema column was added.
 - GET /consegne enriches rows with `bollaId/bollaNumero/bollaStato`, picking the highest-priority non-`annullato` linked bolla (consegnato > confermato > bozza).

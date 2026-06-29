@@ -1867,6 +1867,14 @@ export const UpdateConsegnaResponse = zod.object({
 
 
 /**
+ * @summary Annulla (elimina) un'intera pianificazione di consegna
+ */
+export const DeleteConsegnaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary Mark delivery as completed - atomic operation
  */
 export const CompletaConsegnaParams = zod.object({

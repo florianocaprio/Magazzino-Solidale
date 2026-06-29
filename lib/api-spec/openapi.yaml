@@ -1354,6 +1354,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consegna"
+    delete:
+      operationId: deleteConsegna
+      tags: [consegne]
+      summary: Annulla (elimina) un'intera pianificazione di consegna
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
 
   /consegne/{id}/completa:
     post:
