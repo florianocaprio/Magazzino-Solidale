@@ -95,9 +95,10 @@ describe("Dashboard — scoping via magazzini visibili", () => {
   });
 
   it("stats: una consegna del centro B è invisibile ad A ma conta per un globale", async () => {
-    // consegneMese counts consegne with dataPrevista >= inizio mese corrente,
-    // scoped via the beneficiario-centro path. Default insertConsegna date is
-    // 2026-06-01 (>= 2026-06-01 month start at today=2026-06-25).
+    // consegneMese counts consegne with dataPrevista >= current month start,
+    // scoped via the beneficiario-centro path. Pin the fixture date to the same
+    // runtime month so the delta assertion stays valid as calendar time moves.
+    const inizioMese = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
     const consMese = (body: { consegneMese: number }) => body.consegneMese;
     const beforeA = consMese((await request(appAs(dashboardRouter, centroA)).get("/dashboard/stats")).body);
     const beforeG = consMese((await request(appAs(dashboardRouter, null)).get("/dashboard/stats")).body);
@@ -106,6 +107,7 @@ describe("Dashboard — scoping via magazzini visibili", () => {
       beneficiarioId: await createBeneficiario(scope, centroB),
       magazzinoId: magNull,
       stato: "effettuata",
+      dataPrevista: inizioMese,
     });
 
     const afterA = consMese((await request(appAs(dashboardRouter, centroA)).get("/dashboard/stats")).body);

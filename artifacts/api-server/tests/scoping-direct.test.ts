@@ -396,7 +396,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, { id: operatoreId, centroAscoltoId: centroA }),
     )
       .post("/beneficiari")
-      .send({ nome: "Mario", cognome: "Rossi", centroAscoltoId: centroB });
+      .send({ nome: "Mario", cognome: "Rossi", sesso: "M", centroAscoltoId: centroB });
     expect(res.status).toBe(201);
     scope.beneficiarioIds.push(res.body.id);
     expect(res.body.centroAscoltoId).toBe(centroA);

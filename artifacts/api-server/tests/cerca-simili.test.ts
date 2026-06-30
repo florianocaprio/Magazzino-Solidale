@@ -41,6 +41,7 @@ async function createBeneficiario(opts: {
   soprannome?: string | null;
   telefono?: string | null;
   dataNascita?: string | null;
+  sesso?: string;
 }): Promise<number> {
   const [b] = await db
     .insert(beneficiariTable)
@@ -48,6 +49,7 @@ async function createBeneficiario(opts: {
       codice: `BEN-${rnd()}`,
       nome: opts.nome,
       cognome: opts.cognome,
+      sesso: opts.sesso ?? "M",
       cittaId: opts.cittaId,
       soprannome: opts.soprannome ?? null,
       telefono: opts.telefono ?? null,

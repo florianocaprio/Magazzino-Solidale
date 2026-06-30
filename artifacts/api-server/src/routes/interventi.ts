@@ -21,7 +21,7 @@ import {
 const router: IRouter = Router();
 
 router.get("/interventi", async (req, res) => {
-  const { beneficiarioId, tipo, centroAscoltoId } = req.query as Record<string, string>;
+  const { beneficiarioId, tipo, centroAscoltoId, cittaId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (beneficiarioId) conditions.push(eq(interventiTable.beneficiarioId, parseInt(beneficiarioId)));
   const caller = callerCentroId(req);
@@ -31,7 +31,9 @@ router.get("/interventi", async (req, res) => {
   } else if (centroAscoltoId) {
     conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
   }
-  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
+  const callerCitta = callerCittaId(req);
+  if (callerCitta == null && cittaId) conditions.push(eq(beneficiariTable.cittaId, parseInt(cittaId)));
+  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCitta);
   if (cittaFilter) conditions.push(cittaFilter);
   const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);

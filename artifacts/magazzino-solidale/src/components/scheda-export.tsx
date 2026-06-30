@@ -26,6 +26,13 @@ function fmtDate(v?: string | null): string {
   return isNaN(d.getTime()) ? "" : format(d, "dd/MM/yyyy");
 }
 
+function fmtSesso(v: string | null | undefined, t: TFn): string {
+  if (v === "M") return t("beneficiarioDettaglio.maschio");
+  if (v === "F") return t("beneficiarioDettaglio.femmina");
+  if (v === "ALTRO") return t("beneficiarioDettaglio.altro");
+  return v ?? "";
+}
+
 function buildAnagrafica(b: BeneficiarioDettaglio, t: TFn): SchedaLabelValue[] {
   return [
     { label: t("scheda.codice"), value: b.codice },
@@ -33,7 +40,7 @@ function buildAnagrafica(b: BeneficiarioDettaglio, t: TFn): SchedaLabelValue[] {
     { label: t("common.name"), value: b.nome },
     { label: t("beneficiarioDettaglio.codiceFiscale"), value: b.codiceFiscale },
     { label: t("beneficiarioDettaglio.dataNascita"), value: fmtDate(b.dataNascita) },
-    { label: t("beneficiarioDettaglio.sesso"), value: b.sesso },
+    { label: t("beneficiarioDettaglio.sesso"), value: fmtSesso(b.sesso, t) },
     { label: t("beneficiarioDettaglio.cittadinanza"), value: b.cittadinanza },
     { label: t("beneficiarioDettaglio.areaProvenienza"), value: b.areaProvenienza },
     { label: t("beneficiarioDettaglio.residenza"), value: b.residenza },
@@ -65,7 +72,7 @@ function buildSections(b: BeneficiarioDettaglio, interventi: Intervento[], t: TF
       headers: [t("common.surname"), t("common.name"), t("scheda.colRelazione"), t("beneficiarioDettaglio.dataNascita"), t("scheda.colEta"), t("beneficiarioDettaglio.sesso"), t("interventi.note")],
       rows: nucleo.map((m) => {
         const eta = calcEta(m.dataNascita);
-        return [m.cognome, m.nome, m.relazione, fmtDate(m.dataNascita), eta != null ? `${eta} ${t("scheda.anni")}` : "", m.sesso, m.note];
+        return [m.cognome, m.nome, m.relazione, fmtDate(m.dataNascita), eta != null ? `${eta} ${t("scheda.anni")}` : "", fmtSesso(m.sesso, t), m.note];
       }),
       emptyText: t("scheda.nucleoVuoto"),
     },

@@ -10,4 +10,5 @@ export type ListInterventiParams = {
 beneficiarioId?: number;
 tipo?: string;
 centroAscoltoId?: number;
+cittaId?: number;
 };

@@ -7,6 +7,7 @@
  */
 
 export interface ProdottoUpdate {
+  codice?: string;
   nome?: string;
   descrizione?: string;
   tipoProdotto?: string;

@@ -34,6 +34,8 @@ export function BeneficiarioCombobox({
   emptyText,
   disabled,
   selectedLabelFallback,
+  searchValue,
+  onSearchChange,
 }: {
   items: BeneficiarioOption[];
   value: string;
@@ -42,6 +44,8 @@ export function BeneficiarioCombobox({
   emptyText?: string;
   disabled?: boolean;
   selectedLabelFallback?: string | null;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -67,7 +71,11 @@ export function BeneficiarioCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
-          <CommandInput placeholder={t("common.searchByNameOrCode")} />
+          <CommandInput
+            placeholder={t("common.searchByNameOrCode")}
+            value={searchValue}
+            onValueChange={onSearchChange}
+          />
           <CommandList>
             <CommandEmpty>{emptyText ?? t("common.noResults")}</CommandEmpty>
             <CommandGroup>

@@ -42,7 +42,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, Footprints, AlertTriangle } from "lucide-react";
+import { Plus, Footprints, AlertTriangle, Search } from "lucide-react";
+import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -61,7 +62,7 @@ function makeSchema(t: (k: string) => string, isGlobal: boolean) {
       soprannome: z.string().optional(),
       codiceFiscale: z.string().optional(),
       dataNascita: z.string().optional(),
-      sesso: z.string().optional(),
+      sesso: z.string().min(1, t("beneficiari.sessoRequired")),
       cittadinanza: z.string().optional(),
       areaProvenienza: z.string().min(1, t("common.requiredField")),
       residenza: z.string().optional(),
@@ -115,6 +116,7 @@ export default function UdsAnagrafica() {
   const [filterZona, setFilterZona] = useState<string>(
     user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
   );
+  const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isGlobal } });
@@ -132,6 +134,7 @@ export default function UdsAnagrafica() {
 
   const listParams = {
     uds: true,
+    ...(search.trim() ? { search: search.trim() } : {}),
     ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
   };
@@ -314,7 +317,7 @@ export default function UdsAnagrafica() {
     if (data.soprannome) payload.soprannome = data.soprannome;
     if (data.codiceFiscale) payload.codiceFiscale = data.codiceFiscale;
     if (data.dataNascita) payload.dataNascita = data.dataNascita;
-    if (data.sesso) payload.sesso = data.sesso;
+    payload.sesso = data.sesso;
     if (data.cittadinanza) payload.cittadinanza = data.cittadinanza;
     if (data.areaProvenienza) payload.areaProvenienza = data.areaProvenienza;
     if (data.residenza) payload.residenza = data.residenza;
@@ -409,6 +412,18 @@ export default function UdsAnagrafica() {
 
       <Card>
         <CardContent className="flex flex-wrap items-end gap-4 p-4">
+          <div className="space-y-1 min-w-[240px] flex-1">
+            <span className="text-sm font-medium">{t("udsAnagrafica.searchLabel")}</span>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("udsAnagrafica.searchPlaceholder")}
+                className="pl-9"
+              />
+            </div>
+          </div>
           {isGlobal && (
             <div className="space-y-1">
               <span className="text-sm font-medium">{t("udsAnagrafica.filterCitta")}</span>
@@ -570,10 +585,14 @@ export default function UdsAnagrafica() {
                           <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.sessoNd")} /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="M">{t("udsAnagrafica.sessoM")}</SelectItem>
-                          <SelectItem value="F">{t("udsAnagrafica.sessoF")}</SelectItem>
+                          {SESSO_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {t(`udsAnagrafica.${option.udsLabelKey}`)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )} />
                 </div>

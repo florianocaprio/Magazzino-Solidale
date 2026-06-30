@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { BeneficiarioInputSesso } from './beneficiarioInputSesso';
 
 export interface BeneficiarioInput {
   codice?: string;
@@ -43,6 +44,6 @@ export interface BeneficiarioInput {
   /** @nullable */
   zonaUdsId?: number | null;
   uds?: boolean;
-  sesso?: string;
+  sesso: BeneficiarioInputSesso;
   areaProvenienza?: string;
 }

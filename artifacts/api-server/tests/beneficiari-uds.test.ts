@@ -52,6 +52,7 @@ let cittaA: number;
 const appAs = (cittaId: number | null, zonaUdsId: number | null = null) =>
   makeApp({ id: 1, centroAscoltoId: null, cittaId, zonaUdsId });
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
+const sessoObbligatorioMsg = "Il campo Sesso è obbligatorio.";
 
 beforeAll(async () => {
   cittaA = await createCitta();
@@ -84,17 +85,46 @@ describe("POST /beneficiari (uds)", () => {
   it("crea una persona UDS con la città e ritorna uds=true", async () => {
     const res = await request(appAs(null))
       .post("/beneficiari")
-      .send({ nome: "Mario", cognome: "Rossi", uds: true, cittaId: cittaA });
+      .send({ nome: "Mario", cognome: "Rossi", sesso: "M", uds: true, cittaId: cittaA });
     expect(res.status).toBe(201);
     expect(res.body.uds).toBe(true);
     expect(res.body.cittaId).toBe(cittaA);
     beneficiarioIds.push(res.body.id);
   });
 
+  it("rifiuta la creazione senza sesso", async () => {
+    const res = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "Senza", cognome: "Sesso" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(sessoObbligatorioMsg);
+  });
+
+  it.each([
+    ["Maschio", "M", "M"],
+    ["Femmina", "F", "F"],
+    ["Altro", "Altro", "ALTRO"],
+  ])("crea un beneficiario con sesso valido: %s", async (_label, sesso, expected) => {
+    const res = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "Con", cognome: "Sesso", sesso });
+    expect(res.status).toBe(201);
+    expect(res.body.sesso).toBe(expected);
+    beneficiarioIds.push(res.body.id);
+  });
+
+  it("rifiuta la creazione con sesso non valido", async () => {
+    const res = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "Sesso", cognome: "NonValido", sesso: "X" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(sessoObbligatorioMsg);
+  });
+
   it("rifiuta una persona UDS senza città per un caller globale (400)", async () => {
     const res = await request(appAs(null))
       .post("/beneficiari")
-      .send({ nome: "Senza", cognome: "Citta", uds: true });
+      .send({ nome: "Senza", cognome: "Citta", sesso: "M", uds: true });
     expect(res.status).toBe(400);
     if (res.body?.id) beneficiarioIds.push(res.body.id);
   });
@@ -102,7 +132,7 @@ describe("POST /beneficiari (uds)", () => {
   it('rifiuta uds passato come stringa "true" senza città (no type-confusion bypass)', async () => {
     const res = await request(appAs(null))
       .post("/beneficiari")
-      .send({ nome: "Coerce", cognome: "Citta", uds: "true" });
+      .send({ nome: "Coerce", cognome: "Citta", sesso: "M", uds: "true" });
     expect(res.status).toBe(400);
     if (res.body?.id) beneficiarioIds.push(res.body.id);
   });
@@ -110,7 +140,7 @@ describe("POST /beneficiari (uds)", () => {
   it("un caller con città pinnata può creare una persona UDS senza inviare cittaId", async () => {
     const res = await request(appAs(cittaA))
       .post("/beneficiari")
-      .send({ nome: "Auto", cognome: "Citta", uds: true });
+      .send({ nome: "Auto", cognome: "Citta", sesso: "M", uds: true });
     expect(res.status).toBe(201);
     expect(res.body.uds).toBe(true);
     expect(res.body.cittaId).toBe(cittaA);
@@ -122,7 +152,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
   it("un caller globale non può attivare uds su una persona senza città (400)", async () => {
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "NoCitta", cognome: rnd(), cittaId: null })
+      .values({ codice: `BEN-${rnd()}`, nome: "NoCitta", cognome: rnd(), sesso: "M", cittaId: null })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
     const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true });
@@ -132,7 +162,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
   it("un caller globale può attivare uds se la persona ha una città", async () => {
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "ConCitta", cognome: rnd(), cittaId: cittaA })
+      .values({ codice: `BEN-${rnd()}`, nome: "ConCitta", cognome: rnd(), sesso: "M", cittaId: cittaA })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
     const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true });
@@ -143,7 +173,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
   it('rifiuta uds="true" (stringa) su una persona senza città per un caller globale', async () => {
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "CoercePatch", cognome: rnd(), cittaId: null })
+      .values({ codice: `BEN-${rnd()}`, nome: "CoercePatch", cognome: rnd(), sesso: "M", cittaId: null })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
     const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: "true" });
@@ -153,7 +183,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
   it("un caller con città attiva uds su un record legacy senza città auto-assegnando la propria città", async () => {
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "Legacy", cognome: rnd(), cittaId: null })
+      .values({ codice: `BEN-${rnd()}`, nome: "Legacy", cognome: rnd(), sesso: "M", cittaId: null })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
     const res = await request(appAs(cittaA)).patch(`/beneficiari/${b.id}`).send({ uds: true });
@@ -165,7 +195,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
   it("un caller globale può attivare uds assegnando contestualmente la città", async () => {
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "AssegnaCitta", cognome: rnd(), cittaId: null })
+      .values({ codice: `BEN-${rnd()}`, nome: "AssegnaCitta", cognome: rnd(), sesso: "M", cittaId: null })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
     const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true, cittaId: cittaA });
@@ -173,12 +203,46 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
     expect(res.body.uds).toBe(true);
     expect(res.body.cittaId).toBe(cittaA);
   });
+
+  it("permette di modificare e salvare il sesso Altro", async () => {
+    const [b] = await db
+      .insert(beneficiariTable)
+      .values({ codice: `BEN-${rnd()}`, nome: "PatchAltro", cognome: rnd(), sesso: "M", cittaId: cittaA })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(b.id);
+    const res = await request(appAs(cittaA)).patch(`/beneficiari/${b.id}`).send({ sesso: "Altro" });
+    expect(res.status).toBe(200);
+    expect(res.body.sesso).toBe("ALTRO");
+  });
+
+  it("permette una PATCH parziale del flag UDS su un legacy senza sesso", async () => {
+    const [b] = await db
+      .insert(beneficiariTable)
+      .values({ codice: `BEN-${rnd()}`, nome: "LegacySoloUds", cognome: rnd(), cittaId: null })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(b.id);
+    const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true, cittaId: cittaA });
+    expect(res.status).toBe(200);
+    expect(res.body.uds).toBe(true);
+    expect(res.body.cittaId).toBe(cittaA);
+  });
+
+  it("rifiuta la modifica di un beneficiario legacy senza sesso", async () => {
+    const [b] = await db
+      .insert(beneficiariTable)
+      .values({ codice: `BEN-${rnd()}`, nome: "LegacySesso", cognome: rnd(), cittaId: cittaA })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(b.id);
+    const res = await request(appAs(cittaA)).patch(`/beneficiari/${b.id}`).send({ nome: "Cambio" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(sessoObbligatorioMsg);
+  });
 });
 
 describe("GET /beneficiari?uds", () => {
   it("ritorna solo le persone con uds=true", async () => {
-    const u = await request(appAs(cittaA)).post("/beneficiari").send({ nome: "UdsOnly", cognome: rnd(), uds: true });
-    const n = await request(appAs(cittaA)).post("/beneficiari").send({ nome: "NoUds", cognome: rnd(), uds: false });
+    const u = await request(appAs(cittaA)).post("/beneficiari").send({ nome: "UdsOnly", cognome: rnd(), sesso: "M", uds: true });
+    const n = await request(appAs(cittaA)).post("/beneficiari").send({ nome: "NoUds", cognome: rnd(), sesso: "F", uds: false });
     beneficiarioIds.push(u.body.id, n.body.id);
 
     const res = await request(appAs(cittaA)).get("/beneficiari").query({ uds: "true", cittaId: String(cittaA) });
@@ -188,15 +252,30 @@ describe("GET /beneficiari?uds", () => {
     expect(ids).not.toContain(n.body.id);
   });
 
+  it("filtra per parte del nome rispettando lo scope città", async () => {
+    const cittaB = await createCitta();
+    const marioA = await request(appAs(cittaA)).post("/beneficiari").send({ nome: "Mario", cognome: rnd(), sesso: "M", uds: true });
+    const luigiA = await request(appAs(cittaA)).post("/beneficiari").send({ nome: "Luigi", cognome: rnd(), sesso: "M", uds: true });
+    const mariaB = await request(appAs(null)).post("/beneficiari").send({ nome: "Maria", cognome: rnd(), sesso: "F", uds: true, cittaId: cittaB });
+    beneficiarioIds.push(marioA.body.id, luigiA.body.id, mariaB.body.id);
+
+    const res = await request(appAs(cittaA)).get("/beneficiari").query({ uds: "true", search: "mar" });
+    expect(res.status).toBe(200);
+    const ids = idsOf(res.body);
+    expect(ids).toContain(marioA.body.id);
+    expect(ids).not.toContain(luigiA.body.id);
+    expect(ids).not.toContain(mariaB.body.id);
+  });
+
   it("un caller con zona vede solo beneficiari della propria zona", async () => {
     const zonaA = await createZona(cittaA);
     const zonaB = await createZona(cittaA);
     const a = await request(appAs(cittaA))
       .post("/beneficiari")
-      .send({ nome: "ZonaA", cognome: rnd(), uds: true, cittaId: cittaA, zonaUdsId: zonaA });
+      .send({ nome: "ZonaA", cognome: rnd(), sesso: "M", uds: true, cittaId: cittaA, zonaUdsId: zonaA });
     const b = await request(appAs(cittaA))
       .post("/beneficiari")
-      .send({ nome: "ZonaB", cognome: rnd(), uds: true, cittaId: cittaA, zonaUdsId: zonaB });
+      .send({ nome: "ZonaB", cognome: rnd(), sesso: "F", uds: true, cittaId: cittaA, zonaUdsId: zonaB });
     beneficiarioIds.push(a.body.id, b.body.id);
 
     const res = await request(appAs(cittaA, zonaA)).get("/beneficiari").query({ uds: "true" });
@@ -211,11 +290,11 @@ describe("GET /beneficiari?uds", () => {
     // uds + centro → deve comparire
     const both = await request(appAs(cittaA))
       .post("/beneficiari")
-      .send({ nome: "UdsCentro", cognome: rnd(), uds: true, centroAscoltoId: centro });
+      .send({ nome: "UdsCentro", cognome: rnd(), sesso: "M", uds: true, centroAscoltoId: centro });
     // solo centro (uds=false) → non deve MAI comparire nell'anagrafica UDS
     const centroOnly = await request(appAs(cittaA))
       .post("/beneficiari")
-      .send({ nome: "SoloCentro", cognome: rnd(), uds: false, centroAscoltoId: centro });
+      .send({ nome: "SoloCentro", cognome: rnd(), sesso: "F", uds: false, centroAscoltoId: centro });
     beneficiarioIds.push(both.body.id, centroOnly.body.id);
     expect(both.body.uds).toBe(true);
     expect(both.body.centroAscoltoId).toBe(centro);
