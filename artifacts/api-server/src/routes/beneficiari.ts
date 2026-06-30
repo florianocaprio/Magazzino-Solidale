@@ -1,8 +1,9 @@
+import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable, cittaTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, and, ilike, sql, desc, type SQL } from "drizzle-orm";
+import { eq, and, or, ilike, sql, desc, ne, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -20,11 +21,82 @@ import {
 
 const router: IRouter = Router();
 
+const CODICE_BENEFICIARIO_DUPLICATO_MSG = "Il codice beneficiario indicato è già associato a un altro beneficiario.";
+const SESSO_OBBLIGATORIO_MSG = "Il campo Sesso è obbligatorio.";
+
 // Normalize a loosely-typed body flag to a real boolean so the città-boundary
 // guard checks the same value that gets persisted (avoids `uds:"true"` /
 // `uds:1` type-confusion bypasses on the unvalidated body).
 function toBool(v: unknown): boolean {
   return v === true || v === "true" || v === "t" || v === "1" || v === 1 || v === "yes";
+}
+
+const trimOrUndefined = (v: unknown): string | undefined =>
+  typeof v === "string" ? v.trim() || undefined : undefined;
+
+const normalizzaSesso = (v: unknown): string | undefined => {
+  if (typeof v !== "string") return undefined;
+  const sesso = v.trim().toUpperCase();
+  if (sesso === "M" || sesso === "MASCHIO") return "M";
+  if (sesso === "F" || sesso === "FEMMINA") return "F";
+  if (sesso === "ALTRO") return "ALTRO";
+  return undefined;
+};
+
+const ANAGRAFICA_BENEFICIARIO_PATCH_KEYS = new Set([
+  "codice",
+  "codiceFiscale",
+  "cognome",
+  "nome",
+  "soprannome",
+  "dataNascita",
+  "sesso",
+  "cittadinanza",
+  "areaProvenienza",
+  "residenza",
+  "domicilio",
+  "comune",
+  "zonaMunicipio",
+  "telefono",
+  "email",
+  "statoCivile",
+  "numComponenti",
+  "numFigliMaschi",
+  "numFiglieFemmine",
+  "numMinori",
+  "numAnziani",
+  "numDisabili",
+  "restrizioniAlimentari",
+  "allergie",
+  "notePaccoAlimentare",
+  "priorita",
+  "consegnaDomicilio",
+  "motivoConsegnaDomicilio",
+]);
+
+const isAnagraficaBeneficiarioPatch = (updates: Record<string, unknown>): boolean =>
+  Object.keys(updates).some((key) => ANAGRAFICA_BENEFICIARIO_PATCH_KEYS.has(key));
+
+async function codiceBeneficiarioEsiste(codice: string, excludeId?: number): Promise<boolean> {
+  const where = excludeId != null
+    ? and(eq(beneficiariTable.codice, codice), ne(beneficiariTable.id, excludeId))
+    : eq(beneficiariTable.codice, codice);
+  const [hit] = await db.select({ id: beneficiariTable.id }).from(beneficiariTable).where(where).limit(1);
+  return hit != null;
+}
+
+async function generaCodiceBeneficiario(): Promise<string> {
+  for (let i = 0; i < 100; i++) {
+    const codice = `BEN-${String(randomInt(0, 10_000_000_000_000)).padStart(13, "0")}`;
+    if (!(await codiceBeneficiarioEsiste(codice))) return codice;
+  }
+  throw new Error("Impossibile generare un codice beneficiario univoco");
+}
+
+function isCodiceBeneficiarioUniqueViolation(error: unknown): boolean {
+  const e = error as { code?: string; constraint?: string; detail?: string } | null | undefined;
+  return e?.code === "23505"
+    && (e.constraint === "beneficiari_codice_unique" || (e.detail?.includes("codice") ?? false));
 }
 
 function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string | null, cittaNome?: string | null) {
@@ -75,7 +147,13 @@ router.get("/beneficiari", async (req, res) => {
   const { search, priorita, domicilio, centroAscoltoId, cittaId, zonaUdsId, uds, attivo } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (search) {
-    conditions.push(ilike(beneficiariTable.cognome, `%${search}%`));
+    const q = `%${search}%`;
+    const searchFilter = or(
+      ilike(beneficiariTable.cognome, q),
+      ilike(beneficiariTable.nome, q),
+      ilike(beneficiariTable.codice, q),
+    );
+    if (searchFilter) conditions.push(searchFilter);
   }
   if (priorita) conditions.push(eq(beneficiariTable.priorita, priorita));
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
@@ -111,14 +189,16 @@ router.get("/beneficiari", async (req, res) => {
 async function createBeneficiarioOne(
   body: Record<string, unknown>,
   req: Request,
-): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string }> {
+): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string; status?: number }> {
   const b = body as Record<string, any>;
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
-  // Timestamp + random suffix keeps codes unique even within a tight bulk loop.
-  const codice = b.codice || `BEN-${Date.now()}${Math.floor(Math.random() * 46656).toString(36).padStart(3, "0")}`;
-  const values: Record<string, any> = { ...b, codice };
+  const codice = trimOrUndefined(b.codice) ?? await generaCodiceBeneficiario();
+  if (await codiceBeneficiarioEsiste(codice)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
+  const sesso = normalizzaSesso(b.sesso);
+  if (!sesso) return { error: SESSO_OBBLIGATORIO_MSG, status: 400 };
+  const values: Record<string, any> = { ...b, codice, sesso };
   if ("uds" in values) values.uds = toBool(values.uds);
   if (caller != null) values.centroAscoltoId = caller;
   if (cid != null) values.cittaId = cid;
@@ -128,13 +208,18 @@ async function createBeneficiarioOne(
   if (values.uds === true && cid == null && values.cittaId == null) {
     return { error: "La città è obbligatoria per una persona UDS" };
   }
-  const [row] = await db.insert(beneficiariTable).values(values as typeof beneficiariTable.$inferInsert).returning();
-  return { row };
+  try {
+    const [row] = await db.insert(beneficiariTable).values(values as typeof beneficiariTable.$inferInsert).returning();
+    return { row };
+  } catch (e) {
+    if (isCodiceBeneficiarioUniqueViolation(e)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
+    throw e;
+  }
 }
 
 router.post("/beneficiari", async (req, res) => {
   const r = await createBeneficiarioOne(req.body, req);
-  if ("error" in r) { res.status(400).json({ error: r.error }); return; }
+  if ("error" in r) { res.status(r.status ?? 400).json({ error: r.error }); return; }
   res.status(201).json(fmtBenef(r.row));
 });
 
@@ -310,6 +395,23 @@ router.patch("/beneficiari/:id", async (req, res) => {
   }
   const updates = { ...req.body, dataAggiornamento: new Date() };
   if ("uds" in updates) updates.uds = toBool(updates.uds);
+  if ("codice" in updates) {
+    const codice = trimOrUndefined(updates.codice);
+    if (!codice) { res.status(400).json({ error: "Codice beneficiario obbligatorio" }); return; }
+    if (await codiceBeneficiarioEsiste(codice, id)) {
+      res.status(409).json({ error: CODICE_BENEFICIARIO_DUPLICATO_MSG });
+      return;
+    }
+    updates.codice = codice;
+  }
+  if ("sesso" in updates) {
+    const sesso = normalizzaSesso(updates.sesso);
+    if (!sesso) { res.status(400).json({ error: SESSO_OBBLIGATORIO_MSG }); return; }
+    updates.sesso = sesso;
+  } else if (isAnagraficaBeneficiarioPatch(updates) && !normalizzaSesso(existing.sesso)) {
+    res.status(400).json({ error: SESSO_OBBLIGATORIO_MSG });
+    return;
+  }
   if (caller != null) delete updates.centroAscoltoId;
   if (cid != null) delete updates.cittaId;
   if (zid != null) updates.zonaUdsId = zid;
@@ -327,8 +429,16 @@ router.patch("/beneficiari/:id", async (req, res) => {
       return;
     }
   }
-  const [row] = await db.update(beneficiariTable).set(updates).where(eq(beneficiariTable.id, id)).returning();
-  res.json(fmtBenef(row));
+  try {
+    const [row] = await db.update(beneficiariTable).set(updates).where(eq(beneficiariTable.id, id)).returning();
+    res.json(fmtBenef(row));
+  } catch (e) {
+    if (isCodiceBeneficiarioUniqueViolation(e)) {
+      res.status(409).json({ error: CODICE_BENEFICIARIO_DUPLICATO_MSG });
+      return;
+    }
+    throw e;
+  }
 });
 
 router.delete("/beneficiari/:id", async (req, res) => {

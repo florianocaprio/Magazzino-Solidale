@@ -180,7 +180,7 @@ export async function createMagazzinoRec(
 export async function createBeneficiario(
   scope: SeedScope,
   centroId: number | null,
-  opts: { uds?: boolean; cittaId?: number | null; zonaUdsId?: number | null } = {},
+  opts: { uds?: boolean; cittaId?: number | null; zonaUdsId?: number | null; sesso?: string } = {},
 ): Promise<number> {
   const [b] = await db
     .insert(beneficiariTable)
@@ -188,6 +188,7 @@ export async function createBeneficiario(
       codice: `BEN-${rnd()}`,
       cognome: "Test",
       nome: `Ben ${rnd()}`,
+      sesso: opts.sesso ?? "M",
       centroAscoltoId: centroId,
       uds: opts.uds ?? false,
       cittaId: opts.cittaId ?? null,

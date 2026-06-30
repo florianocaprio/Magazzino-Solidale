@@ -41,6 +41,7 @@ export const beneficiari = {
     disattiva: "Disattiva",
     toastAttivato: "Beneficiario attivato",
     toastDisattivato: "Beneficiario disattivato",
+    sessoRequired: "Il campo Sesso è obbligatorio.",
   },
   es: {
     title: "Beneficiarios",
@@ -84,6 +85,7 @@ export const beneficiari = {
     disattiva: "Desactivar",
     toastAttivato: "Beneficiario activado",
     toastDisattivato: "Beneficiario desactivado",
+    sessoRequired: "El campo Sexo es obligatorio.",
   },
   en: {
     title: "Beneficiaries",
@@ -127,6 +129,7 @@ export const beneficiari = {
     disattiva: "Deactivate",
     toastAttivato: "Beneficiary activated",
     toastDisattivato: "Beneficiary deactivated",
+    sessoRequired: "The Sex field is required.",
   },
   fr: {
     title: "Bénéficiaires",
@@ -170,6 +173,7 @@ export const beneficiari = {
     disattiva: "Désactiver",
     toastAttivato: "Bénéficiaire activé",
     toastDisattivato: "Bénéficiaire désactivé",
+    sessoRequired: "Le champ Sexe est obligatoire.",
   },
   de: {
     title: "Begünstigte",
@@ -213,6 +217,7 @@ export const beneficiari = {
     disattiva: "Deaktivieren",
     toastAttivato: "Begünstigter aktiviert",
     toastDisattivato: "Begünstigter deaktiviert",
+    sessoRequired: "Das Feld Geschlecht ist erforderlich.",
   },
   ar: {
     title: "المستفيدون",
@@ -256,5 +261,6 @@ export const beneficiari = {
     disattiva: "إلغاء التفعيل",
     toastAttivato: "تم تفعيل المستفيد",
     toastDisattivato: "تم إلغاء تفعيل المستفيد",
+    sessoRequired: "حقل الجنس إلزامي.",
   },
 } as const;

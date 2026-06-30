@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useListInterventi, useCreateIntervento, useUpdateIntervento, useListBeneficiari, useListCentriAscolto, useListTipiIntervento, getListInterventiQueryKey, type Intervento } from "@workspace/api-client-react";
+import { useState, useEffect, useMemo } from "react";
+import { useListInterventi, useCreateIntervento, useUpdateIntervento, useListBeneficiari, useListCentriAscolto, useListTipiIntervento, useListCitta, getListInterventiQueryKey, getListCittaQueryKey, type Intervento } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -15,12 +15,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, Filter, ClipboardList, Calendar, StickyNote } from "lucide-react";
+import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { Plus, Filter, Calendar, StickyNote } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 
 const formSchema = z.object({
@@ -42,6 +43,9 @@ export default function Interventi() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
+  const isCittaGlobal = user?.cittaId == null;
+  const isCittaFilterVisible = !isCentroLocked && isCittaGlobal;
+  const [cittaFilter, setCittaFilter] = useState("all");
   const [tipoFilter, setTipoFilter] = useState("all");
   const [centroFilter, setCentroFilter] = useState("all");
   useEffect(() => {
@@ -49,13 +53,39 @@ export default function Interventi() {
       setCentroFilter(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
+  const effectiveCittaId = isCittaGlobal
+    ? cittaFilter !== "all" ? parseInt(cittaFilter) : undefined
+    : user?.cittaId ?? undefined;
+  const effectiveCentroId = isCentroLocked
+    ? lockedCentroId
+    : centroFilter !== "all" ? parseInt(centroFilter) : undefined;
   const { data: interventi, isLoading } = useListInterventi({
     tipo: tipoFilter !== "all" ? tipoFilter : undefined,
-    centroAscoltoId: centroFilter !== "all" ? parseInt(centroFilter) : undefined,
+    cittaId: effectiveCittaId,
+    centroAscoltoId: effectiveCentroId ?? undefined,
   });
-  const { data: beneficiari } = useListBeneficiari();
+  const { data: beneficiari } = useListBeneficiari({
+    attivo: true,
+    cittaId: effectiveCittaId,
+    centroAscoltoId: effectiveCentroId ?? undefined,
+  });
   const { data: centri } = useListCentriAscolto();
+  const { data: cittaList } = useListCitta({
+    query: { queryKey: getListCittaQueryKey(), enabled: isCittaFilterVisible },
+  });
   const { data: tipiIntervento } = useListTipiIntervento();
+  const cittaNotChosen = isCittaFilterVisible && cittaFilter === "all";
+  const centriFiltrati = useMemo(() => (centri ?? []).filter((c) => {
+    if (isCentroLocked) return true;
+    if (!isCittaGlobal) return true;
+    if (cittaFilter === "all") return false;
+    return c.cittaId != null && String(c.cittaId) === cittaFilter;
+  }), [centri, cittaFilter, isCentroLocked, isCittaGlobal]);
+
+  const handleCittaFilterChange = (value: string) => {
+    setCittaFilter(value);
+    setCentroFilter("all");
+  };
 
   // Built-in type keys are translated; admin-added custom names display as typed.
   const tipoLabel = (nome: string) => t(`tipiIntervento.opt.${nome}`, { defaultValue: nome.replace(/_/g, " ") });
@@ -104,6 +134,23 @@ export default function Interventi() {
       scadenzaAutodichiarazioneIndigenza: ""
     }
   });
+
+  const selectedBeneficiarioId = form.watch("beneficiarioId");
+  const selectedBeneficiario = useMemo(
+    () => (beneficiari ?? []).find((b) => b.id === Number(selectedBeneficiarioId)),
+    [beneficiari, selectedBeneficiarioId],
+  );
+
+  const handleBeneficiarioScan = (value: string) => {
+    const scanned = value.trim();
+    const found = (beneficiari ?? []).find((b) => (b.codice ?? "").trim().toLowerCase() === scanned.toLowerCase());
+    if (!found) {
+      form.setError("beneficiarioId", { type: "manual", message: `${t("common.noResults")} (${scanned})` });
+      return;
+    }
+    form.setValue("beneficiarioId", found.id, { shouldDirty: true, shouldValidate: true });
+    form.clearErrors("beneficiarioId");
+  };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const data = {
@@ -164,14 +211,25 @@ export default function Interventi() {
             title={t("interventi.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => { form.setValue("tipoIntervento", defaultTipo); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("interventi.registerIntervention")}</Button>
+          <Button onClick={() => { form.setValue("tipoIntervento", defaultTipo); form.clearErrors("beneficiarioId"); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("interventi.registerIntervention")}</Button>
         </div>
       </div>
 
       <Card>
         <CardHeader className="py-4 border-b">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
+            {isCittaFilterVisible && (
+              <Select value={cittaFilter} onValueChange={handleCittaFilterChange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder={t("udsAnagrafica.allCitta")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("udsAnagrafica.allCitta")}</SelectItem>
+                  {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={tipoFilter} onValueChange={setTipoFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder={t("interventi.filterAllTypes")} />
@@ -183,13 +241,13 @@ export default function Interventi() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked}>
+            <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked || cittaNotChosen}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder={t("interventi.filterAllCenters")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("interventi.filterAllCenters")}</SelectItem>
-                {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                {centriFiltrati.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -292,12 +350,23 @@ export default function Interventi() {
                 <FormField control={form.control} name="beneficiarioId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("interventi.beneficiario")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={t("interventi.selectPlaceholder")} /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {beneficiari?.map(b => <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <BeneficiarioCombobox
+                          items={beneficiari ?? []}
+                          value={field.value ? String(field.value) : ""}
+                          onChange={(value) => {
+                            field.onChange(Number(value));
+                            form.clearErrors("beneficiarioId");
+                          }}
+                          placeholder={t("interventi.selectPlaceholder")}
+                          disabled={createIntervento.isPending}
+                          selectedLabelFallback={selectedBeneficiario ? `${selectedBeneficiario.cognome} ${selectedBeneficiario.nome}` : null}
+                        />
+                      </FormControl>
+                      <BarcodeScannerButton onScan={handleBeneficiarioScan} disabled={createIntervento.isPending} />
+                    </div>
+                    <FormMessage />
                   </FormItem>
                 )} />
 

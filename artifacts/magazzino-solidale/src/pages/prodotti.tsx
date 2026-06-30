@@ -41,7 +41,7 @@ import { useTranslation } from "react-i18next";
 import * as z from "zod";
 
 const makeFormSchema = (t: (key: string) => string) => z.object({
-  codice: z.string().min(2, t("prodotti.errCodiceShort")),
+  codice: z.string().optional(),
   nome: z.string().min(2, t("prodotti.errNomeShort")),
   descrizione: z.string().optional(),
   tipoProdotto: z.string().min(1, t("common.requiredField")),
@@ -56,6 +56,11 @@ const makeFormSchema = (t: (key: string) => string) => z.object({
 });
 
 type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
+
+const apiErrorMessage = (e: unknown) =>
+  (e as { data?: { error?: string } })?.data?.error ??
+  (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+  "Operazione non riuscita";
 
 const makeCaricoSchema = (t: (key: string) => string) => z.object({
   magazzinoId: z.string().min(1, t("prodotti.errSelectMagazzino")),
@@ -437,13 +442,25 @@ export default function Prodotti() {
   };
 
   const onSubmit = (data: FormValues) => {
+    form.clearErrors("codice");
+    form.clearErrors("codiceBarre");
+    const handleError = (err: unknown) => {
+      const message = apiErrorMessage(err);
+      if (message.toLowerCase().includes("codice a barre")) {
+        form.setError("codiceBarre", { type: "server", message });
+      } else if (message.toLowerCase().includes("codice prodotto")) {
+        form.setError("codice", { type: "server", message });
+      }
+      toast({ title: t("prodotti.toastErrorTitle"), description: message, variant: "destructive" });
+    };
     if (editingId) {
       updateProdotto.mutate({ id: editingId, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
           toast({ title: t("prodotti.toastUpdated") });
           setIsFormOpen(false);
-        }
+        },
+        onError: handleError,
       });
     } else {
       createProdotto.mutate({ data }, {
@@ -451,7 +468,8 @@ export default function Prodotti() {
           queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
           toast({ title: t("prodotti.toastCreated") });
           setIsFormOpen(false);
-        }
+        },
+        onError: handleError,
       });
     }
   };
@@ -548,7 +566,6 @@ export default function Prodotti() {
           { key: "fornitore", header: t("prodotti.fornitore"), example: "" },
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
-          if (!r.codice) return { error: t("bulkImport.requiredMissing", { field: t("common.code") }) };
           if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("common.name") }) };
           if (!r.tipoProdotto) return { error: t("bulkImport.requiredMissing", { field: t("common.type") }) };
           if (!r.unitaMisura) return { error: t("bulkImport.requiredMissing", { field: t("prodotti.colUm") }) };
@@ -572,7 +589,7 @@ export default function Prodotti() {
           }
           return {
             data: {
-              codice: r.codice,
+              codice: r.codice || undefined,
               nome: r.nome,
               tipoProdotto: r.tipoProdotto,
               unitaMisura: r.unitaMisura,

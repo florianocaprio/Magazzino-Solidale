@@ -1232,6 +1232,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of interventions
@@ -3499,11 +3503,13 @@ components:
           type: string
         fornitoreId:
           type: integer
-      required: [codice, nome, tipoProdotto, unitaMisura]
+      required: [nome, tipoProdotto, unitaMisura]
 
     ProdottoUpdate:
       type: object
       properties:
+        codice:
+          type: string
         nome:
           type: string
         descrizione:
@@ -4589,9 +4595,10 @@ components:
           type: boolean
         sesso:
           type: string
+          enum: [M, F, ALTRO]
         areaProvenienza:
           type: string
-      required: [cognome, nome]
+      required: [cognome, nome, sesso]
 
     BeneficiarioUpdate:
       type: object
@@ -4660,6 +4667,7 @@ components:
           type: ["integer", "null"]
         sesso:
           type: string
+          enum: [M, F, ALTRO]
         areaProvenienza:
           type: string
 
@@ -5059,6 +5067,7 @@ components:
           type: string
         sesso:
           type: string
+          enum: [M, F, ALTRO]
         areaProvenienza:
           type: string
         relazione:

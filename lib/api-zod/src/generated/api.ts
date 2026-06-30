@@ -204,7 +204,7 @@ export const ListProdottiResponse = zod.array(ListProdottiResponseItem)
 
 
 export const CreateProdottoBody = zod.object({
-  "codice": zod.string(),
+  "codice": zod.string().optional(),
   "nome": zod.string(),
   "descrizione": zod.string().optional(),
   "tipoProdotto": zod.string(),
@@ -227,7 +227,7 @@ export const CreateProdottoBody = zod.object({
 
 export const BulkProdottiBody = zod.object({
   "righe": zod.array(zod.object({
-  "codice": zod.string(),
+  "codice": zod.string().optional(),
   "nome": zod.string(),
   "descrizione": zod.string().optional(),
   "tipoProdotto": zod.string(),
@@ -291,6 +291,7 @@ export const UpdateProdottoParams = zod.object({
 })
 
 export const UpdateProdottoBody = zod.object({
+  "codice": zod.string().optional(),
   "nome": zod.string().optional(),
   "descrizione": zod.string().optional(),
   "tipoProdotto": zod.string().optional(),
@@ -1344,7 +1345,7 @@ export const CreateBeneficiarioBody = zod.object({
   "cittaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "uds": zod.boolean().optional(),
-  "sesso": zod.string().optional(),
+  "sesso": zod.enum(['M', 'F', 'ALTRO']),
   "areaProvenienza": zod.string().optional()
 })
 
@@ -1416,7 +1417,7 @@ export const BulkBeneficiariBody = zod.object({
   "cittaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "uds": zod.boolean().optional(),
-  "sesso": zod.string().optional(),
+  "sesso": zod.enum(['M', 'F', 'ALTRO']),
   "areaProvenienza": zod.string().optional()
 }))
 })
@@ -1575,7 +1576,7 @@ export const UpdateBeneficiarioBody = zod.object({
   "soprannome": zod.string().optional(),
   "cittaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
-  "sesso": zod.string().optional(),
+  "sesso": zod.enum(['M', 'F', 'ALTRO']).optional(),
   "areaProvenienza": zod.string().optional()
 })
 
@@ -1647,7 +1648,7 @@ export const AddNucleoFamiliareBody = zod.object({
   "nome": zod.string().optional(),
   "cognome": zod.string().optional(),
   "dataNascita": zod.string().optional(),
-  "sesso": zod.string().optional(),
+  "sesso": zod.enum(['M', 'F', 'ALTRO']).optional(),
   "areaProvenienza": zod.string().optional(),
   "relazione": zod.string().optional(),
   "tagliaVestiti": zod.string().optional(),
@@ -1666,7 +1667,8 @@ export const DeleteNucleoFamiliareParams = zod.object({
 export const ListInterventiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
   "tipo": zod.coerce.string().optional(),
-  "centroAscoltoId": zod.coerce.number().optional()
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "cittaId": zod.coerce.number().optional()
 })
 
 export const ListInterventiResponseItem = zod.object({

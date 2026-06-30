@@ -5,12 +5,13 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { NucleoFamiliareInputSesso } from './nucleoFamiliareInputSesso';
 
 export interface NucleoFamiliareInput {
   nome?: string;
   cognome?: string;
   dataNascita?: string;
-  sesso?: string;
+  sesso?: NucleoFamiliareInputSesso;
   areaProvenienza?: string;
   relazione?: string;
   tagliaVestiti?: string;

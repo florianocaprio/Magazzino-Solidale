@@ -25,6 +25,7 @@ import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
 import { loadAssociationLogo } from "@/lib/bolla-pdf";
+import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,7 +37,7 @@ const makeFormSchema = (t: (k: string) => string) => z.object({
   soprannome: z.string().optional(),
   codiceFiscale: z.string().optional(),
   dataNascita: z.string().optional(),
-  sesso: z.string().optional(),
+  sesso: z.string().min(1, t("beneficiari.sessoRequired")),
   cittadinanza: z.string().optional(),
   areaProvenienza: z.string().min(1, t("common.requiredField")),
   residenza: z.string().optional(),
@@ -166,7 +167,7 @@ export default function Beneficiari() {
       ...rest,
       uds,
       dataNascita: rest.dataNascita || undefined,
-      sesso: rest.sesso || undefined,
+      sesso: rest.sesso,
       centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
       codiceFiscale: codiceFiscale?.trim() ? codiceFiscale.trim().toUpperCase() : null,
     };
@@ -237,7 +238,7 @@ export default function Beneficiari() {
           { key: "codice", header: t("common.code"), example: "" },
           { key: "codiceFiscale", header: "Codice Fiscale", example: "" },
           { key: "dataNascita", header: t("beneficiarioDettaglio.dataNascita"), example: "1985-04-12" },
-          { key: "sesso", header: t("beneficiarioDettaglio.sesso"), example: "F" },
+          { key: "sesso", header: t("beneficiarioDettaglio.sesso"), example: "ALTRO" },
           { key: "cittadinanza", header: t("beneficiarioDettaglio.cittadinanza"), example: "" },
           { key: "telefono", header: t("common.phone"), example: "3331234567" },
           { key: "email", header: t("common.email"), example: "" },
@@ -251,6 +252,7 @@ export default function Beneficiari() {
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
           if (!r.cognome) return { error: t("bulkImport.requiredMissing", { field: t("common.surname") }) };
           if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("common.name") }) };
+          if (!r.sesso) return { error: t("beneficiari.sessoRequired") };
           let centroAscoltoId: number | null = null;
           if (r.centro) {
             const c = matchByName(centri, r.centro, (x) => x.nome);
@@ -276,7 +278,7 @@ export default function Beneficiari() {
               codice: r.codice || undefined,
               codiceFiscale: r.codiceFiscale ? r.codiceFiscale.trim().toUpperCase() : undefined,
               dataNascita: r.dataNascita || undefined,
-              sesso: r.sesso || undefined,
+              sesso: r.sesso.trim().toUpperCase(),
               cittadinanza: r.cittadinanza || undefined,
               telefono: r.telefono || undefined,
               email: r.email || undefined,
@@ -516,10 +518,14 @@ export default function Beneficiari() {
                       <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value="M">{t("beneficiarioDettaglio.maschio")}</SelectItem>
-                          <SelectItem value="F">{t("beneficiarioDettaglio.femmina")}</SelectItem>
+                          {SESSO_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {t(`beneficiarioDettaglio.${option.beneficiarioLabelKey}`)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )} />
                 </div>

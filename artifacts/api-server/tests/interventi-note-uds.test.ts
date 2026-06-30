@@ -36,7 +36,7 @@ let beneficiarioId: number;
 beforeAll(async () => {
   const [b] = await db
     .insert(beneficiariTable)
-    .values({ codice: `BEN-${rnd()}`, nome: "NoteUds", cognome: rnd(), uds: true, cittaId: null })
+    .values({ codice: `BEN-${rnd()}`, nome: "NoteUds", cognome: rnd(), sesso: "M", uds: true, cittaId: null })
     .returning({ id: beneficiariTable.id });
   beneficiarioId = b.id;
   beneficiarioIds.push(b.id);

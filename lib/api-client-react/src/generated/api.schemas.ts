@@ -168,7 +168,7 @@ export interface FornitoriBulkInput {
 }
 
 export interface ProdottoInput {
-  codice: string;
+  codice?: string;
   nome: string;
   descrizione?: string;
   tipoProdotto: string;
@@ -191,6 +191,15 @@ export interface ProdottoInput {
 export interface ProdottiBulkInput {
   righe: ProdottoInput[];
 }
+
+export type BeneficiarioInputSesso = typeof BeneficiarioInputSesso[keyof typeof BeneficiarioInputSesso];
+
+
+export const BeneficiarioInputSesso = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+} as const;
 
 export interface BeneficiarioInput {
   codice?: string;
@@ -229,7 +238,7 @@ export interface BeneficiarioInput {
   /** @nullable */
   zonaUdsId?: number | null;
   uds?: boolean;
-  sesso?: string;
+  sesso: BeneficiarioInputSesso;
   areaProvenienza?: string;
 }
 
@@ -310,6 +319,7 @@ export interface Prodotto {
 }
 
 export interface ProdottoUpdate {
+  codice?: string;
   nome?: string;
   descrizione?: string;
   tipoProdotto?: string;
@@ -1058,6 +1068,15 @@ export interface BeneficiarioDettaglio {
   dataCreazione: string;
 }
 
+export type BeneficiarioUpdateSesso = typeof BeneficiarioUpdateSesso[keyof typeof BeneficiarioUpdateSesso];
+
+
+export const BeneficiarioUpdateSesso = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+} as const;
+
 export interface BeneficiarioUpdate {
   /** @nullable */
   codiceFiscale?: string | null;
@@ -1094,7 +1113,7 @@ export interface BeneficiarioUpdate {
   cittaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
-  sesso?: string;
+  sesso?: BeneficiarioUpdateSesso;
   areaProvenienza?: string;
 }
 
@@ -1361,11 +1380,20 @@ export interface EmailSendResult {
   error?: string | null;
 }
 
+export type NucleoFamiliareInputSesso = typeof NucleoFamiliareInputSesso[keyof typeof NucleoFamiliareInputSesso];
+
+
+export const NucleoFamiliareInputSesso = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+} as const;
+
 export interface NucleoFamiliareInput {
   nome?: string;
   cognome?: string;
   dataNascita?: string;
-  sesso?: string;
+  sesso?: NucleoFamiliareInputSesso;
   areaProvenienza?: string;
   relazione?: string;
   tagliaVestiti?: string;
@@ -2052,6 +2080,7 @@ export type ListInterventiParams = {
 beneficiarioId?: number;
 tipo?: string;
 centroAscoltoId?: number;
+cittaId?: number;
 };
 
 export type ListConsegneParams = {

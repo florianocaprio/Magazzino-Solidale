@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getListCittaQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getListCittaQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Tr
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
 import { SchedaExportButtons } from "@/components/scheda-export";
 import { loadAssociationLogo } from "@/lib/bolla-pdf";
+import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
@@ -41,7 +42,12 @@ function calcEta(dataNascita?: string | null): number | null {
   return eta;
 }
 
-const SESSO_LABEL: Record<string, string> = { M: "M", F: "F" };
+const SESSO_LABEL: Record<string, string> = { M: "Maschio", F: "Femmina", ALTRO: "Altro" };
+
+const apiErrorMessage = (e: unknown, fallback: string) =>
+  (e as { data?: { error?: string } })?.data?.error ??
+  (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+  fallback;
 
 export default function BeneficiarioDettaglio() {
   const { t } = useTranslation();
@@ -52,6 +58,7 @@ export default function BeneficiarioDettaglio() {
   const updateBeneficiario = useUpdateBeneficiario();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [editing, setEditing] = useState(false);
 
   const onChangeCentro = (value: string) => {
@@ -71,15 +78,29 @@ export default function BeneficiarioDettaglio() {
   };
 
   const onToggleUds = (next: boolean) => {
+    if (next && b?.cittaId == null && user?.cittaId == null) {
+      setEditing(true);
+      toast({ title: t("beneficiarioDettaglio.error"), description: t("common.requiredField"), variant: "destructive" });
+      return;
+    }
+    const data: Record<string, unknown> = { uds: next };
+    if (next) {
+      if (b?.cittaId != null) data.cittaId = b.cittaId;
+      if (b?.zonaUdsId != null) data.zonaUdsId = b.zonaUdsId;
+    }
     updateBeneficiario.mutate(
-      { id: numId, data: { uds: next } },
+      { id: numId, data: data as never },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) });
           queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
           toast({ title: t("beneficiarioDettaglio.toastUdsUpdated") });
         },
-        onError: () => toast({ title: t("beneficiarioDettaglio.error"), description: t("beneficiarioDettaglio.errorUds"), variant: "destructive" }),
+        onError: (e) => toast({
+          title: t("beneficiarioDettaglio.error"),
+          description: apiErrorMessage(e, t("beneficiarioDettaglio.errorUds")),
+          variant: "destructive",
+        }),
       },
     );
   };
@@ -323,7 +344,7 @@ const makeEditSchema = (t: (k: string) => string) => z.object({
   nome: z.string().min(1, t("beneficiarioDettaglio.required")),
   codiceFiscale: z.string().optional(),
   dataNascita: z.string().optional(),
-  sesso: z.string().optional(),
+  sesso: z.string().min(1, t("beneficiari.sessoRequired")),
   cittadinanza: z.string().optional(),
   areaProvenienza: z.string().min(1, t("beneficiarioDettaglio.required")),
   residenza: z.string().optional(),
@@ -400,7 +421,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       ...rest,
       uds,
       dataNascita: data.dataNascita || undefined,
-      sesso: data.sesso || undefined,
+      sesso: data.sesso,
       areaProvenienza: data.areaProvenienza || undefined,
       codiceFiscale: data.codiceFiscale?.trim() ? data.codiceFiscale.trim().toUpperCase() : null,
     };
@@ -447,10 +468,14 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="M">{t("beneficiarioDettaglio.maschio")}</SelectItem>
-                        <SelectItem value="F">{t("beneficiarioDettaglio.femmina")}</SelectItem>
+                        {SESSO_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {t(`beneficiarioDettaglio.${option.beneficiarioLabelKey}`)}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )} />
               </div>
@@ -621,7 +646,7 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
           cognome: data.cognome || undefined,
           relazione: data.relazione || undefined,
           dataNascita: data.dataNascita || undefined,
-          sesso: data.sesso || undefined,
+          sesso: data.sesso ? data.sesso as NucleoFamiliareInputSesso : undefined,
           areaProvenienza: data.areaProvenienza || undefined,
           note: data.note || undefined,
         },
@@ -733,8 +758,11 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="M">{t("beneficiarioDettaglio.maschio")}</SelectItem>
-                        <SelectItem value="F">{t("beneficiarioDettaglio.femmina")}</SelectItem>
+                        {SESSO_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {t(`beneficiarioDettaglio.${option.beneficiarioLabelKey}`)}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FormItem>

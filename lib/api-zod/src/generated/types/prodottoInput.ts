@@ -7,7 +7,7 @@
  */
 
 export interface ProdottoInput {
-  codice: string;
+  codice?: string;
   nome: string;
   descrizione?: string;
   tipoProdotto: string;
