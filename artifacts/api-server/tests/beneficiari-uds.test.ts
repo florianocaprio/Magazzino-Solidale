@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable } from "@workspace/db";
+import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
 
@@ -13,7 +13,7 @@ import beneficiariRouter from "../src/routes/beneficiari";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
-function makeApp(user: { id: number; centroAscoltoId: number | null; cittaId: number | null }): Express {
+function makeApp(user: { id: number; centroAscoltoId: number | null; cittaId: number | null; zonaUdsId?: number | null }): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -27,6 +27,7 @@ function makeApp(user: { id: number; centroAscoltoId: number | null; cittaId: nu
 const beneficiarioIds: number[] = [];
 const cittaIds: number[] = [];
 const centroIds: number[] = [];
+const zonaIds: number[] = [];
 
 async function createCitta(nome = `Citta ${rnd()}`): Promise<number> {
   const [c] = await db.insert(cittaTable).values({ nome }).returning({ id: cittaTable.id });
@@ -40,9 +41,16 @@ async function createCentro(cittaId: number, nome = `Centro ${rnd()}`): Promise<
   return c.id;
 }
 
+async function createZona(cittaId: number, nome = `Zona ${rnd()}`): Promise<number> {
+  const [z] = await db.insert(zoneUdsTable).values({ nome, cittaId }).returning({ id: zoneUdsTable.id });
+  zonaIds.push(z.id);
+  return z.id;
+}
+
 let cittaA: number;
 
-const appAs = (cittaId: number | null) => makeApp({ id: 1, centroAscoltoId: null, cittaId });
+const appAs = (cittaId: number | null, zonaUdsId: number | null = null) =>
+  makeApp({ id: 1, centroAscoltoId: null, cittaId, zonaUdsId });
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 
 beforeAll(async () => {
@@ -62,6 +70,9 @@ afterEach(async () => {
 afterAll(async () => {
   if (centroIds.length > 0) {
     await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds));
+  }
+  if (zonaIds.length > 0) {
+    await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, zonaIds));
   }
   if (cittaIds.length > 0) {
     await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds));
@@ -175,6 +186,24 @@ describe("GET /beneficiari?uds", () => {
     const ids = idsOf(res.body);
     expect(ids).toContain(u.body.id);
     expect(ids).not.toContain(n.body.id);
+  });
+
+  it("un caller con zona vede solo beneficiari della propria zona", async () => {
+    const zonaA = await createZona(cittaA);
+    const zonaB = await createZona(cittaA);
+    const a = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "ZonaA", cognome: rnd(), uds: true, cittaId: cittaA, zonaUdsId: zonaA });
+    const b = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "ZonaB", cognome: rnd(), uds: true, cittaId: cittaA, zonaUdsId: zonaB });
+    beneficiarioIds.push(a.body.id, b.body.id);
+
+    const res = await request(appAs(cittaA, zonaA)).get("/beneficiari").query({ uds: "true" });
+    expect(res.status).toBe(200);
+    const ids = idsOf(res.body);
+    expect(ids).toContain(a.body.id);
+    expect(ids).not.toContain(b.body.id);
   });
 
   it("mostra le persone uds+centro ma MAI le persone solo-centro", async () => {

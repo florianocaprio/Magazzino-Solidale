@@ -149,17 +149,21 @@ export async function canUseBeneficiario(
   beneficiarioId: number | null | undefined,
   centroId: number | null,
   cittaId: number | null = null,
+  zonaUdsId: number | null = null,
 ): Promise<boolean> {
   if (beneficiarioId == null) return true;
   const [b] = await db
     .select({
       c: beneficiariTable.centroAscoltoId,
       ci: beneficiariTable.cittaId,
+      z: beneficiariTable.zonaUdsId,
     })
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId));
   if (!b) return false;
-  return canAccessCentro(b.c, centroId) && canAccessCitta(b.ci, cittaId);
+  return canAccessCentro(b.c, centroId)
+    && canAccessCitta(b.ci, cittaId)
+    && canAccessZonaUds(b.z, zonaUdsId);
 }
 
 /**
@@ -188,8 +192,9 @@ export async function canUseMagazzino(
  * their own città plus città-unassigned (NULL) legacy/shared rows. They never
  * see another città's data. A user with no città (null) is global across
  * cities. This is ADDITIVE to the centro scoping above: an entity scoped by
- * both must satisfy BOTH filters. The optional UDS zona is a SOFT preference
- * (default view), not an enforcement boundary.
+ * both must satisfy BOTH filters. The optional UDS zona is also enforced when
+ * present on the caller: a zona-bound caller sees only records assigned to the
+ * same zona.
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** The caller's città id, or null if the user is global across cities. */
@@ -200,6 +205,18 @@ export function callerCittaId(req: Request): number | null {
 /** The caller's preferred UDS zona id, or null = all zones of the città. */
 export function callerZonaUdsId(req: Request): number | null {
   return req.user?.zonaUdsId ?? null;
+}
+
+/**
+ * HARD UDS zona boundary: rows whose zona column equals the caller's zona.
+ * Returns `undefined` for a zona-global caller (no filtering).
+ */
+export function zonaUdsScopeFilter(
+  column: Column,
+  zonaUdsId: number | null,
+): SQL | undefined {
+  if (zonaUdsId == null) return undefined;
+  return eq(column, zonaUdsId);
 }
 
 /**
@@ -224,6 +241,15 @@ export function canAccessCitta(
   return rowCittaId == null || rowCittaId === cittaId;
 }
 
+/** Whether a stored UDS zona value is visible to a caller scoped to `zonaUdsId`. */
+export function canAccessZonaUds(
+  rowZonaUdsId: number | null | undefined,
+  zonaUdsId: number | null,
+): boolean {
+  if (zonaUdsId == null) return true;
+  return rowZonaUdsId === zonaUdsId;
+}
+
 /** The città of a beneficiario, used to scope indirect-link entities. */
 export async function beneficiarioCittaId(
   beneficiarioId: number | null | undefined,
@@ -234,6 +260,18 @@ export async function beneficiarioCittaId(
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId));
   return b?.c ?? null;
+}
+
+/** The UDS zona of a beneficiario, used to scope indirect-link entities. */
+export async function beneficiarioZonaUdsId(
+  beneficiarioId: number | null | undefined,
+): Promise<number | null> {
+  if (beneficiarioId == null) return null;
+  const [b] = await db
+    .select({ z: beneficiariTable.zonaUdsId })
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, beneficiarioId));
+  return b?.z ?? null;
 }
 
 /**

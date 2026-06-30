@@ -5,12 +5,16 @@ import { eq, and, gte, lte, desc, inArray, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
+  callerZonaUdsId,
   centroScopeFilter,
   cittaScopeFilter,
+  zonaUdsScopeFilter,
   canAccessCentro,
   canAccessCitta,
+  canAccessZonaUds,
   beneficiarioCentroId,
   beneficiarioCittaId,
+  beneficiarioZonaUdsId,
   canUseBeneficiario,
   canAccessMagazzino,
 } from "../lib/centroScope";
@@ -68,6 +72,8 @@ router.get("/consegne", async (req, res) => {
   }
   const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
   if (cittaFilter) conditions.push(cittaFilter);
+  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
+  if (zonaFilter) conditions.push(zonaFilter);
 
   const rows = await db
     .select({
@@ -126,7 +132,8 @@ router.post("/consegne", async (req, res) => {
   const body = req.body;
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
-  if ((caller != null || cid != null) && !(await canUseBeneficiario(body.beneficiarioId, caller, cid))) {
+  const zid = callerZonaUdsId(req);
+  if ((caller != null || cid != null || zid != null) && !(await canUseBeneficiario(body.beneficiarioId, caller, cid, zid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
     return;
   }
@@ -149,7 +156,8 @@ router.get("/consegne/:id", async (req, res) => {
   const [row] = await db.select().from(consegneTable).where(eq(consegneTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(row.beneficiarioId), callerCittaId(req))) {
+      || !canAccessCitta(await beneficiarioCittaId(row.beneficiarioId), callerCittaId(req))
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(row.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -162,13 +170,15 @@ router.patch("/consegne/:id", async (req, res) => {
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
+  const zid = callerZonaUdsId(req);
   if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)
-      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), cid)) {
+      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), cid)
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), zid)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if ((caller != null || cid != null) && req.body.beneficiarioId != null && req.body.beneficiarioId !== existing.beneficiarioId
-      && !(await canUseBeneficiario(req.body.beneficiarioId, caller, cid))) {
+  if ((caller != null || cid != null || zid != null) && req.body.beneficiarioId != null && req.body.beneficiarioId !== existing.beneficiarioId
+      && !(await canUseBeneficiario(req.body.beneficiarioId, caller, cid, zid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
     return;
   }
@@ -196,7 +206,8 @@ router.delete("/consegne/:id", async (req, res) => {
   const [existing] = await db.select().from(consegneTable).where(eq(consegneTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), callerCittaId(req))) {
+      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), callerCittaId(req))
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -216,7 +227,8 @@ router.post("/consegne/:id/associa-bolla", async (req, res) => {
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Consegna non trovata" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), callerCittaId(req))) {
+      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), callerCittaId(req))
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -256,7 +268,8 @@ router.post("/consegne/:id/completa", async (req, res) => {
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), callerCittaId(req))) {
+      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), callerCittaId(req))
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -373,7 +386,8 @@ async function inviaReminderConsegna(req: import("express").Request, res: import
   const r = await caricaConsegnaPerEmail(consegnaId);
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(r.c.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(r.c.beneficiarioId), callerCittaId(req))) {
+      || !canAccessCitta(await beneficiarioCittaId(r.c.beneficiarioId), callerCittaId(req))
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(r.c.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }

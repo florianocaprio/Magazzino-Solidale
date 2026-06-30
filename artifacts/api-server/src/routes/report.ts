@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
-import { callerCentroId, callerCittaId } from "../lib/centroScope";
+import { callerCentroId, callerCittaId, callerZonaUdsId } from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -412,17 +412,18 @@ router.get("/report/fse-plus", async (req, res) => {
  * UDS (Unità di Strada) reports. Street-outreach interventions / people.
  * Always restricted to UDS persons (beneficiari.uds = true). Città is a HARD
  * scope (caller's città OR NULL legacy), optionally narrowed via ?cittaId for a
- * global caller; ?zonaUdsId is an optional soft filter.
+ * global caller; zona is HARD when present on the caller and can be narrowed
+ * via ?zonaUdsId by a zona-global caller.
  * ──────────────────────────────────────────────────────────────────────── */
 
-function udsScopeConds(req: { query: Record<string, unknown> }, caller: number | null): SQL[] {
+function udsScopeConds(req: { query: Record<string, unknown> }, callerCitta: number | null, callerZona: number | null): SQL[] {
   const conds: SQL[] = [sql`be.uds = true`];
-  const cittaCond = ownOrNullSql(sql`be.citta_id`, caller);
+  const cittaCond = ownOrNullSql(sql`be.citta_id`, callerCitta);
   if (cittaCond) conds.push(cittaCond);
   const qCitta = parseIntParam(req.query.cittaId);
   if (qCitta) conds.push(sql`be.citta_id = ${qCitta}`);
-  const qZona = parseIntParam(req.query.zonaUdsId);
-  if (qZona) conds.push(sql`be.zona_uds_id = ${qZona}`);
+  const zonaId = callerZona ?? parseIntParam(req.query.zonaUdsId);
+  if (zonaId) conds.push(sql`be.zona_uds_id = ${zonaId}`);
   return conds;
 }
 
@@ -433,7 +434,7 @@ router.get("/report/uds/interventi-per-mese", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerCittaId(req));
+  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 
@@ -475,7 +476,7 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
   // Normalize so callers can pass the range in either order.
   const from = da <= aRaw ? da : aRaw;
   const to = da <= aRaw ? aRaw : da;
-  const conds = udsScopeConds(req, callerCittaId(req));
+  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
   const where = sql.join(conds, sql` AND `);
 
   const result = await db.execute(sql`
@@ -538,7 +539,7 @@ router.get("/report/uds/interventi-per-tipo", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerCittaId(req));
+  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 
@@ -565,7 +566,7 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerCittaId(req));
+  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 
@@ -589,7 +590,7 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
 });
 
 router.get("/report/uds/persone-per-zona", async (req, res) => {
-  const conds = udsScopeConds(req, callerCittaId(req));
+  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
   const where = sql.join(conds, sql` AND `);
 
   const result = await db.execute(sql`

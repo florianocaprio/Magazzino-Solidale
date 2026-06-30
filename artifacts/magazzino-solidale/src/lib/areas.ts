@@ -7,6 +7,7 @@ export const ALL_AREAS: AreaDef[] = [
   { key: "generale", label: "Generale" },
   { key: "magazzino", label: "Magazzino" },
   { key: "sociale", label: "Sociale" },
+  { key: "uds", label: "Unità di Strada" },
   { key: "logistica", label: "Logistica" },
   { key: "analisi", label: "Analisi" },
   { key: "amministrazione", label: "Amministrazione" },

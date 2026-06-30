@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, utentiTable, ruoliTable, cittaTable } from "@workspace/db";
+import { db, pool, utentiTable, ruoliTable, cittaTable, zoneUdsTable } from "@workspace/db";
 import { inArray, eq } from "drizzle-orm";
 import utentiRouter from "../src/routes/utenti";
 
 let app: Express;
 let adminId: number;
 let cittaId: number;
+let zonaUdsId: number;
 let ruoloId: number;
 const createdUserIds: number[] = [];
 
@@ -32,6 +33,7 @@ async function insertUser(values: {
   cognome?: string | null;
   matricola?: string | null;
   cittaId?: number | null;
+  zonaUdsId?: number | null;
   dataCreazione?: Date;
 }): Promise<number> {
   const [row] = await db
@@ -44,6 +46,7 @@ async function insertUser(values: {
       matricola: values.matricola ?? null,
       ruoloId,
       cittaId: values.cittaId ?? null,
+      zonaUdsId: values.zonaUdsId ?? null,
       attivo: true,
       ...(values.dataCreazione ? { dataCreazione: values.dataCreazione } : {}),
     })
@@ -59,6 +62,12 @@ beforeAll(async () => {
     .values({ nome: `Milano Test ${suffix}`, sigla: "MI" })
     .returning({ id: cittaTable.id });
   cittaId = c.id;
+
+  const [z] = await db
+    .insert(zoneUdsTable)
+    .values({ nome: `Zona Test ${suffix}`, cittaId })
+    .returning({ id: zoneUdsTable.id });
+  zonaUdsId = z.id;
 
   const [r] = await db
     .insert(ruoliTable)
@@ -82,6 +91,7 @@ afterAll(async () => {
     await db.delete(utentiTable).where(inArray(utentiTable.id, createdUserIds));
   }
   await db.delete(ruoliTable).where(eq(ruoliTable.id, ruoloId));
+  await db.delete(zoneUdsTable).where(eq(zoneUdsTable.id, zonaUdsId));
   await db.delete(cittaTable).where(eq(cittaTable.id, cittaId));
   await pool.end();
 });
@@ -175,5 +185,86 @@ describe("POST /utenti — accesso immediato", () => {
       .from(utentiTable)
       .where(eq(utentiTable.id, res.body.id));
     expect(row.mustChangePassword).toBe(false);
+  });
+
+  it("persiste e restituisce città e zona UDS", async () => {
+    const res = await request(app)
+      .post("/utenti")
+      .send({
+        username: `zona-${Date.now()}`,
+        password: "passwordIniziale1",
+        nome: "Utente",
+        cognome: "Zona",
+        ruoloId,
+        cittaId,
+        zonaUdsId,
+      });
+    expect(res.status).toBe(201);
+    createdUserIds.push(res.body.id);
+    expect(res.body.cittaId).toBe(cittaId);
+    expect(res.body.cittaNome).toContain("Milano Test");
+    expect(res.body.zonaUdsId).toBe(zonaUdsId);
+    expect(res.body.zonaUdsNome).toContain("Zona Test");
+
+    const [row] = await db
+      .select({ cittaId: utentiTable.cittaId, zonaUdsId: utentiTable.zonaUdsId })
+      .from(utentiTable)
+      .where(eq(utentiTable.id, res.body.id));
+    expect(row.cittaId).toBe(cittaId);
+    expect(row.zonaUdsId).toBe(zonaUdsId);
+  });
+});
+
+describe("Utenti — matricola univoca", () => {
+  it("rifiuta una matricola già usata in creazione", async () => {
+    const matricola = `DUP-UT-${Date.now()}-1`;
+    await insertUser({
+      username: `dup-a-${Date.now()}`,
+      nome: "Dup",
+      cognome: "Uno",
+      matricola,
+      cittaId,
+    });
+
+    const res = await request(app)
+      .post("/utenti")
+      .send({
+        username: `dup-b-${Date.now()}`,
+        password: "passwordIniziale1",
+        nome: "Dup",
+        cognome: "Due",
+        matricola: ` ${matricola} `,
+        ruoloId,
+        cittaId,
+      });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("Matricola già assegnata a un altro utente");
+  });
+
+  it("rifiuta una matricola già usata in modifica", async () => {
+    const matricolaA = `DUP-UT-${Date.now()}-2`;
+    const matricolaB = `DUP-UT-${Date.now()}-3`;
+    await insertUser({
+      username: `dup-patch-a-${Date.now()}`,
+      nome: "Patch",
+      cognome: "Uno",
+      matricola: matricolaA,
+      cittaId,
+    });
+    const id = await insertUser({
+      username: `dup-patch-b-${Date.now()}`,
+      nome: "Patch",
+      cognome: "Due",
+      matricola: matricolaB,
+      cittaId,
+    });
+
+    const res = await request(app)
+      .patch(`/utenti/${id}`)
+      .send({ matricola: matricolaA });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("Matricola già assegnata a un altro utente");
   });
 });

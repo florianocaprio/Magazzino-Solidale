@@ -1,14 +1,14 @@
 import { Router, type IRouter } from "express";
-import { and, eq, ne, desc } from "drizzle-orm";
+import { and, eq, ne, desc, type SQL } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable } from "@workspace/db";
+import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable, zoneUdsTable } from "@workspace/db";
 import {
   CreateUtenteBody,
   UpdateUtenteBody,
   ResetUtentePasswordBody,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
-import { callerCentroId, callerCittaId, andScoped } from "../lib/centroScope";
+import { callerCentroId, callerCittaId, callerZonaUdsId, andScoped } from "../lib/centroScope";
 
 const router: IRouter = Router();
 
@@ -25,6 +25,9 @@ type UtenteRow = {
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
   cittaId: number | null;
+  cittaNome: string | null;
+  zonaUdsId: number | null;
+  zonaUdsNome: string | null;
   attivo: boolean;
   mustChangePassword: boolean;
   ultimoAccesso: Date | null;
@@ -41,6 +44,10 @@ const fmt = (r: UtenteRow) => ({
   ruoloNome: r.ruoloNome ?? null,
   centroAscoltoId: r.centroAscoltoId ?? null,
   centroAscoltoNome: r.centroAscoltoNome ?? null,
+  cittaId: r.cittaId ?? null,
+  cittaNome: r.cittaNome ?? null,
+  zonaUdsId: r.zonaUdsId ?? null,
+  zonaUdsNome: r.zonaUdsNome ?? null,
   attivo: r.attivo,
   mustChangePassword: r.mustChangePassword,
   ultimoAccesso: r.ultimoAccesso ? r.ultimoAccesso.toISOString() : null,
@@ -60,6 +67,9 @@ const selectUtente = () =>
       centroAscoltoId: utentiTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
       cittaId: utentiTable.cittaId,
+      cittaNome: cittaTable.nome,
+      zonaUdsId: utentiTable.zonaUdsId,
+      zonaUdsNome: zoneUdsTable.nome,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
       ultimoAccesso: utentiTable.ultimoAccesso,
@@ -67,7 +77,9 @@ const selectUtente = () =>
     })
     .from(utentiTable)
     .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
-    .leftJoin(centriAscoltoTable, eq(utentiTable.centroAscoltoId, centriAscoltoTable.id));
+    .leftJoin(centriAscoltoTable, eq(utentiTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(cittaTable, eq(utentiTable.cittaId, cittaTable.id))
+    .leftJoin(zoneUdsTable, eq(utentiTable.zonaUdsId, zoneUdsTable.id));
 
 async function otherActiveAdminExists(excludeId: number): Promise<boolean> {
   const rows = await db
@@ -98,6 +110,12 @@ function cittaSigla(sigla: string | null, nome: string | null): string {
   return (fromName.slice(0, 2) || "XX").padEnd(2, "X");
 }
 
+function normalizeMatricola(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed || null;
+}
+
 function buildMatricola(
   nome: string,
   cognome: string,
@@ -109,11 +127,13 @@ function buildMatricola(
   return `${initials}${yy}-${sigla}-${tail}`;
 }
 
-async function matricolaExists(m: string): Promise<boolean> {
+async function matricolaExists(m: string, excludeId?: number): Promise<boolean> {
+  const conditions: SQL[] = [eq(utentiTable.matricola, m)];
+  if (excludeId != null) conditions.push(ne(utentiTable.id, excludeId));
   const [hit] = await db
     .select({ id: utentiTable.id })
     .from(utentiTable)
-    .where(eq(utentiTable.matricola, m));
+    .where(and(...conditions));
   return !!hit;
 }
 
@@ -160,11 +180,13 @@ router.get("/utenti", async (req, res): Promise<void> => {
   // STRICT città boundary on utenti: a città-bound admin sees ONLY users of
   // their own città (no NULL/global users), mirroring the strict centro rule.
   const cittaCaller = callerCittaId(req);
+  const zonaCaller = callerZonaUdsId(req);
   const rows = await selectUtente()
     .where(
       andScoped(
         caller != null ? eq(utentiTable.centroAscoltoId, caller) : undefined,
         cittaCaller != null ? eq(utentiTable.cittaId, cittaCaller) : undefined,
+        zonaCaller != null ? eq(utentiTable.zonaUdsId, zonaCaller) : undefined,
       ),
     )
     .orderBy(desc(utentiTable.id));
@@ -177,7 +199,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { username, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId, cittaId } = parsed.data;
+  const { username, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId, cittaId, zonaUdsId } = parsed.data;
 
   // A centro-bound admin can only create users inside their own centro; the
   // caller's centro is auto-assigned and locked (any body value is ignored).
@@ -187,6 +209,12 @@ router.post("/utenti", async (req, res): Promise<void> => {
   // the caller's città is auto-assigned and locked (any body value is ignored).
   const cittaCaller = callerCittaId(req);
   const finalCittaId = cittaCaller != null ? cittaCaller : (cittaId ?? null);
+  const zonaCaller = callerZonaUdsId(req);
+  const finalZonaUdsId = zonaCaller != null
+    ? zonaCaller
+    : finalCittaId == null
+      ? null
+      : (zonaUdsId ?? null);
 
   const [existing] = await db
     .select({ id: utentiTable.id })
@@ -199,7 +227,11 @@ router.post("/utenti", async (req, res): Promise<void> => {
 
   const nomeTrim = nome.trim();
   const cognomeTrim = cognome.trim();
-  const finalMatricola = matricola?.trim() || (await generateMatricola(nomeTrim, cognomeTrim, finalCittaId));
+  const finalMatricola = normalizeMatricola(matricola) || (await generateMatricola(nomeTrim, cognomeTrim, finalCittaId));
+  if (await matricolaExists(finalMatricola)) {
+    res.status(409).json({ error: "Matricola già assegnata a un altro utente" });
+    return;
+  }
 
   const passwordHash = await bcrypt.hash(password, 10);
   const [created] = await db
@@ -213,6 +245,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
       ruoloId: ruoloId ?? null,
       centroAscoltoId: finalCentroId,
       cittaId: finalCittaId,
+      zonaUdsId: finalZonaUdsId,
       attivo: attivo ?? true,
       mustChangePassword: false,
     })
@@ -240,6 +273,11 @@ router.get("/utenti/:id", async (req, res): Promise<void> => {
   const cittaCaller = callerCittaId(req);
   if (cittaCaller != null && row.cittaId !== cittaCaller) {
     res.status(403).json({ error: "Utente non accessibile per la tua città" });
+    return;
+  }
+  const zonaCaller = callerZonaUdsId(req);
+  if (zonaCaller != null && row.zonaUdsId !== zonaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua zona" });
     return;
   }
   res.json(fmt(row));
@@ -276,6 +314,11 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per la tua città" });
     return;
   }
+  const zonaCaller = callerZonaUdsId(req);
+  if (zonaCaller != null && target.zonaUdsId !== zonaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua zona" });
+    return;
+  }
 
   const wasActiveAdmin =
     target.attivo && (await roleIsAdmin(target.ruoloId));
@@ -295,7 +338,7 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   const updates: Partial<typeof utentiTable.$inferInsert> = {};
   if (body.nome !== undefined) updates.nome = body.nome;
   if (body.cognome !== undefined) updates.cognome = body.cognome;
-  if (body.matricola !== undefined) updates.matricola = body.matricola;
+  if (body.matricola !== undefined) updates.matricola = normalizeMatricola(body.matricola);
   if (body.ruoloId !== undefined) updates.ruoloId = body.ruoloId;
   if (body.attivo !== undefined) updates.attivo = body.attivo;
   // A centro-bound admin cannot move users to another centro; only a global
@@ -307,6 +350,19 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   // admin may (re)assign the città.
   if (cittaCaller == null && body.cittaId !== undefined) {
     updates.cittaId = body.cittaId;
+  }
+  // A zona-bound admin cannot move users to another zona; only a zona-global
+  // admin may (re)assign the UDS zona. A user without città cannot keep a zona.
+  if (zonaCaller == null && body.zonaUdsId !== undefined) {
+    const effectiveCittaId =
+      updates.cittaId !== undefined ? (updates.cittaId ?? null) : target.cittaId;
+    updates.zonaUdsId = effectiveCittaId == null ? null : body.zonaUdsId;
+  }
+  if (zonaCaller != null) {
+    updates.zonaUdsId = zonaCaller;
+  }
+  if (updates.cittaId === null) {
+    updates.zonaUdsId = null;
   }
 
   // If the user would be left without a matricola (legacy record, or the edit
@@ -327,6 +383,12 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
       genCittaId,
       genYear,
     );
+  }
+  if (updates.matricola !== undefined && updates.matricola !== null) {
+    if (await matricolaExists(updates.matricola, id)) {
+      res.status(409).json({ error: "Matricola già assegnata a un altro utente" });
+      return;
+    }
   }
 
   if (Object.keys(updates).length > 0) {
@@ -367,6 +429,11 @@ router.delete("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per la tua città" });
     return;
   }
+  const zonaCaller = callerZonaUdsId(req);
+  if (zonaCaller != null && target.zonaUdsId !== zonaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua zona" });
+    return;
+  }
 
   const isActiveAdmin =
     target.attivo && (await roleIsAdmin(target.ruoloId));
@@ -393,7 +460,12 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
   }
 
   const [target] = await db
-    .select({ id: utentiTable.id, centroAscoltoId: utentiTable.centroAscoltoId, cittaId: utentiTable.cittaId })
+    .select({
+      id: utentiTable.id,
+      centroAscoltoId: utentiTable.centroAscoltoId,
+      cittaId: utentiTable.cittaId,
+      zonaUdsId: utentiTable.zonaUdsId,
+    })
     .from(utentiTable)
     .where(eq(utentiTable.id, id));
   if (!target) {
@@ -409,6 +481,11 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
   const cittaCaller = callerCittaId(req);
   if (cittaCaller != null && target.cittaId !== cittaCaller) {
     res.status(403).json({ error: "Utente non accessibile per la tua città" });
+    return;
+  }
+  const zonaCaller = callerZonaUdsId(req);
+  if (zonaCaller != null && target.zonaUdsId !== zonaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua zona" });
     return;
   }
 

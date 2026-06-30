@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, boolean, timestamp, integer, jsonb, json, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, boolean, timestamp, integer, jsonb, json, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { centriAscoltoTable } from "./centri";
 import { cittaTable } from "./citta";
 import { zoneUdsTable } from "./zoneUds";
@@ -12,22 +12,26 @@ export const ruoliTable = pgTable("ruoli", {
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 
-export const utentiTable = pgTable("utenti", {
-  id: serial("id").primaryKey(),
-  username: varchar("username", { length: 60 }).notNull().unique(),
-  passwordHash: varchar("password_hash", { length: 200 }).notNull(),
-  nome: varchar("nome", { length: 120 }).notNull(),
-  cognome: varchar("cognome", { length: 120 }),
-  matricola: varchar("matricola", { length: 40 }),
-  ruoloId: integer("ruolo_id").references(() => ruoliTable.id),
-  centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
-  cittaId: integer("citta_id").references(() => cittaTable.id),
-  zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
-  attivo: boolean("attivo").notNull().default(true),
-  mustChangePassword: boolean("must_change_password").notNull().default(false),
-  ultimoAccesso: timestamp("ultimo_accesso"),
-  dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
-});
+export const utentiTable = pgTable(
+  "utenti",
+  {
+    id: serial("id").primaryKey(),
+    username: varchar("username", { length: 60 }).notNull().unique(),
+    passwordHash: varchar("password_hash", { length: 200 }).notNull(),
+    nome: varchar("nome", { length: 120 }).notNull(),
+    cognome: varchar("cognome", { length: 120 }),
+    matricola: varchar("matricola", { length: 40 }),
+    ruoloId: integer("ruolo_id").references(() => ruoliTable.id),
+    centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
+    cittaId: integer("citta_id").references(() => cittaTable.id),
+    zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
+    attivo: boolean("attivo").notNull().default(true),
+    mustChangePassword: boolean("must_change_password").notNull().default(false),
+    ultimoAccesso: timestamp("ultimo_accesso"),
+    dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("utenti_matricola_unique").on(table.matricola)],
+);
 
 // Session store table for connect-pg-simple. Defined here (instead of relying
 // on createTableIfMissing) because the bundled server can't read the library's
