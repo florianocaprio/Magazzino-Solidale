@@ -5,12 +5,19 @@ import {
   useListTurni,
   getListTurniQueryKey,
   useUpsertTurno,
+  useCreateTurnoVolontarioPending,
+  useCreateTurnoMezzoPending,
   useListCentriAscolto,
   useListVolontari,
+  getListVolontariQueryKey,
   useListMezzi,
+  getListMezziQueryKey,
+  type Volontario,
+  type Mezzo,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { volontarioLabel } from "@/lib/volontari-label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +37,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -81,6 +89,26 @@ export default function Turni() {
   const [selectedCentro, setSelectedCentro] = useState<number | null>(
     user?.centroAscoltoId ?? null,
   );
+  const [pendingVolontari, setPendingVolontari] = useState<Volontario[]>([]);
+  const [pendingMezzi, setPendingMezzi] = useState<Mezzo[]>([]);
+  const [volontarioDialogOpen, setVolontarioDialogOpen] = useState(false);
+  const [mezzoDialogOpen, setMezzoDialogOpen] = useState(false);
+  const [nuovoVolontario, setNuovoVolontario] = useState({
+    nome: "",
+    cognome: "",
+    matricola: "",
+    telefono: "",
+    patente: false,
+    note: "",
+  });
+  const [volontarioError, setVolontarioError] = useState<string | null>(null);
+  const [nuovoMezzo, setNuovoMezzo] = useState({
+    tipo: "",
+    targa: "",
+    proprieta: "associazione",
+    descrizione: "",
+    note: "",
+  });
   const effectiveCentro = isScoped ? user!.centroAscoltoId! : selectedCentro;
 
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeekMonday(new Date()));
@@ -95,25 +123,35 @@ export default function Turni() {
   const { data: volontari } = useListVolontari();
   const volontariCentro = useMemo(
     () =>
-      (volontari ?? []).filter(
-        (v) =>
+      [...(volontari ?? []), ...pendingVolontari].filter((v, idx, all) => {
+        if (all.findIndex((x) => x.id === v.id) !== idx) return false;
+        const centroOk =
           v.centroAscoltoId == null ||
           effectiveCentro == null ||
-          v.centroAscoltoId === effectiveCentro,
-      ),
-    [volontari, effectiveCentro],
+          v.centroAscoltoId === effectiveCentro;
+        const isPendingLocal = pendingVolontari.some((p) => p.id === v.id);
+        const approved = (v.statoApprovazione ?? "approvato") === "approvato" && v.attivo;
+        return centroOk && (approved || isPendingLocal);
+      }),
+    [volontari, pendingVolontari, effectiveCentro],
   );
 
   const { data: mezzi } = useListMezzi();
   const mezziCentro = useMemo(
     () =>
-      (mezzi ?? []).filter(
-        (m) =>
+      [...(mezzi ?? []), ...pendingMezzi].filter((m, idx, all) => {
+        if (all.findIndex((x) => x.id === m.id) !== idx) return false;
+        const centroOk =
           m.centroAscoltoId == null ||
           effectiveCentro == null ||
-          m.centroAscoltoId === effectiveCentro,
-      ),
-    [mezzi, effectiveCentro],
+          m.centroAscoltoId === effectiveCentro;
+        const isPendingLocal = pendingMezzi.some((p) => p.id === m.id);
+        const approved =
+          (m.statoApprovazione ?? "approvato") === "approvato" &&
+          m.stato === "disponibile";
+        return centroOk && (approved || isPendingLocal);
+      }),
+    [mezzi, pendingMezzi, effectiveCentro],
   );
 
   const { data: turni } = useListTurni(
@@ -150,6 +188,13 @@ export default function Turni() {
   }, [allTurni, effectiveCentro]);
 
   const upsert = useUpsertTurno();
+  const createPendingVolontario = useCreateTurnoVolontarioPending();
+  const createPendingMezzo = useCreateTurnoMezzoPending();
+
+  const apiErrorMessage = (e: unknown) =>
+    (e as { data?: { error?: string } })?.data?.error ??
+    (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+    t("turni.error");
 
   const [dialog, setDialog] = useState<{ data: string; fascia: string } | null>(null);
   const [rows, setRows] = useState<VolRow[]>([]);
@@ -200,6 +245,75 @@ export default function Turni() {
     );
   }
 
+  function creaVolontarioPending() {
+    if (effectiveCentro == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
+      return;
+    }
+    setVolontarioError(null);
+    createPendingVolontario.mutate(
+      {
+        data: {
+          centroAscoltoId: effectiveCentro,
+          nome: nuovoVolontario.nome.trim(),
+          cognome: nuovoVolontario.cognome.trim(),
+          matricola: nuovoVolontario.matricola.trim(),
+          telefono: nuovoVolontario.telefono.trim() || undefined,
+          patente: nuovoVolontario.patente,
+          note: nuovoVolontario.note.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: (created) => {
+          setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
+          setRows((current) => {
+            const next = [...current];
+            const emptyIndex = next.findIndex((r) => r.volontarioId === "");
+            if (emptyIndex >= 0) next[emptyIndex] = { ...next[emptyIndex], volontarioId: created.id };
+            else next.push({ volontarioId: created.id, ruolo: "" });
+            return next;
+          });
+          queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
+          toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
+          setNuovoVolontario({ nome: "", cognome: "", matricola: "", telefono: "", patente: false, note: "" });
+          setVolontarioError(null);
+          setVolontarioDialogOpen(false);
+        },
+        onError: (e: unknown) => {
+          const message = apiErrorMessage(e);
+          setVolontarioError(message);
+          toast({ variant: "destructive", description: message });
+        },
+      },
+    );
+  }
+
+  function creaMezzoPending() {
+    if (effectiveCentro == null || !nuovoMezzo.tipo.trim()) return;
+    createPendingMezzo.mutate(
+      {
+        data: {
+          centroAscoltoId: effectiveCentro,
+          tipo: nuovoMezzo.tipo.trim(),
+          targa: nuovoMezzo.targa.trim() || undefined,
+          proprieta: nuovoMezzo.proprieta || "associazione",
+          descrizione: nuovoMezzo.descrizione.trim() || undefined,
+          note: nuovoMezzo.note.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: (created) => {
+          setPendingMezzi((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
+          setMezzoId(created.id);
+          queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
+          toast({ description: t("turni.pendingMezzoCreated", { defaultValue: "Mezzo inserito in attesa di approvazione" }) });
+          setNuovoMezzo({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
+          setMezzoDialogOpen(false);
+        },
+        onError: (e: unknown) => toast({ variant: "destructive", description: apiErrorMessage(e) }),
+      },
+    );
+  }
+
   const fasciaLabel = (key: string) => {
     const f = FASCE.find((x) => x.key === key);
     return f ? `${t(`turni.${f.labelKey}`)} (${f.time})` : key;
@@ -208,6 +322,13 @@ export default function Turni() {
   const fasciaShort = (key: string) => {
     const f = FASCE.find((x) => x.key === key);
     return f ? t(`turni.${f.labelKey}`) : key;
+  };
+
+  const isNonApprovato = (stato?: string | null) => stato != null && stato !== "approvato";
+  const statoApprovazioneLabel = (stato?: string | null) => {
+    if (stato === "in_attesa") return t("turni.pendingLabel", { defaultValue: "in attesa approvazione" });
+    if (stato === "respinto") return t("turni.rejectedLabel", { defaultValue: "respinto" });
+    return null;
   };
 
   // Allocazione mezzi: per mezzo, le fasce/centri usati in ciascun giorno della settimana.
@@ -342,18 +463,41 @@ export default function Turni() {
                           onClick={() => openCell(iso, f.key)}
                           className="bg-background hover:bg-accent min-h-[72px] p-1.5 text-left align-top transition-colors"
                         >
-                          {turno && turno.volontari.length ? (
+                          {turno && (turno.volontari.length || turno.mezzoCodice) ? (
                             <div className="space-y-1">
                               {turno.volontari.map((v) => (
-                                <div key={v.volontarioId} className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[11px] leading-tight">
+                                <div
+                                  key={v.volontarioId}
+                                  className={
+                                    isNonApprovato(v.volontarioStatoApprovazione)
+                                      ? "rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] leading-tight text-muted-foreground"
+                                      : "bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[11px] leading-tight"
+                                  }
+                                >
                                   <div className="truncate font-medium">{v.volontarioNome ?? `#${v.volontarioId}`}</div>
                                   {v.ruolo && <div className="truncate opacity-80">{v.ruolo}</div>}
+                                  {statoApprovazioneLabel(v.volontarioStatoApprovazione) && (
+                                    <div className="truncate text-[10px] uppercase tracking-wide">
+                                      {statoApprovazioneLabel(v.volontarioStatoApprovazione)}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                               {turno.mezzoCodice && (
-                                <div className="flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] leading-tight text-amber-700 dark:text-amber-400">
+                                <div
+                                  className={
+                                    isNonApprovato(turno.mezzoStatoApprovazione)
+                                      ? "flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] leading-tight text-muted-foreground"
+                                      : "flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] leading-tight text-amber-700 dark:text-amber-400"
+                                  }
+                                >
                                   <Truck className="h-3 w-3 shrink-0" />
-                                  <span className="truncate font-medium">{turno.mezzoCodice}</span>
+                                  <span className="truncate font-medium">
+                                    {turno.mezzoCodice}
+                                    {statoApprovazioneLabel(turno.mezzoStatoApprovazione)
+                                      ? ` · ${statoApprovazioneLabel(turno.mezzoStatoApprovazione)}`
+                                      : ""}
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -512,8 +656,9 @@ export default function Turni() {
                     </SelectTrigger>
                     <SelectContent>
                       {volontariCentro.map((v) => (
-                        <SelectItem key={v.id} value={String(v.id)}>
-                          {v.cognome} {v.nome}
+                        <SelectItem key={v.id} value={String(v.id)} className={v.statoApprovazione === "in_attesa" ? "text-muted-foreground" : undefined}>
+                          {volontarioLabel(v)}
+                          {v.statoApprovazione === "in_attesa" ? ` · ${t("turni.pendingLabel", { defaultValue: "in attesa approvazione" })}` : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -539,13 +684,23 @@ export default function Turni() {
                 </Button>
               </div>
             ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRows((rs) => [...rs, { volontarioId: "", ruolo: "" }])}
-            >
-              <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontario")}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRows((rs) => [...rs, { volontarioId: "", ruolo: "" }])}
+              >
+                <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontario")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVolontarioDialogOpen(true)}
+                disabled={effectiveCentro == null}
+              >
+                <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontarioNonCensito", { defaultValue: "Nuovo Volontario" })}
+              </Button>
+            </div>
 
             <div className="border-t pt-3">
               <Label className="text-xs">{t("turni.mezzo")}</Label>
@@ -559,13 +714,24 @@ export default function Turni() {
                 <SelectContent>
                   <SelectItem value="none">{t("turni.nessunMezzo")}</SelectItem>
                   {mezziDisponibili.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>
+                    <SelectItem key={m.id} value={String(m.id)} className={m.statoApprovazione === "in_attesa" ? "text-muted-foreground" : undefined}>
                       {m.codice}
                       {m.tipo ? ` · ${m.tipo}` : ""}
+                      {m.statoApprovazione === "in_attesa" ? ` · ${t("turni.pendingLabel", { defaultValue: "in attesa approvazione" })}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => setMezzoDialogOpen(true)}
+                disabled={effectiveCentro == null}
+              >
+                <Plus className="me-1 h-4 w-4" /> {t("turni.addMezzoNonCensito", { defaultValue: "Nuovo Mezzo" })}
+              </Button>
             </div>
           </div>
 
@@ -575,6 +741,151 @@ export default function Turni() {
             </Button>
             <Button onClick={save} disabled={upsert.isPending}>
               {t("turni.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={volontarioDialogOpen} onOpenChange={(open) => {
+        setVolontarioDialogOpen(open);
+        setVolontarioError(null);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("turni.pendingVolTitle", { defaultValue: "Nuovo Volontario" })}</DialogTitle>
+            <DialogDescription>
+              {t("turni.pendingVolDesc", { defaultValue: "Il volontario sarà inserito in attesa di approvazione Logistica." })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>{t("common.name")}</Label>
+              <Input
+                value={nuovoVolontario.nome}
+                onChange={(e) => setNuovoVolontario((v) => ({ ...v, nome: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("common.surname")}</Label>
+              <Input
+                value={nuovoVolontario.cognome}
+                onChange={(e) => setNuovoVolontario((v) => ({ ...v, cognome: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("volontari.matricola", { defaultValue: "Matricola" })}</Label>
+              <Input
+                value={nuovoVolontario.matricola}
+                onChange={(e) => {
+                  setVolontarioError(null);
+                  setNuovoVolontario((v) => ({ ...v, matricola: e.target.value }));
+                }}
+              />
+              {volontarioError ? <p className="text-sm text-destructive">{volontarioError}</p> : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("common.phone")}</Label>
+              <Input
+                value={nuovoVolontario.telefono}
+                onChange={(e) => setNuovoVolontario((v) => ({ ...v, telefono: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 sm:col-span-2">
+              <Label htmlFor="turni-patente-b">{t("volontari.patenteB", { defaultValue: "Patente B" })}</Label>
+              <Switch
+                id="turni-patente-b"
+                checked={nuovoVolontario.patente}
+                onCheckedChange={(checked) => setNuovoVolontario((v) => ({ ...v, patente: checked }))}
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>{t("common.notes")}</Label>
+              <Input
+                value={nuovoVolontario.note}
+                onChange={(e) => setNuovoVolontario((v) => ({ ...v, note: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVolontarioDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={creaVolontarioPending}
+              disabled={
+                createPendingVolontario.isPending ||
+                !nuovoVolontario.nome.trim() ||
+                !nuovoVolontario.cognome.trim() ||
+                !nuovoVolontario.matricola.trim()
+              }
+            >
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mezzoDialogOpen} onOpenChange={setMezzoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("turni.pendingMezzoTitle", { defaultValue: "Nuovo Mezzo" })}</DialogTitle>
+            <DialogDescription>
+              {t("turni.pendingMezzoDesc", { defaultValue: "Il mezzo sarà inserito in attesa di approvazione Logistica." })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>{t("common.type")}</Label>
+              <Input
+                value={nuovoMezzo.tipo}
+                onChange={(e) => setNuovoMezzo((m) => ({ ...m, tipo: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("mezzi.targa", { defaultValue: "Targa" })}</Label>
+              <Input
+                value={nuovoMezzo.targa}
+                onChange={(e) => setNuovoMezzo((m) => ({ ...m, targa: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("mezzi.proprieta", { defaultValue: "Proprietà" })}</Label>
+              <Select
+                value={nuovoMezzo.proprieta}
+                onValueChange={(v) => setNuovoMezzo((m) => ({ ...m, proprieta: v }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="associazione">{t("mezzi.proprietaOpts.associazione", { defaultValue: "Associazione" })}</SelectItem>
+                  <SelectItem value="noleggio">{t("mezzi.proprietaOpts.noleggio", { defaultValue: "Noleggio / Leasing" })}</SelectItem>
+                  <SelectItem value="volontario">{t("mezzi.proprietaOpts.volontario", { defaultValue: "Volontario" })}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("common.description")}</Label>
+              <Input
+                value={nuovoMezzo.descrizione}
+                onChange={(e) => setNuovoMezzo((m) => ({ ...m, descrizione: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>{t("common.notes")}</Label>
+              <Input
+                value={nuovoMezzo.note}
+                onChange={(e) => setNuovoMezzo((m) => ({ ...m, note: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMezzoDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={creaMezzoPending}
+              disabled={createPendingMezzo.isPending || !nuovoMezzo.tipo.trim()}
+            >
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

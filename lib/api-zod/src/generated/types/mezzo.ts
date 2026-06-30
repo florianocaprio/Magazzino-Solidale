@@ -32,6 +32,7 @@ export interface Mezzo {
   /** @nullable */
   descrizione?: string | null;
   stato: string;
+  statoApprovazione?: string;
   /** @nullable */
   scadenzaAssicurazione?: string | null;
   /** @nullable */

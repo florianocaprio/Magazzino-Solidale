@@ -25,6 +25,7 @@ import Giacenze from "@/pages/giacenze";
 import PreparazioneConsegne from "@/pages/preparazione-consegne";
 import Volontari from "@/pages/volontari";
 import Mezzi from "@/pages/mezzi";
+import ApprovazioniLogistica from "@/pages/approvazioni-logistica";
 import Fornitori from "@/pages/fornitori";
 import Trasferimenti from "@/pages/trasferimenti";
 import Scarichi from "@/pages/scarichi";
@@ -225,6 +226,13 @@ function AppRoutes() {
           {() => (
             <Guard area="logistica">
               <Mezzi />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/approvazioni-logistica">
+          {() => (
+            <Guard area="logistica">
+              <ApprovazioniLogistica />
             </Guard>
           )}
         </Route>

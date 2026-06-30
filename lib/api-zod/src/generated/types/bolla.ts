@@ -15,6 +15,7 @@ export interface Bolla {
   beneficiarioNome?: string | null;
   /** @nullable */
   consegnaId?: number | null;
+  daPianificazione?: boolean;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;

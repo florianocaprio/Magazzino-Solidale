@@ -1,6 +1,15 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { consegneTable, beneficiariTable, magazziniTable, volontariTable, bolleTable, centriAscoltoTable } from "@workspace/db";
+import {
+  consegneTable,
+  beneficiariTable,
+  magazziniTable,
+  volontariTable,
+  bolleTable,
+  centriAscoltoTable,
+  turniTable,
+  turniVolontariTable,
+} from "@workspace/db";
 import { eq, and, gte, lte, desc, inArray, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
@@ -29,6 +38,82 @@ const router: IRouter = Router();
 // priorità con cui scegliere la bolla "rappresentativa" di una consegna quando
 // ce ne fosse più d'una collegata (le annullate sono ignorate del tutto)
 const BOLLA_PRIORITA: Record<string, number> = { consegnato: 3, confermato: 2, bozza: 1 };
+
+function normalizeText(v: unknown): string | null {
+  if (typeof v !== "string") return v == null ? null : String(v).trim() || null;
+  return v.trim() || null;
+}
+
+function normalizeConsegnaPayload(raw: Record<string, any>) {
+  const body = { ...raw };
+  if ("volontarioAltro" in body) {
+    body.volontarioAltro = normalizeText(body.volontarioAltro);
+    if (body.volontarioAltro) body.volontarioId = null;
+  }
+  return body;
+}
+
+function fasciaTurnoFromConsegna(fascia: string | null | undefined): string | null {
+  const normalized = (fascia ?? "").toLowerCase();
+  if (normalized.includes("matt")) return "09-13";
+  if (normalized.includes("pom")) return "14-18";
+  if (normalized.includes("sera") || normalized.includes("18")) return "18-20";
+  return null;
+}
+
+async function syncTurnoDaConsegna(consegna: typeof consegneTable.$inferSelect) {
+  if (consegna.volontarioId == null && consegna.mezzoId == null) return;
+  const centroAscoltoId = await beneficiarioCentroId(consegna.beneficiarioId);
+  const fascia = fasciaTurnoFromConsegna(consegna.fasciaOraria);
+  if (centroAscoltoId == null || fascia == null) return;
+
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(turniTable)
+      .where(and(
+        eq(turniTable.centroAscoltoId, centroAscoltoId),
+        eq(turniTable.data, consegna.dataPrevista),
+        eq(turniTable.fascia, fascia),
+      ));
+
+    let turnoId: number;
+    if (existing) {
+      turnoId = existing.id;
+      if (consegna.mezzoId != null && existing.mezzoId !== consegna.mezzoId) {
+        await tx.update(turniTable).set({ mezzoId: consegna.mezzoId }).where(eq(turniTable.id, turnoId));
+      }
+    } else {
+      const [created] = await tx
+        .insert(turniTable)
+        .values({
+          centroAscoltoId,
+          data: consegna.dataPrevista,
+          fascia,
+          mezzoId: consegna.mezzoId ?? null,
+        })
+        .returning();
+      turnoId = created.id;
+    }
+
+    if (consegna.volontarioId != null) {
+      const [already] = await tx
+        .select({ id: turniVolontariTable.id })
+        .from(turniVolontariTable)
+        .where(and(
+          eq(turniVolontariTable.turnoId, turnoId),
+          eq(turniVolontariTable.volontarioId, consegna.volontarioId),
+        ));
+      if (!already) {
+        await tx.insert(turniVolontariTable).values({
+          turnoId,
+          volontarioId: consegna.volontarioId,
+          ruolo: "Consegna",
+        });
+      }
+    }
+  });
+}
 
 /** Ritorna, per ogni consegnaId, la bolla collegata più rilevante (non annullata). */
 async function bollePerConsegne(consegnaIds: number[]) {
@@ -115,6 +200,7 @@ router.get("/consegne", async (req, res) => {
       centroAscoltoNome: r.centroAscoltoNome ?? null,
       volontarioId: r.c.volontarioId ?? null,
       volontarioNome: r.volNome && r.volCognome ? `${r.volCognome} ${r.volNome}` : null,
+      volontarioAltro: r.c.volontarioAltro ?? null,
       mezzoId: r.c.mezzoId ?? null,
       mezzoAltro: r.c.mezzoAltro ?? false,
       stato: r.c.stato,
@@ -129,10 +215,14 @@ router.get("/consegne", async (req, res) => {
 });
 
 router.post("/consegne", async (req, res) => {
-  const body = req.body;
+  const body = normalizeConsegnaPayload(req.body);
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
+  if (body.volontarioId != null && body.volontarioAltro) {
+    res.status(400).json({ error: "Indicare un volontario censito oppure Altro, non entrambi" });
+    return;
+  }
   if ((caller != null || cid != null || zid != null) && !(await canUseBeneficiario(body.beneficiarioId, caller, cid, zid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
     return;
@@ -148,7 +238,8 @@ router.post("/consegne", async (req, res) => {
     return;
   }
   const codice = `CON-${Date.now()}`;
-  const [row] = await db.insert(consegneTable).values({ ...body, codice }).returning();
+  const [row] = await db.insert(consegneTable).values({ ...body, codice } as typeof consegneTable.$inferInsert).returning();
+  await syncTurnoDaConsegna(row);
   res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
@@ -187,14 +278,21 @@ router.patch("/consegne/:id", async (req, res) => {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
     return;
   }
-  const nextVol = req.body.volontarioId !== undefined ? req.body.volontarioId : existing.volontarioId;
-  const nextData = req.body.dataPrevista !== undefined ? req.body.dataPrevista : existing.dataPrevista;
+  const body = normalizeConsegnaPayload(req.body);
+  const nextVol = body.volontarioId !== undefined ? body.volontarioId : existing.volontarioId;
+  const nextAltro = body.volontarioAltro !== undefined ? body.volontarioAltro : existing.volontarioAltro;
+  if (nextVol != null && nextAltro) {
+    res.status(400).json({ error: "Indicare un volontario censito oppure Altro, non entrambi" });
+    return;
+  }
+  const nextData = body.dataPrevista !== undefined ? body.dataPrevista : existing.dataPrevista;
   if (nextVol != null && nextData
       && await volontarioOverLimit(nextVol, nextData, { excludeConsegnaId: id })) {
     res.status(400).json({ error: LIMITE_TURNO_MSG });
     return;
   }
-  const [row] = await db.update(consegneTable).set(req.body).where(eq(consegneTable.id, id)).returning();
+  const [row] = await db.update(consegneTable).set(body).where(eq(consegneTable.id, id)).returning();
+  await syncTurnoDaConsegna(row);
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
@@ -338,6 +436,7 @@ async function dettaglioConsegna(id: number) {
     centroAscoltoNome: r.centroAscoltoNome ?? null,
     volontarioId: r.c.volontarioId ?? null,
     volontarioNome: r.volNome && r.volCognome ? `${r.volCognome} ${r.volNome}` : null,
+    volontarioAltro: r.c.volontarioAltro ?? null,
     mezzoId: r.c.mezzoId ?? null,
     mezzoAltro: r.c.mezzoAltro ?? false,
     stato: r.c.stato,

@@ -26,6 +26,7 @@ import {
   CalendarDays,
   Printer,
   ShieldCheck,
+  ClipboardCheck,
   UserCog,
   Contact,
   ListChecks,
@@ -88,6 +89,7 @@ const NAV_ITEMS = [
 
   { key: "volontari", url: "/volontari", icon: UsersRound, groupKey: "logistica", area: "logistica" },
   { key: "mezzi", url: "/mezzi", icon: Car, groupKey: "logistica", area: "logistica" },
+  { key: "approvazioniLogistica", url: "/approvazioni-logistica", icon: ClipboardCheck, groupKey: "logistica", area: "logistica" },
   { key: "fornitori", url: "/fornitori", icon: Store, groupKey: "logistica", area: "logistica" },
   { key: "approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, groupKey: "logistica", area: "logistica" },
   

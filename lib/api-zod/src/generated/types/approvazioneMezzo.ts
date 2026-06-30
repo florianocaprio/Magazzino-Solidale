@@ -6,26 +6,23 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Volontario {
+export interface ApprovazioneMezzo {
   id: number;
-  nome: string;
-  cognome: string;
+  codice: string;
+  tipo: string;
   /** @nullable */
-  matricola?: string | null;
+  targa?: string | null;
+  proprieta: string;
+  /** @nullable */
+  proprietarioNome?: string | null;
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  telefono?: string | null;
-  /** @nullable */
-  email?: string | null;
-  ruolo: string;
-  patente: boolean;
-  mezzoPersonale: boolean;
-  maxConsegneTurno: number;
-  attivo: boolean;
-  statoApprovazione?: string;
+  descrizione?: string | null;
+  stato: string;
+  statoApprovazione: string;
   /** @nullable */
   note?: string | null;
   dataCreazione: string;

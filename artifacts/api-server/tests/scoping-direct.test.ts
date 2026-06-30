@@ -153,6 +153,27 @@ describe("Volontari — scoping per centro", () => {
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([vA, vB]));
   });
 
+  it("lista filtrata per centro: restituisce il centro richiesto + comuni, non altri centri", async () => {
+    const vA = await createVolontario(scope, centroA);
+    const vB = await createVolontario(scope, centroB);
+    const vNull = await createVolontario(scope, null);
+    const res = await request(
+      makeScopedApp(volontariRouter, { id: operatoreId, centroAscoltoId: null }),
+    ).get(`/volontari?centroAscoltoId=${centroA}`);
+    expect(res.status).toBe(200);
+    const ids = idsOf(res.body);
+    expect(ids).toContain(vA);
+    expect(ids).toContain(vNull);
+    expect(ids).not.toContain(vB);
+  });
+
+  it("lista filtrata per centro fuori perimetro → 403", async () => {
+    const res = await request(
+      makeScopedApp(volontariRouter, { id: operatoreId, centroAscoltoId: centroA }),
+    ).get(`/volontari?centroAscoltoId=${centroB}`);
+    expect(res.status).toBe(403);
+  });
+
   it("GET /:id fuori centro → 403", async () => {
     const vB = await createVolontario(scope, centroB);
     const res = await request(

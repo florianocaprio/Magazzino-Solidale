@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { volontariTable, centriAscoltoTable, consegneTable, bolleTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, and, ne, isNull, getTableColumns, desc } from "drizzle-orm";
+import { eq, and, ne, isNull, getTableColumns, desc, ilike, or } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -13,6 +13,14 @@ import {
   inVisibleCentroSet,
   andScoped,
 } from "../lib/centroScope";
+import {
+  isVolontarioMatricolaUniqueViolation,
+  MATRICOLA_OBBLIGATORIA_MSG,
+  matricolaVolontarioDuplicataPayload,
+  matricolaVolontarioGiaUsata,
+  normalizeVolontarioMatricola,
+  type MatricolaDuplicataPayload,
+} from "../lib/volontariMatricola";
 
 const router: IRouter = Router();
 
@@ -34,6 +42,7 @@ const fmt = (r: VolontarioRow) => ({
   mezzoPersonale: r.mezzoPersonale,
   maxConsegneTurno: r.maxConsegneTurno,
   attivo: r.attivo,
+  statoApprovazione: r.statoApprovazione,
   note: r.note ?? null,
   dataCreazione: r.dataCreazione.toISOString(),
 });
@@ -48,30 +57,52 @@ const selectVolontario = () =>
     .leftJoin(centriAscoltoTable, eq(volontariTable.centroAscoltoId, centriAscoltoTable.id));
 
 router.get("/volontari", async (req, res) => {
+  const caller = callerCentroId(req);
   const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
+  let requestedCentroScope: ReturnType<typeof centroScopeFilter>;
+  let searchScope: ReturnType<typeof or>;
+  if (req.query.centroAscoltoId != null) {
+    const requestedCentroId = Number(req.query.centroAscoltoId);
+    if (!Number.isInteger(requestedCentroId) || requestedCentroId <= 0) {
+      res.status(400).json({ error: "centroAscoltoId non valido" });
+      return;
+    }
+    if (!canAccessCentro(requestedCentroId, caller) || !inVisibleCentroSet(requestedCentroId, cittaCentroIds)) {
+      res.status(403).json({ error: "Centro non accessibile per il tuo perimetro" });
+      return;
+    }
+    requestedCentroScope = centroScopeFilter(volontariTable.centroAscoltoId, requestedCentroId);
+  }
+  const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+  if (search) {
+    const pattern = `%${search}%`;
+    searchScope = or(
+      ilike(volontariTable.nome, pattern),
+      ilike(volontariTable.cognome, pattern),
+      ilike(volontariTable.matricola, pattern),
+    );
+  }
   const rows = await selectVolontario()
     .where(
       andScoped(
-        centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)),
+        centroScopeFilter(volontariTable.centroAscoltoId, caller),
         idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds),
+        requestedCentroScope,
+        searchScope,
       ),
     )
     .orderBy(desc(volontariTable.id));
   res.json(rows.map(fmt));
 });
 
-function normalizeMatricola(v: unknown): string | undefined {
-  return typeof v === "string" ? v.trim() : undefined;
-}
-
 async function createVolontarioOne(
   body: Record<string, unknown>,
   req: Request,
-): Promise<{ id: number } | { error: string }> {
+): Promise<{ id: number } | (MatricolaDuplicataPayload & { status?: number })> {
   const caller = callerCentroId(req);
   const values = { ...body };
-  const matricola = normalizeMatricola(values.matricola);
-  if (!matricola) return { error: "Matricola obbligatoria" };
+  const matricola = normalizeVolontarioMatricola(values.matricola);
+  if (!matricola) return { error: MATRICOLA_OBBLIGATORIA_MSG, status: 400 };
   values.matricola = matricola;
   if (caller != null) values.centroAscoltoId = caller;
   if (
@@ -79,19 +110,32 @@ async function createVolontarioOne(
     values.centroAscoltoId != null &&
     !inVisibleCentroSet(values.centroAscoltoId as number, await visibleCentroIds(callerCittaId(req)))
   ) {
-    return { error: "Centro non accessibile per la tua città" };
+    return { error: "Centro non accessibile per la tua città", status: 403 };
   }
-  const [created] = await db
-    .insert(volontariTable)
-    .values(values as typeof volontariTable.$inferInsert)
-    .returning({ id: volontariTable.id });
-  return { id: created.id };
+  if (await matricolaVolontarioGiaUsata(matricola)) {
+    return { ...(await matricolaVolontarioDuplicataPayload(matricola)), status: 409 };
+  }
+  try {
+    const [created] = await db
+      .insert(volontariTable)
+      .values(values as typeof volontariTable.$inferInsert)
+      .returning({ id: volontariTable.id });
+    return { id: created.id };
+  } catch (e) {
+    if (isVolontarioMatricolaUniqueViolation(e)) {
+      return { ...(await matricolaVolontarioDuplicataPayload(matricola)), status: 409 };
+    }
+    throw e;
+  }
 }
 
 router.post("/volontari", async (req, res) => {
   const r = await createVolontarioOne(req.body, req);
   if ("error" in r) {
-    res.status(r.error === "Matricola obbligatoria" ? 400 : 403).json({ error: r.error });
+    res.status(r.status ?? 403).json({
+      error: r.error,
+      ...(r.matricolaSuggerita ? { matricolaSuggerita: r.matricolaSuggerita } : {}),
+    });
     return;
   }
   const [row] = await selectVolontario().where(eq(volontariTable.id, r.id));
@@ -193,14 +237,27 @@ router.patch("/volontari/:id", async (req, res) => {
   }
   const updates = { ...req.body };
   if ("matricola" in updates) {
-    const matricola = normalizeMatricola(updates.matricola);
-    if (!matricola) { res.status(400).json({ error: "Matricola obbligatoria" }); return; }
+    const matricola = normalizeVolontarioMatricola(updates.matricola);
+    if (!matricola) { res.status(400).json({ error: MATRICOLA_OBBLIGATORIA_MSG }); return; }
+    if (await matricolaVolontarioGiaUsata(matricola, existing.id)) {
+      res.status(409).json(await matricolaVolontarioDuplicataPayload(matricola, existing.id));
+      return;
+    }
     updates.matricola = matricola;
   }
   if (caller != null) delete updates.centroAscoltoId;
-  const [updated] = await db.update(volontariTable).set(updates).where(eq(volontariTable.id, parseInt(req.params.id))).returning({ id: volontariTable.id });
-  const [row] = await selectVolontario().where(eq(volontariTable.id, updated.id));
-  res.json(fmt(row));
+  try {
+    const [updated] = await db.update(volontariTable).set(updates).where(eq(volontariTable.id, parseInt(req.params.id))).returning({ id: volontariTable.id });
+    const [row] = await selectVolontario().where(eq(volontariTable.id, updated.id));
+    res.json(fmt(row));
+  } catch (e) {
+    if (isVolontarioMatricolaUniqueViolation(e)) {
+      const matricola = normalizeVolontarioMatricola(updates.matricola) ?? existing.matricola ?? "";
+      res.status(409).json(await matricolaVolontarioDuplicataPayload(matricola, existing.id));
+      return;
+    }
+    throw e;
+  }
 });
 
 router.delete("/volontari/:id", async (req, res) => {

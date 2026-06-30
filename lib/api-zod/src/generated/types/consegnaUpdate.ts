@@ -13,6 +13,8 @@ export interface ConsegnaUpdate {
   indirizzoConsegna?: string;
   zona?: string;
   volontarioId?: number;
+  /** @nullable */
+  volontarioAltro?: string | null;
   mezzoId?: number;
   mezzoAltro?: boolean;
   stato?: string;

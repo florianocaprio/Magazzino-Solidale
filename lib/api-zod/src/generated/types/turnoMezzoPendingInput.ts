@@ -6,21 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface MezzoInput {
+export interface TurnoMezzoPendingInput {
+  centroAscoltoId: number;
   codice?: string;
   tipo: string;
   targa?: string;
-  proprieta: string;
+  proprieta?: string;
   proprietarioNome?: string;
-  /** @nullable */
-  volontarioId?: number | null;
-  /** @nullable */
-  centroAscoltoId?: number | null;
   capacitaColli?: number;
   capacitaKg?: number;
   descrizione?: string;
-  statoApprovazione?: string;
-  scadenzaAssicurazione?: string;
-  scadenzaRevisione?: string;
   note?: string;
 }

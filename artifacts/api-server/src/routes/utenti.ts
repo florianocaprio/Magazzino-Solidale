@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, ne, desc, type SQL } from "drizzle-orm";
+import { and, eq, ne, desc, ilike, or, type SQL } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable, zoneUdsTable } from "@workspace/db";
 import {
@@ -181,12 +181,39 @@ router.get("/utenti", async (req, res): Promise<void> => {
   // their own città (no NULL/global users), mirroring the strict centro rule.
   const cittaCaller = callerCittaId(req);
   const zonaCaller = callerZonaUdsId(req);
+  const cittaId = req.query.cittaId != null ? Number(req.query.cittaId) : null;
+  const matricola = typeof req.query.matricola === "string" ? req.query.matricola.trim() : "";
+  const query = typeof req.query.query === "string" ? req.query.query.trim() : "";
+  const filters: SQL[] = [];
+  if (cittaId != null) {
+    if (!Number.isInteger(cittaId) || cittaId <= 0) {
+      res.status(400).json({ error: "Area geografica non valida" });
+      return;
+    }
+    if (cittaCaller != null && cittaId !== cittaCaller) {
+      res.status(403).json({ error: "Area geografica non accessibile per il tuo perimetro" });
+      return;
+    }
+    filters.push(eq(utentiTable.cittaId, cittaId));
+  }
+  if (matricola) filters.push(ilike(utentiTable.matricola, `%${matricola}%`));
+  if (query) {
+    const pattern = `%${query}%`;
+    filters.push(
+      or(
+        ilike(utentiTable.nome, pattern),
+        ilike(utentiTable.cognome, pattern),
+        ilike(utentiTable.username, pattern),
+      )!,
+    );
+  }
   const rows = await selectUtente()
     .where(
       andScoped(
         caller != null ? eq(utentiTable.centroAscoltoId, caller) : undefined,
         cittaCaller != null ? eq(utentiTable.cittaId, cittaCaller) : undefined,
         zonaCaller != null ? eq(utentiTable.zonaUdsId, zonaCaller) : undefined,
+        ...filters,
       ),
     )
     .orderBy(desc(utentiTable.id));

@@ -28,6 +28,7 @@ import {
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
   getListConsegneQueryKey,
+  getListVolontariQueryKey,
   type Trasferimento,
   type Scarico,
 } from "@workspace/api-client-react";
@@ -50,6 +51,7 @@ import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { volontarioLabel } from "@/lib/volontari-label";
 import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowLeft, ArrowRightLeft, ScanLine, CalendarClock } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -114,6 +116,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   const [magazzinoId, setMagazzinoId] = useState("");
   const [centroId, setCentroId] = useState("all");
   const [trasportatore, setTrasportatore] = useState("");
+  const [trasportatoreAltro, setTrasportatoreAltro] = useState("");
   const [mezzo, setMezzo] = useState("");
   const [scanCode, setScanCode] = useState("");
   useEffect(() => {
@@ -128,6 +131,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
     if (!open) {
       setMagazzinoId("");
       setTrasportatore("");
+      setTrasportatoreAltro("");
       setMezzo("");
       setScanCode("");
       if (!lockedBeneficiario) setBeneficiarioId("");
@@ -139,9 +143,12 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
     ...(centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : {}),
   });
   const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
+  const selectedBenef = allBeneficiari?.find(b => String(b.id) === beneficiarioId);
+  const volontariParams = selectedBenef?.centroAscoltoId != null ? { centroAscoltoId: selectedBenef.centroAscoltoId } : undefined;
   const { data: magazzini } = useListMagazzini();
-  const { data: volontari } = useListVolontari();
+  const { data: volontari } = useListVolontari(volontariParams, { query: { queryKey: getListVolontariQueryKey(volontariParams), enabled: selectedBenef != null } });
   const { data: mezzi } = useListMezzi();
+  const { data: consegne } = useListConsegne();
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -161,12 +168,24 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
     toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
   };
 
-  const selectedBenef = allBeneficiari?.find(b => String(b.id) === beneficiarioId);
+  const consegnaSource = consegne?.find((c) => c.id === consegnaId);
+  useEffect(() => {
+    if (!open || !consegnaSource) return;
+    if (consegnaSource.volontarioId != null) {
+      setTrasportatore(String(consegnaSource.volontarioId));
+      setTrasportatoreAltro("");
+    } else if (consegnaSource.volontarioAltro) {
+      setTrasportatore("__altro__");
+      setTrasportatoreAltro(consegnaSource.volontarioAltro);
+    }
+    if (consegnaSource.mezzoId != null) setMezzo(String(consegnaSource.mezzoId));
+    else if (consegnaSource.mezzoAltro) setMezzo("altro");
+  }, [open, consegnaSource]);
   // Il trasportatore (un volontario del centro) si indica SOLO per i beneficiari con
   // consegna a domicilio. Negli altri casi vale il ritiro presso il magazzino.
   // Mezzo e conteggio del carico vivono ora sulla pianificazione consegne, non sulla bolla.
   const requiresTrasportatore = selectedBenef?.consegnaDomicilio === true;
-  const trasportatoreMissing = requiresTrasportatore && !trasportatore;
+  const trasportatoreMissing = requiresTrasportatore && (!trasportatore || (trasportatore === "__altro__" && !trasportatoreAltro.trim()));
 
   const onSubmit = () => {
     if (!beneficiarioId || !magazzinoId || trasportatoreMissing) return;
@@ -177,10 +196,12 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
       volontarioConsegnaId?: number;
       mezzoId?: number;
       mezzoAltro?: boolean;
+      trasportatoreNome?: string;
     } = { beneficiarioId: parseInt(beneficiarioId), magazzinoId: parseInt(magazzinoId) };
     if (consegnaId != null) data.consegnaId = consegnaId;
     if (requiresTrasportatore && trasportatore) {
-      data.volontarioConsegnaId = parseInt(trasportatore);
+      if (trasportatore === "__altro__") data.trasportatoreNome = trasportatoreAltro.trim();
+      else data.volontarioConsegnaId = parseInt(trasportatore);
       if (mezzo === "altro") data.mezzoAltro = true;
       else if (mezzo) data.mezzoId = parseInt(mezzo);
     }
@@ -268,24 +289,32 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
               </SelectContent>
             </Select>
           </div>
+          {consegnaSource && (
+            <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              {t("bolle.daPianificazioneInfo", { defaultValue: "Volontario e mezzo sono precompilati dalla pianificazione collegata, se presenti." })}
+            </div>
+          )}
           {requiresTrasportatore ? (
             <div className="space-y-2">
               <Label>{t("bolle.trasportatoreLabel")}</Label>
-              <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); setMezzo(""); }}>
+              <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); setTrasportatoreAltro(""); setMezzo(""); }}>
                 <SelectTrigger><SelectValue placeholder={t("bolle.trasportatorePlaceholder")} /></SelectTrigger>
                 <SelectContent>
-                  {volontari?.filter(v => {
-                    if (!v.attivo) return false;
-                    if (v.centroAscoltoId == null) return true;
-                    const benefCentro = allBeneficiari?.find(b => String(b.id) === beneficiarioId)?.centroAscoltoId ?? null;
-                    return benefCentro != null && v.centroAscoltoId === benefCentro;
-                  }).map(v => (
+                  {volontari?.filter(v => v.attivo && (v.statoApprovazione ?? "approvato") === "approvato").map(v => (
                     <SelectItem key={v.id} value={String(v.id)}>
-                      {v.cognome} {v.nome}
+                      {volontarioLabel(v)}
                     </SelectItem>
                   ))}
+                  <SelectItem value="__altro__">{t("consegne.volontarioAltro", { defaultValue: "Altro" })}</SelectItem>
                 </SelectContent>
               </Select>
+              {trasportatore === "__altro__" && (
+                <Input
+                  value={trasportatoreAltro}
+                  onChange={(e) => setTrasportatoreAltro(e.target.value)}
+                  placeholder={t("consegne.volontarioAltroPlaceholder", { defaultValue: "Es. familiare delegato, vicino di casa..." })}
+                />
+              )}
               {trasportatoreMissing && (
                 <p className="text-sm text-destructive">{t("bolle.trasportatoreObbligatorioDomicilio")}</p>
               )}
@@ -297,7 +326,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
                     <SelectContent>
                       <SelectItem value="0">{t("common.none")}</SelectItem>
                       {mezzi?.filter(m => {
-                        if (m.stato !== "disponibile") return false;
+                        if (m.stato !== "disponibile" || (m.statoApprovazione ?? "approvato") !== "approvato") return false;
                         if (m.effectiveCentroId == null) return true;
                         const benefCentro = allBeneficiari?.find(b => String(b.id) === beneficiarioId)?.centroAscoltoId ?? null;
                         return benefCentro != null && m.effectiveCentroId === benefCentro;
@@ -676,8 +705,10 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const [printTemplate, setPrintTemplate] = useState<BollaTemplate>("standard");
   const [printing, setPrinting] = useState(false);
   const { data: bolla, isLoading } = useGetBolla(bollaId);
-  const { data: volontari } = useListVolontari();
   const { data: beneficiari } = useListBeneficiari();
+  const bollaCentroId = beneficiari?.find((b) => b.id === bolla?.beneficiarioId)?.centroAscoltoId ?? null;
+  const volontariDettaglioParams = bollaCentroId != null ? { centroAscoltoId: bollaCentroId } : undefined;
+  const { data: volontari } = useListVolontari(volontariDettaglioParams, { query: { queryKey: getListVolontariQueryKey(volontariDettaglioParams), enabled: bolla != null && beneficiari != null } });
   const { data: centri } = useListCentriAscolto();
   const { data: impostazioni } = useGetImpostazioniStampa();
   const deleteRiga = useDeleteBollaRiga();
@@ -690,7 +721,6 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  const bollaCentroId = beneficiari?.find((b) => b.id === bolla?.beneficiarioId)?.centroAscoltoId ?? null;
   const consegneParams = bollaCentroId != null ? { centroAscoltoId: bollaCentroId } : {};
   const { data: consegnePianificabili } = useListConsegne(consegneParams, {
     query: { enabled: assegnaOpen && beneficiari != null, queryKey: getListConsegneQueryKey(consegneParams) },
@@ -902,6 +932,11 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
           <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
             <User className="h-3.5 w-3.5" /> {t("bolle.chiEffettuaConsegna")}
           </Label>
+          {bolla.daPianificazione && (
+            <p className="text-xs text-muted-foreground">
+              {t("bolle.daPianificazioneDettaglio", { defaultValue: "Dati ripresi dalla pianificazione collegata; puoi modificarli se necessario." })}
+            </p>
+          )}
           {isConsegnato ? (
             <p className="text-sm font-medium">{bolla.volontarioNome ?? bolla.trasportatoreNome ?? bolla.noteConsegna ?? "—"}</p>
           ) : (
@@ -914,8 +949,8 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
                 <SelectTrigger><SelectValue placeholder={t("bolle.consegnaPlaceholder")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__centro__">{t("bolle.consegnaPressoCentro")}</SelectItem>
-                  {volontari?.filter(v => v.attivo).map(v => (
-                    <SelectItem key={v.id} value={String(v.id)}>{v.cognome} {v.nome}</SelectItem>
+                  {volontari?.filter(v => v.attivo && (v.statoApprovazione ?? "approvato") === "approvato").map(v => (
+                    <SelectItem key={v.id} value={String(v.id)}>{volontarioLabel(v)}</SelectItem>
                   ))}
                   <SelectItem value="__altro__">{t("bolle.altroRitiro")}</SelectItem>
                 </SelectContent>

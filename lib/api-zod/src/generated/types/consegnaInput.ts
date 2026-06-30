@@ -15,6 +15,7 @@ export interface ConsegnaInput {
   zona?: string;
   magazzinoId: number;
   volontarioId?: number;
+  volontarioAltro?: string;
   mezzoId?: number;
   mezzoAltro?: boolean;
   noteOperative?: string;

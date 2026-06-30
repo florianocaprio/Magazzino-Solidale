@@ -95,6 +95,23 @@ async function removeInterventoBolla(bollaId: number) {
   await db.delete(interventiTable).where(eq(interventiTable.bollaId, bollaId));
 }
 
+async function canUseVolontarioConsegna(volontarioId: unknown, beneficiarioId: number): Promise<boolean> {
+  const id = Number(volontarioId);
+  if (!Number.isInteger(id)) return false;
+  const centroBeneficiario = await beneficiarioCentroId(beneficiarioId);
+  const [volontario] = await db
+    .select({
+      centroAscoltoId: volontariTable.centroAscoltoId,
+      attivo: volontariTable.attivo,
+      statoApprovazione: volontariTable.statoApprovazione,
+    })
+    .from(volontariTable)
+    .where(eq(volontariTable.id, id));
+  if (!volontario) return false;
+  if (!volontario.attivo || volontario.statoApprovazione !== "approvato") return false;
+  return canAccessCentro(volontario.centroAscoltoId, centroBeneficiario);
+}
+
 // Allinea la pianificazione consegne quando una bolla viene consegnata.
 // - se la bolla è già collegata a una consegna, la marca come effettuata;
 // - altrimenti crea una "consegna diretta" (fatta in sede dal centro di ascolto
@@ -177,6 +194,7 @@ async function buildDettaglio(id: number) {
     beneficiarioId: row.b.beneficiarioId,
     beneficiarioNome: row.cognome && row.nome ? `${row.cognome} ${row.nome}` : null,
     consegnaId: row.b.consegnaId ?? null,
+    daPianificazione: row.b.consegnaId != null,
     magazzinoId: row.b.magazzinoId,
     magazzinoNome: row.magazzinoNome ?? null,
     magazzinoIndirizzo: row.magazzinoIndirizzo ?? null,
@@ -382,6 +400,7 @@ router.get("/bolle", async (req, res) => {
     beneficiarioId: r.b.beneficiarioId,
     beneficiarioNome: r.cognome && r.nome ? `${r.cognome} ${r.nome}` : null,
     consegnaId: r.b.consegnaId ?? null,
+    daPianificazione: r.b.consegnaId != null,
     magazzinoId: r.b.magazzinoId,
     magazzinoNome: r.magazzinoNome ?? null,
     centroAscoltoId: r.centroAscoltoId ?? null,
@@ -404,7 +423,7 @@ router.get("/bolle", async (req, res) => {
 // ─── CREATE ──────────────────────────────────────────────────────────────────
 
 router.post("/bolle", async (req, res) => {
-  const body = req.body;
+  const body = { ...req.body };
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
@@ -438,6 +457,21 @@ router.post("/bolle", async (req, res) => {
       res.status(400).json({ error: "La consegna ha già una bolla associata" });
       return;
     }
+    if (body.volontarioConsegnaId == null && !body.trasportatoreNome) {
+      if (consegna.volontarioId != null) body.volontarioConsegnaId = consegna.volontarioId;
+      else if (consegna.volontarioAltro) body.trasportatoreNome = consegna.volontarioAltro;
+    }
+    if (body.mezzoId == null && body.mezzoAltro == null) {
+      if (consegna.mezzoId != null) body.mezzoId = consegna.mezzoId;
+      else if (consegna.mezzoAltro) body.mezzoAltro = true;
+    }
+    if (!body.indirizzoConsegna && consegna.indirizzoConsegna) {
+      body.indirizzoConsegna = consegna.indirizzoConsegna;
+    }
+  }
+  if (body.volontarioConsegnaId != null && !(await canUseVolontarioConsegna(body.volontarioConsegnaId, body.beneficiarioId))) {
+    res.status(403).json({ error: "Volontario non accessibile per il centro della bolla" });
+    return;
   }
   const anno = new Date().getFullYear();
   const existing = await db.select({ n: bolleTable.numeroBolla }).from(bolleTable).orderBy(desc(bolleTable.id)).limit(1);
@@ -512,6 +546,14 @@ router.patch("/bolle/:id", async (req, res) => {
   const nextTrasportatore = body.trasportatoreNome !== undefined ? body.trasportatoreNome : bolla.trasportatoreNome;
   if (nextVolontario != null && nextTrasportatore != null) {
     res.status(400).json({ error: "Indicare un volontario OPPURE un trasportatore esterno, non entrambi" });
+    return;
+  }
+  if (
+    (body.volontarioConsegnaId !== undefined || body.beneficiarioId !== undefined) &&
+    nextVolontario != null &&
+    !(await canUseVolontarioConsegna(nextVolontario, body.beneficiarioId ?? bolla.beneficiarioId))
+  ) {
+    res.status(403).json({ error: "Volontario non accessibile per il centro della bolla" });
     return;
   }
 

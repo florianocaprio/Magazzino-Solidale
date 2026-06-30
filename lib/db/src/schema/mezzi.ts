@@ -17,6 +17,7 @@ export const mezziTable = pgTable("mezzi", {
   capacitaKg: decimal("capacita_kg", { precision: 8, scale: 2 }),
   descrizione: text("descrizione"),
   stato: varchar("stato", { length: 20 }).notNull().default("disponibile"),
+  statoApprovazione: varchar("stato_approvazione", { length: 20 }).notNull().default("approvato"),
   scadenzaAssicurazione: date("scadenza_assicurazione"),
   scadenzaRevisione: date("scadenza_revisione"),
   note: text("note"),
