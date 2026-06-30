@@ -7,8 +7,13 @@ import {
   cittaScopeFilter,
   canAccessCitta,
 } from "../lib/centroScope";
+import { requireAdmin } from "../middlewares/auth";
 
 const router: IRouter = Router();
+
+function paramId(v: string | string[]): number {
+  return parseInt(Array.isArray(v) ? v[0] : v, 10);
+}
 
 function fmt(r: typeof centriAscoltoTable.$inferSelect, beneficiariCount = 0) {
   return {
@@ -42,7 +47,7 @@ router.get("/centri-ascolto", async (req, res) => {
   res.json(rows.map(r => fmt(r, countMap.get(r.id) ?? 0)));
 });
 
-router.post("/centri-ascolto", async (req, res) => {
+router.post("/centri-ascolto", requireAdmin, async (req, res) => {
   const cid = callerCittaId(req);
   const values = { ...req.body };
   if (cid != null) values.cittaId = cid;
@@ -51,7 +56,7 @@ router.post("/centri-ascolto", async (req, res) => {
 });
 
 router.get("/centri-ascolto/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = paramId(req.params.id);
   const [row] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCitta(row.cittaId, callerCittaId(req))) {
@@ -62,8 +67,8 @@ router.get("/centri-ascolto/:id", async (req, res) => {
   res.json(fmt(row, c?.n ?? 0));
 });
 
-router.patch("/centri-ascolto/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.patch("/centri-ascolto/:id", requireAdmin, async (req, res) => {
+  const id = paramId(req.params.id);
   const cid = callerCittaId(req);
   const [existing] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
@@ -78,8 +83,8 @@ router.patch("/centri-ascolto/:id", async (req, res) => {
   res.json(fmt(row));
 });
 
-router.delete("/centri-ascolto/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.delete("/centri-ascolto/:id", requireAdmin, async (req, res) => {
+  const id = paramId(req.params.id);
   const [existing] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCitta(existing.cittaId, callerCittaId(req))) {

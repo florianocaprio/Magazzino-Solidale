@@ -87,7 +87,7 @@ function AppRoutes() {
 
         <Route path="/magazzini">
           {() => (
-            <Guard area="magazzino">
+            <Guard area="amministrazione">
               <Magazzini />
             </Guard>
           )}
@@ -144,7 +144,7 @@ function AppRoutes() {
 
         <Route path="/centri-ascolto">
           {() => (
-            <Guard area="sociale">
+            <Guard area="amministrazione">
               <CentriAscolto />
             </Guard>
           )}

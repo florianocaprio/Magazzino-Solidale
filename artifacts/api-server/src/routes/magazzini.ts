@@ -11,8 +11,13 @@ import {
   canAccessCitta,
   andScoped,
 } from "../lib/centroScope";
+import { requireAdmin } from "../middlewares/auth";
 
 const router: IRouter = Router();
+
+function paramId(v: string | string[]): number {
+  return parseInt(Array.isArray(v) ? v[0] : v, 10);
+}
 
 /** True when an error is a Postgres unique-constraint violation (SQLSTATE 23505).
  * Drizzle wraps driver errors, so the pg error may be nested under `.cause`. */
@@ -81,7 +86,7 @@ router.get("/magazzini", async (req, res) => {
   res.json(rows.map((r) => fmt(r.m, r.centroNome)));
 });
 
-router.post("/magazzini", async (req, res) => {
+router.post("/magazzini", requireAdmin, async (req, res) => {
   const body = req.body;
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
@@ -140,7 +145,7 @@ router.post("/magazzini", async (req, res) => {
 });
 
 router.get("/magazzini/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = paramId(req.params.id);
   const [row] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
@@ -154,8 +159,8 @@ router.get("/magazzini/:id", async (req, res) => {
   res.json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
 });
 
-router.patch("/magazzini/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
+  const id = paramId(req.params.id);
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const [existing] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
@@ -177,8 +182,8 @@ router.patch("/magazzini/:id", async (req, res) => {
   res.json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
 });
 
-router.delete("/magazzini/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.delete("/magazzini/:id", requireAdmin, async (req, res) => {
+  const id = paramId(req.params.id);
   const caller = callerCentroId(req);
   const [existing] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
   if (!existing) { res.status(204).send(); return; }

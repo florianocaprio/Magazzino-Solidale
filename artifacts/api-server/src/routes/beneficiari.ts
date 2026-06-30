@@ -6,12 +6,16 @@ import { eq, and, ilike, sql, desc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
+  callerZonaUdsId,
   centroScopeFilter,
   cittaScopeFilter,
+  zonaUdsScopeFilter,
   canAccessCentro,
   canAccessCitta,
+  canAccessZonaUds,
   beneficiarioCentroId,
   beneficiarioCittaId,
+  beneficiarioZonaUdsId,
 } from "../lib/centroScope";
 
 const router: IRouter = Router();
@@ -75,10 +79,8 @@ router.get("/beneficiari", async (req, res) => {
   }
   if (priorita) conditions.push(eq(beneficiariTable.priorita, priorita));
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
-  // Città is the HARD boundary (enforced below from the caller); an explicit
-  // cittaId param lets a global caller narrow to one city. zonaUdsId is the SOFT
-  // UDS preference filter (operator's zone by default; clearing it shows the
-  // whole città).
+  // Città and zona are HARD boundaries when present on the caller; explicit
+  // query params let a global caller narrow the result.
   if (cittaId) conditions.push(eq(beneficiariTable.cittaId, parseInt(cittaId)));
   if (zonaUdsId) conditions.push(eq(beneficiariTable.zonaUdsId, parseInt(zonaUdsId)));
   if (uds === "true") conditions.push(eq(beneficiariTable.uds, true));
@@ -91,6 +93,8 @@ router.get("/beneficiari", async (req, res) => {
   }
   const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
   if (cittaFilter) conditions.push(cittaFilter);
+  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
+  if (zonaFilter) conditions.push(zonaFilter);
   if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
   else if (attivo === "false") conditions.push(eq(beneficiariTable.attivo, false));
 
@@ -111,12 +115,14 @@ async function createBeneficiarioOne(
   const b = body as Record<string, any>;
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
+  const zid = callerZonaUdsId(req);
   // Timestamp + random suffix keeps codes unique even within a tight bulk loop.
   const codice = b.codice || `BEN-${Date.now()}${Math.floor(Math.random() * 46656).toString(36).padStart(3, "0")}`;
   const values: Record<string, any> = { ...b, codice };
   if ("uds" in values) values.uds = toBool(values.uds);
   if (caller != null) values.centroAscoltoId = caller;
   if (cid != null) values.cittaId = cid;
+  if (zid != null) values.zonaUdsId = zid;
   // Città is the HARD UDS boundary: a città-global caller must pin a città when
   // creating a UDS person, otherwise the row would be visible across all cities.
   if (values.uds === true && cid == null && values.cittaId == null) {
@@ -168,9 +174,12 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
   }
 
   // Città is the HARD boundary: a scoped caller can only search their own città
-  // (or NULL/legacy rows); a global caller may narrow with ?cittaId.
+  // (or NULL/legacy rows); zona is HARD when present on the caller. Global
+  // callers may narrow with ?cittaId / ?zonaUdsId.
   const callerCitta = callerCittaId(req);
   const cittaId = callerCitta != null ? callerCitta : toIntOrNull(q.cittaId);
+  const callerZona = callerZonaUdsId(req);
+  const zonaId = callerZona != null ? callerZona : toIntOrNull(q.zonaUdsId);
 
   const result = await db.execute(sql`
     SELECT * FROM (
@@ -195,6 +204,7 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
       LEFT JOIN zone_uds z ON z.id = b.zona_uds_id
       LEFT JOIN centri_di_ascolto ca ON ca.id = b.centro_ascolto_id
       WHERE (${cittaId}::int IS NULL OR b.citta_id = ${cittaId}::int OR b.citta_id IS NULL)
+        AND (${zonaId}::int IS NULL OR b.zona_uds_id = ${zonaId}::int)
         AND (${excludeId}::int IS NULL OR b.id <> ${excludeId}::int)
     ) s
     WHERE s.score >= 0.2
@@ -232,6 +242,10 @@ router.get("/beneficiari/:id", async (req, res) => {
   }
   if (!canAccessCitta(row.cittaId, callerCittaId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    return;
+  }
+  if (!canAccessZonaUds(row.zonaUdsId, callerZonaUdsId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua zona" });
     return;
   }
 
@@ -279,6 +293,7 @@ router.patch("/beneficiari/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
+  const zid = callerZonaUdsId(req);
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
@@ -289,10 +304,15 @@ router.patch("/beneficiari/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
+  if (!canAccessZonaUds(existing.zonaUdsId, zid)) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua zona" });
+    return;
+  }
   const updates = { ...req.body, dataAggiornamento: new Date() };
   if ("uds" in updates) updates.uds = toBool(updates.uds);
   if (caller != null) delete updates.centroAscoltoId;
   if (cid != null) delete updates.cittaId;
+  if (zid != null) updates.zonaUdsId = zid;
   // Mirror the POST città-HARD-boundary guard: a UDS person must never end up
   // with a null città (cross-città visibility leak). A scoped caller auto-pins
   // their own città (even on legacy null-città rows); a global caller must
@@ -323,13 +343,21 @@ router.delete("/beneficiari/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
+  if (!canAccessZonaUds(existing.zonaUdsId, callerZonaUdsId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua zona" });
+    return;
+  }
   await db.delete(beneficiariTable).where(eq(beneficiariTable.id, id));
   res.status(204).send();
 });
 
 router.get("/beneficiari/:id/nucleo", async (req, res) => {
   const id = parseInt(req.params.id);
-  if (!canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req)) || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))) {
+  if (
+    !canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))
+    || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))
+    || !canAccessZonaUds(await beneficiarioZonaUdsId(id), callerZonaUdsId(req))
+  ) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -339,7 +367,11 @@ router.get("/beneficiari/:id/nucleo", async (req, res) => {
 
 router.post("/beneficiari/:id/nucleo", async (req, res) => {
   const id = parseInt(req.params.id);
-  if (!canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req)) || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))) {
+  if (
+    !canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))
+    || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))
+    || !canAccessZonaUds(await beneficiarioZonaUdsId(id), callerZonaUdsId(req))
+  ) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -349,7 +381,11 @@ router.post("/beneficiari/:id/nucleo", async (req, res) => {
 
 router.delete("/beneficiari/:id/nucleo/:membroId", async (req, res) => {
   const id = parseInt(req.params.id);
-  if (!canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req)) || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))) {
+  if (
+    !canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))
+    || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))
+    || !canAccessZonaUds(await beneficiarioZonaUdsId(id), callerZonaUdsId(req))
+  ) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }

@@ -8,20 +8,29 @@ import magazziniRouter from "../src/routes/magazzini";
 let app: Express;
 const createdIds: number[] = [];
 
-/** Builds a minimal app mounting only the magazzini router (no auth needed). */
-function makeApp(): Express {
+/** Builds a minimal app mounting only the magazzini router. */
+function makeApp(isAdmin = true): Express {
   const a = express();
   a.use(express.json());
+  a.use((req, _res, next) => {
+    (req as unknown as { user: { isAdmin: boolean; centroAscoltoId: null; cittaId: null } }).user = {
+      isAdmin,
+      centroAscoltoId: null,
+      cittaId: null,
+    };
+    next();
+  });
   a.use(magazziniRouter);
   return a;
 }
 
 /** Mounts the router behind a middleware injecting a caller scoped to `centroId`. */
-function makeAppAs(centroId: number | null): Express {
+function makeAppAs(centroId: number | null, isAdmin = true): Express {
   const a = express();
   a.use(express.json());
   a.use((req, _res, next) => {
-    (req as unknown as { user: { centroAscoltoId: number | null } }).user = {
+    (req as unknown as { user: { isAdmin: boolean; centroAscoltoId: number | null } }).user = {
+      isAdmin,
       centroAscoltoId: centroId,
     };
     next();
@@ -127,6 +136,16 @@ describe("POST /magazzini — codice duplicato", () => {
       .from(magazziniTable)
       .where(eq(magazziniTable.codice, codice));
     expect(rows.length).toBe(1);
+  });
+});
+
+describe("Mutazioni /magazzini — admin only", () => {
+  it("rifiuta la creazione per un non-admin", async () => {
+    const res = await request(makeApp(false))
+      .post("/magazzini")
+      .send({ nome: "Non Admin" });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("Accesso riservato agli amministratori");
   });
 });
 

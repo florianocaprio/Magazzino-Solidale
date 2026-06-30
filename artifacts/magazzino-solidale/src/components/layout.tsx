@@ -66,7 +66,7 @@ import { LANGUAGES } from "@/lib/i18n";
 
 const NAV_ITEMS = [
   { key: "dashboard", url: "/", icon: LayoutDashboard, groupKey: "generale", area: "generale" },
-  { key: "magazzini", url: "/magazzini", icon: Warehouse, groupKey: "magazzino", area: "magazzino" },
+  { key: "magazzini", url: "/magazzini", icon: Warehouse, groupKey: "amministrazione", area: "amministrazione" },
   { key: "prodotti", url: "/prodotti", icon: Package, groupKey: "magazzino", area: "magazzino" },
   { key: "lotti", url: "/lotti", icon: Boxes, groupKey: "magazzino", area: "magazzino" },
   { key: "movimenti", url: "/movimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
@@ -74,11 +74,11 @@ const NAV_ITEMS = [
   { key: "trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
   { key: "preparazioneConsegne", url: "/preparazione-consegne", icon: PackageCheck, groupKey: "magazzino", area: "magazzino" },
   
-  { key: "centriAscolto", url: "/centri-ascolto", icon: Building2, groupKey: "sociale", area: "sociale" },
+  { key: "centriAscolto", url: "/centri-ascolto", icon: Building2, groupKey: "amministrazione", area: "amministrazione" },
   { key: "beneficiari", url: "/beneficiari", icon: Users, groupKey: "sociale", area: "sociale" },
   { key: "interventi", url: "/interventi", icon: ClipboardList, groupKey: "sociale", area: "sociale" },
   { key: "consegne", url: "/consegne", icon: Truck, groupKey: "sociale", area: "sociale" },
-  { key: "bolle", url: "/bolle", icon: FileText, groupKey: "sociale", area: "sociale" },
+  { key: "bolle", url: "/bolle", icon: FileText, groupKey: "magazzino", area: "sociale" },
   { key: "turni", url: "/turni", icon: CalendarDays, groupKey: "sociale", area: "sociale" },
   { key: "scarichi", url: "/scarichi", icon: PackageMinus, groupKey: "sociale", area: "sociale" },
 

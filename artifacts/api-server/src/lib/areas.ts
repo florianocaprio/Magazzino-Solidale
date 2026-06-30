@@ -27,7 +27,9 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   trasferimenti: "magazzino",
   "preparazione-consegne": "magazzino",
 
-  "centri-ascolto": "sociale",
+  // Read by several operational areas to populate filters/forms; mutations are
+  // admin-gated in the route.
+  "centri-ascolto": ["sociale", "uds", "magazzino", "logistica", "analisi"],
   beneficiari: ["sociale", "uds"],
   interventi: ["sociale", "uds"],
   consegne: "sociale",

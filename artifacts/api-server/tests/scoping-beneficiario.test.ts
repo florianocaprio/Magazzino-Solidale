@@ -169,6 +169,13 @@ describe("Bolle — scoping via beneficiario", () => {
     expect(res.status).toBe(403);
   });
 
+  it("GET /:id/righe restituisce le righe della bolla", async () => {
+    const bA = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magNull });
+    const res = await request(appAs(bolleRouter, centroA)).get(`/bolle/${bA}/righe`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
   it("POST: non può creare per un beneficiario di un altro centro → 403", async () => {
     const res = await request(appAs(bolleRouter, centroA))
       .post("/bolle")
@@ -194,6 +201,7 @@ describe("Bolle — scoping via beneficiario", () => {
   it("azioni (righe/conferma/consegna/annulla) fuori centro → 403", async () => {
     const bB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull });
     const appA = appAs(bolleRouter, centroA);
+    expect((await request(appA).get(`/bolle/${bB}/righe`)).status).toBe(403);
     expect((await request(appA).post(`/bolle/${bB}/righe`).send({})).status).toBe(403);
     expect((await request(appA).delete(`/bolle/${bB}/righe/1`)).status).toBe(403);
     expect((await request(appA).post(`/bolle/${bB}/conferma`).send({})).status).toBe(403);
