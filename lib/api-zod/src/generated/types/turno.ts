@@ -20,5 +20,7 @@ export interface Turno {
   mezzoCodice?: string | null;
   /** @nullable */
   mezzoTipo?: string | null;
+  /** @nullable */
+  mezzoStatoApprovazione?: string | null;
   volontari: TurnoVolontario[];
 }

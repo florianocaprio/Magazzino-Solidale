@@ -13,6 +13,7 @@ export const consegneTable = pgTable("consegne", {
   zona: varchar("zona", { length: 80 }),
   magazzinoId: integer("magazzino_id").notNull(),
   volontarioId: integer("volontario_id"),
+  volontarioAltro: text("volontario_altro"),
   mezzoId: integer("mezzo_id"),
   mezzoAltro: boolean("mezzo_altro").notNull().default(false),
   stato: varchar("stato", { length: 20 }).notNull().default("pianificata"),

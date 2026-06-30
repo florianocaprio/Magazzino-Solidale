@@ -42,13 +42,21 @@ export default function Volontari() {
     centroAscoltoId: z.number().nullable().default(null),
     note: z.string().optional()
   });
-  const { data: volontari, isLoading } = useListVolontari();
+  const [search, setSearch] = useState("");
+  const [centroFilter, setCentroFilter] = useState<string>("all");
+  const volontariParams = {
+    ...(search.trim() ? { search: search.trim() } : {}),
+    ...(centroFilter !== "all" ? { centroAscoltoId: parseInt(centroFilter) } : {}),
+  };
+  const listVolontariParams = Object.keys(volontariParams).length > 0 ? volontariParams : undefined;
+  const { data: volontari, isLoading } = useListVolontari(
+    listVolontariParams,
+    { query: { queryKey: getListVolontariQueryKey(listVolontariParams) } },
+  );
   const { data: centri } = useListCentriAscolto();
   const { data: ruoliVolontari } = useListRuoliVolontari();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [search, setSearch] = useState("");
-  const [centroFilter, setCentroFilter] = useState<string>("all");
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -97,14 +105,31 @@ export default function Volontari() {
     setIsFormOpen(true);
   };
 
+  const apiErrorMessage = (e: unknown) =>
+    (e as { data?: { error?: string } })?.data?.error ??
+    (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+    t("common.error", { defaultValue: "Errore" });
+
+  const handleSaveError = (e: unknown) => {
+    const message = apiErrorMessage(e);
+    form.setError("matricola", { type: "server", message });
+    toast({
+      title: t("volontari.toastError", { defaultValue: "Operazione non riuscita" }),
+      description: message,
+      variant: "destructive",
+    });
+  };
+
   const onSubmit = (data: z.infer<typeof formSchema>) => {
+    form.clearErrors("matricola");
     if (editingId) {
       updateVolontario.mutate({ id: editingId, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ title: t("volontari.toastUpdated") });
           setIsFormOpen(false);
-        }
+        },
+        onError: handleSaveError,
       });
     } else {
       createVolontario.mutate({ data }, {
@@ -112,7 +137,8 @@ export default function Volontari() {
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ title: t("volontari.toastCreated") });
           setIsFormOpen(false);
-        }
+        },
+        onError: handleSaveError,
       });
     }
   };
@@ -137,14 +163,31 @@ export default function Volontari() {
   };
 
   const filtered = volontari?.filter(v => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      v.nome.toLowerCase().includes(search.toLowerCase()) ||
-      v.cognome.toLowerCase().includes(search.toLowerCase());
+      !q ||
+      v.nome.toLowerCase().includes(q) ||
+      v.cognome.toLowerCase().includes(q) ||
+      (v.matricola ?? "").toLowerCase().includes(q);
     const matchesCentro = centroFilter === "all" || v.centroAscoltoId === parseInt(centroFilter);
     return matchesSearch && matchesCentro;
   });
 
   const roleLabel = (ruolo: string) => t(`volontari.roles.${ruolo}`, { defaultValue: ruolo.replace('_', ' ') });
+  const statoLabel = (v: NonNullable<typeof volontari>[number]) => {
+    const stato = v.statoApprovazione ?? "approvato";
+    if (stato === "in_attesa") return t("volontari.statoInAttesa", { defaultValue: "In attesa approvazione" });
+    if (stato === "respinto") return t("volontari.statoRespinto", { defaultValue: "Respinto" });
+    if (stato !== "approvato") return stato;
+    return v.attivo ? t("volontari.statoApprovato", { defaultValue: "Approvato" }) : t("common.inactive");
+  };
+  const statoClassName = (v: NonNullable<typeof volontari>[number]) => {
+    const stato = v.statoApprovazione ?? "approvato";
+    if (stato === "in_attesa") return "bg-amber-500/10 text-amber-700 hover:bg-amber-500/10";
+    if (stato === "respinto") return "bg-destructive/10 text-destructive hover:bg-destructive/10";
+    if (!v.attivo) return "";
+    return "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10";
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -159,6 +202,7 @@ export default function Volontari() {
             columns={[
               { header: t("common.name"), accessor: (v) => v.nome },
               { header: t("common.surname"), accessor: (v) => v.cognome },
+              { header: t("volontari.matricola"), accessor: (v) => v.matricola ?? "" },
               { header: t("volontari.centroAscolto"), accessor: (v) => v.centroAscoltoNome ?? t("volontari.tuttiCentri") },
               { header: t("common.email"), accessor: (v) => v.email },
               { header: t("common.phone"), accessor: (v) => v.telefono },
@@ -263,7 +307,8 @@ export default function Volontari() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.name")}</TableHead>
-                {isGlobal && <TableHead>{t("volontari.centroAscolto")}</TableHead>}
+                <TableHead>{t("volontari.matricola")}</TableHead>
+                <TableHead>{t("volontari.centroAscolto")}</TableHead>
                 <TableHead>{t("volontari.contatti")}</TableHead>
                 <TableHead>{t("volontari.ruolo")}</TableHead>
                 <TableHead className="text-center">{t("volontari.patente")}</TableHead>
@@ -277,7 +322,8 @@ export default function Volontari() {
                 Array(5).fill(0).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
@@ -288,7 +334,7 @@ export default function Volontari() {
                 ))
               ) : filtered?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isGlobal ? 8 : 7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                     {t("volontari.empty")}
                   </TableCell>
                 </TableRow>
@@ -297,11 +343,12 @@ export default function Volontari() {
                   <TableCell>
                     <div className="font-medium">{v.nome} {v.cognome}</div>
                   </TableCell>
-                  {isGlobal && (
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">{v.centroAscoltoNome ?? t("volontari.tuttiCentri")}</span>
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    <span className="text-sm">{v.matricola?.trim() || "—"}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">{v.centroAscoltoNome ?? t("volontari.tuttiCentri")}</span>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                       {v.telefono && <div className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {v.telefono}</div>}
@@ -320,7 +367,12 @@ export default function Volontari() {
                     {v.mezzoPersonale ? <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" /> : <XCircle className="h-4 w-4 text-muted mx-auto" />}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Switch checked={v.attivo} onCheckedChange={() => toggleStatus(v)} />
+                    <div className="flex flex-col items-center gap-2">
+                      <Badge variant="secondary" className={statoClassName(v)}>
+                        {statoLabel(v)}
+                      </Badge>
+                      <Switch checked={v.attivo} onCheckedChange={() => toggleStatus(v)} />
+                    </div>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>

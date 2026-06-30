@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, type Consegna } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
@@ -26,6 +28,7 @@ import * as z from "zod";
 import { format, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
+import { volontarioLabel } from "@/lib/volontari-label";
 
 const formSchema = z.object({
   beneficiarioId: z.coerce.number().min(1),
@@ -36,6 +39,7 @@ const formSchema = z.object({
   zona: z.string().optional(),
   magazzinoId: z.coerce.number().min(1),
   volontarioId: z.coerce.number().optional(),
+  volontarioAltro: z.string().optional(),
   mezzoId: z.coerce.number().optional(),
   mezzoAltro: z.boolean().optional(),
   noteOperative: z.string().optional()
@@ -107,6 +111,11 @@ export default function Consegne() {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const apiErrorMessage = (e: unknown) =>
+    (e as { data?: { error?: string } })?.data?.error ??
+    (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+    t("consegne.toastErrore");
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [completingId, setCompletingId] = useState<number | null>(null);
@@ -119,6 +128,13 @@ export default function Consegne() {
   const [riFascia, setRiFascia] = useState("Mattina");
   const [scanCode, setScanCode] = useState("");
   const [annullandoId, setAnnullandoId] = useState<number | null>(null);
+  const [pendingVolontari, setPendingVolontari] = useState<Volontario[]>([]);
+  const [pendingMezzi, setPendingMezzi] = useState<Mezzo[]>([]);
+  const [volontarioDialogOpen, setVolontarioDialogOpen] = useState(false);
+  const [mezzoDialogOpen, setMezzoDialogOpen] = useState(false);
+  const [nuovoVolontario, setNuovoVolontario] = useState({ nome: "", cognome: "", matricola: "", telefono: "", patente: false, note: "" });
+  const [volontarioError, setVolontarioError] = useState<string | null>(null);
+  const [nuovoMezzo, setNuovoMezzo] = useState({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
 
   const { data: bolle } = useListBolle();
 
@@ -128,6 +144,8 @@ export default function Consegne() {
   const associaBolla = useAssociaBolla();
   const inviaEmailBeneficiario = useInviaEmailConsegnaBeneficiario();
   const inviaEmailVolontario = useInviaEmailConsegnaVolontario();
+  const createPendingVolontario = useCreateTurnoVolontarioPending();
+  const createPendingMezzo = useCreateTurnoMezzoPending();
 
   const associatingConsegna = consegne?.find(c => c.id === associatingId) ?? null;
   // bolle selezionabili: stesso beneficiario, non annullate, non già consegnate, non già legate ad altra consegna
@@ -185,9 +203,47 @@ export default function Consegne() {
     { query: { queryKey: getGetVolontariCaricoQueryKey({ data: dataPrevistaWatch }), enabled: validData } },
   );
   const caricoMap = new Map((caricoTurno ?? []).map((c) => [c.volontarioId, c.count]));
+  const selectedBeneficiarioId = form.watch("beneficiarioId");
+  const beneficiarioSelezionato = useMemo(
+    () => [...(beneficiari ?? []), ...(allBeneficiari ?? [])].find((b) => b.id === selectedBeneficiarioId),
+    [allBeneficiari, beneficiari, selectedBeneficiarioId],
+  );
+  const effectiveConsegnaCentroId = beneficiarioSelezionato?.centroAscoltoId
+    ?? (createCentroId !== "all" ? parseInt(createCentroId) : lockedCentroId);
+  const volontariConsegna = useMemo(
+    () => [...pendingVolontari, ...(volontari ?? [])].filter((v, idx, all) => {
+      if (all.findIndex((item) => item.id === v.id) !== idx) return false;
+      const isPendingLocal = pendingVolontari.some((p) => p.id === v.id);
+      if (!isPendingLocal && (!v.attivo || (v.statoApprovazione ?? "approvato") !== "approvato")) return false;
+      if (v.centroAscoltoId == null) return true;
+      return effectiveConsegnaCentroId != null && v.centroAscoltoId === effectiveConsegnaCentroId;
+    }),
+    [effectiveConsegnaCentroId, pendingVolontari, volontari],
+  );
+  const mezziConsegna = useMemo(
+    () => [...pendingMezzi, ...(mezzi ?? [])].filter((m, idx, all) => {
+      if (all.findIndex((item) => item.id === m.id) !== idx) return false;
+      const isPendingLocal = pendingMezzi.some((p) => p.id === m.id);
+      if (!isPendingLocal && (m.stato !== "disponibile" || (m.statoApprovazione ?? "approvato") !== "approvato")) return false;
+      if (m.effectiveCentroId == null) return true;
+      return effectiveConsegnaCentroId != null && m.effectiveCentroId === effectiveConsegnaCentroId;
+    }),
+    [effectiveConsegnaCentroId, mezzi, pendingMezzi],
+  );
 
   const onSubmit = (raw: z.infer<typeof formSchema>) => {
     const data = { ...raw };
+    const altroSelected = data.volontarioAltro !== undefined;
+    if (altroSelected && !data.volontarioAltro?.trim()) {
+      form.setError("volontarioAltro", { type: "manual", message: t("common.requiredField") });
+      return;
+    }
+    if (data.volontarioAltro?.trim()) {
+      data.volontarioAltro = data.volontarioAltro.trim();
+      delete data.volontarioId;
+    } else {
+      delete data.volontarioAltro;
+    }
     if (!data.volontarioId) delete data.volontarioId;
     if (!data.mezzoId) delete data.mezzoId;
     data.mezzoAltro = !!data.mezzoAltro && !data.mezzoId;
@@ -202,6 +258,73 @@ export default function Consegne() {
         toast({ title: t("consegne.toastOpFallita"), description: msg ?? t("consegne.toastErrore"), variant: "destructive" });
       },
     });
+  };
+
+  const creaVolontarioPending = () => {
+    if (effectiveConsegnaCentroId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
+      return;
+    }
+    setVolontarioError(null);
+    createPendingVolontario.mutate(
+      {
+        data: {
+          centroAscoltoId: effectiveConsegnaCentroId,
+          nome: nuovoVolontario.nome.trim(),
+          cognome: nuovoVolontario.cognome.trim(),
+          matricola: nuovoVolontario.matricola.trim(),
+          telefono: nuovoVolontario.telefono.trim() || undefined,
+          patente: nuovoVolontario.patente,
+          note: nuovoVolontario.note.trim() || "Inserito da pianificazione consegne",
+        },
+      },
+      {
+        onSuccess: (created) => {
+          setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
+          form.setValue("volontarioId", created.id);
+          form.setValue("volontarioAltro", undefined);
+          form.setValue("mezzoId", 0);
+          form.setValue("mezzoAltro", false);
+          queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
+          toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
+          setNuovoVolontario({ nome: "", cognome: "", matricola: "", telefono: "", patente: false, note: "" });
+          setVolontarioError(null);
+          setVolontarioDialogOpen(false);
+        },
+        onError: (e: unknown) => {
+          const message = apiErrorMessage(e);
+          setVolontarioError(message);
+          toast({ variant: "destructive", description: message });
+        },
+      },
+    );
+  };
+
+  const creaMezzoPending = () => {
+    if (effectiveConsegnaCentroId == null || !nuovoMezzo.tipo.trim()) return;
+    createPendingMezzo.mutate(
+      {
+        data: {
+          centroAscoltoId: effectiveConsegnaCentroId,
+          tipo: nuovoMezzo.tipo.trim(),
+          targa: nuovoMezzo.targa.trim() || undefined,
+          proprieta: nuovoMezzo.proprieta || "associazione",
+          descrizione: nuovoMezzo.descrizione.trim() || undefined,
+          note: nuovoMezzo.note.trim() || "Inserito da pianificazione consegne",
+        },
+      },
+      {
+        onSuccess: (created) => {
+          setPendingMezzi((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
+          form.setValue("mezzoId", created.id);
+          form.setValue("mezzoAltro", false);
+          queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
+          toast({ description: t("turni.pendingMezzoCreated", { defaultValue: "Mezzo inserito in attesa di approvazione" }) });
+          setNuovoMezzo({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
+          setMezzoDialogOpen(false);
+        },
+        onError: (e: unknown) => toast({ variant: "destructive", description: apiErrorMessage(e) }),
+      },
+    );
   };
 
   const handleScan = (codeOverride?: string) => {
@@ -236,6 +359,7 @@ export default function Consegne() {
       zona: c.zona ?? undefined,
       magazzinoId: c.magazzinoId,
       volontarioId: c.volontarioId ?? undefined,
+      volontarioAltro: c.volontarioAltro ?? undefined,
       mezzoId: c.mezzoId ?? undefined,
       mezzoAltro: c.mezzoAltro ?? false,
       noteOperative: c.noteOperative ?? undefined,
@@ -304,14 +428,29 @@ export default function Consegne() {
               { header: t("common.address"), accessor: (c) => c.indirizzoConsegna },
               { header: t("consegne.zona"), accessor: (c) => c.zona },
               { header: t("consegne.magazzino"), accessor: (c) => c.magazzinoNome },
-              { header: t("consegne.volontario"), accessor: (c) => c.volontarioNome },
+              { header: t("consegne.volontario"), accessor: (c) => c.volontarioNome ?? c.volontarioAltro ?? "" },
               { header: t("common.status"), accessor: (c) => c.stato },
             ]}
             filename="consegne"
             title={t("consegne.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("consegne.planDelivery")}</Button>
+          <Button
+            onClick={() => {
+              form.reset({
+                beneficiarioId: 0,
+                tipoConsegna: "in_sede",
+                dataPrevista: new Date().toISOString().substring(0, 10),
+                fasciaOraria: "Mattina",
+                magazzinoId: 0,
+                noteOperative: "",
+              });
+              setIsFormOpen(true);
+            }}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" /> {t("consegne.planDelivery")}
+          </Button>
         </div>
       </div>
 
@@ -443,7 +582,11 @@ export default function Consegne() {
                           )}
                         </>
                       )}
-                      {c.volontarioNome && <div className="text-xs text-muted-foreground">{t("consegne.volontarioPrefix", { name: c.volontarioNome })}</div>}
+                      {(c.volontarioNome || c.volontarioAltro) && (
+                        <div className="text-xs text-muted-foreground">
+                          {t("consegne.volontarioPrefix", { name: c.volontarioNome ?? c.volontarioAltro })}
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -505,7 +648,7 @@ export default function Consegne() {
                       <div className="flex items-center justify-end gap-2">
                         {(c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') ? (
                           <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
-                            <CheckCircle2 className="h-3.5 w-3.5" /> {t("consegne.btnConsegnato")}
+                            <CheckCircle2 className="h-3.5 w-3.5" /> {t("bolle.segnaConsegnata")}
                           </Button>
                         ) : (
                           <>
@@ -664,7 +807,18 @@ export default function Consegne() {
                 <FormField control={form.control} name="tipoConsegna" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("consegne.formModalita")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        if (v !== "domicilio") {
+                          form.setValue("volontarioId", 0);
+                          form.setValue("volontarioAltro", undefined);
+                          form.setValue("mezzoId", 0);
+                          form.setValue("mezzoAltro", false);
+                        }
+                      }}
+                      defaultValue={field.value}
+                    >
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="in_sede">{t("consegne.modInSede")}</SelectItem>
@@ -685,19 +839,33 @@ export default function Consegne() {
                     <FormField control={form.control} name="volontarioId" render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t("consegne.formVolontario")}</FormLabel>
-                        <Select onValueChange={(v) => { field.onChange(v); form.setValue("mezzoId", 0); form.setValue("mezzoAltro", false); }} defaultValue={field.value ? String(field.value) : undefined}>
+                        <Select
+                          value={form.watch("volontarioAltro") !== undefined ? "altro" : (field.value ? String(field.value) : "0")}
+                          onValueChange={(v) => {
+                            form.setValue("mezzoId", 0);
+                            form.setValue("mezzoAltro", false);
+                            if (v === "altro") {
+                              field.onChange(0);
+                              form.setValue("volontarioAltro", "");
+                              return;
+                            }
+                            form.setValue("volontarioAltro", undefined);
+                            form.clearErrors("volontarioAltro");
+                            field.onChange(Number(v));
+                          }}
+                        >
                           <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="0">{t("common.none")}</SelectItem>
-                            {volontari?.filter(v => {
-                              if (v.centroAscoltoId == null) return true;
-                              const benefCentro = beneficiari?.find(b => b.id === form.watch("beneficiarioId"))?.centroAscoltoId ?? null;
-                              return benefCentro != null && v.centroAscoltoId === benefCentro;
-                            }).map(v => {
+                            <SelectItem value="altro">{t("consegne.volontarioAltro", { defaultValue: "Altro" })}</SelectItem>
+                            {volontariConsegna.map(v => {
                               const overLimit = v.maxConsegneTurno > 0 && (caricoMap.get(v.id) ?? 0) >= v.maxConsegneTurno;
+                              const isPending = v.statoApprovazione === "in_attesa";
                               return (
-                                <SelectItem key={v.id} value={String(v.id)} disabled={overLimit}>
-                                  {v.nome} {v.cognome}{overLimit ? ` — ${t("consegne.limiteRaggiunto")}` : ""}
+                                <SelectItem key={v.id} value={String(v.id)} disabled={overLimit} className={isPending ? "text-muted-foreground" : undefined}>
+                                  {volontarioLabel(v)}
+                                  {isPending ? ` · ${t("turni.pendingLabel", { defaultValue: "in attesa" })}` : ""}
+                                  {overLimit ? ` — ${t("consegne.limiteRaggiunto")}` : ""}
                                 </SelectItem>
                               );
                             })}
@@ -705,10 +873,47 @@ export default function Consegne() {
                         </Select>
                       </FormItem>
                     )} />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setVolontarioDialogOpen(true)}
+                        disabled={effectiveConsegnaCentroId == null}
+                      >
+                        <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontarioNonCensito", { defaultValue: "Nuovo Volontario" })}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setMezzoDialogOpen(true)}
+                        disabled={effectiveConsegnaCentroId == null}
+                      >
+                        <Plus className="me-1 h-4 w-4" /> {t("turni.addMezzoNonCensito", { defaultValue: "Nuovo Mezzo" })}
+                      </Button>
+                    </div>
+                    {form.watch("volontarioAltro") !== undefined && (
+                      <FormField control={form.control} name="volontarioAltro" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("consegne.volontarioAltroNote", { defaultValue: "Nominativo e nota" })}</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              placeholder={t("consegne.volontarioAltroPlaceholder", { defaultValue: "Es. familiare delegato, vicino di casa..." })}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
                     {(() => {
-                      const selVol = volontari?.find(v => v.id === Number(form.watch("volontarioId")));
-                      if (!selVol?.patente) return null;
+                      if (form.watch("volontarioAltro") !== undefined) return null;
                       const mezzoVal = form.watch("mezzoAltro") ? "altro" : (form.watch("mezzoId") ? String(form.watch("mezzoId")) : "0");
+                      const selVol = volontariConsegna.find(v => v.id === Number(form.watch("volontarioId")));
+                      const hasMezzoSelected = mezzoVal !== "0";
+                      if (!selVol?.patente && !hasMezzoSelected) return null;
                       return (
                         <div className="space-y-2">
                           <Label>{t("consegne.formMezzo")}</Label>
@@ -719,14 +924,10 @@ export default function Consegne() {
                             <SelectTrigger><SelectValue placeholder={t("consegne.mezzoPlaceholder")} /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="0">{t("common.none")}</SelectItem>
-                              {mezzi?.filter(m => {
-                                if (m.stato !== "disponibile") return false;
-                                if (m.effectiveCentroId == null) return true;
-                                const benefCentro = beneficiari?.find(b => b.id === form.watch("beneficiarioId"))?.centroAscoltoId ?? null;
-                                return benefCentro != null && m.effectiveCentroId === benefCentro;
-                              }).map(m => (
-                                <SelectItem key={m.id} value={String(m.id)}>
+                              {mezziConsegna.map(m => (
+                                <SelectItem key={m.id} value={String(m.id)} className={m.statoApprovazione === "in_attesa" ? "text-muted-foreground" : undefined}>
                                   {m.codice}{m.targa ? ` (${m.targa})` : ""} — {m.tipo}
+                                  {m.statoApprovazione === "in_attesa" ? ` · ${t("turni.pendingLabel", { defaultValue: "in attesa" })}` : ""}
                                 </SelectItem>
                               ))}
                               <SelectItem value="altro">{t("consegne.mezzoAltro")}</SelectItem>
@@ -761,6 +962,132 @@ export default function Consegne() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={volontarioDialogOpen} onOpenChange={(open) => {
+        setVolontarioDialogOpen(open);
+        setVolontarioError(null);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("turni.pendingVolTitle", { defaultValue: "Nuovo Volontario" })}</DialogTitle>
+            <DialogDescription>
+              {t("turni.pendingVolDesc", { defaultValue: "Il volontario sarà inserito in attesa di approvazione Logistica." })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>{t("common.name")}</Label>
+                <Input value={nuovoVolontario.nome} onChange={(e) => setNuovoVolontario((v) => ({ ...v, nome: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("common.surname", { defaultValue: "Cognome" })}</Label>
+                <Input value={nuovoVolontario.cognome} onChange={(e) => setNuovoVolontario((v) => ({ ...v, cognome: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>{t("volontari.matricola", { defaultValue: "Matricola" })}</Label>
+                <Input
+                  value={nuovoVolontario.matricola}
+                  onChange={(e) => {
+                    setVolontarioError(null);
+                    setNuovoVolontario((v) => ({ ...v, matricola: e.target.value }));
+                  }}
+                />
+                {volontarioError ? <p className="text-sm text-destructive">{volontarioError}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <Label>{t("common.phone", { defaultValue: "Telefono" })}</Label>
+                <Input value={nuovoVolontario.telefono} onChange={(e) => setNuovoVolontario((v) => ({ ...v, telefono: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+              <Label htmlFor="consegne-patente-b">{t("volontari.patenteB", { defaultValue: "Patente B" })}</Label>
+              <Switch
+                id="consegne-patente-b"
+                checked={nuovoVolontario.patente}
+                onCheckedChange={(checked) => setNuovoVolontario((v) => ({ ...v, patente: checked }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("common.notes")}</Label>
+              <Input value={nuovoVolontario.note} onChange={(e) => setNuovoVolontario((v) => ({ ...v, note: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVolontarioDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={creaVolontarioPending}
+              disabled={
+                createPendingVolontario.isPending ||
+                effectiveConsegnaCentroId == null ||
+                !nuovoVolontario.nome.trim() ||
+                !nuovoVolontario.cognome.trim() ||
+                !nuovoVolontario.matricola.trim()
+              }
+            >
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mezzoDialogOpen} onOpenChange={setMezzoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("turni.pendingMezzoTitle", { defaultValue: "Nuovo Mezzo" })}</DialogTitle>
+            <DialogDescription>
+              {t("turni.pendingMezzoDesc", { defaultValue: "Il mezzo sarà inserito in attesa di approvazione Logistica." })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>{t("mezzi.tipo", { defaultValue: "Tipo" })}</Label>
+                <Input value={nuovoMezzo.tipo} onChange={(e) => setNuovoMezzo((m) => ({ ...m, tipo: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("mezzi.targa", { defaultValue: "Targa" })}</Label>
+                <Input value={nuovoMezzo.targa} onChange={(e) => setNuovoMezzo((m) => ({ ...m, targa: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("mezzi.proprieta", { defaultValue: "Proprietà" })}</Label>
+              <Select value={nuovoMezzo.proprieta} onValueChange={(v) => setNuovoMezzo((m) => ({ ...m, proprieta: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="associazione">{t("mezzi.proprietaOpts.associazione", { defaultValue: "Associazione" })}</SelectItem>
+                  <SelectItem value="centro">{t("mezzi.proprietaOpts.centro", { defaultValue: "Centro" })}</SelectItem>
+                  <SelectItem value="volontario">{t("mezzi.proprietaOpts.volontario", { defaultValue: "Volontario" })}</SelectItem>
+                  <SelectItem value="noleggio">{t("mezzi.proprietaOpts.noleggio", { defaultValue: "Noleggio" })}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("mezzi.descrizione", { defaultValue: "Descrizione" })}</Label>
+              <Input value={nuovoMezzo.descrizione} onChange={(e) => setNuovoMezzo((m) => ({ ...m, descrizione: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("common.notes")}</Label>
+              <Input value={nuovoMezzo.note} onChange={(e) => setNuovoMezzo((m) => ({ ...m, note: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMezzoDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={creaMezzoPending}
+              disabled={createPendingMezzo.isPending || effectiveConsegnaCentroId == null || !nuovoMezzo.tipo.trim()}
+            >
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!completingId} onOpenChange={(open) => !open && setCompletingId(null)}>
         <AlertDialogContent>

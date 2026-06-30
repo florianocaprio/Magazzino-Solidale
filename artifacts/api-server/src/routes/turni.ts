@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import {
   turniTable,
@@ -17,10 +17,61 @@ import {
   inVisibleCentroSet,
   idSetScopeFilter,
 } from "../lib/centroScope";
+import {
+  isVolontarioMatricolaUniqueViolation,
+  matricolaVolontarioDuplicataPayload,
+  matricolaVolontarioGiaUsata,
+} from "../lib/volontariMatricola";
 
 const router: IRouter = Router();
 
 type VolInput = { volontarioId: number; ruolo?: string | null };
+
+function toIntOrNull(v: unknown): number | null {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  return Number.isInteger(n) ? n : null;
+}
+
+function trimText(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+async function resolveCentroAscoltoId(
+  req: Request,
+  rawCentroAscoltoId: unknown,
+): Promise<{ centroAscoltoId: number } | { status: number; error: string }> {
+  const caller = callerCentroId(req);
+  const centroAscoltoId = caller ?? toIntOrNull(rawCentroAscoltoId);
+  if (centroAscoltoId == null) {
+    return { status: 400, error: "centroAscoltoId obbligatorio" };
+  }
+  if (
+    caller == null &&
+    !inVisibleCentroSet(centroAscoltoId, await visibleCentroIds(callerCittaId(req)))
+  ) {
+    return { status: 403, error: "Centro non accessibile per la tua città" };
+  }
+  return { centroAscoltoId };
+}
+
+async function centroNome(centroAscoltoId: number): Promise<string | null> {
+  const [centro] = await db
+    .select({ nome: centriAscoltoTable.nome })
+    .from(centriAscoltoTable)
+    .where(eq(centriAscoltoTable.id, centroAscoltoId));
+  return centro?.nome ?? null;
+}
+
+async function nextMezzoCodice(): Promise<string> {
+  const rows = await db.select({ codice: mezziTable.codice }).from(mezziTable);
+  let max = 0;
+  for (const r of rows) {
+    const m = /^MEZ-(\d+)$/.exec(r.codice);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `MEZ-${String(max + 1).padStart(3, "0")}`;
+}
 
 async function buildTurno(id: number) {
   const [t] = await db
@@ -29,6 +80,7 @@ async function buildTurno(id: number) {
       centroNome: centriAscoltoTable.nome,
       mezzoCodice: mezziTable.codice,
       mezzoTipo: mezziTable.tipo,
+      mezzoStatoApprovazione: mezziTable.statoApprovazione,
     })
     .from(turniTable)
     .leftJoin(centriAscoltoTable, eq(turniTable.centroAscoltoId, centriAscoltoTable.id))
@@ -36,7 +88,12 @@ async function buildTurno(id: number) {
     .where(eq(turniTable.id, id));
   if (!t) return null;
   const vols = await db
-    .select({ v: turniVolontariTable, nome: volontariTable.nome, cognome: volontariTable.cognome })
+    .select({
+      v: turniVolontariTable,
+      nome: volontariTable.nome,
+      cognome: volontariTable.cognome,
+      statoApprovazione: volontariTable.statoApprovazione,
+    })
     .from(turniVolontariTable)
     .leftJoin(volontariTable, eq(turniVolontariTable.volontarioId, volontariTable.id))
     .where(eq(turniVolontariTable.turnoId, id));
@@ -49,9 +106,11 @@ async function buildTurno(id: number) {
     mezzoId: t.t.mezzoId ?? null,
     mezzoCodice: t.mezzoCodice ?? null,
     mezzoTipo: t.mezzoTipo ?? null,
+    mezzoStatoApprovazione: t.mezzoStatoApprovazione ?? null,
     volontari: vols.map((r) => ({
       volontarioId: r.v.volontarioId,
       volontarioNome: r.nome && r.cognome ? `${r.cognome} ${r.nome}` : null,
+      volontarioStatoApprovazione: r.statoApprovazione ?? null,
       ruolo: r.v.ruolo ?? null,
     })),
   };
@@ -83,6 +142,7 @@ router.get("/turni", async (req, res) => {
       centroNome: centriAscoltoTable.nome,
       mezzoCodice: mezziTable.codice,
       mezzoTipo: mezziTable.tipo,
+      mezzoStatoApprovazione: mezziTable.statoApprovazione,
     })
     .from(turniTable)
     .leftJoin(centriAscoltoTable, eq(turniTable.centroAscoltoId, centriAscoltoTable.id))
@@ -93,7 +153,12 @@ router.get("/turni", async (req, res) => {
   const ids = turni.map((r) => r.t.id);
   const vols = ids.length
     ? await db
-        .select({ v: turniVolontariTable, nome: volontariTable.nome, cognome: volontariTable.cognome })
+        .select({
+          v: turniVolontariTable,
+          nome: volontariTable.nome,
+          cognome: volontariTable.cognome,
+          statoApprovazione: volontariTable.statoApprovazione,
+        })
         .from(turniVolontariTable)
         .leftJoin(volontariTable, eq(turniVolontariTable.volontarioId, volontariTable.id))
         .where(inArray(turniVolontariTable.turnoId, ids))
@@ -109,11 +174,13 @@ router.get("/turni", async (req, res) => {
       mezzoId: r.t.mezzoId ?? null,
       mezzoCodice: r.mezzoCodice ?? null,
       mezzoTipo: r.mezzoTipo ?? null,
+      mezzoStatoApprovazione: r.mezzoStatoApprovazione ?? null,
       volontari: vols
         .filter((x) => x.v.turnoId === r.t.id)
         .map((x) => ({
           volontarioId: x.v.volontarioId,
           volontarioNome: x.nome && x.cognome ? `${x.cognome} ${x.nome}` : null,
+          volontarioStatoApprovazione: x.statoApprovazione ?? null,
           ruolo: x.v.ruolo ?? null,
         })),
     })),
@@ -145,10 +212,18 @@ router.put("/turni", async (req, res) => {
   // can't attach an out-of-scope vehicle and read its codice/tipo back via GET.
   if (mezzoId != null) {
     const [m] = await db
-      .select({ id: mezziTable.id, centroAscoltoId: mezziTable.centroAscoltoId })
+      .select({
+        id: mezziTable.id,
+        centroAscoltoId: mezziTable.centroAscoltoId,
+        statoApprovazione: mezziTable.statoApprovazione,
+      })
       .from(mezziTable)
       .where(eq(mezziTable.id, mezzoId));
-    if (!m || (m.centroAscoltoId != null && m.centroAscoltoId !== centroAscoltoId)) {
+    if (
+      !m ||
+      m.statoApprovazione === "respinto" ||
+      (m.centroAscoltoId != null && m.centroAscoltoId !== centroAscoltoId)
+    ) {
       res.status(403).json({ error: "Mezzo non assegnabile a questo centro" });
       return;
     }
@@ -188,12 +263,19 @@ router.put("/turni", async (req, res) => {
   // their names back via GET /turni (which joins volontari).
   if (volIds.length) {
     const found = await db
-      .select({ id: volontariTable.id, centroAscoltoId: volontariTable.centroAscoltoId })
+      .select({
+        id: volontariTable.id,
+        centroAscoltoId: volontariTable.centroAscoltoId,
+        statoApprovazione: volontariTable.statoApprovazione,
+      })
       .from(volontariTable)
       .where(inArray(volontariTable.id, volIds));
     const okIds = new Set(
       found
-        .filter((v) => v.centroAscoltoId == null || v.centroAscoltoId === centroAscoltoId)
+        .filter((v) =>
+          v.statoApprovazione !== "respinto" &&
+          (v.centroAscoltoId == null || v.centroAscoltoId === centroAscoltoId)
+        )
         .map((v) => v.id),
     );
     if (volIds.some((id) => !okIds.has(id))) {
@@ -233,14 +315,14 @@ router.put("/turni", async (req, res) => {
       await tx.insert(turniVolontariTable).values(
         volontari.map((v) => ({ turnoId: id, volontarioId: v.volontarioId, ruolo: v.ruolo ?? null })),
       );
-    } else {
-      // No volunteers left → drop the empty slot.
+    } else if (mezzoId == null) {
+      // No volunteers and no mezzo left -> drop the empty slot.
       await tx.delete(turniTable).where(eq(turniTable.id, id));
     }
     return id;
   });
 
-  if (volontari.length) {
+  if (volontari.length || mezzoId != null) {
     res.json(await buildTurno(turnoId));
     return;
   }
@@ -258,7 +340,130 @@ router.put("/turni", async (req, res) => {
     mezzoId: null,
     mezzoCodice: null,
     mezzoTipo: null,
+    mezzoStatoApprovazione: null,
     volontari: [],
+  });
+});
+
+router.post("/turni/volontari-pending", async (req, res) => {
+  const resolved = await resolveCentroAscoltoId(req, req.body?.centroAscoltoId);
+  if ("error" in resolved) {
+    res.status(resolved.status).json({ error: resolved.error });
+    return;
+  }
+  const nome = trimText(req.body?.nome);
+  const cognome = trimText(req.body?.cognome);
+  const matricola = trimText(req.body?.matricola);
+  if (!nome || !cognome || !matricola) {
+    res.status(400).json({ error: "nome, cognome e matricola sono obbligatori" });
+    return;
+  }
+  if (await matricolaVolontarioGiaUsata(matricola)) {
+    res.status(409).json(await matricolaVolontarioDuplicataPayload(matricola));
+    return;
+  }
+  let created: typeof volontariTable.$inferSelect | null = null;
+  try {
+    [created] = await db
+      .insert(volontariTable)
+      .values({
+        nome,
+        cognome,
+        matricola,
+        centroAscoltoId: resolved.centroAscoltoId,
+        telefono: trimText(req.body?.telefono) || null,
+        email: trimText(req.body?.email) || null,
+        ruolo: trimText(req.body?.ruolo) || "volontario",
+        patente: Boolean(req.body?.patente),
+        mezzoPersonale: false,
+        maxConsegneTurno: 5,
+        attivo: false,
+        statoApprovazione: "in_attesa",
+        note: trimText(req.body?.note) || "Inserito da pianificazione turni",
+      })
+      .returning();
+  } catch (e) {
+    if (isVolontarioMatricolaUniqueViolation(e)) {
+      res.status(409).json(await matricolaVolontarioDuplicataPayload(matricola));
+      return;
+    }
+    throw e;
+  }
+  if (!created) {
+    res.status(500).json({ error: "Creazione volontario non riuscita" });
+    return;
+  }
+  res.status(201).json({
+    id: created.id,
+    nome: created.nome,
+    cognome: created.cognome,
+    matricola: created.matricola ?? null,
+    centroAscoltoId: created.centroAscoltoId ?? null,
+    centroAscoltoNome: await centroNome(resolved.centroAscoltoId),
+    telefono: created.telefono ?? null,
+    email: created.email ?? null,
+    ruolo: created.ruolo,
+    patente: created.patente,
+    mezzoPersonale: created.mezzoPersonale,
+    maxConsegneTurno: created.maxConsegneTurno,
+    attivo: created.attivo,
+    statoApprovazione: created.statoApprovazione,
+    note: created.note ?? null,
+    dataCreazione: created.dataCreazione.toISOString(),
+  });
+});
+
+router.post("/turni/mezzi-pending", async (req, res) => {
+  const resolved = await resolveCentroAscoltoId(req, req.body?.centroAscoltoId);
+  if ("error" in resolved) {
+    res.status(resolved.status).json({ error: resolved.error });
+    return;
+  }
+  const tipo = trimText(req.body?.tipo);
+  if (!tipo) {
+    res.status(400).json({ error: "tipo è obbligatorio" });
+    return;
+  }
+  const codice = trimText(req.body?.codice) || await nextMezzoCodice();
+  const [created] = await db
+    .insert(mezziTable)
+    .values({
+      codice,
+      tipo,
+      targa: trimText(req.body?.targa) || null,
+      proprieta: trimText(req.body?.proprieta) || "associazione",
+      proprietarioNome: trimText(req.body?.proprietarioNome) || null,
+      centroAscoltoId: resolved.centroAscoltoId,
+      capacitaColli: toIntOrNull(req.body?.capacitaColli),
+      capacitaKg: req.body?.capacitaKg != null && req.body.capacitaKg !== "" ? String(req.body.capacitaKg) : null,
+      descrizione: trimText(req.body?.descrizione) || null,
+      stato: "non_disponibile",
+      statoApprovazione: "in_attesa",
+      note: trimText(req.body?.note) || "Inserito da pianificazione turni",
+    })
+    .returning();
+  const nomeCentro = await centroNome(resolved.centroAscoltoId);
+  res.status(201).json({
+    id: created.id,
+    codice: created.codice,
+    tipo: created.tipo,
+    targa: created.targa ?? null,
+    proprieta: created.proprieta,
+    proprietarioNome: created.proprietarioNome ?? null,
+    volontarioId: created.volontarioId ?? null,
+    volontarioNome: null,
+    centroAscoltoId: created.centroAscoltoId ?? null,
+    effectiveCentroId: created.centroAscoltoId ?? null,
+    effectiveCentroNome: nomeCentro,
+    capacitaColli: created.capacitaColli ?? null,
+    capacitaKg: created.capacitaKg ? parseFloat(created.capacitaKg) : null,
+    descrizione: created.descrizione ?? null,
+    stato: created.stato,
+    statoApprovazione: created.statoApprovazione,
+    scadenzaAssicurazione: created.scadenzaAssicurazione ?? null,
+    scadenzaRevisione: created.scadenzaRevisione ?? null,
+    note: created.note ?? null,
+    dataCreazione: created.dataCreazione.toISOString(),
   });
 });
 

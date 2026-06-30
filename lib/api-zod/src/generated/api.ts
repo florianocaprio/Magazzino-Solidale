@@ -1183,9 +1183,11 @@ export const ListTurniResponseItem = zod.object({
   "mezzoId": zod.number().nullish(),
   "mezzoCodice": zod.string().nullish(),
   "mezzoTipo": zod.string().nullish(),
+  "mezzoStatoApprovazione": zod.string().nullish(),
   "volontari": zod.array(zod.object({
   "volontarioId": zod.number(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioStatoApprovazione": zod.string().nullish(),
   "ruolo": zod.string().nullish()
 }))
 })
@@ -1215,11 +1217,46 @@ export const UpsertTurnoResponse = zod.object({
   "mezzoId": zod.number().nullish(),
   "mezzoCodice": zod.string().nullish(),
   "mezzoTipo": zod.string().nullish(),
+  "mezzoStatoApprovazione": zod.string().nullish(),
   "volontari": zod.array(zod.object({
   "volontarioId": zod.number(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioStatoApprovazione": zod.string().nullish(),
   "ruolo": zod.string().nullish()
 }))
+})
+
+
+/**
+ * @summary Create a pending volunteer from shift planning
+ */
+export const CreateTurnoVolontarioPendingBody = zod.object({
+  "centroAscoltoId": zod.number(),
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "matricola": zod.string(),
+  "telefono": zod.string().optional(),
+  "email": zod.string().optional(),
+  "ruolo": zod.string().optional(),
+  "patente": zod.boolean().optional(),
+  "note": zod.string().optional()
+})
+
+
+/**
+ * @summary Create a pending vehicle from shift planning
+ */
+export const CreateTurnoMezzoPendingBody = zod.object({
+  "centroAscoltoId": zod.number(),
+  "codice": zod.string().optional(),
+  "tipo": zod.string(),
+  "targa": zod.string().optional(),
+  "proprieta": zod.string().optional(),
+  "proprietarioNome": zod.string().optional(),
+  "capacitaColli": zod.number().optional(),
+  "capacitaKg": zod.number().optional(),
+  "descrizione": zod.string().optional(),
+  "note": zod.string().optional()
 })
 
 
@@ -1487,6 +1524,7 @@ export const GetBeneficiarioResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
   "stato": zod.string(),
@@ -1761,6 +1799,7 @@ export const ListConsegneResponseItem = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
   "stato": zod.string(),
@@ -1783,6 +1822,7 @@ export const CreateConsegnaBody = zod.object({
   "zona": zod.string().optional(),
   "magazzinoId": zod.number(),
   "volontarioId": zod.number().optional(),
+  "volontarioAltro": zod.string().optional(),
   "mezzoId": zod.number().optional(),
   "mezzoAltro": zod.boolean().optional(),
   "noteOperative": zod.string().optional()
@@ -1809,6 +1849,7 @@ export const GetConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
   "stato": zod.string(),
@@ -1832,6 +1873,7 @@ export const UpdateConsegnaBody = zod.object({
   "indirizzoConsegna": zod.string().optional(),
   "zona": zod.string().optional(),
   "volontarioId": zod.number().optional(),
+  "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().optional(),
   "mezzoAltro": zod.boolean().optional(),
   "stato": zod.string().optional(),
@@ -1854,6 +1896,7 @@ export const UpdateConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
   "stato": zod.string(),
@@ -1897,6 +1940,7 @@ export const CompletaConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
   "stato": zod.string(),
@@ -1962,6 +2006,7 @@ export const AssociaBollaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
   "stato": zod.string(),
@@ -1987,6 +2032,7 @@ export const ListBolleResponseItem = zod.object({
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
   "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -2031,6 +2077,7 @@ export const GetBollaResponse = zod.object({
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
   "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
@@ -2090,6 +2137,7 @@ export const UpdateBollaResponse = zod.object({
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
   "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
@@ -2185,6 +2233,7 @@ export const ConfermaBollaResponse = zod.object({
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
   "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
@@ -2233,6 +2282,7 @@ export const AnnullaBollaResponse = zod.object({
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
   "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
@@ -2286,6 +2336,7 @@ export const ConsegnaBollaResponse = zod.object({
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
   "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "indirizzoConsegna": zod.string().nullish(),
@@ -2746,6 +2797,11 @@ export const UpdateImpostazioniEmailResponse = zod.object({
 })
 
 
+export const ListVolontariQueryParams = zod.object({
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "search": zod.coerce.string().optional()
+})
+
 export const ListVolontariResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
@@ -2760,6 +2816,7 @@ export const ListVolontariResponseItem = zod.object({
   "mezzoPersonale": zod.boolean(),
   "maxConsegneTurno": zod.number(),
   "attivo": zod.boolean(),
+  "statoApprovazione": zod.string().optional(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
@@ -2777,6 +2834,7 @@ export const CreateVolontarioBody = zod.object({
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
   "maxConsegneTurno": zod.number().optional(),
+  "statoApprovazione": zod.string().optional(),
   "note": zod.string().optional()
 })
 
@@ -2793,6 +2851,7 @@ export const BulkVolontariBody = zod.object({
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
   "maxConsegneTurno": zod.number().optional(),
+  "statoApprovazione": zod.string().optional(),
   "note": zod.string().optional()
 }))
 })
@@ -2840,6 +2899,7 @@ export const GetVolontarioResponse = zod.object({
   "mezzoPersonale": zod.boolean(),
   "maxConsegneTurno": zod.number(),
   "attivo": zod.boolean(),
+  "statoApprovazione": zod.string().optional(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
@@ -2861,6 +2921,7 @@ export const UpdateVolontarioBody = zod.object({
   "mezzoPersonale": zod.boolean().optional(),
   "maxConsegneTurno": zod.number().optional(),
   "attivo": zod.boolean().optional(),
+  "statoApprovazione": zod.string().optional(),
   "note": zod.string().optional()
 })
 
@@ -2878,6 +2939,7 @@ export const UpdateVolontarioResponse = zod.object({
   "mezzoPersonale": zod.boolean(),
   "maxConsegneTurno": zod.number(),
   "attivo": zod.boolean(),
+  "statoApprovazione": zod.string().optional(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
@@ -2904,6 +2966,7 @@ export const ListMezziResponseItem = zod.object({
   "capacitaKg": zod.number().nullish(),
   "descrizione": zod.string().nullish(),
   "stato": zod.string(),
+  "statoApprovazione": zod.string().optional(),
   "scadenzaAssicurazione": zod.string().nullish(),
   "scadenzaRevisione": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -2923,6 +2986,7 @@ export const CreateMezzoBody = zod.object({
   "capacitaColli": zod.number().optional(),
   "capacitaKg": zod.number().optional(),
   "descrizione": zod.string().optional(),
+  "statoApprovazione": zod.string().optional(),
   "scadenzaAssicurazione": zod.string().optional(),
   "scadenzaRevisione": zod.string().optional(),
   "note": zod.string().optional()
@@ -2941,6 +3005,7 @@ export const BulkMezziBody = zod.object({
   "capacitaColli": zod.number().optional(),
   "capacitaKg": zod.number().optional(),
   "descrizione": zod.string().optional(),
+  "statoApprovazione": zod.string().optional(),
   "scadenzaAssicurazione": zod.string().optional(),
   "scadenzaRevisione": zod.string().optional(),
   "note": zod.string().optional()
@@ -2976,6 +3041,7 @@ export const GetMezzoResponse = zod.object({
   "capacitaKg": zod.number().nullish(),
   "descrizione": zod.string().nullish(),
   "stato": zod.string(),
+  "statoApprovazione": zod.string().optional(),
   "scadenzaAssicurazione": zod.string().nullish(),
   "scadenzaRevisione": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -2998,6 +3064,7 @@ export const UpdateMezzoBody = zod.object({
   "capacitaKg": zod.number().optional(),
   "descrizione": zod.string().optional(),
   "stato": zod.string().optional(),
+  "statoApprovazione": zod.string().optional(),
   "scadenzaAssicurazione": zod.string().optional(),
   "scadenzaRevisione": zod.string().optional(),
   "note": zod.string().optional()
@@ -3019,6 +3086,7 @@ export const UpdateMezzoResponse = zod.object({
   "capacitaKg": zod.number().nullish(),
   "descrizione": zod.string().nullish(),
   "stato": zod.string(),
+  "statoApprovazione": zod.string().optional(),
   "scadenzaAssicurazione": zod.string().nullish(),
   "scadenzaRevisione": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -3028,6 +3096,79 @@ export const UpdateMezzoResponse = zod.object({
 
 export const DeleteMezzoParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Pending volunteers and vehicles inserted from planning
+ */
+export const ListApprovazioniLogisticaResponse = zod.object({
+  "volontari": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "matricola": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "ruolo": zod.string(),
+  "attivo": zod.boolean(),
+  "statoApprovazione": zod.string(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})),
+  "mezzi": zod.array(zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "tipo": zod.string(),
+  "targa": zod.string().nullish(),
+  "proprieta": zod.string(),
+  "proprietarioNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "descrizione": zod.string().nullish(),
+  "stato": zod.string(),
+  "statoApprovazione": zod.string(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+}))
+})
+
+
+export const ApprovaVolontarioLogisticaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApprovaVolontarioLogisticaResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+export const RespingiVolontarioLogisticaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RespingiVolontarioLogisticaResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+export const ApprovaMezzoLogisticaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApprovaMezzoLogisticaResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+export const RespingiMezzoLogisticaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RespingiMezzoLogisticaResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 
@@ -3384,6 +3525,12 @@ export const DeleteRuoloParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+export const ListUtentiQueryParams = zod.object({
+  "cittaId": zod.coerce.number().optional(),
+  "matricola": zod.coerce.string().optional(),
+  "query": zod.coerce.string().optional()
+})
 
 export const ListUtentiResponseItem = zod.object({
   "id": zod.number(),

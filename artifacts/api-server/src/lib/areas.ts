@@ -54,6 +54,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   // (that would auto-deny every non-admin in areaGuard).
   "tipologie-fornitore": "logistica",
   approvvigionamenti: "logistica",
+  "approvazioni-logistica": "logistica",
 
   report: "analisi",
 

@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Volontario {
+export interface ApprovazioneVolontario {
   id: number;
   nome: string;
   cognome: string;
@@ -21,11 +21,8 @@ export interface Volontario {
   /** @nullable */
   email?: string | null;
   ruolo: string;
-  patente: boolean;
-  mezzoPersonale: boolean;
-  maxConsegneTurno: number;
   attivo: boolean;
-  statoApprovazione?: string;
+  statoApprovazione: string;
   /** @nullable */
   note?: string | null;
   dataCreazione: string;

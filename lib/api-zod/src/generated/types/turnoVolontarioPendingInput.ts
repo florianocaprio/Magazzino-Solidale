@@ -6,18 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface VolontarioInput {
+export interface TurnoVolontarioPendingInput {
+  centroAscoltoId: number;
   nome: string;
   cognome: string;
   matricola: string;
-  /** @nullable */
-  centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
-  ruolo: string;
+  ruolo?: string;
   patente?: boolean;
-  mezzoPersonale?: boolean;
-  maxConsegneTurno?: number;
-  statoApprovazione?: string;
   note?: string;
 }

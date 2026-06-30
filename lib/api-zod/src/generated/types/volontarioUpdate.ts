@@ -19,5 +19,6 @@ export interface VolontarioUpdate {
   mezzoPersonale?: boolean;
   maxConsegneTurno?: number;
   attivo?: boolean;
+  statoApprovazione?: string;
   note?: string;
 }

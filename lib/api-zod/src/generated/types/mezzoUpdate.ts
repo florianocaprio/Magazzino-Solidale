@@ -19,6 +19,7 @@ export interface MezzoUpdate {
   capacitaKg?: number;
   descrizione?: string;
   stato?: string;
+  statoApprovazione?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;

@@ -11,5 +11,7 @@ export interface TurnoVolontario {
   /** @nullable */
   volontarioNome?: string | null;
   /** @nullable */
+  volontarioStatoApprovazione?: string | null;
+  /** @nullable */
   ruolo?: string | null;
 }

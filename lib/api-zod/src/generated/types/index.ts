@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './actionResult';
 export * from './alert';
 export * from './allocazioneMezziReport';
 export * from './allocazioneMezziReportAltro';
 export * from './allocazioneMezziRiga';
+export * from './approvazioneMezzo';
+export * from './approvazioneVolontario';
+export * from './approvazioniLogistica';
 export * from './approvvigionamento';
 export * from './approvvigionamentoInput';
 export * from './approvvigionamentoRiga';
@@ -83,6 +87,8 @@ export * from './listMovimentiParams';
 export * from './listProdottiParams';
 export * from './listTrasferimentiParams';
 export * from './listTurniParams';
+export * from './listUtentiParams';
+export * from './listVolontariParams';
 export * from './listZoneUdsParams';
 export * from './loginInput';
 export * from './lotto';
@@ -145,8 +151,10 @@ export * from './trasferimentoRigaInput';
 export * from './trasferimentoUpdate';
 export * from './turno';
 export * from './turnoInput';
+export * from './turnoMezzoPendingInput';
 export * from './turnoVolontario';
 export * from './turnoVolontarioInput';
+export * from './turnoVolontarioPendingInput';
 export * from './udsInterventiMeseReport';
 export * from './udsInterventiTipoReport';
 export * from './udsInterventiZonaReport';

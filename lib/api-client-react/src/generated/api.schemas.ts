@@ -115,6 +115,7 @@ export interface VolontarioInput {
   patente?: boolean;
   mezzoPersonale?: boolean;
   maxConsegneTurno?: number;
+  statoApprovazione?: string;
   note?: string;
 }
 
@@ -135,6 +136,7 @@ export interface MezzoInput {
   capacitaColli?: number;
   capacitaKg?: number;
   descrizione?: string;
+  statoApprovazione?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;
@@ -742,6 +744,8 @@ export interface TurnoVolontario {
   /** @nullable */
   volontarioNome?: string | null;
   /** @nullable */
+  volontarioStatoApprovazione?: string | null;
+  /** @nullable */
   ruolo?: string | null;
 }
 
@@ -758,6 +762,8 @@ export interface Turno {
   mezzoCodice?: string | null;
   /** @nullable */
   mezzoTipo?: string | null;
+  /** @nullable */
+  mezzoStatoApprovazione?: string | null;
   volontari: TurnoVolontario[];
 }
 
@@ -773,6 +779,31 @@ export interface TurnoInput {
   /** @nullable */
   mezzoId?: number | null;
   volontari: TurnoVolontarioInput[];
+}
+
+export interface TurnoVolontarioPendingInput {
+  centroAscoltoId: number;
+  nome: string;
+  cognome: string;
+  matricola: string;
+  telefono?: string;
+  email?: string;
+  ruolo?: string;
+  patente?: boolean;
+  note?: string;
+}
+
+export interface TurnoMezzoPendingInput {
+  centroAscoltoId: number;
+  codice?: string;
+  tipo: string;
+  targa?: string;
+  proprieta?: string;
+  proprietarioNome?: string;
+  capacitaColli?: number;
+  capacitaKg?: number;
+  descrizione?: string;
+  note?: string;
 }
 
 export interface BeneficiarioSimile {
@@ -937,6 +968,8 @@ export interface Consegna {
   volontarioId?: number | null;
   /** @nullable */
   volontarioNome?: string | null;
+  /** @nullable */
+  volontarioAltro?: string | null;
   /** @nullable */
   mezzoId?: number | null;
   mezzoAltro?: boolean;
@@ -1384,6 +1417,7 @@ export interface ConsegnaInput {
   zona?: string;
   magazzinoId: number;
   volontarioId?: number;
+  volontarioAltro?: string;
   mezzoId?: number;
   mezzoAltro?: boolean;
   noteOperative?: string;
@@ -1396,6 +1430,8 @@ export interface ConsegnaUpdate {
   indirizzoConsegna?: string;
   zona?: string;
   volontarioId?: number;
+  /** @nullable */
+  volontarioAltro?: string | null;
   mezzoId?: number;
   mezzoAltro?: boolean;
   stato?: string;
@@ -1411,6 +1447,7 @@ export interface Bolla {
   beneficiarioNome?: string | null;
   /** @nullable */
   consegnaId?: number | null;
+  daPianificazione?: boolean;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
@@ -1466,6 +1503,7 @@ export interface BollaDettaglio {
   beneficiarioNome?: string | null;
   /** @nullable */
   consegnaId?: number | null;
+  daPianificazione?: boolean;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
@@ -1564,6 +1602,7 @@ export interface Volontario {
   mezzoPersonale: boolean;
   maxConsegneTurno: number;
   attivo: boolean;
+  statoApprovazione?: string;
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
@@ -1582,6 +1621,7 @@ export interface VolontarioUpdate {
   mezzoPersonale?: boolean;
   maxConsegneTurno?: number;
   attivo?: boolean;
+  statoApprovazione?: string;
   note?: string;
 }
 
@@ -1611,6 +1651,7 @@ export interface Mezzo {
   /** @nullable */
   descrizione?: string | null;
   stato: string;
+  statoApprovazione?: string;
   /** @nullable */
   scadenzaAssicurazione?: string | null;
   /** @nullable */
@@ -1633,9 +1674,63 @@ export interface MezzoUpdate {
   capacitaKg?: number;
   descrizione?: string;
   stato?: string;
+  statoApprovazione?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;
+}
+
+export interface ActionResult {
+  ok: boolean;
+}
+
+export interface ApprovazioneVolontario {
+  id: number;
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  email?: string | null;
+  ruolo: string;
+  attivo: boolean;
+  statoApprovazione: string;
+  /** @nullable */
+  note?: string | null;
+  dataCreazione: string;
+}
+
+export interface ApprovazioneMezzo {
+  id: number;
+  codice: string;
+  tipo: string;
+  /** @nullable */
+  targa?: string | null;
+  proprieta: string;
+  /** @nullable */
+  proprietarioNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
+  descrizione?: string | null;
+  stato: string;
+  statoApprovazione: string;
+  /** @nullable */
+  note?: string | null;
+  dataCreazione: string;
+}
+
+export interface ApprovazioniLogistica {
+  volontari: ApprovazioneVolontario[];
+  mezzi: ApprovazioneMezzo[];
 }
 
 export interface GiacenzaMagazzinoReport {
@@ -1978,6 +2073,11 @@ export type ListZoneUdsParams = {
 cittaId?: number;
 };
 
+export type ListVolontariParams = {
+centroAscoltoId?: number;
+search?: string;
+};
+
 export type GetVolontariCaricoParams = {
 /**
  * Data del turno (YYYY-MM-DD)
@@ -2061,5 +2161,11 @@ zonaUdsId?: number;
 export type ReportUdsPersonePerZonaParams = {
 cittaId?: number;
 zonaUdsId?: number;
+};
+
+export type ListUtentiParams = {
+cittaId?: number;
+matricola?: string;
+query?: string;
 };
 

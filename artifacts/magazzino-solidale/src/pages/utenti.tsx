@@ -82,7 +82,21 @@ export default function Utenti() {
   const isCentroLocked = lockedCentroId != null;
   const lockedCittaId = currentUser?.cittaId ?? null;
   const isCittaLocked = lockedCittaId != null;
-  const { data: utenti, isLoading } = useListUtenti();
+  const canFilterAreaGeografica = currentUser?.isAdmin ?? false;
+  const [cittaFilter, setCittaFilter] = useState("all");
+  const [matricolaFilter, setMatricolaFilter] = useState("");
+  const [nomeFilter, setNomeFilter] = useState("");
+  const effectiveCittaFilter = isCittaLocked && lockedCittaId != null ? String(lockedCittaId) : cittaFilter;
+  const utentiParams = {
+    ...(canFilterAreaGeografica && effectiveCittaFilter !== "all" ? { cittaId: parseInt(effectiveCittaFilter, 10) } : {}),
+    ...(matricolaFilter.trim() ? { matricola: matricolaFilter.trim() } : {}),
+    ...(nomeFilter.trim() ? { query: nomeFilter.trim() } : {}),
+  };
+  const listUtentiParams = Object.keys(utentiParams).length > 0 ? utentiParams : undefined;
+  const { data: utenti, isLoading } = useListUtenti(
+    listUtentiParams,
+    { query: { queryKey: getListUtentiQueryKey(listUtentiParams) } },
+  );
   const { data: ruoli } = useListRuoli();
   const { data: centri } = useListCentriAscolto();
   const { data: citta } = useListCitta();
@@ -290,7 +304,46 @@ export default function Utenti() {
       </div>
 
       <Card>
-        <CardHeader className="pb-0" />
+        <CardHeader className="border-b">
+          <div className="grid gap-3 md:grid-cols-3">
+            {canFilterAreaGeografica && (
+              <div className="space-y-2">
+                <Label>{t("utenti.areaGeografica", { defaultValue: "Area geografica" })}</Label>
+                <Select value={effectiveCittaFilter} onValueChange={setCittaFilter} disabled={isCittaLocked}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("common.tutteCitta", { defaultValue: "Tutte le aree" })} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!isCittaLocked && <SelectItem value="all">{t("common.tutteCitta", { defaultValue: "Tutte le aree" })}</SelectItem>}
+                    {citta?.map((area) => (
+                      <SelectItem key={area.id} value={String(area.id)}>
+                        {area.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="utenti-filter-matricola">{t("utenti.colMatricola")}</Label>
+              <Input
+                id="utenti-filter-matricola"
+                value={matricolaFilter}
+                onChange={(e) => setMatricolaFilter(e.target.value)}
+                placeholder={t("utenti.matricolaPlaceholder")}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="utenti-filter-nome">{t("common.name")}</Label>
+              <Input
+                id="utenti-filter-nome"
+                value={nomeFilter}
+                onChange={(e) => setNomeFilter(e.target.value)}
+                placeholder={t("utenti.searchNamePlaceholder", { defaultValue: "Nome, cognome o username" })}
+              />
+            </div>
+          </div>
+        </CardHeader>
         <CardContent className="pt-6">
           {isLoading ? (
             <div className="space-y-2">
