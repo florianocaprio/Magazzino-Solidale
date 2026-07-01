@@ -30,6 +30,7 @@ import {
 import { volontarioOverLimit } from "../lib/volontarioCarico";
 import { sendEmail } from "../lib/emailService";
 import { buildIcs } from "../lib/ics";
+import { completeBollaDelivery, handleBollaActionError } from "../lib/bollaDelivery";
 
 const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
 
@@ -357,7 +358,8 @@ router.post("/consegne/:id/associa-bolla", async (req, res) => {
   await db.update(bolleTable).set({ consegnaId: null }).where(eq(bolleTable.consegnaId, consegnaId));
   await db.update(bolleTable).set({ consegnaId }).where(eq(bolleTable.id, bollaId));
 
-  res.json(await dettaglioConsegna(consegnaId));
+  const [row] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
+  res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
 router.post("/consegne/:id/completa", async (req, res) => {
@@ -365,9 +367,12 @@ router.post("/consegne/:id/completa", async (req, res) => {
 
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), callerCittaId(req))
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), callerZonaUdsId(req))) {
+  const caller = callerCentroId(req);
+  const cid = callerCittaId(req);
+  const zid = callerZonaUdsId(req);
+  if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), caller)
+      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), cid)
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), zid)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -385,17 +390,25 @@ router.post("/consegne/:id/completa", async (req, res) => {
     res.status(400).json({ error: "Associa prima una bolla pronta: la merce non risulta ancora preparata." });
     return;
   }
-
-  // marca la bolla come consegnata (l'intervento collegato è già stato creato
-  // alla conferma della bolla, quindi figura nello storico interventi del beneficiario)
-  if (bollaPronta.stato === "confermato") {
-    await db.update(bolleTable).set({ stato: "consegnato", confermaRicezione: true }).where(eq(bolleTable.id, bollaPronta.id));
+  if (!(await canAccessMagazzino(bollaPronta.magazzinoId, caller, cid))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
+    return;
   }
 
-  const [row] = await db.update(consegneTable)
-    .set({ stato: "effettuata", dataEffettuata: new Date() })
-    .where(eq(consegneTable.id, consegnaId))
-    .returning();
+  try {
+    await completeBollaDelivery({
+      bollaId: bollaPronta.id,
+      userId: req.user!.id,
+      confermaRicezione: true,
+      allowAlreadyConsegnata: true,
+    });
+  } catch (err) {
+    if (handleBollaActionError(err, res)) return;
+    throw err;
+  }
+
+  const [row] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 

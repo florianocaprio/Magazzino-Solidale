@@ -15,6 +15,7 @@ export * from "./beneficiari";
 export * from "./interventi";
 export * from "./consegne";
 export * from "./bolle";
+export * from "./prenotazioniMagazzino";
 export * from "./trasferimenti";
 export * from "./scarichi";
 export * from "./approvvigionamenti";

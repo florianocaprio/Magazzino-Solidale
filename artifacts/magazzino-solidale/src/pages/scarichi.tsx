@@ -83,7 +83,7 @@ function RigheEditor({
       return;
     }
     const g = giacenze?.find((x) => x.prodottoId === p.id);
-    if (!g || g.quantitaTotale <= 0) {
+    if (!g || Math.max(0, g.disponibileReale) <= 0) {
       toast({ title: t("scarichi.scanNoStock", { name: p.nome }), variant: "destructive" });
       return;
     }
@@ -114,7 +114,7 @@ function RigheEditor({
 
       {righe.map((r) => {
         const giac = giacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
-        const max = giac?.quantitaTotale ?? 0;
+        const max = Math.max(0, giac?.disponibileReale ?? 0);
         const qNum = parseFloat(r.quantita || "0");
         const eccede = !!r.prodottoId && qNum > max;
         return (
@@ -135,7 +135,7 @@ function RigheEditor({
                       ?.filter((g) => g.prodottoId === parseInt(r.prodottoId) || !usedIds.includes(String(g.prodottoId)))
                       .map((g) => (
                         <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
-                          {g.prodottoNome} — {g.quantitaTotale} {g.unitaMisura} {t("scarichi.disponibileSuffix")}
+                          {g.prodottoNome} — {Math.max(0, g.disponibileReale)} {g.unitaMisura} {t("scarichi.disponibileSuffix")}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -251,7 +251,7 @@ function NuovoScaricoForm({
   const righeValide = righe.filter((r) => r.prodottoId && parseFloat(r.quantita || "0") > 0);
   const hasEccesso = righeValide.some((r) => {
     const giac = giacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
-    return parseFloat(r.quantita) > (giac?.quantitaTotale ?? 0);
+    return parseFloat(r.quantita) > Math.max(0, giac?.disponibileReale ?? 0);
   });
   const canSubmit =
     !!magazzinoId &&

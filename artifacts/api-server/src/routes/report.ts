@@ -312,7 +312,7 @@ router.get("/report/fse-plus", async (req, res) => {
     JOIN lotti l ON br.lotto_id = l.id
     JOIN prodotti p ON br.prodotto_id = p.id
     WHERE l.fse_plus = true
-      AND b.stato IN ('confermato', 'consegnato')
+      AND b.stato = 'consegnato'
       AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
     GROUP BY p.id, p.nome, p.unita_misura
     ORDER BY p.nome
@@ -325,7 +325,7 @@ router.get("/report/fse-plus", async (req, res) => {
     JOIN bolla_righe br ON br.bolla_id = b.id
     JOIN lotti l ON br.lotto_id = l.id
     WHERE l.fse_plus = true
-      AND b.stato IN ('confermato', 'consegnato')
+      AND b.stato = 'consegnato'
       AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
   `);
   const beneficiariTotali = Number((famRes.rows[0] as Record<string, unknown>)?.tot ?? 0);
@@ -337,7 +337,7 @@ router.get("/report/fse-plus", async (req, res) => {
       JOIN bolla_righe br ON br.bolla_id = b.id
       JOIN lotti l ON br.lotto_id = l.id
       WHERE l.fse_plus = true
-        AND b.stato IN ('confermato', 'consegnato')
+        AND b.stato = 'consegnato'
         AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
     ),
     persone AS (

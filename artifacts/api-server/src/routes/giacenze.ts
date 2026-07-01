@@ -1,13 +1,18 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { lottiTable, prodottiTable, magazziniTable } from "@workspace/db";
-import { eq, and, gt, sum, count, min, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, gt, sum, count, min } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
 } from "../lib/centroScope";
+import {
+  calcolaImpegnatoAttivoPerGiacenze,
+  disponibilitaMagazzinoKey,
+  parseDbNumber,
+} from "../lib/disponibilitaMagazzino";
 
 const router: IRouter = Router();
 
@@ -42,9 +47,14 @@ router.get("/giacenze", async (req, res) => {
     .groupBy(prodottiTable.id, magazziniTable.id)
     .orderBy(prodottiTable.nome);
 
+  const impegnatoByKey = await calcolaImpegnatoAttivoPerGiacenze(
+    rows.map((r) => ({ prodottoId: r.prodottoId, magazzinoId: r.magazzinoId })),
+  );
+
   const result = rows.map(r => {
-    const qt = parseFloat(r.quantitaTotale ?? "0");
-    const sm = parseFloat(r.scortaMinima ?? "0");
+    const giacenzaFisica = parseDbNumber(r.quantitaTotale);
+    const impegnato = impegnatoByKey.get(disponibilitaMagazzinoKey(r.prodottoId, r.magazzinoId)) ?? 0;
+    const sm = parseDbNumber(r.scortaMinima);
     return {
       prodottoId: r.prodottoId,
       prodottoNome: r.prodottoNome,
@@ -53,10 +63,13 @@ router.get("/giacenze", async (req, res) => {
       unitaMisura: r.unitaMisura,
       magazzinoId: r.magazzinoId,
       magazzinoNome: r.magazzinoNome,
-      quantitaTotale: qt,
+      quantitaTotale: giacenzaFisica,
+      giacenzaFisica,
+      impegnato,
+      disponibileReale: giacenzaFisica - impegnato,
       scortaMinima: sm,
-      scortaConsigliata: parseFloat(r.scortaConsigliata ?? "0"),
-      sottoscorta: qt <= sm,
+      scortaConsigliata: parseDbNumber(r.scortaConsigliata),
+      sottoscorta: giacenzaFisica <= sm,
       lottiAttivi: Number(r.lottiAttivi),
       prossimaScadenza: r.prossimaScadenza ?? null,
     };

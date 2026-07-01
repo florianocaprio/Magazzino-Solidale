@@ -127,12 +127,12 @@ describe("Report — filtro ?cittaId (admin globale)", () => {
 
     const benA = await createBeneficiario(scope, centro, { cittaId: cittaA });
     const lotA = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 5, fsePlus: true });
-    const bolA = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magNull, stato: "confermato" });
+    const bolA = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magNull, stato: "consegnato" });
     await insertBollaRiga(scope, { bollaId: bolA, prodottoId: prod, lottoId: lotA, quantita: 5 });
 
     const benB = await createBeneficiario(scope, centro, { cittaId: cittaB });
     const lotB = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 5, fsePlus: true });
-    const bolB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull, stato: "confermato" });
+    const bolB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull, stato: "consegnato" });
     await insertBollaRiga(scope, { bollaId: bolB, prodottoId: prod, lottoId: lotB, quantita: 5 });
 
     const afterFiltered = (await request(appAs(null, null)).get(`${q}&cittaId=${cittaA}`)).body
