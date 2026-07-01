@@ -9,6 +9,7 @@ import {
   lottiTable,
   movimentiTable,
   utentiTable,
+  prenotazioniMagazzinoTable,
 } from "@workspace/db";
 import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
 import {
@@ -21,6 +22,11 @@ import {
   magazzinoScopeFilter,
   andScoped,
 } from "../lib/centroScope";
+import {
+  PRENOTAZIONE_MAGAZZINO_ATTIVA,
+  calcolaDisponibilitaMagazzino,
+  parseDbNumber,
+} from "../lib/disponibilitaMagazzino";
 
 const router: IRouter = Router();
 
@@ -76,19 +82,22 @@ async function getScaricoWithRighe(id: number) {
   };
 }
 
-/** Giacenza disponibile per un prodotto in un magazzino */
-async function giacenzaDisponibile(prodottoId: number, magazzinoId: number): Promise<number> {
-  const [res] = await db
-    .select({ totale: sum(lottiTable.quantitaResidua) })
-    .from(lottiTable)
+async function disponibileRealeProdotto(prodottoId: number, magazzinoId: number): Promise<number> {
+  const disponibilita = await calcolaDisponibilitaMagazzino(prodottoId, magazzinoId);
+  return Math.max(0, disponibilita.disponibileReale);
+}
+
+async function impegnatoAttivoLotto(tx: Tx, lottoId: number): Promise<number> {
+  const [res] = await tx
+    .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
+    .from(prenotazioniMagazzinoTable)
     .where(
       and(
-        eq(lottiTable.prodottoId, prodottoId),
-        eq(lottiTable.magazzinoId, magazzinoId),
-        gt(lottiTable.quantitaResidua, "0"),
+        eq(prenotazioniMagazzinoTable.lottoId, lottoId),
+        eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
       ),
     );
-  return parseFloat(res?.totale ?? "0");
+  return parseDbNumber(res?.totale);
 }
 
 /** Scarico FEFO: scala quantità dai lotti per scadenza crescente e registra i movimenti */
@@ -117,8 +126,10 @@ async function scaricoFEFO(tx: Tx, opts: {
 
   for (const lotto of lotti) {
     if (rimanente <= 0) break;
-    const disp = parseFloat(lotto.quantitaResidua);
-    const scala = Math.min(disp, rimanente);
+    const disp = parseDbNumber(lotto.quantitaResidua);
+    const disponibileReale = Math.max(0, disp - await impegnatoAttivoLotto(tx, lotto.id));
+    const scala = Math.min(disponibileReale, rimanente);
+    if (scala <= 0) continue;
 
     await tx
       .update(lottiTable)
@@ -137,7 +148,7 @@ async function scaricoFEFO(tx: Tx, opts: {
       note: `Scarico ${opts.scaricoCodice}${opts.note ? ` — ${opts.note}` : ""}`,
     });
 
-    rimanente -= scala;
+    rimanente = Math.round((rimanente - scala) * 100) / 100;
   }
 }
 
@@ -270,7 +281,7 @@ router.post("/scarichi", async (req, res) => {
     richiestaPerProdotto.set(r.prodottoId, (richiestaPerProdotto.get(r.prodottoId) ?? 0) + r.quantita);
   }
   for (const [prodottoId, richiesta] of richiestaPerProdotto) {
-    const disp = await giacenzaDisponibile(prodottoId, body.magazzinoId);
+    const disp = await disponibileRealeProdotto(prodottoId, body.magazzinoId);
     if (richiesta > disp) {
       res.status(400).json({
         error: `Disponibilità insufficiente per ${prodottoMap.get(prodottoId)?.nome ?? `prodotto #${prodottoId}`}: ${disp} disponibili, richiesti ${richiesta}`,

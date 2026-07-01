@@ -407,6 +407,7 @@ export async function insertBolla(
     magazzinoId: number;
     stato?: string;
     dataBolla?: string;
+    consegnaId?: number | null;
     mezzoId?: number | null;
     mezzoAltro?: boolean;
   },
@@ -418,6 +419,7 @@ export async function insertBolla(
       dataBolla: opts.dataBolla ?? "2026-06-01",
       beneficiarioId: opts.beneficiarioId,
       magazzinoId: opts.magazzinoId,
+      consegnaId: opts.consegnaId ?? null,
       ...(opts.stato ? { stato: opts.stato } : {}),
       ...(opts.mezzoId != null ? { mezzoId: opts.mezzoId } : {}),
       ...(opts.mezzoAltro ? { mezzoAltro: true } : {}),
@@ -568,6 +570,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(prenotazioniMagazzinoTable).where(inArray(prenotazioniMagazzinoTable.id, scope.prenotazioneIds));
   }
   if (scope.bollaIds.length > 0) {
+    await db.delete(interventiTable).where(inArray(interventiTable.bollaId, scope.bollaIds));
     await db.delete(prenotazioniMagazzinoTable).where(inArray(prenotazioniMagazzinoTable.bollaId, scope.bollaIds));
     await db.delete(bollaRigheTable).where(inArray(bollaRigheTable.bollaId, scope.bollaIds));
     await db.delete(bolleTable).where(inArray(bolleTable.id, scope.bollaIds));

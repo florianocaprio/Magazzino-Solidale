@@ -73,7 +73,7 @@ function RigheEditor({
 
       {righe.map((r) => {
         const giac = giacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
-        const max = giac?.quantitaTotale ?? 0;
+        const max = Math.max(0, giac?.disponibileReale ?? 0);
         const qNum = parseFloat(r.quantita || "0");
         const eccede = !!r.prodottoId && qNum > max;
         return (
@@ -94,7 +94,7 @@ function RigheEditor({
                       ?.filter((g) => g.prodottoId === parseInt(r.prodottoId) || !usedIds.includes(String(g.prodottoId)))
                       .map((g) => (
                         <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
-                          {g.prodottoNome} — {g.quantitaTotale} {g.unitaMisura} {t("trasferimenti.disponibileSuffix")}
+                          {g.prodottoNome} — {Math.max(0, g.disponibileReale)} {g.unitaMisura} {t("trasferimenti.disponibileSuffix")}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -202,7 +202,7 @@ function NuovoTrasferimentoForm({
   const righeValide = righe.filter((r) => r.prodottoId && parseFloat(r.quantita || "0") > 0);
   const hasEccesso = righeValide.some((r) => {
     const giac = origineGiacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
-    return parseFloat(r.quantita) > (giac?.quantitaTotale ?? 0);
+    return parseFloat(r.quantita) > Math.max(0, giac?.disponibileReale ?? 0);
   });
   const trasportatoreValido =
     (!!trasportatore && trasportatore !== "altro") ||
@@ -370,7 +370,7 @@ function ModificaTrasferimentoForm({
   const righeValide = righe.filter((r) => r.prodottoId && parseFloat(r.quantita || "0") > 0);
   const hasEccesso = righeValide.some((r) => {
     const giac = origineGiacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
-    return parseFloat(r.quantita) > (giac?.quantitaTotale ?? 0);
+    return parseFloat(r.quantita) > Math.max(0, giac?.disponibileReale ?? 0);
   });
   const canSubmit = righeValide.length > 0 && !hasEccesso && !updateTrasferimento.isPending;
 

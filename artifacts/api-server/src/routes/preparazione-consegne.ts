@@ -8,6 +8,7 @@ import {
   lottiTable,
   magazziniTable,
   beneficiariTable,
+  prenotazioniMagazzinoTable,
 } from "@workspace/db";
 import { eq, and, ne, gt, sum, inArray, countDistinct, asc } from "drizzle-orm";
 import {
@@ -17,6 +18,7 @@ import {
   magazzinoScopeFilter,
   andScoped,
 } from "../lib/centroScope";
+import { PRENOTAZIONE_MAGAZZINO_ATTIVA, parseDbNumber } from "../lib/disponibilitaMagazzino";
 
 const router: IRouter = Router();
 
@@ -105,7 +107,7 @@ router.get("/preparazione-consegne", async (req, res) => {
   const stockRows = await db
     .select({
       prodottoId: lottiTable.prodottoId,
-      disponibile: sum(lottiTable.quantitaResidua),
+      giacenzaFisica: sum(lottiTable.quantitaResidua),
     })
     .from(lottiTable)
     .where(
@@ -116,7 +118,24 @@ router.get("/preparazione-consegne", async (req, res) => {
     )
     .groupBy(lottiTable.prodottoId);
   const stockMap = new Map(
-    stockRows.map((s) => [s.prodottoId, parseFloat(s.disponibile ?? "0")]),
+    stockRows.map((s) => [s.prodottoId, parseDbNumber(s.giacenzaFisica)]),
+  );
+
+  const impegnatoRows = await db
+    .select({
+      prodottoId: prenotazioniMagazzinoTable.prodottoId,
+      impegnato: sum(prenotazioniMagazzinoTable.quantita),
+    })
+    .from(prenotazioniMagazzinoTable)
+    .where(
+      and(
+        inArray(prenotazioniMagazzinoTable.magazzinoId, magIds),
+        eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
+      ),
+    )
+    .groupBy(prenotazioniMagazzinoTable.prodottoId);
+  const impegnatoMap = new Map(
+    impegnatoRows.map((p) => [p.prodottoId, parseDbNumber(p.impegnato)]),
   );
 
   // 4) The deliveries included (one row per non-annullato bolla of a planned consegna).
@@ -154,7 +173,9 @@ router.get("/preparazione-consegne", async (req, res) => {
 
   const righe = righeRows.map((r) => {
     const richiesta = parseFloat(r.quantitaRichiesta ?? "0");
-    const disponibile = stockMap.get(r.prodottoId) ?? 0;
+    const giacenzaFisica = stockMap.get(r.prodottoId) ?? 0;
+    const impegnato = impegnatoMap.get(r.prodottoId) ?? 0;
+    const disponibile = Math.max(0, giacenzaFisica - impegnato);
     return {
       prodottoId: r.prodottoId,
       prodottoNome: r.prodottoNome,

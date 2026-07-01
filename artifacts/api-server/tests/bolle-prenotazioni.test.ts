@@ -8,9 +8,13 @@ import {
   lottiTable,
   movimentiTable,
   prenotazioniMagazzinoTable,
+  consegneTable,
 } from "@workspace/db";
 import { and, asc, eq } from "drizzle-orm";
 import bolleRouter from "../src/routes/bolle";
+import consegneRouter from "../src/routes/consegne";
+import preparazioneConsegneRouter from "../src/routes/preparazione-consegne";
+import reportRouter from "../src/routes/report";
 import {
   makeScopedApp,
   newScope,
@@ -22,6 +26,7 @@ import {
   createMagazzino,
   createProdotto,
   createUtente,
+  insertConsegna,
   insertBolla,
   insertBollaRiga,
   insertPrenotazioneMagazzino,
@@ -40,6 +45,12 @@ let prod: number;
 
 const appAs = (centro: number | null) =>
   makeScopedApp(bolleRouter, { id: operatoreId, centroAscoltoId: centro });
+const consegneAppAs = (centro: number | null) =>
+  makeScopedApp(consegneRouter, { id: operatoreId, centroAscoltoId: centro });
+const preparazioneAppAs = (centro: number | null) =>
+  makeScopedApp(preparazioneConsegneRouter, { id: operatoreId, centroAscoltoId: centro });
+const reportAppAs = (centro: number | null) =>
+  makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro });
 
 async function prenotazioniBolla(bollaId: number) {
   return db
@@ -285,6 +296,126 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
   });
 });
 
+describe("Consegne — completa converte le prenotazioni bolla", () => {
+  it("completa una consegna collegata a bolla confermata convertendo prenotazioni in scarico fisico", async () => {
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+
+    const res = await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.stato).toBe("effettuata");
+    expect(await bollaStato(bollaId)).toBe("consegnato");
+    expect(await lottoResidua(lottoId)).toBe(6);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["convertita_in_scarico"]);
+    expect(await movimentiBolla(bollaId)).toHaveLength(1);
+
+    const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
+    expect(consegna.stato).toBe("effettuata");
+    expect(consegna.dataEffettuata).not.toBeNull();
+  });
+
+  it("completa una consegna legacy senza scalare lotti o duplicare movimenti", async () => {
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId, stato: "confermato" });
+    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    await db.update(lottiTable).set({ quantitaResidua: "6.00" }).where(eq(lottiTable.id, lottoId));
+    await db.insert(movimentiTable).values({
+      tipoMovimento: "scarico",
+      tipoDettaglio: "consegna_beneficiario",
+      dataMovimento: "2026-06-01",
+      magazzinoId: magA,
+      prodottoId: prod,
+      lottoId,
+      quantita: "4.00",
+      unitaMisura: "kg",
+      beneficiarioId: benA,
+      bollaId,
+      bollaRigaId: rigaId,
+      documentoRiferimento: "legacy",
+    });
+
+    const res = await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.stato).toBe("effettuata");
+    expect(await bollaStato(bollaId)).toBe("consegnato");
+    expect(await lottoResidua(lottoId)).toBe(6);
+    expect(await movimentiBolla(bollaId)).toHaveLength(1);
+    expect(await prenotazioniBolla(bollaId)).toHaveLength(0);
+  });
+
+  it("non scarica due volte su doppia chiamata completa/consegna", async () => {
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    expect((await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({})).status).toBe(200);
+
+    const completaBis = await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({});
+    const consegnaBis = await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({});
+
+    expect(completaBis.status).toBe(400);
+    expect(completaBis.body.error).toContain("già consegnata");
+    expect(consegnaBis.status).toBe(400);
+    expect(consegnaBis.body.error).toContain("già consegnata");
+    expect(await lottoResidua(lottoId)).toBe(6);
+    expect(await movimentiBolla(bollaId)).toHaveLength(1);
+  });
+});
+
+describe("Report e preparazione — semantica merce impegnata/consegnata", () => {
+  it("il report FSE+ conta solo bolle fisicamente consegnate", async () => {
+    const before = (await request(reportAppAs(null)).get("/report/fse-plus?anno=2026")).body.beneficiariTotali as number;
+    const benConfermato = await createBeneficiario(scope, centroA);
+    const benConsegnato = await createBeneficiario(scope, centroA);
+    const lottoConfermato = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 5, fsePlus: true });
+    const lottoConsegnato = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 5, fsePlus: true });
+    const bollaConfermata = await insertBolla(scope, { beneficiarioId: benConfermato, magazzinoId: magA, stato: "confermato" });
+    const bollaConsegnata = await insertBolla(scope, { beneficiarioId: benConsegnato, magazzinoId: magA, stato: "consegnato" });
+    await insertBollaRiga(scope, { bollaId: bollaConfermata, prodottoId: prod, lottoId: lottoConfermato, quantita: 5 });
+    await insertBollaRiga(scope, { bollaId: bollaConsegnata, prodottoId: prod, lottoId: lottoConsegnato, quantita: 5 });
+
+    const after = (await request(reportAppAs(null)).get("/report/fse-plus?anno=2026")).body.beneficiariTotali as number;
+
+    expect(after).toBe(before + 1);
+  });
+
+  it("preparazione consegne usa il disponibile reale e non propone merce già impegnata", async () => {
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
+    const bollaPrenotata = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato" });
+    const rigaPrenotata = await insertBollaRiga(scope, { bollaId: bollaPrenotata, prodottoId: prod, lottoId, quantita: 8 });
+    await insertPrenotazioneMagazzino(scope, {
+      bollaId: bollaPrenotata,
+      rigaBollaId: rigaPrenotata,
+      prodottoId: prod,
+      lottoId,
+      magazzinoId: magA,
+      quantita: 8,
+    });
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA });
+    const bollaDaPreparare = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId });
+    await insertBollaRiga(scope, { bollaId: bollaDaPreparare, prodottoId: prod, lottoId, quantita: 3 });
+
+    const res = await request(preparazioneAppAs(centroA)).get(`/preparazione-consegne?magazzinoId=${magA}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.righe).toEqual([
+      expect.objectContaining({
+        prodottoId: prod,
+        quantitaRichiesta: 3,
+        quantitaDisponibile: 2,
+        sufficiente: false,
+      }),
+    ]);
+  });
+});
+
 describe("Bolle — scoping prenotazioni", () => {
   it("impedisce a un utente del centro A di confermare merce del magazzino del centro B", async () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
@@ -317,5 +448,27 @@ describe("Bolle — scoping prenotazioni", () => {
 
     expect(res.status).toBe(409);
     expect(await prenotazioniBolla(bollaId)).toHaveLength(0);
+  });
+
+  it("completa consegna rispetta anche lo scope del magazzino della bolla", async () => {
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magB });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magB, consegnaId, stato: "confermato" });
+    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    await insertPrenotazioneMagazzino(scope, {
+      bollaId,
+      rigaBollaId: rigaId,
+      prodottoId: prod,
+      lottoId,
+      magazzinoId: magB,
+      quantita: 4,
+    });
+
+    const res = await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({});
+
+    expect(res.status).toBe(403);
+    expect(await lottoResidua(lottoId)).toBe(10);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["attiva"]);
+    expect(await bollaStato(bollaId)).toBe("confermato");
   });
 });

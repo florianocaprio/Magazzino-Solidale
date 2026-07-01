@@ -1,8 +1,8 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
   bolleTable, bollaRigheTable, beneficiariTable, magazziniTable,
-  movimentiTable, lottiTable, prodottiTable, volontariTable, interventiTable,
+  lottiTable, prodottiTable, volontariTable,
   consegneTable, utentiTable, centriAscoltoTable,
   prenotazioniMagazzinoTable,
 } from "@workspace/db";
@@ -24,6 +24,17 @@ import {
   visibleMagazzinoIds,
 } from "../lib/centroScope";
 import { parseDbNumber } from "../lib/disponibilitaMagazzino";
+import {
+  BollaActionError,
+  completeBollaDelivery,
+  handleBollaActionError,
+  lockBolla,
+  lockLotto,
+  removeInterventoBolla,
+  scarichiFisiciBolla,
+  stornoRigaTx,
+  syncInterventoBolla,
+} from "../lib/bollaDelivery";
 
 const router: IRouter = Router();
 
@@ -31,90 +42,8 @@ const router: IRouter = Router();
 const STATI_MODIFICABILI = ["bozza"];
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_RILASCIATA = "rilasciata";
-const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-class BollaActionError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
-
-function handleBollaActionError(err: unknown, res: Response): boolean {
-  if (err instanceof BollaActionError) {
-    res.status(err.status).json({ error: err.message });
-    return true;
-  }
-  return false;
-}
-
-// mappa tipo prodotto → etichetta tipo intervento sociale
-const TIPO_PRODOTTO_INTERVENTO: Record<string, string> = {
-  alimentare: "pacco_alimentare",
-  vestiario: "vestiti",
-  igiene: "igiene",
-  medicinali: "medicinali",
-  farmaci: "medicinali",
-};
-
-const LABEL_INTERVENTO: Record<string, string> = {
-  pacco_alimentare: "Pacco Alimentare",
-  vestiti: "Vestiti",
-  igiene: "Igiene",
-  medicinali: "Medicinali",
-};
-
-// crea/aggiorna automaticamente l'intervento sociale collegato alla bolla,
-// etichettato in base ai tipi di prodotto consegnati. Rimuove l'intervento se
-// la bolla non ha più righe.
-async function syncInterventoBolla(bollaId: number) {
-  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
-  if (!bolla) return;
-
-  const righe = await db
-    .select({ tipoProdotto: prodottiTable.tipoProdotto })
-    .from(bollaRigheTable)
-    .leftJoin(prodottiTable, eq(bollaRigheTable.prodottoId, prodottiTable.id))
-    .where(eq(bollaRigheTable.bollaId, bollaId));
-
-  const [esistente] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
-
-  if (righe.length === 0) {
-    if (esistente) await db.delete(interventiTable).where(eq(interventiTable.id, esistente.id));
-    return;
-  }
-
-  // etichette distinte, in ordine di prima comparsa
-  const etichette: string[] = [];
-  for (const r of righe) {
-    const tipo = r.tipoProdotto ?? "";
-    const label = TIPO_PRODOTTO_INTERVENTO[tipo] ?? (tipo || "consegna");
-    if (!etichette.includes(label)) etichette.push(label);
-  }
-  const tipoIntervento = etichette.join(",");
-  const descLabels = etichette.map(e => LABEL_INTERVENTO[e] ?? e).join(", ");
-  const descrizione = `Consegna automatica da bolla ${bolla.numeroBolla}: ${descLabels}`;
-
-  if (esistente) {
-    await db.update(interventiTable)
-      .set({ tipoIntervento, descrizione, beneficiarioId: bolla.beneficiarioId, dataIntervento: bolla.dataBolla, operatoreId: bolla.operatoreId })
-      .where(eq(interventiTable.id, esistente.id));
-  } else {
-    await db.insert(interventiTable).values({
-      beneficiarioId: bolla.beneficiarioId,
-      bollaId,
-      dataIntervento: bolla.dataBolla,
-      tipoIntervento,
-      descrizione,
-      operatoreId: bolla.operatoreId,
-    });
-  }
-}
-
-async function removeInterventoBolla(bollaId: number) {
-  await db.delete(interventiTable).where(eq(interventiTable.bollaId, bollaId));
-}
 
 async function canUseVolontarioConsegna(volontarioId: unknown, beneficiarioId: number): Promise<boolean> {
   const id = Number(volontarioId);
@@ -131,41 +60,6 @@ async function canUseVolontarioConsegna(volontarioId: unknown, beneficiarioId: n
   if (!volontario) return false;
   if (!volontario.attivo || volontario.statoApprovazione !== "approvato") return false;
   return canAccessCentro(volontario.centroAscoltoId, centroBeneficiario);
-}
-
-// Allinea la pianificazione consegne quando una bolla viene consegnata.
-// - se la bolla è già collegata a una consegna, la marca come effettuata;
-// - altrimenti crea una "consegna diretta" (fatta in sede dal centro di ascolto
-//   a cui il beneficiario fa riferimento) già effettuata, e vi collega la bolla.
-async function syncConsegnaDaBolla(bolla: typeof bolleTable.$inferSelect) {
-  const now = new Date();
-
-  if (bolla.consegnaId != null) {
-    const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, bolla.consegnaId));
-    if (consegna) {
-      if (consegna.stato !== "effettuata") {
-        await db.update(consegneTable)
-          .set({ stato: "effettuata", dataEffettuata: now })
-          .where(eq(consegneTable.id, bolla.consegnaId));
-      }
-      return;
-    }
-    // link pendente verso una consegna inesistente: ricade nella creazione diretta
-  }
-
-  const today = new Date().toISOString().split("T")[0];
-  const codice = `CON-${Date.now()}`;
-  const [nuova] = await db.insert(consegneTable).values({
-    codice,
-    beneficiarioId: bolla.beneficiarioId,
-    tipoConsegna: "diretta",
-    dataPrevista: today,
-    magazzinoId: bolla.magazzinoId,
-    stato: "effettuata",
-    dataEffettuata: now,
-    noteOperative: `Consegna diretta registrata dalla bolla ${bolla.numeroBolla}`,
-  }).returning();
-  await db.update(bolleTable).set({ consegnaId: nuova.id }).where(eq(bolleTable.id, bolla.id));
 }
 
 async function buildDettaglio(id: number) {
@@ -305,20 +199,6 @@ async function productName(prodottoId: number): Promise<string> {
   return prod?.nome ?? `prodotto #${prodottoId}`;
 }
 
-async function lockBolla(tx: Tx, bollaId: number): Promise<typeof bolleTable.$inferSelect> {
-  await tx.execute(sql`SELECT id FROM ${bolleTable} WHERE ${bolleTable.id} = ${bollaId} FOR UPDATE`);
-  const [bolla] = await tx.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
-  if (!bolla) throw new BollaActionError(404, "Bolla non trovata");
-  return bolla;
-}
-
-async function lockLotto(tx: Tx, lottoId: number): Promise<typeof lottiTable.$inferSelect> {
-  await tx.execute(sql`SELECT id FROM ${lottiTable} WHERE ${lottiTable.id} = ${lottoId} FOR UPDATE`);
-  const [lotto] = await tx.select().from(lottiTable).where(eq(lottiTable.id, lottoId));
-  if (!lotto) throw new BollaActionError(404, "Lotto non trovato");
-  return lotto;
-}
-
 async function lockLottiFEFO(
   tx: Tx,
   prodottoId: number,
@@ -438,90 +318,6 @@ async function prenotaRigaFEFO(
   if (primoLottoId != null) {
     await tx.update(bollaRigheTable).set({ lottoId: primoLottoId }).where(eq(bollaRigheTable.id, riga.id));
   }
-}
-
-async function stornoRigaTx(tx: Tx, riga: { id: number }, bollaId: number) {
-  const movimenti = await tx.select()
-    .from(movimentiTable)
-    .where(and(
-      eq(movimentiTable.bollaId, bollaId),
-      eq(movimentiTable.bollaRigaId, riga.id),
-    ));
-
-  for (const mov of movimenti) {
-    if (!mov.lottoId) continue;
-    const lotto = await lockLotto(tx, mov.lottoId);
-    const nuovaQta = parseDbNumber(lotto.quantitaResidua) + parseDbNumber(mov.quantita);
-    await tx.update(lottiTable)
-      .set({ quantitaResidua: nuovaQta.toFixed(2) })
-      .where(eq(lottiTable.id, mov.lottoId));
-  }
-
-  await tx.delete(movimentiTable).where(
-    and(eq(movimentiTable.bollaId, bollaId), eq(movimentiTable.bollaRigaId, riga.id))
-  );
-}
-
-async function scarichiFisiciBolla(tx: Tx, bollaId: number): Promise<number> {
-  const rows = await tx
-    .select({ id: movimentiTable.id })
-    .from(movimentiTable)
-    .where(and(eq(movimentiTable.bollaId, bollaId), eq(movimentiTable.tipoMovimento, "scarico")));
-  return rows.length;
-}
-
-async function convertiPrenotazioniAttiveInScarico(
-  tx: Tx,
-  bolla: typeof bolleTable.$inferSelect,
-  opts: { dataMovimento: string },
-): Promise<number> {
-  const prenotazioni = await tx
-    .select({ p: prenotazioniMagazzinoTable, r: bollaRigheTable })
-    .from(prenotazioniMagazzinoTable)
-    .leftJoin(bollaRigheTable, eq(prenotazioniMagazzinoTable.rigaBollaId, bollaRigheTable.id))
-    .where(and(
-      eq(prenotazioniMagazzinoTable.bollaId, bolla.id),
-      eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
-    ));
-
-  for (const row of prenotazioni) {
-    const prenotazione = row.p;
-    const qta = parseDbNumber(prenotazione.quantita);
-    const lotto = await lockLotto(tx, prenotazione.lottoId);
-    const residua = parseDbNumber(lotto.quantitaResidua);
-    if (residua < qta) {
-      throw new BollaActionError(
-        409,
-        `Impossibile consegnare la bolla: il lotto ${lotto.codiceLotto ?? `#${lotto.id}`} ha ${residua.toFixed(2)} disponibili ma risultano prenotati ${qta.toFixed(2)}`,
-      );
-    }
-
-    await tx.update(lottiTable)
-      .set({ quantitaResidua: (residua - qta).toFixed(2) })
-      .where(eq(lottiTable.id, lotto.id));
-
-    await tx.insert(movimentiTable).values({
-      tipoMovimento: "scarico",
-      tipoDettaglio: "consegna_beneficiario",
-      dataMovimento: opts.dataMovimento,
-      magazzinoId: prenotazione.magazzinoId,
-      prodottoId: prenotazione.prodottoId,
-      lottoId: prenotazione.lottoId,
-      quantita: prenotazione.quantita,
-      unitaMisura: row.r?.unitaMisura ?? "pz",
-      beneficiarioId: bolla.beneficiarioId,
-      bollaId: bolla.id,
-      bollaRigaId: prenotazione.rigaBollaId,
-      documentoRiferimento: bolla.numeroBolla,
-      note: row.r?.note ?? undefined,
-    });
-
-    await tx.update(prenotazioniMagazzinoTable)
-      .set({ stato: PRENOTAZIONE_CONVERTITA, updatedAt: new Date() })
-      .where(eq(prenotazioniMagazzinoTable.id, prenotazione.id));
-  }
-
-  return prenotazioni.length;
 }
 
 // ─── LIST ────────────────────────────────────────────────────────────────────
@@ -922,39 +718,18 @@ router.post("/bolle/:id/consegna", async (req, res) => {
   }
 
   const { noteRicezione, confermaRicezione } = req.body ?? {};
-  const dataMovimento = new Date().toISOString().split("T")[0];
 
   try {
-    await db.transaction(async (tx) => {
-      const current = await lockBolla(tx, bollaId);
-      if (current.stato !== "confermato") {
-        throw new BollaActionError(400, "La bolla deve essere in stato confermato per essere consegnata");
-      }
-
-      const convertite = await convertiPrenotazioniAttiveInScarico(tx, current, { dataMovimento });
-      if (convertite === 0) {
-        const scarichiLegacy = await scarichiFisiciBolla(tx, bollaId);
-        if (scarichiLegacy === 0) {
-          throw new BollaActionError(409, "Nessuna prenotazione attiva da convertire in scarico per questa bolla");
-        }
-      }
-
-      await tx.update(bolleTable).set({
-        stato: "consegnato",
-        confermaRicezione: confermaRicezione ?? true,
-        noteRicezione: noteRicezione ?? null,
-        operatoreId: req.user!.id,
-      }).where(eq(bolleTable.id, bollaId));
+    await completeBollaDelivery({
+      bollaId,
+      userId: req.user!.id,
+      noteRicezione,
+      confermaRicezione,
     });
   } catch (err) {
     if (handleBollaActionError(err, res)) return;
     throw err;
   }
-
-  await syncInterventoBolla(bollaId);
-
-  // allinea la pianificazione consegne (aggiorna quella collegata o ne crea una diretta)
-  await syncConsegnaDaBolla(bolla);
 
   const det = await buildDettaglio(bollaId);
   res.json(det);
