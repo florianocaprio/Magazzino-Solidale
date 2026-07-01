@@ -447,7 +447,7 @@ export async function insertTurno(
 /** Inserts a bolla riga (cleaned up with its bolla in {@link cleanup}). */
 export async function insertBollaRiga(
   scope: SeedScope,
-  opts: { bollaId: number; prodottoId: number; lottoId: number; quantita: number; unitaMisura?: string },
+  opts: { bollaId: number; prodottoId: number; lottoId?: number | null; quantita: number; unitaMisura?: string },
 ): Promise<number> {
   void scope;
   const [r] = await db
@@ -455,7 +455,7 @@ export async function insertBollaRiga(
     .values({
       bollaId: opts.bollaId,
       prodottoId: opts.prodottoId,
-      lottoId: opts.lottoId,
+      lottoId: opts.lottoId ?? null,
       quantita: opts.quantita.toFixed(2),
       unitaMisura: opts.unitaMisura ?? "kg",
     })
@@ -611,6 +611,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(magazziniTable).where(inArray(magazziniTable.id, scope.magazzinoIds));
   }
   if (scope.utenteIds.length > 0) {
+    await db.delete(interventiTable).where(inArray(interventiTable.operatoreId, scope.utenteIds));
     await db.delete(utentiTable).where(inArray(utentiTable.id, scope.utenteIds));
   }
   if (scope.ruoloIds.length > 0) {

@@ -521,7 +521,7 @@ function AggiungiProdottoDialog({
       return;
     }
     const g = giacenze?.find(x => x.prodottoId === p.id);
-    if (!g) {
+    if (!g || g.disponibileReale <= 0) {
       toast({ title: t("bolle.scanProdottoNoStock", { name: p.nome }), variant: "destructive" });
       return;
     }
@@ -536,7 +536,7 @@ function AggiungiProdottoDialog({
   const lottiDisponibili = lotti?.filter(l => l.magazzinoId === magazzinoId && l.quantitaResidua > 0) ?? [];
 
   // quantità già inserita in questa bolla: va sottratta solo in bozza
-  // (in una bolla confermata la giacenza/lotto è già stata scalata)
+  // (le bolle confermate hanno prenotazioni bloccate e non sono modificabili)
   const isBozza = bollaCorrente?.stato === "bozza";
   const giaInBollaProdotto = isBozza && prodottoId
     ? (bollaCorrente?.righe ?? [])
@@ -554,7 +554,7 @@ function AggiungiProdottoDialog({
   const lottoSelezionato = lottiDisponibili.find(l => l.id === parseInt(lottoId));
   const maxBase = lottoSelezionato
     ? lottoSelezionato.quantitaResidua
-    : giacenzaSelezionata?.quantitaTotale ?? 0;
+    : giacenzaSelezionata?.disponibileReale ?? 0;
   const giaUsato = lottoSelezionato ? giaInBollaLotto(lottoSelezionato.id) : giaInBollaProdotto;
   const maxDisponibile = Math.max(0, Math.round((maxBase - giaUsato) * 100) / 100);
   const quantitaNum = parseFloat(quantita || "0");
@@ -617,7 +617,7 @@ function AggiungiProdottoDialog({
               <SelectContent>
                 {giacenze && giacenze.length > 0 ? giacenze.map(g => (
                   <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
-                    {g.prodottoNome} — {g.quantitaTotale} {g.unitaMisura} {t("bolle.disponibili")}
+                    {g.prodottoNome} — {Math.max(0, g.disponibileReale)} {g.unitaMisura} {t("bolle.disponibili")}
                   </SelectItem>
                 )) : (
                   <div className="px-2 py-3 text-sm text-muted-foreground text-center">
@@ -887,7 +887,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const isConfermato = bolla.stato === "confermato";
   const isConsegnato = bolla.stato === "consegnato";
   const isAnnullato = bolla.stato === "annullato";
-  const modificabile = isBozza || isConfermato; // si possono gestire i prodotti
+  const modificabile = isBozza; // le prenotazioni si ricalcolano solo confermando una bozza
 
   return (
     <div className="mt-4 space-y-5">
