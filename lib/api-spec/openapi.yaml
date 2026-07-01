@@ -3709,6 +3709,12 @@ components:
           type: string
         quantitaTotale:
           type: number
+        giacenzaFisica:
+          type: number
+        impegnato:
+          type: number
+        disponibileReale:
+          type: number
         scortaMinima:
           type: number
         scortaConsigliata:
@@ -3719,7 +3725,7 @@ components:
           type: integer
         prossimaScadenza:
           type: ["string", "null"]
-      required: [prodottoId, prodottoNome, prodottoCodice, tipoProdotto, unitaMisura, magazzinoId, magazzinoNome, quantitaTotale, scortaMinima, scortaConsigliata, sottoscorta, lottiAttivi]
+      required: [prodottoId, prodottoNome, prodottoCodice, tipoProdotto, unitaMisura, magazzinoId, magazzinoNome, quantitaTotale, giacenzaFisica, impegnato, disponibileReale, scortaMinima, scortaConsigliata, sottoscorta, lottiAttivi]
 
     # ── Preparazione Consegne ─────────────────────────────────────────────
     PreparazioneRiga:

@@ -18,6 +18,7 @@ import {
   consegneTable,
   bolleTable,
   bollaRigheTable,
+  prenotazioniMagazzinoTable,
   interventiTable,
   trasferimentiTable,
   trasferimentoRigheTable,
@@ -93,6 +94,7 @@ export interface SeedScope {
   approvvigionamentoIds: number[];
   consegnaIds: number[];
   bollaIds: number[];
+  prenotazioneIds: number[];
   interventoIds: number[];
   trasferimentoIds: number[];
   turnoIds: number[];
@@ -116,6 +118,7 @@ export function newScope(): SeedScope {
     approvvigionamentoIds: [],
     consegnaIds: [],
     bollaIds: [],
+    prenotazioneIds: [],
     interventoIds: [],
     trasferimentoIds: [],
     turnoIds: [],
@@ -460,6 +463,34 @@ export async function insertBollaRiga(
   return r.id;
 }
 
+export async function insertPrenotazioneMagazzino(
+  scope: SeedScope,
+  opts: {
+    bollaId: number;
+    rigaBollaId: number;
+    prodottoId: number;
+    lottoId: number;
+    magazzinoId: number;
+    quantita: number;
+    stato?: string;
+  },
+): Promise<number> {
+  const [p] = await db
+    .insert(prenotazioniMagazzinoTable)
+    .values({
+      bollaId: opts.bollaId,
+      rigaBollaId: opts.rigaBollaId,
+      prodottoId: opts.prodottoId,
+      lottoId: opts.lottoId,
+      magazzinoId: opts.magazzinoId,
+      quantita: opts.quantita.toFixed(2),
+      stato: opts.stato ?? "attiva",
+    })
+    .returning({ id: prenotazioniMagazzinoTable.id });
+  scope.prenotazioneIds.push(p.id);
+  return p.id;
+}
+
 export async function insertIntervento(
   scope: SeedScope,
   opts: { beneficiarioId: number; dataIntervento?: string; tipoIntervento?: string },
@@ -533,7 +564,11 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   if (scope.turnoIds.length > 0) {
     await db.delete(turniTable).where(inArray(turniTable.id, scope.turnoIds));
   }
+  if (scope.prenotazioneIds.length > 0) {
+    await db.delete(prenotazioniMagazzinoTable).where(inArray(prenotazioniMagazzinoTable.id, scope.prenotazioneIds));
+  }
   if (scope.bollaIds.length > 0) {
+    await db.delete(prenotazioniMagazzinoTable).where(inArray(prenotazioniMagazzinoTable.bollaId, scope.bollaIds));
     await db.delete(bollaRigheTable).where(inArray(bollaRigheTable.bollaId, scope.bollaIds));
     await db.delete(bolleTable).where(inArray(bolleTable.id, scope.bollaIds));
   }

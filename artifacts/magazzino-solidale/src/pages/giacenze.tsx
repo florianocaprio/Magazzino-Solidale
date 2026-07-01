@@ -56,7 +56,9 @@ export default function Giacenze() {
             { header: t("giacenze.colProdotto"), accessor: (g) => g.prodottoNome },
             { header: t("giacenze.colTipo"), accessor: (g) => g.tipoProdotto?.replace("_", " ") },
             { header: t("giacenze.colMagazzino"), accessor: (g) => g.magazzinoNome },
-            { header: t("giacenze.colQtaTotale"), accessor: (g) => g.quantitaTotale },
+            { header: t("giacenze.colGiacenzaFisica"), accessor: (g) => g.giacenzaFisica },
+            { header: t("giacenze.colImpegnato"), accessor: (g) => g.impegnato },
+            { header: t("giacenze.colDisponibileReale"), accessor: (g) => Math.max(0, g.disponibileReale) },
             { header: t("giacenze.colUM"), accessor: (g) => g.unitaMisura },
             { header: t("giacenze.colScortaMinima"), accessor: (g) => g.scortaMinima },
             { header: t("giacenze.colProssimaScadenza"), accessor: (g) => g.prossimaScadenza ? new Date(g.prossimaScadenza).toLocaleDateString("it-IT") : "" },
@@ -105,7 +107,9 @@ export default function Giacenze() {
                 <TableHead className="w-[100px]">{t("giacenze.colCodice")}</TableHead>
                 <TableHead>{t("giacenze.colProdotto")}</TableHead>
                 <TableHead>{t("giacenze.colMagazzino")}</TableHead>
-                <TableHead className="text-right">{t("giacenze.colQtaTotale")}</TableHead>
+                <TableHead className="text-right">{t("giacenze.colGiacenzaFisica")}</TableHead>
+                <TableHead className="text-right">{t("giacenze.colImpegnato")}</TableHead>
+                <TableHead className="text-right">{t("giacenze.colDisponibileReale")}</TableHead>
                 <TableHead className="text-right">{t("giacenze.colScortaMinima")}</TableHead>
                 <TableHead className="text-center">{t("giacenze.colProssimaScad")}</TableHead>
                 <TableHead className="w-[120px] text-center">{t("giacenze.colStato")}</TableHead>
@@ -120,13 +124,15 @@ export default function Giacenze() {
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                   </TableRow>
                 ))
               ) : giacenze?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                     {t("giacenze.noResults")}
                   </TableCell>
                 </TableRow>
@@ -139,7 +145,13 @@ export default function Giacenze() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{g.magazzinoNome}</TableCell>
                   <TableCell className="text-right">
-                    <span className="font-bold">{g.quantitaTotale}</span> <span className="text-xs text-muted-foreground">{g.unitaMisura}</span>
+                    <span className="font-bold">{g.giacenzaFisica}</span> <span className="text-xs text-muted-foreground">{g.unitaMisura}</span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="font-medium">{g.impegnato}</span> <span className="text-xs text-muted-foreground">{g.unitaMisura}</span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="font-bold">{Math.max(0, g.disponibileReale)}</span> <span className="text-xs text-muted-foreground">{g.unitaMisura}</span>
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {g.scortaMinima}

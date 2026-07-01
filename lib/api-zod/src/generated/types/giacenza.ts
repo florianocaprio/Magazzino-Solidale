@@ -15,6 +15,9 @@ export interface Giacenza {
   magazzinoId: number;
   magazzinoNome: string;
   quantitaTotale: number;
+  giacenzaFisica: number;
+  impegnato: number;
+  disponibileReale: number;
   scortaMinima: number;
   scortaConsigliata: number;
   sottoscorta: boolean;
