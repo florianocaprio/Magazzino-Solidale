@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, boolean, timestamp, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, boolean, timestamp, integer, date, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cittaTable } from "./citta";
@@ -41,6 +41,10 @@ export const beneficiariTable = pgTable("beneficiari", {
   creditoSolidaleDataAbilitazione: timestamp("credito_solidale_data_abilitazione"),
   creditoSolidaleNote: text("credito_solidale_note"),
   magazzinoEmporioPreferitoId: integer("magazzino_emporio_preferito_id").references(() => magazziniTable.id),
+  creditoSolidaleMensileAssegnato: decimal("credito_solidale_mensile_assegnato", { precision: 10, scale: 2 }),
+  creditoSolidaleMensileManuale: boolean("credito_solidale_mensile_manuale").notNull().default(false),
+  creditoSolidaleMotivoModifica: text("credito_solidale_motivo_modifica"),
+  creditoSolidaleDataUltimaModificaQuota: timestamp("credito_solidale_data_ultima_modifica_quota"),
   uds: boolean("uds").notNull().default(false),
   cittaId: integer("citta_id").references(() => cittaTable.id),
   zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),

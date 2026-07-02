@@ -2212,6 +2212,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/ImpostazioniEmail"
 
+  /impostazioni-moduli:
+    get:
+      operationId: getImpostazioniModuli
+      tags: [impostazioni-moduli]
+      responses:
+        "200":
+          description: Global module settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImpostazioniModuli"
+    patch:
+      operationId: updateImpostazioniModuli
+      tags: [impostazioni-moduli]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImpostazioniModuliUpdate"
+      responses:
+        "200":
+          description: Updated global module settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImpostazioniModuli"
+
   /politiche-credito-solidale:
     get:
       operationId: listPoliticheCreditoSolidale
@@ -4564,6 +4592,15 @@ components:
           type: ["integer", "null"]
         magazzinoEmporioPreferitoNome:
           type: ["string", "null"]
+        creditoSolidaleMensileAssegnato:
+          type: ["number", "null"]
+        creditoSolidaleMensileManuale:
+          type: boolean
+        creditoSolidaleMotivoModifica:
+          type: ["string", "null"]
+        creditoSolidaleDataUltimaModificaQuota:
+          type: ["string", "null"]
+          format: date-time
         uds:
           type: boolean
         attivo:
@@ -4582,7 +4619,7 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, uds, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, uds, attivo, dataCreazione]
 
     BeneficiarioDettaglio:
       type: object
@@ -4661,6 +4698,15 @@ components:
           type: ["integer", "null"]
         magazzinoEmporioPreferitoNome:
           type: ["string", "null"]
+        creditoSolidaleMensileAssegnato:
+          type: ["number", "null"]
+        creditoSolidaleMensileManuale:
+          type: boolean
+        creditoSolidaleMotivoModifica:
+          type: ["string", "null"]
+        creditoSolidaleDataUltimaModificaQuota:
+          type: ["string", "null"]
+          format: date-time
         uds:
           type: boolean
         attivo:
@@ -4693,7 +4739,7 @@ components:
             $ref: "#/components/schemas/Consegna"
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, attivo, dataCreazione]
 
     BeneficiarioInput:
       type: object
@@ -4762,6 +4808,17 @@ components:
           type: ["string", "null"]
         magazzinoEmporioPreferitoId:
           type: ["integer", "null"]
+        creditoSolidaleMensileAssegnato:
+          type: ["number", "null"]
+        creditoSolidaleMensileManuale:
+          type: boolean
+        creditoSolidaleMotivoModifica:
+          type: ["string", "null"]
+        creditoSolidaleDataUltimaModificaQuota:
+          type: ["string", "null"]
+          format: date-time
+        creditoSolidaleMensileSuggerito:
+          type: ["number", "null"]
         dataPresaInCarico:
           type: string
         noteInterne:
@@ -4846,6 +4903,17 @@ components:
           type: ["string", "null"]
         magazzinoEmporioPreferitoId:
           type: ["integer", "null"]
+        creditoSolidaleMensileAssegnato:
+          type: ["number", "null"]
+        creditoSolidaleMensileManuale:
+          type: boolean
+        creditoSolidaleMotivoModifica:
+          type: ["string", "null"]
+        creditoSolidaleDataUltimaModificaQuota:
+          type: ["string", "null"]
+          format: date-time
+        creditoSolidaleMensileSuggerito:
+          type: ["number", "null"]
         uds:
           type: boolean
         attivo:
@@ -5403,6 +5471,26 @@ components:
           type: ["string", "null"]
         smtpPassword:
           type: ["string", "null"]
+
+    ImpostazioniModuli:
+      type: object
+      properties:
+        emporioAbilitato:
+          type: boolean
+        unitaStradaAbilitata:
+          type: boolean
+        dataAggiornamento:
+          type: ["string", "null"]
+          format: date-time
+      required: [emporioAbilitato, unitaStradaAbilitata, dataAggiornamento]
+
+    ImpostazioniModuliUpdate:
+      type: object
+      properties:
+        emporioAbilitato:
+          type: boolean
+        unitaStradaAbilitata:
+          type: boolean
 
     EmailSendResult:
       type: object

@@ -35,6 +35,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { generateProdottiBarcodePdf } from "@/lib/prodotti-barcode-pdf";
 import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus, Barcode, Upload } from "lucide-react";
+import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -423,6 +424,7 @@ export default function Prodotti() {
   const deleteProdotto = useDeleteProdotto();
   const bulkProdotti = useBulkProdotti();
   const { data: fornitori } = useListFornitori();
+  const { emporioAbilitato } = useModuloFlags();
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   const formSchema = makeFormSchema(t);
@@ -903,6 +905,9 @@ export default function Prodotti() {
                   <div>
                     <h4 className="text-sm font-medium">{t("prodotti.emporioSection")}</h4>
                     <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.creditoSolidaleHelp")}</p>
+                    {!emporioAbilitato && (
+                      <p className="text-[0.8rem] text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>
+                    )}
                   </div>
 
                   <FormField control={form.control} name="abilitatoEmporio" render={({ field }) => (
@@ -911,7 +916,7 @@ export default function Prodotti() {
                         <FormLabel>{t("prodotti.abilitatoEmporio")}</FormLabel>
                       </div>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!emporioAbilitato} />
                       </FormControl>
                     </FormItem>
                   )} />
@@ -921,7 +926,7 @@ export default function Prodotti() {
                       <FormItem>
                         <FormLabel>{t("prodotti.creditoSolidaleValore")}</FormLabel>
                         <FormControl>
-                          <Input type="number" min="0" step="0.01" disabled={!abilitatoEmporio} {...field} />
+                          <Input type="number" min="0" step="0.01" disabled={!emporioAbilitato || !abilitatoEmporio} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -934,7 +939,7 @@ export default function Prodotti() {
                             type="number"
                             min="0"
                             step="0.01"
-                            disabled={!abilitatoEmporio}
+                            disabled={!emporioAbilitato || !abilitatoEmporio}
                             {...field}
                             value={field.value ?? ""}
                           />
@@ -952,7 +957,7 @@ export default function Prodotti() {
                           type="number"
                           min="0"
                           step="0.01"
-                          disabled={!abilitatoEmporio}
+                          disabled={!emporioAbilitato || !abilitatoEmporio}
                           {...field}
                           value={field.value ?? ""}
                         />

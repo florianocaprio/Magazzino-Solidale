@@ -74,6 +74,8 @@ import type {
   HealthStatus,
   ImpostazioniEmail,
   ImpostazioniEmailUpdate,
+  ImpostazioniModuli,
+  ImpostazioniModuliUpdate,
   ImpostazioniStampa,
   ImpostazioniStampaUpdate,
   Intervento,
@@ -8057,6 +8059,142 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateImpostazioniEmailMutationOptions(options));
+    }
+
+export const getGetImpostazioniModuliUrl = () => {
+
+
+
+
+  return `/api/impostazioni-moduli`
+}
+
+export const getImpostazioniModuli = async ( options?: RequestInit): Promise<ImpostazioniModuli> => {
+
+  return customFetch<ImpostazioniModuli>(getGetImpostazioniModuliUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetImpostazioniModuliQueryKey = () => {
+    return [
+    `/api/impostazioni-moduli`
+    ] as const;
+    }
+
+
+export const getGetImpostazioniModuliQueryOptions = <TData = Awaited<ReturnType<typeof getImpostazioniModuli>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniModuli>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetImpostazioniModuliQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getImpostazioniModuli>>> = ({ signal }) => getImpostazioniModuli({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniModuli>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetImpostazioniModuliQueryResult = NonNullable<Awaited<ReturnType<typeof getImpostazioniModuli>>>
+export type GetImpostazioniModuliQueryError = ErrorType<unknown>
+
+
+
+export function useGetImpostazioniModuli<TData = Awaited<ReturnType<typeof getImpostazioniModuli>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getImpostazioniModuli>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetImpostazioniModuliQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateImpostazioniModuliUrl = () => {
+
+
+
+
+  return `/api/impostazioni-moduli`
+}
+
+export const updateImpostazioniModuli = async (impostazioniModuliUpdate: ImpostazioniModuliUpdate, options?: RequestInit): Promise<ImpostazioniModuli> => {
+
+  return customFetch<ImpostazioniModuli>(getUpdateImpostazioniModuliUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      impostazioniModuliUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateImpostazioniModuliMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniModuli>>, TError,{data: BodyType<ImpostazioniModuliUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniModuli>>, TError,{data: BodyType<ImpostazioniModuliUpdate>}, TContext> => {
+
+const mutationKey = ['updateImpostazioniModuli'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateImpostazioniModuli>>, {data: BodyType<ImpostazioniModuliUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateImpostazioniModuli(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateImpostazioniModuliMutationResult = NonNullable<Awaited<ReturnType<typeof updateImpostazioniModuli>>>
+    export type UpdateImpostazioniModuliMutationBody = BodyType<ImpostazioniModuliUpdate>
+    export type UpdateImpostazioniModuliMutationError = ErrorType<unknown>
+
+    export const useUpdateImpostazioniModuli = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateImpostazioniModuli>>, TError,{data: BodyType<ImpostazioniModuliUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateImpostazioniModuli>>,
+        TError,
+        {data: BodyType<ImpostazioniModuliUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateImpostazioniModuliMutationOptions(options));
     }
 
 export const getListPoliticheCreditoSolidaleUrl = () => {

@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 
 const NONE = "__none__";
 const ROUNDING_VALUES = ["nessuno", "intero_superiore", "intero_inferiore", "intero_piu_vicino"] as const;
@@ -106,6 +107,7 @@ export default function PoliticheCreditoSolidale() {
   const { data: politiche, isLoading } = useListPoliticheCreditoSolidale();
   const { data: citta } = useListCitta();
   const { data: centri } = useListCentriAscolto();
+  const { emporioAbilitato } = useModuloFlags();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -234,8 +236,9 @@ export default function PoliticheCreditoSolidale() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("creditoSolidale.title")}</h1>
           <p className="text-muted-foreground">{t("creditoSolidale.subtitle")}</p>
+          {!emporioAbilitato && <p className="text-sm text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>}
         </div>
-        <Button onClick={resetForCreate} className="gap-2">
+        <Button onClick={resetForCreate} className="gap-2" disabled={!emporioAbilitato}>
           <Plus className="h-4 w-4" /> {t("creditoSolidale.newPolicy")}
         </Button>
       </div>

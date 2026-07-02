@@ -38,6 +38,7 @@ import Consegne from "@/pages/consegne";
 import Bolle from "@/pages/bolle";
 import Turni from "@/pages/turni";
 import ImpostazioniStampa from "@/pages/impostazioni-stampa";
+import ImpostazioniModuli from "@/pages/impostazioni-moduli";
 import Approvvigionamenti from "@/pages/approvvigionamenti";
 import Report from "@/pages/report";
 import ReportUds from "@/pages/report-uds";
@@ -49,6 +50,7 @@ import RuoliVolontari from "@/pages/ruoli-volontari";
 import TipiIntervento from "@/pages/tipi-intervento";
 import TipologieFornitore from "@/pages/tipologie-fornitore";
 import PoliticheCreditoSolidale from "@/pages/politiche-credito-solidale";
+import { EmporioAccessi, EmporioCassa, EmporioCreditiSaldo } from "@/pages/emporio-placeholder";
 import UdsAnagrafica from "@/pages/uds-anagrafica";
 import UdsInterventi from "@/pages/uds-interventi";
 import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
@@ -140,6 +142,28 @@ function AppRoutes() {
           {() => (
             <Guard area="magazzino">
               <Scarichi />
+            </Guard>
+          )}
+        </Route>
+
+        <Route path="/emporio/cassa">
+          {() => (
+            <Guard area="sociale">
+              <EmporioCassa />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/emporio/crediti-saldo">
+          {() => (
+            <Guard area="sociale">
+              <EmporioCreditiSaldo />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/emporio/accessi">
+          {() => (
+            <Guard area="sociale">
+              <EmporioAccessi />
             </Guard>
           )}
         </Route>
@@ -312,6 +336,13 @@ function AppRoutes() {
           {() => (
             <Guard area="amministrazione">
               <ImpostazioniStampa />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/impostazioni-moduli">
+          {() => (
+            <Guard area="amministrazione">
+              <ImpostazioniModuli />
             </Guard>
           )}
         </Route>

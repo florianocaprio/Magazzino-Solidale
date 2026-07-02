@@ -1337,6 +1337,10 @@ export const ListBeneficiariResponseItem = zod.object({
   "creditoSolidaleNote": zod.string().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "creditoSolidaleMensileManuale": zod.boolean(),
+  "creditoSolidaleMotivoModifica": zod.string().nullable(),
+  "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullable(),
   "uds": zod.boolean(),
   "attivo": zod.boolean(),
   "soprannome": zod.string().nullish(),
@@ -1382,6 +1386,11 @@ export const CreateBeneficiarioBody = zod.object({
   "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
   "creditoSolidaleNote": zod.string().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullish(),
+  "creditoSolidaleMensileManuale": zod.boolean().optional(),
+  "creditoSolidaleMotivoModifica": zod.string().nullish(),
+  "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullish(),
+  "creditoSolidaleMensileSuggerito": zod.number().nullish(),
   "dataPresaInCarico": zod.string().optional(),
   "noteInterne": zod.string().optional(),
   "soprannome": zod.string().optional(),
@@ -1459,6 +1468,11 @@ export const BulkBeneficiariBody = zod.object({
   "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
   "creditoSolidaleNote": zod.string().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullish(),
+  "creditoSolidaleMensileManuale": zod.boolean().optional(),
+  "creditoSolidaleMotivoModifica": zod.string().nullish(),
+  "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullish(),
+  "creditoSolidaleMensileSuggerito": zod.number().nullish(),
   "dataPresaInCarico": zod.string().optional(),
   "noteInterne": zod.string().optional(),
   "soprannome": zod.string().optional(),
@@ -1520,6 +1534,10 @@ export const GetBeneficiarioResponse = zod.object({
   "creditoSolidaleNote": zod.string().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "creditoSolidaleMensileManuale": zod.boolean(),
+  "creditoSolidaleMotivoModifica": zod.string().nullable(),
+  "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullable(),
   "uds": zod.boolean().optional(),
   "attivo": zod.boolean(),
   "dataPresaInCarico": zod.string().nullish(),
@@ -1629,6 +1647,11 @@ export const UpdateBeneficiarioBody = zod.object({
   "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
   "creditoSolidaleNote": zod.string().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullish(),
+  "creditoSolidaleMensileManuale": zod.boolean().optional(),
+  "creditoSolidaleMotivoModifica": zod.string().nullish(),
+  "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullish(),
+  "creditoSolidaleMensileSuggerito": zod.number().nullish(),
   "uds": zod.boolean().optional(),
   "attivo": zod.boolean().optional(),
   "noteInterne": zod.string().optional(),
@@ -1667,6 +1690,10 @@ export const UpdateBeneficiarioResponse = zod.object({
   "creditoSolidaleNote": zod.string().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "creditoSolidaleMensileManuale": zod.boolean(),
+  "creditoSolidaleMotivoModifica": zod.string().nullable(),
+  "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullable(),
   "uds": zod.boolean(),
   "attivo": zod.boolean(),
   "soprannome": zod.string().nullish(),
@@ -2861,6 +2888,25 @@ export const UpdateImpostazioniEmailResponse = zod.object({
   "smtpUser": zod.string().nullish(),
   "hasPassword": zod.boolean(),
   "dataAggiornamento": zod.string().optional()
+})
+
+
+export const GetImpostazioniModuliResponse = zod.object({
+  "emporioAbilitato": zod.boolean(),
+  "unitaStradaAbilitata": zod.boolean(),
+  "dataAggiornamento": zod.coerce.date().nullable()
+})
+
+
+export const UpdateImpostazioniModuliBody = zod.object({
+  "emporioAbilitato": zod.boolean().optional(),
+  "unitaStradaAbilitata": zod.boolean().optional()
+})
+
+export const UpdateImpostazioniModuliResponse = zod.object({
+  "emporioAbilitato": zod.boolean(),
+  "unitaStradaAbilitata": zod.boolean(),
+  "dataAggiornamento": zod.coerce.date().nullable()
 })
 
 

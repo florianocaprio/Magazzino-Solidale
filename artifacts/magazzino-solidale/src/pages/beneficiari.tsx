@@ -25,6 +25,7 @@ import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
 import { loadAssociationLogo } from "@/lib/bolla-pdf";
+import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
@@ -115,6 +116,7 @@ export default function Beneficiari() {
     [magazzini],
   );
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
+  const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -690,6 +692,9 @@ export default function Beneficiari() {
                   <div>
                     <h4 className="text-sm font-medium">{t("beneficiari.creditoSolidaleSection")}</h4>
                     <p className="text-xs text-muted-foreground">{t("beneficiari.creditoSolidaleHelp")}</p>
+                    {!emporioAbilitato && (
+                      <p className="text-xs text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>
+                    )}
                   </div>
                   <FormField control={form.control} name="creditoSolidaleAbilitato" render={({ field }) => (
                     <FormItem className="flex items-center justify-between">
@@ -697,6 +702,7 @@ export default function Beneficiari() {
                       <FormControl>
                         <Switch
                           checked={field.value}
+                          disabled={!emporioAbilitato}
                           onCheckedChange={(checked) => {
                             field.onChange(checked);
                             form.setValue("creditoSolidaleStato", checked ? "attivo" : "non_abilitato");
@@ -711,7 +717,7 @@ export default function Beneficiari() {
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
-                        disabled={!creditoSolidaleAbilitato}
+                        disabled={!emporioAbilitato || !creditoSolidaleAbilitato}
                       >
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -729,7 +735,7 @@ export default function Beneficiari() {
                       <Select
                         onValueChange={field.onChange}
                         value={field.value || NO_EMPORIO}
-                        disabled={!creditoSolidaleAbilitato}
+                        disabled={!emporioAbilitato || !creditoSolidaleAbilitato}
                       >
                         <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -748,7 +754,7 @@ export default function Beneficiari() {
                   <FormField control={form.control} name="creditoSolidaleNote" render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("beneficiari.creditoSolidaleNote")}</FormLabel>
-                      <FormControl><Textarea rows={2} {...field} /></FormControl>
+                      <FormControl><Textarea rows={2} disabled={!emporioAbilitato} {...field} /></FormControl>
                     </FormItem>
                   )} />
                 </div>
@@ -769,13 +775,16 @@ export default function Beneficiari() {
                 )} />
 
                 <div className="rounded-md border p-3 space-y-3">
+                  {!unitaStradaAbilitata && (
+                    <p className="text-xs text-muted-foreground">{UNITA_STRADA_DISABLED_MESSAGE}</p>
+                  )}
                   <FormField control={form.control} name="uds" render={({ field }) => (
                     <FormItem className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <FormLabel className="!mt-0">{t("beneficiari.udsToggle")}</FormLabel>
                         <p className="text-xs text-muted-foreground">{t("beneficiari.udsToggleHint")}</p>
                       </div>
-                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={!unitaStradaAbilitata} /></FormControl>
                     </FormItem>
                   )} />
                   {watchUds && (
@@ -784,7 +793,7 @@ export default function Beneficiari() {
                         <FormField control={form.control} name="cittaId" render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
-                            <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NO_ZONE); }}>
+                            <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NO_ZONE); }} disabled={!unitaStradaAbilitata}>
                               <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger></FormControl>
                               <SelectContent>
                                 {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
@@ -797,7 +806,7 @@ export default function Beneficiari() {
                       <FormField control={form.control} name="zonaUdsId" render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
-                          <Select value={field.value || NO_ZONE} onValueChange={field.onChange}>
+                          <Select value={field.value || NO_ZONE} onValueChange={field.onChange} disabled={!unitaStradaAbilitata}>
                             <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.allZone")} /></SelectTrigger></FormControl>
                             <SelectContent>
                               <SelectItem value={NO_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>

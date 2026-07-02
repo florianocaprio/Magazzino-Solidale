@@ -264,6 +264,15 @@ export interface BeneficiarioInput {
   creditoSolidaleNote?: string | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleMensileManuale?: boolean;
+  /** @nullable */
+  creditoSolidaleMotivoModifica?: string | null;
+  /** @nullable */
+  creditoSolidaleDataUltimaModificaQuota?: string | null;
+  /** @nullable */
+  creditoSolidaleMensileSuggerito?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
   soprannome?: string;
@@ -966,6 +975,13 @@ export interface Beneficiario {
   magazzinoEmporioPreferitoId?: number | null;
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato: number | null;
+  creditoSolidaleMensileManuale: boolean;
+  /** @nullable */
+  creditoSolidaleMotivoModifica: string | null;
+  /** @nullable */
+  creditoSolidaleDataUltimaModificaQuota: string | null;
   uds: boolean;
   attivo: boolean;
   /** @nullable */
@@ -1155,6 +1171,13 @@ export interface BeneficiarioDettaglio {
   magazzinoEmporioPreferitoId?: number | null;
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato: number | null;
+  creditoSolidaleMensileManuale: boolean;
+  /** @nullable */
+  creditoSolidaleMotivoModifica: string | null;
+  /** @nullable */
+  creditoSolidaleDataUltimaModificaQuota: string | null;
   uds?: boolean;
   attivo: boolean;
   /** @nullable */
@@ -1232,6 +1255,15 @@ export interface BeneficiarioUpdate {
   creditoSolidaleNote?: string | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleMensileManuale?: boolean;
+  /** @nullable */
+  creditoSolidaleMotivoModifica?: string | null;
+  /** @nullable */
+  creditoSolidaleDataUltimaModificaQuota?: string | null;
+  /** @nullable */
+  creditoSolidaleMensileSuggerito?: number | null;
   uds?: boolean;
   attivo?: boolean;
   noteInterne?: string;
@@ -1690,6 +1722,18 @@ export interface ImpostazioniEmailUpdate {
   smtpUser?: string | null;
   /** @nullable */
   smtpPassword?: string | null;
+}
+
+export interface ImpostazioniModuli {
+  emporioAbilitato: boolean;
+  unitaStradaAbilitata: boolean;
+  /** @nullable */
+  dataAggiornamento: string | null;
+}
+
+export interface ImpostazioniModuliUpdate {
+  emporioAbilitato?: boolean;
+  unitaStradaAbilitata?: boolean;
 }
 
 export interface EmailSendResult {

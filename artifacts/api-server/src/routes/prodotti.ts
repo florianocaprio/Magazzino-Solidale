@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { prodottiTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
 import { eq, ilike, and, ne, or, desc, type SQL } from "drizzle-orm";
+import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
 
 const router: IRouter = Router();
 
@@ -173,6 +174,9 @@ async function createProdottoOne(
   if (await barcodeProdottoEsiste(codiceBarre)) return { error: BARCODE_DUPLICATO_MSG, status: 409 };
   const abilitatoEmporio = parseOptionalBoolean(b.abilitatoEmporio, false);
   if (abilitatoEmporio == null) return { error: "Abilitato Emporio non valido.", status: 400 };
+  if (abilitatoEmporio && !(await isEmporioEnabled())) {
+    return { error: EMPORIO_DISABLED_MSG, status: 403 };
+  }
   const creditoSolidaleValore = parseNonNegativeDecimal(b.creditoSolidaleValore ?? 0, "Valore Credito Solidale");
   if ("error" in creditoSolidaleValore) return { error: creditoSolidaleValore.error, status: 400 };
   const quantitaMassimaPerSpesa = parseOptionalNonNegativeDecimal(b.quantitaMassimaPerSpesa, "Quantità massima per singola spesa");
@@ -237,6 +241,8 @@ router.get("/prodotti/:id", async (req, res) => {
 
 router.patch("/prodotti/:id", async (req, res) => {
   const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const body = req.body;
   const update: Record<string, unknown> = { ...body };
   if ("codice" in update) {
@@ -260,6 +266,10 @@ router.patch("/prodotti/:id", async (req, res) => {
   if ("abilitatoEmporio" in update) {
     const abilitatoEmporio = parseOptionalBoolean(update.abilitatoEmporio, false);
     if (abilitatoEmporio == null) { res.status(400).json({ error: "Abilitato Emporio non valido." }); return; }
+    if (abilitatoEmporio && !existing.abilitatoEmporio && !(await isEmporioEnabled())) {
+      res.status(403).json({ error: EMPORIO_DISABLED_MSG });
+      return;
+    }
     update.abilitatoEmporio = abilitatoEmporio;
   }
   if ("creditoSolidaleValore" in update) {
@@ -279,7 +289,6 @@ router.patch("/prodotti/:id", async (req, res) => {
   }
   try {
     const [row] = await db.update(prodottiTable).set(update).where(eq(prodottiTable.id, id)).returning();
-    if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(fmtProdotto(row));
   } catch (e) {
     if (isUniqueViolation(e, "codice")) { res.status(409).json({ error: CODICE_DUPLICATO_MSG }); return; }

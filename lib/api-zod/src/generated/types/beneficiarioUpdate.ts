@@ -44,6 +44,15 @@ export interface BeneficiarioUpdate {
   creditoSolidaleNote?: string | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleMensileManuale?: boolean;
+  /** @nullable */
+  creditoSolidaleMotivoModifica?: string | null;
+  /** @nullable */
+  creditoSolidaleDataUltimaModificaQuota?: Date | null;
+  /** @nullable */
+  creditoSolidaleMensileSuggerito?: number | null;
   uds?: boolean;
   attivo?: boolean;
   noteInterne?: string;

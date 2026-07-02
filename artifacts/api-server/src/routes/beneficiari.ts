@@ -18,6 +18,12 @@ import {
   beneficiarioCittaId,
   beneficiarioZonaUdsId,
 } from "../lib/centroScope";
+import {
+  EMPORIO_DISABLED_MSG,
+  UNITA_STRADA_DISABLED_MSG,
+  isEmporioEnabled,
+  isUnitaStradaEnabled,
+} from "../lib/impostazioniModuli";
 
 const router: IRouter = Router();
 
@@ -61,6 +67,20 @@ function parseDateTime(v: unknown): Date | null {
   if (v == null || v === "") return null;
   const d = v instanceof Date ? v : new Date(String(v));
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function parseNonNegativeDecimal(v: unknown, label: string): { value: string | null; number: number | null } | { error: string } {
+  if (v == null || v === "") return { value: null, number: null };
+  const n = typeof v === "number" ? v : Number(String(v).replace(",", "."));
+  if (!Number.isFinite(n) || n < 0) return { error: `${label} non può essere negativo.` };
+  const rounded = Math.round(n * 100) / 100;
+  return { value: rounded.toFixed(2), number: rounded };
+}
+
+function sameNullableDecimal(a: string | number | null | undefined, b: string | number | null | undefined): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Math.round(Number(a) * 100) === Math.round(Number(b) * 100);
 }
 
 const normalizzaSesso = (v: unknown): string | undefined => {
@@ -179,6 +199,49 @@ function normalizeCreditoSolidaleFields(
   return {};
 }
 
+function normalizeCreditoSolidaleQuotaFields(
+  values: Record<string, unknown>,
+  source: Record<string, unknown>,
+  existing?: typeof beneficiariTable.$inferSelect,
+): { error?: string; quotaChanged: boolean; motivoChanged: boolean } {
+  const hasAssegnato = "creditoSolidaleMensileAssegnato" in source;
+  const hasMotivo = "creditoSolidaleMotivoModifica" in source;
+  const hasSuggerito = "creditoSolidaleMensileSuggerito" in source;
+  let quotaChanged = false;
+  let motivoChanged = false;
+  delete values.creditoSolidaleMensileSuggerito;
+  delete values.creditoSolidaleDataUltimaModificaQuota;
+  if (!hasAssegnato) delete values.creditoSolidaleMensileManuale;
+
+  if (hasAssegnato) {
+    const assegnato = parseNonNegativeDecimal(source.creditoSolidaleMensileAssegnato, "Credito mensile assegnato");
+    if ("error" in assegnato) return { error: assegnato.error, quotaChanged, motivoChanged };
+    quotaChanged = !sameNullableDecimal(assegnato.value, existing?.creditoSolidaleMensileAssegnato ?? null);
+    values.creditoSolidaleMensileAssegnato = assegnato.value;
+    values.creditoSolidaleDataUltimaModificaQuota = quotaChanged
+      ? new Date()
+      : existing?.creditoSolidaleDataUltimaModificaQuota ?? null;
+
+    let manuale = existing?.creditoSolidaleMensileManuale ?? false;
+    if (assegnato.number == null) {
+      manuale = false;
+    } else if (hasSuggerito) {
+      const suggerito = parseNonNegativeDecimal(source.creditoSolidaleMensileSuggerito, "Credito mensile suggerito");
+      if ("error" in suggerito) return { error: suggerito.error, quotaChanged, motivoChanged };
+      manuale = suggerito.number != null && !sameNullableDecimal(assegnato.number, suggerito.number);
+    }
+    values.creditoSolidaleMensileManuale = manuale;
+  }
+
+  if (hasMotivo) {
+    const motivo = nullableText(source.creditoSolidaleMotivoModifica);
+    motivoChanged = motivo !== (existing?.creditoSolidaleMotivoModifica ?? null);
+    values.creditoSolidaleMotivoModifica = motivo;
+  }
+
+  return { quotaChanged, motivoChanged };
+}
+
 async function validateMagazzinoEmporioPreferito(
   id: unknown,
   req: Request,
@@ -250,6 +313,10 @@ function fmtBenef(
     creditoSolidaleNote: r.creditoSolidaleNote ?? null,
     magazzinoEmporioPreferitoId: r.magazzinoEmporioPreferitoId ?? null,
     magazzinoEmporioPreferitoNome: magazzinoEmporioPreferitoNome ?? null,
+    creditoSolidaleMensileAssegnato: r.creditoSolidaleMensileAssegnato == null ? null : Number(r.creditoSolidaleMensileAssegnato),
+    creditoSolidaleMensileManuale: r.creditoSolidaleMensileManuale ?? false,
+    creditoSolidaleMotivoModifica: r.creditoSolidaleMotivoModifica ?? null,
+    creditoSolidaleDataUltimaModificaQuota: r.creditoSolidaleDataUltimaModificaQuota?.toISOString() ?? null,
     uds: r.uds,
     cittaId: r.cittaId ?? null,
     cittaNome: cittaNome ?? null,
@@ -334,10 +401,27 @@ async function createBeneficiarioOne(
   }
   const credito = normalizeCreditoSolidaleFields(values, b);
   if (credito.error) return { error: credito.error, status: 400 };
+  const quota = normalizeCreditoSolidaleQuotaFields(values, b);
+  if (quota.error) return { error: quota.error, status: 400 };
   if ("magazzinoEmporioPreferitoId" in b) {
     const emporio = await validateMagazzinoEmporioPreferito(b.magazzinoEmporioPreferitoId, req);
     if ("error" in emporio) return { error: emporio.error, status: emporio.status ?? 400 };
     values.magazzinoEmporioPreferitoId = emporio.value;
+  }
+  const createsEmporioData =
+    values.creditoSolidaleAbilitato === true ||
+    values.magazzinoEmporioPreferitoId != null ||
+    quota.quotaChanged ||
+    quota.motivoChanged;
+  if (createsEmporioData && !(await isEmporioEnabled())) {
+    return { error: EMPORIO_DISABLED_MSG, status: 403 };
+  }
+  const createsUdsData =
+    values.uds === true ||
+    ("zonaUdsId" in b && values.zonaUdsId != null) ||
+    (zid != null && values.zonaUdsId != null);
+  if (createsUdsData && !(await isUnitaStradaEnabled())) {
+    return { error: UNITA_STRADA_DISABLED_MSG, status: 403 };
   }
   try {
     const [row] = await db.insert(beneficiariTable).values(values as typeof beneficiariTable.$inferInsert).returning();
@@ -536,6 +620,11 @@ router.patch("/beneficiari/:id", async (req, res) => {
     res.status(400).json({ error: credito.error });
     return;
   }
+  const quota = normalizeCreditoSolidaleQuotaFields(updates, req.body as Record<string, unknown>, existing);
+  if (quota.error) {
+    res.status(400).json({ error: quota.error });
+    return;
+  }
   if ("magazzinoEmporioPreferitoId" in updates) {
     const emporio = await validateMagazzinoEmporioPreferito(updates.magazzinoEmporioPreferitoId, req);
     if ("error" in emporio) {
@@ -543,6 +632,15 @@ router.patch("/beneficiari/:id", async (req, res) => {
       return;
     }
     updates.magazzinoEmporioPreferitoId = emporio.value;
+  }
+  const enablesCreditoSolidale = updates.creditoSolidaleAbilitato === true && !existing.creditoSolidaleAbilitato;
+  const assignsEmporio =
+    "magazzinoEmporioPreferitoId" in updates &&
+    updates.magazzinoEmporioPreferitoId != null &&
+    updates.magazzinoEmporioPreferitoId !== existing.magazzinoEmporioPreferitoId;
+  if ((enablesCreditoSolidale || assignsEmporio || quota.quotaChanged || quota.motivoChanged) && !(await isEmporioEnabled())) {
+    res.status(403).json({ error: EMPORIO_DISABLED_MSG });
+    return;
   }
   if ("codice" in updates) {
     const codice = trimOrUndefined(updates.codice);
@@ -564,6 +662,15 @@ router.patch("/beneficiari/:id", async (req, res) => {
   if (caller != null) delete updates.centroAscoltoId;
   if (cid != null) delete updates.cittaId;
   if (zid != null) updates.zonaUdsId = zid;
+  const enablesUds = updates.uds === true && !existing.uds;
+  const assignsZonaUds =
+    "zonaUdsId" in updates &&
+    updates.zonaUdsId != null &&
+    updates.zonaUdsId !== existing.zonaUdsId;
+  if ((enablesUds || assignsZonaUds) && !(await isUnitaStradaEnabled())) {
+    res.status(403).json({ error: UNITA_STRADA_DISABLED_MSG });
+    return;
+  }
   // Mirror the POST città-HARD-boundary guard: a UDS person must never end up
   // with a null città (cross-città visibility leak). A scoped caller auto-pins
   // their own città (even on legacy null-città rows); a global caller must

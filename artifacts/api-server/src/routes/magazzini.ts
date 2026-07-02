@@ -12,6 +12,7 @@ import {
   andScoped,
 } from "../lib/centroScope";
 import { requireAdmin } from "../middlewares/auth";
+import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,10 @@ function parseTipoMagazzino(value: unknown, fallback?: TipoMagazzino): TipoMagaz
   return typeof value === "string" && TIPI_MAGAZZINO.includes(value as TipoMagazzino)
     ? (value as TipoMagazzino)
     : null;
+}
+
+function isTipoEmporio(tipo: TipoMagazzino): boolean {
+  return tipo === "emporio" || tipo === "misto";
 }
 
 /** True when an error is a Postgres unique-constraint violation (SQLSTATE 23505).
@@ -106,6 +111,10 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
   const tipoMagazzino = parseTipoMagazzino(body.tipoMagazzino, "logistico");
   if (!tipoMagazzino) {
     res.status(400).json({ error: "Tipo magazzino non valido." });
+    return;
+  }
+  if (isTipoEmporio(tipoMagazzino) && !(await isEmporioEnabled())) {
+    res.status(403).json({ error: EMPORIO_DISABLED_MSG });
     return;
   }
   const providedCodice = typeof body.codice === "string" ? body.codice.trim() : "";
@@ -195,6 +204,10 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
     const tipoMagazzino = parseTipoMagazzino(updates.tipoMagazzino);
     if (!tipoMagazzino) {
       res.status(400).json({ error: "Tipo magazzino non valido." });
+      return;
+    }
+    if (tipoMagazzino !== existing.tipoMagazzino && isTipoEmporio(tipoMagazzino) && !(await isEmporioEnabled())) {
+      res.status(403).json({ error: EMPORIO_DISABLED_MSG });
       return;
     }
     updates.tipoMagazzino = tipoMagazzino;

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
@@ -7,6 +7,7 @@ import {
   centriAscoltoTable,
   cittaTable,
   db,
+  impostazioniModuliTable,
   politicheCreditoSolidaleTable,
   pool,
 } from "@workspace/db";
@@ -20,6 +21,16 @@ const beneficiarioIds: number[] = [];
 const centroIds: number[] = [];
 const cittaIds: number[] = [];
 const policyIdsToReactivate: number[] = [];
+
+async function setEmporioEnabled(enabled: boolean): Promise<void> {
+  await db
+    .insert(impostazioniModuliTable)
+    .values({ id: 1, emporioAbilitato: enabled, unitaStradaAbilitata: true })
+    .onConflictDoUpdate({
+      target: impostazioniModuliTable.id,
+      set: { emporioAbilitato: enabled, unitaStradaAbilitata: true },
+    });
+}
 
 function makeApp(user: { centroAscoltoId: number | null; cittaId: number | null; isAdmin?: boolean }): Express {
   const app = express();
@@ -110,6 +121,10 @@ async function deactivateActivePoliciesForDefaultCase(): Promise<void> {
     .where(inArray(politicheCreditoSolidaleTable.id, ids));
 }
 
+beforeEach(async () => {
+  await setEmporioEnabled(true);
+});
+
 afterEach(async () => {
   if (policyIdsToReactivate.length > 0) {
     await db
@@ -129,6 +144,7 @@ afterEach(async () => {
   if (cittaIds.length > 0) {
     await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds.splice(0)));
   }
+  await setEmporioEnabled(false);
 });
 
 afterAll(async () => {

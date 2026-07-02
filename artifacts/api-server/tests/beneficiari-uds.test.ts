@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable, magazziniTable } from "@workspace/db";
+import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable, magazziniTable, impostazioniModuliTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
 
@@ -64,11 +64,22 @@ const appAs = (cittaId: number | null, zonaUdsId: number | null = null) =>
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 const sessoObbligatorioMsg = "Il campo Sesso è obbligatorio.";
 
+async function setEmporioEnabled(enabled: boolean): Promise<void> {
+  await db
+    .insert(impostazioniModuliTable)
+    .values({ id: 1, emporioAbilitato: enabled, unitaStradaAbilitata: true })
+    .onConflictDoUpdate({
+      target: impostazioniModuliTable.id,
+      set: { emporioAbilitato: enabled, unitaStradaAbilitata: true },
+    });
+}
+
 beforeAll(async () => {
   cittaA = await createCitta();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
+  await setEmporioEnabled(true);
   beneficiarioIds.length = 0;
   magazzinoIds.length = 0;
 });
@@ -80,6 +91,7 @@ afterEach(async () => {
   if (magazzinoIds.length > 0) {
     await db.delete(magazziniTable).where(inArray(magazziniTable.id, magazzinoIds));
   }
+  await setEmporioEnabled(false);
 });
 
 afterAll(async () => {

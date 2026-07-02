@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Pencil, Trash2, MapPin, Building, User } from "lucide-react";
+import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -55,6 +56,7 @@ export default function Magazzini() {
   const lockedCittaId = user?.cittaId ?? null;
   const isCittaLocked = lockedCittaId != null;
   const { data: magazzini, isLoading } = useListMagazzini();
+  const { emporioAbilitato } = useModuloFlags();
   const { data: centri } = useListCentriAscolto();
   const { data: citta } = useListCitta();
   const queryClient = useQueryClient();
@@ -410,10 +412,13 @@ export default function Magazzini() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="logistico">{t("magazzini.tipo_logistico")}</SelectItem>
-                        <SelectItem value="emporio">{t("magazzini.tipo_emporio")}</SelectItem>
-                        <SelectItem value="misto">{t("magazzini.tipo_misto")}</SelectItem>
+                        <SelectItem value="emporio" disabled={!emporioAbilitato}>{t("magazzini.tipo_emporio")}</SelectItem>
+                        <SelectItem value="misto" disabled={!emporioAbilitato}>{t("magazzini.tipo_misto")}</SelectItem>
                       </SelectContent>
                     </Select>
+                    {!emporioAbilitato && (
+                      <p className="text-xs text-muted-foreground">{EMPORIO_DISABLED_MESSAGE}</p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )} />

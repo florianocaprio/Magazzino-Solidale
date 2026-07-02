@@ -78,6 +78,8 @@ export * from './impostazioniEmail';
 export * from './impostazioniEmailProvider';
 export * from './impostazioniEmailUpdate';
 export * from './impostazioniEmailUpdateProvider';
+export * from './impostazioniModuli';
+export * from './impostazioniModuliUpdate';
 export * from './impostazioniStampa';
 export * from './impostazioniStampaTemplateBolla';
 export * from './impostazioniStampaUpdate';

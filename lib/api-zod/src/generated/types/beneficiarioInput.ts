@@ -45,6 +45,15 @@ export interface BeneficiarioInput {
   creditoSolidaleNote?: string | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleMensileManuale?: boolean;
+  /** @nullable */
+  creditoSolidaleMotivoModifica?: string | null;
+  /** @nullable */
+  creditoSolidaleDataUltimaModificaQuota?: Date | null;
+  /** @nullable */
+  creditoSolidaleMensileSuggerito?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
   soprannome?: string;

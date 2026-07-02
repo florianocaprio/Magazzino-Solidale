@@ -7,6 +7,7 @@ import {
   politicheCreditoSolidaleTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
+import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
 import {
   andScoped,
   callerCentroId,
@@ -258,6 +259,10 @@ router.get("/politiche-credito-solidale/:id", async (req, res) => {
 });
 
 router.post("/politiche-credito-solidale", requireAdmin, async (req, res) => {
+  if (!(await isEmporioEnabled())) {
+    res.status(403).json({ error: EMPORIO_DISABLED_MSG });
+    return;
+  }
   const parsed = parseBody(req.body ?? {}, false);
   if (!parsed.values) {
     res.status(400).json({ error: parsed.error });
@@ -290,6 +295,10 @@ router.patch("/politiche-credito-solidale/:id", requireAdmin, async (req, res) =
   const parsed = parseBody(req.body ?? {}, true);
   if (!parsed.values) {
     res.status(400).json({ error: parsed.error });
+    return;
+  }
+  if (parsed.values.attiva === true && !(await isEmporioEnabled())) {
+    res.status(403).json({ error: EMPORIO_DISABLED_MSG });
     return;
   }
   const effective = { ...existing.politica, ...parsed.values };

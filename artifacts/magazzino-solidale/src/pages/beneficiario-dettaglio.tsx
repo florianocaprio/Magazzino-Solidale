@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "wouter";
 import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
@@ -21,6 +21,7 @@ import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Tr
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
 import { SchedaExportButtons } from "@/components/scheda-export";
 import { loadAssociationLogo } from "@/lib/bolla-pdf";
+import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -63,6 +64,7 @@ export default function BeneficiarioDettaglio() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { unitaStradaAbilitata } = useModuloFlags();
   const [editing, setEditing] = useState(false);
 
   const onChangeCentro = (value: string) => {
@@ -219,8 +221,15 @@ export default function BeneficiarioDettaglio() {
                   <span className="text-sm font-medium">{t("beneficiarioDettaglio.udsLabel")}</span>
                   <p className="text-xs text-muted-foreground">{t("beneficiarioDettaglio.udsHelp")}</p>
                 </div>
-                <Switch checked={b.uds} onCheckedChange={onToggleUds} disabled={updateBeneficiario.isPending} />
+                <Switch
+                  checked={b.uds}
+                  onCheckedChange={onToggleUds}
+                  disabled={updateBeneficiario.isPending || !unitaStradaAbilitata}
+                />
               </div>
+              {!unitaStradaAbilitata && (
+                <p className="text-xs text-muted-foreground mt-2">{UNITA_STRADA_DISABLED_MESSAGE}</p>
+              )}
             </div>
 
             <div className="pt-4 border-t border-border mt-4">
@@ -432,6 +441,102 @@ function CreditoSolidaleCalcoloPanel({ beneficiarioId, enabled }: { beneficiario
   );
 }
 
+function CreditoSolidaleQuotaPanel({
+  b,
+  enabled,
+  emporioAbilitato,
+}: {
+  b: BeneficiarioDettaglioType;
+  enabled: boolean;
+  emporioAbilitato: boolean;
+}) {
+  const updateBeneficiario = useUpdateBeneficiario();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data } = useCalcolaCreditoSolidaleBeneficiario(b.id, {
+    query: { queryKey: getCalcolaCreditoSolidaleBeneficiarioQueryKey(b.id), enabled: enabled && emporioAbilitato },
+  });
+  const suggested = data?.totaleSuggerito ?? null;
+  const [assegnato, setAssegnato] = useState(
+    b.creditoSolidaleMensileAssegnato == null ? "" : String(b.creditoSolidaleMensileAssegnato),
+  );
+  const [motivo, setMotivo] = useState(b.creditoSolidaleMotivoModifica ?? "");
+
+  useEffect(() => {
+    if (b.creditoSolidaleMensileAssegnato == null && suggested != null) {
+      setAssegnato(String(suggested));
+    }
+  }, [b.creditoSolidaleMensileAssegnato, suggested]);
+
+  if (!enabled) return null;
+
+  const assignedNumber = assegnato === "" ? null : Number(assegnato);
+  const isManuale = assignedNumber != null && suggested != null
+    ? Math.round(assignedNumber * 100) !== Math.round(suggested * 100)
+    : b.creditoSolidaleMensileManuale;
+  const disabled = !emporioAbilitato || updateBeneficiario.isPending;
+
+  const onSave = () => {
+    updateBeneficiario.mutate(
+      {
+        id: b.id,
+        data: {
+          creditoSolidaleMensileAssegnato: assegnato === "" ? null : Number(assegnato),
+          creditoSolidaleMensileSuggerito: suggested,
+          creditoSolidaleMotivoModifica: motivo.trim() ? motivo.trim() : null,
+        } as never,
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) });
+          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+          toast({ title: "Quota assegnata salvata" });
+        },
+        onError: (e) => toast({
+          title: "Credito Solidale",
+          description: apiErrorMessage(e, "Impossibile salvare la quota assegnata"),
+          variant: "destructive",
+        }),
+      },
+    );
+  };
+
+  return (
+    <div className="rounded-md border bg-background p-3 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h5 className="text-sm font-medium">Credito mensile assegnato</h5>
+          <p className="text-xs text-muted-foreground">Suggerito dal calcolo: {formatCreditoQuota(suggested)}</p>
+        </div>
+        <Badge variant="outline" className={isManuale ? "bg-amber-500/10 text-amber-700" : "bg-emerald-500/10 text-emerald-700"}>
+          {isManuale ? "Modificato manualmente" : "Allineato al calcolo"}
+        </Badge>
+      </div>
+      {!emporioAbilitato && <p className="text-xs text-muted-foreground">{EMPORIO_DISABLED_MESSAGE}</p>}
+      <div className="space-y-2">
+        <label className="text-sm font-medium leading-none">Credito mensile assegnato</label>
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={assegnato}
+          onChange={(event) => setAssegnato(event.target.value)}
+          disabled={disabled}
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium leading-none">Motivo modifica quota</label>
+        <Textarea rows={2} value={motivo} onChange={(event) => setMotivo(event.target.value)} disabled={disabled} />
+      </div>
+      <div className="flex justify-end">
+        <Button type="button" onClick={onSave} disabled={disabled}>
+          Salva quota assegnata
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettaglioType; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
   const updateBeneficiario = useUpdateBeneficiario();
@@ -441,6 +546,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   const isCittaGlobal = user?.cittaId == null;
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
   const { data: magazzini } = useListMagazzini();
+  const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const emporiDisponibili = useMemo(
     () => (magazzini ?? []).filter((m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto"),
     [magazzini],
@@ -647,6 +753,9 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 <div>
                   <h4 className="text-sm font-medium">{t("beneficiari.creditoSolidaleSection")}</h4>
                   <p className="text-xs text-muted-foreground">{t("beneficiari.creditoSolidaleHelp")}</p>
+                  {!emporioAbilitato && (
+                    <p className="text-xs text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>
+                  )}
                 </div>
                 <FormField control={form.control} name="creditoSolidaleAbilitato" render={({ field }) => (
                   <FormItem className="flex items-center justify-between">
@@ -654,6 +763,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                     <FormControl>
                       <Switch
                         checked={field.value}
+                        disabled={!emporioAbilitato}
                         onCheckedChange={(checked) => {
                           field.onChange(checked);
                           form.setValue("creditoSolidaleStato", checked ? "attivo" : "non_abilitato");
@@ -665,7 +775,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 <FormField control={form.control} name="creditoSolidaleStato" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("beneficiari.creditoSolidaleStato")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!creditoSolidaleAbilitato}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!emporioAbilitato || !creditoSolidaleAbilitato}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="non_abilitato">{t("beneficiari.creditoSolidaleStatoNonAbilitato")}</SelectItem>
@@ -679,7 +789,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 <FormField control={form.control} name="magazzinoEmporioPreferitoId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("beneficiari.magazzinoEmporioPreferito")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || NONE_VALUE} disabled={!creditoSolidaleAbilitato}>
+                    <Select onValueChange={field.onChange} value={field.value || NONE_VALUE} disabled={!emporioAbilitato || !creditoSolidaleAbilitato}>
                       <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value={NONE_VALUE}>{t("common.none")}</SelectItem>
@@ -702,20 +812,24 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 <FormField control={form.control} name="creditoSolidaleNote" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("beneficiari.creditoSolidaleNote")}</FormLabel>
-                    <FormControl><Textarea rows={2} {...field} /></FormControl>
+                    <FormControl><Textarea rows={2} disabled={!emporioAbilitato} {...field} /></FormControl>
                   </FormItem>
                 )} />
-                <CreditoSolidaleCalcoloPanel beneficiarioId={b.id} enabled={creditoSolidaleAbilitato} />
+                <CreditoSolidaleCalcoloPanel beneficiarioId={b.id} enabled={creditoSolidaleAbilitato && emporioAbilitato} />
+                <CreditoSolidaleQuotaPanel b={b} enabled={creditoSolidaleAbilitato} emporioAbilitato={emporioAbilitato} />
               </div>
 
               <div className="rounded-md border p-3 space-y-3">
+                {!unitaStradaAbilitata && (
+                  <p className="text-xs text-muted-foreground">{UNITA_STRADA_DISABLED_MESSAGE}</p>
+                )}
                 <FormField control={form.control} name="uds" render={({ field }) => (
                   <FormItem className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <FormLabel className="!mt-0">{t("beneficiari.udsToggle")}</FormLabel>
                       <p className="text-xs text-muted-foreground">{t("beneficiari.udsToggleHint")}</p>
                     </div>
-                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={!unitaStradaAbilitata} /></FormControl>
                   </FormItem>
                 )} />
                 {watchUds && (
@@ -724,7 +838,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                       <FormField control={form.control} name="cittaId" render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
-                          <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NONE_VALUE); }}>
+                          <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NONE_VALUE); }} disabled={!unitaStradaAbilitata}>
                             <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger></FormControl>
                             <SelectContent>
                               {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
@@ -737,7 +851,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                     <FormField control={form.control} name="zonaUdsId" render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
-                        <Select value={field.value || NONE_VALUE} onValueChange={field.onChange}>
+                        <Select value={field.value || NONE_VALUE} onValueChange={field.onChange} disabled={!unitaStradaAbilitata}>
                           <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.allZone")} /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value={NONE_VALUE}>{t("udsAnagrafica.allZone")}</SelectItem>
