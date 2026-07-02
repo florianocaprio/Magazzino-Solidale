@@ -30,6 +30,7 @@ const formSchema = z.object({
   responsabile: z.string().optional(),
   telefono: z.string().optional(),
   email: z.string().email("Email non valida").optional().or(z.literal("")),
+  tipoMagazzino: z.enum(["logistico", "emporio", "misto"]).default("logistico"),
   stato: z.string().default("attivo"),
   centroAscoltoId: z.string().optional(),
   cittaId: z.string().optional(),
@@ -38,6 +39,12 @@ const formSchema = z.object({
 
 const NO_CENTRO = "__none__";
 const NO_CITTA = "__nocitta__";
+
+const tipoMagazzinoBadgeClasses: Record<string, string> = {
+  logistico: "bg-slate-500/10 text-slate-700 hover:bg-slate-500/20",
+  emporio: "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20",
+  misto: "bg-sky-500/10 text-sky-700 hover:bg-sky-500/20",
+};
 
 export default function Magazzini() {
   const { t } = useTranslation();
@@ -55,6 +62,7 @@ export default function Magazzini() {
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState<string>("all");
   const [cittaFilter, setCittaFilter] = useState<string>("all");
+  const [tipoFilter, setTipoFilter] = useState<string>("all");
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -68,7 +76,7 @@ export default function Magazzini() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       codice: "", nome: "", indirizzo: "", comune: "", zona: "",
-      responsabile: "", telefono: "", email: "", stato: "attivo", centroAscoltoId: NO_CENTRO, cittaId: NO_CITTA, note: ""
+      responsabile: "", telefono: "", email: "", tipoMagazzino: "logistico", stato: "attivo", centroAscoltoId: NO_CENTRO, cittaId: NO_CITTA, note: ""
     }
   });
 
@@ -83,6 +91,7 @@ export default function Magazzini() {
       responsabile: magazzino.responsabile || "",
       telefono: magazzino.telefono || "",
       email: magazzino.email || "",
+      tipoMagazzino: magazzino.tipoMagazzino || "logistico",
       stato: magazzino.stato,
       centroAscoltoId: magazzino.centroAscoltoId != null ? String(magazzino.centroAscoltoId) : NO_CENTRO,
       cittaId: magazzino.cittaId != null ? String(magazzino.cittaId) : NO_CITTA,
@@ -95,7 +104,7 @@ export default function Magazzini() {
     setEditingId(null);
     form.reset({
       codice: "", nome: "", indirizzo: "", comune: "", zona: "",
-      responsabile: "", telefono: "", email: "", stato: "attivo",
+      responsabile: "", telefono: "", email: "", tipoMagazzino: "logistico", stato: "attivo",
       centroAscoltoId: isCentroLocked ? String(lockedCentroId) : NO_CENTRO,
       cittaId: isCittaLocked ? String(lockedCittaId) : NO_CITTA, note: ""
     });
@@ -152,7 +161,8 @@ export default function Magazzini() {
       m.comune?.toLowerCase().includes(search.toLowerCase());
     const matchesCentro = centroFilter === "all" || m.centroAscoltoId === parseInt(centroFilter);
     const matchesCitta = cittaFilter === "all" || m.cittaId === parseInt(cittaFilter);
-    return matchesSearch && matchesCentro && matchesCitta;
+    const matchesTipo = tipoFilter === "all" || (m.tipoMagazzino ?? "logistico") === tipoFilter;
+    return matchesSearch && matchesCentro && matchesCitta && matchesTipo;
   });
 
   return (
@@ -168,6 +178,7 @@ export default function Magazzini() {
             columns={[
               { header: t("common.code"), accessor: (m) => m.codice },
               { header: t("common.name"), accessor: (m) => m.nome },
+              { header: t("magazzini.tipoMagazzino"), accessor: (m) => t(`magazzini.tipo_${m.tipoMagazzino ?? "logistico"}`) },
               { header: t("common.address"), accessor: (m) => m.indirizzo },
               { header: t("magazzini.comune"), accessor: (m) => m.comune },
               { header: t("magazzini.zona"), accessor: (m) => m.zona },
@@ -196,6 +207,17 @@ export default function Magazzini() {
               className="max-w-sm"
             />
             <div className="flex flex-wrap items-center gap-3">
+              <Select value={tipoFilter} onValueChange={setTipoFilter}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder={t("magazzini.filterTipoMagazzino")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("magazzini.filterTipoMagazzino")}</SelectItem>
+                  <SelectItem value="logistico">{t("magazzini.tipo_logistico")}</SelectItem>
+                  <SelectItem value="emporio">{t("magazzini.tipo_emporio")}</SelectItem>
+                  <SelectItem value="misto">{t("magazzini.tipo_misto")}</SelectItem>
+                </SelectContent>
+              </Select>
               {!isCittaLocked && (
                 <Select value={cittaFilter} onValueChange={setCittaFilter}>
                   <SelectTrigger className="w-full sm:w-56">
@@ -231,6 +253,7 @@ export default function Magazzini() {
               <TableRow>
                 <TableHead className="w-[100px]">{t("common.code")}</TableHead>
                 <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("magazzini.tipoMagazzino")}</TableHead>
                 <TableHead>{t("magazzini.colPlace")}</TableHead>
                 <TableHead>{t("magazzini.colResponsabile")}</TableHead>
                 {isGlobal && <TableHead>{t("common.centro")}</TableHead>}
@@ -244,6 +267,7 @@ export default function Magazzini() {
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
@@ -253,7 +277,7 @@ export default function Magazzini() {
                 ))
               ) : filtered?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isGlobal ? 7 : 6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={isGlobal ? 8 : 7} className="h-32 text-center text-muted-foreground">
                     {t("magazzini.noWarehouses")}
                   </TableCell>
                 </TableRow>
@@ -263,6 +287,14 @@ export default function Magazzini() {
                   <TableCell>
                     <div className="font-medium">{magazzino.nome}</div>
                     {magazzino.note && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{magazzino.note}</div>}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="secondary"
+                      className={tipoMagazzinoBadgeClasses[magazzino.tipoMagazzino ?? "logistico"] ?? tipoMagazzinoBadgeClasses.logistico}
+                    >
+                      {t(`magazzini.tipo_${magazzino.tipoMagazzino ?? "logistico"}`)}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
@@ -366,6 +398,25 @@ export default function Magazzini() {
                     </FormItem>
                   )} />
                 </div>
+
+                <FormField control={form.control} name="tipoMagazzino" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("magazzini.tipoMagazzino")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("magazzini.tipoMagazzino")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="logistico">{t("magazzini.tipo_logistico")}</SelectItem>
+                        <SelectItem value="emporio">{t("magazzini.tipo_emporio")}</SelectItem>
+                        <SelectItem value="misto">{t("magazzini.tipo_misto")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
                 <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                   <FormItem>

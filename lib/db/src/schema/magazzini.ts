@@ -16,6 +16,7 @@ export const magazziniTable = pgTable("magazzini", {
   telefono: varchar("telefono", { length: 20 }),
   email: varchar("email", { length: 120 }),
   centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
+  tipoMagazzino: varchar("tipo_magazzino", { length: 20 }).notNull().default("logistico"),
   stato: varchar("stato", { length: 20 }).notNull().default("attivo"),
   note: text("note"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),

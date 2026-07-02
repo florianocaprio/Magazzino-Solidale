@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { MagazzinoTipoMagazzino } from './magazzinoTipoMagazzino';
 
 export interface Magazzino {
   id: number;
@@ -28,6 +29,7 @@ export interface Magazzino {
   centroAscoltoNome?: string | null;
   /** @nullable */
   cittaId?: number | null;
+  tipoMagazzino: MagazzinoTipoMagazzino;
   stato: string;
   /** @nullable */
   note?: string | null;

@@ -15,8 +15,18 @@ import { requireAdmin } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
+const TIPI_MAGAZZINO = ["logistico", "emporio", "misto"] as const;
+type TipoMagazzino = (typeof TIPI_MAGAZZINO)[number];
+
 function paramId(v: string | string[]): number {
   return parseInt(Array.isArray(v) ? v[0] : v, 10);
+}
+
+function parseTipoMagazzino(value: unknown, fallback?: TipoMagazzino): TipoMagazzino | null {
+  if (value == null || value === "") return fallback ?? null;
+  return typeof value === "string" && TIPI_MAGAZZINO.includes(value as TipoMagazzino)
+    ? (value as TipoMagazzino)
+    : null;
 }
 
 /** True when an error is a Postgres unique-constraint violation (SQLSTATE 23505).
@@ -54,6 +64,7 @@ const fmt = (r: typeof magazziniTable.$inferSelect, centroNome?: string | null) 
   centroAscoltoId: r.centroAscoltoId ?? null,
   centroAscoltoNome: centroNome ?? null,
   cittaId: r.cittaId ?? null,
+  tipoMagazzino: r.tipoMagazzino ?? "logistico",
   stato: r.stato,
   note: r.note ?? null,
   dataCreazione: r.dataCreazione.toISOString(),
@@ -92,6 +103,11 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
   const cid = callerCittaId(req);
   const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
   const cittaId = cid != null ? cid : (body.cittaId ?? null);
+  const tipoMagazzino = parseTipoMagazzino(body.tipoMagazzino, "logistico");
+  if (!tipoMagazzino) {
+    res.status(400).json({ error: "Tipo magazzino non valido." });
+    return;
+  }
   const providedCodice = typeof body.codice === "string" ? body.codice.trim() : "";
   const values = {
     nome: body.nome,
@@ -103,6 +119,7 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
     email: body.email,
     centroAscoltoId,
     cittaId,
+    tipoMagazzino,
     stato: body.stato ?? "attivo",
     note: body.note,
   };
@@ -174,6 +191,14 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
     return;
   }
   const updates = { ...req.body };
+  if ("tipoMagazzino" in updates) {
+    const tipoMagazzino = parseTipoMagazzino(updates.tipoMagazzino);
+    if (!tipoMagazzino) {
+      res.status(400).json({ error: "Tipo magazzino non valido." });
+      return;
+    }
+    updates.tipoMagazzino = tipoMagazzino;
+  }
   // Scoped users cannot reassign a record's centro.
   if (caller != null) delete updates.centroAscoltoId;
   // Scoped users cannot move a record to another città.

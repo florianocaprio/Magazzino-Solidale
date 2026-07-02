@@ -75,6 +75,15 @@ export interface MovimentoSummary {
   dataMovimento: string;
 }
 
+export type MagazzinoTipoMagazzino = typeof MagazzinoTipoMagazzino[keyof typeof MagazzinoTipoMagazzino];
+
+
+export const MagazzinoTipoMagazzino = {
+  logistico: 'logistico',
+  emporio: 'emporio',
+  misto: 'misto',
+} as const;
+
 export interface Magazzino {
   id: number;
   codice: string;
@@ -97,6 +106,7 @@ export interface Magazzino {
   centroAscoltoNome?: string | null;
   /** @nullable */
   cittaId?: number | null;
+  tipoMagazzino: MagazzinoTipoMagazzino;
   stato: string;
   /** @nullable */
   note?: string | null;
@@ -179,6 +189,12 @@ export interface ProdottoInput {
   fsePlus?: boolean;
   scortaMinima?: number;
   scortaConsigliata?: number;
+  abilitatoEmporio?: boolean;
+  creditoSolidaleValore?: number;
+  /** @nullable */
+  quantitaMassimaPerSpesa?: number | null;
+  /** @nullable */
+  quantitaMassimaMensile?: number | null;
   conservazione?: string;
   taglia?: string;
   genere?: string;
@@ -256,6 +272,15 @@ export interface BulkImportResult {
   errori: BulkImportResultErroriItem[];
 }
 
+export type MagazzinoInputTipoMagazzino = typeof MagazzinoInputTipoMagazzino[keyof typeof MagazzinoInputTipoMagazzino];
+
+
+export const MagazzinoInputTipoMagazzino = {
+  logistico: 'logistico',
+  emporio: 'emporio',
+  misto: 'misto',
+} as const;
+
 export interface MagazzinoInput {
   codice?: string;
   nome: string;
@@ -267,9 +292,19 @@ export interface MagazzinoInput {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  tipoMagazzino?: MagazzinoInputTipoMagazzino;
   stato?: string;
   note?: string;
 }
+
+export type MagazzinoUpdateTipoMagazzino = typeof MagazzinoUpdateTipoMagazzino[keyof typeof MagazzinoUpdateTipoMagazzino];
+
+
+export const MagazzinoUpdateTipoMagazzino = {
+  logistico: 'logistico',
+  emporio: 'emporio',
+  misto: 'misto',
+} as const;
 
 export interface MagazzinoUpdate {
   nome?: string;
@@ -281,6 +316,7 @@ export interface MagazzinoUpdate {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
   note?: string;
 }
@@ -300,6 +336,12 @@ export interface Prodotto {
   fsePlus: boolean;
   scortaMinima: number;
   scortaConsigliata: number;
+  abilitatoEmporio: boolean;
+  creditoSolidaleValore: number;
+  /** @nullable */
+  quantitaMassimaPerSpesa: number | null;
+  /** @nullable */
+  quantitaMassimaMensile: number | null;
   /** @nullable */
   conservazione?: string | null;
   /** @nullable */
@@ -330,6 +372,12 @@ export interface ProdottoUpdate {
   fsePlus?: boolean;
   scortaMinima?: number;
   scortaConsigliata?: number;
+  abilitatoEmporio?: boolean;
+  creditoSolidaleValore?: number;
+  /** @nullable */
+  quantitaMassimaPerSpesa?: number | null;
+  /** @nullable */
+  quantitaMassimaMensile?: number | null;
   conservazione?: string;
   taglia?: string;
   genere?: string;

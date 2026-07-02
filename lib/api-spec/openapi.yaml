@@ -3295,13 +3295,16 @@ components:
           type: ["string", "null"]
         cittaId:
           type: ["integer", "null"]
+        tipoMagazzino:
+          type: string
+          enum: [logistico, emporio, misto]
         stato:
           type: string
         note:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, nome, stato, dataCreazione]
+      required: [id, codice, nome, tipoMagazzino, stato, dataCreazione]
 
     VolontariBulkInput:
       type: object
@@ -3386,6 +3389,9 @@ components:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
+        tipoMagazzino:
+          type: string
+          enum: [logistico, emporio, misto]
         stato:
           type: string
         note:
@@ -3411,6 +3417,9 @@ components:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
+        tipoMagazzino:
+          type: string
+          enum: [logistico, emporio, misto]
         stato:
           type: string
         note:
@@ -3444,6 +3453,14 @@ components:
           type: number
         scortaConsigliata:
           type: number
+        abilitatoEmporio:
+          type: boolean
+        creditoSolidaleValore:
+          type: number
+        quantitaMassimaPerSpesa:
+          type: ["number", "null"]
+        quantitaMassimaMensile:
+          type: ["number", "null"]
         conservazione:
           type: ["string", "null"]
         taglia:
@@ -3462,7 +3479,7 @@ components:
           type: string
         fornitoreId:
           type: ["integer", "null"]
-      required: [id, codice, nome, tipoProdotto, unitaMisura, gestioneLotto, gestioneScadenza, fsePlus, scortaMinima, scortaConsigliata, attivo, dataCreazione]
+      required: [id, codice, nome, tipoProdotto, unitaMisura, gestioneLotto, gestioneScadenza, fsePlus, scortaMinima, scortaConsigliata, abilitatoEmporio, creditoSolidaleValore, quantitaMassimaPerSpesa, quantitaMassimaMensile, attivo, dataCreazione]
 
     ProdottoInput:
       type: object
@@ -3489,6 +3506,14 @@ components:
           type: number
         scortaConsigliata:
           type: number
+        abilitatoEmporio:
+          type: boolean
+        creditoSolidaleValore:
+          type: number
+        quantitaMassimaPerSpesa:
+          type: ["number", "null"]
+        quantitaMassimaMensile:
+          type: ["number", "null"]
         conservazione:
           type: string
         taglia:
@@ -3530,6 +3555,14 @@ components:
           type: number
         scortaConsigliata:
           type: number
+        abilitatoEmporio:
+          type: boolean
+        creditoSolidaleValore:
+          type: number
+        quantitaMassimaPerSpesa:
+          type: ["number", "null"]
+        quantitaMassimaMensile:
+          type: ["number", "null"]
         conservazione:
           type: string
         taglia:

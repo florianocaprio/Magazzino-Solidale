@@ -11,6 +11,30 @@ const CODICE_DUPLICATO_MSG = "Il codice prodotto indicato è già associato a un
 const BARCODE_DUPLICATO_MSG = "Il codice a barre indicato è già associato a un altro prodotto.";
 const BARCODE_NON_VALIDO_MSG = "Il codice a barre deve essere un EAN-13 numerico valido.";
 
+function parseNonNegativeDecimal(value: unknown, label: string): { value: string } | { error: string } {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { error: `${label} non valido.` };
+  if (n < 0) return { error: `${label} non può essere negativo.` };
+  return { value: String(n) };
+}
+
+function parseOptionalNonNegativeDecimal(value: unknown, label: string): { value: string | null } | { error: string } {
+  if (value == null || value === "") return { value: null };
+  return parseNonNegativeDecimal(value, label);
+}
+
+function parseOptionalBoolean(value: unknown, fallback: boolean): boolean | null {
+  if (value == null || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number" && (value === 0 || value === 1)) return Boolean(value);
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["si", "sì", "true", "1", "yes", "y", "vero"].includes(normalized)) return true;
+    if (["no", "false", "0", "n", "falso"].includes(normalized)) return false;
+  }
+  return null;
+}
+
 const fmtProdotto = (r: typeof prodottiTable.$inferSelect) => ({
   id: r.id,
   codice: r.codice,
@@ -24,6 +48,10 @@ const fmtProdotto = (r: typeof prodottiTable.$inferSelect) => ({
   fsePlus: r.fsePlus,
   scortaMinima: parseFloat(r.scortaMinima ?? "0"),
   scortaConsigliata: parseFloat(r.scortaConsigliata ?? "0"),
+  abilitatoEmporio: r.abilitatoEmporio ?? false,
+  creditoSolidaleValore: parseFloat(r.creditoSolidaleValore ?? "0"),
+  quantitaMassimaPerSpesa: r.quantitaMassimaPerSpesa == null ? null : parseFloat(r.quantitaMassimaPerSpesa),
+  quantitaMassimaMensile: r.quantitaMassimaMensile == null ? null : parseFloat(r.quantitaMassimaMensile),
   conservazione: r.conservazione ?? null,
   taglia: r.taglia ?? null,
   genere: r.genere ?? null,
@@ -143,6 +171,14 @@ async function createProdottoOne(
   if (await codiceProdottoEsiste(codice)) return { error: CODICE_DUPLICATO_MSG, status: 409 };
   if (!isEan13Valido(codiceBarre)) return { error: BARCODE_NON_VALIDO_MSG, status: 400 };
   if (await barcodeProdottoEsiste(codiceBarre)) return { error: BARCODE_DUPLICATO_MSG, status: 409 };
+  const abilitatoEmporio = parseOptionalBoolean(b.abilitatoEmporio, false);
+  if (abilitatoEmporio == null) return { error: "Abilitato Emporio non valido.", status: 400 };
+  const creditoSolidaleValore = parseNonNegativeDecimal(b.creditoSolidaleValore ?? 0, "Valore Credito Solidale");
+  if ("error" in creditoSolidaleValore) return { error: creditoSolidaleValore.error, status: 400 };
+  const quantitaMassimaPerSpesa = parseOptionalNonNegativeDecimal(b.quantitaMassimaPerSpesa, "Quantità massima per singola spesa");
+  if ("error" in quantitaMassimaPerSpesa) return { error: quantitaMassimaPerSpesa.error, status: 400 };
+  const quantitaMassimaMensile = parseOptionalNonNegativeDecimal(b.quantitaMassimaMensile, "Quantità massima mensile");
+  if ("error" in quantitaMassimaMensile) return { error: quantitaMassimaMensile.error, status: 400 };
   try {
     const [row] = await db.insert(prodottiTable).values({
       codice,
@@ -156,6 +192,10 @@ async function createProdottoOne(
       fsePlus: b.fsePlus ?? false,
       scortaMinima: b.scortaMinima?.toString() ?? "0",
       scortaConsigliata: b.scortaConsigliata?.toString() ?? "0",
+      abilitatoEmporio,
+      creditoSolidaleValore: creditoSolidaleValore.value,
+      quantitaMassimaPerSpesa: quantitaMassimaPerSpesa.value,
+      quantitaMassimaMensile: quantitaMassimaMensile.value,
       conservazione: b.conservazione,
       taglia: b.taglia,
       genere: b.genere,
@@ -217,6 +257,26 @@ router.patch("/prodotti/:id", async (req, res) => {
   }
   if (body.scortaMinima !== undefined) update.scortaMinima = body.scortaMinima.toString();
   if (body.scortaConsigliata !== undefined) update.scortaConsigliata = body.scortaConsigliata.toString();
+  if ("abilitatoEmporio" in update) {
+    const abilitatoEmporio = parseOptionalBoolean(update.abilitatoEmporio, false);
+    if (abilitatoEmporio == null) { res.status(400).json({ error: "Abilitato Emporio non valido." }); return; }
+    update.abilitatoEmporio = abilitatoEmporio;
+  }
+  if ("creditoSolidaleValore" in update) {
+    const creditoSolidaleValore = parseNonNegativeDecimal(update.creditoSolidaleValore, "Valore Credito Solidale");
+    if ("error" in creditoSolidaleValore) { res.status(400).json({ error: creditoSolidaleValore.error }); return; }
+    update.creditoSolidaleValore = creditoSolidaleValore.value;
+  }
+  if ("quantitaMassimaPerSpesa" in update) {
+    const quantitaMassimaPerSpesa = parseOptionalNonNegativeDecimal(update.quantitaMassimaPerSpesa, "Quantità massima per singola spesa");
+    if ("error" in quantitaMassimaPerSpesa) { res.status(400).json({ error: quantitaMassimaPerSpesa.error }); return; }
+    update.quantitaMassimaPerSpesa = quantitaMassimaPerSpesa.value;
+  }
+  if ("quantitaMassimaMensile" in update) {
+    const quantitaMassimaMensile = parseOptionalNonNegativeDecimal(update.quantitaMassimaMensile, "Quantità massima mensile");
+    if ("error" in quantitaMassimaMensile) { res.status(400).json({ error: quantitaMassimaMensile.error }); return; }
+    update.quantitaMassimaMensile = quantitaMassimaMensile.value;
+  }
   try {
     const [row] = await db.update(prodottiTable).set(update).where(eq(prodottiTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
