@@ -48,6 +48,7 @@ import ZoneUds from "@/pages/zone-uds";
 import RuoliVolontari from "@/pages/ruoli-volontari";
 import TipiIntervento from "@/pages/tipi-intervento";
 import TipologieFornitore from "@/pages/tipologie-fornitore";
+import PoliticheCreditoSolidale from "@/pages/politiche-credito-solidale";
 import UdsAnagrafica from "@/pages/uds-anagrafica";
 import UdsInterventi from "@/pages/uds-interventi";
 import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
@@ -297,6 +298,13 @@ function AppRoutes() {
           {() => (
             <Guard area="amministrazione">
               <TipologieFornitore />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/politiche-credito-solidale">
+          {() => (
+            <Guard area="amministrazione">
+              <PoliticheCreditoSolidale />
             </Guard>
           )}
         </Route>

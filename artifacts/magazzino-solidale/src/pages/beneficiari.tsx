@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey } from "@workspace/api-client-react";
-import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey } from "@workspace/api-client-react";
+import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,10 @@ const makeFormSchema = (t: (k: string) => string) => z.object({
   numComponenti: z.coerce.number().min(1).default(1),
   priorita: z.string().default("media"),
   centroAscoltoId: z.string().optional(),
+  creditoSolidaleAbilitato: z.boolean().default(false),
+  creditoSolidaleStato: z.enum(STATI_CREDITO_SOLIDALE).default("non_abilitato"),
+  creditoSolidaleNote: z.string().optional(),
+  magazzinoEmporioPreferitoId: z.string().optional(),
   consegnaDomicilio: z.boolean().default(false),
   motivoConsegnaDomicilio: z.string().optional(),
   restrizioniAlimentari: z.string().optional(),
@@ -62,6 +66,25 @@ const CENTRO_ALL = "__all__";
 const PRIORITA_ALL = "__all__";
 const CITTA_ALL = "__all__";
 const NO_ZONE = "__none__";
+const NO_EMPORIO = "__none__";
+const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
+type CreditoSolidaleStato = (typeof STATI_CREDITO_SOLIDALE)[number];
+
+const creditoSolidaleBadgeClasses: Record<CreditoSolidaleStato, string> = {
+  non_abilitato: "bg-muted text-muted-foreground",
+  attivo: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  sospeso: "bg-amber-500/10 text-amber-700 border-amber-200",
+  revocato: "bg-red-500/10 text-red-700 border-red-200",
+};
+
+function creditoSolidaleLabelKey(stato?: string | null): string {
+  switch (stato) {
+    case "attivo": return "beneficiari.creditoSolidaleStatoAttivo";
+    case "sospeso": return "beneficiari.creditoSolidaleStatoSospeso";
+    case "revocato": return "beneficiari.creditoSolidaleStatoRevocato";
+    default: return "beneficiari.creditoSolidaleStatoNonAbilitato";
+  }
+}
 
 export default function Beneficiari() {
   const { t } = useTranslation();
@@ -86,6 +109,11 @@ export default function Beneficiari() {
     cittaId: isCittaGlobal && cittaFilter !== CITTA_ALL ? parseInt(cittaFilter) : undefined,
   });
   const { data: centri } = useListCentriAscolto();
+  const { data: magazzini } = useListMagazzini();
+  const emporiDisponibili = useMemo(
+    () => (magazzini ?? []).filter((m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto"),
+    [magazzini],
+  );
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
 
   const queryClient = useQueryClient();
@@ -118,10 +146,13 @@ export default function Beneficiari() {
       cognome: "", nome: "", soprannome: "", codiceFiscale: "", dataNascita: "", sesso: "",
       cittadinanza: "", areaProvenienza: "", residenza: "", domicilio: "", comune: "", zonaMunicipio: "",
       telefono: "", email: "", numComponenti: 1, priorita: "media", centroAscoltoId: "",
+      creditoSolidaleAbilitato: false, creditoSolidaleStato: "non_abilitato", creditoSolidaleNote: "",
+      magazzinoEmporioPreferitoId: NO_EMPORIO,
       consegnaDomicilio: false, motivoConsegnaDomicilio: "", restrizioniAlimentari: "",
       uds: false, cittaId: "", zonaUdsId: ""
     }
   });
+  const creditoSolidaleAbilitato = form.watch("creditoSolidaleAbilitato");
 
   const watchUds = form.watch("uds");
   const formCitta = isCittaGlobal
@@ -156,7 +187,16 @@ export default function Beneficiari() {
   const resetDup = () => { setDupDismissed(false); setDupParams({}); };
 
   const onSubmit = (data: FormValues) => {
-    const { centroAscoltoId, codiceFiscale, cittaId, zonaUdsId, uds, ...rest } = data;
+    const {
+      centroAscoltoId,
+      codiceFiscale,
+      cittaId,
+      zonaUdsId,
+      uds,
+      magazzinoEmporioPreferitoId,
+      creditoSolidaleNote,
+      ...rest
+    } = data;
     // A città-global admin must pin a città when flagging a person as UDS,
     // mirroring the server-side hard-boundary guard.
     if (uds && isCittaGlobal && !cittaId) {
@@ -170,6 +210,13 @@ export default function Beneficiari() {
       sesso: rest.sesso,
       centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
       codiceFiscale: codiceFiscale?.trim() ? codiceFiscale.trim().toUpperCase() : null,
+      creditoSolidaleAbilitato: rest.creditoSolidaleAbilitato,
+      creditoSolidaleStato: rest.creditoSolidaleAbilitato ? rest.creditoSolidaleStato : "non_abilitato",
+      creditoSolidaleNote: creditoSolidaleNote?.trim() ? creditoSolidaleNote.trim() : null,
+      magazzinoEmporioPreferitoId:
+        magazzinoEmporioPreferitoId && magazzinoEmporioPreferitoId !== NO_EMPORIO
+          ? parseInt(magazzinoEmporioPreferitoId)
+          : null,
     };
     if (uds) {
       if (isCittaGlobal && cittaId) payload.cittaId = parseInt(cittaId);
@@ -215,6 +262,8 @@ export default function Beneficiari() {
               { header: t("beneficiari.comune"), accessor: (b) => b.comune },
               { header: t("beneficiari.zonaMunicipio"), accessor: (b) => b.zonaMunicipio },
               { header: t("beneficiari.centroAscolto"), accessor: (b) => b.centroAscoltoNome },
+              { header: t("beneficiari.creditoSolidaleStato"), accessor: (b) => t(creditoSolidaleLabelKey(b.creditoSolidaleStato)) },
+              { header: t("beneficiari.magazzinoEmporioPreferito"), accessor: (b) => b.magazzinoEmporioPreferitoNome },
             ]}
             filename="beneficiari"
             title={t("beneficiari.exportTitle")}
@@ -247,6 +296,10 @@ export default function Beneficiari() {
           { key: "priorita", header: t("beneficiari.colPriorita"), example: "media" },
           { key: "areaProvenienza", header: t("beneficiarioDettaglio.areaProvenienza"), example: "UE" },
           { key: "centro", header: t("beneficiari.centroAscolto"), example: "" },
+          { key: "creditoSolidaleAbilitato", header: t("beneficiari.creditoSolidaleAbilitato"), example: "No" },
+          { key: "creditoSolidaleStato", header: t("beneficiari.creditoSolidaleStato"), example: "non_abilitato" },
+          { key: "magazzinoEmporioPreferito", header: t("beneficiari.magazzinoEmporioPreferito"), example: "" },
+          { key: "creditoSolidaleNote", header: t("beneficiari.creditoSolidaleNote"), example: "" },
           ...(isCittaGlobal ? [{ key: "citta", header: t("nav.citta"), example: "" }] : []),
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
@@ -264,6 +317,19 @@ export default function Beneficiari() {
             const ci = matchByName(cittaList, r.citta, (x) => x.nome);
             if (!ci) return { error: t("bulkImport.unknownRef", { field: t("nav.citta"), value: r.citta }) };
             cittaId = ci.id;
+          }
+          let magazzinoEmporioPreferitoId: number | null = null;
+          if (r.magazzinoEmporioPreferito) {
+            const emporio = matchByName(emporiDisponibili, r.magazzinoEmporioPreferito, (x) => x.nome);
+            if (!emporio) {
+              return { error: t("bulkImport.unknownRef", { field: t("beneficiari.magazzinoEmporioPreferito"), value: r.magazzinoEmporioPreferito }) };
+            }
+            magazzinoEmporioPreferitoId = emporio.id;
+          }
+          const creditoSolidaleAbilitato = parseBoolCell(r.creditoSolidaleAbilitato);
+          const creditoSolidaleStato = r.creditoSolidaleStato?.trim() || (creditoSolidaleAbilitato ? "attivo" : "non_abilitato");
+          if (!STATI_CREDITO_SOLIDALE.includes(creditoSolidaleStato as CreditoSolidaleStato)) {
+            return { error: t("bulkImport.unknownRef", { field: t("beneficiari.creditoSolidaleStato"), value: creditoSolidaleStato }) };
           }
           let numComponenti: number | undefined;
           if (r.numComponenti) {
@@ -288,6 +354,10 @@ export default function Beneficiari() {
               areaProvenienza: r.areaProvenienza || undefined,
               centroAscoltoId,
               cittaId,
+              creditoSolidaleAbilitato,
+              creditoSolidaleStato: creditoSolidaleAbilitato ? creditoSolidaleStato : "non_abilitato",
+              creditoSolidaleNote: r.creditoSolidaleNote || undefined,
+              magazzinoEmporioPreferitoId,
             },
           };
         }}
@@ -360,6 +430,7 @@ export default function Beneficiari() {
                 {isGlobal && <TableHead>{t("beneficiari.centroAscolto")}</TableHead>}
                 <TableHead className="text-center">{t("beneficiari.colComponenti")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
+                <TableHead className="text-center">{t("beneficiari.creditoSolidaleSection")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colDomicilio")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -375,6 +446,7 @@ export default function Beneficiari() {
                     {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
@@ -382,7 +454,7 @@ export default function Beneficiari() {
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isGlobal ? 9 : 8} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={isGlobal ? 10 : 9} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
                 <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
@@ -409,6 +481,14 @@ export default function Beneficiari() {
                   )}
                   <TableCell className="text-center font-medium">{b.numComponenti}</TableCell>
                   <TableCell className="text-center">{getPriorityBadge(b.priorita)}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge
+                      variant="outline"
+                      className={creditoSolidaleBadgeClasses[(b.creditoSolidaleStato ?? "non_abilitato") as CreditoSolidaleStato] ?? creditoSolidaleBadgeClasses.non_abilitato}
+                    >
+                      {t(creditoSolidaleLabelKey(b.creditoSolidaleStato))}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-center">
                     {b.consegnaDomicilio && <Home className="h-4 w-4 text-blue-500 mx-auto" />}
                   </TableCell>
@@ -441,7 +521,7 @@ export default function Beneficiari() {
                               associationLogoDataUrl: logo,
                             });
                           }}
-                        ><CreditCard className="mr-2 h-4 w-4" /> {t("tessera.generate")}</DropdownMenuItem>
+                        ><CreditCard className="mr-2 h-4 w-4" /> {t("beneficiari.stampaTessera")}</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -605,6 +685,73 @@ export default function Beneficiari() {
                     </Select>
                   </FormItem>
                 )} />
+
+                <div className="rounded-md border p-3 space-y-3">
+                  <div>
+                    <h4 className="text-sm font-medium">{t("beneficiari.creditoSolidaleSection")}</h4>
+                    <p className="text-xs text-muted-foreground">{t("beneficiari.creditoSolidaleHelp")}</p>
+                  </div>
+                  <FormField control={form.control} name="creditoSolidaleAbilitato" render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <FormLabel className="!mt-0">{t("beneficiari.creditoSolidaleAbilitato")}</FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            form.setValue("creditoSolidaleStato", checked ? "attivo" : "non_abilitato");
+                          }}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="creditoSolidaleStato" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("beneficiari.creditoSolidaleStato")}</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={!creditoSolidaleAbilitato}
+                      >
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="non_abilitato">{t("beneficiari.creditoSolidaleStatoNonAbilitato")}</SelectItem>
+                          <SelectItem value="attivo">{t("beneficiari.creditoSolidaleStatoAttivo")}</SelectItem>
+                          <SelectItem value="sospeso">{t("beneficiari.creditoSolidaleStatoSospeso")}</SelectItem>
+                          <SelectItem value="revocato">{t("beneficiari.creditoSolidaleStatoRevocato")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="magazzinoEmporioPreferitoId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("beneficiari.magazzinoEmporioPreferito")}</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || NO_EMPORIO}
+                        disabled={!creditoSolidaleAbilitato}
+                      >
+                        <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value={NO_EMPORIO}>{t("common.none")}</SelectItem>
+                          {emporiDisponibili.map((m) => (
+                            <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">{t("beneficiari.creditoSolidaleDataAbilitazione")}</label>
+                    <Input disabled placeholder={t("beneficiari.creditoSolidaleDataAutomatica")} />
+                  </div>
+                  <FormField control={form.control} name="creditoSolidaleNote" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("beneficiari.creditoSolidaleNote")}</FormLabel>
+                      <FormControl><Textarea rows={2} {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                </div>
 
                 <FormField control={form.control} name="consegnaDomicilio" render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">

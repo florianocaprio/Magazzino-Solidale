@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getListCittaQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
 const NONE_VALUE = "__none__";
+const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
 
 function calcEta(dataNascita?: string | null): number | null {
   if (!dataNascita) return null;
@@ -48,6 +49,9 @@ const apiErrorMessage = (e: unknown, fallback: string) =>
   (e as { data?: { error?: string } })?.data?.error ??
   (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
   fallback;
+
+const formatCreditoQuota = (v: number | null | undefined): string =>
+  v == null ? "-" : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(v);
 
 export default function BeneficiarioDettaglio() {
   const { t } = useTranslation();
@@ -358,12 +362,75 @@ const makeEditSchema = (t: (k: string) => string) => z.object({
   consegnaDomicilio: z.boolean(),
   motivoConsegnaDomicilio: z.string().optional(),
   restrizioniAlimentari: z.string().optional(),
+  creditoSolidaleAbilitato: z.boolean().default(false),
+  creditoSolidaleStato: z.enum(STATI_CREDITO_SOLIDALE).default("non_abilitato"),
+  creditoSolidaleNote: z.string().optional(),
+  magazzinoEmporioPreferitoId: z.string().optional(),
   uds: z.boolean().default(false),
   cittaId: z.string().optional(),
   zonaUdsId: z.string().optional(),
 });
 
 type EditValues = z.infer<ReturnType<typeof makeEditSchema>>;
+
+function CreditoSolidaleCalcoloPanel({ beneficiarioId, enabled }: { beneficiarioId: number; enabled: boolean }) {
+  const { t } = useTranslation();
+  const { data, isLoading, isError } = useCalcolaCreditoSolidaleBeneficiario(beneficiarioId, {
+    query: { queryKey: getCalcolaCreditoSolidaleBeneficiarioQueryKey(beneficiarioId), enabled },
+  });
+
+  if (!enabled) return null;
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+      <div>
+        <h5 className="text-sm font-medium">{t("creditoSolidale.simulationTitle")}</h5>
+        <p className="text-xs text-muted-foreground">{t("creditoSolidale.simulationSubtitle")}</p>
+      </div>
+      {isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-4 w-64" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ) : isError ? (
+        <p className="text-sm text-destructive">{t("creditoSolidale.calculateError")}</p>
+      ) : data ? (
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">{t("creditoSolidale.politicaApplicata")}</span>
+            <span className="text-right font-medium">
+              {data.politicaNome} · {t(`creditoSolidale.origin.${data.politicaOrigine}`)}
+            </span>
+          </div>
+          {[
+            ["creditoSolidale.creditoBaseNucleo", data.dettaglio.creditoBaseNucleo],
+            ["creditoSolidale.quotaComponenti", data.dettaglio.quotaComponenti],
+            ["creditoSolidale.quotaMinori", data.dettaglio.quotaMinori],
+            ["creditoSolidale.quotaAnziani", data.dettaglio.quotaAnziani],
+            ["creditoSolidale.quotaDisabili", data.dettaglio.quotaDisabili],
+            ["creditoSolidale.totalePrimaDeiLimiti", data.dettaglio.totalePrimaDeiLimiti],
+            ["creditoSolidale.creditoMinimoApplicato", data.dettaglio.creditoMinimoApplicato],
+            ["creditoSolidale.creditoMassimoApplicato", data.dettaglio.creditoMassimoApplicato],
+          ].map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">{t(label as string)}</span>
+              <span className="font-medium">{formatCreditoQuota(value as number | null)}</span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">{t("creditoSolidale.arrotondamentoApplicato")}</span>
+            <span className="font-medium">{t(`creditoSolidale.rounding.${data.dettaglio.arrotondamentoApplicato}`)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t pt-2">
+            <span className="font-medium">{t("creditoSolidale.totaleSuggerito")}</span>
+            <span className="text-lg font-semibold">{formatCreditoQuota(data.totaleSuggerito)}</span>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettaglioType; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
@@ -373,6 +440,11 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   const { user } = useAuth();
   const isCittaGlobal = user?.cittaId == null;
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
+  const { data: magazzini } = useListMagazzini();
+  const emporiDisponibili = useMemo(
+    () => (magazzini ?? []).filter((m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto"),
+    [magazzini],
+  );
 
   const form = useForm<EditValues>({
     resolver: zodResolver(editSchema),
@@ -395,6 +467,10 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       consegnaDomicilio: b.consegnaDomicilio ?? false,
       motivoConsegnaDomicilio: b.motivoConsegnaDomicilio ?? "",
       restrizioniAlimentari: b.restrizioniAlimentari ?? "",
+      creditoSolidaleAbilitato: b.creditoSolidaleAbilitato ?? false,
+      creditoSolidaleStato: b.creditoSolidaleStato ?? "non_abilitato",
+      creditoSolidaleNote: b.creditoSolidaleNote ?? "",
+      magazzinoEmporioPreferitoId: b.magazzinoEmporioPreferitoId != null ? String(b.magazzinoEmporioPreferitoId) : NONE_VALUE,
       uds: b.uds ?? false,
       cittaId: b.cittaId != null ? String(b.cittaId) : "",
       zonaUdsId: b.zonaUdsId != null ? String(b.zonaUdsId) : "",
@@ -402,6 +478,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   });
 
   const watchUds = form.watch("uds");
+  const creditoSolidaleAbilitato = form.watch("creditoSolidaleAbilitato");
   const formCitta = isCittaGlobal
     ? (form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined)
     : (user?.cittaId ?? undefined);
@@ -411,7 +488,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   );
 
   const onSubmit = (data: EditValues) => {
-    const { uds, cittaId, zonaUdsId, ...rest } = data;
+    const { uds, cittaId, zonaUdsId, magazzinoEmporioPreferitoId, creditoSolidaleNote, ...rest } = data;
     // A città-global admin must pin a città when flagging a person as UDS.
     if (uds && isCittaGlobal && !cittaId) {
       form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
@@ -424,6 +501,13 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       sesso: data.sesso,
       areaProvenienza: data.areaProvenienza || undefined,
       codiceFiscale: data.codiceFiscale?.trim() ? data.codiceFiscale.trim().toUpperCase() : null,
+      creditoSolidaleAbilitato: rest.creditoSolidaleAbilitato,
+      creditoSolidaleStato: rest.creditoSolidaleAbilitato ? rest.creditoSolidaleStato : "non_abilitato",
+      creditoSolidaleNote: creditoSolidaleNote?.trim() ? creditoSolidaleNote.trim() : null,
+      magazzinoEmporioPreferitoId:
+        magazzinoEmporioPreferitoId && magazzinoEmporioPreferitoId !== NONE_VALUE
+          ? parseInt(magazzinoEmporioPreferitoId)
+          : null,
     };
     if (uds) {
       if (isCittaGlobal && cittaId) payload.cittaId = parseInt(cittaId);
@@ -558,6 +642,71 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
               <FormField control={form.control} name="restrizioniAlimentari" render={({ field }) => (
                 <FormItem><FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
               )} />
+
+              <div className="rounded-md border p-3 space-y-3">
+                <div>
+                  <h4 className="text-sm font-medium">{t("beneficiari.creditoSolidaleSection")}</h4>
+                  <p className="text-xs text-muted-foreground">{t("beneficiari.creditoSolidaleHelp")}</p>
+                </div>
+                <FormField control={form.control} name="creditoSolidaleAbilitato" render={({ field }) => (
+                  <FormItem className="flex items-center justify-between">
+                    <FormLabel className="!mt-0">{t("beneficiari.creditoSolidaleAbilitato")}</FormLabel>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked);
+                          form.setValue("creditoSolidaleStato", checked ? "attivo" : "non_abilitato");
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="creditoSolidaleStato" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("beneficiari.creditoSolidaleStato")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!creditoSolidaleAbilitato}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="non_abilitato">{t("beneficiari.creditoSolidaleStatoNonAbilitato")}</SelectItem>
+                        <SelectItem value="attivo">{t("beneficiari.creditoSolidaleStatoAttivo")}</SelectItem>
+                        <SelectItem value="sospeso">{t("beneficiari.creditoSolidaleStatoSospeso")}</SelectItem>
+                        <SelectItem value="revocato">{t("beneficiari.creditoSolidaleStatoRevocato")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="magazzinoEmporioPreferitoId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("beneficiari.magazzinoEmporioPreferito")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || NONE_VALUE} disabled={!creditoSolidaleAbilitato}>
+                      <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value={NONE_VALUE}>{t("common.none")}</SelectItem>
+                        {emporiDisponibili.map((m) => (
+                          <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">{t("beneficiari.creditoSolidaleDataAbilitazione")}</label>
+                  <Input
+                    disabled
+                    readOnly
+                    value={b.creditoSolidaleDataAbilitazione ? new Date(b.creditoSolidaleDataAbilitazione).toLocaleDateString("it-IT") : ""}
+                    placeholder={t("beneficiari.creditoSolidaleDataAutomatica")}
+                  />
+                </div>
+                <FormField control={form.control} name="creditoSolidaleNote" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("beneficiari.creditoSolidaleNote")}</FormLabel>
+                    <FormControl><Textarea rows={2} {...field} /></FormControl>
+                  </FormItem>
+                )} />
+                <CreditoSolidaleCalcoloPanel beneficiarioId={b.id} enabled={creditoSolidaleAbilitato} />
+              </div>
 
               <div className="rounded-md border p-3 space-y-3">
                 <FormField control={form.control} name="uds" render={({ field }) => (

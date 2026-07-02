@@ -27,6 +27,8 @@ import approvazioniLogisticaRouter from "./approvazioni-logistica";
 import turniRouter from "./turni";
 import impostazioniStampaRouter from "./impostazioni-stampa";
 import impostazioniEmailRouter from "./impostazioni-email";
+import politicheCreditoSolidaleRouter from "./politiche-credito-solidale";
+import creditoSolidaleRouter from "./credito-solidale";
 import reportRouter from "./report";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
@@ -77,6 +79,8 @@ router.use(approvazioniLogisticaRouter);
 router.use(turniRouter);
 router.use(impostazioniStampaRouter);
 router.use(impostazioniEmailRouter);
+router.use(politicheCreditoSolidaleRouter);
+router.use(creditoSolidaleRouter);
 router.use(reportRouter);
 
 // Admin-only management endpoints.

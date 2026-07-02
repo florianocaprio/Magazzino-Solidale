@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable } from "@workspace/db";
+import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable, magazziniTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
 
@@ -28,6 +28,7 @@ const beneficiarioIds: number[] = [];
 const cittaIds: number[] = [];
 const centroIds: number[] = [];
 const zonaIds: number[] = [];
+const magazzinoIds: number[] = [];
 
 async function createCitta(nome = `Citta ${rnd()}`): Promise<number> {
   const [c] = await db.insert(cittaTable).values({ nome }).returning({ id: cittaTable.id });
@@ -47,6 +48,15 @@ async function createZona(cittaId: number, nome = `Zona ${rnd()}`): Promise<numb
   return z.id;
 }
 
+async function createMagazzino(tipoMagazzino: "emporio" | "misto" | "logistico", cittaId: number | null, nome = `Magazzino ${rnd()}`): Promise<{ id: number; nome: string }> {
+  const [m] = await db
+    .insert(magazziniTable)
+    .values({ codice: `MAG-${rnd()}`, nome, tipoMagazzino, cittaId })
+    .returning({ id: magazziniTable.id, nome: magazziniTable.nome });
+  magazzinoIds.push(m.id);
+  return m;
+}
+
 let cittaA: number;
 
 const appAs = (cittaId: number | null, zonaUdsId: number | null = null) =>
@@ -60,11 +70,15 @@ beforeAll(async () => {
 
 beforeEach(() => {
   beneficiarioIds.length = 0;
+  magazzinoIds.length = 0;
 });
 
 afterEach(async () => {
   if (beneficiarioIds.length > 0) {
     await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiarioIds));
+  }
+  if (magazzinoIds.length > 0) {
+    await db.delete(magazziniTable).where(inArray(magazziniTable.id, magazzinoIds));
   }
 });
 
@@ -145,6 +159,75 @@ describe("POST /beneficiari (uds)", () => {
     expect(res.body.uds).toBe(true);
     expect(res.body.cittaId).toBe(cittaA);
     beneficiarioIds.push(res.body.id);
+  });
+});
+
+describe("Credito Solidale beneficiari", () => {
+  it.each(["emporio", "misto"] as const)("accetta un magazzino %s come emporio preferito e abilita con stato attivo", async (tipoMagazzino) => {
+    const emporio = await createMagazzino(tipoMagazzino, cittaA, `Emporio ${tipoMagazzino} ${rnd()}`);
+
+    const res = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({
+        nome: "Credito",
+        cognome: rnd(),
+        sesso: "M",
+        creditoSolidaleAbilitato: true,
+        magazzinoEmporioPreferitoId: emporio.id,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.creditoSolidaleAbilitato).toBe(true);
+    expect(res.body.creditoSolidaleStato).toBe("attivo");
+    expect(typeof res.body.creditoSolidaleDataAbilitazione).toBe("string");
+    expect(Date.parse(res.body.creditoSolidaleDataAbilitazione)).not.toBeNaN();
+    expect(res.body.magazzinoEmporioPreferitoId).toBe(emporio.id);
+    expect(res.body.magazzinoEmporioPreferitoNome).toBe(emporio.nome);
+    beneficiarioIds.push(res.body.id);
+  });
+
+  it("rifiuta un magazzino logistico come emporio preferito", async () => {
+    const logistico = await createMagazzino("logistico", cittaA);
+
+    const res = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({
+        nome: "No",
+        cognome: "Logistico",
+        sesso: "F",
+        creditoSolidaleAbilitato: true,
+        magazzinoEmporioPreferitoId: logistico.id,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Il magazzino selezionato non è un Emporio Solidale.");
+  });
+
+  it("alla prima abilitazione via PATCH valorizza la data e la conserva in disabilitazione", async () => {
+    const [b] = await db
+      .insert(beneficiariTable)
+      .values({ codice: `BEN-${rnd()}`, nome: "PatchCredito", cognome: rnd(), sesso: "M", cittaId: cittaA })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(b.id);
+
+    const enabled = await request(appAs(cittaA))
+      .patch(`/beneficiari/${b.id}`)
+      .send({ creditoSolidaleAbilitato: true });
+
+    expect(enabled.status).toBe(200);
+    expect(enabled.body.creditoSolidaleAbilitato).toBe(true);
+    expect(enabled.body.creditoSolidaleStato).toBe("attivo");
+    expect(typeof enabled.body.creditoSolidaleDataAbilitazione).toBe("string");
+    expect(Date.parse(enabled.body.creditoSolidaleDataAbilitazione)).not.toBeNaN();
+
+    const disabled = await request(appAs(cittaA))
+      .patch(`/beneficiari/${b.id}`)
+      .send({ creditoSolidaleAbilitato: false, creditoSolidaleDataAbilitazione: null });
+
+    expect(disabled.status).toBe(200);
+    expect(disabled.body.creditoSolidaleAbilitato).toBe(false);
+    expect(disabled.body.creditoSolidaleStato).toBe("non_abilitato");
+    expect(disabled.body.creditoSolidaleDataAbilitazione).toBe(enabled.body.creditoSolidaleDataAbilitazione);
   });
 });
 

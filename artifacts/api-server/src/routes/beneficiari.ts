@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable, cittaTable } from "@workspace/db";
+import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
 import { eq, and, or, ilike, sql, desc, ne, type SQL } from "drizzle-orm";
 import {
@@ -23,6 +23,8 @@ const router: IRouter = Router();
 
 const CODICE_BENEFICIARIO_DUPLICATO_MSG = "Il codice beneficiario indicato è già associato a un altro beneficiario.";
 const SESSO_OBBLIGATORIO_MSG = "Il campo Sesso è obbligatorio.";
+const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
+type CreditoSolidaleStato = (typeof STATI_CREDITO_SOLIDALE)[number];
 
 // Normalize a loosely-typed body flag to a real boolean so the città-boundary
 // guard checks the same value that gets persisted (avoids `uds:"true"` /
@@ -31,8 +33,35 @@ function toBool(v: unknown): boolean {
   return v === true || v === "true" || v === "t" || v === "1" || v === 1 || v === "yes";
 }
 
+function toOptionalBool(v: unknown): boolean | null {
+  if (v == null || v === "") return null;
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number" && (v === 0 || v === 1)) return Boolean(v);
+  if (typeof v === "string") {
+    const normalized = v.trim().toLowerCase();
+    if (["si", "sì", "true", "t", "1", "yes", "y", "vero"].includes(normalized)) return true;
+    if (["no", "false", "f", "0", "n", "falso"].includes(normalized)) return false;
+  }
+  return null;
+}
+
 const trimOrUndefined = (v: unknown): string | undefined =>
   typeof v === "string" ? v.trim() || undefined : undefined;
+
+const nullableText = (v: unknown): string | null =>
+  typeof v === "string" ? v.trim() || null : v == null ? null : String(v);
+
+function parseCreditoSolidaleStato(v: unknown): CreditoSolidaleStato | null {
+  return typeof v === "string" && STATI_CREDITO_SOLIDALE.includes(v as CreditoSolidaleStato)
+    ? (v as CreditoSolidaleStato)
+    : null;
+}
+
+function parseDateTime(v: unknown): Date | null {
+  if (v == null || v === "") return null;
+  const d = v instanceof Date ? v : new Date(String(v));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 const normalizzaSesso = (v: unknown): string | undefined => {
   if (typeof v !== "string") return undefined;
@@ -99,7 +128,90 @@ function isCodiceBeneficiarioUniqueViolation(error: unknown): boolean {
     && (e.constraint === "beneficiari_codice_unique" || (e.detail?.includes("codice") ?? false));
 }
 
-function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string | null, cittaNome?: string | null) {
+function normalizeCreditoSolidaleFields(
+  values: Record<string, unknown>,
+  source: Record<string, unknown>,
+  existing?: typeof beneficiariTable.$inferSelect,
+): { error?: string } {
+  const hasAbilitato = "creditoSolidaleAbilitato" in source;
+  const hasStato = "creditoSolidaleStato" in source;
+  const hasData = "creditoSolidaleDataAbilitazione" in source;
+  const hasNote = "creditoSolidaleNote" in source;
+
+  let enabled = existing?.creditoSolidaleAbilitato ?? false;
+  if (hasAbilitato) {
+    const parsed = toOptionalBool(source.creditoSolidaleAbilitato);
+    if (parsed == null) return { error: "Abilitazione Credito Solidale non valida." };
+    enabled = parsed;
+    values.creditoSolidaleAbilitato = parsed;
+  } else if (!existing) {
+    values.creditoSolidaleAbilitato = false;
+  }
+
+  if (hasStato) {
+    const stato = parseCreditoSolidaleStato(source.creditoSolidaleStato);
+    if (!stato) return { error: "Stato Credito Solidale non valido." };
+    values.creditoSolidaleStato = stato;
+  }
+
+  if (!enabled) {
+    if (!existing || hasAbilitato || hasStato) values.creditoSolidaleStato = "non_abilitato";
+  } else if (!hasStato || values.creditoSolidaleStato === "non_abilitato") {
+    values.creditoSolidaleStato = "attivo";
+  }
+
+  if (hasData) {
+    const dataAbilitazione = parseDateTime(source.creditoSolidaleDataAbilitazione);
+    if (source.creditoSolidaleDataAbilitazione != null && source.creditoSolidaleDataAbilitazione !== "" && !dataAbilitazione) {
+      return { error: "Data abilitazione Credito Solidale non valida." };
+    }
+    values.creditoSolidaleDataAbilitazione = dataAbilitazione;
+  }
+
+  if (enabled && (!existing || !existing.creditoSolidaleAbilitato) && !existing?.creditoSolidaleDataAbilitazione && !values.creditoSolidaleDataAbilitazione) {
+    values.creditoSolidaleDataAbilitazione = new Date();
+  }
+  if (!enabled && existing?.creditoSolidaleDataAbilitazione && values.creditoSolidaleDataAbilitazione == null) {
+    delete values.creditoSolidaleDataAbilitazione;
+  }
+
+  if (hasNote) values.creditoSolidaleNote = nullableText(source.creditoSolidaleNote);
+  return {};
+}
+
+async function validateMagazzinoEmporioPreferito(
+  id: unknown,
+  req: Request,
+): Promise<{ value: number | null } | { error: string; status?: number }> {
+  if (id == null || id === "") return { value: null };
+  const magazzinoId = typeof id === "number" ? id : Number(id);
+  if (!Number.isInteger(magazzinoId)) return { error: "Emporio di riferimento non valido." };
+  const [magazzino] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, magazzinoId));
+  if (!magazzino) return { error: "Emporio di riferimento non trovato.", status: 404 };
+  if (!canAccessCentro(magazzino.centroAscoltoId, callerCentroId(req))) {
+    return { error: "Risorsa non accessibile per il tuo centro", status: 403 };
+  }
+  if (!canAccessCitta(magazzino.cittaId, callerCittaId(req))) {
+    return { error: "Risorsa non accessibile per la tua città", status: 403 };
+  }
+  if (magazzino.tipoMagazzino !== "emporio" && magazzino.tipoMagazzino !== "misto") {
+    return { error: "Il magazzino selezionato non è un Emporio Solidale." };
+  }
+  return { value: magazzinoId };
+}
+
+async function magazzinoEmporioNomeOf(id: number | null | undefined): Promise<string | null> {
+  if (id == null) return null;
+  const [m] = await db.select({ nome: magazziniTable.nome }).from(magazziniTable).where(eq(magazziniTable.id, id));
+  return m?.nome ?? null;
+}
+
+function fmtBenef(
+  r: typeof beneficiariTable.$inferSelect,
+  centroNome?: string | null,
+  cittaNome?: string | null,
+  magazzinoEmporioPreferitoNome?: string | null,
+) {
   return {
     id: r.id,
     codice: r.codice,
@@ -132,6 +244,12 @@ function fmtBenef(r: typeof beneficiariTable.$inferSelect, centroNome?: string |
     motivoConsegnaDomicilio: r.motivoConsegnaDomicilio ?? null,
     centroAscoltoId: r.centroAscoltoId ?? null,
     centroAscoltoNome: centroNome ?? null,
+    creditoSolidaleAbilitato: r.creditoSolidaleAbilitato ?? false,
+    creditoSolidaleStato: r.creditoSolidaleStato ?? "non_abilitato",
+    creditoSolidaleDataAbilitazione: r.creditoSolidaleDataAbilitazione?.toISOString() ?? null,
+    creditoSolidaleNote: r.creditoSolidaleNote ?? null,
+    magazzinoEmporioPreferitoId: r.magazzinoEmporioPreferitoId ?? null,
+    magazzinoEmporioPreferitoNome: magazzinoEmporioPreferitoNome ?? null,
     uds: r.uds,
     cittaId: r.cittaId ?? null,
     cittaNome: cittaNome ?? null,
@@ -177,13 +295,19 @@ router.get("/beneficiari", async (req, res) => {
   else if (attivo === "false") conditions.push(eq(beneficiariTable.attivo, false));
 
   const rows = await db
-    .select({ b: beneficiariTable, centroNome: centriAscoltoTable.nome, cittaNome: cittaTable.nome })
+    .select({
+      b: beneficiariTable,
+      centroNome: centriAscoltoTable.nome,
+      cittaNome: cittaTable.nome,
+      magazzinoEmporioPreferitoNome: magazziniTable.nome,
+    })
     .from(beneficiariTable)
     .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+    .leftJoin(magazziniTable, eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(beneficiariTable.dataCreazione), desc(beneficiariTable.id));
-  res.json(rows.map(r => fmtBenef(r.b, r.centroNome, r.cittaNome)));
+  res.json(rows.map(r => fmtBenef(r.b, r.centroNome, r.cittaNome, r.magazzinoEmporioPreferitoNome)));
 });
 
 async function createBeneficiarioOne(
@@ -208,6 +332,13 @@ async function createBeneficiarioOne(
   if (values.uds === true && cid == null && values.cittaId == null) {
     return { error: "La città è obbligatoria per una persona UDS" };
   }
+  const credito = normalizeCreditoSolidaleFields(values, b);
+  if (credito.error) return { error: credito.error, status: 400 };
+  if ("magazzinoEmporioPreferitoId" in b) {
+    const emporio = await validateMagazzinoEmporioPreferito(b.magazzinoEmporioPreferitoId, req);
+    if ("error" in emporio) return { error: emporio.error, status: emporio.status ?? 400 };
+    values.magazzinoEmporioPreferitoId = emporio.value;
+  }
   try {
     const [row] = await db.insert(beneficiariTable).values(values as typeof beneficiariTable.$inferInsert).returning();
     return { row };
@@ -220,7 +351,12 @@ async function createBeneficiarioOne(
 router.post("/beneficiari", async (req, res) => {
   const r = await createBeneficiarioOne(req.body, req);
   if ("error" in r) { res.status(r.status ?? 400).json({ error: r.error }); return; }
-  res.status(201).json(fmtBenef(r.row));
+  res.status(201).json(fmtBenef(
+    r.row,
+    null,
+    null,
+    await magazzinoEmporioNomeOf(r.row.magazzinoEmporioPreferitoId),
+  ));
 });
 
 router.post("/beneficiari/bulk", async (req, res) => {
@@ -345,7 +481,7 @@ router.get("/beneficiari/:id", async (req, res) => {
   const consegne = await db.select().from(consegneTable).where(eq(consegneTable.beneficiarioId, id)).limit(20);
 
   res.json({
-    ...fmtBenef(row, centroNome),
+    ...fmtBenef(row, centroNome, null, await magazzinoEmporioNomeOf(row.magazzinoEmporioPreferitoId)),
     nucleo: nucleo.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, sesso: n.sesso ?? null })),
     interventi: interventi.map(i => ({
       id: i.id,
@@ -395,6 +531,19 @@ router.patch("/beneficiari/:id", async (req, res) => {
   }
   const updates = { ...req.body, dataAggiornamento: new Date() };
   if ("uds" in updates) updates.uds = toBool(updates.uds);
+  const credito = normalizeCreditoSolidaleFields(updates, req.body as Record<string, unknown>, existing);
+  if (credito.error) {
+    res.status(400).json({ error: credito.error });
+    return;
+  }
+  if ("magazzinoEmporioPreferitoId" in updates) {
+    const emporio = await validateMagazzinoEmporioPreferito(updates.magazzinoEmporioPreferitoId, req);
+    if ("error" in emporio) {
+      res.status(emporio.status ?? 400).json({ error: emporio.error });
+      return;
+    }
+    updates.magazzinoEmporioPreferitoId = emporio.value;
+  }
   if ("codice" in updates) {
     const codice = trimOrUndefined(updates.codice);
     if (!codice) { res.status(400).json({ error: "Codice beneficiario obbligatorio" }); return; }
@@ -431,7 +580,12 @@ router.patch("/beneficiari/:id", async (req, res) => {
   }
   try {
     const [row] = await db.update(beneficiariTable).set(updates).where(eq(beneficiariTable.id, id)).returning();
-    res.json(fmtBenef(row));
+    res.json(fmtBenef(
+      row,
+      null,
+      null,
+      await magazzinoEmporioNomeOf(row.magazzinoEmporioPreferitoId),
+    ));
   } catch (e) {
     if (isCodiceBeneficiarioUniqueViolation(e)) {
       res.status(409).json({ error: CODICE_BENEFICIARIO_DUPLICATO_MSG });

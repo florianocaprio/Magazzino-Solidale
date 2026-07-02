@@ -32,6 +32,8 @@ tags:
   - name: aree
   - name: citta
   - name: zone-uds
+  - name: politiche-credito-solidale
+  - name: credito-solidale
 
 paths:
   /healthz:
@@ -2209,6 +2211,106 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImpostazioniEmail"
+
+  /politiche-credito-solidale:
+    get:
+      operationId: listPoliticheCreditoSolidale
+      tags: [politiche-credito-solidale]
+      responses:
+        "200":
+          description: List of Credito Solidale policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PoliticaCreditoSolidale"
+    post:
+      operationId: createPoliticaCreditoSolidale
+      tags: [politiche-credito-solidale]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PoliticaCreditoSolidaleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PoliticaCreditoSolidale"
+
+  /politiche-credito-solidale/{id}:
+    get:
+      operationId: getPoliticaCreditoSolidale
+      tags: [politiche-credito-solidale]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Credito Solidale policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PoliticaCreditoSolidale"
+    patch:
+      operationId: updatePoliticaCreditoSolidale
+      tags: [politiche-credito-solidale]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PoliticaCreditoSolidaleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PoliticaCreditoSolidale"
+    delete:
+      operationId: deletePoliticaCreditoSolidale
+      tags: [politiche-credito-solidale]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /credito-solidale/calcola-beneficiario/{beneficiarioId}:
+    get:
+      operationId: calcolaCreditoSolidaleBeneficiario
+      tags: [credito-solidale]
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Suggested monthly Credito Solidale calculation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleCalcolo"
 
   /volontari:
     get:
@@ -4448,6 +4550,20 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
+        creditoSolidaleAbilitato:
+          type: boolean
+        creditoSolidaleStato:
+          type: string
+          enum: [non_abilitato, attivo, sospeso, revocato]
+        creditoSolidaleDataAbilitazione:
+          type: ["string", "null"]
+          format: date-time
+        creditoSolidaleNote:
+          type: ["string", "null"]
+        magazzinoEmporioPreferitoId:
+          type: ["integer", "null"]
+        magazzinoEmporioPreferitoNome:
+          type: ["string", "null"]
         uds:
           type: boolean
         attivo:
@@ -4466,7 +4582,7 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, uds, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, uds, attivo, dataCreazione]
 
     BeneficiarioDettaglio:
       type: object
@@ -4531,6 +4647,20 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
+        creditoSolidaleAbilitato:
+          type: boolean
+        creditoSolidaleStato:
+          type: string
+          enum: [non_abilitato, attivo, sospeso, revocato]
+        creditoSolidaleDataAbilitazione:
+          type: ["string", "null"]
+          format: date-time
+        creditoSolidaleNote:
+          type: ["string", "null"]
+        magazzinoEmporioPreferitoId:
+          type: ["integer", "null"]
+        magazzinoEmporioPreferitoNome:
+          type: ["string", "null"]
         uds:
           type: boolean
         attivo:
@@ -4563,7 +4693,7 @@ components:
             $ref: "#/components/schemas/Consegna"
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, attivo, dataCreazione]
 
     BeneficiarioInput:
       type: object
@@ -4619,6 +4749,18 @@ components:
         motivoConsegnaDomicilio:
           type: string
         centroAscoltoId:
+          type: ["integer", "null"]
+        creditoSolidaleAbilitato:
+          type: boolean
+        creditoSolidaleStato:
+          type: string
+          enum: [non_abilitato, attivo, sospeso, revocato]
+        creditoSolidaleDataAbilitazione:
+          type: ["string", "null"]
+          format: date-time
+        creditoSolidaleNote:
+          type: ["string", "null"]
+        magazzinoEmporioPreferitoId:
           type: ["integer", "null"]
         dataPresaInCarico:
           type: string
@@ -4692,6 +4834,18 @@ components:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
+        creditoSolidaleAbilitato:
+          type: boolean
+        creditoSolidaleStato:
+          type: string
+          enum: [non_abilitato, attivo, sospeso, revocato]
+        creditoSolidaleDataAbilitazione:
+          type: ["string", "null"]
+          format: date-time
+        creditoSolidaleNote:
+          type: ["string", "null"]
+        magazzinoEmporioPreferitoId:
+          type: ["integer", "null"]
         uds:
           type: boolean
         attivo:
@@ -4709,6 +4863,199 @@ components:
           enum: [M, F, ALTRO]
         areaProvenienza:
           type: string
+
+    PoliticaCreditoSolidale:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        descrizione:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        attiva:
+          type: boolean
+        creditoBaseNucleo:
+          type: number
+        creditoPerComponente:
+          type: number
+        bonusMinore:
+          type: number
+        bonusAnziano:
+          type: number
+        bonusDisabile:
+          type: number
+        creditoMinimoMensile:
+          type: number
+        creditoMassimoMensile:
+          type: ["number", "null"]
+        giornoRicaricaMensile:
+          type: integer
+        ricaricaAutomaticaAbilitata:
+          type: boolean
+        arrotondamento:
+          type: string
+          enum: [nessuno, intero_superiore, intero_inferiore, intero_piu_vicino]
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+        dataAggiornamento:
+          type: ["string", "null"]
+      required: [id, nome, centroAscoltoId, centroAscoltoNome, cittaId, cittaNome, attiva, creditoBaseNucleo, creditoPerComponente, bonusMinore, bonusAnziano, bonusDisabile, creditoMinimoMensile, creditoMassimoMensile, giornoRicaricaMensile, ricaricaAutomaticaAbilitata, arrotondamento, dataCreazione]
+
+    PoliticaCreditoSolidaleInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 120
+        descrizione:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        attiva:
+          type: boolean
+        creditoBaseNucleo:
+          type: number
+          minimum: 0
+        creditoPerComponente:
+          type: number
+          minimum: 0
+        bonusMinore:
+          type: number
+          minimum: 0
+        bonusAnziano:
+          type: number
+          minimum: 0
+        bonusDisabile:
+          type: number
+          minimum: 0
+        creditoMinimoMensile:
+          type: number
+          minimum: 0
+        creditoMassimoMensile:
+          type: ["number", "null"]
+          minimum: 0
+        giornoRicaricaMensile:
+          type: integer
+          minimum: 1
+          maximum: 28
+        ricaricaAutomaticaAbilitata:
+          type: boolean
+        arrotondamento:
+          type: string
+          enum: [nessuno, intero_superiore, intero_inferiore, intero_piu_vicino]
+        note:
+          type: ["string", "null"]
+      required: [nome]
+
+    PoliticaCreditoSolidaleUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 120
+        descrizione:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        attiva:
+          type: boolean
+        creditoBaseNucleo:
+          type: number
+          minimum: 0
+        creditoPerComponente:
+          type: number
+          minimum: 0
+        bonusMinore:
+          type: number
+          minimum: 0
+        bonusAnziano:
+          type: number
+          minimum: 0
+        bonusDisabile:
+          type: number
+          minimum: 0
+        creditoMinimoMensile:
+          type: number
+          minimum: 0
+        creditoMassimoMensile:
+          type: ["number", "null"]
+          minimum: 0
+        giornoRicaricaMensile:
+          type: integer
+          minimum: 1
+          maximum: 28
+        ricaricaAutomaticaAbilitata:
+          type: boolean
+        arrotondamento:
+          type: string
+          enum: [nessuno, intero_superiore, intero_inferiore, intero_piu_vicino]
+        note:
+          type: ["string", "null"]
+
+    CreditoSolidaleCalcoloDettaglio:
+      type: object
+      properties:
+        creditoBaseNucleo:
+          type: number
+        quotaComponenti:
+          type: number
+        quotaMinori:
+          type: number
+        quotaAnziani:
+          type: number
+        quotaDisabili:
+          type: number
+        totalePrimaDeiLimiti:
+          type: number
+        creditoMinimoApplicato:
+          type: ["number", "null"]
+        creditoMassimoApplicato:
+          type: ["number", "null"]
+        arrotondamentoApplicato:
+          type: string
+          enum: [nessuno, intero_superiore, intero_inferiore, intero_piu_vicino]
+        totaleSuggerito:
+          type: number
+      required: [creditoBaseNucleo, quotaComponenti, quotaMinori, quotaAnziani, quotaDisabili, totalePrimaDeiLimiti, creditoMinimoApplicato, creditoMassimoApplicato, arrotondamentoApplicato, totaleSuggerito]
+
+    CreditoSolidaleCalcolo:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        politicaId:
+          type: ["integer", "null"]
+        politicaNome:
+          type: string
+        politicaOrigine:
+          type: string
+          enum: [centro, citta, globale, default]
+        giornoRicaricaMensile:
+          type: integer
+        ricaricaAutomaticaAbilitata:
+          type: boolean
+        totaleSuggerito:
+          type: number
+        dettaglio:
+          $ref: "#/components/schemas/CreditoSolidaleCalcoloDettaglio"
+      required: [beneficiarioId, politicaId, politicaNome, politicaOrigine, giornoRicaricaMensile, ricaricaAutomaticaAbilitata, totaleSuggerito, dettaglio]
 
     # ── Ruoli Volontari ──────────────────────────────────────────────────
     RuoloVolontario:

@@ -60,6 +60,8 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
 
   "impostazioni-stampa": "amministrazione",
   "impostazioni-email": "amministrazione",
+  "politiche-credito-solidale": "amministrazione",
+  "credito-solidale": ["sociale", "uds"],
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",

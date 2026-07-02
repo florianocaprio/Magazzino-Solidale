@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { BeneficiarioDettaglioCreditoSolidaleStato } from './beneficiarioDettaglioCreditoSolidaleStato';
 import type { Consegna } from './consegna';
 import type { Intervento } from './intervento';
 import type { NucleoFamiliare } from './nucleoFamiliare';
@@ -58,6 +59,16 @@ export interface BeneficiarioDettaglio {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: BeneficiarioDettaglioCreditoSolidaleStato;
+  /** @nullable */
+  creditoSolidaleDataAbilitazione?: Date | null;
+  /** @nullable */
+  creditoSolidaleNote?: string | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoNome?: string | null;
   uds?: boolean;
   attivo: boolean;
   /** @nullable */

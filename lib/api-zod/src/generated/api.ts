@@ -1331,6 +1331,12 @@ export const ListBeneficiariResponseItem = zod.object({
   "consegnaDomicilio": zod.boolean(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "creditoSolidaleAbilitato": zod.boolean(),
+  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
+  "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
+  "creditoSolidaleNote": zod.string().nullish(),
+  "magazzinoEmporioPreferitoId": zod.number().nullish(),
+  "magazzinoEmporioPreferitoNome": zod.string().nullish(),
   "uds": zod.boolean(),
   "attivo": zod.boolean(),
   "soprannome": zod.string().nullish(),
@@ -1371,6 +1377,11 @@ export const CreateBeneficiarioBody = zod.object({
   "consegnaDomicilio": zod.boolean().optional(),
   "motivoConsegnaDomicilio": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
+  "creditoSolidaleAbilitato": zod.boolean().optional(),
+  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']).optional(),
+  "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
+  "creditoSolidaleNote": zod.string().nullish(),
+  "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "dataPresaInCarico": zod.string().optional(),
   "noteInterne": zod.string().optional(),
   "soprannome": zod.string().optional(),
@@ -1443,6 +1454,11 @@ export const BulkBeneficiariBody = zod.object({
   "consegnaDomicilio": zod.boolean().optional(),
   "motivoConsegnaDomicilio": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
+  "creditoSolidaleAbilitato": zod.boolean().optional(),
+  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']).optional(),
+  "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
+  "creditoSolidaleNote": zod.string().nullish(),
+  "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "dataPresaInCarico": zod.string().optional(),
   "noteInterne": zod.string().optional(),
   "soprannome": zod.string().optional(),
@@ -1498,6 +1514,12 @@ export const GetBeneficiarioResponse = zod.object({
   "motivoConsegnaDomicilio": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "creditoSolidaleAbilitato": zod.boolean(),
+  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
+  "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
+  "creditoSolidaleNote": zod.string().nullish(),
+  "magazzinoEmporioPreferitoId": zod.number().nullish(),
+  "magazzinoEmporioPreferitoNome": zod.string().nullish(),
   "uds": zod.boolean().optional(),
   "attivo": zod.boolean(),
   "dataPresaInCarico": zod.string().nullish(),
@@ -1602,6 +1624,11 @@ export const UpdateBeneficiarioBody = zod.object({
   "consegnaDomicilio": zod.boolean().optional(),
   "motivoConsegnaDomicilio": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
+  "creditoSolidaleAbilitato": zod.boolean().optional(),
+  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']).optional(),
+  "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
+  "creditoSolidaleNote": zod.string().nullish(),
+  "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "uds": zod.boolean().optional(),
   "attivo": zod.boolean().optional(),
   "noteInterne": zod.string().optional(),
@@ -1634,6 +1661,12 @@ export const UpdateBeneficiarioResponse = zod.object({
   "consegnaDomicilio": zod.boolean(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
+  "creditoSolidaleAbilitato": zod.boolean(),
+  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
+  "creditoSolidaleDataAbilitazione": zod.coerce.date().nullish(),
+  "creditoSolidaleNote": zod.string().nullish(),
+  "magazzinoEmporioPreferitoId": zod.number().nullish(),
+  "magazzinoEmporioPreferitoNome": zod.string().nullish(),
   "uds": zod.boolean(),
   "attivo": zod.boolean(),
   "soprannome": zod.string().nullish(),
@@ -2828,6 +2861,201 @@ export const UpdateImpostazioniEmailResponse = zod.object({
   "smtpUser": zod.string().nullish(),
   "hasPassword": zod.boolean(),
   "dataAggiornamento": zod.string().optional()
+})
+
+
+export const ListPoliticheCreditoSolidaleResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "cittaNome": zod.string().nullable(),
+  "attiva": zod.boolean(),
+  "creditoBaseNucleo": zod.number(),
+  "creditoPerComponente": zod.number(),
+  "bonusMinore": zod.number(),
+  "bonusAnziano": zod.number(),
+  "bonusDisabile": zod.number(),
+  "creditoMinimoMensile": zod.number(),
+  "creditoMassimoMensile": zod.number().nullable(),
+  "giornoRicaricaMensile": zod.number(),
+  "ricaricaAutomaticaAbilitata": zod.boolean(),
+  "arrotondamento": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "dataAggiornamento": zod.string().nullish()
+})
+export const ListPoliticheCreditoSolidaleResponse = zod.array(ListPoliticheCreditoSolidaleResponseItem)
+
+
+export const createPoliticaCreditoSolidaleBodyNomeMax = 120;
+
+export const createPoliticaCreditoSolidaleBodyCreditoBaseNucleoMin = 0;
+
+export const createPoliticaCreditoSolidaleBodyCreditoPerComponenteMin = 0;
+
+export const createPoliticaCreditoSolidaleBodyBonusMinoreMin = 0;
+
+export const createPoliticaCreditoSolidaleBodyBonusAnzianoMin = 0;
+
+export const createPoliticaCreditoSolidaleBodyBonusDisabileMin = 0;
+
+export const createPoliticaCreditoSolidaleBodyCreditoMinimoMensileMin = 0;
+
+export const createPoliticaCreditoSolidaleBodyCreditoMassimoMensileMin = 0;
+
+export const createPoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax = 28;
+
+
+
+export const CreatePoliticaCreditoSolidaleBody = zod.object({
+  "nome": zod.string().min(1).max(createPoliticaCreditoSolidaleBodyNomeMax),
+  "descrizione": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "attiva": zod.boolean().optional(),
+  "creditoBaseNucleo": zod.number().min(createPoliticaCreditoSolidaleBodyCreditoBaseNucleoMin).optional(),
+  "creditoPerComponente": zod.number().min(createPoliticaCreditoSolidaleBodyCreditoPerComponenteMin).optional(),
+  "bonusMinore": zod.number().min(createPoliticaCreditoSolidaleBodyBonusMinoreMin).optional(),
+  "bonusAnziano": zod.number().min(createPoliticaCreditoSolidaleBodyBonusAnzianoMin).optional(),
+  "bonusDisabile": zod.number().min(createPoliticaCreditoSolidaleBodyBonusDisabileMin).optional(),
+  "creditoMinimoMensile": zod.number().min(createPoliticaCreditoSolidaleBodyCreditoMinimoMensileMin).optional(),
+  "creditoMassimoMensile": zod.number().min(createPoliticaCreditoSolidaleBodyCreditoMassimoMensileMin).nullish(),
+  "giornoRicaricaMensile": zod.number().min(1).max(createPoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax).optional(),
+  "ricaricaAutomaticaAbilitata": zod.boolean().optional(),
+  "arrotondamento": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']).optional(),
+  "note": zod.string().nullish()
+})
+
+
+export const GetPoliticaCreditoSolidaleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPoliticaCreditoSolidaleResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "cittaNome": zod.string().nullable(),
+  "attiva": zod.boolean(),
+  "creditoBaseNucleo": zod.number(),
+  "creditoPerComponente": zod.number(),
+  "bonusMinore": zod.number(),
+  "bonusAnziano": zod.number(),
+  "bonusDisabile": zod.number(),
+  "creditoMinimoMensile": zod.number(),
+  "creditoMassimoMensile": zod.number().nullable(),
+  "giornoRicaricaMensile": zod.number(),
+  "ricaricaAutomaticaAbilitata": zod.boolean(),
+  "arrotondamento": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "dataAggiornamento": zod.string().nullish()
+})
+
+
+export const UpdatePoliticaCreditoSolidaleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updatePoliticaCreditoSolidaleBodyNomeMax = 120;
+
+export const updatePoliticaCreditoSolidaleBodyCreditoBaseNucleoMin = 0;
+
+export const updatePoliticaCreditoSolidaleBodyCreditoPerComponenteMin = 0;
+
+export const updatePoliticaCreditoSolidaleBodyBonusMinoreMin = 0;
+
+export const updatePoliticaCreditoSolidaleBodyBonusAnzianoMin = 0;
+
+export const updatePoliticaCreditoSolidaleBodyBonusDisabileMin = 0;
+
+export const updatePoliticaCreditoSolidaleBodyCreditoMinimoMensileMin = 0;
+
+export const updatePoliticaCreditoSolidaleBodyCreditoMassimoMensileMin = 0;
+
+export const updatePoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax = 28;
+
+
+
+export const UpdatePoliticaCreditoSolidaleBody = zod.object({
+  "nome": zod.string().min(1).max(updatePoliticaCreditoSolidaleBodyNomeMax).optional(),
+  "descrizione": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "attiva": zod.boolean().optional(),
+  "creditoBaseNucleo": zod.number().min(updatePoliticaCreditoSolidaleBodyCreditoBaseNucleoMin).optional(),
+  "creditoPerComponente": zod.number().min(updatePoliticaCreditoSolidaleBodyCreditoPerComponenteMin).optional(),
+  "bonusMinore": zod.number().min(updatePoliticaCreditoSolidaleBodyBonusMinoreMin).optional(),
+  "bonusAnziano": zod.number().min(updatePoliticaCreditoSolidaleBodyBonusAnzianoMin).optional(),
+  "bonusDisabile": zod.number().min(updatePoliticaCreditoSolidaleBodyBonusDisabileMin).optional(),
+  "creditoMinimoMensile": zod.number().min(updatePoliticaCreditoSolidaleBodyCreditoMinimoMensileMin).optional(),
+  "creditoMassimoMensile": zod.number().min(updatePoliticaCreditoSolidaleBodyCreditoMassimoMensileMin).nullish(),
+  "giornoRicaricaMensile": zod.number().min(1).max(updatePoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax).optional(),
+  "ricaricaAutomaticaAbilitata": zod.boolean().optional(),
+  "arrotondamento": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']).optional(),
+  "note": zod.string().nullish()
+})
+
+export const UpdatePoliticaCreditoSolidaleResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "cittaNome": zod.string().nullable(),
+  "attiva": zod.boolean(),
+  "creditoBaseNucleo": zod.number(),
+  "creditoPerComponente": zod.number(),
+  "bonusMinore": zod.number(),
+  "bonusAnziano": zod.number(),
+  "bonusDisabile": zod.number(),
+  "creditoMinimoMensile": zod.number(),
+  "creditoMassimoMensile": zod.number().nullable(),
+  "giornoRicaricaMensile": zod.number(),
+  "ricaricaAutomaticaAbilitata": zod.boolean(),
+  "arrotondamento": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "dataAggiornamento": zod.string().nullish()
+})
+
+
+export const DeletePoliticaCreditoSolidaleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const CalcolaCreditoSolidaleBeneficiarioParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const CalcolaCreditoSolidaleBeneficiarioResponse = zod.object({
+  "beneficiarioId": zod.number(),
+  "politicaId": zod.number().nullable(),
+  "politicaNome": zod.string(),
+  "politicaOrigine": zod.enum(['centro', 'citta', 'globale', 'default']),
+  "giornoRicaricaMensile": zod.number(),
+  "ricaricaAutomaticaAbilitata": zod.boolean(),
+  "totaleSuggerito": zod.number(),
+  "dettaglio": zod.object({
+  "creditoBaseNucleo": zod.number(),
+  "quotaComponenti": zod.number(),
+  "quotaMinori": zod.number(),
+  "quotaAnziani": zod.number(),
+  "quotaDisabili": zod.number(),
+  "totalePrimaDeiLimiti": zod.number(),
+  "creditoMinimoApplicato": zod.number().nullable(),
+  "creditoMassimoApplicato": zod.number().nullable(),
+  "arrotondamentoApplicato": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']),
+  "totaleSuggerito": zod.number()
+})
 })
 
 

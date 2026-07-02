@@ -208,6 +208,16 @@ export interface ProdottiBulkInput {
   righe: ProdottoInput[];
 }
 
+export type BeneficiarioInputCreditoSolidaleStato = typeof BeneficiarioInputCreditoSolidaleStato[keyof typeof BeneficiarioInputCreditoSolidaleStato];
+
+
+export const BeneficiarioInputCreditoSolidaleStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
+
 export type BeneficiarioInputSesso = typeof BeneficiarioInputSesso[keyof typeof BeneficiarioInputSesso];
 
 
@@ -246,6 +256,14 @@ export interface BeneficiarioInput {
   motivoConsegnaDomicilio?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  creditoSolidaleAbilitato?: boolean;
+  creditoSolidaleStato?: BeneficiarioInputCreditoSolidaleStato;
+  /** @nullable */
+  creditoSolidaleDataAbilitazione?: string | null;
+  /** @nullable */
+  creditoSolidaleNote?: string | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoId?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
   soprannome?: string;
@@ -894,6 +912,16 @@ export interface BeneficiarioSimile {
   score: number;
 }
 
+export type BeneficiarioCreditoSolidaleStato = typeof BeneficiarioCreditoSolidaleStato[keyof typeof BeneficiarioCreditoSolidaleStato];
+
+
+export const BeneficiarioCreditoSolidaleStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
+
 export interface Beneficiario {
   id: number;
   codice: string;
@@ -928,6 +956,16 @@ export interface Beneficiario {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: BeneficiarioCreditoSolidaleStato;
+  /** @nullable */
+  creditoSolidaleDataAbilitazione?: string | null;
+  /** @nullable */
+  creditoSolidaleNote?: string | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoNome?: string | null;
   uds: boolean;
   attivo: boolean;
   /** @nullable */
@@ -944,6 +982,16 @@ export interface Beneficiario {
   dataPresaInCarico?: string | null;
   dataCreazione: string;
 }
+
+export type BeneficiarioDettaglioCreditoSolidaleStato = typeof BeneficiarioDettaglioCreditoSolidaleStato[keyof typeof BeneficiarioDettaglioCreditoSolidaleStato];
+
+
+export const BeneficiarioDettaglioCreditoSolidaleStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
 
 export interface NucleoFamiliare {
   id: number;
@@ -1097,6 +1145,16 @@ export interface BeneficiarioDettaglio {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: BeneficiarioDettaglioCreditoSolidaleStato;
+  /** @nullable */
+  creditoSolidaleDataAbilitazione?: string | null;
+  /** @nullable */
+  creditoSolidaleNote?: string | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoNome?: string | null;
   uds?: boolean;
   attivo: boolean;
   /** @nullable */
@@ -1118,6 +1176,16 @@ export interface BeneficiarioDettaglio {
   consegne?: Consegna[];
   dataCreazione: string;
 }
+
+export type BeneficiarioUpdateCreditoSolidaleStato = typeof BeneficiarioUpdateCreditoSolidaleStato[keyof typeof BeneficiarioUpdateCreditoSolidaleStato];
+
+
+export const BeneficiarioUpdateCreditoSolidaleStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
 
 export type BeneficiarioUpdateSesso = typeof BeneficiarioUpdateSesso[keyof typeof BeneficiarioUpdateSesso];
 
@@ -1156,6 +1224,14 @@ export interface BeneficiarioUpdate {
   motivoConsegnaDomicilio?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  creditoSolidaleAbilitato?: boolean;
+  creditoSolidaleStato?: BeneficiarioUpdateCreditoSolidaleStato;
+  /** @nullable */
+  creditoSolidaleDataAbilitazione?: string | null;
+  /** @nullable */
+  creditoSolidaleNote?: string | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoId?: number | null;
   uds?: boolean;
   attivo?: boolean;
   noteInterne?: string;
@@ -1166,6 +1242,197 @@ export interface BeneficiarioUpdate {
   zonaUdsId?: number | null;
   sesso?: BeneficiarioUpdateSesso;
   areaProvenienza?: string;
+}
+
+export type PoliticaCreditoSolidaleArrotondamento = typeof PoliticaCreditoSolidaleArrotondamento[keyof typeof PoliticaCreditoSolidaleArrotondamento];
+
+
+export const PoliticaCreditoSolidaleArrotondamento = {
+  nessuno: 'nessuno',
+  intero_superiore: 'intero_superiore',
+  intero_inferiore: 'intero_inferiore',
+  intero_piu_vicino: 'intero_piu_vicino',
+} as const;
+
+export interface PoliticaCreditoSolidale {
+  id: number;
+  nome: string;
+  /** @nullable */
+  descrizione?: string | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  centroAscoltoNome: string | null;
+  /** @nullable */
+  cittaId: number | null;
+  /** @nullable */
+  cittaNome: string | null;
+  attiva: boolean;
+  creditoBaseNucleo: number;
+  creditoPerComponente: number;
+  bonusMinore: number;
+  bonusAnziano: number;
+  bonusDisabile: number;
+  creditoMinimoMensile: number;
+  /** @nullable */
+  creditoMassimoMensile: number | null;
+  giornoRicaricaMensile: number;
+  ricaricaAutomaticaAbilitata: boolean;
+  arrotondamento: PoliticaCreditoSolidaleArrotondamento;
+  /** @nullable */
+  note?: string | null;
+  dataCreazione: string;
+  /** @nullable */
+  dataAggiornamento?: string | null;
+}
+
+export type PoliticaCreditoSolidaleInputArrotondamento = typeof PoliticaCreditoSolidaleInputArrotondamento[keyof typeof PoliticaCreditoSolidaleInputArrotondamento];
+
+
+export const PoliticaCreditoSolidaleInputArrotondamento = {
+  nessuno: 'nessuno',
+  intero_superiore: 'intero_superiore',
+  intero_inferiore: 'intero_inferiore',
+  intero_piu_vicino: 'intero_piu_vicino',
+} as const;
+
+export interface PoliticaCreditoSolidaleInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  nome: string;
+  /** @nullable */
+  descrizione?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+  attiva?: boolean;
+  /** @minimum 0 */
+  creditoBaseNucleo?: number;
+  /** @minimum 0 */
+  creditoPerComponente?: number;
+  /** @minimum 0 */
+  bonusMinore?: number;
+  /** @minimum 0 */
+  bonusAnziano?: number;
+  /** @minimum 0 */
+  bonusDisabile?: number;
+  /** @minimum 0 */
+  creditoMinimoMensile?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  creditoMassimoMensile?: number | null;
+  /**
+     * @minimum 1
+     * @maximum 28
+     */
+  giornoRicaricaMensile?: number;
+  ricaricaAutomaticaAbilitata?: boolean;
+  arrotondamento?: PoliticaCreditoSolidaleInputArrotondamento;
+  /** @nullable */
+  note?: string | null;
+}
+
+export type PoliticaCreditoSolidaleUpdateArrotondamento = typeof PoliticaCreditoSolidaleUpdateArrotondamento[keyof typeof PoliticaCreditoSolidaleUpdateArrotondamento];
+
+
+export const PoliticaCreditoSolidaleUpdateArrotondamento = {
+  nessuno: 'nessuno',
+  intero_superiore: 'intero_superiore',
+  intero_inferiore: 'intero_inferiore',
+  intero_piu_vicino: 'intero_piu_vicino',
+} as const;
+
+export interface PoliticaCreditoSolidaleUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  nome?: string;
+  /** @nullable */
+  descrizione?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+  attiva?: boolean;
+  /** @minimum 0 */
+  creditoBaseNucleo?: number;
+  /** @minimum 0 */
+  creditoPerComponente?: number;
+  /** @minimum 0 */
+  bonusMinore?: number;
+  /** @minimum 0 */
+  bonusAnziano?: number;
+  /** @minimum 0 */
+  bonusDisabile?: number;
+  /** @minimum 0 */
+  creditoMinimoMensile?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  creditoMassimoMensile?: number | null;
+  /**
+     * @minimum 1
+     * @maximum 28
+     */
+  giornoRicaricaMensile?: number;
+  ricaricaAutomaticaAbilitata?: boolean;
+  arrotondamento?: PoliticaCreditoSolidaleUpdateArrotondamento;
+  /** @nullable */
+  note?: string | null;
+}
+
+export type CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato = typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato[keyof typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato];
+
+
+export const CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato = {
+  nessuno: 'nessuno',
+  intero_superiore: 'intero_superiore',
+  intero_inferiore: 'intero_inferiore',
+  intero_piu_vicino: 'intero_piu_vicino',
+} as const;
+
+export interface CreditoSolidaleCalcoloDettaglio {
+  creditoBaseNucleo: number;
+  quotaComponenti: number;
+  quotaMinori: number;
+  quotaAnziani: number;
+  quotaDisabili: number;
+  totalePrimaDeiLimiti: number;
+  /** @nullable */
+  creditoMinimoApplicato: number | null;
+  /** @nullable */
+  creditoMassimoApplicato: number | null;
+  arrotondamentoApplicato: CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato;
+  totaleSuggerito: number;
+}
+
+export type CreditoSolidaleCalcoloPoliticaOrigine = typeof CreditoSolidaleCalcoloPoliticaOrigine[keyof typeof CreditoSolidaleCalcoloPoliticaOrigine];
+
+
+export const CreditoSolidaleCalcoloPoliticaOrigine = {
+  centro: 'centro',
+  citta: 'citta',
+  globale: 'globale',
+  default: 'default',
+} as const;
+
+export interface CreditoSolidaleCalcolo {
+  beneficiarioId: number;
+  /** @nullable */
+  politicaId: number | null;
+  politicaNome: string;
+  politicaOrigine: CreditoSolidaleCalcoloPoliticaOrigine;
+  giornoRicaricaMensile: number;
+  ricaricaAutomaticaAbilitata: boolean;
+  totaleSuggerito: number;
+  dettaglio: CreditoSolidaleCalcoloDettaglio;
 }
 
 export interface RuoloVolontario {

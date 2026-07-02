@@ -30,6 +30,7 @@ import {
   UserCog,
   Contact,
   ListChecks,
+  SlidersHorizontal,
   Languages,
   ChevronDown,
   LogOut
@@ -103,6 +104,7 @@ const NAV_ITEMS = [
   { key: "ruoliVolontari", url: "/ruoli-volontari", icon: Contact, groupKey: "amministrazione", area: "amministrazione" },
   { key: "tipiIntervento", url: "/tipi-intervento", icon: ListChecks, groupKey: "amministrazione", area: "amministrazione" },
   { key: "tipologieFornitore", url: "/tipologie-fornitore", icon: Truck, groupKey: "amministrazione", area: "amministrazione" },
+  { key: "politicheCreditoSolidale", url: "/politiche-credito-solidale", icon: SlidersHorizontal, groupKey: "amministrazione", area: "amministrazione" },
   { key: "impostazioniStampa", url: "/impostazioni-stampa", icon: Printer, groupKey: "amministrazione", area: "amministrazione" },
 ];
 

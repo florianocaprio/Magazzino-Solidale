@@ -59,6 +59,7 @@ import type {
   ConsegnaUpdate,
   ConsegneMeseReport,
   ConsegnePerCentroReport,
+  CreditoSolidaleCalcolo,
   DashboardStats,
   EmailSendResult,
   Fornitore,
@@ -109,6 +110,9 @@ import type {
   MovimentoSummary,
   NucleoFamiliare,
   NucleoFamiliareInput,
+  PoliticaCreditoSolidale,
+  PoliticaCreditoSolidaleInput,
+  PoliticaCreditoSolidaleUpdate,
   PreparazioneConsegne,
   ProdottiBulkInput,
   Prodotto,
@@ -8054,6 +8058,414 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getUpdateImpostazioniEmailMutationOptions(options));
     }
+
+export const getListPoliticheCreditoSolidaleUrl = () => {
+
+
+
+
+  return `/api/politiche-credito-solidale`
+}
+
+export const listPoliticheCreditoSolidale = async ( options?: RequestInit): Promise<PoliticaCreditoSolidale[]> => {
+
+  return customFetch<PoliticaCreditoSolidale[]>(getListPoliticheCreditoSolidaleUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPoliticheCreditoSolidaleQueryKey = () => {
+    return [
+    `/api/politiche-credito-solidale`
+    ] as const;
+    }
+
+
+export const getListPoliticheCreditoSolidaleQueryOptions = <TData = Awaited<ReturnType<typeof listPoliticheCreditoSolidale>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPoliticheCreditoSolidale>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPoliticheCreditoSolidaleQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPoliticheCreditoSolidale>>> = ({ signal }) => listPoliticheCreditoSolidale({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPoliticheCreditoSolidale>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPoliticheCreditoSolidaleQueryResult = NonNullable<Awaited<ReturnType<typeof listPoliticheCreditoSolidale>>>
+export type ListPoliticheCreditoSolidaleQueryError = ErrorType<unknown>
+
+
+
+export function useListPoliticheCreditoSolidale<TData = Awaited<ReturnType<typeof listPoliticheCreditoSolidale>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPoliticheCreditoSolidale>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPoliticheCreditoSolidaleQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreatePoliticaCreditoSolidaleUrl = () => {
+
+
+
+
+  return `/api/politiche-credito-solidale`
+}
+
+export const createPoliticaCreditoSolidale = async (politicaCreditoSolidaleInput: PoliticaCreditoSolidaleInput, options?: RequestInit): Promise<PoliticaCreditoSolidale> => {
+
+  return customFetch<PoliticaCreditoSolidale>(getCreatePoliticaCreditoSolidaleUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      politicaCreditoSolidaleInput,)
+  }
+);}
+
+
+
+
+export const getCreatePoliticaCreditoSolidaleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPoliticaCreditoSolidale>>, TError,{data: BodyType<PoliticaCreditoSolidaleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPoliticaCreditoSolidale>>, TError,{data: BodyType<PoliticaCreditoSolidaleInput>}, TContext> => {
+
+const mutationKey = ['createPoliticaCreditoSolidale'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPoliticaCreditoSolidale>>, {data: BodyType<PoliticaCreditoSolidaleInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPoliticaCreditoSolidale(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePoliticaCreditoSolidaleMutationResult = NonNullable<Awaited<ReturnType<typeof createPoliticaCreditoSolidale>>>
+    export type CreatePoliticaCreditoSolidaleMutationBody = BodyType<PoliticaCreditoSolidaleInput>
+    export type CreatePoliticaCreditoSolidaleMutationError = ErrorType<unknown>
+
+    export const useCreatePoliticaCreditoSolidale = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPoliticaCreditoSolidale>>, TError,{data: BodyType<PoliticaCreditoSolidaleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPoliticaCreditoSolidale>>,
+        TError,
+        {data: BodyType<PoliticaCreditoSolidaleInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePoliticaCreditoSolidaleMutationOptions(options));
+    }
+
+export const getGetPoliticaCreditoSolidaleUrl = (id: number,) => {
+
+
+
+
+  return `/api/politiche-credito-solidale/${id}`
+}
+
+export const getPoliticaCreditoSolidale = async (id: number, options?: RequestInit): Promise<PoliticaCreditoSolidale> => {
+
+  return customFetch<PoliticaCreditoSolidale>(getGetPoliticaCreditoSolidaleUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPoliticaCreditoSolidaleQueryKey = (id: number,) => {
+    return [
+    `/api/politiche-credito-solidale/${id}`
+    ] as const;
+    }
+
+
+export const getGetPoliticaCreditoSolidaleQueryOptions = <TData = Awaited<ReturnType<typeof getPoliticaCreditoSolidale>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPoliticaCreditoSolidale>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPoliticaCreditoSolidaleQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPoliticaCreditoSolidale>>> = ({ signal }) => getPoliticaCreditoSolidale(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPoliticaCreditoSolidale>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPoliticaCreditoSolidaleQueryResult = NonNullable<Awaited<ReturnType<typeof getPoliticaCreditoSolidale>>>
+export type GetPoliticaCreditoSolidaleQueryError = ErrorType<unknown>
+
+
+
+export function useGetPoliticaCreditoSolidale<TData = Awaited<ReturnType<typeof getPoliticaCreditoSolidale>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPoliticaCreditoSolidale>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPoliticaCreditoSolidaleQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdatePoliticaCreditoSolidaleUrl = (id: number,) => {
+
+
+
+
+  return `/api/politiche-credito-solidale/${id}`
+}
+
+export const updatePoliticaCreditoSolidale = async (id: number,
+    politicaCreditoSolidaleUpdate: PoliticaCreditoSolidaleUpdate, options?: RequestInit): Promise<PoliticaCreditoSolidale> => {
+
+  return customFetch<PoliticaCreditoSolidale>(getUpdatePoliticaCreditoSolidaleUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      politicaCreditoSolidaleUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdatePoliticaCreditoSolidaleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePoliticaCreditoSolidale>>, TError,{id: number;data: BodyType<PoliticaCreditoSolidaleUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePoliticaCreditoSolidale>>, TError,{id: number;data: BodyType<PoliticaCreditoSolidaleUpdate>}, TContext> => {
+
+const mutationKey = ['updatePoliticaCreditoSolidale'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePoliticaCreditoSolidale>>, {id: number;data: BodyType<PoliticaCreditoSolidaleUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePoliticaCreditoSolidale(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePoliticaCreditoSolidaleMutationResult = NonNullable<Awaited<ReturnType<typeof updatePoliticaCreditoSolidale>>>
+    export type UpdatePoliticaCreditoSolidaleMutationBody = BodyType<PoliticaCreditoSolidaleUpdate>
+    export type UpdatePoliticaCreditoSolidaleMutationError = ErrorType<unknown>
+
+    export const useUpdatePoliticaCreditoSolidale = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePoliticaCreditoSolidale>>, TError,{id: number;data: BodyType<PoliticaCreditoSolidaleUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePoliticaCreditoSolidale>>,
+        TError,
+        {id: number;data: BodyType<PoliticaCreditoSolidaleUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdatePoliticaCreditoSolidaleMutationOptions(options));
+    }
+
+export const getDeletePoliticaCreditoSolidaleUrl = (id: number,) => {
+
+
+
+
+  return `/api/politiche-credito-solidale/${id}`
+}
+
+export const deletePoliticaCreditoSolidale = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeletePoliticaCreditoSolidaleUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeletePoliticaCreditoSolidaleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePoliticaCreditoSolidale>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePoliticaCreditoSolidale>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deletePoliticaCreditoSolidale'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePoliticaCreditoSolidale>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deletePoliticaCreditoSolidale(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePoliticaCreditoSolidaleMutationResult = NonNullable<Awaited<ReturnType<typeof deletePoliticaCreditoSolidale>>>
+
+    export type DeletePoliticaCreditoSolidaleMutationError = ErrorType<unknown>
+
+    export const useDeletePoliticaCreditoSolidale = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePoliticaCreditoSolidale>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePoliticaCreditoSolidale>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeletePoliticaCreditoSolidaleMutationOptions(options));
+    }
+
+export const getCalcolaCreditoSolidaleBeneficiarioUrl = (beneficiarioId: number,) => {
+
+
+
+
+  return `/api/credito-solidale/calcola-beneficiario/${beneficiarioId}`
+}
+
+export const calcolaCreditoSolidaleBeneficiario = async (beneficiarioId: number, options?: RequestInit): Promise<CreditoSolidaleCalcolo> => {
+
+  return customFetch<CreditoSolidaleCalcolo>(getCalcolaCreditoSolidaleBeneficiarioUrl(beneficiarioId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCalcolaCreditoSolidaleBeneficiarioQueryKey = (beneficiarioId: number,) => {
+    return [
+    `/api/credito-solidale/calcola-beneficiario/${beneficiarioId}`
+    ] as const;
+    }
+
+
+export const getCalcolaCreditoSolidaleBeneficiarioQueryOptions = <TData = Awaited<ReturnType<typeof calcolaCreditoSolidaleBeneficiario>>, TError = ErrorType<unknown>>(beneficiarioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof calcolaCreditoSolidaleBeneficiario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCalcolaCreditoSolidaleBeneficiarioQueryKey(beneficiarioId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof calcolaCreditoSolidaleBeneficiario>>> = ({ signal }) => calcolaCreditoSolidaleBeneficiario(beneficiarioId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(beneficiarioId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof calcolaCreditoSolidaleBeneficiario>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CalcolaCreditoSolidaleBeneficiarioQueryResult = NonNullable<Awaited<ReturnType<typeof calcolaCreditoSolidaleBeneficiario>>>
+export type CalcolaCreditoSolidaleBeneficiarioQueryError = ErrorType<unknown>
+
+
+
+export function useCalcolaCreditoSolidaleBeneficiario<TData = Awaited<ReturnType<typeof calcolaCreditoSolidaleBeneficiario>>, TError = ErrorType<unknown>>(
+ beneficiarioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof calcolaCreditoSolidaleBeneficiario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCalcolaCreditoSolidaleBeneficiarioQueryOptions(beneficiarioId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListVolontariUrl = (params?: ListVolontariParams,) => {
   const normalizedParams = new URLSearchParams();
