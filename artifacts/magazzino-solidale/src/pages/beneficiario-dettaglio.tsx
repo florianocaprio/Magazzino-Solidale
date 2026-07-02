@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +66,21 @@ export default function BeneficiarioDettaglio() {
   const { user } = useAuth();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const [editing, setEditing] = useState(false);
+  const { data: accessiEmporio } = useListAccessiEmporio(
+    { beneficiarioId: numId },
+    { query: { queryKey: getListAccessiEmporioQueryKey({ beneficiarioId: numId }), enabled: Number.isInteger(numId) && numId > 0 } },
+  );
+  const prossimoAccesso = useMemo(() => {
+    const now = Date.now();
+    return (accessiEmporio ?? [])
+      .filter((a) => a.dataOraInizio && new Date(a.dataOraInizio).getTime() >= now && a.statoAccessoEmporio !== "annullato" && a.statoAccessoEmporio !== "non_presentato")
+      .sort((a, b) => new Date(a.dataOraInizio!).getTime() - new Date(b.dataOraInizio!).getTime())[0] ?? null;
+  }, [accessiEmporio]);
+  const ultimoAccesso = useMemo(() => {
+    return (accessiEmporio ?? [])
+      .filter((a) => a.statoAccessoEmporio === "effettuato")
+      .sort((a, b) => new Date(b.dataOraInizio ?? 0).getTime() - new Date(a.dataOraInizio ?? 0).getTime())[0] ?? null;
+  }, [accessiEmporio]);
 
   const onChangeCentro = (value: string) => {
     const next = value === NONE_VALUE ? null : parseInt(value);
@@ -164,6 +179,30 @@ export default function BeneficiarioDettaglio() {
       )}
 
       <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />
+
+      {b.creditoSolidaleAbilitato && (
+        <Card>
+          <CardHeader className="py-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              {t("accessiEmporio.titolo")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
+            <div>
+              <div className="text-xs text-muted-foreground">{t("accessiEmporio.prossimoAccesso")}</div>
+              <div className="font-medium">{prossimoAccesso?.dataOraInizio ? new Date(prossimoAccesso.dataOraInizio).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" }) : "-"}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">{t("accessiEmporio.ultimoAccesso")}</div>
+              <div className="font-medium">{ultimoAccesso?.dataOraInizio ? new Date(ultimoAccesso.dataOraInizio).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" }) : "-"}</div>
+            </div>
+            <Button asChild className="gap-2">
+              <Link href={`/emporio/accessi?beneficiarioId=${b.id}`}>{t("accessiEmporio.pianificaDaBeneficiario")}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="md:col-span-1 shadow-sm">

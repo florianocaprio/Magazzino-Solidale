@@ -63,6 +63,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   "impostazioni-moduli": ALL_AREA_KEYS,
   "politiche-credito-solidale": "amministrazione",
   "credito-solidale": ["sociale", "uds"],
+  "accessi-emporio": ["sociale", "uds"],
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",

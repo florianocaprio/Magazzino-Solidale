@@ -1071,12 +1071,21 @@ export interface Intervento {
   dataCreazione: string;
 }
 
+export type ConsegnaTipoPianificazione = typeof ConsegnaTipoPianificazione[keyof typeof ConsegnaTipoPianificazione];
+
+
+export const ConsegnaTipoPianificazione = {
+  consegna_pacco: 'consegna_pacco',
+  accesso_emporio: 'accesso_emporio',
+} as const;
+
 export interface Consegna {
   id: number;
   codice: string;
   beneficiarioId: number;
   /** @nullable */
   beneficiarioNome?: string | null;
+  tipoPianificazione: ConsegnaTipoPianificazione;
   tipoConsegna: string;
   dataPrevista: string;
   /** @nullable */
@@ -1954,6 +1963,90 @@ export interface InterventoUpdate {
   scadenzaAutodichiarazioneIndigenza?: string;
 }
 
+export type AccessoEmporioStato = typeof AccessoEmporioStato[keyof typeof AccessoEmporioStato];
+
+
+export const AccessoEmporioStato = {
+  pianificato: 'pianificato',
+  confermato: 'confermato',
+  effettuato: 'effettuato',
+  annullato: 'annullato',
+  non_presentato: 'non_presentato',
+} as const;
+
+export type AccessoEmporioTipoPianificazione = typeof AccessoEmporioTipoPianificazione[keyof typeof AccessoEmporioTipoPianificazione];
+
+
+export const AccessoEmporioTipoPianificazione = {
+  accesso_emporio: 'accesso_emporio',
+} as const;
+
+export interface AccessoEmporio {
+  id: number;
+  codice: string;
+  beneficiarioId: number;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  beneficiarioCodice?: string | null;
+  /** @nullable */
+  beneficiarioCodiceFiscale?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  tipoPianificazione: AccessoEmporioTipoPianificazione;
+  /** @nullable */
+  magazzinoEmporioId: number | null;
+  /** @nullable */
+  magazzinoEmporioNome?: string | null;
+  /** @nullable */
+  dataOraInizio: string | null;
+  /** @nullable */
+  dataOraFine?: string | null;
+  statoAccessoEmporio: AccessoEmporioStato | null;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @nullable */
+  noteAccessoEmporio?: string | null;
+  saldoCreditoSolidale: number;
+  /** @nullable */
+  quotaMensileAssegnata: number | null;
+  dataCreazione: string;
+}
+
+export interface AccessoEmporioInput {
+  beneficiarioId: number;
+  magazzinoEmporioId: number;
+  dataOraInizio: string;
+  /** @nullable */
+  dataOraFine?: string | null;
+  statoAccessoEmporio?: AccessoEmporioStato;
+  /** @nullable */
+  noteAccessoEmporio?: string | null;
+}
+
+export interface AccessoEmporioUpdate {
+  beneficiarioId?: number;
+  magazzinoEmporioId?: number;
+  dataOraInizio?: string;
+  /** @nullable */
+  dataOraFine?: string | null;
+  statoAccessoEmporio?: AccessoEmporioStato;
+  /** @nullable */
+  noteAccessoEmporio?: string | null;
+}
+
+export interface AccessoEmporioStatoUpdate {
+  statoAccessoEmporio: AccessoEmporioStato;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+}
+
 export interface AssociaBollaInput {
   /** @nullable */
   bollaId?: number | null;
@@ -2613,6 +2706,18 @@ dataInizio?: string;
 dataFine?: string;
 beneficiarioId?: number;
 centroAscoltoId?: number;
+};
+
+export type ListAccessiEmporioParams = {
+dataDa?: string;
+dataA?: string;
+centroAscoltoId?: number;
+cittaId?: number;
+areaId?: number;
+magazzinoEmporioId?: number;
+statoAccessoEmporio?: AccessoEmporioStato;
+beneficiarioSearch?: string;
+beneficiarioId?: number;
 };
 
 export type ListBolleParams = {

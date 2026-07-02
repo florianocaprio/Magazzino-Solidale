@@ -1495,6 +1495,138 @@ paths:
               schema:
                 $ref: "#/components/schemas/Consegna"
 
+  # ─── ACCESSI EMPORIO ────────────────────────────────────────────────────────
+  /accessi-emporio:
+    get:
+      operationId: listAccessiEmporio
+      tags: [accessi-emporio]
+      parameters:
+        - name: dataDa
+          in: query
+          schema:
+            type: string
+        - name: dataA
+          in: query
+          schema:
+            type: string
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: areaId
+          in: query
+          schema:
+            type: integer
+        - name: magazzinoEmporioId
+          in: query
+          schema:
+            type: integer
+        - name: statoAccessoEmporio
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccessoEmporioStato"
+        - name: beneficiarioSearch
+          in: query
+          schema:
+            type: string
+        - name: beneficiarioId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of Emporio accesses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccessoEmporio"
+    post:
+      operationId: createAccessoEmporio
+      tags: [accessi-emporio]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessoEmporioInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessoEmporio"
+
+  /accessi-emporio/{id}:
+    get:
+      operationId: getAccessoEmporio
+      tags: [accessi-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Emporio access
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessoEmporio"
+    patch:
+      operationId: updateAccessoEmporio
+      tags: [accessi-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessoEmporioUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessoEmporio"
+
+  /accessi-emporio/{id}/stato:
+    patch:
+      operationId: updateAccessoEmporioStato
+      tags: [accessi-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessoEmporioStatoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessoEmporio"
+
   # ─── BOLLE ───────────────────────────────────────────────────────────────────
   /bolle:
     get:
@@ -6069,6 +6201,9 @@ components:
           type: integer
         beneficiarioNome:
           type: ["string", "null"]
+        tipoPianificazione:
+          type: string
+          enum: [consegna_pacco, accesso_emporio]
         tipoConsegna:
           type: string
         dataPrevista:
@@ -6111,7 +6246,110 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, beneficiarioId, tipoConsegna, dataPrevista, magazzinoId, stato, dataCreazione]
+      required: [id, codice, beneficiarioId, tipoPianificazione, tipoConsegna, dataPrevista, magazzinoId, stato, dataCreazione]
+
+    AccessoEmporioStato:
+      type: string
+      enum: [pianificato, confermato, effettuato, annullato, non_presentato]
+
+    AccessoEmporio:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: ["string", "null"]
+        beneficiarioCodice:
+          type: ["string", "null"]
+        beneficiarioCodiceFiscale:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        tipoPianificazione:
+          type: string
+          enum: [accesso_emporio]
+        magazzinoEmporioId:
+          type: ["integer", "null"]
+        magazzinoEmporioNome:
+          type: ["string", "null"]
+        dataOraInizio:
+          type: ["string", "null"]
+          format: date-time
+        dataOraFine:
+          type: ["string", "null"]
+          format: date-time
+        statoAccessoEmporio:
+          anyOf:
+            - $ref: "#/components/schemas/AccessoEmporioStato"
+            - type: "null"
+        motivoAnnullamento:
+          type: ["string", "null"]
+        noteAccessoEmporio:
+          type: ["string", "null"]
+        saldoCreditoSolidale:
+          type: number
+        quotaMensileAssegnata:
+          type: ["number", "null"]
+        dataCreazione:
+          type: string
+          format: date-time
+      required: [id, codice, beneficiarioId, tipoPianificazione, magazzinoEmporioId, dataOraInizio, statoAccessoEmporio, saldoCreditoSolidale, quotaMensileAssegnata, dataCreazione]
+
+    AccessoEmporioInput:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        magazzinoEmporioId:
+          type: integer
+        dataOraInizio:
+          type: string
+          format: date-time
+        dataOraFine:
+          type: ["string", "null"]
+          format: date-time
+        statoAccessoEmporio:
+          $ref: "#/components/schemas/AccessoEmporioStato"
+        noteAccessoEmporio:
+          type: ["string", "null"]
+      required: [beneficiarioId, magazzinoEmporioId, dataOraInizio]
+
+    AccessoEmporioUpdate:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        magazzinoEmporioId:
+          type: integer
+        dataOraInizio:
+          type: string
+          format: date-time
+        dataOraFine:
+          type: ["string", "null"]
+          format: date-time
+        statoAccessoEmporio:
+          $ref: "#/components/schemas/AccessoEmporioStato"
+        noteAccessoEmporio:
+          type: ["string", "null"]
+
+    AccessoEmporioStatoUpdate:
+      type: object
+      properties:
+        statoAccessoEmporio:
+          $ref: "#/components/schemas/AccessoEmporioStato"
+        motivoAnnullamento:
+          type: ["string", "null"]
+      required: [statoAccessoEmporio]
 
     AssociaBollaInput:
       type: object

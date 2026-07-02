@@ -30,6 +30,7 @@ import impostazioniEmailRouter from "./impostazioni-email";
 import impostazioniModuliRouter from "./impostazioni-moduli";
 import politicheCreditoSolidaleRouter from "./politiche-credito-solidale";
 import creditoSolidaleRouter from "./credito-solidale";
+import accessiEmporioRouter from "./accessi-emporio";
 import reportRouter from "./report";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
@@ -83,6 +84,7 @@ router.use(impostazioniEmailRouter);
 router.use(impostazioniModuliRouter);
 router.use(politicheCreditoSolidaleRouter);
 router.use(creditoSolidaleRouter);
+router.use(accessiEmporioRouter);
 router.use(reportRouter);
 
 // Admin-only management endpoints.

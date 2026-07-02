@@ -6,6 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accessoEmporio';
+export * from './accessoEmporioInput';
+export * from './accessoEmporioStato';
+export * from './accessoEmporioStatoUpdate';
+export * from './accessoEmporioTipoPianificazione';
+export * from './accessoEmporioUpdate';
 export * from './actionResult';
 export * from './alert';
 export * from './allocazioneMezziReport';
@@ -55,6 +61,7 @@ export * from './confermaRicezione';
 export * from './consegna';
 export * from './consegnaInput';
 export * from './consegnaRicezioneInput';
+export * from './consegnaTipoPianificazione';
 export * from './consegnaUpdate';
 export * from './consegneMeseReport';
 export * from './consegnePerCentroReport';
@@ -99,6 +106,7 @@ export * from './impostazioniStampaUpdateTemplateBolla';
 export * from './intervento';
 export * from './interventoInput';
 export * from './interventoUpdate';
+export * from './listAccessiEmporioParams';
 export * from './listApprovvigionamentiParams';
 export * from './listBeneficiariParams';
 export * from './listBolleParams';

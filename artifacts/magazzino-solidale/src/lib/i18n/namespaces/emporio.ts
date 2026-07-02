@@ -1,7 +1,7 @@
 export const emporio = {
   it: {
     cassaTitle: "Cassa Emporio",
-    cassaText: "La Cassa Emporio sarà disponibile in una fase successiva.",
+    cassaText: "La Cassa Emporio sarà disponibile dalla Fase4-6.",
     creditiTitle: "Crediti e saldo",
     creditiText: "La gestione dei saldi e dei movimenti Credito Solidale sarà disponibile in una fase successiva.",
     accessiTitle: "Accessi Emporio",

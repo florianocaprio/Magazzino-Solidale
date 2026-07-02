@@ -1,11 +1,13 @@
 import { pgTable, serial, varchar, text, boolean, timestamp, integer, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { magazziniTable } from "./magazzini";
 
 export const consegneTable = pgTable("consegne", {
   id: serial("id").primaryKey(),
   codice: varchar("codice", { length: 30 }).notNull().unique(),
   beneficiarioId: integer("beneficiario_id").notNull(),
+  tipoPianificazione: varchar("tipo_pianificazione", { length: 30 }).notNull().default("consegna_pacco"),
   tipoConsegna: varchar("tipo_consegna", { length: 20 }).notNull(),
   dataPrevista: date("data_prevista").notNull(),
   fasciaOraria: varchar("fascia_oraria", { length: 30 }),
@@ -20,6 +22,12 @@ export const consegneTable = pgTable("consegne", {
   motivo_mancata: text("motivo_mancata"),
   noteOperative: text("note_operative"),
   dataEffettuata: timestamp("data_effettuata"),
+  magazzinoEmporioId: integer("magazzino_emporio_id").references(() => magazziniTable.id),
+  dataOraInizio: timestamp("data_ora_inizio"),
+  dataOraFine: timestamp("data_ora_fine"),
+  statoAccessoEmporio: varchar("stato_accesso_emporio", { length: 40 }),
+  motivoAnnullamento: text("motivo_annullamento"),
+  noteAccessoEmporio: text("note_accesso_emporio"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 
