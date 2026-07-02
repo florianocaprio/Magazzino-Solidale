@@ -6,6 +6,7 @@ import {
   beneficiariTable,
   centriAscoltoTable,
   cittaTable,
+  creditoSolidaleMovimentiTable,
   db,
   impostazioniModuliTable,
   politicheCreditoSolidaleTable,
@@ -70,6 +71,11 @@ async function createBeneficiario(opts: {
   numMinori?: number;
   numAnziani?: number;
   numDisabili?: number;
+  creditoSolidaleAbilitato?: boolean;
+  creditoSolidaleStato?: "non_abilitato" | "attivo" | "sospeso" | "revocato";
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleSaldo?: number;
+  attivo?: boolean;
 } = {}): Promise<number> {
   const [beneficiario] = await db
     .insert(beneficiariTable)
@@ -84,6 +90,11 @@ async function createBeneficiario(opts: {
       numMinori: opts.numMinori ?? 0,
       numAnziani: opts.numAnziani ?? 0,
       numDisabili: opts.numDisabili ?? 0,
+      creditoSolidaleAbilitato: opts.creditoSolidaleAbilitato ?? false,
+      creditoSolidaleStato: opts.creditoSolidaleStato ?? "non_abilitato",
+      creditoSolidaleMensileAssegnato: opts.creditoSolidaleMensileAssegnato == null ? null : opts.creditoSolidaleMensileAssegnato.toFixed(2),
+      ...(opts.creditoSolidaleSaldo == null ? {} : { creditoSolidaleSaldo: opts.creditoSolidaleSaldo.toFixed(2) }),
+      attivo: opts.attivo ?? true,
     })
     .returning({ id: beneficiariTable.id });
   beneficiarioIds.push(beneficiario.id);
@@ -136,6 +147,7 @@ afterEach(async () => {
     await db.delete(politicheCreditoSolidaleTable).where(inArray(politicheCreditoSolidaleTable.id, politicaIds.splice(0)));
   }
   if (beneficiarioIds.length > 0) {
+    await db.delete(creditoSolidaleMovimentiTable).where(inArray(creditoSolidaleMovimentiTable.beneficiarioId, beneficiarioIds));
     await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiarioIds.splice(0)));
   }
   if (centroIds.length > 0) {
@@ -233,5 +245,175 @@ describe("Politiche Credito Solidale", () => {
     expect(res.body.politicaId).toBeNull();
     expect(res.body.politicaOrigine).toBe("default");
     expect(res.body.totaleSuggerito).toBe(60);
+  });
+});
+
+describe("Movimenti Credito Solidale", () => {
+  it("crea una ricarica manuale e aggiorna il saldo solo tramite movimento", async () => {
+    const beneficiarioId = await createBeneficiario({
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+    });
+
+    const res = await request(makeApp({ centroAscoltoId: null, cittaId: null }))
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
+      .send({ variazioneCredito: 25, motivo: "Avvio saldo" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.tipoMovimento).toBe("ricarica_manuale");
+    expect(res.body.saldoPrima).toBe(0);
+    expect(res.body.variazioneCredito).toBe(25);
+    expect(res.body.saldoDopo).toBe(25);
+
+    const saldo = await request(makeApp({ centroAscoltoId: null, cittaId: null }))
+      .get(`/credito-solidale/beneficiari/${beneficiarioId}/saldo`);
+    expect(saldo.status).toBe(200);
+    expect(saldo.body.saldoAttuale).toBe(25);
+  });
+
+  it("blocca una rettifica negativa che renderebbe il saldo sotto zero", async () => {
+    const beneficiarioId = await createBeneficiario({
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+    });
+    await request(makeApp({ centroAscoltoId: null, cittaId: null }))
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
+      .send({ variazioneCredito: 10 });
+
+    const res = await request(makeApp({ centroAscoltoId: null, cittaId: null }))
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
+      .send({ variazioneCredito: -15, motivo: "Controllo saldo" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Il saldo Credito Solidale non può diventare negativo.");
+    const saldo = await request(makeApp({ centroAscoltoId: null, cittaId: null }))
+      .get(`/credito-solidale/beneficiari/${beneficiarioId}/saldo`);
+    expect(saldo.body.saldoAttuale).toBe(10);
+  });
+
+  it("usa la quota mensile assegnata per la ricarica mensile ed evita duplicazioni per periodo", async () => {
+    const cittaId = await createCitta();
+    const centroId = await createCentro(cittaId);
+    const ricaricabileId = await createBeneficiario({
+      cittaId,
+      centroAscoltoId: centroId,
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+      creditoSolidaleMensileAssegnato: 15,
+    });
+    await createBeneficiario({
+      cittaId,
+      centroAscoltoId: centroId,
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+      creditoSolidaleMensileAssegnato: null,
+    });
+    const app = makeApp({ centroAscoltoId: null, cittaId: null });
+
+    const preview = await request(app)
+      .post("/credito-solidale/ricariche-mensili/preview")
+      .send({ periodoRiferimento: "2026-07", centroAscoltoId: centroId });
+
+    expect(preview.status).toBe(200);
+    expect(preview.body.totaleRicaricabili).toBe(1);
+    expect(preview.body.totaleCreditoDaRicaricare).toBe(15);
+    expect(preview.body.righe.find((r: { beneficiarioId: number }) => r.beneficiarioId === ricaricabileId).saldoPrevistoDopoRicarica).toBe(15);
+
+    const first = await request(app)
+      .post("/credito-solidale/ricariche-mensili/esegui")
+      .send({ periodoRiferimento: "2026-07", centroAscoltoId: centroId });
+    expect(first.status).toBe(200);
+    expect(first.body.creati).toBe(1);
+    expect(first.body.totaleCreditoRicaricato).toBe(15);
+
+    const second = await request(app)
+      .post("/credito-solidale/ricariche-mensili/esegui")
+      .send({ periodoRiferimento: "2026-07", centroAscoltoId: centroId });
+    expect(second.status).toBe(200);
+    expect(second.body.creati).toBe(0);
+    expect(second.body.saltatiGiaRicaricati).toBe(1);
+
+    const saldo = await request(app).get(`/credito-solidale/beneficiari/${ricaricabileId}/saldo`);
+    expect(saldo.body.saldoAttuale).toBe(15);
+  });
+
+  it("con modulo Emporio disabilitato consente lettura e blocca nuovi movimenti", async () => {
+    const beneficiarioId = await createBeneficiario({
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+    });
+    await setEmporioEnabled(false);
+
+    const saldo = await request(makeApp({ centroAscoltoId: null, cittaId: null }))
+      .get(`/credito-solidale/beneficiari/${beneficiarioId}/saldo`);
+    expect(saldo.status).toBe(200);
+
+    const write = await request(makeApp({ centroAscoltoId: null, cittaId: null }))
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
+      .send({ variazioneCredito: 5 });
+    expect(write.status).toBe(403);
+    expect(write.body.error).toBe("Il modulo Emporio Solidale è disabilitato.");
+  });
+
+  it("storna un movimento creando il movimento contrario e impedisce il doppio storno", async () => {
+    const beneficiarioId = await createBeneficiario({
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+    });
+    const app = makeApp({ centroAscoltoId: null, cittaId: null });
+    const movimento = await request(app)
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
+      .send({ variazioneCredito: 20 });
+
+    const storno = await request(app)
+      .post(`/credito-solidale/movimenti/${movimento.body.id}/storno`)
+      .send({ motivo: "Errore operativo" });
+
+    expect(storno.status).toBe(201);
+    expect(storno.body.tipoMovimento).toBe("storno");
+    expect(storno.body.variazioneCredito).toBe(-20);
+    expect(storno.body.saldoDopo).toBe(0);
+
+    const lista = await request(app).get(`/credito-solidale/beneficiari/${beneficiarioId}/movimenti`);
+    const originale = lista.body.find((m: { id: number }) => m.id === movimento.body.id);
+    expect(originale.annullato).toBe(true);
+    expect(originale.annullatoDaMovimentoId).toBe(storno.body.id);
+
+    const second = await request(app)
+      .post(`/credito-solidale/movimenti/${movimento.body.id}/storno`)
+      .send({ motivo: "Secondo tentativo" });
+    expect(second.status).toBe(400);
+    expect(second.body.error).toBe("Il movimento è già stato stornato.");
+  });
+
+  it("rispetta lo scoping centro nella lista movimenti", async () => {
+    const cittaId = await createCitta();
+    const centroA = await createCentro(cittaId);
+    const centroB = await createCentro(cittaId);
+    const beneficiarioA = await createBeneficiario({
+      cittaId,
+      centroAscoltoId: centroA,
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+    });
+    const beneficiarioB = await createBeneficiario({
+      cittaId,
+      centroAscoltoId: centroB,
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+    });
+    const forbidden = await request(makeApp({ centroAscoltoId: centroA, cittaId: null }))
+      .post(`/credito-solidale/beneficiari/${beneficiarioB}/ricarica-manuale`)
+      .send({ variazioneCredito: 9 });
+    expect(forbidden.status).toBe(403);
+    const globalApp = makeApp({ centroAscoltoId: null, cittaId: null });
+    await request(globalApp).post(`/credito-solidale/beneficiari/${beneficiarioA}/ricarica-manuale`).send({ variazioneCredito: 7 });
+    await request(globalApp).post(`/credito-solidale/beneficiari/${beneficiarioB}/ricarica-manuale`).send({ variazioneCredito: 9 });
+
+    const scoped = await request(makeApp({ centroAscoltoId: centroA, cittaId: null }))
+      .get("/credito-solidale/movimenti");
+
+    expect(scoped.status).toBe(200);
+    expect(scoped.body.map((m: { beneficiarioId: number }) => m.beneficiarioId)).toEqual([beneficiarioA]);
   });
 });

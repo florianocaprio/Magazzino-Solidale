@@ -977,6 +977,9 @@ export interface Beneficiario {
   magazzinoEmporioPreferitoNome?: string | null;
   /** @nullable */
   creditoSolidaleMensileAssegnato: number | null;
+  creditoSolidaleSaldo: number;
+  /** @nullable */
+  creditoSolidaleDataUltimoMovimento: string | null;
   creditoSolidaleMensileManuale: boolean;
   /** @nullable */
   creditoSolidaleMotivoModifica: string | null;
@@ -1173,6 +1176,9 @@ export interface BeneficiarioDettaglio {
   magazzinoEmporioPreferitoNome?: string | null;
   /** @nullable */
   creditoSolidaleMensileAssegnato: number | null;
+  creditoSolidaleSaldo: number;
+  /** @nullable */
+  creditoSolidaleDataUltimoMovimento: string | null;
   creditoSolidaleMensileManuale: boolean;
   /** @nullable */
   creditoSolidaleMotivoModifica: string | null;
@@ -1465,6 +1471,161 @@ export interface CreditoSolidaleCalcolo {
   ricaricaAutomaticaAbilitata: boolean;
   totaleSuggerito: number;
   dettaglio: CreditoSolidaleCalcoloDettaglio;
+}
+
+export type CreditoSolidaleMovimentoTipoMovimento = typeof CreditoSolidaleMovimentoTipoMovimento[keyof typeof CreditoSolidaleMovimentoTipoMovimento];
+
+
+export const CreditoSolidaleMovimentoTipoMovimento = {
+  ricarica_mensile: 'ricarica_mensile',
+  ricarica_manuale: 'ricarica_manuale',
+  rettifica_positiva: 'rettifica_positiva',
+  rettifica_negativa: 'rettifica_negativa',
+  storno: 'storno',
+} as const;
+
+export interface CreditoSolidaleMovimento {
+  id: number;
+  beneficiarioId: number;
+  beneficiarioNome: string;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  centroAscoltoNome: string | null;
+  /** @nullable */
+  cittaId: number | null;
+  /** @nullable */
+  cittaNome: string | null;
+  tipoMovimento: CreditoSolidaleMovimentoTipoMovimento;
+  variazioneCredito: number;
+  saldoPrima: number;
+  saldoDopo: number;
+  /** @nullable */
+  periodoRiferimento: string | null;
+  /** @nullable */
+  politicaCreditoSolidaleId: number | null;
+  /** @nullable */
+  quotaMensileAssegnata: number | null;
+  /** @nullable */
+  origine: string | null;
+  /** @nullable */
+  riferimentoId: number | null;
+  /** @nullable */
+  riferimentoTipo: string | null;
+  /** @nullable */
+  note: string | null;
+  /** @nullable */
+  motivo: string | null;
+  dataMovimento: string;
+  dataCreazione: string;
+  annullato: boolean;
+  /** @nullable */
+  annullatoDaMovimentoId: number | null;
+}
+
+export type CreditoSolidaleSaldoCreditoSolidaleStato = typeof CreditoSolidaleSaldoCreditoSolidaleStato[keyof typeof CreditoSolidaleSaldoCreditoSolidaleStato];
+
+
+export const CreditoSolidaleSaldoCreditoSolidaleStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
+
+export interface CreditoSolidaleSaldo {
+  beneficiarioId: number;
+  beneficiarioNome: string;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: CreditoSolidaleSaldoCreditoSolidaleStato;
+  saldoAttuale: number;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato: number | null;
+  /** @nullable */
+  dataUltimoMovimento: string | null;
+}
+
+export interface CreditoSolidaleRicaricaManualeInput {
+  /** @minimum 0.01 */
+  variazioneCredito: number;
+  /** @nullable */
+  motivo?: string | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CreditoSolidaleRettificaInput {
+  variazioneCredito: number;
+  motivo: string;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CreditoSolidaleStornoInput {
+  motivo: string;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CreditoSolidaleRicaricaMensilePreviewInput {
+  /** @pattern ^\d{4}-(0[1-9]|1[0-2])$ */
+  periodoRiferimento: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+}
+
+export interface CreditoSolidaleRicaricaMensilePreviewRiga {
+  beneficiarioId: number;
+  beneficiarioNome: string;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  centroAscoltoNome: string | null;
+  /** @nullable */
+  cittaId: number | null;
+  /** @nullable */
+  cittaNome: string | null;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato: number | null;
+  saldoAttuale: number;
+  ricaricabile: boolean;
+  giaRicaricato: boolean;
+  /** @nullable */
+  motivoEsclusione: string | null;
+  /** @nullable */
+  saldoPrevistoDopoRicarica: number | null;
+}
+
+export interface CreditoSolidaleRicaricaMensilePreview {
+  periodoRiferimento: string;
+  totaleBeneficiari: number;
+  totaleRicaricabili: number;
+  totaleGiaRicaricati: number;
+  totaleEsclusi: number;
+  totaleCreditoDaRicaricare: number;
+  righe: CreditoSolidaleRicaricaMensilePreviewRiga[];
+}
+
+export interface CreditoSolidaleRicaricaMensileEsecuzioneInput {
+  /** @pattern ^\d{4}-(0[1-9]|1[0-2])$ */
+  periodoRiferimento: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CreditoSolidaleRicaricaMensileEsecuzione {
+  periodoRiferimento: string;
+  creati: number;
+  saltatiGiaRicaricati: number;
+  saltatiNonRicaricabili: number;
+  totaleCreditoRicaricato: number;
+  movimentiCreati: CreditoSolidaleMovimento[];
 }
 
 export interface RuoloVolontario {
@@ -2463,6 +2624,29 @@ centroAscoltoId?: number;
 export type ListZoneUdsParams = {
 cittaId?: number;
 };
+
+export type ListCreditoSolidaleMovimentiParams = {
+beneficiarioId?: number;
+centroAscoltoId?: number;
+cittaId?: number;
+tipoMovimento?: ListCreditoSolidaleMovimentiTipoMovimento;
+/**
+ * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+ */
+periodoRiferimento?: string;
+annullato?: boolean;
+};
+
+export type ListCreditoSolidaleMovimentiTipoMovimento = typeof ListCreditoSolidaleMovimentiTipoMovimento[keyof typeof ListCreditoSolidaleMovimentiTipoMovimento];
+
+
+export const ListCreditoSolidaleMovimentiTipoMovimento = {
+  ricarica_mensile: 'ricarica_mensile',
+  ricarica_manuale: 'ricarica_manuale',
+  rettifica_positiva: 'rettifica_positiva',
+  rettifica_negativa: 'rettifica_negativa',
+  storno: 'storno',
+} as const;
 
 export type ListVolontariParams = {
 centroAscoltoId?: number;

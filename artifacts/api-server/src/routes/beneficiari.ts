@@ -29,6 +29,8 @@ const router: IRouter = Router();
 
 const CODICE_BENEFICIARIO_DUPLICATO_MSG = "Il codice beneficiario indicato è già associato a un altro beneficiario.";
 const SESSO_OBBLIGATORIO_MSG = "Il campo Sesso è obbligatorio.";
+const CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG =
+  "ATTENZIONE: il beneficiario non ha un Centro di Ascolto assegnato. Non è possibile assegnare Credito Solidale.";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
 type CreditoSolidaleStato = (typeof STATI_CREDITO_SOLIDALE)[number];
 
@@ -317,6 +319,8 @@ function fmtBenef(
     creditoSolidaleMensileManuale: r.creditoSolidaleMensileManuale ?? false,
     creditoSolidaleMotivoModifica: r.creditoSolidaleMotivoModifica ?? null,
     creditoSolidaleDataUltimaModificaQuota: r.creditoSolidaleDataUltimaModificaQuota?.toISOString() ?? null,
+    creditoSolidaleSaldo: Number(r.creditoSolidaleSaldo ?? "0"),
+    creditoSolidaleDataUltimoMovimento: r.creditoSolidaleDataUltimoMovimento?.toISOString() ?? null,
     uds: r.uds,
     cittaId: r.cittaId ?? null,
     cittaNome: cittaNome ?? null,
@@ -337,6 +341,7 @@ router.get("/beneficiari", async (req, res) => {
       ilike(beneficiariTable.cognome, q),
       ilike(beneficiariTable.nome, q),
       ilike(beneficiariTable.codice, q),
+      ilike(beneficiariTable.codiceFiscale, q),
     );
     if (searchFilter) conditions.push(searchFilter);
   }
@@ -390,6 +395,8 @@ async function createBeneficiarioOne(
   const sesso = normalizzaSesso(b.sesso);
   if (!sesso) return { error: SESSO_OBBLIGATORIO_MSG, status: 400 };
   const values: Record<string, any> = { ...b, codice, sesso };
+  delete values.creditoSolidaleSaldo;
+  delete values.creditoSolidaleDataUltimoMovimento;
   if ("uds" in values) values.uds = toBool(values.uds);
   if (caller != null) values.centroAscoltoId = caller;
   if (cid != null) values.cittaId = cid;
@@ -401,6 +408,9 @@ async function createBeneficiarioOne(
   }
   const credito = normalizeCreditoSolidaleFields(values, b);
   if (credito.error) return { error: credito.error, status: 400 };
+  if (values.creditoSolidaleAbilitato === true && values.centroAscoltoId == null) {
+    return { error: CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG, status: 400 };
+  }
   const quota = normalizeCreditoSolidaleQuotaFields(values, b);
   if (quota.error) return { error: quota.error, status: 400 };
   if ("magazzinoEmporioPreferitoId" in b) {
@@ -614,6 +624,8 @@ router.patch("/beneficiari/:id", async (req, res) => {
     return;
   }
   const updates = { ...req.body, dataAggiornamento: new Date() };
+  delete updates.creditoSolidaleSaldo;
+  delete updates.creditoSolidaleDataUltimoMovimento;
   if ("uds" in updates) updates.uds = toBool(updates.uds);
   const credito = normalizeCreditoSolidaleFields(updates, req.body as Record<string, unknown>, existing);
   if (credito.error) {
@@ -632,6 +644,24 @@ router.patch("/beneficiari/:id", async (req, res) => {
       return;
     }
     updates.magazzinoEmporioPreferitoId = emporio.value;
+  }
+  const creditoSolidaleAbilitatoFinale = "creditoSolidaleAbilitato" in updates
+    ? updates.creditoSolidaleAbilitato === true
+    : existing.creditoSolidaleAbilitato === true;
+  if (caller != null) {
+    if (creditoSolidaleAbilitatoFinale && existing.centroAscoltoId == null) {
+      updates.centroAscoltoId = caller;
+    } else {
+      delete updates.centroAscoltoId;
+    }
+  }
+  if (cid != null) delete updates.cittaId;
+  if (zid != null) updates.zonaUdsId = zid;
+
+  const centroAscoltoIdFinale = "centroAscoltoId" in updates ? updates.centroAscoltoId : existing.centroAscoltoId;
+  if (creditoSolidaleAbilitatoFinale && (centroAscoltoIdFinale == null || centroAscoltoIdFinale === "")) {
+    res.status(400).json({ error: CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG });
+    return;
   }
   const enablesCreditoSolidale = updates.creditoSolidaleAbilitato === true && !existing.creditoSolidaleAbilitato;
   const assignsEmporio =
@@ -659,9 +689,6 @@ router.patch("/beneficiari/:id", async (req, res) => {
     res.status(400).json({ error: SESSO_OBBLIGATORIO_MSG });
     return;
   }
-  if (caller != null) delete updates.centroAscoltoId;
-  if (cid != null) delete updates.cittaId;
-  if (zid != null) updates.zonaUdsId = zid;
   const enablesUds = updates.uds === true && !existing.uds;
   const assignsZonaUds =
     "zonaUdsId" in updates &&

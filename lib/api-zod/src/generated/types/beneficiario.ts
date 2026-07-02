@@ -53,6 +53,9 @@ export interface Beneficiario {
   magazzinoEmporioPreferitoNome?: string | null;
   /** @nullable */
   creditoSolidaleMensileAssegnato: number | null;
+  creditoSolidaleSaldo: number;
+  /** @nullable */
+  creditoSolidaleDataUltimoMovimento: Date | null;
   creditoSolidaleMensileManuale: boolean;
   /** @nullable */
   creditoSolidaleMotivoModifica: string | null;

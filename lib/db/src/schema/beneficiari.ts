@@ -45,6 +45,8 @@ export const beneficiariTable = pgTable("beneficiari", {
   creditoSolidaleMensileManuale: boolean("credito_solidale_mensile_manuale").notNull().default(false),
   creditoSolidaleMotivoModifica: text("credito_solidale_motivo_modifica"),
   creditoSolidaleDataUltimaModificaQuota: timestamp("credito_solidale_data_ultima_modifica_quota"),
+  creditoSolidaleSaldo: decimal("credito_solidale_saldo", { precision: 10, scale: 2 }).notNull().default("0"),
+  creditoSolidaleDataUltimoMovimento: timestamp("credito_solidale_data_ultimo_movimento"),
   uds: boolean("uds").notNull().default(false),
   cittaId: integer("citta_id").references(() => cittaTable.id),
   zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),

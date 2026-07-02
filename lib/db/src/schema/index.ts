@@ -13,6 +13,7 @@ export * from "./zoneUds";
 export * from "./centri";
 export * from "./beneficiari";
 export * from "./politicheCreditoSolidale";
+export * from "./creditoSolidaleMovimenti";
 export * from "./interventi";
 export * from "./consegne";
 export * from "./bolle";

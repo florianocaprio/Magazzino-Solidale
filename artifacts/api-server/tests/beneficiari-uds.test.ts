@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable, magazziniTable, impostazioniModuliTable } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable, magazziniTable, impostazioniModuliTable, creditoSolidaleMovimentiTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
 
 /**
@@ -61,8 +61,12 @@ let cittaA: number;
 
 const appAs = (cittaId: number | null, zonaUdsId: number | null = null) =>
   makeApp({ id: 1, centroAscoltoId: null, cittaId, zonaUdsId });
+const appAsCentro = (centroAscoltoId: number, cittaId: number | null, zonaUdsId: number | null = null) =>
+  makeApp({ id: 1, centroAscoltoId, cittaId, zonaUdsId });
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 const sessoObbligatorioMsg = "Il campo Sesso è obbligatorio.";
+const creditoSolidaleCentroAscoltoRichiestoMsg =
+  "ATTENZIONE: il beneficiario non ha un Centro di Ascolto assegnato. Non è possibile assegnare Credito Solidale.";
 
 async function setEmporioEnabled(enabled: boolean): Promise<void> {
   await db
@@ -86,6 +90,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   if (beneficiarioIds.length > 0) {
+    await db.delete(creditoSolidaleMovimentiTable).where(inArray(creditoSolidaleMovimentiTable.beneficiarioId, beneficiarioIds));
     await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiarioIds));
   }
   if (magazzinoIds.length > 0) {
@@ -176,6 +181,7 @@ describe("POST /beneficiari (uds)", () => {
 
 describe("Credito Solidale beneficiari", () => {
   it.each(["emporio", "misto"] as const)("accetta un magazzino %s come emporio preferito e abilita con stato attivo", async (tipoMagazzino) => {
+    const centro = await createCentro(cittaA);
     const emporio = await createMagazzino(tipoMagazzino, cittaA, `Emporio ${tipoMagazzino} ${rnd()}`);
 
     const res = await request(appAs(cittaA))
@@ -184,6 +190,7 @@ describe("Credito Solidale beneficiari", () => {
         nome: "Credito",
         cognome: rnd(),
         sesso: "M",
+        centroAscoltoId: centro,
         creditoSolidaleAbilitato: true,
         magazzinoEmporioPreferitoId: emporio.id,
       });
@@ -198,7 +205,22 @@ describe("Credito Solidale beneficiari", () => {
     beneficiarioIds.push(res.body.id);
   });
 
+  it("rifiuta l'abilitazione Credito Solidale senza Centro di Ascolto", async () => {
+    const res = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({
+        nome: "Senza",
+        cognome: "CentroCredito",
+        sesso: "M",
+        creditoSolidaleAbilitato: true,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(creditoSolidaleCentroAscoltoRichiestoMsg);
+  });
+
   it("rifiuta un magazzino logistico come emporio preferito", async () => {
+    const centro = await createCentro(cittaA);
     const logistico = await createMagazzino("logistico", cittaA);
 
     const res = await request(appAs(cittaA))
@@ -207,6 +229,7 @@ describe("Credito Solidale beneficiari", () => {
         nome: "No",
         cognome: "Logistico",
         sesso: "F",
+        centroAscoltoId: centro,
         creditoSolidaleAbilitato: true,
         magazzinoEmporioPreferitoId: logistico.id,
       });
@@ -216,9 +239,10 @@ describe("Credito Solidale beneficiari", () => {
   });
 
   it("alla prima abilitazione via PATCH valorizza la data e la conserva in disabilitazione", async () => {
+    const centro = await createCentro(cittaA);
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "PatchCredito", cognome: rnd(), sesso: "M", cittaId: cittaA })
+      .values({ codice: `BEN-${rnd()}`, nome: "PatchCredito", cognome: rnd(), sesso: "M", cittaId: cittaA, centroAscoltoId: centro })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
 
@@ -240,6 +264,72 @@ describe("Credito Solidale beneficiari", () => {
     expect(disabled.body.creditoSolidaleAbilitato).toBe(false);
     expect(disabled.body.creditoSolidaleStato).toBe("non_abilitato");
     expect(disabled.body.creditoSolidaleDataAbilitazione).toBe(enabled.body.creditoSolidaleDataAbilitazione);
+  });
+
+  it("rifiuta l'abilitazione via PATCH se il beneficiario non ha Centro di Ascolto", async () => {
+    const [b] = await db
+      .insert(beneficiariTable)
+      .values({ codice: `BEN-${rnd()}`, nome: "PatchNoCentro", cognome: rnd(), sesso: "M", cittaId: cittaA })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(b.id);
+
+    const res = await request(appAs(cittaA))
+      .patch(`/beneficiari/${b.id}`)
+      .send({ creditoSolidaleAbilitato: true });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(creditoSolidaleCentroAscoltoRichiestoMsg);
+  });
+
+  it("abilita via PATCH quando assegna il Centro nello stesso payload senza creare movimenti o cambiare saldo", async () => {
+    const centro = await createCentro(cittaA);
+    const [b] = await db
+      .insert(beneficiariTable)
+      .values({ codice: `BEN-${rnd()}`, nome: "PatchCentroCredito", cognome: rnd(), sesso: "M", cittaId: cittaA })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(b.id);
+
+    const res = await request(appAs(cittaA))
+      .patch(`/beneficiari/${b.id}`)
+      .send({ centroAscoltoId: centro, creditoSolidaleAbilitato: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.centroAscoltoId).toBe(centro);
+    expect(res.body.creditoSolidaleAbilitato).toBe(true);
+    expect(res.body.creditoSolidaleStato).toBe("attivo");
+    expect(res.body.creditoSolidaleSaldo).toBe(0);
+
+    const [after] = await db
+      .select({ saldo: beneficiariTable.creditoSolidaleSaldo })
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, b.id));
+    expect(Number(after.saldo)).toBe(0);
+
+    const movimenti = await db
+      .select({ id: creditoSolidaleMovimentiTable.id })
+      .from(creditoSolidaleMovimentiTable)
+      .where(eq(creditoSolidaleMovimentiTable.beneficiarioId, b.id));
+    expect(movimenti).toHaveLength(0);
+  });
+
+  it("un utente UDS con Centro assegnato abilita Credito Solidale su beneficiario UDS condiviso", async () => {
+    const centro = await createCentro(cittaA);
+    const zona = await createZona(cittaA);
+    const [b] = await db
+      .insert(beneficiariTable)
+      .values({ codice: `BEN-${rnd()}`, nome: "UdsCentroCredito", cognome: rnd(), sesso: "M", cittaId: cittaA, uds: true, zonaUdsId: zona })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(b.id);
+
+    const res = await request(appAsCentro(centro, cittaA, zona))
+      .patch(`/beneficiari/${b.id}`)
+      .send({ creditoSolidaleAbilitato: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.centroAscoltoId).toBe(centro);
+    expect(res.body.creditoSolidaleAbilitato).toBe(true);
+    expect(res.body.creditoSolidaleStato).toBe("attivo");
+    expect(res.body.creditoSolidaleSaldo).toBe(0);
   });
 });
 
@@ -360,6 +450,28 @@ describe("GET /beneficiari?uds", () => {
     expect(ids).toContain(marioA.body.id);
     expect(ids).not.toContain(luigiA.body.id);
     expect(ids).not.toContain(mariaB.body.id);
+  });
+
+  it("filtra anche per codice tessera e codice fiscale", async () => {
+    const codice = `BEN-${rnd().toUpperCase()}`;
+    const cf = `RSSMRA80A01H501${rnd().slice(0, 1).toUpperCase()}`;
+    const target = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ codice, codiceFiscale: cf, nome: "Codice", cognome: rnd(), sesso: "M", uds: true });
+    const other = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "Altro", cognome: rnd(), sesso: "F", uds: true });
+    beneficiarioIds.push(target.body.id, other.body.id);
+
+    const byCodice = await request(appAs(cittaA)).get("/beneficiari").query({ search: codice.toLowerCase() });
+    expect(byCodice.status).toBe(200);
+    expect(idsOf(byCodice.body)).toContain(target.body.id);
+    expect(idsOf(byCodice.body)).not.toContain(other.body.id);
+
+    const byCf = await request(appAs(cittaA)).get("/beneficiari").query({ search: cf.toLowerCase() });
+    expect(byCf.status).toBe(200);
+    expect(idsOf(byCf.body)).toContain(target.body.id);
+    expect(idsOf(byCf.body)).not.toContain(other.body.id);
   });
 
   it("un caller con zona vede solo beneficiari della propria zona", async () => {

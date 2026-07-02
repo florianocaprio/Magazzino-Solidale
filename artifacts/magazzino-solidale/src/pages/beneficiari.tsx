@@ -87,6 +87,15 @@ function creditoSolidaleLabelKey(stato?: string | null): string {
   }
 }
 
+const apiErrorMessage = (err: unknown, fallback: string): string => {
+  const data = (err as { data?: unknown })?.data ?? (err as { response?: { data?: unknown } })?.response?.data;
+  if (data && typeof data === "object" && "error" in data) {
+    const msg = (data as { error?: unknown }).error;
+    if (typeof msg === "string") return msg;
+  }
+  return fallback;
+};
+
 export default function Beneficiari() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -205,12 +214,22 @@ export default function Beneficiari() {
       form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
       return;
     }
+    const centroId = centroAscoltoId ? parseInt(centroAscoltoId) : (isCentroLocked && lockedCentroId != null ? lockedCentroId : null);
+    if (rest.creditoSolidaleAbilitato && centroId == null) {
+      form.setError("centroAscoltoId", { type: "manual", message: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto") });
+      toast({
+        title: t("beneficiari.creditoSolidaleSection"),
+        description: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto"),
+        variant: "destructive",
+      });
+      return;
+    }
     const payload: Record<string, unknown> = {
       ...rest,
       uds,
       dataNascita: rest.dataNascita || undefined,
       sesso: rest.sesso,
-      centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
+      centroAscoltoId: centroId,
       codiceFiscale: codiceFiscale?.trim() ? codiceFiscale.trim().toUpperCase() : null,
       creditoSolidaleAbilitato: rest.creditoSolidaleAbilitato,
       creditoSolidaleStato: rest.creditoSolidaleAbilitato ? rest.creditoSolidaleStato : "non_abilitato",
@@ -231,7 +250,12 @@ export default function Beneficiari() {
         setIsFormOpen(false);
         resetDup();
         form.reset();
-      }
+      },
+      onError: (err) => toast({
+        title: t("beneficiari.creditoSolidaleSection"),
+        description: apiErrorMessage(err, t("beneficiari.creditoSolidaleCentroAscoltoRichiesto")),
+        variant: "destructive",
+      }),
     });
   };
 
@@ -685,6 +709,7 @@ export default function Beneficiari() {
                         {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )} />
 

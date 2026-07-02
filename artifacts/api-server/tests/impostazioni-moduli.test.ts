@@ -4,6 +4,7 @@ import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
 import {
   beneficiariTable,
+  centriAscoltoTable,
   cittaTable,
   db,
   impostazioniModuliTable,
@@ -26,6 +27,7 @@ const UDS_DISABLED_MSG = "La gestione Unità di Strada è disabilitata.";
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
 const beneficiarioIds: number[] = [];
+const centroIds: number[] = [];
 const cittaIds: number[] = [];
 const magazzinoIds: number[] = [];
 const politicaIds: number[] = [];
@@ -81,6 +83,15 @@ async function createCitta(): Promise<number> {
   return citta.id;
 }
 
+async function createCentro(cittaId: number): Promise<number> {
+  const [centro] = await db
+    .insert(centriAscoltoTable)
+    .values({ nome: `Centro ${rnd()}`, cittaId })
+    .returning({ id: centriAscoltoTable.id });
+  centroIds.push(centro.id);
+  return centro.id;
+}
+
 beforeEach(async () => {
   await setModuli(false, true);
 });
@@ -91,6 +102,7 @@ afterEach(async () => {
   if (politicaIds.length > 0) await db.delete(politicheCreditoSolidaleTable).where(inArray(politicheCreditoSolidaleTable.id, politicaIds.splice(0)));
   if (prodottoIds.length > 0) await db.delete(prodottiTable).where(inArray(prodottiTable.id, prodottoIds.splice(0)));
   if (magazzinoIds.length > 0) await db.delete(magazziniTable).where(inArray(magazziniTable.id, magazzinoIds.splice(0)));
+  if (centroIds.length > 0) await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds.splice(0)));
   if (cittaIds.length > 0) await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds.splice(0)));
   await setModuli(false, true);
 });
@@ -122,6 +134,8 @@ describe("Impostazioni moduli", () => {
 
   it("blocca nuove configurazioni Emporio quando il modulo è disabilitato", async () => {
     const app = makeApp();
+    const cittaId = await createCitta();
+    const centroId = await createCentro(cittaId);
 
     const magazzino = await request(app)
       .post("/magazzini")
@@ -137,7 +151,7 @@ describe("Impostazioni moduli", () => {
 
     const beneficiarioCredito = await request(app)
       .post("/beneficiari")
-      .send({ nome: "Credito", cognome: rnd(), sesso: "M", creditoSolidaleAbilitato: true });
+      .send({ nome: "Credito", cognome: rnd(), sesso: "M", centroAscoltoId: centroId, creditoSolidaleAbilitato: true });
     expect(beneficiarioCredito.status).toBe(403);
     expect(beneficiarioCredito.body.error).toBe(EMPORIO_DISABLED_MSG);
 
@@ -156,6 +170,8 @@ describe("Impostazioni moduli", () => {
 
   it("salva la quota mensile assegnata e marca la modifica manuale quando Emporio è abilitato", async () => {
     await setModuli(true, true);
+    const cittaId = await createCitta();
+    const centroId = await createCentro(cittaId);
 
     const res = await request(makeApp())
       .post("/beneficiari")
@@ -163,6 +179,7 @@ describe("Impostazioni moduli", () => {
         nome: "Quota",
         cognome: rnd(),
         sesso: "M",
+        centroAscoltoId: centroId,
         creditoSolidaleAbilitato: true,
         creditoSolidaleMensileAssegnato: 70,
         creditoSolidaleMensileSuggerito: 60,

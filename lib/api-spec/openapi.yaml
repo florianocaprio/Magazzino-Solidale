@@ -2340,6 +2340,199 @@ paths:
               schema:
                 $ref: "#/components/schemas/CreditoSolidaleCalcolo"
 
+  /credito-solidale/movimenti:
+    get:
+      operationId: listCreditoSolidaleMovimenti
+      tags: [credito-solidale]
+      parameters:
+        - name: beneficiarioId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: centroAscoltoId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: cittaId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: tipoMovimento
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ricarica_mensile, ricarica_manuale, rettifica_positiva, rettifica_negativa, storno]
+        - name: periodoRiferimento
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+        - name: annullato
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Movimenti Credito Solidale
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CreditoSolidaleMovimento"
+
+  /credito-solidale/beneficiari/{beneficiarioId}/saldo:
+    get:
+      operationId: getCreditoSolidaleBeneficiarioSaldo
+      tags: [credito-solidale]
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Saldo Credito Solidale del beneficiario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleSaldo"
+
+  /credito-solidale/beneficiari/{beneficiarioId}/movimenti:
+    get:
+      operationId: listCreditoSolidaleBeneficiarioMovimenti
+      tags: [credito-solidale]
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Movimenti Credito Solidale del beneficiario
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CreditoSolidaleMovimento"
+
+  /credito-solidale/beneficiari/{beneficiarioId}/ricarica-manuale:
+    post:
+      operationId: createCreditoSolidaleRicaricaManuale
+      tags: [credito-solidale]
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditoSolidaleRicaricaManualeInput"
+      responses:
+        "201":
+          description: Movimento Credito Solidale creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleMovimento"
+
+  /credito-solidale/beneficiari/{beneficiarioId}/rettifica:
+    post:
+      operationId: createCreditoSolidaleRettifica
+      tags: [credito-solidale]
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditoSolidaleRettificaInput"
+      responses:
+        "201":
+          description: Movimento Credito Solidale creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleMovimento"
+
+  /credito-solidale/movimenti/{id}/storno:
+    post:
+      operationId: stornaCreditoSolidaleMovimento
+      tags: [credito-solidale]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditoSolidaleStornoInput"
+      responses:
+        "201":
+          description: Movimento Credito Solidale di storno creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleMovimento"
+
+  /credito-solidale/ricariche-mensili/preview:
+    post:
+      operationId: previewCreditoSolidaleRicaricaMensile
+      tags: [credito-solidale]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditoSolidaleRicaricaMensilePreviewInput"
+      responses:
+        "200":
+          description: Anteprima ricarica mensile Credito Solidale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleRicaricaMensilePreview"
+
+  /credito-solidale/ricariche-mensili/esegui:
+    post:
+      operationId: executeCreditoSolidaleRicaricaMensile
+      tags: [credito-solidale]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditoSolidaleRicaricaMensileEsecuzioneInput"
+      responses:
+        "200":
+          description: Esecuzione ricarica mensile Credito Solidale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleRicaricaMensileEsecuzione"
+
   /volontari:
     get:
       operationId: listVolontari
@@ -4594,6 +4787,11 @@ components:
           type: ["string", "null"]
         creditoSolidaleMensileAssegnato:
           type: ["number", "null"]
+        creditoSolidaleSaldo:
+          type: number
+        creditoSolidaleDataUltimoMovimento:
+          type: ["string", "null"]
+          format: date-time
         creditoSolidaleMensileManuale:
           type: boolean
         creditoSolidaleMotivoModifica:
@@ -4619,7 +4817,7 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, uds, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleSaldo, creditoSolidaleDataUltimoMovimento, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, uds, attivo, dataCreazione]
 
     BeneficiarioDettaglio:
       type: object
@@ -4700,6 +4898,11 @@ components:
           type: ["string", "null"]
         creditoSolidaleMensileAssegnato:
           type: ["number", "null"]
+        creditoSolidaleSaldo:
+          type: number
+        creditoSolidaleDataUltimoMovimento:
+          type: ["string", "null"]
+          format: date-time
         creditoSolidaleMensileManuale:
           type: boolean
         creditoSolidaleMotivoModifica:
@@ -4739,7 +4942,7 @@ components:
             $ref: "#/components/schemas/Consegna"
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleSaldo, creditoSolidaleDataUltimoMovimento, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, attivo, dataCreazione]
 
     BeneficiarioInput:
       type: object
@@ -5124,6 +5327,208 @@ components:
         dettaglio:
           $ref: "#/components/schemas/CreditoSolidaleCalcoloDettaglio"
       required: [beneficiarioId, politicaId, politicaNome, politicaOrigine, giornoRicaricaMensile, ricaricaAutomaticaAbilitata, totaleSuggerito, dettaglio]
+
+    CreditoSolidaleMovimento:
+      type: object
+      properties:
+        id:
+          type: integer
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        tipoMovimento:
+          type: string
+          enum: [ricarica_mensile, ricarica_manuale, rettifica_positiva, rettifica_negativa, storno]
+        variazioneCredito:
+          type: number
+        saldoPrima:
+          type: number
+        saldoDopo:
+          type: number
+        periodoRiferimento:
+          type: ["string", "null"]
+        politicaCreditoSolidaleId:
+          type: ["integer", "null"]
+        quotaMensileAssegnata:
+          type: ["number", "null"]
+        origine:
+          type: ["string", "null"]
+        riferimentoId:
+          type: ["integer", "null"]
+        riferimentoTipo:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        motivo:
+          type: ["string", "null"]
+        dataMovimento:
+          type: string
+          format: date-time
+        dataCreazione:
+          type: string
+          format: date-time
+        annullato:
+          type: boolean
+        annullatoDaMovimentoId:
+          type: ["integer", "null"]
+      required: [id, beneficiarioId, beneficiarioNome, centroAscoltoId, centroAscoltoNome, cittaId, cittaNome, tipoMovimento, variazioneCredito, saldoPrima, saldoDopo, periodoRiferimento, politicaCreditoSolidaleId, quotaMensileAssegnata, origine, riferimentoId, riferimentoTipo, note, motivo, dataMovimento, dataCreazione, annullato, annullatoDaMovimentoId]
+
+    CreditoSolidaleSaldo:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: string
+        creditoSolidaleAbilitato:
+          type: boolean
+        creditoSolidaleStato:
+          type: string
+          enum: [non_abilitato, attivo, sospeso, revocato]
+        saldoAttuale:
+          type: number
+        creditoSolidaleMensileAssegnato:
+          type: ["number", "null"]
+        dataUltimoMovimento:
+          type: ["string", "null"]
+          format: date-time
+      required: [beneficiarioId, beneficiarioNome, creditoSolidaleAbilitato, creditoSolidaleStato, saldoAttuale, creditoSolidaleMensileAssegnato, dataUltimoMovimento]
+
+    CreditoSolidaleRicaricaManualeInput:
+      type: object
+      properties:
+        variazioneCredito:
+          type: number
+          minimum: 0.01
+        motivo:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+      required: [variazioneCredito]
+
+    CreditoSolidaleRettificaInput:
+      type: object
+      properties:
+        variazioneCredito:
+          type: number
+        motivo:
+          type: string
+        note:
+          type: ["string", "null"]
+      required: [variazioneCredito, motivo]
+
+    CreditoSolidaleStornoInput:
+      type: object
+      properties:
+        motivo:
+          type: string
+        note:
+          type: ["string", "null"]
+      required: [motivo]
+
+    CreditoSolidaleRicaricaMensilePreviewInput:
+      type: object
+      properties:
+        periodoRiferimento:
+          type: string
+          pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+        centroAscoltoId:
+          type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+      required: [periodoRiferimento]
+
+    CreditoSolidaleRicaricaMensilePreviewRiga:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: string
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        creditoSolidaleMensileAssegnato:
+          type: ["number", "null"]
+        saldoAttuale:
+          type: number
+        ricaricabile:
+          type: boolean
+        giaRicaricato:
+          type: boolean
+        motivoEsclusione:
+          type: ["string", "null"]
+        saldoPrevistoDopoRicarica:
+          type: ["number", "null"]
+      required: [beneficiarioId, beneficiarioNome, centroAscoltoId, centroAscoltoNome, cittaId, cittaNome, creditoSolidaleMensileAssegnato, saldoAttuale, ricaricabile, giaRicaricato, motivoEsclusione, saldoPrevistoDopoRicarica]
+
+    CreditoSolidaleRicaricaMensilePreview:
+      type: object
+      properties:
+        periodoRiferimento:
+          type: string
+        totaleBeneficiari:
+          type: integer
+        totaleRicaricabili:
+          type: integer
+        totaleGiaRicaricati:
+          type: integer
+        totaleEsclusi:
+          type: integer
+        totaleCreditoDaRicaricare:
+          type: number
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreditoSolidaleRicaricaMensilePreviewRiga"
+      required: [periodoRiferimento, totaleBeneficiari, totaleRicaricabili, totaleGiaRicaricati, totaleEsclusi, totaleCreditoDaRicaricare, righe]
+
+    CreditoSolidaleRicaricaMensileEsecuzioneInput:
+      type: object
+      properties:
+        periodoRiferimento:
+          type: string
+          pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+        centroAscoltoId:
+          type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        note:
+          type: ["string", "null"]
+      required: [periodoRiferimento]
+
+    CreditoSolidaleRicaricaMensileEsecuzione:
+      type: object
+      properties:
+        periodoRiferimento:
+          type: string
+        creati:
+          type: integer
+        saltatiGiaRicaricati:
+          type: integer
+        saltatiNonRicaricabili:
+          type: integer
+        totaleCreditoRicaricato:
+          type: number
+        movimentiCreati:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreditoSolidaleMovimento"
+      required: [periodoRiferimento, creati, saltatiGiaRicaricati, saltatiNonRicaricabili, totaleCreditoRicaricato, movimentiCreati]
 
     # ── Ruoli Volontari ──────────────────────────────────────────────────
     RuoloVolontario:

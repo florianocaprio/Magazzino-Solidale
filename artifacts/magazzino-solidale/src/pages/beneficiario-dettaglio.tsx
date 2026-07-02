@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { Link, useParams } from "wouter";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ExportButtons } from "@/components/export-buttons";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil, Plus, Trash2, CreditCard } from "lucide-react";
+import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil, Plus, Trash2, CreditCard, History, RefreshCw } from "lucide-react";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
 import { SchedaExportButtons } from "@/components/scheda-export";
 import { loadAssociationLogo } from "@/lib/bolla-pdf";
@@ -64,7 +64,7 @@ export default function BeneficiarioDettaglio() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { unitaStradaAbilitata } = useModuloFlags();
+  const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const [editing, setEditing] = useState(false);
 
   const onChangeCentro = (value: string) => {
@@ -162,6 +162,8 @@ export default function BeneficiarioDettaglio() {
           }}
         />
       )}
+
+      <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="md:col-span-1 shadow-sm">
@@ -371,6 +373,7 @@ const makeEditSchema = (t: (k: string) => string) => z.object({
   consegnaDomicilio: z.boolean(),
   motivoConsegnaDomicilio: z.string().optional(),
   restrizioniAlimentari: z.string().optional(),
+  centroAscoltoId: z.string().optional(),
   creditoSolidaleAbilitato: z.boolean().default(false),
   creditoSolidaleStato: z.enum(STATI_CREDITO_SOLIDALE).default("non_abilitato"),
   creditoSolidaleNote: z.string().optional(),
@@ -450,6 +453,7 @@ function CreditoSolidaleQuotaPanel({
   enabled: boolean;
   emporioAbilitato: boolean;
 }) {
+  const { t } = useTranslation();
   const updateBeneficiario = useUpdateBeneficiario();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -490,11 +494,11 @@ function CreditoSolidaleQuotaPanel({
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) });
           queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
-          toast({ title: "Quota assegnata salvata" });
+          toast({ title: t("creditoSolidale.quotaAssegnataSalvata") });
         },
         onError: (e) => toast({
-          title: "Credito Solidale",
-          description: apiErrorMessage(e, "Impossibile salvare la quota assegnata"),
+          title: t("creditoSolidale.title"),
+          description: apiErrorMessage(e, t("creditoSolidale.quotaAssegnataSaveError")),
           variant: "destructive",
         }),
       },
@@ -505,16 +509,16 @@ function CreditoSolidaleQuotaPanel({
     <div className="rounded-md border bg-background p-3 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h5 className="text-sm font-medium">Credito mensile assegnato</h5>
-          <p className="text-xs text-muted-foreground">Suggerito dal calcolo: {formatCreditoQuota(suggested)}</p>
+          <h5 className="text-sm font-medium">{t("creditoSolidale.quotaMensileAssegnata")}</h5>
+          <p className="text-xs text-muted-foreground">{t("creditoSolidale.suggeritoDalCalcolo")}: {formatCreditoQuota(suggested)}</p>
         </div>
         <Badge variant="outline" className={isManuale ? "bg-amber-500/10 text-amber-700" : "bg-emerald-500/10 text-emerald-700"}>
-          {isManuale ? "Modificato manualmente" : "Allineato al calcolo"}
+          {isManuale ? t("creditoSolidale.modificatoManualmente") : t("creditoSolidale.allineatoAlCalcolo")}
         </Badge>
       </div>
       {!emporioAbilitato && <p className="text-xs text-muted-foreground">{EMPORIO_DISABLED_MESSAGE}</p>}
       <div className="space-y-2">
-        <label className="text-sm font-medium leading-none">Credito mensile assegnato</label>
+        <label className="text-sm font-medium leading-none">{t("creditoSolidale.quotaMensileAssegnata")}</label>
         <Input
           type="number"
           min="0"
@@ -525,15 +529,207 @@ function CreditoSolidaleQuotaPanel({
         />
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium leading-none">Motivo modifica quota</label>
+        <label className="text-sm font-medium leading-none">{t("creditoSolidale.motivoModificaQuota")}</label>
         <Textarea rows={2} value={motivo} onChange={(event) => setMotivo(event.target.value)} disabled={disabled} />
       </div>
       <div className="flex justify-end">
         <Button type="button" onClick={onSave} disabled={disabled}>
-          Salva quota assegnata
+          {t("creditoSolidale.salvaQuotaAssegnata")}
         </Button>
       </div>
     </div>
+  );
+}
+
+function CreditoSolidaleSaldoPanel({
+  b,
+  emporioAbilitato,
+}: {
+  b: BeneficiarioDettaglioType;
+  emporioAbilitato: boolean;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const visible = b.creditoSolidaleAbilitato || b.creditoSolidaleStato !== "non_abilitato" || b.creditoSolidaleSaldo > 0 || b.creditoSolidaleMensileAssegnato != null;
+  const canOperate = emporioAbilitato && b.attivo && b.creditoSolidaleAbilitato && b.creditoSolidaleStato === "attivo";
+  const { data: saldo } = useGetCreditoSolidaleBeneficiarioSaldo(b.id, {
+    query: { queryKey: getGetCreditoSolidaleBeneficiarioSaldoQueryKey(b.id), enabled: visible },
+  });
+  const { data: movimenti } = useListCreditoSolidaleBeneficiarioMovimenti(b.id, {
+    query: { queryKey: getListCreditoSolidaleBeneficiarioMovimentiQueryKey(b.id), enabled: visible },
+  });
+  const createRicarica = useCreateCreditoSolidaleRicaricaManuale();
+  const createRettifica = useCreateCreditoSolidaleRettifica();
+  const [action, setAction] = useState<"ricarica" | "rettifica" | null>(null);
+  const [variazione, setVariazione] = useState("");
+  const [motivo, setMotivo] = useState("");
+  const [note, setNote] = useState("");
+
+  if (!visible) return null;
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) });
+    queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+    queryClient.invalidateQueries({
+      predicate: (query) => String(query.queryKey[0] ?? "").includes("/api/credito-solidale"),
+    });
+  };
+
+  const openAction = (next: "ricarica" | "rettifica") => {
+    setAction(next);
+    setVariazione("");
+    setMotivo("");
+    setNote("");
+  };
+
+  const submitAction = () => {
+    if (!action) return;
+    const parsed = Number(variazione.replace(",", "."));
+    if (!Number.isFinite(parsed) || (action === "ricarica" ? parsed <= 0 : parsed === 0)) {
+      toast({ title: t("creditoSolidale.operazioneNonRiuscita"), description: t("creditoSolidale.valoreRichiesto"), variant: "destructive" });
+      return;
+    }
+    const cleanMotivo = motivo.trim();
+    const cleanNote = note.trim();
+    if (action === "rettifica" && !cleanMotivo) {
+      toast({ title: t("creditoSolidale.operazioneNonRiuscita"), description: t("creditoSolidale.motivoRichiesto"), variant: "destructive" });
+      return;
+    }
+
+    const onSuccess = () => {
+      invalidate();
+      toast({ title: t("creditoSolidale.movimentoCreato") });
+      setAction(null);
+    };
+    const onError = (err: unknown) => toast({
+      title: t("creditoSolidale.operazioneNonRiuscita"),
+      description: apiErrorMessage(err, t("creditoSolidale.operazioneNonRiuscita")),
+      variant: "destructive",
+    });
+
+    if (action === "ricarica") {
+      createRicarica.mutate({
+        beneficiarioId: b.id,
+        data: { variazioneCredito: parsed, motivo: cleanMotivo || null, note: cleanNote || null },
+      }, { onSuccess, onError });
+      return;
+    }
+
+    createRettifica.mutate({
+      beneficiarioId: b.id,
+      data: { variazioneCredito: parsed, motivo: cleanMotivo, note: cleanNote || null },
+    }, { onSuccess, onError });
+  };
+
+  const saldoAttuale = saldo?.saldoAttuale ?? b.creditoSolidaleSaldo;
+  const ultimiMovimenti = (movimenti ?? []).slice(0, 5);
+  const pending = createRicarica.isPending || createRettifica.isPending;
+
+  const renderMovimento = (movimento: CreditoSolidaleMovimento) => (
+    <div key={movimento.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
+      <div>
+        <div className="text-sm font-medium">{t(`creditoSolidale.movements.${movimento.tipoMovimento}`)}</div>
+        <div className="text-xs text-muted-foreground">
+          {new Date(movimento.dataMovimento).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" })}
+        </div>
+        {movimento.motivo && <div className="text-xs text-muted-foreground mt-1">{movimento.motivo}</div>}
+      </div>
+      <div className="text-right">
+        <div className={movimento.variazioneCredito < 0 ? "text-sm font-medium text-red-700" : "text-sm font-medium text-emerald-700"}>
+          {formatCreditoQuota(movimento.variazioneCredito)}
+        </div>
+        <div className="text-xs text-muted-foreground">{t("creditoSolidale.saldoDopo")}: {formatCreditoQuota(movimento.saldoDopo)}</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <CreditCard className="h-5 w-5 text-muted-foreground" />
+          {t("creditoSolidale.saldoCreditoSolidale")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!emporioAbilitato && <p className="text-sm text-muted-foreground">{t("creditoSolidale.readOnlyDisabled")}</p>}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">{t("creditoSolidale.saldoAttuale")}</div>
+            <div className="text-2xl font-semibold">{formatCreditoQuota(saldoAttuale)}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">{t("creditoSolidale.quotaMensileAssegnata")}</div>
+            <div className="text-2xl font-semibold">{formatCreditoQuota(saldo?.creditoSolidaleMensileAssegnato ?? b.creditoSolidaleMensileAssegnato)}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">{t("creditoSolidale.statoCreditoSolidale")}</div>
+            <div className="text-sm font-medium">{t(`creditoSolidale.stato.${saldo?.creditoSolidaleStato ?? b.creditoSolidaleStato}`)}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">{t("creditoSolidale.ultimoMovimento")}</div>
+            <div className="text-sm font-medium">
+              {(saldo?.dataUltimoMovimento ?? b.creditoSolidaleDataUltimoMovimento)
+                ? new Date((saldo?.dataUltimoMovimento ?? b.creditoSolidaleDataUltimoMovimento) as string).toLocaleDateString("it-IT")
+                : "-"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 justify-end">
+          <Button asChild variant="outline">
+            <Link href={`/emporio/crediti-saldo?beneficiarioId=${b.id}`}>{t("creditoSolidale.tornaSaldo")}</Link>
+          </Button>
+          <Button type="button" variant="outline" onClick={() => openAction("ricarica")} disabled={!canOperate}>
+            <RefreshCw className="h-4 w-4 mr-2" /> {t("creditoSolidale.ricaricaCreditoSolidale")}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => openAction("rettifica")} disabled={!canOperate}>
+            {t("creditoSolidale.rettificaCreditoSolidale")}
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium flex items-center gap-2">
+            <History className="h-4 w-4 text-muted-foreground" />
+            {t("creditoSolidale.ultimiMovimenti")}
+          </h4>
+          {ultimiMovimenti.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("creditoSolidale.nessunMovimento")}</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">{ultimiMovimenti.map(renderMovimento)}</div>
+          )}
+        </div>
+      </CardContent>
+
+      <Dialog open={action != null} onOpenChange={(open) => !open && setAction(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{action === "ricarica" ? t("creditoSolidale.ricaricaCreditoSolidale") : t("creditoSolidale.rettificaCreditoSolidale")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("creditoSolidale.variazioneCredito")}</label>
+              <Input type="number" step="0.01" value={variazione} onChange={(event) => setVariazione(event.target.value)} disabled={pending} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("creditoSolidale.motivo")}</label>
+              <Textarea rows={2} value={motivo} onChange={(event) => setMotivo(event.target.value)} disabled={pending} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("creditoSolidale.noteOperative")}</label>
+              <Textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)} disabled={pending} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAction(null)}>{t("creditoSolidale.annulla")}</Button>
+            <Button type="button" onClick={submitAction} disabled={pending}>
+              {action === "ricarica" ? t("creditoSolidale.salvaRicarica") : t("creditoSolidale.salvaRettifica")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }
 
@@ -544,7 +740,10 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   const editSchema = useMemo(() => makeEditSchema(t), [t]);
   const { user } = useAuth();
   const isCittaGlobal = user?.cittaId == null;
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
+  const { data: centri } = useListCentriAscolto();
   const { data: magazzini } = useListMagazzini();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const emporiDisponibili = useMemo(
@@ -573,6 +772,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       consegnaDomicilio: b.consegnaDomicilio ?? false,
       motivoConsegnaDomicilio: b.motivoConsegnaDomicilio ?? "",
       restrizioniAlimentari: b.restrizioniAlimentari ?? "",
+      centroAscoltoId: b.centroAscoltoId != null ? String(b.centroAscoltoId) : isCentroLocked ? String(lockedCentroId) : NONE_VALUE,
       creditoSolidaleAbilitato: b.creditoSolidaleAbilitato ?? false,
       creditoSolidaleStato: b.creditoSolidaleStato ?? "non_abilitato",
       creditoSolidaleNote: b.creditoSolidaleNote ?? "",
@@ -585,6 +785,11 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
 
   const watchUds = form.watch("uds");
   const creditoSolidaleAbilitato = form.watch("creditoSolidaleAbilitato");
+  const centroAscoltoIdSelezionato = form.watch("centroAscoltoId");
+  const centroAscoltoMancantePerCredito =
+    creditoSolidaleAbilitato &&
+    !isCentroLocked &&
+    (!centroAscoltoIdSelezionato || centroAscoltoIdSelezionato === NONE_VALUE);
   const formCitta = isCittaGlobal
     ? (form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined)
     : (user?.cittaId ?? undefined);
@@ -594,10 +799,25 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   );
 
   const onSubmit = (data: EditValues) => {
-    const { uds, cittaId, zonaUdsId, magazzinoEmporioPreferitoId, creditoSolidaleNote, ...rest } = data;
+    const { uds, cittaId, zonaUdsId, centroAscoltoId, magazzinoEmporioPreferitoId, creditoSolidaleNote, ...rest } = data;
     // A città-global admin must pin a città when flagging a person as UDS.
     if (uds && isCittaGlobal && !cittaId) {
       form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
+      return;
+    }
+    const centroAscoltoIdFinale =
+      centroAscoltoId && centroAscoltoId !== NONE_VALUE
+        ? parseInt(centroAscoltoId)
+        : isCentroLocked
+          ? lockedCentroId
+          : null;
+    if (rest.creditoSolidaleAbilitato && centroAscoltoIdFinale == null) {
+      form.setError("centroAscoltoId", { type: "manual", message: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto") });
+      toast({
+        title: t("beneficiari.creditoSolidaleSection"),
+        description: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto"),
+        variant: "destructive",
+      });
       return;
     }
     const payload: Record<string, unknown> = {
@@ -610,6 +830,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       creditoSolidaleAbilitato: rest.creditoSolidaleAbilitato,
       creditoSolidaleStato: rest.creditoSolidaleAbilitato ? rest.creditoSolidaleStato : "non_abilitato",
       creditoSolidaleNote: creditoSolidaleNote?.trim() ? creditoSolidaleNote.trim() : null,
+      centroAscoltoId: centroAscoltoIdFinale,
       magazzinoEmporioPreferitoId:
         magazzinoEmporioPreferitoId && magazzinoEmporioPreferitoId !== NONE_VALUE
           ? parseInt(magazzinoEmporioPreferitoId)
@@ -623,7 +844,17 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       { id: b.id, data: payload as never },
       {
         onSuccess: () => onSaved(),
-        onError: () => toast({ title: t("beneficiarioDettaglio.error"), description: t("beneficiarioDettaglio.errorSave"), variant: "destructive" }),
+        onError: (err) => {
+          const message = apiErrorMessage(err, t("beneficiarioDettaglio.errorSave"));
+          if (message === t("beneficiari.creditoSolidaleCentroAscoltoRichiesto")) {
+            form.setError("centroAscoltoId", { type: "server", message });
+          }
+          toast({
+            title: t("beneficiarioDettaglio.error"),
+            description: message,
+            variant: "destructive",
+          });
+        },
       },
     );
   };
@@ -734,6 +965,27 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 )} />
               </div>
 
+              <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("beneficiari.centroRiferimento")}</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      form.clearErrors("centroAscoltoId");
+                    }}
+                    value={field.value || NONE_VALUE}
+                    disabled={isCentroLocked}
+                  >
+                    <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE_VALUE}>{t("common.none")}</SelectItem>
+                      {centri?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               <FormField control={form.control} name="consegnaDomicilio" render={({ field }) => (
                 <FormItem className="flex items-center justify-between rounded-lg border p-3">
                   <FormLabel className="mb-0">{t("beneficiarioDettaglio.consegnaDomicilio")}</FormLabel>
@@ -757,6 +1009,12 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                     <p className="text-xs text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>
                   )}
                 </div>
+                {centroAscoltoMancantePerCredito && (
+                  <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{t("beneficiari.creditoSolidaleCentroAscoltoRichiesto")}</span>
+                  </div>
+                )}
                 <FormField control={form.control} name="creditoSolidaleAbilitato" render={({ field }) => (
                   <FormItem className="flex items-center justify-between">
                     <FormLabel className="!mt-0">{t("beneficiari.creditoSolidaleAbilitato")}</FormLabel>

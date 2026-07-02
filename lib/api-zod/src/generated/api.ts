@@ -1338,6 +1338,8 @@ export const ListBeneficiariResponseItem = zod.object({
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
   "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "creditoSolidaleSaldo": zod.number(),
+  "creditoSolidaleDataUltimoMovimento": zod.coerce.date().nullable(),
   "creditoSolidaleMensileManuale": zod.boolean(),
   "creditoSolidaleMotivoModifica": zod.string().nullable(),
   "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullable(),
@@ -1535,6 +1537,8 @@ export const GetBeneficiarioResponse = zod.object({
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
   "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "creditoSolidaleSaldo": zod.number(),
+  "creditoSolidaleDataUltimoMovimento": zod.coerce.date().nullable(),
   "creditoSolidaleMensileManuale": zod.boolean(),
   "creditoSolidaleMotivoModifica": zod.string().nullable(),
   "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullable(),
@@ -1691,6 +1695,8 @@ export const UpdateBeneficiarioResponse = zod.object({
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
   "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "creditoSolidaleSaldo": zod.number(),
+  "creditoSolidaleDataUltimoMovimento": zod.coerce.date().nullable(),
   "creditoSolidaleMensileManuale": zod.boolean(),
   "creditoSolidaleMotivoModifica": zod.string().nullable(),
   "creditoSolidaleDataUltimaModificaQuota": zod.coerce.date().nullable(),
@@ -3102,6 +3108,206 @@ export const CalcolaCreditoSolidaleBeneficiarioResponse = zod.object({
   "arrotondamentoApplicato": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']),
   "totaleSuggerito": zod.number()
 })
+})
+
+
+export const listCreditoSolidaleMovimentiQueryPeriodoRiferimentoRegExp = new RegExp('^\\d{4}-(0[1-9]|1[0-2])$');
+
+
+export const ListCreditoSolidaleMovimentiQueryParams = zod.object({
+  "beneficiarioId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "cittaId": zod.coerce.number().optional(),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno']).optional(),
+  "periodoRiferimento": zod.coerce.string().regex(listCreditoSolidaleMovimentiQueryPeriodoRiferimentoRegExp).optional(),
+  "annullato": zod.coerce.boolean().optional()
+})
+
+export const ListCreditoSolidaleMovimentiResponseItem = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "cittaNome": zod.string().nullable(),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno']),
+  "variazioneCredito": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "periodoRiferimento": zod.string().nullable(),
+  "politicaCreditoSolidaleId": zod.number().nullable(),
+  "quotaMensileAssegnata": zod.number().nullable(),
+  "origine": zod.string().nullable(),
+  "riferimentoId": zod.number().nullable(),
+  "riferimentoTipo": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "motivo": zod.string().nullable(),
+  "dataMovimento": zod.coerce.date(),
+  "dataCreazione": zod.coerce.date(),
+  "annullato": zod.boolean(),
+  "annullatoDaMovimentoId": zod.number().nullable()
+})
+export const ListCreditoSolidaleMovimentiResponse = zod.array(ListCreditoSolidaleMovimentiResponseItem)
+
+
+export const GetCreditoSolidaleBeneficiarioSaldoParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const GetCreditoSolidaleBeneficiarioSaldoResponse = zod.object({
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "creditoSolidaleAbilitato": zod.boolean(),
+  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
+  "saldoAttuale": zod.number(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "dataUltimoMovimento": zod.coerce.date().nullable()
+})
+
+
+export const ListCreditoSolidaleBeneficiarioMovimentiParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const ListCreditoSolidaleBeneficiarioMovimentiResponseItem = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "cittaNome": zod.string().nullable(),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno']),
+  "variazioneCredito": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "periodoRiferimento": zod.string().nullable(),
+  "politicaCreditoSolidaleId": zod.number().nullable(),
+  "quotaMensileAssegnata": zod.number().nullable(),
+  "origine": zod.string().nullable(),
+  "riferimentoId": zod.number().nullable(),
+  "riferimentoTipo": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "motivo": zod.string().nullable(),
+  "dataMovimento": zod.coerce.date(),
+  "dataCreazione": zod.coerce.date(),
+  "annullato": zod.boolean(),
+  "annullatoDaMovimentoId": zod.number().nullable()
+})
+export const ListCreditoSolidaleBeneficiarioMovimentiResponse = zod.array(ListCreditoSolidaleBeneficiarioMovimentiResponseItem)
+
+
+export const CreateCreditoSolidaleRicaricaManualeParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const createCreditoSolidaleRicaricaManualeBodyVariazioneCreditoMin = 0.01;
+
+
+
+export const CreateCreditoSolidaleRicaricaManualeBody = zod.object({
+  "variazioneCredito": zod.number().min(createCreditoSolidaleRicaricaManualeBodyVariazioneCreditoMin),
+  "motivo": zod.string().nullish(),
+  "note": zod.string().nullish()
+})
+
+
+export const CreateCreditoSolidaleRettificaParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const CreateCreditoSolidaleRettificaBody = zod.object({
+  "variazioneCredito": zod.number(),
+  "motivo": zod.string(),
+  "note": zod.string().nullish()
+})
+
+
+export const StornaCreditoSolidaleMovimentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const StornaCreditoSolidaleMovimentoBody = zod.object({
+  "motivo": zod.string(),
+  "note": zod.string().nullish()
+})
+
+
+export const previewCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp = new RegExp('^\\d{4}-(0[1-9]|1[0-2])$');
+
+
+export const PreviewCreditoSolidaleRicaricaMensileBody = zod.object({
+  "periodoRiferimento": zod.string().regex(previewCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp),
+  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish()
+})
+
+export const PreviewCreditoSolidaleRicaricaMensileResponse = zod.object({
+  "periodoRiferimento": zod.string(),
+  "totaleBeneficiari": zod.number(),
+  "totaleRicaricabili": zod.number(),
+  "totaleGiaRicaricati": zod.number(),
+  "totaleEsclusi": zod.number(),
+  "totaleCreditoDaRicaricare": zod.number(),
+  "righe": zod.array(zod.object({
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "cittaNome": zod.string().nullable(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "saldoAttuale": zod.number(),
+  "ricaricabile": zod.boolean(),
+  "giaRicaricato": zod.boolean(),
+  "motivoEsclusione": zod.string().nullable(),
+  "saldoPrevistoDopoRicarica": zod.number().nullable()
+}))
+})
+
+
+export const executeCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp = new RegExp('^\\d{4}-(0[1-9]|1[0-2])$');
+
+
+export const ExecuteCreditoSolidaleRicaricaMensileBody = zod.object({
+  "periodoRiferimento": zod.string().regex(executeCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp),
+  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "note": zod.string().nullish()
+})
+
+export const ExecuteCreditoSolidaleRicaricaMensileResponse = zod.object({
+  "periodoRiferimento": zod.string(),
+  "creati": zod.number(),
+  "saltatiGiaRicaricati": zod.number(),
+  "saltatiNonRicaricabili": zod.number(),
+  "totaleCreditoRicaricato": zod.number(),
+  "movimentiCreati": zod.array(zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "cittaNome": zod.string().nullable(),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno']),
+  "variazioneCredito": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "periodoRiferimento": zod.string().nullable(),
+  "politicaCreditoSolidaleId": zod.number().nullable(),
+  "quotaMensileAssegnata": zod.number().nullable(),
+  "origine": zod.string().nullable(),
+  "riferimentoId": zod.number().nullable(),
+  "riferimentoTipo": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "motivo": zod.string().nullable(),
+  "dataMovimento": zod.coerce.date(),
+  "dataCreazione": zod.coerce.date(),
+  "annullato": zod.boolean(),
+  "annullatoDaMovimentoId": zod.number().nullable()
+}))
 })
 
 
