@@ -16,6 +16,8 @@ export * from "./politicheCreditoSolidale";
 export * from "./creditoSolidaleMovimenti";
 export * from "./interventi";
 export * from "./consegne";
+export * from "./sessioniCassaEmporio";
+export * from "./sessioniCassaEmporioRighe";
 export * from "./bolle";
 export * from "./prenotazioniMagazzino";
 export * from "./trasferimenti";

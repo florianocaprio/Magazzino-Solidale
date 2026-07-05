@@ -37,6 +37,7 @@ import { impostazioniEmail } from "./namespaces/impostazioniEmail";
 import { moduli } from "./namespaces/moduli";
 import { emporio } from "./namespaces/emporio";
 import { accessiEmporio } from "./namespaces/accessiEmporio";
+import { cassaEmporio } from "./namespaces/cassaEmporio";
 import { creditoSolidale } from "./namespaces/creditoSolidale";
 import { utenti } from "./namespaces/utenti";
 import { ruoli } from "./namespaces/ruoli";
@@ -89,6 +90,7 @@ const PAGE_NAMESPACES = {
   moduli,
   emporio,
   accessiEmporio,
+  cassaEmporio,
   creditoSolidale,
   utenti,
   ruoli,

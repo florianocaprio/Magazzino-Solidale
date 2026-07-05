@@ -2047,6 +2047,168 @@ export interface AccessoEmporioStatoUpdate {
   motivoAnnullamento?: string | null;
 }
 
+export type SessioneCassaEmporioStato = typeof SessioneCassaEmporioStato[keyof typeof SessioneCassaEmporioStato];
+
+
+export const SessioneCassaEmporioStato = {
+  aperta: 'aperta',
+  sospesa: 'sospesa',
+  annullata: 'annullata',
+  pronta_per_chiusura: 'pronta_per_chiusura',
+} as const;
+
+export interface SessioneCassaEmporioRiga {
+  id: number;
+  sessioneCassaId: number;
+  prodottoId: number;
+  /** @nullable */
+  lottoId?: number | null;
+  /** @nullable */
+  codiceProdotto?: string | null;
+  descrizioneProdotto: string;
+  quantita: number;
+  creditoUnitario: number;
+  creditoTotale: number;
+  /** @nullable */
+  giacenzaDisponibileAlMomento?: number | null;
+  /** @nullable */
+  limitePerSpesa?: number | null;
+  /** @nullable */
+  limiteMensile?: number | null;
+  superaLimitePerSpesa: boolean;
+  superaLimiteMensile: boolean;
+  superaGiacenza: boolean;
+  /** @nullable */
+  note?: string | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export interface SessioneCassaEmporio {
+  id: number;
+  accessoEmporioId: number;
+  beneficiarioId: number;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  beneficiarioCodice?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+  magazzinoEmporioId: number;
+  /** @nullable */
+  magazzinoEmporioNome?: string | null;
+  statoSessione: SessioneCassaEmporioStato;
+  saldoCreditoIniziale: number;
+  totaleCreditoPrevisto: number;
+  creditoResiduoPrevisto: number;
+  statoAccessoEmporio?: AccessoEmporioStato | null;
+  /** @nullable */
+  dataOraAccesso?: string | null;
+  /** @nullable */
+  operatoreAperturaId?: number | null;
+  /** @nullable */
+  operatoreUltimaModificaId?: number | null;
+  dataApertura: string;
+  dataUltimaModifica: string;
+  /** @nullable */
+  dataSospensione?: string | null;
+  /** @nullable */
+  dataAnnullamento?: string | null;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @nullable */
+  note?: string | null;
+  righe: SessioneCassaEmporioRiga[];
+}
+
+export interface SessioneCassaEmporioInput {
+  accessoEmporioId: number;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface SessioneCassaEmporioUpdate {
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface SessioneCassaEmporioAperturaInput {
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface SessioneCassaEmporioAggiungiProdottoInput {
+  prodottoId: number;
+  /** @minimum 1 */
+  quantita: number;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface SessioneCassaEmporioAggiornaRigaInput {
+  /** @minimum 1 */
+  quantita: number;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface SessioneCassaEmporioAccessoValido {
+  id: number;
+  /** @nullable */
+  magazzinoEmporioId?: number | null;
+  /** @nullable */
+  magazzinoEmporioNome?: string | null;
+  /** @nullable */
+  dataOraInizio?: string | null;
+  /** @nullable */
+  dataOraFine?: string | null;
+  statoAccessoEmporio?: AccessoEmporioStato | null;
+}
+
+export interface SessioneCassaEmporioRicercaBeneficiarioResult {
+  beneficiarioId: number;
+  beneficiarioNome: string;
+  beneficiarioCodice: string;
+  /** @nullable */
+  beneficiarioCodiceFiscale?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  cittaId?: number | null;
+  saldoCreditoSolidale: number;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: string;
+  attivo: boolean;
+  accessi: SessioneCassaEmporioAccessoValido[];
+}
+
+export interface SessioneCassaEmporioRicercaProdottoResult {
+  prodottoId: number;
+  codice: string;
+  /** @nullable */
+  codiceBarre?: string | null;
+  nome: string;
+  /** @nullable */
+  descrizione?: string | null;
+  creditoSolidaleValore: number;
+  /** @nullable */
+  quantitaMassimaPerSpesa?: number | null;
+  /** @nullable */
+  quantitaMassimaMensile?: number | null;
+  /** @nullable */
+  giacenzaDisponibile?: number | null;
+}
+
+export interface SessioneCassaEmporioValidazione {
+  valido: boolean;
+  /** @nullable */
+  messaggio?: string | null;
+}
+
 export interface AssociaBollaInput {
   /** @nullable */
   bollaId?: number | null;
@@ -2718,6 +2880,28 @@ magazzinoEmporioId?: number;
 statoAccessoEmporio?: AccessoEmporioStato;
 beneficiarioSearch?: string;
 beneficiarioId?: number;
+};
+
+export type ListSessioniCassaEmporioParams = {
+statoSessione?: SessioneCassaEmporioStato;
+magazzinoEmporioId?: number;
+cittaId?: number;
+areaId?: number;
+data?: string;
+beneficiarioSearch?: string;
+};
+
+export type SearchBeneficiariCassaEmporioParams = {
+search?: string;
+data?: string;
+cittaId?: number;
+areaId?: number;
+magazzinoEmporioId?: number;
+};
+
+export type SearchProdottiCassaEmporioParams = {
+search?: string;
+magazzinoEmporioId?: number;
 };
 
 export type ListBolleParams = {

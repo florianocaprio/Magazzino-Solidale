@@ -106,6 +106,7 @@ import type {
   ListLottiParams,
   ListMovimentiParams,
   ListProdottiParams,
+  ListSessioniCassaEmporioParams,
   ListTrasferimentiParams,
   ListTurniParams,
   ListUtentiParams,
@@ -155,6 +156,16 @@ import type {
   RuoloVolontarioUpdate,
   Scarico,
   ScaricoInput,
+  SearchBeneficiariCassaEmporioParams,
+  SearchProdottiCassaEmporioParams,
+  SessioneCassaEmporio,
+  SessioneCassaEmporioAggiornaRigaInput,
+  SessioneCassaEmporioAggiungiProdottoInput,
+  SessioneCassaEmporioAperturaInput,
+  SessioneCassaEmporioRicercaBeneficiarioResult,
+  SessioneCassaEmporioRicercaProdottoResult,
+  SessioneCassaEmporioRiga,
+  SessioneCassaEmporioUpdate,
   TipoIntervento,
   TipoInterventoInput,
   TipoInterventoUpdate,
@@ -5620,6 +5631,835 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getUpdateAccessoEmporioStatoMutationOptions(options));
     }
+
+export const getListSessioniCassaEmporioUrl = (params?: ListSessioniCassaEmporioParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/cassa-emporio/sessioni?${stringifiedParams}` : `/api/cassa-emporio/sessioni`
+}
+
+export const listSessioniCassaEmporio = async (params?: ListSessioniCassaEmporioParams, options?: RequestInit): Promise<SessioneCassaEmporio[]> => {
+
+  return customFetch<SessioneCassaEmporio[]>(getListSessioniCassaEmporioUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSessioniCassaEmporioQueryKey = (params?: ListSessioniCassaEmporioParams,) => {
+    return [
+    `/api/cassa-emporio/sessioni`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSessioniCassaEmporioQueryOptions = <TData = Awaited<ReturnType<typeof listSessioniCassaEmporio>>, TError = ErrorType<unknown>>(params?: ListSessioniCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessioniCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSessioniCassaEmporioQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSessioniCassaEmporio>>> = ({ signal }) => listSessioniCassaEmporio(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSessioniCassaEmporio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSessioniCassaEmporioQueryResult = NonNullable<Awaited<ReturnType<typeof listSessioniCassaEmporio>>>
+export type ListSessioniCassaEmporioQueryError = ErrorType<unknown>
+
+
+
+export function useListSessioniCassaEmporio<TData = Awaited<ReturnType<typeof listSessioniCassaEmporio>>, TError = ErrorType<unknown>>(
+ params?: ListSessioniCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessioniCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSessioniCassaEmporioQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSessioneCassaEmporioUrl = (id: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/sessioni/${id}`
+}
+
+export const getSessioneCassaEmporio = async (id: number, options?: RequestInit): Promise<SessioneCassaEmporio> => {
+
+  return customFetch<SessioneCassaEmporio>(getGetSessioneCassaEmporioUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSessioneCassaEmporioQueryKey = (id: number,) => {
+    return [
+    `/api/cassa-emporio/sessioni/${id}`
+    ] as const;
+    }
+
+
+export const getGetSessioneCassaEmporioQueryOptions = <TData = Awaited<ReturnType<typeof getSessioneCassaEmporio>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessioneCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSessioneCassaEmporioQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSessioneCassaEmporio>>> = ({ signal }) => getSessioneCassaEmporio(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSessioneCassaEmporio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSessioneCassaEmporioQueryResult = NonNullable<Awaited<ReturnType<typeof getSessioneCassaEmporio>>>
+export type GetSessioneCassaEmporioQueryError = ErrorType<unknown>
+
+
+
+export function useGetSessioneCassaEmporio<TData = Awaited<ReturnType<typeof getSessioneCassaEmporio>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessioneCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSessioneCassaEmporioQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getApriSessioneCassaEmporioUrl = (accessoEmporioId: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/accessi/${accessoEmporioId}/apri-sessione`
+}
+
+export const apriSessioneCassaEmporio = async (accessoEmporioId: number,
+    sessioneCassaEmporioAperturaInput?: SessioneCassaEmporioAperturaInput, options?: RequestInit): Promise<SessioneCassaEmporio> => {
+
+  return customFetch<SessioneCassaEmporio>(getApriSessioneCassaEmporioUrl(accessoEmporioId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sessioneCassaEmporioAperturaInput,)
+  }
+);}
+
+
+
+
+export const getApriSessioneCassaEmporioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof apriSessioneCassaEmporio>>, TError,{accessoEmporioId: number;data?: BodyType<SessioneCassaEmporioAperturaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof apriSessioneCassaEmporio>>, TError,{accessoEmporioId: number;data?: BodyType<SessioneCassaEmporioAperturaInput>}, TContext> => {
+
+const mutationKey = ['apriSessioneCassaEmporio'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof apriSessioneCassaEmporio>>, {accessoEmporioId: number;data?: BodyType<SessioneCassaEmporioAperturaInput>}> = (props) => {
+          const {accessoEmporioId,data} = props ?? {};
+
+          return  apriSessioneCassaEmporio(accessoEmporioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApriSessioneCassaEmporioMutationResult = NonNullable<Awaited<ReturnType<typeof apriSessioneCassaEmporio>>>
+    export type ApriSessioneCassaEmporioMutationBody = BodyType<SessioneCassaEmporioAperturaInput> | undefined
+    export type ApriSessioneCassaEmporioMutationError = ErrorType<unknown>
+
+    export const useApriSessioneCassaEmporio = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof apriSessioneCassaEmporio>>, TError,{accessoEmporioId: number;data?: BodyType<SessioneCassaEmporioAperturaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof apriSessioneCassaEmporio>>,
+        TError,
+        {accessoEmporioId: number;data?: BodyType<SessioneCassaEmporioAperturaInput>},
+        TContext
+      > => {
+      return useMutation(getApriSessioneCassaEmporioMutationOptions(options));
+    }
+
+export const getAddSessioneCassaEmporioRigaUrl = (id: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/sessioni/${id}/righe`
+}
+
+export const addSessioneCassaEmporioRiga = async (id: number,
+    sessioneCassaEmporioAggiungiProdottoInput: SessioneCassaEmporioAggiungiProdottoInput, options?: RequestInit): Promise<SessioneCassaEmporioRiga> => {
+
+  return customFetch<SessioneCassaEmporioRiga>(getAddSessioneCassaEmporioRigaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sessioneCassaEmporioAggiungiProdottoInput,)
+  }
+);}
+
+
+
+
+export const getAddSessioneCassaEmporioRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addSessioneCassaEmporioRiga>>, TError,{id: number;data: BodyType<SessioneCassaEmporioAggiungiProdottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addSessioneCassaEmporioRiga>>, TError,{id: number;data: BodyType<SessioneCassaEmporioAggiungiProdottoInput>}, TContext> => {
+
+const mutationKey = ['addSessioneCassaEmporioRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addSessioneCassaEmporioRiga>>, {id: number;data: BodyType<SessioneCassaEmporioAggiungiProdottoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addSessioneCassaEmporioRiga(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddSessioneCassaEmporioRigaMutationResult = NonNullable<Awaited<ReturnType<typeof addSessioneCassaEmporioRiga>>>
+    export type AddSessioneCassaEmporioRigaMutationBody = BodyType<SessioneCassaEmporioAggiungiProdottoInput>
+    export type AddSessioneCassaEmporioRigaMutationError = ErrorType<unknown>
+
+    export const useAddSessioneCassaEmporioRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addSessioneCassaEmporioRiga>>, TError,{id: number;data: BodyType<SessioneCassaEmporioAggiungiProdottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addSessioneCassaEmporioRiga>>,
+        TError,
+        {id: number;data: BodyType<SessioneCassaEmporioAggiungiProdottoInput>},
+        TContext
+      > => {
+      return useMutation(getAddSessioneCassaEmporioRigaMutationOptions(options));
+    }
+
+export const getUpdateSessioneCassaEmporioRigaUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/sessioni/${id}/righe/${rigaId}`
+}
+
+export const updateSessioneCassaEmporioRiga = async (id: number,
+    rigaId: number,
+    sessioneCassaEmporioAggiornaRigaInput: SessioneCassaEmporioAggiornaRigaInput, options?: RequestInit): Promise<SessioneCassaEmporioRiga> => {
+
+  return customFetch<SessioneCassaEmporioRiga>(getUpdateSessioneCassaEmporioRigaUrl(id,rigaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sessioneCassaEmporioAggiornaRigaInput,)
+  }
+);}
+
+
+
+
+export const getUpdateSessioneCassaEmporioRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSessioneCassaEmporioRiga>>, TError,{id: number;rigaId: number;data: BodyType<SessioneCassaEmporioAggiornaRigaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSessioneCassaEmporioRiga>>, TError,{id: number;rigaId: number;data: BodyType<SessioneCassaEmporioAggiornaRigaInput>}, TContext> => {
+
+const mutationKey = ['updateSessioneCassaEmporioRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSessioneCassaEmporioRiga>>, {id: number;rigaId: number;data: BodyType<SessioneCassaEmporioAggiornaRigaInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  updateSessioneCassaEmporioRiga(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSessioneCassaEmporioRigaMutationResult = NonNullable<Awaited<ReturnType<typeof updateSessioneCassaEmporioRiga>>>
+    export type UpdateSessioneCassaEmporioRigaMutationBody = BodyType<SessioneCassaEmporioAggiornaRigaInput>
+    export type UpdateSessioneCassaEmporioRigaMutationError = ErrorType<unknown>
+
+    export const useUpdateSessioneCassaEmporioRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSessioneCassaEmporioRiga>>, TError,{id: number;rigaId: number;data: BodyType<SessioneCassaEmporioAggiornaRigaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSessioneCassaEmporioRiga>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<SessioneCassaEmporioAggiornaRigaInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateSessioneCassaEmporioRigaMutationOptions(options));
+    }
+
+export const getDeleteSessioneCassaEmporioRigaUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/sessioni/${id}/righe/${rigaId}`
+}
+
+export const deleteSessioneCassaEmporioRiga = async (id: number,
+    rigaId: number, options?: RequestInit): Promise<SessioneCassaEmporio> => {
+
+  return customFetch<SessioneCassaEmporio>(getDeleteSessioneCassaEmporioRigaUrl(id,rigaId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSessioneCassaEmporioRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSessioneCassaEmporioRiga>>, TError,{id: number;rigaId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSessioneCassaEmporioRiga>>, TError,{id: number;rigaId: number}, TContext> => {
+
+const mutationKey = ['deleteSessioneCassaEmporioRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSessioneCassaEmporioRiga>>, {id: number;rigaId: number}> = (props) => {
+          const {id,rigaId} = props ?? {};
+
+          return  deleteSessioneCassaEmporioRiga(id,rigaId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSessioneCassaEmporioRigaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSessioneCassaEmporioRiga>>>
+
+    export type DeleteSessioneCassaEmporioRigaMutationError = ErrorType<unknown>
+
+    export const useDeleteSessioneCassaEmporioRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSessioneCassaEmporioRiga>>, TError,{id: number;rigaId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSessioneCassaEmporioRiga>>,
+        TError,
+        {id: number;rigaId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSessioneCassaEmporioRigaMutationOptions(options));
+    }
+
+export const getSospendiSessioneCassaEmporioUrl = (id: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/sessioni/${id}/sospendi`
+}
+
+export const sospendiSessioneCassaEmporio = async (id: number, options?: RequestInit): Promise<SessioneCassaEmporio> => {
+
+  return customFetch<SessioneCassaEmporio>(getSospendiSessioneCassaEmporioUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSospendiSessioneCassaEmporioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sospendiSessioneCassaEmporio>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sospendiSessioneCassaEmporio>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['sospendiSessioneCassaEmporio'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sospendiSessioneCassaEmporio>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  sospendiSessioneCassaEmporio(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SospendiSessioneCassaEmporioMutationResult = NonNullable<Awaited<ReturnType<typeof sospendiSessioneCassaEmporio>>>
+
+    export type SospendiSessioneCassaEmporioMutationError = ErrorType<unknown>
+
+    export const useSospendiSessioneCassaEmporio = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sospendiSessioneCassaEmporio>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sospendiSessioneCassaEmporio>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSospendiSessioneCassaEmporioMutationOptions(options));
+    }
+
+export const getRiprendiSessioneCassaEmporioUrl = (id: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/sessioni/${id}/riprendi`
+}
+
+export const riprendiSessioneCassaEmporio = async (id: number, options?: RequestInit): Promise<SessioneCassaEmporio> => {
+
+  return customFetch<SessioneCassaEmporio>(getRiprendiSessioneCassaEmporioUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRiprendiSessioneCassaEmporioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof riprendiSessioneCassaEmporio>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof riprendiSessioneCassaEmporio>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['riprendiSessioneCassaEmporio'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof riprendiSessioneCassaEmporio>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  riprendiSessioneCassaEmporio(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RiprendiSessioneCassaEmporioMutationResult = NonNullable<Awaited<ReturnType<typeof riprendiSessioneCassaEmporio>>>
+
+    export type RiprendiSessioneCassaEmporioMutationError = ErrorType<unknown>
+
+    export const useRiprendiSessioneCassaEmporio = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof riprendiSessioneCassaEmporio>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof riprendiSessioneCassaEmporio>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRiprendiSessioneCassaEmporioMutationOptions(options));
+    }
+
+export const getAnnullaSessioneCassaEmporioUrl = (id: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/sessioni/${id}/annulla`
+}
+
+export const annullaSessioneCassaEmporio = async (id: number,
+    sessioneCassaEmporioUpdate: SessioneCassaEmporioUpdate, options?: RequestInit): Promise<SessioneCassaEmporio> => {
+
+  return customFetch<SessioneCassaEmporio>(getAnnullaSessioneCassaEmporioUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sessioneCassaEmporioUpdate,)
+  }
+);}
+
+
+
+
+export const getAnnullaSessioneCassaEmporioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaSessioneCassaEmporio>>, TError,{id: number;data: BodyType<SessioneCassaEmporioUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annullaSessioneCassaEmporio>>, TError,{id: number;data: BodyType<SessioneCassaEmporioUpdate>}, TContext> => {
+
+const mutationKey = ['annullaSessioneCassaEmporio'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annullaSessioneCassaEmporio>>, {id: number;data: BodyType<SessioneCassaEmporioUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  annullaSessioneCassaEmporio(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnnullaSessioneCassaEmporioMutationResult = NonNullable<Awaited<ReturnType<typeof annullaSessioneCassaEmporio>>>
+    export type AnnullaSessioneCassaEmporioMutationBody = BodyType<SessioneCassaEmporioUpdate>
+    export type AnnullaSessioneCassaEmporioMutationError = ErrorType<unknown>
+
+    export const useAnnullaSessioneCassaEmporio = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaSessioneCassaEmporio>>, TError,{id: number;data: BodyType<SessioneCassaEmporioUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof annullaSessioneCassaEmporio>>,
+        TError,
+        {id: number;data: BodyType<SessioneCassaEmporioUpdate>},
+        TContext
+      > => {
+      return useMutation(getAnnullaSessioneCassaEmporioMutationOptions(options));
+    }
+
+export const getPreparaChiusuraSessioneCassaEmporioUrl = (id: number,) => {
+
+
+
+
+  return `/api/cassa-emporio/sessioni/${id}/pronta-per-chiusura`
+}
+
+export const preparaChiusuraSessioneCassaEmporio = async (id: number, options?: RequestInit): Promise<SessioneCassaEmporio> => {
+
+  return customFetch<SessioneCassaEmporio>(getPreparaChiusuraSessioneCassaEmporioUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPreparaChiusuraSessioneCassaEmporioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preparaChiusuraSessioneCassaEmporio>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof preparaChiusuraSessioneCassaEmporio>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['preparaChiusuraSessioneCassaEmporio'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preparaChiusuraSessioneCassaEmporio>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  preparaChiusuraSessioneCassaEmporio(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreparaChiusuraSessioneCassaEmporioMutationResult = NonNullable<Awaited<ReturnType<typeof preparaChiusuraSessioneCassaEmporio>>>
+
+    export type PreparaChiusuraSessioneCassaEmporioMutationError = ErrorType<unknown>
+
+    export const usePreparaChiusuraSessioneCassaEmporio = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preparaChiusuraSessioneCassaEmporio>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof preparaChiusuraSessioneCassaEmporio>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPreparaChiusuraSessioneCassaEmporioMutationOptions(options));
+    }
+
+export const getSearchBeneficiariCassaEmporioUrl = (params?: SearchBeneficiariCassaEmporioParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/cassa-emporio/beneficiari/ricerca?${stringifiedParams}` : `/api/cassa-emporio/beneficiari/ricerca`
+}
+
+export const searchBeneficiariCassaEmporio = async (params?: SearchBeneficiariCassaEmporioParams, options?: RequestInit): Promise<SessioneCassaEmporioRicercaBeneficiarioResult[]> => {
+
+  return customFetch<SessioneCassaEmporioRicercaBeneficiarioResult[]>(getSearchBeneficiariCassaEmporioUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchBeneficiariCassaEmporioQueryKey = (params?: SearchBeneficiariCassaEmporioParams,) => {
+    return [
+    `/api/cassa-emporio/beneficiari/ricerca`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchBeneficiariCassaEmporioQueryOptions = <TData = Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError = ErrorType<unknown>>(params?: SearchBeneficiariCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchBeneficiariCassaEmporioQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>> = ({ signal }) => searchBeneficiariCassaEmporio(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchBeneficiariCassaEmporioQueryResult = NonNullable<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>>
+export type SearchBeneficiariCassaEmporioQueryError = ErrorType<unknown>
+
+
+
+export function useSearchBeneficiariCassaEmporio<TData = Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError = ErrorType<unknown>>(
+ params?: SearchBeneficiariCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchBeneficiariCassaEmporioQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSearchProdottiCassaEmporioUrl = (params?: SearchProdottiCassaEmporioParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/cassa-emporio/prodotti/ricerca?${stringifiedParams}` : `/api/cassa-emporio/prodotti/ricerca`
+}
+
+export const searchProdottiCassaEmporio = async (params?: SearchProdottiCassaEmporioParams, options?: RequestInit): Promise<SessioneCassaEmporioRicercaProdottoResult[]> => {
+
+  return customFetch<SessioneCassaEmporioRicercaProdottoResult[]>(getSearchProdottiCassaEmporioUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchProdottiCassaEmporioQueryKey = (params?: SearchProdottiCassaEmporioParams,) => {
+    return [
+    `/api/cassa-emporio/prodotti/ricerca`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchProdottiCassaEmporioQueryOptions = <TData = Awaited<ReturnType<typeof searchProdottiCassaEmporio>>, TError = ErrorType<unknown>>(params?: SearchProdottiCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchProdottiCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchProdottiCassaEmporioQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchProdottiCassaEmporio>>> = ({ signal }) => searchProdottiCassaEmporio(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchProdottiCassaEmporio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchProdottiCassaEmporioQueryResult = NonNullable<Awaited<ReturnType<typeof searchProdottiCassaEmporio>>>
+export type SearchProdottiCassaEmporioQueryError = ErrorType<unknown>
+
+
+
+export function useSearchProdottiCassaEmporio<TData = Awaited<ReturnType<typeof searchProdottiCassaEmporio>>, TError = ErrorType<unknown>>(
+ params?: SearchProdottiCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchProdottiCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchProdottiCassaEmporioQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListBolleUrl = (params?: ListBolleParams,) => {
   const normalizedParams = new URLSearchParams();

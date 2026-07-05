@@ -1627,6 +1627,298 @@ paths:
               schema:
                 $ref: "#/components/schemas/AccessoEmporio"
 
+  # ─── CASSA EMPORIO ──────────────────────────────────────────────────────────
+  /cassa-emporio/sessioni:
+    get:
+      operationId: listSessioniCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: statoSessione
+          in: query
+          schema:
+            $ref: "#/components/schemas/SessioneCassaEmporioStato"
+        - name: magazzinoEmporioId
+          in: query
+          schema:
+            type: integer
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: areaId
+          in: query
+          schema:
+            type: integer
+        - name: data
+          in: query
+          schema:
+            type: string
+        - name: beneficiarioSearch
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of Emporio checkout sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/sessioni/{id}:
+    get:
+      operationId: getSessioneCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Emporio checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/accessi/{accessoEmporioId}/apri-sessione:
+    post:
+      operationId: apriSessioneCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: accessoEmporioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioAperturaInput"
+      responses:
+        "201":
+          description: Created checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/sessioni/{id}/righe:
+    post:
+      operationId: addSessioneCassaEmporioRiga
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioAggiungiProdottoInput"
+      responses:
+        "201":
+          description: Created cart row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporioRiga"
+
+  /cassa-emporio/sessioni/{id}/righe/{rigaId}:
+    patch:
+      operationId: updateSessioneCassaEmporioRiga
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: rigaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioAggiornaRigaInput"
+      responses:
+        "200":
+          description: Updated cart row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporioRiga"
+    delete:
+      operationId: deleteSessioneCassaEmporioRiga
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: rigaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/sessioni/{id}/sospendi:
+    post:
+      operationId: sospendiSessioneCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Suspended checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/sessioni/{id}/riprendi:
+    post:
+      operationId: riprendiSessioneCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resumed checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/sessioni/{id}/annulla:
+    post:
+      operationId: annullaSessioneCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioUpdate"
+      responses:
+        "200":
+          description: Cancelled checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/sessioni/{id}/pronta-per-chiusura:
+    post:
+      operationId: preparaChiusuraSessioneCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Checkout session ready for later closure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/beneficiari/ricerca:
+    get:
+      operationId: searchBeneficiariCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: data
+          in: query
+          schema:
+            type: string
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: areaId
+          in: query
+          schema:
+            type: integer
+        - name: magazzinoEmporioId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Beneficiary search results for checkout
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessioneCassaEmporioRicercaBeneficiarioResult"
+
+  /cassa-emporio/prodotti/ricerca:
+    get:
+      operationId: searchProdottiCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: magazzinoEmporioId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product search results for checkout
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessioneCassaEmporioRicercaProdottoResult"
+
   # ─── BOLLE ───────────────────────────────────────────────────────────────────
   /bolle:
     get:
@@ -6350,6 +6642,242 @@ components:
         motivoAnnullamento:
           type: ["string", "null"]
       required: [statoAccessoEmporio]
+
+    SessioneCassaEmporioStato:
+      type: string
+      enum: [aperta, sospesa, annullata, pronta_per_chiusura]
+
+    SessioneCassaEmporioRiga:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessioneCassaId:
+          type: integer
+        prodottoId:
+          type: integer
+        lottoId:
+          type: ["integer", "null"]
+        codiceProdotto:
+          type: ["string", "null"]
+        descrizioneProdotto:
+          type: string
+        quantita:
+          type: integer
+        creditoUnitario:
+          type: number
+        creditoTotale:
+          type: number
+        giacenzaDisponibileAlMomento:
+          type: ["integer", "null"]
+        limitePerSpesa:
+          type: ["integer", "null"]
+        limiteMensile:
+          type: ["integer", "null"]
+        superaLimitePerSpesa:
+          type: boolean
+        superaLimiteMensile:
+          type: boolean
+        superaGiacenza:
+          type: boolean
+        note:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+          format: date-time
+        dataAggiornamento:
+          type: string
+          format: date-time
+      required: [id, sessioneCassaId, prodottoId, descrizioneProdotto, quantita, creditoUnitario, creditoTotale, superaLimitePerSpesa, superaLimiteMensile, superaGiacenza, dataCreazione, dataAggiornamento]
+
+    SessioneCassaEmporio:
+      type: object
+      properties:
+        id:
+          type: integer
+        accessoEmporioId:
+          type: integer
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: ["string", "null"]
+        beneficiarioCodice:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        magazzinoEmporioId:
+          type: integer
+        magazzinoEmporioNome:
+          type: ["string", "null"]
+        statoSessione:
+          $ref: "#/components/schemas/SessioneCassaEmporioStato"
+        saldoCreditoIniziale:
+          type: number
+        totaleCreditoPrevisto:
+          type: number
+        creditoResiduoPrevisto:
+          type: number
+        statoAccessoEmporio:
+          anyOf:
+            - $ref: "#/components/schemas/AccessoEmporioStato"
+            - type: "null"
+        dataOraAccesso:
+          type: ["string", "null"]
+          format: date-time
+        operatoreAperturaId:
+          type: ["integer", "null"]
+        operatoreUltimaModificaId:
+          type: ["integer", "null"]
+        dataApertura:
+          type: string
+          format: date-time
+        dataUltimaModifica:
+          type: string
+          format: date-time
+        dataSospensione:
+          type: ["string", "null"]
+          format: date-time
+        dataAnnullamento:
+          type: ["string", "null"]
+          format: date-time
+        motivoAnnullamento:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessioneCassaEmporioRiga"
+      required: [id, accessoEmporioId, beneficiarioId, magazzinoEmporioId, statoSessione, saldoCreditoIniziale, totaleCreditoPrevisto, creditoResiduoPrevisto, dataApertura, dataUltimaModifica, righe]
+
+    SessioneCassaEmporioInput:
+      type: object
+      properties:
+        accessoEmporioId:
+          type: integer
+        note:
+          type: ["string", "null"]
+      required: [accessoEmporioId]
+
+    SessioneCassaEmporioUpdate:
+      type: object
+      properties:
+        motivoAnnullamento:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+
+    SessioneCassaEmporioAperturaInput:
+      type: object
+      properties:
+        note:
+          type: ["string", "null"]
+
+    SessioneCassaEmporioAggiungiProdottoInput:
+      type: object
+      properties:
+        prodottoId:
+          type: integer
+        quantita:
+          type: integer
+          minimum: 1
+        note:
+          type: ["string", "null"]
+      required: [prodottoId, quantita]
+
+    SessioneCassaEmporioAggiornaRigaInput:
+      type: object
+      properties:
+        quantita:
+          type: integer
+          minimum: 1
+        note:
+          type: ["string", "null"]
+      required: [quantita]
+
+    SessioneCassaEmporioAccessoValido:
+      type: object
+      properties:
+        id:
+          type: integer
+        magazzinoEmporioId:
+          type: ["integer", "null"]
+        magazzinoEmporioNome:
+          type: ["string", "null"]
+        dataOraInizio:
+          type: ["string", "null"]
+          format: date-time
+        dataOraFine:
+          type: ["string", "null"]
+          format: date-time
+        statoAccessoEmporio:
+          anyOf:
+            - $ref: "#/components/schemas/AccessoEmporioStato"
+            - type: "null"
+      required: [id]
+
+    SessioneCassaEmporioRicercaBeneficiarioResult:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: string
+        beneficiarioCodice:
+          type: string
+        beneficiarioCodiceFiscale:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        saldoCreditoSolidale:
+          type: number
+        creditoSolidaleAbilitato:
+          type: boolean
+        creditoSolidaleStato:
+          type: string
+        attivo:
+          type: boolean
+        accessi:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessioneCassaEmporioAccessoValido"
+      required: [beneficiarioId, beneficiarioNome, beneficiarioCodice, saldoCreditoSolidale, creditoSolidaleAbilitato, creditoSolidaleStato, attivo, accessi]
+
+    SessioneCassaEmporioRicercaProdottoResult:
+      type: object
+      properties:
+        prodottoId:
+          type: integer
+        codice:
+          type: string
+        codiceBarre:
+          type: ["string", "null"]
+        nome:
+          type: string
+        descrizione:
+          type: ["string", "null"]
+        creditoSolidaleValore:
+          type: number
+        quantitaMassimaPerSpesa:
+          type: ["number", "null"]
+        quantitaMassimaMensile:
+          type: ["number", "null"]
+        giacenzaDisponibile:
+          type: ["integer", "null"]
+      required: [prodottoId, codice, nome, creditoSolidaleValore]
+
+    SessioneCassaEmporioValidazione:
+      type: object
+      properties:
+        valido:
+          type: boolean
+        messaggio:
+          type: ["string", "null"]
+      required: [valido]
 
     AssociaBollaInput:
       type: object

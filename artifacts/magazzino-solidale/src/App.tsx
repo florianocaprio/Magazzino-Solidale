@@ -50,7 +50,7 @@ import RuoliVolontari from "@/pages/ruoli-volontari";
 import TipiIntervento from "@/pages/tipi-intervento";
 import TipologieFornitore from "@/pages/tipologie-fornitore";
 import PoliticheCreditoSolidale from "@/pages/politiche-credito-solidale";
-import { EmporioCassa } from "@/pages/emporio-placeholder";
+import EmporioCassa from "@/pages/emporio-cassa";
 import EmporioCreditiSaldo from "@/pages/emporio-crediti-saldo";
 import EmporioAccessi from "@/pages/emporio-accessi";
 import UdsAnagrafica from "@/pages/uds-anagrafica";
