@@ -40,6 +40,15 @@ export interface AccessoEmporio {
   motivoAnnullamento?: string | null;
   /** @nullable */
   noteAccessoEmporio?: string | null;
+  /** @nullable */
+  origineAccesso?: string | null;
+  accessoForzato?: boolean;
+  /** @nullable */
+  motivoAccessoForzato?: string | null;
+  /** @nullable */
+  dataOraEffettivaAccesso?: Date | null;
+  /** @nullable */
+  operatoreAccessoEmporioId?: number | null;
   saldoCreditoSolidale: number;
   /** @nullable */
   quotaMensileAssegnata: number | null;

@@ -4,7 +4,7 @@ import {
   bolleTable, bollaRigheTable, beneficiariTable, magazziniTable,
   lottiTable, prodottiTable, volontariTable,
   consegneTable, utentiTable, centriAscoltoTable,
-  prenotazioniMagazzinoTable,
+  prenotazioniMagazzinoTable, speseEmporioRigheTable, speseEmporioTable,
 } from "@workspace/db";
 import { eq, and, desc, asc, gt, sum, sql, type SQL } from "drizzle-orm";
 import {
@@ -102,6 +102,22 @@ async function buildDettaglio(id: number) {
     .leftJoin(lottiTable, eq(bollaRigheTable.lottoId, lottiTable.id))
     .where(eq(bollaRigheTable.bollaId, id));
 
+  const righeFallbackEmporio = righe.length > 0
+    ? []
+    : await db
+        .select({
+          r: speseEmporioRigheTable,
+          prodottoNome: prodottiTable.nome,
+          codiceLotto: lottiTable.codiceLotto,
+          lottoFsePlus: lottiTable.fsePlus,
+          prodottoFsePlus: prodottiTable.fsePlus,
+        })
+        .from(speseEmporioRigheTable)
+        .innerJoin(speseEmporioTable, eq(speseEmporioRigheTable.spesaEmporioId, speseEmporioTable.id))
+        .leftJoin(prodottiTable, eq(speseEmporioRigheTable.prodottoId, prodottiTable.id))
+        .leftJoin(lottiTable, eq(speseEmporioRigheTable.lottoId, lottiTable.id))
+        .where(eq(speseEmporioTable.bollaId, id));
+
   return {
     id: row.b.id,
     numeroBolla: row.b.numeroBolla,
@@ -130,7 +146,7 @@ async function buildDettaglio(id: number) {
     operatoreId: row.b.operatoreId ?? null,
     operatoreCodice: row.operatoreMatricola ?? row.operatoreUsername ?? null,
     dataCreazione: row.b.dataCreazione.toISOString(),
-    righe: righe.map(r => ({
+    righe: righe.length > 0 ? righe.map(r => ({
       id: r.r.id,
       bollaId: r.r.bollaId,
       prodottoId: r.r.prodottoId,
@@ -141,6 +157,17 @@ async function buildDettaglio(id: number) {
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: r.r.note ?? null,
+    })) : righeFallbackEmporio.map(r => ({
+      id: r.r.bollaRigaId ?? r.r.id,
+      bollaId: id,
+      prodottoId: r.r.prodottoId,
+      prodottoNome: r.prodottoNome ?? r.r.descrizioneProdotto ?? null,
+      lottoId: r.r.lottoId ?? null,
+      codiceLotto: r.codiceLotto ?? null,
+      fsePlus: r.r.lottoId ? !!r.lottoFsePlus : !!r.prodottoFsePlus,
+      quantita: parseFloat(r.r.quantita),
+      unitaMisura: "pz",
+      note: "Riga da Spesa Emporio",
     })),
   };
 }

@@ -74,7 +74,7 @@ const it = {
   beneficiario: "Beneficiario",
   beneficiariCreditoSolidale: "Beneficiari Credito Solidale",
   centro: "Centro",
-  citta: "Città",
+  citta: "Area",
   statoCreditoSolidale: "Stato Credito Solidale",
   emporio: "Emporio",
   tutti: "Tutti",
@@ -142,6 +142,7 @@ const it = {
     ricarica_manuale: "Ricarica manuale",
     rettifica_positiva: "Rettifica positiva",
     rettifica_negativa: "Rettifica negativa",
+    consumo_spesa: "Consumo spesa Emporio",
     storno: "Storno",
   },
   rounding: {

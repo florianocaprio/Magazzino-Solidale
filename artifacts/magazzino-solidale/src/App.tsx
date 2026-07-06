@@ -53,6 +53,7 @@ import PoliticheCreditoSolidale from "@/pages/politiche-credito-solidale";
 import EmporioCassa from "@/pages/emporio-cassa";
 import EmporioCreditiSaldo from "@/pages/emporio-crediti-saldo";
 import EmporioAccessi from "@/pages/emporio-accessi";
+import EmporioSpese from "@/pages/emporio-spese";
 import UdsAnagrafica from "@/pages/uds-anagrafica";
 import UdsInterventi from "@/pages/uds-interventi";
 import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
@@ -166,6 +167,13 @@ function AppRoutes() {
           {() => (
             <Guard area="sociale">
               <EmporioAccessi />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/emporio/spese">
+          {() => (
+            <Guard area="sociale">
+              <EmporioSpese />
             </Guard>
           )}
         </Route>

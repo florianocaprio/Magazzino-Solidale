@@ -601,7 +601,7 @@ export default function Prodotti() {
           { key: "scortaMinima", header: t("prodotti.colScortaMinima"), example: 0 },
           { key: "scortaConsigliata", header: t("prodotti.scortaConsigliata"), example: 0 },
           { key: "abilitatoEmporio", header: t("prodotti.abilitatoEmporio"), example: "No" },
-          { key: "creditoSolidaleValore", header: t("prodotti.creditoSolidaleValore"), example: 0 },
+          { key: "creditoSolidaleValore", header: t("prodotti.creditoSolidaleValore"), example: 1 },
           { key: "quantitaMassimaPerSpesa", header: t("prodotti.quantitaMassimaPerSpesa"), example: "" },
           { key: "quantitaMassimaMensile", header: t("prodotti.quantitaMassimaMensile"), example: "" },
           { key: "fornitore", header: t("prodotti.fornitore"), example: "" },
@@ -646,6 +646,7 @@ export default function Prodotti() {
             t,
           );
           if (!quantitaMassimaMensile.ok) return { error: quantitaMassimaMensile.error };
+          const abilitatoEmporioImport = parseBoolCell(r.abilitatoEmporio);
           return {
             data: {
               codice: r.codice || undefined,
@@ -659,8 +660,8 @@ export default function Prodotti() {
               fsePlus: parseBoolCell(r.fsePlus),
               scortaMinima,
               scortaConsigliata,
-              abilitatoEmporio: parseBoolCell(r.abilitatoEmporio),
-              creditoSolidaleValore: creditoSolidaleValore.value,
+              abilitatoEmporio: abilitatoEmporioImport,
+              creditoSolidaleValore: abilitatoEmporioImport ? (creditoSolidaleValore.value ?? 1) : creditoSolidaleValore.value,
               quantitaMassimaPerSpesa: quantitaMassimaPerSpesa.value,
               quantitaMassimaMensile: quantitaMassimaMensile.value,
               fornitoreId,
@@ -916,7 +917,16 @@ export default function Prodotti() {
                         <FormLabel>{t("prodotti.abilitatoEmporio")}</FormLabel>
                       </div>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!emporioAbilitato} />
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            if (checked && Number(form.getValues("creditoSolidaleValore") ?? 0) <= 0) {
+                              form.setValue("creditoSolidaleValore", 1, { shouldDirty: true, shouldValidate: true });
+                            }
+                          }}
+                          disabled={!emporioAbilitato}
+                        />
                       </FormControl>
                     </FormItem>
                   )} />

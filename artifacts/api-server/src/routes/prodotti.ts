@@ -177,7 +177,8 @@ async function createProdottoOne(
   if (abilitatoEmporio && !(await isEmporioEnabled())) {
     return { error: EMPORIO_DISABLED_MSG, status: 403 };
   }
-  const creditoSolidaleValore = parseNonNegativeDecimal(b.creditoSolidaleValore ?? 0, "Valore Credito Solidale");
+  const creditoSolidaleDefault = abilitatoEmporio ? 1 : 0;
+  const creditoSolidaleValore = parseNonNegativeDecimal(b.creditoSolidaleValore ?? creditoSolidaleDefault, "Valore Credito Solidale");
   if ("error" in creditoSolidaleValore) return { error: creditoSolidaleValore.error, status: 400 };
   const quantitaMassimaPerSpesa = parseOptionalNonNegativeDecimal(b.quantitaMassimaPerSpesa, "Quantità massima per singola spesa");
   if ("error" in quantitaMassimaPerSpesa) return { error: quantitaMassimaPerSpesa.error, status: 400 };
@@ -269,6 +270,9 @@ router.patch("/prodotti/:id", async (req, res) => {
     if (abilitatoEmporio && !existing.abilitatoEmporio && !(await isEmporioEnabled())) {
       res.status(403).json({ error: EMPORIO_DISABLED_MSG });
       return;
+    }
+    if (abilitatoEmporio && !existing.abilitatoEmporio && !("creditoSolidaleValore" in update) && Number(existing.creditoSolidaleValore ?? "0") <= 0) {
+      update.creditoSolidaleValore = "1";
     }
     update.abilitatoEmporio = abilitatoEmporio;
   }

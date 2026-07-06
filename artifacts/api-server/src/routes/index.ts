@@ -32,6 +32,7 @@ import politicheCreditoSolidaleRouter from "./politiche-credito-solidale";
 import creditoSolidaleRouter from "./credito-solidale";
 import accessiEmporioRouter from "./accessi-emporio";
 import cassaEmporioRouter from "./cassa-emporio";
+import speseEmporioRouter from "./spese-emporio";
 import reportRouter from "./report";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
@@ -87,6 +88,7 @@ router.use(politicheCreditoSolidaleRouter);
 router.use(creditoSolidaleRouter);
 router.use(accessiEmporioRouter);
 router.use(cassaEmporioRouter);
+router.use(speseEmporioRouter);
 router.use(reportRouter);
 
 // Admin-only management endpoints.

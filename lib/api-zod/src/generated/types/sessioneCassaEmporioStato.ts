@@ -14,4 +14,5 @@ export const SessioneCassaEmporioStato = {
   sospesa: 'sospesa',
   annullata: 'annullata',
   pronta_per_chiusura: 'pronta_per_chiusura',
+  chiusa: 'chiusa',
 } as const;

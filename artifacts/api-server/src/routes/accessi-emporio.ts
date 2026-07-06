@@ -7,7 +7,7 @@ import {
   db,
   magazziniTable,
 } from "@workspace/db";
-import { and, desc, eq, gte, ilike, lt, lte, ne, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lt, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -154,6 +154,11 @@ function formatAccesso(row: {
     statoAccessoEmporio: row.c.statoAccessoEmporio,
     motivoAnnullamento: row.c.motivoAnnullamento ?? null,
     noteAccessoEmporio: row.c.noteAccessoEmporio ?? null,
+    origineAccesso: row.c.origineAccesso ?? null,
+    accessoForzato: row.c.accessoForzato,
+    motivoAccessoForzato: row.c.motivoAccessoForzato ?? null,
+    dataOraEffettivaAccesso: row.c.dataOraEffettivaAccesso?.toISOString() ?? null,
+    operatoreAccessoEmporioId: row.c.operatoreAccessoEmporioId ?? null,
     saldoCreditoSolidale: Number(row.creditoSolidaleSaldo ?? "0"),
     quotaMensileAssegnata: row.creditoSolidaleMensileAssegnato == null ? null : Number(row.creditoSolidaleMensileAssegnato),
     dataCreazione: row.c.dataCreazione.toISOString(),
@@ -198,6 +203,8 @@ router.get("/accessi-emporio", async (req, res) => {
     const filter = or(
       ilike(beneficiariTable.nome, s),
       ilike(beneficiariTable.cognome, s),
+      ilike(sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`, s),
+      ilike(sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`, s),
       ilike(beneficiariTable.codice, s),
       ilike(beneficiariTable.codiceFiscale, s),
     );
@@ -219,6 +226,67 @@ router.get("/accessi-emporio", async (req, res) => {
 
   const rows = await selectAccessi(conditions).limit(250);
   res.json(rows.map(formatAccesso));
+});
+
+router.get("/accessi-emporio/beneficiari/ricerca", async (req, res) => {
+  if (!(await assertEmporioEnabled(res))) return;
+  const q = req.query as Record<string, string | undefined>;
+  const search = asText(q.search);
+  const beneficiarioId = asInt(q.beneficiarioId);
+  if (!search && beneficiarioId == null) { res.json([]); return; }
+
+  const conditions: SQL[] = [eq(beneficiariTable.attivo, true)];
+  if (beneficiarioId != null) conditions.push(eq(beneficiariTable.id, beneficiarioId));
+  if (search) {
+    const s = `%${search}%`;
+    conditions.push(or(
+      ilike(beneficiariTable.nome, s),
+      ilike(beneficiariTable.cognome, s),
+      ilike(sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`, s),
+      ilike(sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`, s),
+      ilike(beneficiariTable.codice, s),
+      ilike(beneficiariTable.codiceFiscale, s),
+    )!);
+  }
+  const centroFilter = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req));
+  if (centroFilter) conditions.push(centroFilter);
+  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
+  if (cittaFilter) conditions.push(cittaFilter);
+  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
+  if (zonaFilter) conditions.push(zonaFilter);
+
+  const rows = await db
+    .select({
+      beneficiario: beneficiariTable,
+      centroAscoltoNome: centriAscoltoTable.nome,
+      cittaNome: cittaTable.nome,
+      magazzinoEmporioPreferitoNome: magazziniTable.nome,
+    })
+    .from(beneficiariTable)
+    .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+    .leftJoin(magazziniTable, eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id))
+    .where(and(...conditions))
+    .orderBy(asc(beneficiariTable.cognome), asc(beneficiariTable.nome))
+    .limit(30);
+
+  res.json(rows.map((row) => ({
+    beneficiarioId: row.beneficiario.id,
+    beneficiarioNome: `${row.beneficiario.cognome} ${row.beneficiario.nome}`,
+    beneficiarioCodice: row.beneficiario.codice,
+    beneficiarioCodiceFiscale: row.beneficiario.codiceFiscale,
+    centroAscoltoId: row.beneficiario.centroAscoltoId,
+    centroAscoltoNome: row.centroAscoltoNome,
+    cittaId: row.beneficiario.cittaId,
+    cittaNome: row.cittaNome,
+    creditoSolidaleAbilitato: row.beneficiario.creditoSolidaleAbilitato,
+    creditoSolidaleStato: row.beneficiario.creditoSolidaleStato,
+    saldoCreditoSolidale: Number(row.beneficiario.creditoSolidaleSaldo ?? "0"),
+    quotaMensileAssegnata: row.beneficiario.creditoSolidaleMensileAssegnato == null ? null : Number(row.beneficiario.creditoSolidaleMensileAssegnato),
+    magazzinoEmporioPreferitoId: row.beneficiario.magazzinoEmporioPreferitoId,
+    magazzinoEmporioPreferitoNome: row.magazzinoEmporioPreferitoNome,
+    attivo: row.beneficiario.attivo,
+  })));
 });
 
 router.get("/accessi-emporio/:id", async (req, res) => {

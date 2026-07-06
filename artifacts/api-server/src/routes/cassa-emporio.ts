@@ -14,7 +14,7 @@ import {
   sessioniCassaEmporioRigheTable,
   sessioniCassaEmporioTable,
 } from "@workspace/db";
-import { and, asc, desc, eq, gt, gte, ilike, inArray, lt, ne, or, sum, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, gte, ilike, inArray, isNotNull, lt, ne, or, sql, sum, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -27,14 +27,19 @@ import {
 } from "../lib/centroScope";
 import { calcolaDisponibilitaMagazzino, parseDbNumber } from "../lib/disponibilitaMagazzino";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
+import {
+  chiudiSessioneCassaEmporio,
+  getSpesaEmporio,
+  SpesaEmporioError,
+} from "../lib/speseEmporio";
 
 const router: IRouter = Router();
 
 const TIPO_ACCESSO = "accesso_emporio";
 const STATI_ACCESSO_VALIDI = ["pianificato", "confermato", "effettuato"] as const;
-const STATI_SESSIONE = ["aperta", "sospesa", "annullata", "pronta_per_chiusura"] as const;
-const STATI_SESSIONE_MODIFICABILI = ["aperta", "sospesa"] as const;
-const STATI_SESSIONE_NON_DUPLICABILI = ["aperta", "sospesa", "pronta_per_chiusura"] as const;
+const STATI_SESSIONE = ["aperta", "sospesa", "annullata", "pronta_per_chiusura", "chiusa"] as const;
+const STATI_SESSIONE_MODIFICABILI = ["aperta", "sospesa", "pronta_per_chiusura"] as const;
+const STATI_SESSIONE_NON_DUPLICABILI = ["aperta", "sospesa", "pronta_per_chiusura", "chiusa"] as const;
 
 type StatoSessione = (typeof STATI_SESSIONE)[number];
 
@@ -51,7 +56,7 @@ const MSG_GIACENZA_INSUFFICIENTE = "La quantità richiesta supera la giacenza di
 const MSG_LIMITE_SPESA = "La quantità supera il limite previsto per singola spesa.";
 const MSG_LIMITE_MENSILE = "La quantità supera il limite mensile previsto per questo prodotto.";
 const MSG_SALDO_INSUFFICIENTE = "Il totale Credito previsto supera il Saldo Credito Solidale disponibile.";
-const MSG_SESSIONE_PRONTA = "Sessione pronta per la chiusura. La chiusura definitiva sarà disponibile nella Fase4-7.";
+const MSG_SESSIONE_PRONTA = "Sessione pronta per la chiusura.";
 
 function asInt(value: unknown): number | null {
   const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
@@ -67,6 +72,19 @@ function asText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function normalizeSearchToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function searchTokens(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
 function asMoney(value: number): string {
   return value.toFixed(2);
 }
@@ -78,6 +96,19 @@ function dayBounds(value: string | null): { start: Date; end: Date } | null {
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
   return { start, end };
+}
+
+function todayDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function parseAccessoDate(value: unknown): string {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  }
+  return todayDate();
 }
 
 function operatorId(req: import("express").Request): number | null {
@@ -168,6 +199,10 @@ async function formatSessione(sessione: typeof sessioniCassaEmporioTable.$inferS
   const [magazzino] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, sessione.magazzinoEmporioId));
   const [accesso] = await db.select().from(consegneTable).where(eq(consegneTable.id, sessione.accessoEmporioId));
   const righe = includeRighe ? await loadRighe(sessione.id) : [];
+  const totaleCreditoPrevisto = parseDbNumber(sessione.totaleCreditoPrevisto);
+  const saldoCreditoDisponibile = sessione.statoSessione === "chiusa"
+    ? parseDbNumber(sessione.saldoCreditoIniziale)
+    : parseDbNumber(beneficiario?.creditoSolidaleSaldo ?? sessione.saldoCreditoIniziale);
   return {
     id: sessione.id,
     accessoEmporioId: sessione.accessoEmporioId,
@@ -179,9 +214,9 @@ async function formatSessione(sessione: typeof sessioniCassaEmporioTable.$inferS
     magazzinoEmporioId: sessione.magazzinoEmporioId,
     magazzinoEmporioNome: magazzino?.nome ?? null,
     statoSessione: sessione.statoSessione,
-    saldoCreditoIniziale: parseDbNumber(sessione.saldoCreditoIniziale),
-    totaleCreditoPrevisto: parseDbNumber(sessione.totaleCreditoPrevisto),
-    creditoResiduoPrevisto: parseDbNumber(sessione.creditoResiduoPrevisto),
+    saldoCreditoIniziale: saldoCreditoDisponibile,
+    totaleCreditoPrevisto,
+    creditoResiduoPrevisto: saldoCreditoDisponibile - totaleCreditoPrevisto,
     statoAccessoEmporio: accesso?.statoAccessoEmporio ?? null,
     dataOraAccesso: accesso?.dataOraInizio?.toISOString() ?? null,
     operatoreAperturaId: sessione.operatoreAperturaId,
@@ -190,6 +225,11 @@ async function formatSessione(sessione: typeof sessioniCassaEmporioTable.$inferS
     dataUltimaModifica: sessione.dataUltimaModifica.toISOString(),
     dataSospensione: sessione.dataSospensione?.toISOString() ?? null,
     dataAnnullamento: sessione.dataAnnullamento?.toISOString() ?? null,
+    dataChiusura: sessione.dataChiusura?.toISOString() ?? null,
+    spesaEmporioId: sessione.spesaEmporioId,
+    bollaId: sessione.bollaId,
+    movimentoCreditoSolidaleId: sessione.movimentoCreditoSolidaleId,
+    operatoreChiusuraId: sessione.operatoreChiusuraId,
     motivoAnnullamento: sessione.motivoAnnullamento,
     note: sessione.note,
     righe: righe.map(formatRiga),
@@ -203,12 +243,16 @@ async function recalcSessione(sessioneId: number, operatoreUltimaModificaId: num
     .where(eq(sessioniCassaEmporioRigheTable.sessioneCassaId, sessioneId));
   const sessione = await loadSessione(sessioneId);
   if (!sessione) return null;
+  const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, sessione.beneficiarioId));
   const totaleCreditoPrevisto = parseDbNumber(totale?.creditoTotale);
-  const saldoCreditoIniziale = parseDbNumber(sessione.saldoCreditoIniziale);
+  const saldoCreditoIniziale = parseDbNumber(beneficiario?.creditoSolidaleSaldo ?? sessione.saldoCreditoIniziale);
   const creditoResiduoPrevisto = saldoCreditoIniziale - totaleCreditoPrevisto;
+  const riapriSessione = sessione.statoSessione === "pronta_per_chiusura";
   const [updated] = await db
     .update(sessioniCassaEmporioTable)
     .set({
+      ...(riapriSessione ? { statoSessione: "aperta" } : {}),
+      saldoCreditoIniziale: asMoney(saldoCreditoIniziale),
       totaleCreditoPrevisto: asMoney(totaleCreditoPrevisto),
       creditoResiduoPrevisto: asMoney(creditoResiduoPrevisto),
       operatoreUltimaModificaId,
@@ -288,23 +332,83 @@ router.get("/cassa-emporio/beneficiari/ricerca", async (req, res) => {
   const requestedCittaId = asInt(query.cittaId ?? query.areaId);
   const magazzinoEmporioId = asInt(query.magazzinoEmporioId);
   const dateBounds = dayBounds(asText(query.data));
-  if (!q && requestedCittaId == null && magazzinoEmporioId == null && dateBounds == null) { res.json([]); return; }
+  if (!q && requestedCittaId == null && magazzinoEmporioId == null) { res.json([]); return; }
+  let selectedMagazzino: typeof magazziniTable.$inferSelect | null = null;
   if (magazzinoEmporioId != null) {
     const magazzino = await validateMagazzinoEmporio(magazzinoEmporioId, req);
     if ("error" in magazzino) { res.status(magazzino.status).json({ error: magazzino.error }); return; }
+    selectedMagazzino = magazzino.magazzino;
+    if (requestedCittaId != null && selectedMagazzino.cittaId != null && selectedMagazzino.cittaId !== requestedCittaId) {
+      res.json([]);
+      return;
+    }
   }
 
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [
+    eq(beneficiariTable.attivo, true),
+    isNotNull(beneficiariTable.centroAscoltoId),
+    eq(beneficiariTable.creditoSolidaleAbilitato, true),
+    eq(beneficiariTable.creditoSolidaleStato, "attivo"),
+  ];
   if (q) {
     const search = `%${q}%`;
-    conditions.push(or(
+    const normalized = normalizeSearchToken(q);
+    const searchConditions: SQL[] = [
       ilike(beneficiariTable.nome, search),
       ilike(beneficiariTable.cognome, search),
+      ilike(sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`, search),
+      ilike(sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`, search),
       ilike(beneficiariTable.codice, search),
       ilike(beneficiariTable.codiceFiscale, search),
-    )!);
+    ];
+    const tokens = searchTokens(q);
+    if (tokens.length > 1) {
+      const tokenConditions = tokens.map((token) => {
+        const textSearch = `%${token.length > 5 ? token.slice(0, 5) : token}%`;
+        const exactSearch = `%${token}%`;
+        return or(
+          ilike(beneficiariTable.nome, textSearch),
+          ilike(beneficiariTable.cognome, textSearch),
+          ilike(beneficiariTable.codice, exactSearch),
+          ilike(beneficiariTable.codiceFiscale, exactSearch),
+        )!;
+      });
+      searchConditions.push(and(...tokenConditions)!);
+    }
+    if (normalized) {
+      const normalizedSearch = `%${normalized}%`;
+      searchConditions.push(
+        ilike(sql<string>`regexp_replace(lower(coalesce(${beneficiariTable.codice}, '')), '[^a-z0-9]', '', 'g')`, normalizedSearch),
+        ilike(sql<string>`regexp_replace(lower(coalesce(${beneficiariTable.codiceFiscale}, '')), '[^a-z0-9]', '', 'g')`, normalizedSearch),
+      );
+    }
+    conditions.push(or(...searchConditions)!);
   }
-  if (requestedCittaId != null) conditions.push(eq(beneficiariTable.cittaId, requestedCittaId));
+  if (magazzinoEmporioId != null) {
+    const accessoEmporioConditions: SQL[] = [
+      eq(consegneTable.tipoPianificazione, TIPO_ACCESSO),
+      eq(consegneTable.beneficiarioId, beneficiariTable.id),
+      eq(consegneTable.magazzinoEmporioId, magazzinoEmporioId),
+      inArray(consegneTable.statoAccessoEmporio, [...STATI_ACCESSO_VALIDI]),
+    ];
+    if (dateBounds != null) {
+      accessoEmporioConditions.push(gte(consegneTable.dataOraInizio, dateBounds.start));
+      accessoEmporioConditions.push(lt(consegneTable.dataOraInizio, dateBounds.end));
+    }
+    conditions.push(or(
+      eq(beneficiariTable.magazzinoEmporioPreferitoId, magazzinoEmporioId),
+      exists(
+        db
+          .select({ id: consegneTable.id })
+          .from(consegneTable)
+          .where(and(...accessoEmporioConditions)),
+      ),
+    )!);
+  } else if (requestedCittaId != null) {
+    conditions.push(eq(beneficiariTable.cittaId, requestedCittaId));
+  } else if (!q && selectedMagazzino?.cittaId != null) {
+    conditions.push(eq(beneficiariTable.cittaId, selectedMagazzino.cittaId));
+  }
   const centroFilter = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req));
   if (centroFilter) conditions.push(centroFilter);
   const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
@@ -320,6 +424,13 @@ router.get("/cassa-emporio/beneficiari/ricerca", async (req, res) => {
     .limit(50);
   const results = [];
   for (const beneficiario of beneficiari) {
+    const [magazzinoPreferito] = beneficiario.magazzinoEmporioPreferitoId == null
+      ? []
+      : await db
+          .select({ id: magazziniTable.id, nome: magazziniTable.nome })
+          .from(magazziniTable)
+          .where(eq(magazziniTable.id, beneficiario.magazzinoEmporioPreferitoId))
+          .limit(1);
     const accessoConditions: SQL[] = [
       eq(consegneTable.tipoPianificazione, TIPO_ACCESSO),
       eq(consegneTable.beneficiarioId, beneficiario.id),
@@ -343,7 +454,6 @@ router.get("/cassa-emporio/beneficiari/ricerca", async (req, res) => {
       .leftJoin(magazziniTable, eq(consegneTable.magazzinoEmporioId, magazziniTable.id))
       .where(and(...accessoConditions))
       .orderBy(desc(consegneTable.dataOraInizio), desc(consegneTable.id));
-    if (!q && accessi.length === 0) continue;
     results.push({
       beneficiarioId: beneficiario.id,
       beneficiarioNome: `${beneficiario.cognome} ${beneficiario.nome}`,
@@ -351,6 +461,8 @@ router.get("/cassa-emporio/beneficiari/ricerca", async (req, res) => {
       beneficiarioCodiceFiscale: beneficiario.codiceFiscale,
       centroAscoltoId: beneficiario.centroAscoltoId,
       cittaId: beneficiario.cittaId,
+      magazzinoEmporioPreferitoId: beneficiario.magazzinoEmporioPreferitoId,
+      magazzinoEmporioPreferitoNome: magazzinoPreferito?.nome ?? null,
       saldoCreditoSolidale: parseDbNumber(beneficiario.creditoSolidaleSaldo),
       creditoSolidaleAbilitato: beneficiario.creditoSolidaleAbilitato,
       creditoSolidaleStato: beneficiario.creditoSolidaleStato,
@@ -373,34 +485,58 @@ router.get("/cassa-emporio/prodotti/ricerca", async (req, res) => {
   const query = req.query as Record<string, string>;
   const q = asText(query.search);
   const magazzinoEmporioId = asInt(query.magazzinoEmporioId);
-  if (!q) { res.json([]); return; }
-  if (magazzinoEmporioId != null) {
-    const magazzino = await validateMagazzinoEmporio(magazzinoEmporioId, req);
-    if ("error" in magazzino) { res.status(magazzino.status).json({ error: magazzino.error }); return; }
+  if (magazzinoEmporioId == null) { res.json([]); return; }
+  const magazzino = await validateMagazzinoEmporio(magazzinoEmporioId, req);
+  if ("error" in magazzino) { res.status(magazzino.status).json({ error: magazzino.error }); return; }
+  const conditions: SQL[] = [
+    eq(lottiTable.magazzinoId, magazzinoEmporioId),
+    gt(lottiTable.quantitaResidua, "0"),
+    eq(prodottiTable.attivo, true),
+    eq(prodottiTable.abilitatoEmporio, true),
+    gt(prodottiTable.creditoSolidaleValore, "0"),
+  ];
+  if (q) {
+    const search = `%${q}%`;
+    conditions.push(or(
+      ilike(prodottiTable.nome, search),
+      ilike(prodottiTable.descrizione, search),
+      ilike(prodottiTable.codice, search),
+      ilike(prodottiTable.codiceBarre, search),
+    )!);
   }
-  const search = `%${q}%`;
   const rows = await db
-    .select()
-    .from(prodottiTable)
-    .where(
-      and(
-        eq(prodottiTable.attivo, true),
-        eq(prodottiTable.abilitatoEmporio, true),
-        gt(prodottiTable.creditoSolidaleValore, "0"),
-        or(
-          ilike(prodottiTable.nome, search),
-          ilike(prodottiTable.descrizione, search),
-          ilike(prodottiTable.codice, search),
-          ilike(prodottiTable.codiceBarre, search),
-        ),
-      ),
+    .select({
+      id: prodottiTable.id,
+      codice: prodottiTable.codice,
+      codiceBarre: prodottiTable.codiceBarre,
+      nome: prodottiTable.nome,
+      descrizione: prodottiTable.descrizione,
+      creditoSolidaleValore: prodottiTable.creditoSolidaleValore,
+      quantitaMassimaPerSpesa: prodottiTable.quantitaMassimaPerSpesa,
+      quantitaMassimaMensile: prodottiTable.quantitaMassimaMensile,
+      quantitaResiduaFisica: sum(lottiTable.quantitaResidua),
+    })
+    .from(lottiTable)
+    .innerJoin(prodottiTable, eq(lottiTable.prodottoId, prodottiTable.id))
+    .where(and(...conditions))
+    .groupBy(
+      prodottiTable.id,
+      prodottiTable.codice,
+      prodottiTable.codiceBarre,
+      prodottiTable.nome,
+      prodottiTable.descrizione,
+      prodottiTable.creditoSolidaleValore,
+      prodottiTable.quantitaMassimaPerSpesa,
+      prodottiTable.quantitaMassimaMensile,
     )
     .orderBy(asc(prodottiTable.nome))
-    .limit(20);
+    .limit(q ? 20 : 50);
 
   const result = [];
   for (const prodotto of rows) {
-    const disponibilita = magazzinoEmporioId == null ? null : await calcolaDisponibilitaMagazzino(prodotto.id, magazzinoEmporioId);
+    const disponibilita = await calcolaDisponibilitaMagazzino(prodotto.id, magazzinoEmporioId);
+    const giacenzaDisponibile = Math.floor(disponibilita.disponibileReale);
+    if (giacenzaDisponibile <= 0) continue;
     result.push({
       prodottoId: prodotto.id,
       codice: prodotto.codice,
@@ -410,7 +546,7 @@ router.get("/cassa-emporio/prodotti/ricerca", async (req, res) => {
       creditoSolidaleValore: parseDbNumber(prodotto.creditoSolidaleValore),
       quantitaMassimaPerSpesa: prodotto.quantitaMassimaPerSpesa == null ? null : parseDbNumber(prodotto.quantitaMassimaPerSpesa),
       quantitaMassimaMensile: prodotto.quantitaMassimaMensile == null ? null : parseDbNumber(prodotto.quantitaMassimaMensile),
-      giacenzaDisponibile: disponibilita == null ? null : Math.floor(disponibilita.disponibileReale),
+      giacenzaDisponibile,
     });
   }
   res.json(result);
@@ -431,7 +567,14 @@ router.get("/cassa-emporio/sessioni", async (req, res) => {
   }
   if (q.beneficiarioSearch) {
     const s = `%${q.beneficiarioSearch}%`;
-    conditions.push(or(ilike(beneficiariTable.nome, s), ilike(beneficiariTable.cognome, s), ilike(beneficiariTable.codice, s), ilike(beneficiariTable.codiceFiscale, s))!);
+    conditions.push(or(
+      ilike(beneficiariTable.nome, s),
+      ilike(beneficiariTable.cognome, s),
+      ilike(sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`, s),
+      ilike(sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`, s),
+      ilike(beneficiariTable.codice, s),
+      ilike(beneficiariTable.codiceFiscale, s),
+    )!);
   }
   const centroFilter = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req));
   if (centroFilter) conditions.push(centroFilter);
@@ -512,6 +655,106 @@ router.post("/cassa-emporio/accessi/:accessoEmporioId/apri-sessione", async (req
   }
 
   res.status(201).json(await formatSessione(created, true));
+});
+
+router.post("/cassa-emporio/accessi/forza", async (req, res) => {
+  if (!(await assertEmporioEnabled(res))) return;
+  const beneficiarioId = asInt(req.body?.beneficiarioId);
+  const magazzinoEmporioId = asInt(req.body?.magazzinoEmporioId);
+  const motivo = asText(req.body?.motivoAccessoForzato ?? req.body?.motivo);
+  const note = asText(req.body?.noteAccessoEmporio ?? req.body?.note);
+  if (beneficiarioId == null || magazzinoEmporioId == null) {
+    res.status(400).json({ error: "Beneficiario ed Emporio sono obbligatori." });
+    return;
+  }
+  if (!motivo) {
+    res.status(400).json({ error: "Il motivo dell'accesso forzato è obbligatorio." });
+    return;
+  }
+  if (!(await canUseBeneficiario(beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+    res.status(403).json({ error: "Beneficiario non accessibile per il tuo profilo" });
+    return;
+  }
+  const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, beneficiarioId));
+  const beneficiarioError = validateBeneficiarioCassa(beneficiario ?? null);
+  if (beneficiarioError) { res.status(400).json({ error: beneficiarioError }); return; }
+  const magazzino = await validateMagazzinoEmporio(magazzinoEmporioId, req);
+  if ("error" in magazzino) { res.status(magazzino.status).json({ error: magazzino.error }); return; }
+
+  const duplicateSession = await db
+    .select({ id: sessioniCassaEmporioTable.id })
+    .from(sessioniCassaEmporioTable)
+    .where(and(
+      eq(sessioniCassaEmporioTable.beneficiarioId, beneficiarioId),
+      eq(sessioniCassaEmporioTable.magazzinoEmporioId, magazzinoEmporioId),
+      inArray(sessioniCassaEmporioTable.statoSessione, ["aperta", "sospesa", "pronta_per_chiusura"]),
+    ))
+    .orderBy(desc(sessioniCassaEmporioTable.id))
+    .limit(1);
+  if (duplicateSession.length > 0) {
+    const existing = await loadSessione(duplicateSession[0].id);
+    if (existing) {
+      res.json({
+        sessione: await formatSessione(existing, true),
+        messaggio: "Sessione Cassa Emporio già aperta per il beneficiario selezionato.",
+      });
+      return;
+    }
+  }
+
+  const date = parseAccessoDate(req.body?.data ?? req.body?.dataOraInizio);
+  const now = new Date();
+  const dataOraInizio = new Date(req.body?.dataOraInizio && !Number.isNaN(new Date(req.body.dataOraInizio).getTime())
+    ? req.body.dataOraInizio
+    : `${date}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:00`);
+  const codice = `EMP-FOR-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const [accesso] = await db
+    .insert(consegneTable)
+    .values({
+      codice,
+      beneficiarioId,
+      tipoPianificazione: TIPO_ACCESSO,
+      tipoConsegna: TIPO_ACCESSO,
+      dataPrevista: date,
+      magazzinoId: magazzinoEmporioId,
+      magazzinoEmporioId,
+      dataOraInizio,
+      stato: "effettuata",
+      statoAccessoEmporio: "effettuato",
+      noteAccessoEmporio: note,
+      origineAccesso: "forzato_da_cassa",
+      accessoForzato: true,
+      motivoAccessoForzato: motivo,
+      dataOraEffettivaAccesso: now,
+      dataEffettuata: now,
+      operatoreAccessoEmporioId: operatorId(req),
+    })
+    .returning();
+
+  const saldoCreditoIniziale = parseDbNumber(beneficiario!.creditoSolidaleSaldo);
+  const [sessione] = await db
+    .insert(sessioniCassaEmporioTable)
+    .values({
+      accessoEmporioId: accesso.id,
+      beneficiarioId,
+      magazzinoEmporioId,
+      centroAscoltoId: beneficiario!.centroAscoltoId,
+      cittaId: beneficiario!.cittaId,
+      saldoCreditoIniziale: asMoney(saldoCreditoIniziale),
+      totaleCreditoPrevisto: "0.00",
+      creditoResiduoPrevisto: asMoney(saldoCreditoIniziale),
+      operatoreAperturaId: operatorId(req),
+      operatoreUltimaModificaId: operatorId(req),
+      note,
+    })
+    .returning();
+
+  res.status(201).json({
+    accessoEmporioId: accesso.id,
+    origineAccesso: "forzato_da_cassa",
+    sessione: await formatSessione(sessione, true),
+    messaggio: "Accesso Emporio forzato creato e tracciato correttamente.",
+  });
 });
 
 router.post("/cassa-emporio/sessioni/:id/righe", async (req, res) => {
@@ -655,6 +898,39 @@ router.post("/cassa-emporio/sessioni/:id/pronta-per-chiusura", async (req, res) 
       scarichiCreati: afterEffects[2].length - beforeEffects[2].length,
     },
   });
+});
+
+router.post("/cassa-emporio/sessioni/:id/chiudi", async (req, res) => {
+  if (!(await assertEmporioEnabled(res))) return;
+  const sessione = await loadSessione(Number(req.params.id));
+  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
+  try {
+    const { spesaId } = await chiudiSessioneCassaEmporio({
+      sessioneId: sessione.id,
+      operatoreId: operatorId(req),
+      note: asText(req.body?.note),
+    });
+    const spesa = await getSpesaEmporio(spesaId);
+    const updatedSessione = await loadSessione(sessione.id);
+    const emailBolla = {
+      stato: "non_preparata" as const,
+      destinatari: [],
+      messaggio: "Bolla pronta per la preparazione nel client email locale.",
+    };
+    res.json({
+      sessione: updatedSessione ? await formatSessione(updatedSessione, true) : null,
+      spesa,
+      emailBolla,
+      messaggio: "Spesa Emporio chiusa correttamente.",
+    });
+  } catch (err) {
+    if (err instanceof SpesaEmporioError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
 });
 
 export default router;

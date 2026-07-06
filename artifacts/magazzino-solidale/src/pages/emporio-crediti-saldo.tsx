@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   getListBeneficiariQueryKey,
@@ -12,11 +12,9 @@ import {
   useListCreditoSolidaleBeneficiarioMovimenti,
   useListCreditoSolidaleMovimenti,
   useListMagazzini,
-  usePreviewCreditoSolidaleRicaricaMensile,
   useStornaCreditoSolidaleMovimento,
   type Beneficiario,
   type CreditoSolidaleMovimento,
-  type CreditoSolidaleRicaricaMensilePreview,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -112,14 +110,9 @@ export default function EmporioCreditiSaldo() {
   const [variazione, setVariazione] = useState("");
   const [motivo, setMotivo] = useState("");
   const [note, setNote] = useState("");
-  const [periodo, setPeriodo] = useState(currentPeriodo());
-  const [ricaricaCentro, setRicaricaCentro] = useState(ALL);
-  const [ricaricaCitta, setRicaricaCitta] = useState(ALL);
-  const [ricaricaNote, setRicaricaNote] = useState("");
-  const [preview, setPreview] = useState<CreditoSolidaleRicaricaMensilePreview | null>(null);
-  const [confirmRicaricaOpen, setConfirmRicaricaOpen] = useState(false);
   const [stornoMovimento, setStornoMovimento] = useState<CreditoSolidaleMovimento | null>(null);
   const [stornoMotivo, setStornoMotivo] = useState("");
+  const autoRicaricaMensileStarted = useRef(false);
   const normalizedSearch = search.trim();
 
   const beneficiariParams = {
@@ -158,7 +151,6 @@ export default function EmporioCreditiSaldo() {
 
   const createRicarica = useCreateCreditoSolidaleRicaricaManuale();
   const createRettifica = useCreateCreditoSolidaleRettifica();
-  const previewRicarica = usePreviewCreditoSolidaleRicaricaMensile();
   const executeRicarica = useExecuteCreditoSolidaleRicaricaMensile();
   const stornaMovimento = useStornaCreditoSolidaleMovimento();
 
@@ -197,6 +189,31 @@ export default function EmporioCreditiSaldo() {
       },
     });
   };
+
+  useEffect(() => {
+    if (!emporioAbilitato || autoRicaricaMensileStarted.current) return;
+    autoRicaricaMensileStarted.current = true;
+    executeRicarica.mutate({
+      data: {
+        periodoRiferimento: currentPeriodo(),
+        centroAscoltoId: null,
+        cittaId: null,
+        note: null,
+      },
+    }, {
+      onSuccess: (data) => {
+        if (data.creati > 0) {
+          invalidateCredito();
+          toast({ title: t("creditoSolidale.ricaricaMensileCompletata") });
+        }
+      },
+      onError: (err) => toast({
+        title: t("creditoSolidale.ricaricaMensile"),
+        description: extractError(err, t("creditoSolidale.operazioneNonRiuscita")),
+        variant: "destructive",
+      }),
+    });
+  }, [emporioAbilitato]);
 
   const openAction = (tipo: "ricarica" | "rettifica", beneficiario: Beneficiario) => {
     setAction({ tipo, beneficiario });
@@ -242,44 +259,6 @@ export default function EmporioCreditiSaldo() {
       beneficiarioId: action.beneficiario.id,
       data: { variazioneCredito: parsed, motivo: cleanMotivo, note: cleanNote || null },
     }, { onSuccess, onError });
-  };
-
-  const previewPayload = () => ({
-    periodoRiferimento: periodo,
-    centroAscoltoId: optionalId(ricaricaCentro) ?? null,
-    cittaId: optionalId(ricaricaCitta) ?? null,
-  });
-
-  const handlePreview = () => {
-    previewRicarica.mutate({ data: previewPayload() }, {
-      onSuccess: (data) => {
-        setPreview(data);
-        toast({ title: t("creditoSolidale.previewAggiornata") });
-      },
-      onError: (err) => toast({
-        title: t("creditoSolidale.ricaricaMensile"),
-        description: extractError(err, t("creditoSolidale.operazioneNonRiuscita")),
-        variant: "destructive",
-      }),
-    });
-  };
-
-  const handleExecute = () => {
-    executeRicarica.mutate({
-      data: { ...previewPayload(), note: ricaricaNote.trim() || null },
-    }, {
-      onSuccess: () => {
-        invalidateCredito();
-        toast({ title: t("creditoSolidale.ricaricaMensileCompletata") });
-        setConfirmRicaricaOpen(false);
-        handlePreview();
-      },
-      onError: (err) => toast({
-        title: t("creditoSolidale.ricaricaMensile"),
-        description: extractError(err, t("creditoSolidale.operazioneNonRiuscita")),
-        variant: "destructive",
-      }),
-    });
   };
 
   const handleStorno = () => {
@@ -471,158 +450,63 @@ export default function EmporioCreditiSaldo() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <History className="h-4 w-4 text-muted-foreground" />
-              {selectedBeneficiario ? `${t("creditoSolidale.movimentiCreditoSolidale")} - ${selectedBeneficiario.cognome} ${selectedBeneficiario.nome}` : t("creditoSolidale.movimentiCreditoSolidale")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {selectedBeneficiario && (
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/beneficiari/${selectedBeneficiario.id}`}>{t("creditoSolidale.apriScheda")}</Link>
-              </Button>
-            )}
-            {(selectedMovimenti ?? movimentiRecenti ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("creditoSolidale.nessunMovimento")}</p>
-            ) : (
-              <div className="max-h-[380px] overflow-auto border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("creditoSolidale.dataMovimento")}</TableHead>
-                      <TableHead>{t("creditoSolidale.movimentiCreditoSolidale")}</TableHead>
-                      <TableHead>{t("creditoSolidale.variazioneCredito")}</TableHead>
-                      <TableHead>{t("creditoSolidale.saldoDopo")}</TableHead>
-                      <TableHead className="text-right">{t("creditoSolidale.actions")}</TableHead>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <History className="h-4 w-4 text-muted-foreground" />
+            {selectedBeneficiario ? `${t("creditoSolidale.movimentiCreditoSolidale")} - ${selectedBeneficiario.cognome} ${selectedBeneficiario.nome}` : t("creditoSolidale.movimentiCreditoSolidale")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {selectedBeneficiario && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/beneficiari/${selectedBeneficiario.id}`}>{t("creditoSolidale.apriScheda")}</Link>
+            </Button>
+          )}
+          {(selectedMovimenti ?? movimentiRecenti ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("creditoSolidale.nessunMovimento")}</p>
+          ) : (
+            <div className="max-h-[380px] overflow-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("creditoSolidale.dataMovimento")}</TableHead>
+                    <TableHead>{t("creditoSolidale.movimentiCreditoSolidale")}</TableHead>
+                    <TableHead>{t("creditoSolidale.variazioneCredito")}</TableHead>
+                    <TableHead>{t("creditoSolidale.saldoDopo")}</TableHead>
+                    <TableHead className="text-right">{t("creditoSolidale.actions")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(selectedMovimenti ?? movimentiRecenti ?? []).slice(0, 20).map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell>{formatDateTime(m.dataMovimento)}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{t(`creditoSolidale.movements.${m.tipoMovimento}`)}</div>
+                        {m.annullato && <Badge variant="outline">{t("creditoSolidale.movimentoAnnullato")}</Badge>}
+                      </TableCell>
+                      <TableCell className={m.variazioneCredito < 0 ? "text-red-700" : "text-emerald-700"}>{formatCredito(m.variazioneCredito)}</TableCell>
+                      <TableCell>{formatCredito(m.saldoDopo)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          title={t("creditoSolidale.stornaMovimento")}
+                          disabled={!emporioAbilitato || m.annullato || m.tipoMovimento === "storno"}
+                          onClick={() => setStornoMovimento(m)}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(selectedMovimenti ?? movimentiRecenti ?? []).slice(0, 20).map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell>{formatDateTime(m.dataMovimento)}</TableCell>
-                        <TableCell>
-                          <div className="font-medium">{t(`creditoSolidale.movements.${m.tipoMovimento}`)}</div>
-                          {m.annullato && <Badge variant="outline">{t("creditoSolidale.movimentoAnnullato")}</Badge>}
-                        </TableCell>
-                        <TableCell className={m.variazioneCredito < 0 ? "text-red-700" : "text-emerald-700"}>{formatCredito(m.variazioneCredito)}</TableCell>
-                        <TableCell>{formatCredito(m.saldoDopo)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            title={t("creditoSolidale.stornaMovimento")}
-                            disabled={!emporioAbilitato || m.annullato || m.tipoMovimento === "storno"}
-                            onClick={() => setStornoMovimento(m)}
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 text-muted-foreground" />
-              {t("creditoSolidale.ricaricaMensile")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Input type="month" value={periodo} onChange={(event) => setPeriodo(event.target.value)} />
-              <Select value={ricaricaCentro} onValueChange={setRicaricaCentro}>
-                <SelectTrigger><SelectValue placeholder={t("creditoSolidale.tuttiCentri")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>{t("creditoSolidale.tuttiCentri")}</SelectItem>
-                  {centri?.map((centro) => <SelectItem key={centro.id} value={String(centro.id)}>{centro.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={ricaricaCitta} onValueChange={setRicaricaCitta}>
-                <SelectTrigger><SelectValue placeholder={t("creditoSolidale.tutteLeAree")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>{t("creditoSolidale.tutteLeAree")}</SelectItem>
-                  {citta?.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-            <Textarea rows={2} value={ricaricaNote} onChange={(event) => setRicaricaNote(event.target.value)} placeholder={t("creditoSolidale.noteOperative")} disabled={!emporioAbilitato} />
-            <div className="flex flex-wrap gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={handlePreview} disabled={previewRicarica.isPending}>
-                {t("creditoSolidale.aggiornaPreview")}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setConfirmRicaricaOpen(true)}
-                disabled={!emporioAbilitato || !preview || preview.totaleRicaricabili === 0 || executeRicarica.isPending}
-              >
-                {t("creditoSolidale.eseguiRicaricaMensile")}
-              </Button>
-            </div>
-            {preview && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">{t("creditoSolidale.ricaricabili")}</div>
-                    <div className="text-xl font-semibold">{preview.totaleRicaricabili}</div>
-                  </div>
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">{t("creditoSolidale.giaRicaricati")}</div>
-                    <div className="text-xl font-semibold">{preview.totaleGiaRicaricati}</div>
-                  </div>
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">{t("creditoSolidale.esclusi")}</div>
-                    <div className="text-xl font-semibold">{preview.totaleEsclusi}</div>
-                  </div>
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">{t("creditoSolidale.creditoDaRicaricare")}</div>
-                    <div className="text-xl font-semibold">{formatCredito(preview.totaleCreditoDaRicaricare)}</div>
-                  </div>
-                </div>
-                <div className="max-h-[300px] overflow-auto border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("creditoSolidale.beneficiario")}</TableHead>
-                        <TableHead>{t("creditoSolidale.quotaMensileAssegnata")}</TableHead>
-                        <TableHead>{t("creditoSolidale.saldoAttuale")}</TableHead>
-                        <TableHead>{t("creditoSolidale.saldoPrevisto")}</TableHead>
-                        <TableHead>{t("common.status")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {preview.righe.map((riga) => (
-                        <TableRow key={riga.beneficiarioId}>
-                          <TableCell>{riga.beneficiarioNome}</TableCell>
-                          <TableCell>{formatCredito(riga.creditoSolidaleMensileAssegnato)}</TableCell>
-                          <TableCell>{formatCredito(riga.saldoAttuale)}</TableCell>
-                          <TableCell>{formatCredito(riga.saldoPrevistoDopoRicarica)}</TableCell>
-                          <TableCell>
-                            {riga.ricaricabile ? (
-                              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-200">{t("creditoSolidale.ricaricabili")}</Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">{riga.motivoEsclusione ?? t("creditoSolidale.esclusi")}</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={action != null} onOpenChange={(open) => !open && setAction(null)}>
         <DialogContent>
@@ -652,19 +536,6 @@ export default function EmporioCreditiSaldo() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={confirmRicaricaOpen} onOpenChange={setConfirmRicaricaOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("creditoSolidale.confermaEsecuzioneTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("creditoSolidale.confermaEsecuzioneDescription")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("creditoSolidale.annulla")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleExecute}>{t("creditoSolidale.conferma")}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={stornoMovimento != null} onOpenChange={(open) => !open && setStornoMovimento(null)}>
         <AlertDialogContent>

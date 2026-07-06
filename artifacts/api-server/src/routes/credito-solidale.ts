@@ -31,7 +31,7 @@ const NEGATIVE_BALANCE_MSG = "Il saldo Credito Solidale non può diventare negat
 const MONTHLY_ALREADY_DONE_MSG = "Ricarica mensile già eseguita per il periodo selezionato.";
 const NO_QUOTA_MSG = "Quota mensile non assegnata";
 
-const TIPI_MOVIMENTO = ["ricarica_mensile", "ricarica_manuale", "rettifica_positiva", "rettifica_negativa", "storno"] as const;
+const TIPI_MOVIMENTO = ["ricarica_mensile", "ricarica_manuale", "rettifica_positiva", "rettifica_negativa", "storno", "consumo_spesa"] as const;
 type TipoMovimento = (typeof TIPI_MOVIMENTO)[number];
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -64,6 +64,11 @@ const decimalString = (n: number): string => round2(n).toFixed(2);
 
 const nullableText = (v: unknown): string | null =>
   typeof v === "string" ? v.trim() || null : v == null ? null : String(v);
+
+function currentPeriodo(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
 
 function parseDecimal(value: unknown): number | null {
   if (value == null || value === "") return null;
@@ -340,6 +345,20 @@ async function creaMovimentoCreditoSolidale(input: CreaMovimentoInput) {
   return db.transaction((tx) => creaMovimentoCreditoSolidaleTx(tx, input));
 }
 
+async function getSaldoBeneficiarioResponse(beneficiarioId: number) {
+  const [b] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, beneficiarioId));
+  if (!b) return null;
+  return {
+    beneficiarioId: b.id,
+    beneficiarioNome: `${b.cognome} ${b.nome}`,
+    creditoSolidaleAbilitato: b.creditoSolidaleAbilitato,
+    creditoSolidaleStato: b.creditoSolidaleStato,
+    saldoAttuale: Number(b.creditoSolidaleSaldo ?? "0"),
+    creditoSolidaleMensileAssegnato: b.creditoSolidaleMensileAssegnato == null ? null : Number(b.creditoSolidaleMensileAssegnato),
+    dataUltimoMovimento: b.creditoSolidaleDataUltimoMovimento?.toISOString() ?? null,
+  };
+}
+
 async function buildMonthlyPreview(req: Request, body: Record<string, unknown>) {
   const periodoRiferimento = parsePeriodo(body.periodoRiferimento);
   if (!periodoRiferimento) return { error: "Periodo di riferimento non valido.", status: 400 } as const;
@@ -512,6 +531,77 @@ router.get("/credito-solidale/beneficiari/:beneficiarioId/saldo", async (req, re
     saldoAttuale: Number(b.creditoSolidaleSaldo ?? "0"),
     creditoSolidaleMensileAssegnato: b.creditoSolidaleMensileAssegnato == null ? null : Number(b.creditoSolidaleMensileAssegnato),
     dataUltimoMovimento: b.creditoSolidaleDataUltimoMovimento?.toISOString() ?? null,
+  });
+});
+
+router.post("/credito-solidale/beneficiari/:beneficiarioId/refresh-credito", async (req, res) => {
+  if (!(await isEmporioEnabled())) {
+    res.status(403).json({ error: EMPORIO_DISABLED_MSG });
+    return;
+  }
+  const beneficiarioId = Number(req.params.beneficiarioId);
+  const access = await requireAccessibleBeneficiario(beneficiarioId, req);
+  if ("error" in access) {
+    res.status(access.status ?? 400).json({ error: access.error });
+    return;
+  }
+  const b = access.beneficiario;
+  if (!b.attivo) {
+    res.status(400).json({ error: NOT_ACTIVE_MSG });
+    return;
+  }
+  if (!b.creditoSolidaleAbilitato) {
+    res.status(400).json({ error: NOT_ENABLED_MSG });
+    return;
+  }
+  if (b.creditoSolidaleStato !== "attivo") {
+    res.status(400).json({ error: NOT_ACTIVE_MSG });
+    return;
+  }
+
+  const periodoRiferimento = parsePeriodo(req.body?.periodoRiferimento) ?? currentPeriodo();
+  const quota = b.creditoSolidaleMensileAssegnato == null ? null : Number(b.creditoSolidaleMensileAssegnato);
+  if (quota == null || quota <= 0) {
+    res.status(400).json({ error: NO_QUOTA_MSG });
+    return;
+  }
+
+  if (await monthlyRechargeExists(b.id, periodoRiferimento)) {
+    const saldo = await getSaldoBeneficiarioResponse(b.id);
+    res.json({
+      periodoRiferimento,
+      ricaricaEseguita: false,
+      movimento: null,
+      saldo,
+      messaggio: MONTHLY_ALREADY_DONE_MSG,
+    });
+    return;
+  }
+
+  const created = await creaMovimentoCreditoSolidale({
+    beneficiarioId: b.id,
+    tipoMovimento: "ricarica_mensile",
+    variazioneCredito: quota,
+    periodoRiferimento,
+    quotaMensileAssegnata: quota,
+    origine: "refresh_cassa",
+    motivo: "Refresh Credito Solidale da Cassa Emporio",
+    note: nullableText(req.body?.note),
+    operatoreId: req.user?.id ?? null,
+  });
+  if ("error" in created) {
+    res.status(created.status ?? 400).json({ error: created.error });
+    return;
+  }
+
+  const rows = await selectMovimenti([eq(creditoSolidaleMovimentiTable.id, created.movimento.id)], 1);
+  const saldo = await getSaldoBeneficiarioResponse(b.id);
+  res.status(201).json({
+    periodoRiferimento,
+    ricaricaEseguita: true,
+    movimento: fmtMovimento(rows[0]),
+    saldo,
+    messaggio: "Credito Solidale aggiornato.",
   });
 });
 

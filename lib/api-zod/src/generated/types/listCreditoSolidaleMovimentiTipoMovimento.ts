@@ -15,4 +15,5 @@ export const ListCreditoSolidaleMovimentiTipoMovimento = {
   rettifica_positiva: 'rettifica_positiva',
   rettifica_negativa: 'rettifica_negativa',
   storno: 'storno',
+  consumo_spesa: 'consumo_spesa',
 } as const;

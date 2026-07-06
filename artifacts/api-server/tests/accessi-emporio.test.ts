@@ -278,6 +278,20 @@ describe("Accessi Emporio", () => {
     expect(list.body.map((r: { id: number }) => r.id)).toContain(res.body.id);
   });
 
+  it("ricerca beneficiari eleggibili per la combo Accessi Emporio", async () => {
+    const codice = `SRC-${rnd()}`;
+    const fixture = await createEligibleFixture({ codice });
+    const bySearch = await request(makeApp()).get("/accessi-emporio/beneficiari/ricerca").query({ search: codice });
+    expect(bySearch.status).toBe(200);
+    expect(bySearch.body.map((b: { beneficiarioId: number }) => b.beneficiarioId)).toContain(fixture.beneficiarioId);
+    expect(bySearch.body[0].creditoSolidaleAbilitato).toBe(true);
+    expect(bySearch.body[0].creditoSolidaleStato).toBe("attivo");
+
+    const byId = await request(makeApp()).get("/accessi-emporio/beneficiari/ricerca").query({ beneficiarioId: fixture.beneficiarioId });
+    expect(byId.status).toBe(200);
+    expect(byId.body[0].beneficiarioId).toBe(fixture.beneficiarioId);
+  });
+
   it("le consegne pacco continuano a funzionare e la lista storica non include accessi Emporio", async () => {
     const fixture = await createEligibleFixture();
     const accesso = await request(makeApp())

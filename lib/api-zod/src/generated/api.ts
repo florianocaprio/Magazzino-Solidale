@@ -2156,6 +2156,11 @@ export const ListAccessiEmporioResponseItem = zod.object({
   "statoAccessoEmporio": zod.union([zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']),zod.null()]),
   "motivoAnnullamento": zod.string().nullish(),
   "noteAccessoEmporio": zod.string().nullish(),
+  "origineAccesso": zod.string().nullish(),
+  "accessoForzato": zod.boolean().optional(),
+  "motivoAccessoForzato": zod.string().nullish(),
+  "dataOraEffettivaAccesso": zod.coerce.date().nullish(),
+  "operatoreAccessoEmporioId": zod.number().nullish(),
   "saldoCreditoSolidale": zod.number(),
   "quotaMensileAssegnata": zod.number().nullable(),
   "dataCreazione": zod.coerce.date()
@@ -2171,6 +2176,31 @@ export const CreateAccessoEmporioBody = zod.object({
   "statoAccessoEmporio": zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']).optional(),
   "noteAccessoEmporio": zod.string().nullish()
 })
+
+
+export const SearchBeneficiariAccessiEmporioQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "beneficiarioId": zod.coerce.number().optional()
+})
+
+export const SearchBeneficiariAccessiEmporioResponseItem = zod.object({
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "beneficiarioCodice": zod.string(),
+  "beneficiarioCodiceFiscale": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "creditoSolidaleAbilitato": zod.boolean(),
+  "creditoSolidaleStato": zod.string(),
+  "saldoCreditoSolidale": zod.number(),
+  "quotaMensileAssegnata": zod.number().nullish(),
+  "magazzinoEmporioPreferitoId": zod.number().nullish(),
+  "magazzinoEmporioPreferitoNome": zod.string().nullish(),
+  "attivo": zod.boolean()
+})
+export const SearchBeneficiariAccessiEmporioResponse = zod.array(SearchBeneficiariAccessiEmporioResponseItem)
 
 
 export const GetAccessoEmporioParams = zod.object({
@@ -2196,6 +2226,11 @@ export const GetAccessoEmporioResponse = zod.object({
   "statoAccessoEmporio": zod.union([zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']),zod.null()]),
   "motivoAnnullamento": zod.string().nullish(),
   "noteAccessoEmporio": zod.string().nullish(),
+  "origineAccesso": zod.string().nullish(),
+  "accessoForzato": zod.boolean().optional(),
+  "motivoAccessoForzato": zod.string().nullish(),
+  "dataOraEffettivaAccesso": zod.coerce.date().nullish(),
+  "operatoreAccessoEmporioId": zod.number().nullish(),
   "saldoCreditoSolidale": zod.number(),
   "quotaMensileAssegnata": zod.number().nullable(),
   "dataCreazione": zod.coerce.date()
@@ -2234,6 +2269,11 @@ export const UpdateAccessoEmporioResponse = zod.object({
   "statoAccessoEmporio": zod.union([zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']),zod.null()]),
   "motivoAnnullamento": zod.string().nullish(),
   "noteAccessoEmporio": zod.string().nullish(),
+  "origineAccesso": zod.string().nullish(),
+  "accessoForzato": zod.boolean().optional(),
+  "motivoAccessoForzato": zod.string().nullish(),
+  "dataOraEffettivaAccesso": zod.coerce.date().nullish(),
+  "operatoreAccessoEmporioId": zod.number().nullish(),
   "saldoCreditoSolidale": zod.number(),
   "quotaMensileAssegnata": zod.number().nullable(),
   "dataCreazione": zod.coerce.date()
@@ -2268,6 +2308,11 @@ export const UpdateAccessoEmporioStatoResponse = zod.object({
   "statoAccessoEmporio": zod.union([zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']),zod.null()]),
   "motivoAnnullamento": zod.string().nullish(),
   "noteAccessoEmporio": zod.string().nullish(),
+  "origineAccesso": zod.string().nullish(),
+  "accessoForzato": zod.boolean().optional(),
+  "motivoAccessoForzato": zod.string().nullish(),
+  "dataOraEffettivaAccesso": zod.coerce.date().nullish(),
+  "operatoreAccessoEmporioId": zod.number().nullish(),
   "saldoCreditoSolidale": zod.number(),
   "quotaMensileAssegnata": zod.number().nullable(),
   "dataCreazione": zod.coerce.date()
@@ -2275,7 +2320,7 @@ export const UpdateAccessoEmporioStatoResponse = zod.object({
 
 
 export const ListSessioniCassaEmporioQueryParams = zod.object({
-  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura']).optional(),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']).optional(),
   "magazzinoEmporioId": zod.coerce.number().optional(),
   "cittaId": zod.coerce.number().optional(),
   "areaId": zod.coerce.number().optional(),
@@ -2293,7 +2338,7 @@ export const ListSessioniCassaEmporioResponseItem = zod.object({
   "cittaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
-  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura']),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -2305,6 +2350,11 @@ export const ListSessioniCassaEmporioResponseItem = zod.object({
   "dataUltimaModifica": zod.coerce.date(),
   "dataSospensione": zod.coerce.date().nullish(),
   "dataAnnullamento": zod.coerce.date().nullish(),
+  "dataChiusura": zod.coerce.date().nullish(),
+  "spesaEmporioId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "operatoreChiusuraId": zod.number().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
@@ -2345,7 +2395,7 @@ export const GetSessioneCassaEmporioResponse = zod.object({
   "cittaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
-  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura']),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -2357,6 +2407,11 @@ export const GetSessioneCassaEmporioResponse = zod.object({
   "dataUltimaModifica": zod.coerce.date(),
   "dataSospensione": zod.coerce.date().nullish(),
   "dataAnnullamento": zod.coerce.date().nullish(),
+  "dataChiusura": zod.coerce.date().nullish(),
+  "spesaEmporioId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "operatoreChiusuraId": zod.number().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
@@ -2388,6 +2443,16 @@ export const ApriSessioneCassaEmporioParams = zod.object({
 
 export const ApriSessioneCassaEmporioBody = zod.object({
   "note": zod.string().nullish()
+})
+
+
+export const ForzaAccessoEmporioCassaBody = zod.object({
+  "beneficiarioId": zod.number(),
+  "magazzinoEmporioId": zod.number(),
+  "data": zod.string().optional(),
+  "dataOraInizio": zod.coerce.date().optional(),
+  "motivoAccessoForzato": zod.string(),
+  "noteAccessoEmporio": zod.string().nullish()
 })
 
 
@@ -2455,7 +2520,7 @@ export const DeleteSessioneCassaEmporioRigaResponse = zod.object({
   "cittaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
-  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura']),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -2467,6 +2532,11 @@ export const DeleteSessioneCassaEmporioRigaResponse = zod.object({
   "dataUltimaModifica": zod.coerce.date(),
   "dataSospensione": zod.coerce.date().nullish(),
   "dataAnnullamento": zod.coerce.date().nullish(),
+  "dataChiusura": zod.coerce.date().nullish(),
+  "spesaEmporioId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "operatoreChiusuraId": zod.number().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
@@ -2506,7 +2576,7 @@ export const SospendiSessioneCassaEmporioResponse = zod.object({
   "cittaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
-  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura']),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -2518,6 +2588,11 @@ export const SospendiSessioneCassaEmporioResponse = zod.object({
   "dataUltimaModifica": zod.coerce.date(),
   "dataSospensione": zod.coerce.date().nullish(),
   "dataAnnullamento": zod.coerce.date().nullish(),
+  "dataChiusura": zod.coerce.date().nullish(),
+  "spesaEmporioId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "operatoreChiusuraId": zod.number().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
@@ -2557,7 +2632,7 @@ export const RiprendiSessioneCassaEmporioResponse = zod.object({
   "cittaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
-  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura']),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -2569,6 +2644,11 @@ export const RiprendiSessioneCassaEmporioResponse = zod.object({
   "dataUltimaModifica": zod.coerce.date(),
   "dataSospensione": zod.coerce.date().nullish(),
   "dataAnnullamento": zod.coerce.date().nullish(),
+  "dataChiusura": zod.coerce.date().nullish(),
+  "spesaEmporioId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "operatoreChiusuraId": zod.number().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
@@ -2613,7 +2693,7 @@ export const AnnullaSessioneCassaEmporioResponse = zod.object({
   "cittaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
-  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura']),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -2625,6 +2705,11 @@ export const AnnullaSessioneCassaEmporioResponse = zod.object({
   "dataUltimaModifica": zod.coerce.date(),
   "dataSospensione": zod.coerce.date().nullish(),
   "dataAnnullamento": zod.coerce.date().nullish(),
+  "dataChiusura": zod.coerce.date().nullish(),
+  "spesaEmporioId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "operatoreChiusuraId": zod.number().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
@@ -2664,7 +2749,7 @@ export const PreparaChiusuraSessioneCassaEmporioResponse = zod.object({
   "cittaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
-  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura']),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -2676,6 +2761,11 @@ export const PreparaChiusuraSessioneCassaEmporioResponse = zod.object({
   "dataUltimaModifica": zod.coerce.date(),
   "dataSospensione": zod.coerce.date().nullish(),
   "dataAnnullamento": zod.coerce.date().nullish(),
+  "dataChiusura": zod.coerce.date().nullish(),
+  "spesaEmporioId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "operatoreChiusuraId": zod.number().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
@@ -2701,6 +2791,184 @@ export const PreparaChiusuraSessioneCassaEmporioResponse = zod.object({
 })
 
 
+export const ChiudiSessioneCassaEmporioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ChiudiSessioneCassaEmporioBody = zod.object({
+  "note": zod.string().nullish()
+})
+
+export const ChiudiSessioneCassaEmporioResponse = zod.object({
+  "sessione": zod.union([zod.object({
+  "id": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "saldoCreditoIniziale": zod.number(),
+  "totaleCreditoPrevisto": zod.number(),
+  "creditoResiduoPrevisto": zod.number(),
+  "statoAccessoEmporio": zod.union([zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']),zod.null()]).optional(),
+  "dataOraAccesso": zod.coerce.date().nullish(),
+  "operatoreAperturaId": zod.number().nullish(),
+  "operatoreUltimaModificaId": zod.number().nullish(),
+  "dataApertura": zod.coerce.date(),
+  "dataUltimaModifica": zod.coerce.date(),
+  "dataSospensione": zod.coerce.date().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "dataChiusura": zod.coerce.date().nullish(),
+  "spesaEmporioId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "prodottoId": zod.number(),
+  "lottoId": zod.number().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "giacenzaDisponibileAlMomento": zod.number().nullish(),
+  "limitePerSpesa": zod.number().nullish(),
+  "limiteMensile": zod.number().nullish(),
+  "superaLimitePerSpesa": zod.boolean(),
+  "superaLimiteMensile": zod.boolean(),
+  "superaGiacenza": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}))
+}),zod.null()]).optional(),
+  "spesa": zod.union([zod.object({
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "scaricoId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "statoSpesa": zod.string(),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "emailBollaDestinatari": zod.string().nullish(),
+  "emailBollaDataInvio": zod.coerce.date().nullish(),
+  "emailBollaDataUltimoClick": zod.coerce.date().nullish(),
+  "emailBollaOperatoreId": zod.number().nullish(),
+  "emailBollaOggetto": zod.string().nullish(),
+  "emailBollaErrore": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "emailBolla": zod.object({
+  "stato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "destinatari": zod.array(zod.string()),
+  "destinatario": zod.string().nullish(),
+  "oggetto": zod.string().nullish(),
+  "corpo": zod.string().nullish(),
+  "linkBolla": zod.string().nullish(),
+  "mailtoHref": zod.string().nullish(),
+  "errore": zod.string().nullish(),
+  "messaggio": zod.string().optional(),
+  "spesa": zod.union([zod.object({
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "scaricoId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "statoSpesa": zod.string(),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "emailBollaDestinatari": zod.string().nullish(),
+  "emailBollaDataInvio": zod.coerce.date().nullish(),
+  "emailBollaDataUltimoClick": zod.coerce.date().nullish(),
+  "emailBollaOperatoreId": zod.number().nullish(),
+  "emailBollaOggetto": zod.string().nullish(),
+  "emailBollaErrore": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional()
+}),
+  "messaggio": zod.string().optional()
+})
+
+
 export const SearchBeneficiariCassaEmporioQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
   "data": zod.coerce.string().optional(),
@@ -2716,6 +2984,8 @@ export const SearchBeneficiariCassaEmporioResponseItem = zod.object({
   "beneficiarioCodiceFiscale": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "cittaId": zod.number().nullish(),
+  "magazzinoEmporioPreferitoId": zod.number().nullish(),
+  "magazzinoEmporioPreferitoNome": zod.string().nullish(),
   "saldoCreditoSolidale": zod.number(),
   "creditoSolidaleAbilitato": zod.boolean(),
   "creditoSolidaleStato": zod.string(),
@@ -2749,6 +3019,373 @@ export const SearchProdottiCassaEmporioResponseItem = zod.object({
   "giacenzaDisponibile": zod.number().nullish()
 })
 export const SearchProdottiCassaEmporioResponse = zod.array(SearchProdottiCassaEmporioResponseItem)
+
+
+export const ListSpeseEmporioQueryParams = zod.object({
+  "dataDa": zod.coerce.string().optional(),
+  "dataA": zod.coerce.string().optional(),
+  "beneficiarioSearch": zod.coerce.string().optional(),
+  "beneficiarioId": zod.coerce.number().optional(),
+  "magazzinoEmporioId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "cittaId": zod.coerce.number().optional(),
+  "areaId": zod.coerce.number().optional()
+})
+
+export const ListSpeseEmporioResponseItem = zod.object({
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "scaricoId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "statoSpesa": zod.string(),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "emailBollaDestinatari": zod.string().nullish(),
+  "emailBollaDataInvio": zod.coerce.date().nullish(),
+  "emailBollaDataUltimoClick": zod.coerce.date().nullish(),
+  "emailBollaOperatoreId": zod.number().nullish(),
+  "emailBollaOggetto": zod.string().nullish(),
+  "emailBollaErrore": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListSpeseEmporioResponse = zod.array(ListSpeseEmporioResponseItem)
+
+
+export const GetSpesaEmporioBySessioneParams = zod.object({
+  "sessioneCassaId": zod.coerce.number()
+})
+
+export const GetSpesaEmporioBySessioneResponse = zod.object({
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "scaricoId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "statoSpesa": zod.string(),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "emailBollaDestinatari": zod.string().nullish(),
+  "emailBollaDataInvio": zod.coerce.date().nullish(),
+  "emailBollaDataUltimoClick": zod.coerce.date().nullish(),
+  "emailBollaOperatoreId": zod.number().nullish(),
+  "emailBollaOggetto": zod.string().nullish(),
+  "emailBollaErrore": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const GetSpesaEmporioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetSpesaEmporioResponse = zod.object({
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "scaricoId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "statoSpesa": zod.string(),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "emailBollaDestinatari": zod.string().nullish(),
+  "emailBollaDataInvio": zod.coerce.date().nullish(),
+  "emailBollaDataUltimoClick": zod.coerce.date().nullish(),
+  "emailBollaOperatoreId": zod.number().nullish(),
+  "emailBollaOggetto": zod.string().nullish(),
+  "emailBollaErrore": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const GetBollaStampaSpesaEmporioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBollaStampaSpesaEmporioResponse = zod.object({
+  "intestazione": zod.string(),
+  "numeroBolla": zod.string().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "beneficiario": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "beneficiarioCodiceFiscale": zod.string().nullish(),
+  "centroAscolto": zod.string().nullish(),
+  "emporio": zod.string().nullish(),
+  "emporioIndirizzo": zod.string().nullish(),
+  "operatore": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish()
+})),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "note": zod.string().nullish()
+})
+
+
+export const RegistraInvioManualeBollaSpesaEmporioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RegistraInvioManualeBollaSpesaEmporioBody = zod.object({
+  "linkBolla": zod.string().nullish()
+})
+
+export const RegistraInvioManualeBollaSpesaEmporioResponse = zod.object({
+  "stato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "destinatari": zod.array(zod.string()),
+  "destinatario": zod.string().nullish(),
+  "oggetto": zod.string().nullish(),
+  "corpo": zod.string().nullish(),
+  "linkBolla": zod.string().nullish(),
+  "mailtoHref": zod.string().nullish(),
+  "errore": zod.string().nullish(),
+  "messaggio": zod.string().optional(),
+  "spesa": zod.union([zod.object({
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "scaricoId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "statoSpesa": zod.string(),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "emailBollaDestinatari": zod.string().nullish(),
+  "emailBollaDataInvio": zod.coerce.date().nullish(),
+  "emailBollaDataUltimoClick": zod.coerce.date().nullish(),
+  "emailBollaOperatoreId": zod.number().nullish(),
+  "emailBollaOggetto": zod.string().nullish(),
+  "emailBollaErrore": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
+
+
+export const InviaBollaEmailSpesaEmporioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const InviaBollaEmailSpesaEmporioBody = zod.object({
+  "linkBolla": zod.string().nullish()
+})
+
+export const InviaBollaEmailSpesaEmporioResponse = zod.object({
+  "stato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "destinatari": zod.array(zod.string()),
+  "destinatario": zod.string().nullish(),
+  "oggetto": zod.string().nullish(),
+  "corpo": zod.string().nullish(),
+  "linkBolla": zod.string().nullish(),
+  "mailtoHref": zod.string().nullish(),
+  "errore": zod.string().nullish(),
+  "messaggio": zod.string().optional(),
+  "spesa": zod.union([zod.object({
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "scaricoId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "statoSpesa": zod.string(),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "emailBollaDestinatari": zod.string().nullish(),
+  "emailBollaDataInvio": zod.coerce.date().nullish(),
+  "emailBollaDataUltimoClick": zod.coerce.date().nullish(),
+  "emailBollaOperatoreId": zod.number().nullish(),
+  "emailBollaOggetto": zod.string().nullish(),
+  "emailBollaErrore": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
 
 
 export const ListBolleQueryParams = zod.object({
@@ -3750,7 +4387,7 @@ export const ListCreditoSolidaleMovimentiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
   "cittaId": zod.coerce.number().optional(),
-  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno']).optional(),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']).optional(),
   "periodoRiferimento": zod.coerce.string().regex(listCreditoSolidaleMovimentiQueryPeriodoRiferimentoRegExp).optional(),
   "annullato": zod.coerce.boolean().optional()
 })
@@ -3763,7 +4400,7 @@ export const ListCreditoSolidaleMovimentiResponseItem = zod.object({
   "centroAscoltoNome": zod.string().nullable(),
   "cittaId": zod.number().nullable(),
   "cittaNome": zod.string().nullable(),
-  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno']),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
   "variazioneCredito": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
@@ -3798,6 +4435,59 @@ export const GetCreditoSolidaleBeneficiarioSaldoResponse = zod.object({
 })
 
 
+export const RefreshCreditoSolidaleBeneficiarioParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const refreshCreditoSolidaleBeneficiarioBodyPeriodoRiferimentoRegExp = new RegExp('^\\d{4}-(0[1-9]|1[0-2])$');
+
+
+export const RefreshCreditoSolidaleBeneficiarioBody = zod.object({
+  "periodoRiferimento": zod.string().regex(refreshCreditoSolidaleBeneficiarioBodyPeriodoRiferimentoRegExp).nullish(),
+  "note": zod.string().nullish()
+})
+
+export const RefreshCreditoSolidaleBeneficiarioResponse = zod.object({
+  "periodoRiferimento": zod.string(),
+  "ricaricaEseguita": zod.boolean(),
+  "movimento": zod.union([zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "cittaNome": zod.string().nullable(),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
+  "variazioneCredito": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "periodoRiferimento": zod.string().nullable(),
+  "politicaCreditoSolidaleId": zod.number().nullable(),
+  "quotaMensileAssegnata": zod.number().nullable(),
+  "origine": zod.string().nullable(),
+  "riferimentoId": zod.number().nullable(),
+  "riferimentoTipo": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "motivo": zod.string().nullable(),
+  "dataMovimento": zod.coerce.date(),
+  "dataCreazione": zod.coerce.date(),
+  "annullato": zod.boolean(),
+  "annullatoDaMovimentoId": zod.number().nullable()
+}),zod.null()]),
+  "saldo": zod.union([zod.object({
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "creditoSolidaleAbilitato": zod.boolean(),
+  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
+  "saldoAttuale": zod.number(),
+  "creditoSolidaleMensileAssegnato": zod.number().nullable(),
+  "dataUltimoMovimento": zod.coerce.date().nullable()
+}),zod.null()]),
+  "messaggio": zod.string()
+})
+
+
 export const ListCreditoSolidaleBeneficiarioMovimentiParams = zod.object({
   "beneficiarioId": zod.coerce.number()
 })
@@ -3810,7 +4500,7 @@ export const ListCreditoSolidaleBeneficiarioMovimentiResponseItem = zod.object({
   "centroAscoltoNome": zod.string().nullable(),
   "cittaId": zod.number().nullable(),
   "cittaNome": zod.string().nullable(),
-  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno']),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
   "variazioneCredito": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
@@ -3923,7 +4613,7 @@ export const ExecuteCreditoSolidaleRicaricaMensileResponse = zod.object({
   "centroAscoltoNome": zod.string().nullable(),
   "cittaId": zod.number().nullable(),
   "cittaNome": zod.string().nullable(),
-  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno']),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
   "variazioneCredito": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),

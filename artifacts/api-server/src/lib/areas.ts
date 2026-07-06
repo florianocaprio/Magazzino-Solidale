@@ -65,6 +65,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   "credito-solidale": ["sociale", "uds"],
   "accessi-emporio": ["sociale", "uds"],
   "cassa-emporio": ["sociale", "uds"],
+  "spese-emporio": ["sociale", "uds"],
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",

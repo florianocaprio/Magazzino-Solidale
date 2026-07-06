@@ -1491,6 +1491,7 @@ export const CreditoSolidaleMovimentoTipoMovimento = {
   rettifica_positiva: 'rettifica_positiva',
   rettifica_negativa: 'rettifica_negativa',
   storno: 'storno',
+  consumo_spesa: 'consumo_spesa',
 } as const;
 
 export interface CreditoSolidaleMovimento {
@@ -1552,6 +1553,24 @@ export interface CreditoSolidaleSaldo {
   creditoSolidaleMensileAssegnato: number | null;
   /** @nullable */
   dataUltimoMovimento: string | null;
+}
+
+export interface CreditoSolidaleRefreshInput {
+  /**
+     * @nullable
+     * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+     */
+  periodoRiferimento?: string | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CreditoSolidaleRefreshResult {
+  periodoRiferimento: string;
+  ricaricaEseguita: boolean;
+  movimento: CreditoSolidaleMovimento | null;
+  saldo: CreditoSolidaleSaldo | null;
+  messaggio: string;
 }
 
 export interface CreditoSolidaleRicaricaManualeInput {
@@ -2013,6 +2032,15 @@ export interface AccessoEmporio {
   motivoAnnullamento?: string | null;
   /** @nullable */
   noteAccessoEmporio?: string | null;
+  /** @nullable */
+  origineAccesso?: string | null;
+  accessoForzato?: boolean;
+  /** @nullable */
+  motivoAccessoForzato?: string | null;
+  /** @nullable */
+  dataOraEffettivaAccesso?: string | null;
+  /** @nullable */
+  operatoreAccessoEmporioId?: number | null;
   saldoCreditoSolidale: number;
   /** @nullable */
   quotaMensileAssegnata: number | null;
@@ -2047,6 +2075,32 @@ export interface AccessoEmporioStatoUpdate {
   motivoAnnullamento?: string | null;
 }
 
+export interface BeneficiarioAccessoEmporioSearchResult {
+  beneficiarioId: number;
+  beneficiarioNome: string;
+  beneficiarioCodice: string;
+  /** @nullable */
+  beneficiarioCodiceFiscale?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: string;
+  saldoCreditoSolidale: number;
+  /** @nullable */
+  quotaMensileAssegnata?: number | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoNome?: string | null;
+  attivo: boolean;
+}
+
 export type SessioneCassaEmporioStato = typeof SessioneCassaEmporioStato[keyof typeof SessioneCassaEmporioStato];
 
 
@@ -2055,6 +2109,7 @@ export const SessioneCassaEmporioStato = {
   sospesa: 'sospesa',
   annullata: 'annullata',
   pronta_per_chiusura: 'pronta_per_chiusura',
+  chiusa: 'chiusa',
 } as const;
 
 export interface SessioneCassaEmporioRiga {
@@ -2116,6 +2171,16 @@ export interface SessioneCassaEmporio {
   dataSospensione?: string | null;
   /** @nullable */
   dataAnnullamento?: string | null;
+  /** @nullable */
+  dataChiusura?: string | null;
+  /** @nullable */
+  spesaEmporioId?: number | null;
+  /** @nullable */
+  bollaId?: number | null;
+  /** @nullable */
+  movimentoCreditoSolidaleId?: number | null;
+  /** @nullable */
+  operatoreChiusuraId?: number | null;
   /** @nullable */
   motivoAnnullamento?: string | null;
   /** @nullable */
@@ -2179,11 +2244,32 @@ export interface SessioneCassaEmporioRicercaBeneficiarioResult {
   centroAscoltoId?: number | null;
   /** @nullable */
   cittaId?: number | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoNome?: string | null;
   saldoCreditoSolidale: number;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: string;
   attivo: boolean;
   accessi: SessioneCassaEmporioAccessoValido[];
+}
+
+export interface AccessoEmporioForzatoInput {
+  beneficiarioId: number;
+  magazzinoEmporioId: number;
+  data?: string;
+  dataOraInizio?: string;
+  motivoAccessoForzato: string;
+  /** @nullable */
+  noteAccessoEmporio?: string | null;
+}
+
+export interface AccessoEmporioForzatoResult {
+  accessoEmporioId: number;
+  origineAccesso: string;
+  sessione: SessioneCassaEmporio;
+  messaggio?: string;
 }
 
 export interface SessioneCassaEmporioRicercaProdottoResult {
@@ -2207,6 +2293,172 @@ export interface SessioneCassaEmporioValidazione {
   valido: boolean;
   /** @nullable */
   messaggio?: string | null;
+}
+
+export interface SpesaEmporioRiga {
+  id: number;
+  spesaEmporioId: number;
+  /** @nullable */
+  sessioneCassaRigaId?: number | null;
+  prodottoId: number;
+  /** @nullable */
+  prodottoNome?: string | null;
+  /** @nullable */
+  lottoId?: number | null;
+  /** @nullable */
+  codiceLotto?: string | null;
+  /** @nullable */
+  codiceProdotto?: string | null;
+  descrizioneProdotto: string;
+  quantita: number;
+  creditoUnitario: number;
+  creditoTotale: number;
+  /** @nullable */
+  scaricoId?: number | null;
+  /** @nullable */
+  bollaRigaId?: number | null;
+}
+
+export type SpesaEmporioEmailBollaStato = typeof SpesaEmporioEmailBollaStato[keyof typeof SpesaEmporioEmailBollaStato];
+
+
+export const SpesaEmporioEmailBollaStato = {
+  non_preparata: 'non_preparata',
+  invio_manuale_avviato: 'invio_manuale_avviato',
+  nessun_destinatario: 'nessun_destinatario',
+  errore: 'errore',
+} as const;
+
+export interface SpesaEmporio {
+  id: number;
+  sessioneCassaId: number;
+  accessoEmporioId: number;
+  beneficiarioId: number;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  beneficiarioCodice?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  magazzinoEmporioId: number;
+  /** @nullable */
+  magazzinoEmporioNome?: string | null;
+  /** @nullable */
+  scaricoId?: number | null;
+  /** @nullable */
+  bollaId?: number | null;
+  /** @nullable */
+  bollaNumero?: string | null;
+  /** @nullable */
+  movimentoCreditoSolidaleId?: number | null;
+  numeroSpesa: string;
+  dataChiusura: string;
+  totaleCreditoConsumati: number;
+  saldoPrima: number;
+  saldoDopo: number;
+  statoSpesa: string;
+  /** @nullable */
+  operatoreChiusuraId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
+  emailBollaStato: SpesaEmporioEmailBollaStato;
+  /** @nullable */
+  emailBollaDestinatari?: string | null;
+  /** @nullable */
+  emailBollaDataInvio?: string | null;
+  /** @nullable */
+  emailBollaDataUltimoClick?: string | null;
+  /** @nullable */
+  emailBollaOperatoreId?: number | null;
+  /** @nullable */
+  emailBollaOggetto?: string | null;
+  /** @nullable */
+  emailBollaErrore?: string | null;
+  /** @nullable */
+  note?: string | null;
+  righe: SpesaEmporioRiga[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SpesaEmporioChiusuraInput {
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface BollaEmporioInvioManualeInput {
+  /** @nullable */
+  linkBolla?: string | null;
+}
+
+export type BollaEmporioEmailResultStato = typeof BollaEmporioEmailResultStato[keyof typeof BollaEmporioEmailResultStato];
+
+
+export const BollaEmporioEmailResultStato = {
+  non_preparata: 'non_preparata',
+  invio_manuale_avviato: 'invio_manuale_avviato',
+  nessun_destinatario: 'nessun_destinatario',
+  errore: 'errore',
+} as const;
+
+export interface BollaEmporioEmailResult {
+  stato: BollaEmporioEmailResultStato;
+  destinatari: string[];
+  /** @nullable */
+  destinatario?: string | null;
+  /** @nullable */
+  oggetto?: string | null;
+  /** @nullable */
+  corpo?: string | null;
+  /** @nullable */
+  linkBolla?: string | null;
+  /** @nullable */
+  mailtoHref?: string | null;
+  /** @nullable */
+  errore?: string | null;
+  messaggio?: string;
+  spesa?: SpesaEmporio | null;
+}
+
+export interface SpesaEmporioChiusuraResult {
+  sessione?: SessioneCassaEmporio | null;
+  spesa?: SpesaEmporio | null;
+  emailBolla: BollaEmporioEmailResult;
+  messaggio?: string;
+}
+
+export interface BollaEmporioStampa {
+  intestazione: string;
+  /** @nullable */
+  numeroBolla?: string | null;
+  numeroSpesa: string;
+  dataChiusura: string;
+  /** @nullable */
+  beneficiario?: string | null;
+  /** @nullable */
+  beneficiarioCodice?: string | null;
+  /** @nullable */
+  beneficiarioCodiceFiscale?: string | null;
+  /** @nullable */
+  centroAscolto?: string | null;
+  /** @nullable */
+  emporio?: string | null;
+  /** @nullable */
+  emporioIndirizzo?: string | null;
+  /** @nullable */
+  operatore?: string | null;
+  righe: SpesaEmporioRiga[];
+  totaleCreditoConsumati: number;
+  saldoPrima: number;
+  saldoDopo: number;
+  /** @nullable */
+  note?: string | null;
 }
 
 export interface AssociaBollaInput {
@@ -2882,6 +3134,11 @@ beneficiarioSearch?: string;
 beneficiarioId?: number;
 };
 
+export type SearchBeneficiariAccessiEmporioParams = {
+search?: string;
+beneficiarioId?: number;
+};
+
 export type ListSessioniCassaEmporioParams = {
 statoSessione?: SessioneCassaEmporioStato;
 magazzinoEmporioId?: number;
@@ -2902,6 +3159,17 @@ magazzinoEmporioId?: number;
 export type SearchProdottiCassaEmporioParams = {
 search?: string;
 magazzinoEmporioId?: number;
+};
+
+export type ListSpeseEmporioParams = {
+dataDa?: string;
+dataA?: string;
+beneficiarioSearch?: string;
+beneficiarioId?: number;
+magazzinoEmporioId?: number;
+centroAscoltoId?: number;
+cittaId?: number;
+areaId?: number;
 };
 
 export type ListBolleParams = {
@@ -2935,6 +3203,7 @@ export const ListCreditoSolidaleMovimentiTipoMovimento = {
   rettifica_positiva: 'rettifica_positiva',
   rettifica_negativa: 'rettifica_negativa',
   storno: 'storno',
+  consumo_spesa: 'consumo_spesa',
 } as const;
 
 export type ListVolontariParams = {

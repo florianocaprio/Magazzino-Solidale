@@ -42,6 +42,16 @@ export interface SessioneCassaEmporio {
   /** @nullable */
   dataAnnullamento?: Date | null;
   /** @nullable */
+  dataChiusura?: Date | null;
+  /** @nullable */
+  spesaEmporioId?: number | null;
+  /** @nullable */
+  bollaId?: number | null;
+  /** @nullable */
+  movimentoCreditoSolidaleId?: number | null;
+  /** @nullable */
+  operatoreChiusuraId?: number | null;
+  /** @nullable */
   motivoAnnullamento?: string | null;
   /** @nullable */
   note?: string | null;

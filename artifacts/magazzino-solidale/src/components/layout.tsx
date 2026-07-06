@@ -16,6 +16,7 @@ import {
   Car,
   Store,
   CreditCard,
+  ReceiptText,
   ShoppingCart,
   BarChart3,
   Building2,
@@ -90,6 +91,7 @@ const NAV_ITEMS = [
   { key: "emporioCreditiSaldo", url: "/emporio/crediti-saldo", icon: CreditCard, groupKey: "emporio", area: "sociale", modulo: "emporio" },
   { key: "politicheCreditoSolidale", url: "/politiche-credito-solidale", icon: SlidersHorizontal, groupKey: "emporio", area: "amministrazione", modulo: "emporio" },
   { key: "emporioAccessi", url: "/emporio/accessi", icon: CalendarClock, groupKey: "emporio", area: "sociale", modulo: "emporio" },
+  { key: "emporioSpese", url: "/emporio/spese", icon: ReceiptText, groupKey: "emporio", area: "sociale", modulo: "emporio" },
 
   { key: "udsAnagrafica", url: "/uds/anagrafica", icon: Footprints, groupKey: "uds", area: "uds", modulo: "uds" },
   { key: "udsInterventi", url: "/uds/interventi", icon: HeartHandshake, groupKey: "uds", area: "uds", modulo: "uds" },

@@ -4,15 +4,15 @@ import {
   getListAccessiEmporioQueryKey,
   useCreateAccessoEmporio,
   useListAccessiEmporio,
-  useListBeneficiari,
   useListCentriAscolto,
   useListCitta,
   useListMagazzini,
+  useSearchBeneficiariAccessiEmporio,
   useUpdateAccessoEmporio,
   useUpdateAccessoEmporioStato,
   type AccessoEmporio,
   type AccessoEmporioStato,
-  type Beneficiario,
+  type BeneficiarioAccessoEmporioSearchResult,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -27,14 +27,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 
 const ALL = "__all__";
 const STATI_ACCESSO: AccessoEmporioStato[] = ["pianificato", "confermato", "effettuato", "annullato", "non_presentato"];
-const CASSA_PLACEHOLDER = "La Cassa Emporio sarà disponibile dalla Fase4-6.";
-
 type FormState = {
   beneficiarioId: string;
   magazzinoEmporioId: string;
@@ -72,7 +69,7 @@ function extractError(err: unknown, fallback: string): string {
   return fallback;
 }
 
-function isEligible(b: Beneficiario | null): string | null {
+function isEligible(b: BeneficiarioAccessoEmporioSearchResult | null): string | null {
   if (!b) return null;
   if (!b.attivo) return "accessiEmporio.beneficiarioNonAttivo";
   if (b.centroAscoltoId == null) return "accessiEmporio.centroAscoltoRichiesto";
@@ -134,16 +131,18 @@ export default function EmporioAccessi() {
   const { data: centri } = useListCentriAscolto();
   const { data: citta } = useListCitta();
   const { data: magazzini } = useListMagazzini();
-  const { data: beneficiari } = useListBeneficiari({
-    search: beneficiarioSearch.trim() || undefined,
-    attivo: true,
-  });
+  const beneficiarioSearchParams = beneficiarioSearch.trim()
+    ? { search: beneficiarioSearch.trim() }
+    : form.beneficiarioId
+      ? { beneficiarioId: Number(form.beneficiarioId) }
+      : undefined;
+  const { data: beneficiari } = useSearchBeneficiariAccessiEmporio(beneficiarioSearchParams);
   const empori = useMemo(
     () => (magazzini ?? []).filter((m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto"),
     [magazzini],
   );
   const beneficiarioSelezionato = useMemo(
-    () => (beneficiari ?? []).find((b) => String(b.id) === form.beneficiarioId) ?? null,
+    () => (beneficiari ?? []).find((b) => String(b.beneficiarioId) === form.beneficiarioId) ?? null,
     [beneficiari, form.beneficiarioId],
   );
   const eligibilityError = isEligible(beneficiarioSelezionato);
@@ -164,10 +163,13 @@ export default function EmporioAccessi() {
     };
   }, [accessi]);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListAccessiEmporioQueryKey() });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: getListAccessiEmporioQueryKey() });
+  };
 
   const openCreate = () => {
     setEditing({ mode: "create" });
+    setBeneficiarioSearch("");
     setForm({
       beneficiarioId: initialBeneficiarioId,
       magazzinoEmporioId: "",
@@ -183,6 +185,7 @@ export default function EmporioAccessi() {
     const start = accesso.dataOraInizio ? new Date(accesso.dataOraInizio) : new Date();
     const end = accesso.dataOraFine ? new Date(accesso.dataOraFine) : null;
     setEditing({ mode: "edit", accesso });
+    setBeneficiarioSearch(accesso.beneficiarioCodice ?? accesso.beneficiarioNome ?? "");
     setForm({
       beneficiarioId: String(accesso.beneficiarioId),
       magazzinoEmporioId: accesso.magazzinoEmporioId != null ? String(accesso.magazzinoEmporioId) : "",
@@ -336,6 +339,7 @@ export default function EmporioAccessi() {
                   <TableCell>
                     <div className="font-medium">{accesso.beneficiarioNome ?? "-"}</div>
                     <div className="text-xs text-muted-foreground">{accesso.beneficiarioCodice ?? "-"}</div>
+                    {accesso.accessoForzato && <Badge variant="secondary" className="mt-1">{t("accessiEmporio.accessoForzatoDaCassa")}</Badge>}
                   </TableCell>
                   <TableCell>{accesso.centroAscoltoNome ?? "-"}</TableCell>
                   <TableCell>{accesso.magazzinoEmporioNome ?? "-"}</TableCell>
@@ -350,14 +354,9 @@ export default function EmporioAccessi() {
                       <Button variant="ghost" size="icon" onClick={() => changeStatus(accesso, "effettuato")} disabled={!emporioAbilitato || pending || accesso.statoAccessoEmporio === "effettuato"} title={t("accessiEmporio.segnoEffettuato")}><CheckCircle2 className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => changeStatus(accesso, "non_presentato")} disabled={!emporioAbilitato || pending || accesso.statoAccessoEmporio === "non_presentato"} title={t("accessiEmporio.segnoNonPresentato")}><UserX className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setAnnullando(accesso)} disabled={!emporioAbilitato || pending || accesso.statoAccessoEmporio === "annullato"} title={t("accessiEmporio.annullaAccesso")}><XCircle className="h-4 w-4" /></Button>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <Button variant="outline" size="icon" disabled title={CASSA_PLACEHOLDER}><Play className="h-4 w-4" /></Button>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>{CASSA_PLACEHOLDER}</TooltipContent>
-                      </Tooltip>
+                      <Button variant="outline" size="icon" asChild title={t("accessiEmporio.apriCassa")}>
+                        <Link href={`/emporio/cassa?accessoEmporioId=${accesso.id}`}><Play className="h-4 w-4" /></Link>
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -376,18 +375,32 @@ export default function EmporioAccessi() {
               <Input placeholder={t("accessiEmporio.cercaBeneficiarioPlaceholder")} value={beneficiarioSearch} onChange={(event) => setBeneficiarioSearch(event.target.value)} disabled={!emporioAbilitato} />
             </div>
             <Select value={form.beneficiarioId || ""} onValueChange={(value) => {
-              const selected = (beneficiari ?? []).find((b) => String(b.id) === value);
+              const selected = (beneficiari ?? []).find((b) => String(b.beneficiarioId) === value);
               setForm((current) => ({
                 ...current,
                 beneficiarioId: value,
                 magazzinoEmporioId: selected?.magazzinoEmporioPreferitoId != null ? String(selected.magazzinoEmporioPreferitoId) : current.magazzinoEmporioId,
               }));
+              if (selected) setBeneficiarioSearch(`${selected.beneficiarioNome} ${selected.beneficiarioCodice}`);
             }} disabled={!emporioAbilitato}>
               <SelectTrigger><SelectValue placeholder={t("accessiEmporio.beneficiario")} /></SelectTrigger>
               <SelectContent>
-                {(beneficiari ?? []).map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.cognome} {b.nome} · {b.codice}</SelectItem>)}
+                {(beneficiari ?? []).map((b) => (
+                  <SelectItem key={b.beneficiarioId} value={String(b.beneficiarioId)}>
+                    {b.beneficiarioNome} · {b.beneficiarioCodice}
+                    {b.centroAscoltoNome ? ` · ${b.centroAscoltoNome}` : ""}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {beneficiarioSelezionato && (
+              <div className="rounded-md border p-3 text-xs text-muted-foreground">
+                <div className="font-medium text-foreground">{beneficiarioSelezionato.beneficiarioNome}</div>
+                <div>{beneficiarioSelezionato.beneficiarioCodice}</div>
+                <div>{beneficiarioSelezionato.centroAscoltoNome ?? "-"}</div>
+                <div>{t(`creditoSolidale.stato.${beneficiarioSelezionato.creditoSolidaleStato}`)}</div>
+              </div>
+            )}
             {eligibilityError && <p className="text-sm font-medium text-destructive">{t(eligibilityError)}</p>}
             <Select value={form.magazzinoEmporioId || ""} onValueChange={(value) => setForm((current) => ({ ...current, magazzinoEmporioId: value }))} disabled={!emporioAbilitato}>
               <SelectTrigger><SelectValue placeholder={t("accessiEmporio.emporio")} /></SelectTrigger>

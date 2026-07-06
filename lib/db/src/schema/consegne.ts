@@ -28,6 +28,11 @@ export const consegneTable = pgTable("consegne", {
   statoAccessoEmporio: varchar("stato_accesso_emporio", { length: 40 }),
   motivoAnnullamento: text("motivo_annullamento"),
   noteAccessoEmporio: text("note_accesso_emporio"),
+  origineAccesso: varchar("origine_accesso", { length: 40 }),
+  accessoForzato: boolean("accesso_forzato").notNull().default(false),
+  motivoAccessoForzato: text("motivo_accesso_forzato"),
+  dataOraEffettivaAccesso: timestamp("data_ora_effettiva_accesso"),
+  operatoreAccessoEmporioId: integer("operatore_accesso_emporio_id"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 

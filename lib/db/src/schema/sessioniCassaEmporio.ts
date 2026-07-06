@@ -22,6 +22,11 @@ export const sessioniCassaEmporioTable = pgTable("sessioni_cassa_emporio", {
   dataUltimaModifica: timestamp("data_ultima_modifica").notNull().defaultNow(),
   dataSospensione: timestamp("data_sospensione"),
   dataAnnullamento: timestamp("data_annullamento"),
+  dataChiusura: timestamp("data_chiusura"),
+  spesaEmporioId: integer("spesa_emporio_id"),
+  bollaId: integer("bolla_id"),
+  movimentoCreditoSolidaleId: integer("movimento_credito_solidale_id"),
+  operatoreChiusuraId: integer("operatore_chiusura_id"),
   motivoAnnullamento: text("motivo_annullamento"),
   note: text("note"),
 });

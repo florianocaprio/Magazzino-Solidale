@@ -5,9 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { SessioneCassaEmporioAccessoValido } from './sessioneCassaEmporioAccessoValido';
 
-export interface SessioneCassaEmporioRicercaBeneficiarioResult {
+export interface BeneficiarioAccessoEmporioSearchResult {
   beneficiarioId: number;
   beneficiarioNome: string;
   beneficiarioCodice: string;
@@ -16,14 +15,19 @@ export interface SessioneCassaEmporioRicercaBeneficiarioResult {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
   cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: string;
+  saldoCreditoSolidale: number;
+  /** @nullable */
+  quotaMensileAssegnata?: number | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
-  saldoCreditoSolidale: number;
-  creditoSolidaleAbilitato: boolean;
-  creditoSolidaleStato: string;
   attivo: boolean;
-  accessi: SessioneCassaEmporioAccessoValido[];
 }

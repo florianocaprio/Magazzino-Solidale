@@ -34,6 +34,9 @@ tags:
   - name: zone-uds
   - name: politiche-credito-solidale
   - name: credito-solidale
+  - name: accessi-emporio
+  - name: cassa-emporio
+  - name: spese-emporio
 
 paths:
   /healthz:
@@ -1563,6 +1566,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/AccessoEmporio"
 
+  /accessi-emporio/beneficiari/ricerca:
+    get:
+      operationId: searchBeneficiariAccessiEmporio
+      tags: [accessi-emporio]
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: beneficiarioId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Beneficiary search results for Emporio accesses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BeneficiarioAccessoEmporioSearchResult"
+
   /accessi-emporio/{id}:
     get:
       operationId: getAccessoEmporio
@@ -1708,6 +1734,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SessioneCassaEmporio"
+
+  /cassa-emporio/accessi/forza:
+    post:
+      operationId: forzaAccessoEmporioCassa
+      tags: [cassa-emporio]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessoEmporioForzatoInput"
+      responses:
+        "201":
+          description: Forced Emporio access and opened checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessoEmporioForzatoResult"
 
   /cassa-emporio/sessioni/{id}/righe:
     post:
@@ -1861,6 +1905,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/SessioneCassaEmporio"
 
+  /cassa-emporio/sessioni/{id}/chiudi:
+    post:
+      operationId: chiudiSessioneCassaEmporio
+      tags: [cassa-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpesaEmporioChiusuraInput"
+      responses:
+        "200":
+          description: Closed Emporio checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpesaEmporioChiusuraResult"
+
   /cassa-emporio/beneficiari/ricerca:
     get:
       operationId: searchBeneficiariCassaEmporio
@@ -1918,6 +1986,156 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SessioneCassaEmporioRicercaProdottoResult"
+
+  # ─── SPESE EMPORIO ──────────────────────────────────────────────────────────
+  /spese-emporio:
+    get:
+      operationId: listSpeseEmporio
+      tags: [spese-emporio]
+      parameters:
+        - name: dataDa
+          in: query
+          schema:
+            type: string
+        - name: dataA
+          in: query
+          schema:
+            type: string
+        - name: beneficiarioSearch
+          in: query
+          schema:
+            type: string
+        - name: beneficiarioId
+          in: query
+          schema:
+            type: integer
+        - name: magazzinoEmporioId
+          in: query
+          schema:
+            type: integer
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
+        - name: cittaId
+          in: query
+          schema:
+            type: integer
+        - name: areaId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Closed Emporio expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SpesaEmporio"
+
+  /spese-emporio/sessione/{sessioneCassaId}:
+    get:
+      operationId: getSpesaEmporioBySessione
+      tags: [spese-emporio]
+      parameters:
+        - name: sessioneCassaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Emporio expense by checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpesaEmporio"
+
+  /spese-emporio/{id}:
+    get:
+      operationId: getSpesaEmporio
+      tags: [spese-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Emporio expense detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpesaEmporio"
+
+  /spese-emporio/{id}/bolla-stampa:
+    get:
+      operationId: getBollaStampaSpesaEmporio
+      tags: [spese-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Printable Emporio delivery note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BollaEmporioStampa"
+
+  /spese-emporio/{id}/registra-invio-manuale-bolla:
+    post:
+      operationId: registraInvioManualeBollaSpesaEmporio
+      tags: [spese-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BollaEmporioInvioManualeInput"
+      responses:
+        "200":
+          description: Emporio delivery note manual email preparation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BollaEmporioEmailResult"
+
+  /spese-emporio/{id}/invia-bolla-email:
+    post:
+      operationId: inviaBollaEmailSpesaEmporio
+      tags: [spese-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BollaEmporioInvioManualeInput"
+      responses:
+        "200":
+          description: Emporio delivery note manual email preparation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BollaEmporioEmailResult"
 
   # ─── BOLLE ───────────────────────────────────────────────────────────────────
   /bolle:
@@ -2789,7 +3007,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [ricarica_mensile, ricarica_manuale, rettifica_positiva, rettifica_negativa, storno]
+            enum: [ricarica_mensile, ricarica_manuale, rettifica_positiva, rettifica_negativa, storno, consumo_spesa]
         - name: periodoRiferimento
           in: query
           required: false
@@ -2828,6 +3046,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreditoSolidaleSaldo"
+
+  /credito-solidale/beneficiari/{beneficiarioId}/refresh-credito:
+    post:
+      operationId: refreshCreditoSolidaleBeneficiario
+      tags: [credito-solidale]
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditoSolidaleRefreshInput"
+      responses:
+        "200":
+          description: Credito Solidale già aggiornato per il periodo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleRefreshResult"
+        "201":
+          description: Credito Solidale aggiornato con ricarica mensile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleRefreshResult"
 
   /credito-solidale/beneficiari/{beneficiarioId}/movimenti:
     get:
@@ -5771,7 +6019,7 @@ components:
           type: ["string", "null"]
         tipoMovimento:
           type: string
-          enum: [ricarica_mensile, ricarica_manuale, rettifica_positiva, rettifica_negativa, storno]
+          enum: [ricarica_mensile, ricarica_manuale, rettifica_positiva, rettifica_negativa, storno, consumo_spesa]
         variazioneCredito:
           type: number
         saldoPrima:
@@ -5826,6 +6074,34 @@ components:
           type: ["string", "null"]
           format: date-time
       required: [beneficiarioId, beneficiarioNome, creditoSolidaleAbilitato, creditoSolidaleStato, saldoAttuale, creditoSolidaleMensileAssegnato, dataUltimoMovimento]
+
+    CreditoSolidaleRefreshInput:
+      type: object
+      properties:
+        periodoRiferimento:
+          type: ["string", "null"]
+          pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+        note:
+          type: ["string", "null"]
+
+    CreditoSolidaleRefreshResult:
+      type: object
+      properties:
+        periodoRiferimento:
+          type: string
+        ricaricaEseguita:
+          type: boolean
+        movimento:
+          anyOf:
+            - $ref: "#/components/schemas/CreditoSolidaleMovimento"
+            - type: "null"
+        saldo:
+          anyOf:
+            - $ref: "#/components/schemas/CreditoSolidaleSaldo"
+            - type: "null"
+        messaggio:
+          type: string
+      required: [periodoRiferimento, ricaricaEseguita, movimento, saldo, messaggio]
 
     CreditoSolidaleRicaricaManualeInput:
       type: object
@@ -6588,6 +6864,17 @@ components:
           type: ["string", "null"]
         noteAccessoEmporio:
           type: ["string", "null"]
+        origineAccesso:
+          type: ["string", "null"]
+        accessoForzato:
+          type: boolean
+        motivoAccessoForzato:
+          type: ["string", "null"]
+        dataOraEffettivaAccesso:
+          type: ["string", "null"]
+          format: date-time
+        operatoreAccessoEmporioId:
+          type: ["integer", "null"]
         saldoCreditoSolidale:
           type: number
         quotaMensileAssegnata:
@@ -6643,9 +6930,44 @@ components:
           type: ["string", "null"]
       required: [statoAccessoEmporio]
 
+    BeneficiarioAccessoEmporioSearchResult:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: string
+        beneficiarioCodice:
+          type: string
+        beneficiarioCodiceFiscale:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        creditoSolidaleAbilitato:
+          type: boolean
+        creditoSolidaleStato:
+          type: string
+        saldoCreditoSolidale:
+          type: number
+        quotaMensileAssegnata:
+          type: ["number", "null"]
+        magazzinoEmporioPreferitoId:
+          type: ["integer", "null"]
+        magazzinoEmporioPreferitoNome:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+      required: [beneficiarioId, beneficiarioNome, beneficiarioCodice, creditoSolidaleAbilitato, creditoSolidaleStato, saldoCreditoSolidale, attivo]
+
     SessioneCassaEmporioStato:
       type: string
-      enum: [aperta, sospesa, annullata, pronta_per_chiusura]
+      enum: [aperta, sospesa, annullata, pronta_per_chiusura, chiusa]
 
     SessioneCassaEmporioRiga:
       type: object
@@ -6742,6 +7064,17 @@ components:
         dataAnnullamento:
           type: ["string", "null"]
           format: date-time
+        dataChiusura:
+          type: ["string", "null"]
+          format: date-time
+        spesaEmporioId:
+          type: ["integer", "null"]
+        bollaId:
+          type: ["integer", "null"]
+        movimentoCreditoSolidaleId:
+          type: ["integer", "null"]
+        operatoreChiusuraId:
+          type: ["integer", "null"]
         motivoAnnullamento:
           type: ["string", "null"]
         note:
@@ -6833,6 +7166,10 @@ components:
           type: ["integer", "null"]
         cittaId:
           type: ["integer", "null"]
+        magazzinoEmporioPreferitoId:
+          type: ["integer", "null"]
+        magazzinoEmporioPreferitoNome:
+          type: ["string", "null"]
         saldoCreditoSolidale:
           type: number
         creditoSolidaleAbilitato:
@@ -6846,6 +7183,37 @@ components:
           items:
             $ref: "#/components/schemas/SessioneCassaEmporioAccessoValido"
       required: [beneficiarioId, beneficiarioNome, beneficiarioCodice, saldoCreditoSolidale, creditoSolidaleAbilitato, creditoSolidaleStato, attivo, accessi]
+
+    AccessoEmporioForzatoInput:
+      type: object
+      properties:
+        beneficiarioId:
+          type: integer
+        magazzinoEmporioId:
+          type: integer
+        data:
+          type: string
+        dataOraInizio:
+          type: string
+          format: date-time
+        motivoAccessoForzato:
+          type: string
+        noteAccessoEmporio:
+          type: ["string", "null"]
+      required: [beneficiarioId, magazzinoEmporioId, motivoAccessoForzato]
+
+    AccessoEmporioForzatoResult:
+      type: object
+      properties:
+        accessoEmporioId:
+          type: integer
+        origineAccesso:
+          type: string
+        sessione:
+          $ref: "#/components/schemas/SessioneCassaEmporio"
+        messaggio:
+          type: string
+      required: [accessoEmporioId, origineAccesso, sessione]
 
     SessioneCassaEmporioRicercaProdottoResult:
       type: object
@@ -6878,6 +7246,221 @@ components:
         messaggio:
           type: ["string", "null"]
       required: [valido]
+
+    SpesaEmporioRiga:
+      type: object
+      properties:
+        id:
+          type: integer
+        spesaEmporioId:
+          type: integer
+        sessioneCassaRigaId:
+          type: ["integer", "null"]
+        prodottoId:
+          type: integer
+        prodottoNome:
+          type: ["string", "null"]
+        lottoId:
+          type: ["integer", "null"]
+        codiceLotto:
+          type: ["string", "null"]
+        codiceProdotto:
+          type: ["string", "null"]
+        descrizioneProdotto:
+          type: string
+        quantita:
+          type: number
+        creditoUnitario:
+          type: number
+        creditoTotale:
+          type: number
+        scaricoId:
+          type: ["integer", "null"]
+        bollaRigaId:
+          type: ["integer", "null"]
+      required: [id, spesaEmporioId, prodottoId, descrizioneProdotto, quantita, creditoUnitario, creditoTotale]
+
+    SpesaEmporio:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessioneCassaId:
+          type: integer
+        accessoEmporioId:
+          type: integer
+        beneficiarioId:
+          type: integer
+        beneficiarioNome:
+          type: ["string", "null"]
+        beneficiarioCodice:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
+        cittaNome:
+          type: ["string", "null"]
+        magazzinoEmporioId:
+          type: integer
+        magazzinoEmporioNome:
+          type: ["string", "null"]
+        scaricoId:
+          type: ["integer", "null"]
+        bollaId:
+          type: ["integer", "null"]
+        bollaNumero:
+          type: ["string", "null"]
+        movimentoCreditoSolidaleId:
+          type: ["integer", "null"]
+        numeroSpesa:
+          type: string
+        dataChiusura:
+          type: string
+          format: date-time
+        totaleCreditoConsumati:
+          type: number
+        saldoPrima:
+          type: number
+        saldoDopo:
+          type: number
+        statoSpesa:
+          type: string
+        operatoreChiusuraId:
+          type: ["integer", "null"]
+        operatoreCodice:
+          type: ["string", "null"]
+        emailBollaStato:
+          type: string
+          enum: [non_preparata, invio_manuale_avviato, nessun_destinatario, errore]
+        emailBollaDestinatari:
+          type: ["string", "null"]
+        emailBollaDataInvio:
+          type: ["string", "null"]
+          format: date-time
+        emailBollaDataUltimoClick:
+          type: ["string", "null"]
+          format: date-time
+        emailBollaOperatoreId:
+          type: ["integer", "null"]
+        emailBollaOggetto:
+          type: ["string", "null"]
+        emailBollaErrore:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpesaEmporioRiga"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, sessioneCassaId, accessoEmporioId, beneficiarioId, magazzinoEmporioId, numeroSpesa, dataChiusura, totaleCreditoConsumati, saldoPrima, saldoDopo, statoSpesa, emailBollaStato, righe, createdAt, updatedAt]
+
+    SpesaEmporioChiusuraInput:
+      type: object
+      properties:
+        note:
+          type: ["string", "null"]
+
+    BollaEmporioInvioManualeInput:
+      type: object
+      properties:
+        linkBolla:
+          type: ["string", "null"]
+
+    BollaEmporioEmailResult:
+      type: object
+      properties:
+        stato:
+          type: string
+          enum: [non_preparata, invio_manuale_avviato, nessun_destinatario, errore]
+        destinatari:
+          type: array
+          items:
+            type: string
+        destinatario:
+          type: ["string", "null"]
+        oggetto:
+          type: ["string", "null"]
+        corpo:
+          type: ["string", "null"]
+        linkBolla:
+          type: ["string", "null"]
+        mailtoHref:
+          type: ["string", "null"]
+        errore:
+          type: ["string", "null"]
+        messaggio:
+          type: string
+        spesa:
+          anyOf:
+            - $ref: "#/components/schemas/SpesaEmporio"
+            - type: "null"
+      required: [stato, destinatari]
+
+    SpesaEmporioChiusuraResult:
+      type: object
+      properties:
+        sessione:
+          anyOf:
+            - $ref: "#/components/schemas/SessioneCassaEmporio"
+            - type: "null"
+        spesa:
+          anyOf:
+            - $ref: "#/components/schemas/SpesaEmporio"
+            - type: "null"
+        emailBolla:
+          $ref: "#/components/schemas/BollaEmporioEmailResult"
+        messaggio:
+          type: string
+      required: [emailBolla]
+
+    BollaEmporioStampa:
+      type: object
+      properties:
+        intestazione:
+          type: string
+        numeroBolla:
+          type: ["string", "null"]
+        numeroSpesa:
+          type: string
+        dataChiusura:
+          type: string
+          format: date-time
+        beneficiario:
+          type: ["string", "null"]
+        beneficiarioCodice:
+          type: ["string", "null"]
+        beneficiarioCodiceFiscale:
+          type: ["string", "null"]
+        centroAscolto:
+          type: ["string", "null"]
+        emporio:
+          type: ["string", "null"]
+        emporioIndirizzo:
+          type: ["string", "null"]
+        operatore:
+          type: ["string", "null"]
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpesaEmporioRiga"
+        totaleCreditoConsumati:
+          type: number
+        saldoPrima:
+          type: number
+        saldoDopo:
+          type: number
+        note:
+          type: ["string", "null"]
+      required: [intestazione, numeroSpesa, dataChiusura, righe, totaleCreditoConsumati, saldoPrima, saldoDopo]
 
     AssociaBollaInput:
       type: object
