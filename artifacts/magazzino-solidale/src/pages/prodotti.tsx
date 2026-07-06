@@ -35,25 +35,37 @@ import { ExportButtons } from "@/components/export-buttons";
 import { generateProdottiBarcodePdf } from "@/lib/prodotti-barcode-pdf";
 import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus, Barcode, Upload } from "lucide-react";
+import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
 
-const makeFormSchema = (t: (key: string) => string) => z.object({
-  codice: z.string().optional(),
-  nome: z.string().min(2, t("prodotti.errNomeShort")),
-  descrizione: z.string().optional(),
-  tipoProdotto: z.string().min(1, t("common.requiredField")),
-  unitaMisura: z.string().min(1, t("common.requiredField")),
-  codiceBarre: z.string().optional(),
-  gestioneLotto: z.boolean().default(false),
-  gestioneScadenza: z.boolean().default(false),
-  fsePlus: z.boolean().default(false),
-  scortaMinima: z.coerce.number().min(0).default(0),
-  scortaConsigliata: z.coerce.number().min(0).default(0),
-  note: z.string().optional()
-});
+const makeFormSchema = (t: (key: string) => string) => {
+  const optionalNonNegativeNumber = z.preprocess(
+    (value) => (value === "" || value == null ? null : value),
+    z.coerce.number().min(0, t("prodotti.errQuantitaNonNegative")).nullable(),
+  );
+
+  return z.object({
+    codice: z.string().optional(),
+    nome: z.string().min(2, t("prodotti.errNomeShort")),
+    descrizione: z.string().optional(),
+    tipoProdotto: z.string().min(1, t("common.requiredField")),
+    unitaMisura: z.string().min(1, t("common.requiredField")),
+    codiceBarre: z.string().optional(),
+    gestioneLotto: z.boolean().default(false),
+    gestioneScadenza: z.boolean().default(false),
+    fsePlus: z.boolean().default(false),
+    scortaMinima: z.coerce.number().min(0).default(0),
+    scortaConsigliata: z.coerce.number().min(0).default(0),
+    abilitatoEmporio: z.boolean().default(false),
+    creditoSolidaleValore: z.coerce.number().min(0, t("prodotti.errCreditoSolidaleNonNegative")).default(0),
+    quantitaMassimaPerSpesa: optionalNonNegativeNumber,
+    quantitaMassimaMensile: optionalNonNegativeNumber,
+    note: z.string().optional()
+  });
+};
 
 type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
@@ -61,6 +73,19 @@ const apiErrorMessage = (e: unknown) =>
   (e as { data?: { error?: string } })?.data?.error ??
   (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
   "Operazione non riuscita";
+
+type OptionalBulkNumberResult = { ok: true; value: number | undefined } | { ok: false; error: string };
+
+function parseOptionalBulkNumber(
+  value: string | undefined,
+  field: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): OptionalBulkNumberResult {
+  if (!value) return { ok: true, value: undefined };
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return { ok: false, error: t("bulkImport.invalidNumber", { field }) };
+  return { ok: true, value: n };
+}
 
 const makeCaricoSchema = (t: (key: string) => string) => z.object({
   magazzinoId: z.string().min(1, t("prodotti.errSelectMagazzino")),
@@ -399,6 +424,7 @@ export default function Prodotti() {
   const deleteProdotto = useDeleteProdotto();
   const bulkProdotti = useBulkProdotti();
   const { data: fornitori } = useListFornitori();
+  const { emporioAbilitato } = useModuloFlags();
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   const formSchema = makeFormSchema(t);
@@ -408,9 +434,11 @@ export default function Prodotti() {
     defaultValues: {
       codice: "", nome: "", descrizione: "", tipoProdotto: "alimentare",
       unitaMisura: "pz", gestioneLotto: false, gestioneScadenza: false, fsePlus: false,
-      scortaMinima: 0, scortaConsigliata: 0, note: "", codiceBarre: ""
+      scortaMinima: 0, scortaConsigliata: 0, abilitatoEmporio: false, creditoSolidaleValore: 0,
+      quantitaMassimaPerSpesa: null, quantitaMassimaMensile: null, note: "", codiceBarre: ""
     }
   });
+  const abilitatoEmporio = form.watch("abilitatoEmporio");
 
   const handleEdit = (prodotto: any) => {
     setEditingId(prodotto.id);
@@ -426,6 +454,10 @@ export default function Prodotti() {
       fsePlus: prodotto.fsePlus,
       scortaMinima: prodotto.scortaMinima,
       scortaConsigliata: prodotto.scortaConsigliata,
+      abilitatoEmporio: prodotto.abilitatoEmporio ?? false,
+      creditoSolidaleValore: prodotto.creditoSolidaleValore ?? 0,
+      quantitaMassimaPerSpesa: prodotto.quantitaMassimaPerSpesa ?? null,
+      quantitaMassimaMensile: prodotto.quantitaMassimaMensile ?? null,
       note: prodotto.note || ""
     });
     setIsFormOpen(true);
@@ -436,7 +468,8 @@ export default function Prodotti() {
     form.reset({
       codice: "", nome: "", descrizione: "", tipoProdotto: "alimentare",
       unitaMisura: "pz", gestioneLotto: false, gestioneScadenza: false, fsePlus: false,
-      scortaMinima: 0, scortaConsigliata: 0, note: "", codiceBarre: ""
+      scortaMinima: 0, scortaConsigliata: 0, abilitatoEmporio: false, creditoSolidaleValore: 0,
+      quantitaMassimaPerSpesa: null, quantitaMassimaMensile: null, note: "", codiceBarre: ""
     });
     setIsFormOpen(true);
   };
@@ -511,6 +544,10 @@ export default function Prodotti() {
               { header: t("common.type"), accessor: (p) => p.tipoProdotto },
               { header: t("prodotti.colUm"), accessor: (p) => p.unitaMisura },
               { header: t("prodotti.colScortaMinima"), accessor: (p) => p.scortaMinima != null ? parseFloat(String(p.scortaMinima)) : "" },
+              { header: t("prodotti.abilitatoEmporio"), accessor: (p) => p.abilitatoEmporio ? t("common.yes") : t("common.no") },
+              { header: t("prodotti.creditoSolidaleValore"), accessor: (p) => p.creditoSolidaleValore ?? 0 },
+              { header: t("prodotti.quantitaMassimaPerSpesa"), accessor: (p) => p.quantitaMassimaPerSpesa ?? "" },
+              { header: t("prodotti.quantitaMassimaMensile"), accessor: (p) => p.quantitaMassimaMensile ?? "" },
             ]}
             filename="prodotti"
             title={t("prodotti.title")}
@@ -563,6 +600,10 @@ export default function Prodotti() {
           { key: "fsePlus", header: "FSE+", example: "No" },
           { key: "scortaMinima", header: t("prodotti.colScortaMinima"), example: 0 },
           { key: "scortaConsigliata", header: t("prodotti.scortaConsigliata"), example: 0 },
+          { key: "abilitatoEmporio", header: t("prodotti.abilitatoEmporio"), example: "No" },
+          { key: "creditoSolidaleValore", header: t("prodotti.creditoSolidaleValore"), example: 1 },
+          { key: "quantitaMassimaPerSpesa", header: t("prodotti.quantitaMassimaPerSpesa"), example: "" },
+          { key: "quantitaMassimaMensile", header: t("prodotti.quantitaMassimaMensile"), example: "" },
           { key: "fornitore", header: t("prodotti.fornitore"), example: "" },
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
@@ -587,6 +628,25 @@ export default function Prodotti() {
             if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("prodotti.scortaConsigliata") }) };
             scortaConsigliata = n;
           }
+          const creditoSolidaleValore = parseOptionalBulkNumber(
+            r.creditoSolidaleValore,
+            t("prodotti.creditoSolidaleValore"),
+            t,
+          );
+          if (!creditoSolidaleValore.ok) return { error: creditoSolidaleValore.error };
+          const quantitaMassimaPerSpesa = parseOptionalBulkNumber(
+            r.quantitaMassimaPerSpesa,
+            t("prodotti.quantitaMassimaPerSpesa"),
+            t,
+          );
+          if (!quantitaMassimaPerSpesa.ok) return { error: quantitaMassimaPerSpesa.error };
+          const quantitaMassimaMensile = parseOptionalBulkNumber(
+            r.quantitaMassimaMensile,
+            t("prodotti.quantitaMassimaMensile"),
+            t,
+          );
+          if (!quantitaMassimaMensile.ok) return { error: quantitaMassimaMensile.error };
+          const abilitatoEmporioImport = parseBoolCell(r.abilitatoEmporio);
           return {
             data: {
               codice: r.codice || undefined,
@@ -600,6 +660,10 @@ export default function Prodotti() {
               fsePlus: parseBoolCell(r.fsePlus),
               scortaMinima,
               scortaConsigliata,
+              abilitatoEmporio: abilitatoEmporioImport,
+              creditoSolidaleValore: abilitatoEmporioImport ? (creditoSolidaleValore.value ?? 1) : creditoSolidaleValore.value,
+              quantitaMassimaPerSpesa: quantitaMassimaPerSpesa.value,
+              quantitaMassimaMensile: quantitaMassimaMensile.value,
               fornitoreId,
             },
           };
@@ -690,6 +754,11 @@ export default function Prodotti() {
                       )}
                       {prodotto.gestioneLotto && (
                         <Badge variant="outline" className="text-xs">{t("prodotti.badgeLotto")}</Badge>
+                      )}
+                      {prodotto.abilitatoEmporio && (
+                        <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-700 border-emerald-200">
+                          {t("prodotti.badgeEmporio")}
+                        </Badge>
                       )}
                     </div>
                   </TableCell>
@@ -828,6 +897,81 @@ export default function Prodotti() {
                     <FormItem>
                       <FormLabel>{t("prodotti.scortaConsigliata")}</FormLabel>
                       <FormControl><Input type="number" min="0" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                <div className="space-y-4 pt-4 border-t">
+                  <div>
+                    <h4 className="text-sm font-medium">{t("prodotti.emporioSection")}</h4>
+                    <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.creditoSolidaleHelp")}</p>
+                    {!emporioAbilitato && (
+                      <p className="text-[0.8rem] text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>
+                    )}
+                  </div>
+
+                  <FormField control={form.control} name="abilitatoEmporio" render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>{t("prodotti.abilitatoEmporio")}</FormLabel>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            if (checked && Number(form.getValues("creditoSolidaleValore") ?? 0) <= 0) {
+                              form.setValue("creditoSolidaleValore", 1, { shouldDirty: true, shouldValidate: true });
+                            }
+                          }}
+                          disabled={!emporioAbilitato}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="creditoSolidaleValore" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("prodotti.creditoSolidaleValore")}</FormLabel>
+                        <FormControl>
+                          <Input type="number" min="0" step="0.01" disabled={!emporioAbilitato || !abilitatoEmporio} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="quantitaMassimaPerSpesa" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("prodotti.quantitaMassimaPerSpesa")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            disabled={!emporioAbilitato || !abilitatoEmporio}
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  <FormField control={form.control} name="quantitaMassimaMensile" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("prodotti.quantitaMassimaMensile")}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          disabled={!emporioAbilitato || !abilitatoEmporio}
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />

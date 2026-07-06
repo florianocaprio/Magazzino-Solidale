@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { CreateZonaUdsBody, UpdateZonaUdsBody } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/auth";
 import { callerCittaId, canAccessCitta } from "../lib/centroScope";
+import { UNITA_STRADA_DISABLED_MSG, isUnitaStradaEnabled } from "../lib/impostazioniModuli";
 
 const router: IRouter = Router();
 
@@ -70,12 +71,20 @@ router.get("/zone-uds/:id", async (req, res) => {
 });
 
 router.post("/zone-uds", requireAdmin, async (req, res) => {
+  if (!(await isUnitaStradaEnabled())) {
+    res.status(403).json({ error: UNITA_STRADA_DISABLED_MSG });
+    return;
+  }
   const parsed = CreateZonaUdsBody.parse(req.body);
   const [row] = await db.insert(zoneUdsTable).values(parsed).returning();
   res.status(201).json(fmt(row));
 });
 
 router.patch("/zone-uds/:id", requireAdmin, async (req, res) => {
+  if (!(await isUnitaStradaEnabled())) {
+    res.status(403).json({ error: UNITA_STRADA_DISABLED_MSG });
+    return;
+  }
   const id = parseInt(req.params.id as string);
   const parsed = UpdateZonaUdsBody.parse(req.body);
   const [row] = await db
@@ -91,6 +100,10 @@ router.patch("/zone-uds/:id", requireAdmin, async (req, res) => {
 });
 
 router.delete("/zone-uds/:id", requireAdmin, async (req, res) => {
+  if (!(await isUnitaStradaEnabled())) {
+    res.status(403).json({ error: UNITA_STRADA_DISABLED_MSG });
+    return;
+  }
   const id = parseInt(req.params.id as string);
   // Clear FK references before deleting (FKs are RESTRICT by default).
   await db

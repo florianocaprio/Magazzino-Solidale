@@ -4,6 +4,7 @@ import { seedRoles } from "./lib/seedRoles";
 import { seedRuoliVolontari } from "./lib/seedRuoliVolontari";
 import { seedTipiIntervento } from "./lib/seedTipiIntervento";
 import { seedTipologieFornitore } from "./lib/seedTipologieFornitore";
+import { seedPoliticheCreditoSolidale } from "./lib/seedPoliticheCreditoSolidale";
 import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
 import { initDbExtensions } from "./lib/dbInit";
 
@@ -47,6 +48,10 @@ app.listen(port, (err) => {
 
   seedTipologieFornitore().catch((err) => {
     logger.error({ err }, "Failed to seed supplier types");
+  });
+
+  seedPoliticheCreditoSolidale().catch((err) => {
+    logger.error({ err }, "Failed to seed Credito Solidale policy");
   });
 
   schedulePriorityDowngrade();

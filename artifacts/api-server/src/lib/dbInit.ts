@@ -13,7 +13,7 @@ export async function initDbExtensions(): Promise<void> {
   await db.execute(sql`
     UPDATE fornitori f
     SET citta_id = c.citta_id
-    FROM centri_ascolto c
+    FROM centri_di_ascolto c
     WHERE f.centro_ascolto_id = c.id
       AND f.citta_id IS NULL
       AND c.citta_id IS NOT NULL

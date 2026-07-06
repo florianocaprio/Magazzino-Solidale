@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ConsegnaTipoPianificazione } from './consegnaTipoPianificazione';
 
 export interface Consegna {
   id: number;
@@ -12,6 +13,7 @@ export interface Consegna {
   beneficiarioId: number;
   /** @nullable */
   beneficiarioNome?: string | null;
+  tipoPianificazione: ConsegnaTipoPianificazione;
   tipoConsegna: string;
   dataPrevista: string;
   /** @nullable */

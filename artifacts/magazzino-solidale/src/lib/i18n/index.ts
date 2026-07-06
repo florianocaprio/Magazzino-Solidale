@@ -34,6 +34,12 @@ import { reportUds } from "./namespaces/reportUds";
 import { udsReportGiornaliero } from "./namespaces/udsReportGiornaliero";
 import { impostazioniStampa } from "./namespaces/impostazioniStampa";
 import { impostazioniEmail } from "./namespaces/impostazioniEmail";
+import { moduli } from "./namespaces/moduli";
+import { emporio } from "./namespaces/emporio";
+import { accessiEmporio } from "./namespaces/accessiEmporio";
+import { cassaEmporio } from "./namespaces/cassaEmporio";
+import { creditoSolidale } from "./namespaces/creditoSolidale";
+import { speseEmporio } from "./namespaces/speseEmporio";
 import { utenti } from "./namespaces/utenti";
 import { ruoli } from "./namespaces/ruoli";
 import { login } from "./namespaces/login";
@@ -82,6 +88,12 @@ const PAGE_NAMESPACES = {
   udsReportGiornaliero,
   impostazioniStampa,
   impostazioniEmail,
+  moduli,
+  emporio,
+  accessiEmporio,
+  cassaEmporio,
+  creditoSolidale,
+  speseEmporio,
   utenti,
   ruoli,
   login,

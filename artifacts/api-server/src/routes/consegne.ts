@@ -33,6 +33,7 @@ import { buildIcs } from "../lib/ics";
 import { completeBollaDelivery, handleBollaActionError } from "../lib/bollaDelivery";
 
 const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
+const TIPO_CONSEGNA_PACCO = "consegna_pacco";
 
 const router: IRouter = Router();
 
@@ -47,6 +48,13 @@ function normalizeText(v: unknown): string | null {
 
 function normalizeConsegnaPayload(raw: Record<string, any>) {
   const body = { ...raw };
+  body.tipoPianificazione = TIPO_CONSEGNA_PACCO;
+  delete body.magazzinoEmporioId;
+  delete body.dataOraInizio;
+  delete body.dataOraFine;
+  delete body.statoAccessoEmporio;
+  delete body.motivoAnnullamento;
+  delete body.noteAccessoEmporio;
   if ("volontarioAltro" in body) {
     body.volontarioAltro = normalizeText(body.volontarioAltro);
     if (body.volontarioAltro) body.volontarioId = null;
@@ -144,6 +152,7 @@ router.get("/consegne", async (req, res) => {
     }
   }
   const conditions: SQL[] = [];
+  conditions.push(eq(consegneTable.tipoPianificazione, TIPO_CONSEGNA_PACCO));
   if (stato) conditions.push(eq(consegneTable.stato, stato));
   if (data) conditions.push(eq(consegneTable.dataPrevista, data));
   if (dataInizio) conditions.push(gte(consegneTable.dataPrevista, dataInizio));
@@ -190,6 +199,7 @@ router.get("/consegne", async (req, res) => {
       codice: r.c.codice,
       beneficiarioId: r.c.beneficiarioId,
       beneficiarioNome: r.cognome && r.nome ? `${r.cognome} ${r.nome}` : null,
+      tipoPianificazione: r.c.tipoPianificazione,
       tipoConsegna: r.c.tipoConsegna,
       dataPrevista: r.c.dataPrevista,
       fasciaOraria: r.c.fasciaOraria ?? null,
@@ -239,7 +249,7 @@ router.post("/consegne", async (req, res) => {
     return;
   }
   const codice = `CON-${Date.now()}`;
-  const [row] = await db.insert(consegneTable).values({ ...body, codice } as typeof consegneTable.$inferInsert).returning();
+  const [row] = await db.insert(consegneTable).values({ ...body, codice, tipoPianificazione: TIPO_CONSEGNA_PACCO } as typeof consegneTable.$inferInsert).returning();
   await syncTurnoDaConsegna(row);
   res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
@@ -247,6 +257,7 @@ router.post("/consegne", async (req, res) => {
 router.get("/consegne/:id", async (req, res) => {
   const [row] = await db.select().from(consegneTable).where(eq(consegneTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (row.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))
       || !canAccessCitta(await beneficiarioCittaId(row.beneficiarioId), callerCittaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(row.beneficiarioId), callerZonaUdsId(req))) {
@@ -260,6 +271,7 @@ router.patch("/consegne/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const [existing] = await db.select().from(consegneTable).where(eq(consegneTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (existing.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
@@ -304,6 +316,7 @@ router.delete("/consegne/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const [existing] = await db.select().from(consegneTable).where(eq(consegneTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (existing.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), callerCentroId(req))
       || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), callerCittaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), callerZonaUdsId(req))) {
@@ -325,6 +338,7 @@ router.post("/consegne/:id/associa-bolla", async (req, res) => {
 
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Consegna non trovata" }); return; }
+  if (consegna.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Consegna non trovata" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))
       || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), callerCittaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), callerZonaUdsId(req))) {
@@ -367,6 +381,7 @@ router.post("/consegne/:id/completa", async (req, res) => {
 
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Not found" }); return; }
+  if (consegna.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);

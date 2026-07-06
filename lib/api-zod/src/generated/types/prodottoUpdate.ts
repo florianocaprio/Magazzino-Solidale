@@ -18,6 +18,12 @@ export interface ProdottoUpdate {
   fsePlus?: boolean;
   scortaMinima?: number;
   scortaConsigliata?: number;
+  abilitatoEmporio?: boolean;
+  creditoSolidaleValore?: number;
+  /** @nullable */
+  quantitaMassimaPerSpesa?: number | null;
+  /** @nullable */
+  quantitaMassimaMensile?: number | null;
   conservazione?: string;
   taglia?: string;
   genere?: string;

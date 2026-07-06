@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, prodottiTable } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { db, impostazioniModuliTable, pool, prodottiTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 import prodottiRouter from "../src/routes/prodotti";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -17,11 +17,22 @@ function makeApp(): Express {
 const app = makeApp();
 const prodottoIds: number[] = [];
 
+async function setEmporioEnabled(enabled: boolean): Promise<void> {
+  await db
+    .insert(impostazioniModuliTable)
+    .values({ id: 1, emporioAbilitato: enabled, unitaStradaAbilitata: true })
+    .onConflictDoUpdate({
+      target: impostazioniModuliTable.id,
+      set: { emporioAbilitato: enabled, unitaStradaAbilitata: true },
+    });
+}
+
 afterEach(async () => {
   if (prodottoIds.length > 0) {
     await db.delete(prodottiTable).where(inArray(prodottiTable.id, prodottoIds));
     prodottoIds.length = 0;
   }
+  await db.delete(impostazioniModuliTable).where(eq(impostazioniModuliTable.id, 1));
 });
 
 afterAll(async () => {
@@ -45,6 +56,30 @@ describe("POST /prodotti — codice prodotto", () => {
     expect(res.status).toBe(201);
     prodottoIds.push(res.body.id);
     expect(res.body.codice).toMatch(new RegExp(`^${prefisso}-\\d{6}$`));
+  });
+
+  it("usa Valore Credito Solidale 1 come default quando abilita un prodotto Emporio", async () => {
+    await setEmporioEnabled(true);
+    const created = await request(app)
+      .post("/prodotti")
+      .send({ nome: `Emporio ${rnd()}`, tipoProdotto: "alimentare", unitaMisura: "pz", abilitatoEmporio: true });
+    expect(created.status).toBe(201);
+    prodottoIds.push(created.body.id);
+    expect(created.body.creditoSolidaleValore).toBe(1);
+
+    const base = await request(app)
+      .post("/prodotti")
+      .send({ nome: `Base ${rnd()}`, tipoProdotto: "alimentare", unitaMisura: "pz" });
+    expect(base.status).toBe(201);
+    prodottoIds.push(base.body.id);
+    expect(base.body.creditoSolidaleValore).toBe(0);
+
+    const enabled = await request(app)
+      .patch(`/prodotti/${base.body.id}`)
+      .send({ abilitatoEmporio: true });
+    expect(enabled.status).toBe(200);
+    expect(enabled.body.abilitatoEmporio).toBe(true);
+    expect(enabled.body.creditoSolidaleValore).toBe(1);
   });
 
   it("genera il codice anche se il campo codice contiene solo spazi", async () => {

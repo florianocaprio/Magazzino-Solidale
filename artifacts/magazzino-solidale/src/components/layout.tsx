@@ -15,6 +15,8 @@ import {
   UsersRound,
   Car,
   Store,
+  CreditCard,
+  ReceiptText,
   ShoppingCart,
   BarChart3,
   Building2,
@@ -30,6 +32,7 @@ import {
   UserCog,
   Contact,
   ListChecks,
+  SlidersHorizontal,
   Languages,
   ChevronDown,
   LogOut
@@ -64,6 +67,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "@/lib/i18n";
+import { useModuloFlags } from "@/lib/use-moduli";
 
 const NAV_ITEMS = [
   { key: "dashboard", url: "/", icon: LayoutDashboard, groupKey: "generale", area: "generale" },
@@ -83,9 +87,15 @@ const NAV_ITEMS = [
   { key: "turni", url: "/turni", icon: CalendarDays, groupKey: "sociale", area: "sociale" },
   { key: "scarichi", url: "/scarichi", icon: PackageMinus, groupKey: "sociale", area: "sociale" },
 
-  { key: "udsAnagrafica", url: "/uds/anagrafica", icon: Footprints, groupKey: "uds", area: "uds" },
-  { key: "udsInterventi", url: "/uds/interventi", icon: HeartHandshake, groupKey: "uds", area: "uds" },
-  { key: "udsReportGiornaliero", url: "/uds/report-giornaliero", icon: CalendarClock, groupKey: "uds", area: "uds" },
+  { key: "emporioCassa", url: "/emporio/cassa", icon: Store, groupKey: "emporio", area: "sociale", modulo: "emporio" },
+  { key: "emporioCreditiSaldo", url: "/emporio/crediti-saldo", icon: CreditCard, groupKey: "emporio", area: "sociale", modulo: "emporio" },
+  { key: "politicheCreditoSolidale", url: "/politiche-credito-solidale", icon: SlidersHorizontal, groupKey: "emporio", area: "amministrazione", modulo: "emporio" },
+  { key: "emporioAccessi", url: "/emporio/accessi", icon: CalendarClock, groupKey: "emporio", area: "sociale", modulo: "emporio" },
+  { key: "emporioSpese", url: "/emporio/spese", icon: ReceiptText, groupKey: "emporio", area: "sociale", modulo: "emporio" },
+
+  { key: "udsAnagrafica", url: "/uds/anagrafica", icon: Footprints, groupKey: "uds", area: "uds", modulo: "uds" },
+  { key: "udsInterventi", url: "/uds/interventi", icon: HeartHandshake, groupKey: "uds", area: "uds", modulo: "uds" },
+  { key: "udsReportGiornaliero", url: "/uds/report-giornaliero", icon: CalendarClock, groupKey: "uds", area: "uds", modulo: "uds" },
 
   { key: "volontari", url: "/volontari", icon: UsersRound, groupKey: "logistica", area: "logistica" },
   { key: "mezzi", url: "/mezzi", icon: Car, groupKey: "logistica", area: "logistica" },
@@ -94,15 +104,16 @@ const NAV_ITEMS = [
   { key: "approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, groupKey: "logistica", area: "logistica" },
   
   { key: "report", url: "/report", icon: BarChart3, groupKey: "analisi", area: "analisi" },
-  { key: "reportUds", url: "/report-uds", icon: Footprints, groupKey: "analisi", area: "analisi" },
+  { key: "reportUds", url: "/report-uds", icon: Footprints, groupKey: "analisi", area: "analisi", modulo: "uds" },
 
   { key: "citta", url: "/citta", icon: MapPin, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "zoneUds", url: "/zone-uds", icon: Map, groupKey: "amministrazione", area: "amministrazione" },
+  { key: "zoneUds", url: "/zone-uds", icon: Map, groupKey: "amministrazione", area: "amministrazione", modulo: "uds" },
   { key: "utenti", url: "/utenti", icon: UserCog, groupKey: "amministrazione", area: "amministrazione" },
   { key: "ruoli", url: "/ruoli", icon: ShieldCheck, groupKey: "amministrazione", area: "amministrazione" },
   { key: "ruoliVolontari", url: "/ruoli-volontari", icon: Contact, groupKey: "amministrazione", area: "amministrazione" },
   { key: "tipiIntervento", url: "/tipi-intervento", icon: ListChecks, groupKey: "amministrazione", area: "amministrazione" },
   { key: "tipologieFornitore", url: "/tipologie-fornitore", icon: Truck, groupKey: "amministrazione", area: "amministrazione" },
+  { key: "impostazioniModuli", url: "/impostazioni-moduli", icon: SlidersHorizontal, groupKey: "amministrazione", area: "amministrazione" },
   { key: "impostazioniStampa", url: "/impostazioni-stampa", icon: Printer, groupKey: "amministrazione", area: "amministrazione" },
 ];
 
@@ -151,8 +162,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, logout } = useAuth();
   const { t } = useTranslation();
+  const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
 
-  const visibleItems = NAV_ITEMS.filter((item) => hasArea(item.area));
+  const visibleItems = NAV_ITEMS
+    .filter((item) => hasArea(item.area))
+    .filter((item) => item.modulo !== "emporio" || emporioAbilitato)
+    .filter((item) => item.modulo !== "uds" || unitaStradaAbilitata);
 
   const groupedNav = visibleItems.reduce((acc, item) => {
     if (!acc[item.groupKey]) acc[item.groupKey] = [];

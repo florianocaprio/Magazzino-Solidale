@@ -27,6 +27,12 @@ import approvazioniLogisticaRouter from "./approvazioni-logistica";
 import turniRouter from "./turni";
 import impostazioniStampaRouter from "./impostazioni-stampa";
 import impostazioniEmailRouter from "./impostazioni-email";
+import impostazioniModuliRouter from "./impostazioni-moduli";
+import politicheCreditoSolidaleRouter from "./politiche-credito-solidale";
+import creditoSolidaleRouter from "./credito-solidale";
+import accessiEmporioRouter from "./accessi-emporio";
+import cassaEmporioRouter from "./cassa-emporio";
+import speseEmporioRouter from "./spese-emporio";
 import reportRouter from "./report";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
@@ -77,6 +83,12 @@ router.use(approvazioniLogisticaRouter);
 router.use(turniRouter);
 router.use(impostazioniStampaRouter);
 router.use(impostazioniEmailRouter);
+router.use(impostazioniModuliRouter);
+router.use(politicheCreditoSolidaleRouter);
+router.use(creditoSolidaleRouter);
+router.use(accessiEmporioRouter);
+router.use(cassaEmporioRouter);
+router.use(speseEmporioRouter);
 router.use(reportRouter);
 
 // Admin-only management endpoints.

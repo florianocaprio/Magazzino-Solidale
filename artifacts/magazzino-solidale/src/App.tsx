@@ -38,6 +38,7 @@ import Consegne from "@/pages/consegne";
 import Bolle from "@/pages/bolle";
 import Turni from "@/pages/turni";
 import ImpostazioniStampa from "@/pages/impostazioni-stampa";
+import ImpostazioniModuli from "@/pages/impostazioni-moduli";
 import Approvvigionamenti from "@/pages/approvvigionamenti";
 import Report from "@/pages/report";
 import ReportUds from "@/pages/report-uds";
@@ -48,6 +49,11 @@ import ZoneUds from "@/pages/zone-uds";
 import RuoliVolontari from "@/pages/ruoli-volontari";
 import TipiIntervento from "@/pages/tipi-intervento";
 import TipologieFornitore from "@/pages/tipologie-fornitore";
+import PoliticheCreditoSolidale from "@/pages/politiche-credito-solidale";
+import EmporioCassa from "@/pages/emporio-cassa";
+import EmporioCreditiSaldo from "@/pages/emporio-crediti-saldo";
+import EmporioAccessi from "@/pages/emporio-accessi";
+import EmporioSpese from "@/pages/emporio-spese";
 import UdsAnagrafica from "@/pages/uds-anagrafica";
 import UdsInterventi from "@/pages/uds-interventi";
 import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
@@ -139,6 +145,35 @@ function AppRoutes() {
           {() => (
             <Guard area="magazzino">
               <Scarichi />
+            </Guard>
+          )}
+        </Route>
+
+        <Route path="/emporio/cassa">
+          {() => (
+            <Guard area="sociale">
+              <EmporioCassa />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/emporio/crediti-saldo">
+          {() => (
+            <Guard area="sociale">
+              <EmporioCreditiSaldo />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/emporio/accessi">
+          {() => (
+            <Guard area="sociale">
+              <EmporioAccessi />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/emporio/spese">
+          {() => (
+            <Guard area="sociale">
+              <EmporioSpese />
             </Guard>
           )}
         </Route>
@@ -300,10 +335,24 @@ function AppRoutes() {
             </Guard>
           )}
         </Route>
+        <Route path="/politiche-credito-solidale">
+          {() => (
+            <Guard area="amministrazione">
+              <PoliticheCreditoSolidale />
+            </Guard>
+          )}
+        </Route>
         <Route path="/impostazioni-stampa">
           {() => (
             <Guard area="amministrazione">
               <ImpostazioniStampa />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/impostazioni-moduli">
+          {() => (
+            <Guard area="amministrazione">
+              <ImpostazioniModuli />
             </Guard>
           )}
         </Route>

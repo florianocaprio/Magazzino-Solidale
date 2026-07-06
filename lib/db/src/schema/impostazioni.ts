@@ -34,3 +34,13 @@ export const impostazioniEmailTable = pgTable("impostazioni_email", {
 });
 
 export type ImpostazioniEmail = typeof impostazioniEmailTable.$inferSelect;
+
+// Singleton: una sola riga (id = 1) con l'abilitazione globale dei moduli.
+export const impostazioniModuliTable = pgTable("impostazioni_moduli", {
+  id: integer("id").primaryKey().default(1),
+  emporioAbilitato: boolean("emporio_abilitato").notNull().default(false),
+  unitaStradaAbilitata: boolean("unita_strada_abilitata").notNull().default(true),
+  dataAggiornamento: timestamp("data_aggiornamento"),
+});
+
+export type ImpostazioniModuli = typeof impostazioniModuliTable.$inferSelect;

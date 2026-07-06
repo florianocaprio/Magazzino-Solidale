@@ -1,8 +1,9 @@
-import { pgTable, serial, varchar, text, boolean, timestamp, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, boolean, timestamp, integer, date, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cittaTable } from "./citta";
 import { zoneUdsTable } from "./zoneUds";
+import { magazziniTable } from "./magazzini";
 
 export const beneficiariTable = pgTable("beneficiari", {
   id: serial("id").primaryKey(),
@@ -35,6 +36,17 @@ export const beneficiariTable = pgTable("beneficiari", {
   consegnaDomicilio: boolean("consegna_domicilio").notNull().default(false),
   motivoConsegnaDomicilio: varchar("motivo_consegna_domicilio", { length: 60 }),
   centroAscoltoId: integer("centro_ascolto_id"),
+  creditoSolidaleAbilitato: boolean("credito_solidale_abilitato").notNull().default(false),
+  creditoSolidaleStato: varchar("credito_solidale_stato", { length: 30 }).notNull().default("non_abilitato"),
+  creditoSolidaleDataAbilitazione: timestamp("credito_solidale_data_abilitazione"),
+  creditoSolidaleNote: text("credito_solidale_note"),
+  magazzinoEmporioPreferitoId: integer("magazzino_emporio_preferito_id").references(() => magazziniTable.id),
+  creditoSolidaleMensileAssegnato: decimal("credito_solidale_mensile_assegnato", { precision: 10, scale: 2 }),
+  creditoSolidaleMensileManuale: boolean("credito_solidale_mensile_manuale").notNull().default(false),
+  creditoSolidaleMotivoModifica: text("credito_solidale_motivo_modifica"),
+  creditoSolidaleDataUltimaModificaQuota: timestamp("credito_solidale_data_ultima_modifica_quota"),
+  creditoSolidaleSaldo: decimal("credito_solidale_saldo", { precision: 10, scale: 2 }).notNull().default("0"),
+  creditoSolidaleDataUltimoMovimento: timestamp("credito_solidale_data_ultimo_movimento"),
   uds: boolean("uds").notNull().default(false),
   cittaId: integer("citta_id").references(() => cittaTable.id),
   zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
