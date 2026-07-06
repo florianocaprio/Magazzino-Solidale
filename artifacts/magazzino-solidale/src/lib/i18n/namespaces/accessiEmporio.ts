@@ -38,7 +38,7 @@ const it = {
   ultimoAccesso: "Ultimo accesso",
   avviaCassaPlaceholder: "La Cassa Emporio sarà disponibile dalla Fase4-6.",
   accessoForzatoDaCassa: "Accesso forzato da Cassa",
-  emporioDisabilitato: "Il modulo Emporio Solidale è disabilitato.",
+  emporioDisabilitato: "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.",
   beneficiarioNonAttivo: "Il beneficiario non è attivo.",
   centroAscoltoRichiesto: "Per pianificare un Accesso Emporio è necessario associare il beneficiario a un Centro di Ascolto.",
   creditoSolidaleRichiesto: "Il beneficiario non è abilitato al Credito Solidale.",

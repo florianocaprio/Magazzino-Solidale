@@ -21,7 +21,7 @@ import politicheCreditoSolidaleRouter from "../src/routes/politiche-credito-soli
 import prodottiRouter from "../src/routes/prodotti";
 import zoneUdsRouter from "../src/routes/zone-uds";
 
-const EMPORIO_DISABLED_MSG = "Il modulo Emporio Solidale è disabilitato.";
+const EMPORIO_DISABLED_MSG = "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.";
 const UDS_DISABLED_MSG = "La gestione Unità di Strada è disabilitata.";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);

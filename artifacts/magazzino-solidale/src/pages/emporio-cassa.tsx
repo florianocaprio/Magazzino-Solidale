@@ -964,7 +964,7 @@ export default function EmporioCassa() {
                         </span>
                       </button>
                     ))}
-                    {prodottoQuery && prodotti.length === 0 && <p className="p-3 text-sm text-muted-foreground">{t("cassaEmporio.prodottoNonTrovato")}</p>}
+                    {prodottoQuery && prodotti.length === 0 && <p className="p-3 text-sm font-medium text-red-600">{t("cassaEmporio.prodottoNonTrovato")}</p>}
                     {!prodottoQuery && prodotti.length === 0 && <p className="p-3 text-sm text-muted-foreground">{t("cassaEmporio.nessunProdottoEmporio")}</p>}
                   </div>
                 </CardContent>

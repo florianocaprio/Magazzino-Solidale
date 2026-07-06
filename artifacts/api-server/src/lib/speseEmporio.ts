@@ -26,12 +26,13 @@ import { parseDbNumber } from "./disponibilitaMagazzino";
 const PRENOTAZIONE_ATTIVA = "attiva";
 
 export const MSG_SESSIONE_NON_PRONTA = "La sessione Cassa Emporio non è pronta per la chiusura.";
-export const MSG_SESSIONE_GIA_CHIUSA = "La sessione Cassa Emporio risulta già chiusa.";
-export const MSG_SALDO_INSUFFICIENTE = "Saldo Credito Solidale insufficiente per chiudere la spesa.";
-export const MSG_GIACENZA_INSUFFICIENTE = "Giacenza insufficiente per chiudere la spesa Emporio.";
+export const MSG_SESSIONE_GIA_CHIUSA = "La sessione Cassa Emporio risulta già chiusa. Non è possibile chiudere due volte la stessa spesa.";
+export const MSG_SALDO_INSUFFICIENTE = "Saldo Credito Solidale insufficiente. Riduci il carrello o effettua una ricarica prima della chiusura.";
+export const MSG_GIACENZA_INSUFFICIENTE = "Giacenza insufficiente per chiudere la spesa Emporio. Verifica le disponibilità di magazzino prima di riprovare.";
 export const MSG_CARRELLO_VUOTO = "Il Carrello Emporio è vuoto.";
-export const MSG_PRODOTTO_NON_ABILITATO = "Prodotto non trovato o non abilitato per Emporio.";
-export const MSG_PRODOTTO_SENZA_CREDITO = "Il prodotto non ha un Valore Credito Solidale configurato.";
+export const MSG_PRODOTTO_NON_TROVATO = "Prodotto non trovato. Verifica il codice a barre o cerca il prodotto per nome.";
+export const MSG_PRODOTTO_NON_ABILITATO = "Il prodotto non è abilitato per Emporio. Abilitalo nella scheda prodotto prima di aggiungerlo al carrello.";
+export const MSG_PRODOTTO_SENZA_CREDITO = "Il prodotto non ha un Valore Credito Solidale configurato. Imposta il valore nella scheda prodotto.";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -133,9 +134,8 @@ async function validateRigheFinali(tx: Tx, righe: CheckoutRow[]): Promise<Map<nu
   const quantityByProduct = new Map<number, number>();
   for (const riga of righe) {
     const prodotto = productMap.get(riga.prodottoId);
-    if (!prodotto || !prodotto.attivo || !prodotto.abilitatoEmporio) {
-      throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_ABILITATO);
-    }
+    if (!prodotto || !prodotto.attivo) throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_TROVATO);
+    if (!prodotto.abilitatoEmporio) throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_ABILITATO);
     if (parseDbNumber(prodotto.creditoSolidaleValore) <= 0) {
       throw new SpesaEmporioError(400, MSG_PRODOTTO_SENZA_CREDITO);
     }
@@ -282,7 +282,7 @@ export async function chiudiSessioneCassaEmporio(opts: {
 
     const beneficiario = await lockBeneficiario(tx, sessione.beneficiarioId);
     if (!beneficiario || !beneficiario.attivo || !beneficiario.creditoSolidaleAbilitato || beneficiario.creditoSolidaleStato !== "attivo") {
-      throw new SpesaEmporioError(400, "Beneficiario non valido per la Cassa Emporio.");
+      throw new SpesaEmporioError(400, "Beneficiario non valido per la Cassa Emporio. Verifica che sia attivo, abilitato al Credito Solidale e con Credito Solidale attivo.");
     }
 
     const righe = await tx
@@ -348,7 +348,7 @@ export async function chiudiSessioneCassaEmporio(opts: {
 
     for (const riga of righe) {
       const prodotto = productMap.get(riga.prodottoId);
-      if (!prodotto) throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_ABILITATO);
+      if (!prodotto) throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_TROVATO);
       await scaricaRigaEmporio(tx, {
         riga,
         prodotto,
@@ -664,7 +664,7 @@ export async function registraInvioManualeBollaEmporio(opts: {
   const now = new Date();
   const stato: EmailBollaStato = recipients.length === 0 ? "nessun_destinatario" : "invio_manuale_avviato";
   const messaggio = recipients.length === 0
-    ? "Nessun destinatario email disponibile. Copiare manualmente il link alla Bolla."
+    ? "Nessun destinatario email disponibile. Copia manualmente il link alla Bolla e invialo dal tuo client di posta."
     : "Apertura email Bolla avviata nel client mail locale.";
 
   await db.update(speseEmporioTable).set({
@@ -673,7 +673,7 @@ export async function registraInvioManualeBollaEmporio(opts: {
     emailBollaDataUltimoClick: now,
     emailBollaOperatoreId: opts.operatoreId,
     emailBollaOggetto: subject,
-    emailBollaErrore: recipients.length === 0 ? "Nessun destinatario email disponibile." : null,
+    emailBollaErrore: recipients.length === 0 ? "Nessun destinatario email disponibile. Copia manualmente il link alla Bolla e invialo dal tuo client di posta." : null,
     updatedAt: now,
   }).where(eq(speseEmporioTable.id, opts.spesaId));
 

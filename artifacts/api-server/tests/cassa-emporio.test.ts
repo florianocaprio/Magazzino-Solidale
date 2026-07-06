@@ -306,7 +306,7 @@ describe("Cassa Emporio", () => {
     await setEmporioEnabled(false);
     const res = await openSession(fixture.accessoId);
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe("Il modulo Emporio Solidale è disabilitato.");
+    expect(res.body.error).toBe("Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.");
   });
 
   it.each(["annullato", "non_presentato"] as const)("blocca apertura da accesso %s", async (stato) => {
@@ -543,7 +543,9 @@ describe("Cassa Emporio", () => {
     const list = await request(makeApp()).get("/cassa-emporio/prodotti/ricerca").query({ search: "GIAC-", magazzinoEmporioId: fixture.magazzinoId });
     expect(list.status).toBe(200);
     expect(list.body.map((p: { prodottoId: number }) => p.prodottoId)).not.toContain(prodottoId);
-    expect((await addProduct(sessione.body.id, prodottoId, 1)).status).toBe(400);
+    const add = await addProduct(sessione.body.id, prodottoId, 1);
+    expect(add.status).toBe(400);
+    expect(add.body.error).toBe("La quantità richiesta supera la giacenza disponibile nel magazzino Emporio selezionato.");
   });
 
   it("blocca prodotto non abilitato Emporio e prodotto senza Valore Credito Solidale", async () => {
@@ -552,8 +554,12 @@ describe("Cassa Emporio", () => {
     const nonAbilitato = await createProdotto({ magazzinoId: fixture.magazzinoId, abilitatoEmporio: false });
     const senzaCredito = await createProdotto({ magazzinoId: fixture.magazzinoId, creditoSolidaleValore: "0" });
 
-    expect((await addProduct(sessione.body.id, nonAbilitato)).status).toBe(400);
-    expect((await addProduct(sessione.body.id, senzaCredito)).status).toBe(400);
+    const blocked = await addProduct(sessione.body.id, nonAbilitato);
+    const noCredit = await addProduct(sessione.body.id, senzaCredito);
+    expect(blocked.status).toBe(400);
+    expect(blocked.body.error).toBe("Il prodotto non è abilitato per Emporio. Abilitalo nella scheda prodotto prima di aggiungerlo al carrello.");
+    expect(noCredit.status).toBe(400);
+    expect(noCredit.body.error).toBe("Il prodotto non ha un Valore Credito Solidale configurato. Imposta il valore nella scheda prodotto.");
   });
 
   it("aggiunta, modifica quantità e rimozione aggiornano il totale Credito previsto", async () => {
@@ -622,7 +628,7 @@ describe("Cassa Emporio", () => {
     await addProduct(sessione.body.id, prodottoId, 1);
     const ready = await request(makeApp()).post(`/cassa-emporio/sessioni/${sessione.body.id}/pronta-per-chiusura`).send({});
     expect(ready.status).toBe(400);
-    expect(ready.body.error).toBe("Il totale Credito previsto supera il Saldo Credito Solidale disponibile.");
+    expect(ready.body.error).toBe("Saldo Credito Solidale insufficiente. Riduci il carrello o effettua una ricarica prima della chiusura.");
   });
 
   it("ricalcola il credito residuo usando il saldo corrente del beneficiario", async () => {
@@ -821,12 +827,12 @@ describe("Cassa Emporio", () => {
     expect(res.body.mailtoHref).toBeNull();
     expect(res.body.linkBolla).toBe(linkBolla);
     expect(res.body.corpo).toContain(linkBolla);
-    expect(res.body.messaggio).toBe("Nessun destinatario email disponibile. Copiare manualmente il link alla Bolla.");
+    expect(res.body.messaggio).toBe("Nessun destinatario email disponibile. Copia manualmente il link alla Bolla e invialo dal tuo client di posta.");
 
     const [spesa] = await db.select().from(speseEmporioTable).where(eq(speseEmporioTable.id, close.body.spesa.id));
     expect(spesa.emailBollaStato).toBe("nessun_destinatario");
     expect(spesa.emailBollaDestinatari).toBeNull();
-    expect(spesa.emailBollaErrore).toBe("Nessun destinatario email disponibile.");
+    expect(spesa.emailBollaErrore).toBe("Nessun destinatario email disponibile. Copia manualmente il link alla Bolla e invialo dal tuo client di posta.");
   });
 
   it("non chiude una sessione non pronta", async () => {
@@ -850,7 +856,7 @@ describe("Cassa Emporio", () => {
 
     const second = await request(makeApp()).post(`/cassa-emporio/sessioni/${sessione.body.id}/chiudi`).send({});
     expect(second.status).toBe(400);
-    expect(second.body.error).toBe("La sessione Cassa Emporio risulta già chiusa.");
+    expect(second.body.error).toBe("La sessione Cassa Emporio risulta già chiusa. Non è possibile chiudere due volte la stessa spesa.");
   });
 
   it("annulla atomicamente la chiusura se la giacenza diventa insufficiente", async () => {
@@ -863,7 +869,7 @@ describe("Cassa Emporio", () => {
 
     const close = await request(makeApp()).post(`/cassa-emporio/sessioni/${sessione.body.id}/chiudi`).send({});
     expect(close.status).toBe(409);
-    expect(close.body.error).toBe("Giacenza insufficiente per chiudere la spesa Emporio.");
+    expect(close.body.error).toBe("Giacenza insufficiente per chiudere la spesa Emporio. Verifica le disponibilità di magazzino prima di riprovare.");
 
     const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, fixture.beneficiarioId));
     const [sessioneDopo] = await db.select().from(sessioniCassaEmporioTable).where(eq(sessioniCassaEmporioTable.id, sessione.body.id));

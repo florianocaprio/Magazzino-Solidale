@@ -33,6 +33,7 @@ const MSG_CREDITO_RICHIESTO = "Il beneficiario non è abilitato al Credito Solid
 const MSG_CREDITO_NON_ATTIVO = "Il Credito Solidale del beneficiario non è attivo.";
 const MSG_MAGAZZINO_EMPORIO = "Selezionare un magazzino di tipo Emporio o Misto.";
 const MSG_DUPLICATO = "Esiste già un Accesso Emporio pianificato per questo beneficiario nella data selezionata.";
+const MSG_ACCESSO_NON_TROVATO = "Accesso Emporio non trovato. Verifica l'accesso selezionato e riprova.";
 
 function asInt(value: unknown): number | null {
   const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
@@ -292,7 +293,7 @@ router.get("/accessi-emporio/beneficiari/ricerca", async (req, res) => {
 router.get("/accessi-emporio/:id", async (req, res) => {
   const id = Number(req.params.id);
   const rows = await selectAccessi([eq(consegneTable.id, id)]).limit(1);
-  if (rows.length === 0) { res.status(404).json({ error: "Not found" }); return; }
+  if (rows.length === 0) { res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO }); return; }
   const row = rows[0];
   if (!(await canUseBeneficiario(row.c.beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
@@ -355,7 +356,7 @@ router.patch("/accessi-emporio/:id", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const id = Number(req.params.id);
   const [existing] = await db.select().from(consegneTable).where(and(eq(consegneTable.id, id), eq(consegneTable.tipoPianificazione, TIPO_ACCESSO)));
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!existing) { res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO }); return; }
   if (!(await canUseBeneficiario(existing.beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;
@@ -415,7 +416,7 @@ router.patch("/accessi-emporio/:id/stato", async (req, res) => {
     return;
   }
   const [existing] = await db.select().from(consegneTable).where(and(eq(consegneTable.id, id), eq(consegneTable.tipoPianificazione, TIPO_ACCESSO)));
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!existing) { res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO }); return; }
   if (!(await canUseBeneficiario(existing.beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;

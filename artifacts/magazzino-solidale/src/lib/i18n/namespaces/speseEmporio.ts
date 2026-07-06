@@ -23,7 +23,7 @@ const it = {
   emailClientApertoDescrizione: "Controlla e invia la bozza dal programma di posta. Se non si apre, premi di nuovo Apri email Bolla.",
   linkBollaCopiato: "Link Bolla copiato.",
   testoEmailCopiato: "Testo email Bolla copiato.",
-  nessunDestinatarioEmail: "Nessun destinatario email disponibile.",
+  nessunDestinatarioEmail: "Nessun destinatario email disponibile. Copia manualmente il link alla Bolla e invialo dal tuo client di posta.",
   emailPreparazioneErrore: "Errore nell'apertura dell'email Bolla.",
   emailDataUltimoClick: "Ultimo tentativo email",
   emailOperatore: "Operatore email",

@@ -352,7 +352,7 @@ describe("Movimenti Credito Solidale", () => {
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
       .send({ variazioneCredito: 5 });
     expect(write.status).toBe(403);
-    expect(write.body.error).toBe("Il modulo Emporio Solidale è disabilitato.");
+    expect(write.body.error).toBe("Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.");
   });
 
   it("storna un movimento creando il movimento contrario e impedisce il doppio storno", async () => {

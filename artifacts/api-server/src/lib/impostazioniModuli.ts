@@ -1,7 +1,7 @@
 import { db, impostazioniModuliTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
-export const EMPORIO_DISABLED_MSG = "Il modulo Emporio Solidale è disabilitato.";
+export const EMPORIO_DISABLED_MSG = "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.";
 export const UNITA_STRADA_DISABLED_MSG = "La gestione Unità di Strada è disabilitata.";
 
 const SINGLETON_ID = 1;

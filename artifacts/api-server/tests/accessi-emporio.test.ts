@@ -21,6 +21,7 @@ const creditoRichiestoMsg = "Il beneficiario non è abilitato al Credito Solidal
 const creditoNonAttivoMsg = "Il Credito Solidale del beneficiario non è attivo.";
 const magazzinoEmporioMsg = "Selezionare un magazzino di tipo Emporio o Misto.";
 const duplicatoMsg = "Esiste già un Accesso Emporio pianificato per questo beneficiario nella data selezionata.";
+const accessoNonTrovatoMsg = "Accesso Emporio non trovato. Verifica l'accesso selezionato e riprova.";
 
 const cittaIds: number[] = [];
 const centroIds: number[] = [];
@@ -160,7 +161,7 @@ describe("Accessi Emporio", () => {
       .post("/accessi-emporio")
       .send({ beneficiarioId: fixture.beneficiarioId, magazzinoEmporioId: fixture.magazzinoId, dataOraInizio: "2026-07-10T09:00:00" });
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe("Il modulo Emporio Solidale è disabilitato.");
+    expect(res.body.error).toBe("Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.");
   });
 
   it("blocca beneficiario senza Centro di Ascolto", async () => {
@@ -244,6 +245,24 @@ describe("Accessi Emporio", () => {
     expect(changed.status).toBe(200);
     expect(changed.body.statoAccessoEmporio).toBe("annullato");
     expect(changed.body.motivoAnnullamento).toBe("Telefonata beneficiario");
+  });
+
+  it("restituisce messaggi chiari se l'Accesso Emporio non esiste", async () => {
+    const detail = await request(makeApp()).get("/accessi-emporio/999999999");
+    expect(detail.status).toBe(404);
+    expect(detail.body.error).toBe(accessoNonTrovatoMsg);
+
+    const update = await request(makeApp())
+      .patch("/accessi-emporio/999999999")
+      .send({ dataOraInizio: "2026-07-10T09:00:00" });
+    expect(update.status).toBe(404);
+    expect(update.body.error).toBe(accessoNonTrovatoMsg);
+
+    const stato = await request(makeApp())
+      .patch("/accessi-emporio/999999999/stato")
+      .send({ statoAccessoEmporio: "confermato" });
+    expect(stato.status).toBe(404);
+    expect(stato.body.error).toBe(accessoNonTrovatoMsg);
   });
 
   it("lista Accessi Emporio filtrando per periodo e stato", async () => {

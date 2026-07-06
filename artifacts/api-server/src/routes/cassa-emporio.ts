@@ -44,18 +44,21 @@ const STATI_SESSIONE_NON_DUPLICABILI = ["aperta", "sospesa", "pronta_per_chiusur
 type StatoSessione = (typeof STATI_SESSIONE)[number];
 
 const MSG_SESSIONE_GIA_APERTA = "Esiste già una sessione Cassa Emporio aperta per questo Accesso Emporio.";
-const MSG_ACCESSO_NON_VALIDO = "Accesso Emporio non valido per la Cassa.";
+const MSG_SESSIONE_NON_TROVATA = "Sessione Cassa Emporio non trovata. Verifica la sessione selezionata e riprova.";
+const MSG_RIGA_NON_TROVATA = "Riga carrello Emporio non trovata. Aggiorna la sessione e riprova.";
+const MSG_ACCESSO_NON_VALIDO = "Accesso Emporio non valido per la Cassa. Verifica che l'accesso sia pianificato o confermato e non sia annullato o non presentato.";
 const MSG_BENEFICIARIO_NON_ATTIVO = "Il beneficiario non è attivo.";
-const MSG_CENTRO_RICHIESTO = "Per usare la Cassa Emporio è necessario associare il beneficiario a un Centro di Ascolto.";
+const MSG_CENTRO_RICHIESTO = "Per effettuare l'accesso Emporio è necessario associare il beneficiario a un Centro di Ascolto.";
 const MSG_CREDITO_RICHIESTO = "Il beneficiario non è abilitato al Credito Solidale.";
 const MSG_CREDITO_NON_ATTIVO = "Il Credito Solidale del beneficiario non è attivo.";
 const MSG_MAGAZZINO_EMPORIO = "La Cassa Emporio può essere aperta solo su un magazzino di tipo Emporio o Misto.";
-const MSG_PRODOTTO_NON_TROVATO = "Prodotto non trovato o non abilitato per Emporio.";
-const MSG_GIACENZA_NON_DISPONIBILE = "Giacenza non disponibile.";
-const MSG_GIACENZA_INSUFFICIENTE = "La quantità richiesta supera la giacenza disponibile.";
+const MSG_PRODOTTO_NON_TROVATO = "Prodotto non trovato. Verifica il codice a barre o cerca il prodotto per nome.";
+const MSG_PRODOTTO_NON_ABILITATO = "Il prodotto non è abilitato per Emporio. Abilitalo nella scheda prodotto prima di aggiungerlo al carrello.";
+const MSG_PRODOTTO_SENZA_CREDITO = "Il prodotto non ha un Valore Credito Solidale configurato. Imposta il valore nella scheda prodotto.";
+const MSG_GIACENZA_INSUFFICIENTE = "La quantità richiesta supera la giacenza disponibile nel magazzino Emporio selezionato.";
 const MSG_LIMITE_SPESA = "La quantità supera il limite previsto per singola spesa.";
 const MSG_LIMITE_MENSILE = "La quantità supera il limite mensile previsto per questo prodotto.";
-const MSG_SALDO_INSUFFICIENTE = "Il totale Credito previsto supera il Saldo Credito Solidale disponibile.";
+const MSG_SALDO_INSUFFICIENTE = "Saldo Credito Solidale insufficiente. Riduci il carrello o effettua una ricarica prima della chiusura.";
 const MSG_SESSIONE_PRONTA = "Sessione pronta per la chiusura.";
 
 function asInt(value: unknown): number | null {
@@ -289,9 +292,11 @@ async function firstLottoId(prodottoId: number, magazzinoId: number): Promise<nu
 async function buildRigaValues(sessione: typeof sessioniCassaEmporioTable.$inferSelect, prodottoId: number, quantita: number, excludeRigaId?: number) {
   const [prodotto] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, prodottoId));
   const creditoUnitario = parseDbNumber(prodotto?.creditoSolidaleValore);
-  if (!prodotto || !prodotto.attivo || !prodotto.abilitatoEmporio || creditoUnitario <= 0) {
+  if (!prodotto || !prodotto.attivo) {
     return { error: MSG_PRODOTTO_NON_TROVATO, status: 400 } as const;
   }
+  if (!prodotto.abilitatoEmporio) return { error: MSG_PRODOTTO_NON_ABILITATO, status: 400 } as const;
+  if (creditoUnitario <= 0) return { error: MSG_PRODOTTO_SENZA_CREDITO, status: 400 } as const;
 
   const otherQuantity = await quantitaProdottoInSessione(sessione.id, prodottoId, excludeRigaId);
   const totalQuantityForProduct = otherQuantity + quantita;
@@ -302,7 +307,7 @@ async function buildRigaValues(sessione: typeof sessioniCassaEmporioTable.$infer
 
   const disponibilita = await calcolaDisponibilitaMagazzino(prodottoId, sessione.magazzinoEmporioId);
   const disponibile = Math.floor(disponibilita.disponibileReale);
-  if (disponibile <= 0) return { error: MSG_GIACENZA_NON_DISPONIBILE, status: 400 } as const;
+  if (disponibile <= 0) return { error: MSG_GIACENZA_INSUFFICIENTE, status: 400 } as const;
   if (totalQuantityForProduct > disponibile) return { error: MSG_GIACENZA_INSUFFICIENTE, status: 400 } as const;
 
   return {
@@ -595,7 +600,7 @@ router.get("/cassa-emporio/sessioni", async (req, res) => {
 router.get("/cassa-emporio/sessioni/:id", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   res.json(await formatSessione(sessione, true));
 });
@@ -760,7 +765,7 @@ router.post("/cassa-emporio/accessi/forza", async (req, res) => {
 router.post("/cassa-emporio/sessioni/:id/righe", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   if (!isSessioneModificabile(sessione.statoSessione)) { res.status(400).json({ error: "La sessione Cassa Emporio non è modificabile." }); return; }
   const prodottoId = asInt(req.body?.prodottoId);
@@ -779,7 +784,7 @@ router.post("/cassa-emporio/sessioni/:id/righe", async (req, res) => {
 router.patch("/cassa-emporio/sessioni/:id/righe/:rigaId", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   if (!isSessioneModificabile(sessione.statoSessione)) { res.status(400).json({ error: "La sessione Cassa Emporio non è modificabile." }); return; }
   const rigaId = Number(req.params.rigaId);
@@ -787,7 +792,7 @@ router.patch("/cassa-emporio/sessioni/:id/righe/:rigaId", async (req, res) => {
     .select()
     .from(sessioniCassaEmporioRigheTable)
     .where(and(eq(sessioniCassaEmporioRigheTable.id, rigaId), eq(sessioniCassaEmporioRigheTable.sessioneCassaId, sessione.id)));
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!existing) { res.status(404).json({ error: MSG_RIGA_NON_TROVATA }); return; }
   const quantita = asPositiveQuantity(req.body?.quantita);
   if (quantita == null) { res.status(400).json({ error: "La quantità deve essere maggiore di zero." }); return; }
   const built = await buildRigaValues(sessione, existing.prodottoId, quantita, existing.id);
@@ -804,7 +809,7 @@ router.patch("/cassa-emporio/sessioni/:id/righe/:rigaId", async (req, res) => {
 router.delete("/cassa-emporio/sessioni/:id/righe/:rigaId", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   if (!isSessioneModificabile(sessione.statoSessione)) { res.status(400).json({ error: "La sessione Cassa Emporio non è modificabile." }); return; }
   await db.delete(sessioniCassaEmporioRigheTable).where(and(eq(sessioniCassaEmporioRigheTable.id, Number(req.params.rigaId)), eq(sessioniCassaEmporioRigheTable.sessioneCassaId, sessione.id)));
@@ -815,7 +820,7 @@ router.delete("/cassa-emporio/sessioni/:id/righe/:rigaId", async (req, res) => {
 router.post("/cassa-emporio/sessioni/:id/sospendi", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   if (!isSessioneModificabile(sessione.statoSessione)) { res.status(400).json({ error: "La sessione Cassa Emporio non è modificabile." }); return; }
   const [updated] = await db
@@ -829,7 +834,7 @@ router.post("/cassa-emporio/sessioni/:id/sospendi", async (req, res) => {
 router.post("/cassa-emporio/sessioni/:id/riprendi", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   if (sessione.statoSessione !== "sospesa") { res.status(400).json({ error: "Solo una sessione sospesa può essere ripresa." }); return; }
   const [updated] = await db
@@ -843,7 +848,7 @@ router.post("/cassa-emporio/sessioni/:id/riprendi", async (req, res) => {
 router.post("/cassa-emporio/sessioni/:id/annulla", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   if (sessione.statoSessione === "annullata") { res.status(400).json({ error: "La sessione Cassa Emporio è già annullata." }); return; }
   const motivo = asText(req.body?.motivoAnnullamento);
@@ -859,7 +864,7 @@ router.post("/cassa-emporio/sessioni/:id/annulla", async (req, res) => {
 router.post("/cassa-emporio/sessioni/:id/pronta-per-chiusura", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   if (!isSessioneModificabile(sessione.statoSessione)) { res.status(400).json({ error: "La sessione Cassa Emporio non è modificabile." }); return; }
   const recalculated = await recalcSessione(sessione.id, operatorId(req));
@@ -903,7 +908,7 @@ router.post("/cassa-emporio/sessioni/:id/pronta-per-chiusura", async (req, res) 
 router.post("/cassa-emporio/sessioni/:id/chiudi", async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const sessione = await loadSessione(Number(req.params.id));
-  if (!sessione) { res.status(404).json({ error: "Not found" }); return; }
+  if (!sessione) { res.status(404).json({ error: MSG_SESSIONE_NON_TROVATA }); return; }
   if (!(await ensureSessioneAccessibile(sessione, req, res))) return;
   try {
     const { spesaId } = await chiudiSessioneCassaEmporio({

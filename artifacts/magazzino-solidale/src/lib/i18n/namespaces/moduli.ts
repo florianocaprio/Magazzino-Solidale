@@ -5,7 +5,7 @@ export const moduli = {
     emporioTitle: "Emporio Solidale",
     emporioDescription: "Abilita menu EMPORIO, configurazioni prodotto e funzioni Credito Solidale.",
     emporioOn: "Modulo Emporio Solidale abilitato.",
-    emporioOff: "Il modulo Emporio Solidale è disabilitato.",
+    emporioOff: "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.",
     udsTitle: "Unità di Strada",
     udsDescription: "Abilita menu, zone e controlli dedicati alla gestione Unità di Strada.",
     udsOn: "Gestione Unità di Strada abilitata.",
