@@ -665,7 +665,7 @@ export async function registraInvioManualeBollaEmporio(opts: {
   const stato: EmailBollaStato = recipients.length === 0 ? "nessun_destinatario" : "invio_manuale_avviato";
   const messaggio = recipients.length === 0
     ? "Nessun destinatario email disponibile. Copiare manualmente il link alla Bolla."
-    : "Bozza email Bolla preparata nel client mail locale.";
+    : "Apertura email Bolla avviata nel client mail locale.";
 
   await db.update(speseEmporioTable).set({
     emailBollaStato: stato,

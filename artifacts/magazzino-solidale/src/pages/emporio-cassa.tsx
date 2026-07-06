@@ -195,6 +195,14 @@ function buildBollaLink(spesa: SpesaEmporio): string {
   return `${window.location.origin}${path}`;
 }
 
+function openMailClient(mailtoHref: string): void {
+  const link = document.createElement("a");
+  link.href = mailtoHref;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 async function copyText(value: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(value);
@@ -649,8 +657,8 @@ export default function EmporioCassa() {
       }
       void queryClient.invalidateQueries({ queryKey: getListSpeseEmporioQueryKey() });
       if (openClient && result.mailtoHref) {
-        window.location.href = result.mailtoHref;
-        toast({ title: t("cassaEmporio.emailClientAperto") });
+        openMailClient(result.mailtoHref);
+        toast({ title: t("cassaEmporio.emailClientAperto"), description: t("cassaEmporio.emailClientApertoDescrizione") });
       } else if (openClient) {
         toast({
           title: t("cassaEmporio.nessunDestinatarioEmail"),
@@ -1047,9 +1055,17 @@ export default function EmporioCassa() {
                       <Button type="button" variant="outline" onClick={() => { void downloadBolla(chiusuraSpesa); }}>
                         <Download className="mr-2 h-4 w-4" />{t("cassaEmporio.stampaBolla")}
                       </Button>
-                      <Button type="button" variant="outline" onClick={() => { void prepareEmailBolla(chiusuraSpesa, true); }} disabled={registraInvioManualeBolla.isPending}>
-                        <Mail className="mr-2 h-4 w-4" />{t("cassaEmporio.ritentaInvioEmailBolla")}
-                      </Button>
+                      {emailDraftBolla?.mailtoHref ? (
+                        <Button type="button" variant="outline" asChild>
+                          <a href={emailDraftBolla.mailtoHref} onClick={() => toast({ title: t("cassaEmporio.emailClientAperto") })}>
+                            <Mail className="mr-2 h-4 w-4" />{t("cassaEmporio.ritentaInvioEmailBolla")}
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button type="button" variant="outline" onClick={() => { void prepareEmailBolla(chiusuraSpesa, true); }} disabled={registraInvioManualeBolla.isPending}>
+                          <Mail className="mr-2 h-4 w-4" />{t("cassaEmporio.ritentaInvioEmailBolla")}
+                        </Button>
+                      )}
                       <Button type="button" variant="outline" onClick={() => { void copyBollaLink(chiusuraSpesa); }}>
                         <Copy className="mr-2 h-4 w-4" />{t("cassaEmporio.copiaLinkBolla")}
                       </Button>

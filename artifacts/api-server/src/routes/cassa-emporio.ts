@@ -916,7 +916,7 @@ router.post("/cassa-emporio/sessioni/:id/chiudi", async (req, res) => {
     const emailBolla = {
       stato: "non_preparata" as const,
       destinatari: [],
-      messaggio: "Bolla pronta per la preparazione nel client email locale.",
+      messaggio: "Bolla pronta per l'apertura email nel client locale.",
     };
     res.json({
       sessione: updatedSessione ? await formatSessione(updatedSessione, true) : null,
