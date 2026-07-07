@@ -7,6 +7,7 @@ import { seedTipologieFornitore } from "./lib/seedTipologieFornitore";
 import { seedPoliticheCreditoSolidale } from "./lib/seedPoliticheCreditoSolidale";
 import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
 import { initDbExtensions } from "./lib/dbInit";
+import { ensureFase5Bootstrap } from "./lib/configurazioneAmbiente";
 
 const rawPort = process.env["PORT"];
 
@@ -34,9 +35,11 @@ app.listen(port, (err) => {
     logger.error({ err }, "Failed to initialize DB extensions");
   });
 
-  seedRoles().catch((err) => {
-    logger.error({ err }, "Failed to seed default roles");
-  });
+  seedRoles()
+    .then(() => ensureFase5Bootstrap())
+    .catch((err) => {
+      logger.error({ err }, "Failed to seed default roles or Fase 5 config");
+    });
 
   seedRuoliVolontari().catch((err) => {
     logger.error({ err }, "Failed to seed volunteer roles");

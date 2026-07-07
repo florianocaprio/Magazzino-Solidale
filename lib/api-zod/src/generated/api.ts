@@ -4185,6 +4185,194 @@ export const UpdateImpostazioniModuliResponse = zod.object({
 })
 
 
+export const GetConfigurazioneAmbientePubblicaResponse = zod.object({
+  "configurazione": zod.object({
+  "id": zod.number(),
+  "codiceAmbiente": zod.string(),
+  "nomeAmbiente": zod.string(),
+  "nomeAssociazione": zod.string(),
+  "descrizione": zod.string().nullable(),
+  "indirizzo": zod.string().nullable(),
+  "comune": zod.string().nullable(),
+  "provincia": zod.string().nullable(),
+  "codiceFiscale": zod.string().nullable(),
+  "partitaIva": zod.string().nullable(),
+  "email": zod.string().nullable(),
+  "telefono": zod.string().nullable(),
+  "sitoWeb": zod.string().nullable(),
+  "logoDocumentiUrl": zod.string().nullable(),
+  "logoTessereUrl": zod.string().nullable(),
+  "footerDocumenti": zod.string().nullable(),
+  "noteLegali": zod.string().nullable(),
+  "privacyTestoBreve": zod.string().nullable(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "aggiornatoDaId": zod.number().nullable()
+}),
+  "moduli": zod.array(zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullable(),
+  "categoria": zod.string(),
+  "core": zod.boolean(),
+  "ordine": zod.number(),
+  "attivoDefault": zod.boolean(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "ambienteModuloId": zod.number().nullable(),
+  "abilitatoDaId": zod.number().nullable()
+})),
+  "moduliAttivi": zod.array(zod.string())
+})
+
+
+export const GetSuperAdminConfigurazioneAmbienteResponse = zod.object({
+  "id": zod.number(),
+  "codiceAmbiente": zod.string(),
+  "nomeAmbiente": zod.string(),
+  "nomeAssociazione": zod.string(),
+  "descrizione": zod.string().nullable(),
+  "indirizzo": zod.string().nullable(),
+  "comune": zod.string().nullable(),
+  "provincia": zod.string().nullable(),
+  "codiceFiscale": zod.string().nullable(),
+  "partitaIva": zod.string().nullable(),
+  "email": zod.string().nullable(),
+  "telefono": zod.string().nullable(),
+  "sitoWeb": zod.string().nullable(),
+  "logoDocumentiUrl": zod.string().nullable(),
+  "logoTessereUrl": zod.string().nullable(),
+  "footerDocumenti": zod.string().nullable(),
+  "noteLegali": zod.string().nullable(),
+  "privacyTestoBreve": zod.string().nullable(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "aggiornatoDaId": zod.number().nullable()
+})
+
+
+
+
+
+
+
+export const UpdateSuperAdminConfigurazioneAmbienteBody = zod.object({
+  "codiceAmbiente": zod.string().min(1).optional(),
+  "nomeAmbiente": zod.string().min(1).optional(),
+  "nomeAssociazione": zod.string().min(1).optional(),
+  "descrizione": zod.string().nullish(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "provincia": zod.string().nullish(),
+  "codiceFiscale": zod.string().nullish(),
+  "partitaIva": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "sitoWeb": zod.string().nullish(),
+  "logoDocumentiUrl": zod.string().nullish(),
+  "logoTessereUrl": zod.string().nullish(),
+  "footerDocumenti": zod.string().nullish(),
+  "noteLegali": zod.string().nullish(),
+  "privacyTestoBreve": zod.string().nullish(),
+  "attivo": zod.boolean().optional()
+})
+
+export const UpdateSuperAdminConfigurazioneAmbienteResponse = zod.object({
+  "id": zod.number(),
+  "codiceAmbiente": zod.string(),
+  "nomeAmbiente": zod.string(),
+  "nomeAssociazione": zod.string(),
+  "descrizione": zod.string().nullable(),
+  "indirizzo": zod.string().nullable(),
+  "comune": zod.string().nullable(),
+  "provincia": zod.string().nullable(),
+  "codiceFiscale": zod.string().nullable(),
+  "partitaIva": zod.string().nullable(),
+  "email": zod.string().nullable(),
+  "telefono": zod.string().nullable(),
+  "sitoWeb": zod.string().nullable(),
+  "logoDocumentiUrl": zod.string().nullable(),
+  "logoTessereUrl": zod.string().nullable(),
+  "footerDocumenti": zod.string().nullable(),
+  "noteLegali": zod.string().nullable(),
+  "privacyTestoBreve": zod.string().nullable(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "aggiornatoDaId": zod.number().nullable()
+})
+
+
+export const ListSuperAdminModuliResponseItem = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullable(),
+  "categoria": zod.string(),
+  "core": zod.boolean(),
+  "ordine": zod.number(),
+  "attivoDefault": zod.boolean(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "ambienteModuloId": zod.number().nullable(),
+  "abilitatoDaId": zod.number().nullable()
+})
+export const ListSuperAdminModuliResponse = zod.array(ListSuperAdminModuliResponseItem)
+
+
+export const UpdateSuperAdminModuloParams = zod.object({
+  "codice": zod.coerce.string()
+})
+
+export const UpdateSuperAdminModuloBody = zod.object({
+  "attivo": zod.boolean()
+})
+
+export const UpdateSuperAdminModuloResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullable(),
+  "categoria": zod.string(),
+  "core": zod.boolean(),
+  "ordine": zod.number(),
+  "attivoDefault": zod.boolean(),
+  "attivo": zod.boolean(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "ambienteModuloId": zod.number().nullable(),
+  "abilitatoDaId": zod.number().nullable()
+})
+
+
+export const listSuperAdminAuditConfigurazioniQueryLimitMax = 200;
+
+
+
+export const ListSuperAdminAuditConfigurazioniQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listSuperAdminAuditConfigurazioniQueryLimitMax).optional()
+})
+
+export const ListSuperAdminAuditConfigurazioniResponseItem = zod.object({
+  "id": zod.number(),
+  "area": zod.string(),
+  "chiave": zod.string(),
+  "valorePrecedente": zod.record(zod.string(), zod.unknown()).nullable(),
+  "valoreNuovo": zod.record(zod.string(), zod.unknown()).nullable(),
+  "utenteId": zod.number().nullable(),
+  "azione": zod.string(),
+  "dataOra": zod.coerce.date(),
+  "ip": zod.string().nullable(),
+  "note": zod.string().nullable()
+})
+export const ListSuperAdminAuditConfigurazioniResponse = zod.array(ListSuperAdminAuditConfigurazioniResponseItem)
+
+
 export const ListPoliticheCreditoSolidaleResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
@@ -5250,6 +5438,7 @@ export const LoginUserResponse = zod.object({
   "cittaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
+  "isSuperAdmin": zod.boolean(),
   "isAdmin": zod.boolean(),
   "aree": zod.array(zod.string()),
   "mustChangePassword": zod.boolean()
@@ -5270,6 +5459,7 @@ export const GetCurrentUserResponse = zod.object({
   "cittaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
+  "isSuperAdmin": zod.boolean(),
   "isAdmin": zod.boolean(),
   "aree": zod.array(zod.string()),
   "mustChangePassword": zod.boolean()
@@ -5382,6 +5572,7 @@ export const ListUtentiResponseItem = zod.object({
   "cittaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
+  "isSuperAdmin": zod.boolean(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
   "ultimoAccesso": zod.string().nullish(),
@@ -5429,6 +5620,7 @@ export const GetUtenteResponse = zod.object({
   "cittaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
+  "isSuperAdmin": zod.boolean(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
   "ultimoAccesso": zod.string().nullish(),
@@ -5468,6 +5660,7 @@ export const UpdateUtenteResponse = zod.object({
   "cittaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
+  "isSuperAdmin": zod.boolean(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
   "ultimoAccesso": zod.string().nullish(),

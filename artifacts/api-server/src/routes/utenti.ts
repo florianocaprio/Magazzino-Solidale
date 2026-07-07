@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { callerCentroId, callerCittaId, callerZonaUdsId, andScoped } from "../lib/centroScope";
+import { ensureAtLeastOneSuperAdmin } from "../lib/configurazioneAmbiente";
 
 const router: IRouter = Router();
 
@@ -28,6 +29,7 @@ type UtenteRow = {
   cittaNome: string | null;
   zonaUdsId: number | null;
   zonaUdsNome: string | null;
+  isSuperAdmin: boolean;
   attivo: boolean;
   mustChangePassword: boolean;
   ultimoAccesso: Date | null;
@@ -48,6 +50,7 @@ const fmt = (r: UtenteRow) => ({
   cittaNome: r.cittaNome ?? null,
   zonaUdsId: r.zonaUdsId ?? null,
   zonaUdsNome: r.zonaUdsNome ?? null,
+  isSuperAdmin: r.isSuperAdmin,
   attivo: r.attivo,
   mustChangePassword: r.mustChangePassword,
   ultimoAccesso: r.ultimoAccesso ? r.ultimoAccesso.toISOString() : null,
@@ -70,6 +73,7 @@ const selectUtente = () =>
       cittaNome: cittaTable.nome,
       zonaUdsId: utentiTable.zonaUdsId,
       zonaUdsNome: zoneUdsTable.nome,
+      isSuperAdmin: utentiTable.isSuperAdmin,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
       ultimoAccesso: utentiTable.ultimoAccesso,
@@ -277,6 +281,8 @@ router.post("/utenti", async (req, res): Promise<void> => {
       mustChangePassword: false,
     })
     .returning({ id: utentiTable.id });
+
+  await ensureAtLeastOneSuperAdmin();
 
   const [row] = await selectUtente().where(eq(utentiTable.id, created.id));
   res.status(201).json(fmt(row));

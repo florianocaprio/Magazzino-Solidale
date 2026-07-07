@@ -30,6 +30,7 @@ export interface AuthUser {
   zonaUdsId?: number | null;
   /** @nullable */
   zonaUdsNome?: string | null;
+  isSuperAdmin: boolean;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;

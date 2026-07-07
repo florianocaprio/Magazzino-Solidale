@@ -10,9 +10,12 @@ import { eq } from "drizzle-orm";
 import { CreateZonaUdsBody, UpdateZonaUdsBody } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/auth";
 import { callerCittaId, canAccessCitta } from "../lib/centroScope";
+import { requireModulo } from "../lib/featureFlags";
 import { UNITA_STRADA_DISABLED_MSG, isUnitaStradaEnabled } from "../lib/impostazioniModuli";
 
 const router: IRouter = Router();
+
+router.use(requireModulo("UDS"));
 
 type ZonaRow = typeof zoneUdsTable.$inferSelect;
 

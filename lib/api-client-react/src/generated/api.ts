@@ -35,6 +35,7 @@ import type {
   ApprovvigionamentoUpdate,
   Area,
   AssociaBollaInput,
+  AuditConfigurazione,
   AuthUser,
   BeneficiariBulkInput,
   Beneficiario,
@@ -63,6 +64,9 @@ import type {
   CittaInput,
   CittaUpdate,
   ConfermaRicezione,
+  ConfigurazioneAmbiente,
+  ConfigurazioneAmbientePubblica,
+  ConfigurazioneAmbienteUpdate,
   Consegna,
   ConsegnaInput,
   ConsegnaRicezioneInput,
@@ -116,6 +120,7 @@ import type {
   ListProdottiParams,
   ListSessioniCassaEmporioParams,
   ListSpeseEmporioParams,
+  ListSuperAdminAuditConfigurazioniParams,
   ListTrasferimentiParams,
   ListTurniParams,
   ListUtentiParams,
@@ -132,6 +137,8 @@ import type {
   Mezzo,
   MezzoInput,
   MezzoUpdate,
+  ModuloFunzionale,
+  ModuloFunzionaleUpdate,
   Movimento,
   MovimentoInput,
   MovimentoSummary,
@@ -10042,6 +10049,428 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getUpdateImpostazioniModuliMutationOptions(options));
     }
+
+export const getGetConfigurazioneAmbientePubblicaUrl = () => {
+
+
+
+
+  return `/api/configurazione-ambiente`
+}
+
+export const getConfigurazioneAmbientePubblica = async ( options?: RequestInit): Promise<ConfigurazioneAmbientePubblica> => {
+
+  return customFetch<ConfigurazioneAmbientePubblica>(getGetConfigurazioneAmbientePubblicaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConfigurazioneAmbientePubblicaQueryKey = () => {
+    return [
+    `/api/configurazione-ambiente`
+    ] as const;
+    }
+
+
+export const getGetConfigurazioneAmbientePubblicaQueryOptions = <TData = Awaited<ReturnType<typeof getConfigurazioneAmbientePubblica>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConfigurazioneAmbientePubblica>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConfigurazioneAmbientePubblicaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConfigurazioneAmbientePubblica>>> = ({ signal }) => getConfigurazioneAmbientePubblica({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConfigurazioneAmbientePubblica>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConfigurazioneAmbientePubblicaQueryResult = NonNullable<Awaited<ReturnType<typeof getConfigurazioneAmbientePubblica>>>
+export type GetConfigurazioneAmbientePubblicaQueryError = ErrorType<unknown>
+
+
+
+export function useGetConfigurazioneAmbientePubblica<TData = Awaited<ReturnType<typeof getConfigurazioneAmbientePubblica>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConfigurazioneAmbientePubblica>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConfigurazioneAmbientePubblicaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSuperAdminConfigurazioneAmbienteUrl = () => {
+
+
+
+
+  return `/api/super-admin/configurazione-ambiente`
+}
+
+export const getSuperAdminConfigurazioneAmbiente = async ( options?: RequestInit): Promise<ConfigurazioneAmbiente> => {
+
+  return customFetch<ConfigurazioneAmbiente>(getGetSuperAdminConfigurazioneAmbienteUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSuperAdminConfigurazioneAmbienteQueryKey = () => {
+    return [
+    `/api/super-admin/configurazione-ambiente`
+    ] as const;
+    }
+
+
+export const getGetSuperAdminConfigurazioneAmbienteQueryOptions = <TData = Awaited<ReturnType<typeof getSuperAdminConfigurazioneAmbiente>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneAmbiente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSuperAdminConfigurazioneAmbienteQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSuperAdminConfigurazioneAmbiente>>> = ({ signal }) => getSuperAdminConfigurazioneAmbiente({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneAmbiente>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSuperAdminConfigurazioneAmbienteQueryResult = NonNullable<Awaited<ReturnType<typeof getSuperAdminConfigurazioneAmbiente>>>
+export type GetSuperAdminConfigurazioneAmbienteQueryError = ErrorType<unknown>
+
+
+
+export function useGetSuperAdminConfigurazioneAmbiente<TData = Awaited<ReturnType<typeof getSuperAdminConfigurazioneAmbiente>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneAmbiente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSuperAdminConfigurazioneAmbienteQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateSuperAdminConfigurazioneAmbienteUrl = () => {
+
+
+
+
+  return `/api/super-admin/configurazione-ambiente`
+}
+
+export const updateSuperAdminConfigurazioneAmbiente = async (configurazioneAmbienteUpdate: ConfigurazioneAmbienteUpdate, options?: RequestInit): Promise<ConfigurazioneAmbiente> => {
+
+  return customFetch<ConfigurazioneAmbiente>(getUpdateSuperAdminConfigurazioneAmbienteUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      configurazioneAmbienteUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateSuperAdminConfigurazioneAmbienteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneAmbiente>>, TError,{data: BodyType<ConfigurazioneAmbienteUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneAmbiente>>, TError,{data: BodyType<ConfigurazioneAmbienteUpdate>}, TContext> => {
+
+const mutationKey = ['updateSuperAdminConfigurazioneAmbiente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneAmbiente>>, {data: BodyType<ConfigurazioneAmbienteUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateSuperAdminConfigurazioneAmbiente(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSuperAdminConfigurazioneAmbienteMutationResult = NonNullable<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneAmbiente>>>
+    export type UpdateSuperAdminConfigurazioneAmbienteMutationBody = BodyType<ConfigurazioneAmbienteUpdate>
+    export type UpdateSuperAdminConfigurazioneAmbienteMutationError = ErrorType<unknown>
+
+    export const useUpdateSuperAdminConfigurazioneAmbiente = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneAmbiente>>, TError,{data: BodyType<ConfigurazioneAmbienteUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSuperAdminConfigurazioneAmbiente>>,
+        TError,
+        {data: BodyType<ConfigurazioneAmbienteUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateSuperAdminConfigurazioneAmbienteMutationOptions(options));
+    }
+
+export const getListSuperAdminModuliUrl = () => {
+
+
+
+
+  return `/api/super-admin/moduli`
+}
+
+export const listSuperAdminModuli = async ( options?: RequestInit): Promise<ModuloFunzionale[]> => {
+
+  return customFetch<ModuloFunzionale[]>(getListSuperAdminModuliUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSuperAdminModuliQueryKey = () => {
+    return [
+    `/api/super-admin/moduli`
+    ] as const;
+    }
+
+
+export const getListSuperAdminModuliQueryOptions = <TData = Awaited<ReturnType<typeof listSuperAdminModuli>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminModuli>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSuperAdminModuliQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSuperAdminModuli>>> = ({ signal }) => listSuperAdminModuli({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminModuli>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSuperAdminModuliQueryResult = NonNullable<Awaited<ReturnType<typeof listSuperAdminModuli>>>
+export type ListSuperAdminModuliQueryError = ErrorType<unknown>
+
+
+
+export function useListSuperAdminModuli<TData = Awaited<ReturnType<typeof listSuperAdminModuli>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminModuli>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSuperAdminModuliQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateSuperAdminModuloUrl = (codice: string,) => {
+
+
+
+
+  return `/api/super-admin/moduli/${codice}`
+}
+
+export const updateSuperAdminModulo = async (codice: string,
+    moduloFunzionaleUpdate: ModuloFunzionaleUpdate, options?: RequestInit): Promise<ModuloFunzionale> => {
+
+  return customFetch<ModuloFunzionale>(getUpdateSuperAdminModuloUrl(codice),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      moduloFunzionaleUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateSuperAdminModuloMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminModulo>>, TError,{codice: string;data: BodyType<ModuloFunzionaleUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminModulo>>, TError,{codice: string;data: BodyType<ModuloFunzionaleUpdate>}, TContext> => {
+
+const mutationKey = ['updateSuperAdminModulo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSuperAdminModulo>>, {codice: string;data: BodyType<ModuloFunzionaleUpdate>}> = (props) => {
+          const {codice,data} = props ?? {};
+
+          return  updateSuperAdminModulo(codice,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSuperAdminModuloMutationResult = NonNullable<Awaited<ReturnType<typeof updateSuperAdminModulo>>>
+    export type UpdateSuperAdminModuloMutationBody = BodyType<ModuloFunzionaleUpdate>
+    export type UpdateSuperAdminModuloMutationError = ErrorType<unknown>
+
+    export const useUpdateSuperAdminModulo = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminModulo>>, TError,{codice: string;data: BodyType<ModuloFunzionaleUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSuperAdminModulo>>,
+        TError,
+        {codice: string;data: BodyType<ModuloFunzionaleUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateSuperAdminModuloMutationOptions(options));
+    }
+
+export const getListSuperAdminAuditConfigurazioniUrl = (params?: ListSuperAdminAuditConfigurazioniParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/super-admin/audit-configurazioni?${stringifiedParams}` : `/api/super-admin/audit-configurazioni`
+}
+
+export const listSuperAdminAuditConfigurazioni = async (params?: ListSuperAdminAuditConfigurazioniParams, options?: RequestInit): Promise<AuditConfigurazione[]> => {
+
+  return customFetch<AuditConfigurazione[]>(getListSuperAdminAuditConfigurazioniUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSuperAdminAuditConfigurazioniQueryKey = (params?: ListSuperAdminAuditConfigurazioniParams,) => {
+    return [
+    `/api/super-admin/audit-configurazioni`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSuperAdminAuditConfigurazioniQueryOptions = <TData = Awaited<ReturnType<typeof listSuperAdminAuditConfigurazioni>>, TError = ErrorType<unknown>>(params?: ListSuperAdminAuditConfigurazioniParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminAuditConfigurazioni>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSuperAdminAuditConfigurazioniQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSuperAdminAuditConfigurazioni>>> = ({ signal }) => listSuperAdminAuditConfigurazioni(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminAuditConfigurazioni>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSuperAdminAuditConfigurazioniQueryResult = NonNullable<Awaited<ReturnType<typeof listSuperAdminAuditConfigurazioni>>>
+export type ListSuperAdminAuditConfigurazioniQueryError = ErrorType<unknown>
+
+
+
+export function useListSuperAdminAuditConfigurazioni<TData = Awaited<ReturnType<typeof listSuperAdminAuditConfigurazioni>>, TError = ErrorType<unknown>>(
+ params?: ListSuperAdminAuditConfigurazioniParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminAuditConfigurazioni>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSuperAdminAuditConfigurazioniQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListPoliticheCreditoSolidaleUrl = () => {
 

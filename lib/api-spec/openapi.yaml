@@ -37,6 +37,8 @@ tags:
   - name: accessi-emporio
   - name: cassa-emporio
   - name: spese-emporio
+  - name: configurazione-ambiente
+  - name: super-admin
 
 paths:
   /healthz:
@@ -2881,6 +2883,106 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImpostazioniModuli"
+
+  /configurazione-ambiente:
+    get:
+      operationId: getConfigurazioneAmbientePubblica
+      tags: [configurazione-ambiente]
+      responses:
+        "200":
+          description: Current environment configuration and enabled modules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneAmbientePubblica"
+
+  /super-admin/configurazione-ambiente:
+    get:
+      operationId: getSuperAdminConfigurazioneAmbiente
+      tags: [super-admin]
+      responses:
+        "200":
+          description: Current environment configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneAmbiente"
+    patch:
+      operationId: updateSuperAdminConfigurazioneAmbiente
+      tags: [super-admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigurazioneAmbienteUpdate"
+      responses:
+        "200":
+          description: Updated environment configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneAmbiente"
+
+  /super-admin/moduli:
+    get:
+      operationId: listSuperAdminModuli
+      tags: [super-admin]
+      responses:
+        "200":
+          description: Functional module catalog and environment state
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModuloFunzionale"
+
+  /super-admin/moduli/{codice}:
+    patch:
+      operationId: updateSuperAdminModulo
+      tags: [super-admin]
+      parameters:
+        - name: codice
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuloFunzionaleUpdate"
+      responses:
+        "200":
+          description: Updated module state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuloFunzionale"
+
+  /super-admin/audit-configurazioni:
+    get:
+      operationId: listSuperAdminAuditConfigurazioni
+      tags: [super-admin]
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Configuration audit log
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditConfigurazione"
 
   /politiche-credito-solidale:
     get:
@@ -6597,6 +6699,228 @@ components:
         unitaStradaAbilitata:
           type: boolean
 
+    ConfigurazioneAmbiente:
+      type: object
+      properties:
+        id:
+          type: integer
+        codiceAmbiente:
+          type: string
+        nomeAmbiente:
+          type: string
+        nomeAssociazione:
+          type: string
+        descrizione:
+          type: ["string", "null"]
+        indirizzo:
+          type: ["string", "null"]
+        comune:
+          type: ["string", "null"]
+        provincia:
+          type: ["string", "null"]
+        codiceFiscale:
+          type: ["string", "null"]
+        partitaIva:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        sitoWeb:
+          type: ["string", "null"]
+        logoDocumentiUrl:
+          type: ["string", "null"]
+        logoTessereUrl:
+          type: ["string", "null"]
+        footerDocumenti:
+          type: ["string", "null"]
+        noteLegali:
+          type: ["string", "null"]
+        privacyTestoBreve:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+        dataCreazione:
+          type: string
+          format: date-time
+        dataAggiornamento:
+          type: string
+          format: date-time
+        aggiornatoDaId:
+          type: ["integer", "null"]
+      required:
+        - id
+        - codiceAmbiente
+        - nomeAmbiente
+        - nomeAssociazione
+        - descrizione
+        - indirizzo
+        - comune
+        - provincia
+        - codiceFiscale
+        - partitaIva
+        - email
+        - telefono
+        - sitoWeb
+        - logoDocumentiUrl
+        - logoTessereUrl
+        - footerDocumenti
+        - noteLegali
+        - privacyTestoBreve
+        - attivo
+        - dataCreazione
+        - dataAggiornamento
+        - aggiornatoDaId
+
+    ConfigurazioneAmbienteUpdate:
+      type: object
+      properties:
+        codiceAmbiente:
+          type: string
+          minLength: 1
+        nomeAmbiente:
+          type: string
+          minLength: 1
+        nomeAssociazione:
+          type: string
+          minLength: 1
+        descrizione:
+          type: ["string", "null"]
+        indirizzo:
+          type: ["string", "null"]
+        comune:
+          type: ["string", "null"]
+        provincia:
+          type: ["string", "null"]
+        codiceFiscale:
+          type: ["string", "null"]
+        partitaIva:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        telefono:
+          type: ["string", "null"]
+        sitoWeb:
+          type: ["string", "null"]
+        logoDocumentiUrl:
+          type: ["string", "null"]
+        logoTessereUrl:
+          type: ["string", "null"]
+        footerDocumenti:
+          type: ["string", "null"]
+        noteLegali:
+          type: ["string", "null"]
+        privacyTestoBreve:
+          type: ["string", "null"]
+        attivo:
+          type: boolean
+
+    ModuloFunzionale:
+      type: object
+      properties:
+        id:
+          type: integer
+        codice:
+          type: string
+        nome:
+          type: string
+        descrizione:
+          type: ["string", "null"]
+        categoria:
+          type: string
+        core:
+          type: boolean
+        ordine:
+          type: integer
+        attivoDefault:
+          type: boolean
+        attivo:
+          type: boolean
+        dataCreazione:
+          type: string
+          format: date-time
+        dataAggiornamento:
+          type: string
+          format: date-time
+        ambienteModuloId:
+          type: ["integer", "null"]
+        abilitatoDaId:
+          type: ["integer", "null"]
+      required:
+        - id
+        - codice
+        - nome
+        - descrizione
+        - categoria
+        - core
+        - ordine
+        - attivoDefault
+        - attivo
+        - dataCreazione
+        - dataAggiornamento
+        - ambienteModuloId
+        - abilitatoDaId
+
+    ModuloFunzionaleUpdate:
+      type: object
+      properties:
+        attivo:
+          type: boolean
+      required: [attivo]
+
+    ConfigurazioneAmbientePubblica:
+      type: object
+      properties:
+        configurazione:
+          $ref: "#/components/schemas/ConfigurazioneAmbiente"
+        moduli:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuloFunzionale"
+        moduliAttivi:
+          type: array
+          items:
+            type: string
+      required: [configurazione, moduli, moduliAttivi]
+
+    AuditConfigurazione:
+      type: object
+      properties:
+        id:
+          type: integer
+        area:
+          type: string
+        chiave:
+          type: string
+        valorePrecedente:
+          type: ["object", "null"]
+          additionalProperties: true
+        valoreNuovo:
+          type: ["object", "null"]
+          additionalProperties: true
+        utenteId:
+          type: ["integer", "null"]
+        azione:
+          type: string
+        dataOra:
+          type: string
+          format: date-time
+        ip:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+      required:
+        - id
+        - area
+        - chiave
+        - valorePrecedente
+        - valoreNuovo
+        - utenteId
+        - azione
+        - dataOra
+        - ip
+        - note
+
     EmailSendResult:
       type: object
       properties:
@@ -8236,6 +8560,8 @@ components:
           type: ["integer", "null"]
         zonaUdsNome:
           type: ["string", "null"]
+        isSuperAdmin:
+          type: boolean
         isAdmin:
           type: boolean
         aree:
@@ -8244,7 +8570,7 @@ components:
             type: string
         mustChangePassword:
           type: boolean
-      required: [id, username, nome, isAdmin, aree, mustChangePassword]
+      required: [id, username, nome, isSuperAdmin, isAdmin, aree, mustChangePassword]
 
     LoginInput:
       type: object
@@ -8294,6 +8620,8 @@ components:
           type: ["integer", "null"]
         zonaUdsNome:
           type: ["string", "null"]
+        isSuperAdmin:
+          type: boolean
         attivo:
           type: boolean
         mustChangePassword:
@@ -8302,7 +8630,7 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, username, nome, attivo, mustChangePassword, dataCreazione]
+      required: [id, username, nome, isSuperAdmin, attivo, mustChangePassword, dataCreazione]
 
     UtenteInput:
       type: object

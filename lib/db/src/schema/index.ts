@@ -26,4 +26,5 @@ export * from "./scarichi";
 export * from "./approvvigionamenti";
 export * from "./turni";
 export * from "./impostazioni";
+export * from "./configurazioneAmbiente";
 export * from "./auth";

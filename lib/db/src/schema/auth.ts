@@ -26,6 +26,7 @@ export const utentiTable = pgTable(
     cittaId: integer("citta_id").references(() => cittaTable.id),
     zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
     attivo: boolean("attivo").notNull().default(true),
+    isSuperAdmin: boolean("is_super_admin").notNull().default(false),
     mustChangePassword: boolean("must_change_password").notNull().default(false),
     ultimoAccesso: timestamp("ultimo_accesso"),
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
