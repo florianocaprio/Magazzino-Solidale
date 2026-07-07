@@ -48,6 +48,7 @@ export default function SuperAdminModuli() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [toDisable, setToDisable] = useState<ModuloFunzionale | null>(null);
+  const [pendingCodice, setPendingCodice] = useState<string | null>(null);
 
   const query = useListSuperAdminModuli({
     query: {
@@ -66,6 +67,9 @@ export default function SuperAdminModuli() {
 
   const update = useUpdateSuperAdminModulo({
     mutation: {
+      onMutate: ({ codice }) => {
+        setPendingCodice(codice);
+      },
       onSuccess: (modulo) => {
         queryClient.invalidateQueries({ queryKey: getListSuperAdminModuliQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetConfigurazioneAmbientePubblicaQueryKey() });
@@ -81,6 +85,9 @@ export default function SuperAdminModuli() {
           description: errorMessage(err, t("superAdmin.modules.errorDescription")),
           variant: "destructive",
         });
+      },
+      onSettled: () => {
+        setPendingCodice(null);
       },
     },
   });
@@ -139,36 +146,51 @@ export default function SuperAdminModuli() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {moduli.map((modulo) => (
-                <TableRow key={modulo.codice}>
-                  <TableCell className="font-mono text-xs">{modulo.codice}</TableCell>
-                  <TableCell className="font-medium">{modulo.nome}</TableCell>
-                  <TableCell className="max-w-md text-muted-foreground">{modulo.descrizione}</TableCell>
-                  <TableCell>{modulo.categoria}</TableCell>
-                  <TableCell>
-                    <Badge variant={modulo.core ? "default" : "secondary"}>
-                      {modulo.core ? t("superAdmin.modules.core") : t("superAdmin.modules.optional")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{statusBadge(modulo.attivo, t)}</TableCell>
-                  <TableCell>{modulo.ordine}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="inline-flex flex-col items-end gap-1">
-                      <Switch
-                        checked={modulo.attivo}
-                        disabled={modulo.core || update.isPending}
-                        onCheckedChange={(checked) => setModulo(modulo, checked)}
-                        title={modulo.core ? t("superAdmin.modules.cannotDisableCore") : undefined}
-                      />
-                      {modulo.core && (
-                        <span className="text-xs text-muted-foreground">
-                          {t("superAdmin.modules.cannotDisableCore")}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {moduli.map((modulo) => {
+                const isPending = pendingCodice === modulo.codice;
+                const actionLabel = modulo.attivo
+                  ? t("superAdmin.modules.disableAction")
+                  : t("superAdmin.modules.enableAction");
+                return (
+                  <TableRow key={modulo.codice}>
+                    <TableCell className="font-mono text-xs">{modulo.codice}</TableCell>
+                    <TableCell className="font-medium">{modulo.nome}</TableCell>
+                    <TableCell className="max-w-md text-muted-foreground">{modulo.descrizione}</TableCell>
+                    <TableCell>{modulo.categoria}</TableCell>
+                    <TableCell>
+                      <Badge variant={modulo.core ? "default" : "secondary"}>
+                        {modulo.core ? t("superAdmin.modules.core") : t("superAdmin.modules.optional")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{statusBadge(modulo.attivo, t)}</TableCell>
+                    <TableCell>{modulo.ordine}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="inline-flex flex-col items-end gap-1">
+                        <div className="inline-flex min-w-36 items-center justify-end gap-2">
+                          {isPending && (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                          <Switch
+                            checked={modulo.attivo}
+                            disabled={modulo.core || isPending}
+                            onCheckedChange={(checked) => setModulo(modulo, checked)}
+                            aria-label={modulo.core ? t("superAdmin.modules.cannotDisableCore") : actionLabel}
+                            title={modulo.core ? t("superAdmin.modules.cannotDisableCore") : actionLabel}
+                          />
+                          <span className="w-24 text-left text-xs text-muted-foreground">
+                            {isPending ? t("superAdmin.modules.updating") : actionLabel}
+                          </span>
+                        </div>
+                        {modulo.core && (
+                          <span className="text-xs text-muted-foreground">
+                            {t("superAdmin.modules.cannotDisableCore")}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

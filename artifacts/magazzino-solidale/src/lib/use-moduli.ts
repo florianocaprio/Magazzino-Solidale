@@ -1,8 +1,6 @@
 import {
   getGetConfigurazioneAmbientePubblicaQueryKey,
-  getGetImpostazioniModuliQueryKey,
   useGetConfigurazioneAmbientePubblica,
-  useGetImpostazioniModuli,
 } from "@workspace/api-client-react";
 
 export const EMPORIO_DISABLED_MESSAGE = "Il modulo Emporio Solidale è disabilitato.";
@@ -28,17 +26,19 @@ export const MODULO_BY_ROUTE: Record<string, string> = {
 };
 
 export function useModuloFlags() {
-  const query = useGetImpostazioniModuli({
+  const query = useGetConfigurazioneAmbientePubblica({
     query: {
-      queryKey: getGetImpostazioniModuliQueryKey(),
+      queryKey: getGetConfigurazioneAmbientePubblicaQueryKey(),
       staleTime: 60_000,
     },
   });
+  const activeCodes = new Set(query.data?.moduliAttivi ?? []);
+  const hasConfig = !!query.data && !query.isError;
 
   return {
     ...query,
-    emporioAbilitato: query.data?.emporioAbilitato ?? false,
-    unitaStradaAbilitata: query.data?.unitaStradaAbilitata ?? true,
+    emporioAbilitato: hasConfig ? activeCodes.has("EMPORIO_SOLIDALE") : false,
+    unitaStradaAbilitata: hasConfig ? activeCodes.has("UDS") : true,
   };
 }
 
