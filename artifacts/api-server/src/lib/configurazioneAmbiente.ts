@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { and, asc, desc, eq } from "drizzle-orm";
 import {
   ambienteModuliTable,
@@ -5,12 +6,14 @@ import {
   configurazioneAmbienteTable,
   db,
   moduliFunzionaliTable,
-  ruoliTable,
   utentiTable,
 } from "@workspace/db";
 import { logger } from "./logger";
+import { ensureSuperAdminRole } from "./seedRoles";
 
 export const CONFIGURAZIONE_AMBIENTE_ID = 1;
+export const DEFAULT_SUPER_ADMIN_USERNAME = "sadmin";
+const DEFAULT_SUPER_ADMIN_PASSWORD = "Apollo13!";
 
 type ModuloSeed = {
   codice: string;
@@ -193,35 +196,51 @@ export async function ensureAmbienteModuli(): Promise<void> {
   }
 }
 
-export async function ensureAtLeastOneSuperAdmin(): Promise<void> {
+export async function ensureDefaultSuperAdminUser(): Promise<void> {
+  const superAdminRoleId = await ensureSuperAdminRole();
+  const passwordHash = await bcrypt.hash(DEFAULT_SUPER_ADMIN_PASSWORD, 10);
   const [existing] = await db
     .select({ id: utentiTable.id })
     .from(utentiTable)
-    .where(eq(utentiTable.isSuperAdmin, true))
-    .limit(1);
-  if (existing) return;
+    .where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
 
-  const [firstAdmin] = await db
-    .select({ id: utentiTable.id })
-    .from(utentiTable)
-    .innerJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
-    .where(and(eq(utentiTable.attivo, true), eq(ruoliTable.isAdmin, true)))
-    .orderBy(asc(utentiTable.id))
-    .limit(1);
+  if (existing) {
+    await db
+      .update(utentiTable)
+      .set({
+        passwordHash,
+        ruoloId: superAdminRoleId,
+        isSuperAdmin: true,
+        attivo: true,
+        mustChangePassword: false,
+        centroAscoltoId: null,
+        cittaId: null,
+        zonaUdsId: null,
+      })
+      .where(eq(utentiTable.id, existing.id));
+    return;
+  }
 
-  if (!firstAdmin) return;
-
-  await db
-    .update(utentiTable)
-    .set({ isSuperAdmin: true })
-    .where(eq(utentiTable.id, firstAdmin.id));
-  logger.info({ userId: firstAdmin.id }, "Promoted first active admin to Super Admin");
+  await db.insert(utentiTable).values({
+    username: DEFAULT_SUPER_ADMIN_USERNAME,
+    passwordHash,
+    nome: "Super",
+    cognome: "Admin",
+    ruoloId: superAdminRoleId,
+    centroAscoltoId: null,
+    cittaId: null,
+    zonaUdsId: null,
+    attivo: true,
+    isSuperAdmin: true,
+    mustChangePassword: false,
+  });
+  logger.info({ username: DEFAULT_SUPER_ADMIN_USERNAME }, "Seeded default SuperAdmin user");
 }
 
 export async function ensureFase5Bootstrap(): Promise<void> {
   await ensureConfigurazioneAmbiente();
   await ensureAmbienteModuli();
-  await ensureAtLeastOneSuperAdmin();
+  await ensureDefaultSuperAdminUser();
 }
 
 export async function getConfigurazioneAmbiente(): Promise<ConfigurazioneAmbienteDto> {

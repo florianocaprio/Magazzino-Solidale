@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
 import { isBootstrapMode } from "../lib/bootstrap";
+import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 
 export interface SessionUser {
   id: number;
@@ -96,7 +97,7 @@ export async function loadSessionUser(
     cittaNome: row.cittaNome ?? null,
     zonaUdsId: row.zonaUdsId ?? null,
     zonaUdsNome: row.zonaUdsNome ?? null,
-    isSuperAdmin: row.isSuperAdmin ?? false,
+    isSuperAdmin: (row.isSuperAdmin ?? false) || row.ruoloNome === SUPER_ADMIN_ROLE_NAME,
     isAdmin: row.isAdmin ?? false,
     aree: row.aree ?? [],
     mustChangePassword: row.mustChangePassword,
@@ -192,8 +193,8 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
  * When the authenticated user is flagged `mustChangePassword`, blocks every
  * protected route except the auth self-service endpoints needed to actually
  * change the password (`/auth/me`, `/auth/change-password`, `/auth/logout`).
- * Frontend gating is UX only — this is the real enforcement boundary so a user
- * with the known bootstrap credential cannot operate before rotating it.
+ * Frontend gating is UX only — this is the real enforcement boundary for users
+ * whose password was explicitly marked as temporary.
  */
 const PASSWORD_CHANGE_ALLOWLIST = new Set([
   "/auth/me",

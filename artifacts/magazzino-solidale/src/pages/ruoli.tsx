@@ -52,9 +52,13 @@ import { MoreHorizontal, Plus, Pencil, Trash2, ShieldCheck } from "lucide-react"
 import { AREA_LABEL } from "@/lib/areas";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
+
+const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
 
 export default function Ruoli() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { data: ruoli, isLoading } = useListRuoli();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -87,6 +91,7 @@ export default function Ruoli() {
   };
 
   const openEdit = (r: Ruolo) => {
+    if (r.nome === SUPER_ADMIN_ROLE_NAME && !user?.isSuperAdmin) return;
     setEditing(r);
     setNome(r.nome);
     setDescrizione(r.descrizione ?? "");
@@ -226,7 +231,12 @@ export default function Ruoli() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {r.isAdmin ? (
+                      {r.nome === SUPER_ADMIN_ROLE_NAME ? (
+                        <Badge className="bg-amber-500/10 text-amber-700">
+                          <ShieldCheck className="mr-1 h-3 w-3" />
+                          SuperAdmin
+                        </Badge>
+                      ) : r.isAdmin ? (
                         <Badge className="bg-amber-500/10 text-amber-700">
                           <ShieldCheck className="mr-1 h-3 w-3" />
                           {t("ruoli.admin")}
@@ -243,12 +253,16 @@ export default function Ruoli() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(r)}>
+                          <DropdownMenuItem
+                            disabled={r.nome === SUPER_ADMIN_ROLE_NAME && !user?.isSuperAdmin}
+                            onClick={() => openEdit(r)}
+                          >
                             <Pencil className="mr-2 h-4 w-4" />
                             {t("common.edit")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
+                            disabled={r.nome === SUPER_ADMIN_ROLE_NAME}
                             onClick={() => setDeleting(r)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -289,6 +303,7 @@ export default function Ruoli() {
                 id="r-nome"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
+                disabled={editing?.nome === SUPER_ADMIN_ROLE_NAME}
                 required
               />
             </div>
@@ -311,6 +326,7 @@ export default function Ruoli() {
                 id="r-admin"
                 checked={isAdmin}
                 onCheckedChange={setIsAdmin}
+                disabled={editing?.nome === SUPER_ADMIN_ROLE_NAME}
               />
             </div>
             {!isAdmin && (

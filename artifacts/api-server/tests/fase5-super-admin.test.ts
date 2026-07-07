@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import {
   auditConfigurazioniTable,
   db,
@@ -12,6 +13,7 @@ import {
 import authRouter from "../src/routes/auth";
 import configurazioneAmbienteRouter from "../src/routes/configurazione-ambiente";
 import superAdminRouter from "../src/routes/super-admin";
+import utentiRouter from "../src/routes/utenti";
 import { requireModulo } from "../src/lib/featureFlags";
 import {
   ensureFase5Bootstrap,
@@ -22,6 +24,8 @@ import {
   type ConfigurazioneAmbienteDto,
 } from "../src/lib/configurazioneAmbiente";
 import type { SessionUser } from "../src/middlewares/auth";
+import { loadSessionUser } from "../src/middlewares/auth";
+import { DEFAULT_SUPER_ADMIN_USERNAME } from "../src/lib/configurazioneAmbiente";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
@@ -42,6 +46,7 @@ function appAs(user: SessionUser): Express {
   });
   app.use(configurazioneAmbienteRouter);
   app.use(superAdminRouter);
+  app.use(utentiRouter);
   app.get("/test-predittivo", requireModulo("PREDITTIVO"), (_req, res) => {
     res.status(204).send();
   });
@@ -169,6 +174,35 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     expect(res.body.isAdmin).toBe(true);
   });
 
+  it("seeda l'utente tecnico sadmin come SuperAdmin globale", async () => {
+    const [seeded] = await db
+      .select({
+        id: utentiTable.id,
+        username: utentiTable.username,
+        passwordHash: utentiTable.passwordHash,
+        isSuperAdmin: utentiTable.isSuperAdmin,
+        centroAscoltoId: utentiTable.centroAscoltoId,
+        cittaId: utentiTable.cittaId,
+        zonaUdsId: utentiTable.zonaUdsId,
+        ruoloNome: ruoliTable.nome,
+      })
+      .from(utentiTable)
+      .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
+      .where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
+
+    expect(seeded).toBeTruthy();
+    expect(seeded.ruoloNome).toBe("SuperAdmin");
+    expect(seeded.isSuperAdmin).toBe(true);
+    expect(seeded.centroAscoltoId).toBeNull();
+    expect(seeded.cittaId).toBeNull();
+    expect(seeded.zonaUdsId).toBeNull();
+    expect(await bcrypt.compare("Apollo13!", seeded.passwordHash)).toBe(true);
+
+    const sessionUser = await loadSessionUser(seeded.id);
+    expect(sessionUser?.isSuperAdmin).toBe(true);
+    expect(sessionUser?.isAdmin).toBe(true);
+  });
+
   it("riserva gli endpoint /super-admin ai soli Super Admin", async () => {
     const forbidden = await request(appAs(adminUser)).get(
       "/super-admin/configurazione-ambiente",
@@ -180,6 +214,23 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     );
     expect(allowed.status).toBe(200);
     expect(allowed.body.id).toBe(1);
+  });
+
+  it("impedisce a un admin normale di modificare o resettare un SuperAdmin", async () => {
+    const [seeded] = await db
+      .select({ id: utentiTable.id })
+      .from(utentiTable)
+      .where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
+
+    const patch = await request(appAs(adminUser))
+      .patch(`/utenti/${seeded.id}`)
+      .send({ nome: "Non autorizzato" });
+    expect(patch.status).toBe(403);
+
+    const reset = await request(appAs(adminUser))
+      .post(`/utenti/${seeded.id}/reset-password`)
+      .send({ newPassword: "NuovaPassword1" });
+    expect(reset.status).toBe(403);
   });
 
   it("aggiorna la configurazione ambiente e registra audit", async () => {
