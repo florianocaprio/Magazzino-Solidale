@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { useIdleLogout } from "@/lib/use-idle-logout";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
+import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const IDLE_KEEPALIVE_MS = 5 * 60 * 1000;
@@ -57,6 +58,9 @@ import EmporioSpese from "@/pages/emporio-spese";
 import UdsAnagrafica from "@/pages/uds-anagrafica";
 import UdsInterventi from "@/pages/uds-interventi";
 import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
+import SuperAdminConfigurazioneAmbiente from "@/pages/super-admin-configurazione-ambiente";
+import SuperAdminModuli from "@/pages/super-admin-moduli";
+import SuperAdminAuditConfigurazioni from "@/pages/super-admin-audit-configurazioni";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +81,36 @@ function Guard({
   const { hasArea } = useAuth();
   const areas = Array.isArray(area) ? area : [area];
   if (!areas.some((a) => hasArea(a))) return <NotAuthorized />;
+  return <>{children}</>;
+}
+
+function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.isSuperAdmin !== true) return <NotAuthorized />;
+  return <>{children}</>;
+}
+
+function RequireModulo({
+  codice,
+  children,
+}: {
+  codice: string;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  if (!isModuloAttivo(codice)) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-6 text-center">
+        <div className="max-w-md space-y-2">
+          <h1 className="text-2xl font-semibold">{t("superAdmin.moduleDisabled.title")}</h1>
+          <p className="text-sm text-muted-foreground">
+            {t("superAdmin.moduleDisabled.description")}
+          </p>
+        </div>
+      </div>
+    );
+  }
   return <>{children}</>;
 }
 
@@ -130,7 +164,9 @@ function AppRoutes() {
         <Route path="/trasferimenti">
           {() => (
             <Guard area="magazzino">
-              <Trasferimenti />
+              <RequireModulo codice="TRASFERIMENTI">
+                <Trasferimenti />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -152,28 +188,36 @@ function AppRoutes() {
         <Route path="/emporio/cassa">
           {() => (
             <Guard area="sociale">
-              <EmporioCassa />
+              <RequireModulo codice="EMPORIO_SOLIDALE">
+                <EmporioCassa />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/emporio/crediti-saldo">
           {() => (
             <Guard area="sociale">
-              <EmporioCreditiSaldo />
+              <RequireModulo codice="CREDITO_SOLIDALE">
+                <EmporioCreditiSaldo />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/emporio/accessi">
           {() => (
             <Guard area="sociale">
-              <EmporioAccessi />
+              <RequireModulo codice="EMPORIO_SOLIDALE">
+                <EmporioAccessi />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/emporio/spese">
           {() => (
             <Guard area="sociale">
-              <EmporioSpese />
+              <RequireModulo codice="EMPORIO_SOLIDALE">
+                <EmporioSpese />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -209,14 +253,18 @@ function AppRoutes() {
         <Route path="/consegne">
           {() => (
             <Guard area="sociale">
-              <Consegne />
+              <RequireModulo codice="CONSEGNE">
+                <Consegne />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/bolle">
           {() => (
             <Guard area="sociale">
-              <Bolle />
+              <RequireModulo codice="BOLLE">
+                <Bolle />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -231,21 +279,27 @@ function AppRoutes() {
         <Route path="/uds/anagrafica">
           {() => (
             <Guard area="uds">
-              <UdsAnagrafica />
+              <RequireModulo codice="UDS">
+                <UdsAnagrafica />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/uds/interventi">
           {() => (
             <Guard area="uds">
-              <UdsInterventi />
+              <RequireModulo codice="UDS">
+                <UdsInterventi />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/uds/report-giornaliero">
           {() => (
             <Guard area="uds">
-              <UdsReportGiornaliero />
+              <RequireModulo codice="UDS">
+                <UdsReportGiornaliero />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -253,14 +307,18 @@ function AppRoutes() {
         <Route path="/volontari">
           {() => (
             <Guard area="logistica">
-              <Volontari />
+              <RequireModulo codice="VOLONTARI">
+                <Volontari />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/mezzi">
           {() => (
             <Guard area="logistica">
-              <Mezzi />
+              <RequireModulo codice="MEZZI">
+                <Mezzi />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -281,7 +339,9 @@ function AppRoutes() {
         <Route path="/approvvigionamenti">
           {() => (
             <Guard area="logistica">
-              <Approvvigionamenti />
+              <RequireModulo codice="APPROVVIGIONAMENTI">
+                <Approvvigionamenti />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -296,7 +356,9 @@ function AppRoutes() {
         <Route path="/report-uds">
           {() => (
             <Guard area="analisi">
-              <ReportUds />
+              <RequireModulo codice="UDS">
+                <ReportUds />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -310,7 +372,9 @@ function AppRoutes() {
         <Route path="/zone-uds">
           {() => (
             <Guard area="amministrazione">
-              <ZoneUds />
+              <RequireModulo codice="UDS">
+                <ZoneUds />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -338,7 +402,9 @@ function AppRoutes() {
         <Route path="/politiche-credito-solidale">
           {() => (
             <Guard area="amministrazione">
-              <PoliticheCreditoSolidale />
+              <RequireModulo codice="CREDITO_SOLIDALE">
+                <PoliticheCreditoSolidale />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -351,9 +417,31 @@ function AppRoutes() {
         </Route>
         <Route path="/impostazioni-moduli">
           {() => (
-            <Guard area="amministrazione">
+            <RequireSuperAdmin>
               <ImpostazioniModuli />
-            </Guard>
+            </RequireSuperAdmin>
+          )}
+        </Route>
+
+        <Route path="/super-admin/configurazione-ambiente">
+          {() => (
+            <RequireSuperAdmin>
+              <SuperAdminConfigurazioneAmbiente />
+            </RequireSuperAdmin>
+          )}
+        </Route>
+        <Route path="/super-admin/moduli">
+          {() => (
+            <RequireSuperAdmin>
+              <SuperAdminModuli />
+            </RequireSuperAdmin>
+          )}
+        </Route>
+        <Route path="/super-admin/audit-configurazioni">
+          {() => (
+            <RequireSuperAdmin>
+              <SuperAdminAuditConfigurazioni />
+            </RequireSuperAdmin>
           )}
         </Route>
 
