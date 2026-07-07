@@ -17,6 +17,96 @@ function timestamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export type PdfExportBranding = {
+  nomeDocumento: string;
+  sottotitoloDocumento?: string | null;
+  contattiDocumento?: string | null;
+  footerDocumenti?: string | null;
+  logoDataUrl?: string | null;
+};
+
+function imageSize(dataUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => resolve({ w: 0, h: 0 });
+    img.src = dataUrl;
+  });
+}
+
+async function drawImageFit(
+  doc: jsPDF,
+  dataUrl: string,
+  x: number,
+  y: number,
+  maxW: number,
+  maxH: number,
+): Promise<number> {
+  const { w, h } = await imageSize(dataUrl);
+  if (!w || !h) return 0;
+  const ratio = Math.min(maxW / w, maxH / h);
+  const drawW = w * ratio;
+  const drawH = h * ratio;
+  try {
+    doc.addImage(dataUrl, "PNG", x, y, drawW, drawH);
+  } catch {
+    try {
+      doc.addImage(dataUrl, "JPEG", x, y, drawW, drawH);
+    } catch {
+      return 0;
+    }
+  }
+  return drawH;
+}
+
+async function drawBrandingHeader(doc: jsPDF, branding: PdfExportBranding | null | undefined, marginX: number): Promise<number> {
+  if (!branding) return 32;
+  const pageW = doc.internal.pageSize.getWidth();
+  const textWidth = pageW - marginX * 2 - 110;
+
+  if (branding.logoDataUrl) {
+    await drawImageFit(doc, branding.logoDataUrl, pageW - marginX - 90, 24, 90, 38);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(20);
+  doc.text(doc.splitTextToSize(branding.nomeDocumento, textWidth)[0] ?? branding.nomeDocumento, marginX, 34);
+
+  let y = 47;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(110);
+  if (branding.sottotitoloDocumento) {
+    doc.text(doc.splitTextToSize(branding.sottotitoloDocumento, textWidth)[0] ?? branding.sottotitoloDocumento, marginX, y);
+    y += 11;
+  }
+  if (branding.contattiDocumento) {
+    doc.text(doc.splitTextToSize(branding.contattiDocumento, textWidth)[0] ?? branding.contattiDocumento, marginX, y);
+    y += 11;
+  }
+
+  return Math.max(y + 6, 58);
+}
+
+function drawBrandingFooters(doc: jsPDF, branding: PdfExportBranding | null | undefined, marginX: number): void {
+  if (!branding?.footerDocumenti) return;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const pages = doc.getNumberOfPages();
+  for (let page = 1; page <= pages; page++) {
+    doc.setPage(page);
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.3);
+    doc.line(marginX, pageH - 28, pageW - marginX, pageH - 28);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(110);
+    const lines = doc.splitTextToSize(branding.footerDocumenti, pageW - marginX * 2) as string[];
+    doc.text(lines.slice(0, 2), marginX, pageH - 18);
+  }
+}
+
 /** Esporta una lista di oggetti in un file .xlsx scaricabile. */
 export function exportToXlsx<T>(
   filename: string,
@@ -42,7 +132,7 @@ export function exportToXlsx<T>(
 }
 
 /** Esporta una lista di oggetti in un file PDF tabellare scaricabile. */
-export function exportToPdf<T>(opts: {
+export async function exportToPdf<T>(opts: {
   filename: string;
   title: string;
   subtitle?: string;
@@ -50,35 +140,40 @@ export function exportToPdf<T>(opts: {
   columns: ExportColumn<T>[];
   orientation?: "portrait" | "landscape";
   generatedBy?: string;
-}): void {
-  const { filename, title, subtitle, rows, columns, orientation = "portrait", generatedBy } = opts;
+  branding?: PdfExportBranding | null;
+}): Promise<void> {
+  const { filename, title, subtitle, rows, columns, orientation = "portrait", generatedBy, branding } = opts;
   const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
   const marginX = 40;
+  const headerBottomY = await drawBrandingHeader(doc, branding, marginX);
+  const titleY = branding ? headerBottomY : 48;
 
   doc.setFontSize(16);
   doc.setTextColor(20);
-  doc.text(title, marginX, 48);
+  doc.text(title, marginX, titleY);
 
   doc.setFontSize(9);
   doc.setTextColor(120);
   const meta = subtitle ? `${subtitle}  •  ` : "";
   const by = generatedBy ? `  •  Report generato da: ${generatedBy}` : "";
+  const metaY = titleY + 16;
   doc.text(
     `${meta}Generato il ${new Date().toLocaleString("it-IT")}  •  ${rows.length} righe${by}`,
     marginX,
-    64,
+    metaY,
   );
 
   autoTable(doc, {
-    startY: 80,
+    startY: metaY + 16,
     head: [columns.map((c) => c.header)],
     body: rows.map((r) => columns.map((c) => String(cellValue(c, r)))),
     styles: { fontSize: 8, cellPadding: 4 },
     headStyles: { fillColor: [51, 65, 85], textColor: 255 },
     alternateRowStyles: { fillColor: [241, 245, 249] },
-    margin: { left: marginX, right: marginX },
+    margin: { left: marginX, right: marginX, bottom: branding?.footerDocumenti ? 42 : 20 },
   });
 
+  drawBrandingFooters(doc, branding, marginX);
   doc.save(`${filename}_${timestamp()}.pdf`);
 }
 
@@ -141,7 +236,7 @@ export function exportSchedaXlsx(opts: {
 }
 
 /** Esporta la scheda di un beneficiario (anagrafica + sezioni tabellari) in un PDF. */
-export function exportSchedaPdf(opts: {
+export async function exportSchedaPdf(opts: {
   filename: string;
   title: string;
   subtitle?: string;
@@ -150,33 +245,37 @@ export function exportSchedaPdf(opts: {
   valoreHeader: string;
   anagrafica: SchedaLabelValue[];
   sections: SchedaSection[];
-}): void {
-  const { filename, title, subtitle, anagraficaTitle, campoHeader, valoreHeader, anagrafica, sections } = opts;
+  branding?: PdfExportBranding | null;
+}): Promise<void> {
+  const { filename, title, subtitle, anagraficaTitle, campoHeader, valoreHeader, anagrafica, sections, branding } = opts;
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const marginX = 40;
+  const headerBottomY = await drawBrandingHeader(doc, branding, marginX);
+  const titleY = branding ? headerBottomY : 48;
 
   doc.setFontSize(16);
   doc.setTextColor(20);
-  doc.text(title, marginX, 48);
+  doc.text(title, marginX, titleY);
 
   doc.setFontSize(9);
   doc.setTextColor(120);
   const meta = subtitle ? `${subtitle}  •  ` : "";
-  doc.text(`${meta}Generato il ${new Date().toLocaleString("it-IT")}`, marginX, 64);
+  const metaY = titleY + 16;
+  doc.text(`${meta}Generato il ${new Date().toLocaleString("it-IT")}`, marginX, metaY);
 
   doc.setFontSize(12);
   doc.setTextColor(20);
-  doc.text(anagraficaTitle, marginX, 88);
+  doc.text(anagraficaTitle, marginX, metaY + 24);
 
   autoTable(doc, {
-    startY: 96,
+    startY: metaY + 32,
     head: [[campoHeader, valoreHeader]],
     body: anagrafica.map((r) => [r.label, toCell(r.value)]),
     styles: { fontSize: 8, cellPadding: 4 },
     headStyles: { fillColor: [51, 65, 85], textColor: 255 },
     alternateRowStyles: { fillColor: [241, 245, 249] },
     columnStyles: { 0: { cellWidth: 160, fontStyle: "bold" } },
-    margin: { left: marginX, right: marginX },
+    margin: { left: marginX, right: marginX, bottom: branding?.footerDocumenti ? 42 : 20 },
   });
 
   for (const sec of sections) {
@@ -197,7 +296,7 @@ export function exportSchedaPdf(opts: {
         startY: y + 22,
         head: [[""]],
         body: [],
-        margin: { left: marginX, right: marginX },
+        margin: { left: marginX, right: marginX, bottom: branding?.footerDocumenti ? 42 : 20 },
         styles: { fontSize: 1, cellPadding: 0 },
         tableLineWidth: 0,
       });
@@ -211,9 +310,10 @@ export function exportSchedaPdf(opts: {
       styles: { fontSize: 8, cellPadding: 4 },
       headStyles: { fillColor: [51, 65, 85], textColor: 255 },
       alternateRowStyles: { fillColor: [241, 245, 249] },
-      margin: { left: marginX, right: marginX },
+      margin: { left: marginX, right: marginX, bottom: branding?.footerDocumenti ? 42 : 20 },
     });
   }
 
+  drawBrandingFooters(doc, branding, marginX);
   doc.save(`${filename}_${timestamp()}.pdf`);
 }

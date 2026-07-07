@@ -6,9 +6,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { exportToXlsx, exportToPdf, type ExportColumn } from "@/lib/export";
+import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 
 type ExportButtonsProps<T> = {
   rows: T[];
@@ -37,12 +39,32 @@ export function ExportButtons<T>({
 }: ExportButtonsProps<T>) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const [pdfLoading, setPdfLoading] = useState(false);
   const generatedBy = user ? `${user.nome ?? ""} ${user.cognome ?? ""}`.trim() || user.username : undefined;
   const empty = disabled || rows.length === 0;
+  const handlePdfExport = async () => {
+    setPdfLoading(true);
+    try {
+      const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
+      await exportToPdf({
+        filename,
+        title,
+        subtitle,
+        rows,
+        columns,
+        orientation,
+        generatedBy,
+        branding: { ...branding, logoDataUrl },
+      });
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} disabled={empty} className="gap-2">
+        <Button variant={variant} size={size} disabled={empty || pdfLoading} className="gap-2">
           <Download className="h-4 w-4" /> {t("common.export")}
         </Button>
       </DropdownMenuTrigger>
@@ -53,9 +75,8 @@ export function ExportButtons<T>({
           <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" /> {t("common.exportExcel")}
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() =>
-            exportToPdf({ filename, title, subtitle, rows, columns, orientation, generatedBy })
-          }
+          disabled={pdfLoading}
+          onClick={() => void handlePdfExport()}
         >
           <FileText className="h-4 w-4 mr-2 text-red-600" /> {t("common.exportPdf")}
         </DropdownMenuItem>

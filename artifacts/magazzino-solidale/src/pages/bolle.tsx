@@ -55,9 +55,10 @@ import { volontarioLabel } from "@/lib/volontari-label";
 import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowLeft, ArrowRightLeft, ScanLine, CalendarClock } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { generateBollaPdf, loadAssociationLogo, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
+import { generateBollaPdf, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { generateScaricoPdf, causaleLabel } from "@/lib/scarico-pdf";
+import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 
@@ -88,7 +89,7 @@ export async function downloadBollaPdf(
   const centro = benef?.centroAscoltoId
     ? opts.centri?.find((c) => c.id === benef.centroAscoltoId)
     : undefined;
-  const associationLogoDataUrl = await loadAssociationLogo();
+  const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
   await generateBollaPdf({
     bolla,
     centro: centro
@@ -96,7 +97,8 @@ export async function downloadBollaPdf(
       : null,
     footer: opts.footer ?? null,
     template: opts.template ?? "standard",
-    associationLogoDataUrl,
+    associationLogoDataUrl: logoDataUrl,
+    branding,
   });
 }
 
@@ -853,7 +855,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
       const centro = benef?.centroAscoltoId
         ? centri?.find((c) => c.id === benef.centroAscoltoId)
         : undefined;
-      const associationLogoDataUrl = await loadAssociationLogo();
+      const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
       await generateBollaPdf({
         bolla,
         centro: centro
@@ -861,7 +863,8 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
           : null,
         footer: impostazioni?.footerBolla ?? null,
         template: printTemplate,
-        associationLogoDataUrl,
+        associationLogoDataUrl: logoDataUrl,
+        branding,
       });
       setPrintOpen(false);
     } catch {
@@ -1338,11 +1341,12 @@ export default function Bolle() {
     e.stopPropagation();
     setDownloadingTrasfId(trasf.id);
     try {
-      const associationLogoDataUrl = await loadAssociationLogo();
+      const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
       await generateTrasferimentoPdf({
         trasferimento: trasf,
         footer: impostazioni?.footerBolla ?? null,
-        associationLogoDataUrl,
+        associationLogoDataUrl: logoDataUrl,
+        branding,
       });
     } catch {
       toast({ title: t("bolle.error"), description: t("bolle.genBollaError"), variant: "destructive" });
@@ -1355,11 +1359,12 @@ export default function Bolle() {
     e.stopPropagation();
     setDownloadingScarId(s.id);
     try {
-      const associationLogoDataUrl = await loadAssociationLogo();
+      const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
       await generateScaricoPdf({
         scarico: s,
         footer: impostazioni?.footerBolla ?? null,
-        associationLogoDataUrl,
+        associationLogoDataUrl: logoDataUrl,
+        branding,
       });
     } catch {
       toast({ title: t("bolle.error"), description: t("bolle.genBollaError"), variant: "destructive" });

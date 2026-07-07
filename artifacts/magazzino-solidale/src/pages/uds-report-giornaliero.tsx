@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarClock, FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { exportUdsReportGiornalieroPdf } from "@/lib/uds-report-pdf";
+import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 
 const ALL = "all";
 type Mode = "day" | "range";
@@ -70,8 +71,9 @@ export default function UdsReportGiornaliero() {
 
   const periodoLabel = mode === "range" ? `${formatIt(da)} – ${formatIt(a)}` : formatIt(da);
 
-  const handleExportPdf = () => {
-    void exportUdsReportGiornalieroPdf({
+  const handleExportPdf = async () => {
+    const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
+    await exportUdsReportGiornalieroPdf({
       filename: `uds_report_${mode === "range" ? `${da}_${a}` : da}`,
       title: t("udsReportGiornaliero.pdfTitle"),
       meta: {
@@ -104,6 +106,8 @@ export default function UdsReportGiornaliero() {
         note: noteOf(r),
         operatore: r.operatoreCodice ?? "—",
       })),
+      branding,
+      associationLogoDataUrl: logoDataUrl,
     });
   };
 

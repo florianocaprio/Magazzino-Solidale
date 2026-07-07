@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileSpreadsheet, FileText } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { exportSchedaPdf, exportSchedaXlsx, type SchedaLabelValue, type SchedaSection } from "@/lib/export";
+import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -85,13 +87,14 @@ function buildSections(b: BeneficiarioDettaglio, interventi: Intervento[], t: TF
   ];
 }
 
-function doExport(b: BeneficiarioDettaglio, interventi: Intervento[], kind: "pdf" | "xlsx", t: TFn) {
+async function doExport(b: BeneficiarioDettaglio, interventi: Intervento[], kind: "pdf" | "xlsx", t: TFn): Promise<void> {
   const fullName = `${b.cognome} ${b.nome}`;
   const filename = `scheda_${b.cognome}_${b.nome}`.replace(/\s+/g, "_");
   const anagrafica = buildAnagrafica(b, t);
   const sections = buildSections(b, interventi, t);
   if (kind === "pdf") {
-    exportSchedaPdf({
+    const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
+    await exportSchedaPdf({
       filename,
       title: `${t("scheda.titolo")} — ${fullName}`,
       subtitle: b.codice,
@@ -100,6 +103,7 @@ function doExport(b: BeneficiarioDettaglio, interventi: Intervento[], kind: "pdf
       valoreHeader: t("scheda.valore"),
       anagrafica,
       sections,
+      branding: { ...branding, logoDataUrl },
     });
   } else {
     exportSchedaXlsx({
@@ -115,17 +119,27 @@ function doExport(b: BeneficiarioDettaglio, interventi: Intervento[], kind: "pdf
 
 export function SchedaExportButtons({ b, size = "sm" }: { b: BeneficiarioDettaglio; size?: "sm" | "default" }) {
   const { t } = useTranslation();
+  const [exporting, setExporting] = useState(false);
   const { data: interventi, isLoading } = useListInterventi(
     { beneficiarioId: b.id },
     { query: { queryKey: getListInterventiQueryKey({ beneficiarioId: b.id }) } },
   );
   const list = interventi ?? b.interventi ?? [];
+  const handleExport = async (kind: "pdf" | "xlsx") => {
+    setExporting(true);
+    try {
+      await doExport(b, list, kind, t);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <>
-      <Button variant="outline" size={size} className="gap-2" disabled={isLoading} onClick={() => doExport(b, list, "pdf", t)}>
+      <Button variant="outline" size={size} className="gap-2" disabled={isLoading || exporting} onClick={() => void handleExport("pdf")}>
         <FileText className="w-4 h-4" /> {t("scheda.schedaPdf")}
       </Button>
-      <Button variant="outline" size={size} className="gap-2" disabled={isLoading} onClick={() => doExport(b, list, "xlsx", t)}>
+      <Button variant="outline" size={size} className="gap-2" disabled={isLoading || exporting} onClick={() => void handleExport("xlsx")}>
         <FileSpreadsheet className="w-4 h-4" /> {t("scheda.schedaXlsx")}
       </Button>
     </>

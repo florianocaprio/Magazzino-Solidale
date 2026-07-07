@@ -31,7 +31,8 @@ import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { Plus, Trash2, Download, CheckCircle, PackageMinus, ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { generateScaricoPdf, loadAssociationLogo } from "@/lib/scarico-pdf";
+import { generateScaricoPdf } from "@/lib/scarico-pdf";
+import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
 
 const CAUSALI = ["deteriorata", "rubata", "scaduta", "altro"] as const;
@@ -421,11 +422,12 @@ export default function Scarichi() {
   const downloadBolla = async (s: Scarico) => {
     setDownloadingId(s.id);
     try {
-      const associationLogoDataUrl = await loadAssociationLogo();
+      const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
       await generateScaricoPdf({
         scarico: s,
         footer: impostazioni?.footerBolla ?? null,
-        associationLogoDataUrl,
+        associationLogoDataUrl: logoDataUrl,
+        branding,
       });
     } catch {
       toast({ title: t("scarichi.errorTitle"), description: t("scarichi.errorBolla"), variant: "destructive" });

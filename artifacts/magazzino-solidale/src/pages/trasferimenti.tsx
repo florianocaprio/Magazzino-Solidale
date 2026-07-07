@@ -29,7 +29,8 @@ import { ExportButtons } from "@/components/export-buttons";
 import { Plus, ArrowRight, Play, CheckCircle2, Trash2, Download, CheckCircle, Pencil, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { generateTrasferimentoPdf, loadAssociationLogo } from "@/lib/trasferimento-pdf";
+import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
+import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
 
 interface RigaDraft {
@@ -592,11 +593,12 @@ export default function Trasferimenti() {
   const downloadBolla = async (tr: Trasferimento) => {
     setDownloadingId(tr.id);
     try {
-      const associationLogoDataUrl = await loadAssociationLogo();
+      const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
       await generateTrasferimentoPdf({
         trasferimento: tr,
         footer: impostazioni?.footerBolla ?? null,
-        associationLogoDataUrl,
+        associationLogoDataUrl: logoDataUrl,
+        branding,
       });
     } catch {
       toast({ title: t("trasferimenti.errorTitle"), description: t("trasferimenti.errorBolla"), variant: "destructive" });
