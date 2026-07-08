@@ -19,8 +19,13 @@ import {
   zonaUdsScopeFilter,
 } from "../lib/centroScope";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+router.use(
+  "/accessi-emporio",
+  requireModulo("EMPORIO_SOLIDALE", EMPORIO_DISABLED_MSG),
+);
 
 const TIPO_ACCESSO = "accesso_emporio";
 const TIPO_CONSEGNA_ACCESSO = "accesso_emporio";

@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, impostazioniModuliTable, pool, prodottiTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { db, pool, prodottiTable } from "@workspace/db";
+import { inArray } from "drizzle-orm";
 import prodottiRouter from "../src/routes/prodotti";
+import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
@@ -18,13 +19,7 @@ const app = makeApp();
 const prodottoIds: number[] = [];
 
 async function setEmporioEnabled(enabled: boolean): Promise<void> {
-  await db
-    .insert(impostazioniModuliTable)
-    .values({ id: 1, emporioAbilitato: enabled, unitaStradaAbilitata: true })
-    .onConflictDoUpdate({
-      target: impostazioniModuliTable.id,
-      set: { emporioAbilitato: enabled, unitaStradaAbilitata: true },
-    });
+  await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
 afterEach(async () => {
@@ -32,7 +27,7 @@ afterEach(async () => {
     await db.delete(prodottiTable).where(inArray(prodottiTable.id, prodottoIds));
     prodottoIds.length = 0;
   }
-  await db.delete(impostazioniModuliTable).where(eq(impostazioniModuliTable.id, 1));
+  await setEmporioEnabled(true);
 });
 
 afterAll(async () => {

@@ -21,8 +21,10 @@ import {
   normalizeVolontarioMatricola,
   type MatricolaDuplicataPayload,
 } from "../lib/volontariMatricola";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+router.use("/volontari", requireModulo("VOLONTARI"));
 
 type VolontarioRow = typeof volontariTable.$inferSelect & {
   centroAscoltoNome: string | null;

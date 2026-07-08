@@ -13,8 +13,10 @@ import {
   inVisibleCentroSet,
   idSetScopeFilter,
 } from "../lib/centroScope";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+router.use("/approvvigionamenti", requireModulo("APPROVVIGIONAMENTI"));
 
 async function getWithRighe(id: number) {
   const [a] = await db.select({

@@ -23,7 +23,7 @@ import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModul
 
 const router: IRouter = Router();
 
-router.use(requireModulo("CREDITO_SOLIDALE"));
+router.use("/credito-solidale", requireModulo("CREDITO_SOLIDALE"));
 
 const BENEFICIARIO_NOT_FOUND_MSG = "Beneficiario non trovato.";
 const MOVIMENTO_NOT_FOUND_MSG = "Movimento Credito Solidale non trovato.";

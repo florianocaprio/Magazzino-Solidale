@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import authRouter from "../src/routes/auth";
 import configurazioneAmbienteRouter from "../src/routes/configurazione-ambiente";
+import impostazioniModuliRouter from "../src/routes/impostazioni-moduli";
 import superAdminRouter from "../src/routes/super-admin";
 import utentiRouter from "../src/routes/utenti";
 import { requireModulo } from "../src/lib/featureFlags";
@@ -36,6 +37,8 @@ let superUser: SessionUser;
 let adminUser: SessionUser;
 let originalConfig: ConfigurazioneAmbienteDto;
 let originalPredittivoAttivo = true;
+let originalEmporioAttivo = true;
+let originalUdsAttivo = true;
 
 function appAs(user: SessionUser): Express {
   const app = express();
@@ -45,9 +48,13 @@ function appAs(user: SessionUser): Express {
     next();
   });
   app.use(configurazioneAmbienteRouter);
+  app.use(impostazioniModuliRouter);
   app.use(superAdminRouter);
   app.use(utentiRouter);
   app.get("/test-predittivo", requireModulo("PREDITTIVO"), (_req, res) => {
+    res.status(204).send();
+  });
+  app.get("/test-modulo-inesistente", requireModulo("NON_ESISTE"), (_req, res) => {
     res.status(204).send();
   });
   return app;
@@ -143,6 +150,11 @@ beforeEach(async () => {
     (m) => m.codice === "PREDITTIVO",
   );
   originalPredittivoAttivo = predittivo?.attivo ?? true;
+  originalEmporioAttivo =
+    (await listModuliFunzionali()).find((m) => m.codice === "EMPORIO_SOLIDALE")
+      ?.attivo ?? true;
+  originalUdsAttivo =
+    (await listModuliFunzionali()).find((m) => m.codice === "UDS")?.attivo ?? true;
   superUser = await createAdminUser(true);
   adminUser = await createAdminUser(false);
 });
@@ -150,6 +162,8 @@ beforeEach(async () => {
 afterEach(async () => {
   await restoreConfig();
   await updateModuloAmbiente("PREDITTIVO", originalPredittivoAttivo, null);
+  await updateModuloAmbiente("EMPORIO_SOLIDALE", originalEmporioAttivo, null);
+  await updateModuloAmbiente("UDS", originalUdsAttivo, null);
   if (createdUserIds.length > 0) {
     await db
       .delete(auditConfigurazioniTable)
@@ -280,7 +294,50 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     expect(core.status).toBe(400);
   });
 
-  it("requireModulo blocca una route quando il modulo è disabilitato", async () => {
+  it("mantiene il PATCH legacy coerente, riservato al Super Admin e con audit", async () => {
+    const forbidden = await request(appAs(adminUser))
+      .patch("/impostazioni-moduli")
+      .send({ emporioAbilitato: !originalEmporioAttivo });
+    expect(forbidden.status).toBe(403);
+
+    const updated = await request(appAs(superUser))
+      .patch("/impostazioni-moduli")
+      .send({
+        emporioAbilitato: !originalEmporioAttivo,
+        unitaStradaAbilitata: !originalUdsAttivo,
+      });
+    expect(updated.status).toBe(200);
+    expect(updated.body.emporioAbilitato).toBe(!originalEmporioAttivo);
+    expect(updated.body.unitaStradaAbilitata).toBe(!originalUdsAttivo);
+
+    const publicConfig = await request(appAs(superUser)).get("/configurazione-ambiente");
+    expect(publicConfig.body.moduliAttivi.includes("EMPORIO_SOLIDALE")).toBe(
+      !originalEmporioAttivo,
+    );
+    expect(publicConfig.body.moduliAttivi.includes("UDS")).toBe(!originalUdsAttivo);
+
+    const audit = await request(appAs(superUser))
+      .get("/super-admin/audit-configurazioni")
+      .query({ limit: "20" });
+    for (const codice of ["EMPORIO_SOLIDALE", "UDS"]) {
+      expect(
+        audit.body.some(
+          (row: {
+            area: string;
+            chiave: string;
+            azione: string;
+            utenteId: number | null;
+          }) =>
+            row.area === "moduli_funzionali" &&
+            row.chiave === codice &&
+            row.azione === "toggle" &&
+            row.utenteId === superUser.id,
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("requireModulo lascia passare il modulo attivo e blocca quello disabilitato", async () => {
     await updateModuloAmbiente("PREDITTIVO", false, superUser.id);
 
     const denied = await request(appAs(superUser)).get("/test-predittivo");
@@ -289,5 +346,14 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     await updateModuloAmbiente("PREDITTIVO", true, superUser.id);
     const allowed = await request(appAs(superUser)).get("/test-predittivo");
     expect(allowed.status).toBe(204);
+  });
+
+  it("requireModulo blocca in sicurezza un codice modulo inesistente", async () => {
+    const denied = await request(appAs(superUser)).get("/test-modulo-inesistente");
+
+    expect(denied.status).toBe(403);
+    expect(denied.body.error).toBe(
+      "Modulo NON_ESISTE non abilitato per questo ambiente",
+    );
   });
 });

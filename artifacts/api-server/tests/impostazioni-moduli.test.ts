@@ -20,6 +20,7 @@ import magazziniRouter from "../src/routes/magazzini";
 import politicheCreditoSolidaleRouter from "../src/routes/politiche-credito-solidale";
 import prodottiRouter from "../src/routes/prodotti";
 import zoneUdsRouter from "../src/routes/zone-uds";
+import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
 const EMPORIO_DISABLED_MSG = "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.";
 const UDS_DISABLED_MSG = "La gestione Unità di Strada è disabilitata.";
@@ -34,7 +35,7 @@ const politicaIds: number[] = [];
 const prodottoIds: number[] = [];
 const zonaIds: number[] = [];
 
-function makeApp(): Express {
+function makeApp(isSuperAdmin = false): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -52,6 +53,7 @@ function makeApp(): Express {
       cittaNome: null,
       zonaUdsId: null,
       zonaUdsNome: null,
+      isSuperAdmin,
       isAdmin: true,
       aree: [],
       mustChangePassword: false,
@@ -68,13 +70,8 @@ function makeApp(): Express {
 }
 
 async function setModuli(emporioAbilitato: boolean, unitaStradaAbilitata: boolean): Promise<void> {
-  await db
-    .insert(impostazioniModuliTable)
-    .values({ id: 1, emporioAbilitato, unitaStradaAbilitata })
-    .onConflictDoUpdate({
-      target: impostazioniModuliTable.id,
-      set: { emporioAbilitato, unitaStradaAbilitata },
-    });
+  await updateModuloAmbiente("EMPORIO_SOLIDALE", emporioAbilitato, null);
+  await updateModuloAmbiente("UDS", unitaStradaAbilitata, null);
 }
 
 async function createCitta(): Promise<number> {
@@ -104,16 +101,24 @@ afterEach(async () => {
   if (magazzinoIds.length > 0) await db.delete(magazziniTable).where(inArray(magazziniTable.id, magazzinoIds.splice(0)));
   if (centroIds.length > 0) await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds.splice(0)));
   if (cittaIds.length > 0) await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds.splice(0)));
+  await db.delete(impostazioniModuliTable).where(eq(impostazioniModuliTable.id, 1));
   await setModuli(false, true);
 });
 
 afterAll(async () => {
+  await setModuli(true, true);
   await pool.end();
 });
 
 describe("Impostazioni moduli", () => {
-  it("ritorna i default quando la riga singleton non esiste", async () => {
-    await db.delete(impostazioniModuliTable).where(eq(impostazioniModuliTable.id, 1));
+  it("ignora la vecchia riga singleton e legge i flag da ambiente_moduli", async () => {
+    await db
+      .insert(impostazioniModuliTable)
+      .values({ id: 1, emporioAbilitato: true, unitaStradaAbilitata: false })
+      .onConflictDoUpdate({
+        target: impostazioniModuliTable.id,
+        set: { emporioAbilitato: true, unitaStradaAbilitata: false },
+      });
 
     const res = await request(makeApp()).get("/impostazioni-moduli");
 
@@ -122,14 +127,13 @@ describe("Impostazioni moduli", () => {
     expect(res.body.unitaStradaAbilitata).toBe(true);
   });
 
-  it("aggiorna i flag globali via PATCH admin", async () => {
+  it("nega il PATCH legacy a un admin non Super Admin", async () => {
     const res = await request(makeApp())
       .patch("/impostazioni-moduli")
       .send({ emporioAbilitato: true, unitaStradaAbilitata: false });
 
-    expect(res.status).toBe(200);
-    expect(res.body.emporioAbilitato).toBe(true);
-    expect(res.body.unitaStradaAbilitata).toBe(false);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("Accesso riservato ai Super Admin");
   });
 
   it("blocca nuove configurazioni Emporio quando il modulo è disabilitato", async () => {
@@ -203,7 +207,7 @@ describe("Impostazioni moduli", () => {
       .post("/zone-uds")
       .send({ nome: `Zona ${rnd()}`, cittaId });
     expect(zona.status).toBe(403);
-    expect(zona.body.error).toBe(UDS_DISABLED_MSG);
+    expect(zona.body.error).toBe("Modulo UDS non abilitato per questo ambiente");
 
     const createUds = await request(app)
       .post("/beneficiari")

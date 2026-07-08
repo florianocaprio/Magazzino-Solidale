@@ -15,7 +15,7 @@ import { UNITA_STRADA_DISABLED_MSG, isUnitaStradaEnabled } from "../lib/impostaz
 
 const router: IRouter = Router();
 
-router.use(requireModulo("UDS"));
+router.use("/zone-uds", requireModulo("UDS"));
 
 type ZonaRow = typeof zoneUdsTable.$inferSelect;
 

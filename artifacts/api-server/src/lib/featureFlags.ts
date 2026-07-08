@@ -14,12 +14,7 @@ function normalizeModuloCodice(codice: string): string {
   return codice.trim().toUpperCase();
 }
 
-export async function isModuloAttivo(codice: string): Promise<boolean> {
-  const normalized = normalizeModuloCodice(codice);
-  if (!normalized) return true;
-
-  await ensureAmbienteModuli();
-
+async function findModuloAmbiente(codice: string) {
   const [row] = await db
     .select({ modulo: moduliFunzionaliTable, ambiente: ambienteModuliTable })
     .from(moduliFunzionaliTable)
@@ -30,14 +25,26 @@ export async function isModuloAttivo(codice: string): Promise<boolean> {
         eq(ambienteModuliTable.configurazioneAmbienteId, CONFIGURAZIONE_AMBIENTE_ID),
       ),
     )
-    .where(eq(moduliFunzionaliTable.codice, normalized));
+    .where(eq(moduliFunzionaliTable.codice, codice));
+  return row;
+}
 
-  if (!row) return true;
+export async function isModuloAttivo(codice: string): Promise<boolean> {
+  const normalized = normalizeModuloCodice(codice);
+  if (!normalized) return false;
+
+  let row = await findModuloAmbiente(normalized);
+  if (!row) {
+    await ensureAmbienteModuli();
+    row = await findModuloAmbiente(normalized);
+  }
+
+  if (!row) return false;
   if (row.modulo.core) return true;
   return row.ambiente?.attivo ?? row.modulo.attivoDefault;
 }
 
-export function requireModulo(codice: string): RequestHandler {
+export function requireModulo(codice: string, errorMessage?: string): RequestHandler {
   const normalized = normalizeModuloCodice(codice);
   return async (_req, res, next) => {
     if (await isModuloAttivo(normalized)) {
@@ -45,7 +52,7 @@ export function requireModulo(codice: string): RequestHandler {
       return;
     }
     res.status(403).json({
-      error: `Modulo ${normalized} non abilitato per questo ambiente`,
+      error: errorMessage ?? `Modulo ${normalized} non abilitato per questo ambiente`,
     });
   };
 }

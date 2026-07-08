@@ -13,8 +13,10 @@ import {
   calcolaDisponibilitaMagazzino,
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 

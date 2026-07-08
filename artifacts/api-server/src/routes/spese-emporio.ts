@@ -14,8 +14,13 @@ import {
   canUseBeneficiario,
 } from "../lib/centroScope";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+router.use(
+  "/spese-emporio",
+  requireModulo("EMPORIO_SOLIDALE", EMPORIO_DISABLED_MSG),
+);
 
 function asInt(value: unknown): number | undefined {
   const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;

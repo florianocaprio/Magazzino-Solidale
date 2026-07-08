@@ -8,12 +8,12 @@ import {
   cittaTable,
   consegneTable,
   db,
-  impostazioniModuliTable,
   magazziniTable,
   pool,
 } from "@workspace/db";
 import accessiEmporioRouter from "../src/routes/accessi-emporio";
 import consegneRouter from "../src/routes/consegne";
+import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 const centroRichiestoMsg = "Per pianificare un Accesso Emporio è necessario associare il beneficiario a un Centro di Ascolto.";
@@ -47,13 +47,7 @@ function makeApp(): Express {
 }
 
 async function setEmporioEnabled(enabled: boolean): Promise<void> {
-  await db
-    .insert(impostazioniModuliTable)
-    .values({ id: 1, emporioAbilitato: enabled, unitaStradaAbilitata: true })
-    .onConflictDoUpdate({
-      target: impostazioniModuliTable.id,
-      set: { emporioAbilitato: enabled, unitaStradaAbilitata: true },
-    });
+  await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
 async function createCitta(): Promise<number> {
@@ -142,6 +136,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await setEmporioEnabled(true);
   await pool.end();
 });
 

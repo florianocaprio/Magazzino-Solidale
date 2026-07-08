@@ -1,10 +1,21 @@
-import { db, impostazioniModuliTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import {
+  ambienteModuliTable,
+  db,
+  moduliFunzionaliTable,
+} from "@workspace/db";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  CONFIGURAZIONE_AMBIENTE_ID,
+  ensureAmbienteModuli,
+  updateModuloAmbiente,
+} from "./configurazioneAmbiente";
 
 export const EMPORIO_DISABLED_MSG = "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.";
 export const UNITA_STRADA_DISABLED_MSG = "La gestione Unità di Strada è disabilitata.";
 
-const SINGLETON_ID = 1;
+const EMPORIO_CODICE = "EMPORIO_SOLIDALE";
+const UDS_CODICE = "UDS";
+const LEGACY_MODULO_CODES = [EMPORIO_CODICE, UDS_CODICE] as const;
 
 export type ImpostazioniModuliDto = {
   emporioAbilitato: boolean;
@@ -12,40 +23,76 @@ export type ImpostazioniModuliDto = {
   dataAggiornamento: string | null;
 };
 
-function fmt(row: typeof impostazioniModuliTable.$inferSelect): ImpostazioniModuliDto {
-  return {
-    emporioAbilitato: row.emporioAbilitato,
-    unitaStradaAbilitata: row.unitaStradaAbilitata,
-    dataAggiornamento: row.dataAggiornamento?.toISOString() ?? null,
-  };
-}
-
-export async function ensureImpostazioniModuliRow(): Promise<typeof impostazioniModuliTable.$inferSelect> {
-  await db
-    .insert(impostazioniModuliTable)
-    .values({ id: SINGLETON_ID })
-    .onConflictDoNothing();
-  const [row] = await db
-    .select()
-    .from(impostazioniModuliTable)
-    .where(eq(impostazioniModuliTable.id, SINGLETON_ID));
-  return row;
+function selectLegacyModuli() {
+  return db
+    .select({
+      codice: moduliFunzionaliTable.codice,
+      core: moduliFunzionaliTable.core,
+      attivoDefault: moduliFunzionaliTable.attivoDefault,
+      attivo: ambienteModuliTable.attivo,
+      dataAggiornamento: ambienteModuliTable.dataAggiornamento,
+    })
+    .from(moduliFunzionaliTable)
+    .leftJoin(
+      ambienteModuliTable,
+      and(
+        eq(ambienteModuliTable.moduloId, moduliFunzionaliTable.id),
+        eq(ambienteModuliTable.configurazioneAmbienteId, CONFIGURAZIONE_AMBIENTE_ID),
+      ),
+    )
+    .where(inArray(moduliFunzionaliTable.codice, [...LEGACY_MODULO_CODES]));
 }
 
 export async function getImpostazioniModuli(): Promise<ImpostazioniModuliDto> {
-  return fmt(await ensureImpostazioniModuliRow());
+  let rows = await selectLegacyModuli();
+  if (rows.length < LEGACY_MODULO_CODES.length) {
+    await ensureAmbienteModuli();
+    rows = await selectLegacyModuli();
+  }
+
+  const byCode = new Map(rows.map((row) => [row.codice, row]));
+  const isActive = (codice: string): boolean => {
+    const row = byCode.get(codice);
+    return row ? row.core || (row.attivo ?? row.attivoDefault) : false;
+  };
+  const lastUpdate = rows.reduce<Date | null>((latest, row) => {
+    if (!row.dataAggiornamento) return latest;
+    return !latest || row.dataAggiornamento > latest ? row.dataAggiornamento : latest;
+  }, null);
+
+  return {
+    emporioAbilitato: isActive(EMPORIO_CODICE),
+    unitaStradaAbilitata: isActive(UDS_CODICE),
+    dataAggiornamento: lastUpdate?.toISOString() ?? null,
+  };
 }
 
 export async function updateImpostazioniModuli(
-  values: Partial<Pick<typeof impostazioniModuliTable.$inferInsert, "emporioAbilitato" | "unitaStradaAbilitata">>,
+  values: Partial<Pick<ImpostazioniModuliDto, "emporioAbilitato" | "unitaStradaAbilitata">>,
+  abilitatoDaId: number | null = null,
 ): Promise<ImpostazioniModuliDto> {
-  await ensureImpostazioniModuliRow();
-  const [row] = await db
-    .update(impostazioniModuliTable)
-    .set({ ...values, dataAggiornamento: new Date() })
-    .where(eq(impostazioniModuliTable.id, SINGLETON_ID))
-    .returning();
-  return fmt(row);
+  const before = await getImpostazioniModuli();
+  if (
+    values.emporioAbilitato !== undefined &&
+    values.emporioAbilitato !== before.emporioAbilitato
+  ) {
+    await updateModuloAmbiente(
+      EMPORIO_CODICE,
+      values.emporioAbilitato,
+      abilitatoDaId,
+    );
+  }
+  if (
+    values.unitaStradaAbilitata !== undefined &&
+    values.unitaStradaAbilitata !== before.unitaStradaAbilitata
+  ) {
+    await updateModuloAmbiente(
+      UDS_CODICE,
+      values.unitaStradaAbilitata,
+      abilitatoDaId,
+    );
+  }
+  return getImpostazioniModuli();
 }
 
 export async function isEmporioEnabled(): Promise<boolean> {
