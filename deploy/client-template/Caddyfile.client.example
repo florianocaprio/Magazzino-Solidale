@@ -1,0 +1,16 @@
+cliente-x.magazzinosolidale.it {
+    reverse_proxy 127.0.0.1:8083
+}
+
+# Note operative:
+# - Creare un record DNS A per cliente-x.magazzinosolidale.it verso l'IP del server.
+# - Aprire sul firewall solo le porte pubbliche necessarie: 80, 443 e 22 per SSH.
+# - Caddy emette automaticamente il certificato HTTPS Let's Encrypt se DNS e porte sono corretti.
+# - Dopo aver aggiornato /etc/caddy/Caddyfile eseguire:
+#   sudo caddy reload --config /etc/caddy/Caddyfile
+# - Per verificare i log:
+#   sudo journalctl -u caddy -f
+# - Test rapido:
+#   curl -I https://cliente-x.magazzinosolidale.it
+# - Se il certificato non viene emesso, controllare DNS, porte 80/443, rate limit Let's Encrypt
+#   e presenza di proxy/firewall davanti al server.
