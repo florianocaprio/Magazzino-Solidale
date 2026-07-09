@@ -84,7 +84,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", url: "/", icon: LayoutDashboard, groupKey: "generale", area: "generale" },
   { key: "magazzini", url: "/magazzini", icon: Warehouse, groupKey: "amministrazione", area: "amministrazione" },
   { key: "prodotti", url: "/prodotti", icon: Package, groupKey: "magazzino", area: "magazzino" },
-  { key: "lotti", url: "/lotti", icon: Boxes, groupKey: "magazzino", area: "magazzino" },
+  { key: "lotti", url: "/lotti", icon: Boxes, groupKey: "magazzino", area: "magazzino", moduloCodice: "LOTTI" },
   { key: "movimenti", url: "/movimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
   { key: "giacenze", url: "/giacenze", icon: TrendingUpDown, groupKey: "magazzino", area: "magazzino" },
   { key: "trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino", moduloCodice: "TRASFERIMENTI" },

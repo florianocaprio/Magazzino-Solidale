@@ -143,7 +143,9 @@ function AppRoutes() {
         <Route path="/lotti">
           {() => (
             <Guard area="magazzino">
-              <Lotti />
+              <RequireModulo codice="LOTTI">
+                <Lotti />
+              </RequireModulo>
             </Guard>
           )}
         </Route>

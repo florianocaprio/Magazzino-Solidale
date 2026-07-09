@@ -7,6 +7,7 @@ export const EMPORIO_DISABLED_MESSAGE = "Il modulo Emporio Solidale è disabilit
 export const UNITA_STRADA_DISABLED_MESSAGE = "La gestione Unità di Strada è disabilitata.";
 
 export const MODULO_BY_ROUTE: Record<string, string> = {
+  "/lotti": "LOTTI",
   "/trasferimenti": "TRASFERIMENTI",
   "/approvvigionamenti": "APPROVVIGIONAMENTI",
   "/volontari": "VOLONTARI",
