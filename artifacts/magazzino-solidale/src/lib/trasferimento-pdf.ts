@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import type { Trasferimento } from "@workspace/api-client-react";
 import { loadAssociationLogo } from "./bolla-pdf";
+import { loadFallbackLogoDataUrl, resolveBrandingAmbiente, type BrandingAmbiente } from "@/lib/branding-ambiente";
 
 export { loadAssociationLogo };
 
@@ -11,6 +12,7 @@ export interface TrasferimentoPdfOptions {
   trasferimento: Trasferimento;
   footer?: string | null;
   associationLogoDataUrl?: string | null;
+  branding?: BrandingAmbiente | null;
 }
 
 const ACCENT: [number, number, number] = [5, 150, 105]; // emerald-600
@@ -51,6 +53,10 @@ async function drawImageFit(
 
 export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): Promise<void> {
   const { trasferimento: t, footer, associationLogoDataUrl } = opts;
+  const branding = opts.branding ?? resolveBrandingAmbiente(null);
+  const documentLogoDataUrl = associationLogoDataUrl === undefined
+    ? await loadFallbackLogoDataUrl()
+    : associationLogoDataUrl;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -61,14 +67,14 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
 
   // ---- Header ----
   let textX = margin;
-  if (associationLogoDataUrl) {
-    const drawn = await drawImageFit(doc, associationLogoDataUrl, margin, y, 22, 22);
+  if (documentLogoDataUrl) {
+    const drawn = await drawImageFit(doc, documentLogoDataUrl, margin, y, 22, 22);
     if (drawn) textX = margin + 26;
   }
   doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2]);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text("Magazzino Solidale AIM", textX, y + 5);
+  doc.text(branding.nomeDocumento, textX, y + 5);
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
@@ -76,7 +82,7 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(110, 110, 110);
-  doc.text("Trasferimento interno tra magazzini", textX, y + 11);
+  doc.text(branding.sottotitoloDocumento ?? branding.contattiDocumento ?? "Trasferimento interno tra magazzini", textX, y + 11);
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
   doc.text(`N. ${t.codice}`, pageW - margin, y + 11, { align: "right" });
@@ -208,14 +214,15 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   doc.line(margin, footerY - 4, pageW - margin, footerY - 4);
 
   let footerTextX = margin;
-  if (associationLogoDataUrl) {
-    const drawn = await drawImageFit(doc, associationLogoDataUrl, margin, footerY - 2, 12, 10);
+  if (documentLogoDataUrl) {
+    const drawn = await drawImageFit(doc, documentLogoDataUrl, margin, footerY - 2, 12, 10);
     if (drawn) footerTextX = margin + 16;
   }
-  if (footer) {
+  const footerText = footer ?? branding.footerDocumenti;
+  if (footerText) {
     doc.setFontSize(8);
     doc.setTextColor(110, 110, 110);
-    const lines = doc.splitTextToSize(footer, pageW - footerTextX - margin);
+    const lines = doc.splitTextToSize(footerText, pageW - footerTextX - margin);
     doc.text(lines, footerTextX, footerY + 1);
   }
 

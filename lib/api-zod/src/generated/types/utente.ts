@@ -30,6 +30,7 @@ export interface Utente {
   zonaUdsId?: number | null;
   /** @nullable */
   zonaUdsNome?: string | null;
+  isSuperAdmin: boolean;
   attivo: boolean;
   mustChangePassword: boolean;
   /** @nullable */

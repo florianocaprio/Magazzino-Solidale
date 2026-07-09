@@ -8,12 +8,12 @@ import {
   cittaTable,
   creditoSolidaleMovimentiTable,
   db,
-  impostazioniModuliTable,
   politicheCreditoSolidaleTable,
   pool,
 } from "@workspace/db";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
 import politicheCreditoSolidaleRouter from "../src/routes/politiche-credito-solidale";
+import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
@@ -24,13 +24,7 @@ const cittaIds: number[] = [];
 const policyIdsToReactivate: number[] = [];
 
 async function setEmporioEnabled(enabled: boolean): Promise<void> {
-  await db
-    .insert(impostazioniModuliTable)
-    .values({ id: 1, emporioAbilitato: enabled, unitaStradaAbilitata: true })
-    .onConflictDoUpdate({
-      target: impostazioniModuliTable.id,
-      set: { emporioAbilitato: enabled, unitaStradaAbilitata: true },
-    });
+  await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
 function makeApp(user: { centroAscoltoId: number | null; cittaId: number | null; isAdmin?: boolean }): Express {
@@ -160,6 +154,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await setEmporioEnabled(true);
   await pool.end();
 });
 

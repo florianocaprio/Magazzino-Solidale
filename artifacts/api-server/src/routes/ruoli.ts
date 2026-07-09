@@ -4,6 +4,7 @@ import { db, ruoliTable, utentiTable } from "@workspace/db";
 import { CreateRuoloBody, UpdateRuoloBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { ALL_AREA_KEYS } from "../lib/areas";
+import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 
 const router: IRouter = Router();
 
@@ -21,6 +22,10 @@ const fmt = (r: typeof ruoliTable.$inferSelect) => ({
 function sanitizeAree(aree: string[] | undefined): string[] {
   if (!aree) return [];
   return aree.filter((a) => ALL_AREA_KEYS.includes(a));
+}
+
+function isSuperAdminRoleName(nome?: string | null): boolean {
+  return nome?.trim() === SUPER_ADMIN_ROLE_NAME;
 }
 
 async function roleHasActiveUsers(ruoloId: number): Promise<boolean> {
@@ -60,6 +65,11 @@ router.post("/ruoli", async (req, res): Promise<void> => {
     return;
   }
   const { nome, descrizione, aree, isAdmin } = parsed.data;
+  const creatingSuperAdminRole = isSuperAdminRoleName(nome);
+  if (creatingSuperAdminRole && !req.user?.isSuperAdmin) {
+    res.status(403).json({ error: "Operazione riservata ai Super Admin" });
+    return;
+  }
 
   const [existing] = await db
     .select({ id: ruoliTable.id })
@@ -75,8 +85,8 @@ router.post("/ruoli", async (req, res): Promise<void> => {
     .values({
       nome,
       descrizione: descrizione ?? null,
-      aree: sanitizeAree(aree),
-      isAdmin: isAdmin ?? false,
+      aree: creatingSuperAdminRole ? ALL_AREA_KEYS : sanitizeAree(aree),
+      isAdmin: creatingSuperAdminRole ? true : (isAdmin ?? false),
     })
     .returning();
   res.status(201).json(fmt(row));
@@ -115,8 +125,18 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Ruolo non trovato" });
     return;
   }
+  const isProtectedSuperAdminRole = isSuperAdminRoleName(current.nome);
+  const nextNameIsSuperAdmin = body.nome !== undefined && isSuperAdminRoleName(body.nome);
+  if ((isProtectedSuperAdminRole || nextNameIsSuperAdmin) && !req.user?.isSuperAdmin) {
+    res.status(403).json({ error: "Operazione riservata ai Super Admin" });
+    return;
+  }
+  if (nextNameIsSuperAdmin && !isProtectedSuperAdminRole) {
+    res.status(409).json({ error: "Nome ruolo riservato" });
+    return;
+  }
 
-  if (body.isAdmin === false && current.isAdmin) {
+  if (!isProtectedSuperAdminRole && body.isAdmin === false && current.isAdmin) {
     if (
       (await roleHasActiveUsers(id)) &&
       !(await otherActiveAdminViaOtherRole(id))
@@ -129,11 +149,17 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
   }
 
   const updates: Partial<typeof ruoliTable.$inferInsert> = {};
-  if (body.nome !== undefined) updates.nome = body.nome;
+  if (isProtectedSuperAdminRole) {
+    updates.nome = SUPER_ADMIN_ROLE_NAME;
+    updates.aree = ALL_AREA_KEYS;
+    updates.isAdmin = true;
+  } else if (body.nome !== undefined) {
+    updates.nome = body.nome;
+  }
   if (body.descrizione !== undefined)
     updates.descrizione = body.descrizione ?? null;
-  if (body.aree !== undefined) updates.aree = sanitizeAree(body.aree);
-  if (body.isAdmin !== undefined) updates.isAdmin = body.isAdmin;
+  if (!isProtectedSuperAdminRole && body.aree !== undefined) updates.aree = sanitizeAree(body.aree);
+  if (!isProtectedSuperAdminRole && body.isAdmin !== undefined) updates.isAdmin = body.isAdmin;
 
   const [row] = await db
     .update(ruoliTable)
@@ -152,6 +178,15 @@ router.delete("/ruoli/:id", async (req, res): Promise<void> => {
     Array.isArray(req.params.id) ? req.params.id[0] : req.params.id,
     10,
   );
+
+  const [current] = await db
+    .select({ nome: ruoliTable.nome })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.id, id));
+  if (current && isSuperAdminRoleName(current.nome)) {
+    res.status(409).json({ error: "Il ruolo SuperAdmin non può essere eliminato" });
+    return;
+  }
 
   const [inUse] = await db
     .select({ id: utentiTable.id })

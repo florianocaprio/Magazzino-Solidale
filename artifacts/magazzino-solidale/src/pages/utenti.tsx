@@ -74,6 +74,7 @@ const NO_ROLE = "none";
 const NO_CENTRO = "__none__";
 const NO_CITTA = "__nocitta__";
 const ALL_ZONE = "__allzone__";
+const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
 
 export default function Utenti() {
   const { t } = useTranslation();
@@ -127,6 +128,9 @@ export default function Utenti() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const selectedCittaNum = cittaId === NO_CITTA ? undefined : parseInt(cittaId, 10);
+  const visibleRoles = currentUser?.isSuperAdmin
+    ? ruoli
+    : ruoli?.filter((r) => r.nome !== SUPER_ADMIN_ROLE_NAME);
   const { data: zoneUds } = useListZoneUds(
     { cittaId: selectedCittaNum },
     { query: { enabled: selectedCittaNum != null, queryKey: ["zoneUds", selectedCittaNum] } },
@@ -152,6 +156,7 @@ export default function Utenti() {
   };
 
   const openEdit = (u: Utente) => {
+    if (u.isSuperAdmin && !currentUser?.isSuperAdmin) return;
     setEditing(u);
     setUsername(u.username);
     setNome(u.nome);
@@ -373,7 +378,16 @@ export default function Utenti() {
                     <TableCell className="font-medium">{u.username}</TableCell>
                     <TableCell>{[u.nome, u.cognome].filter(Boolean).join(" ")}</TableCell>
                     <TableCell>{u.matricola ?? "—"}</TableCell>
-                    <TableCell>{u.ruoloNome ?? "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span>{u.ruoloNome ?? "—"}</span>
+                        {u.isSuperAdmin && (
+                          <Badge className="bg-amber-500/10 text-amber-700">
+                            SuperAdmin
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {u.centroAscoltoNome ?? t("common.centroComune")}
                     </TableCell>
@@ -405,11 +419,15 @@ export default function Utenti() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(u)}>
+                          <DropdownMenuItem
+                            disabled={u.isSuperAdmin && !currentUser?.isSuperAdmin}
+                            onClick={() => openEdit(u)}
+                          >
                             <Pencil className="mr-2 h-4 w-4" />
                             {t("common.edit")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            disabled={u.isSuperAdmin && !currentUser?.isSuperAdmin}
                             onClick={() => {
                               setResetting(u);
                               setResetPwd("");
@@ -420,7 +438,7 @@ export default function Utenti() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
-                            disabled={u.id === currentUser?.id}
+                            disabled={u.id === currentUser?.id || (u.isSuperAdmin && !currentUser?.isSuperAdmin)}
                             onClick={() => setDeleting(u)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -521,7 +539,7 @@ export default function Utenti() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_ROLE}>{t("utenti.nessunRuolo")}</SelectItem>
-                  {ruoli?.map((r) => (
+                  {visibleRoles?.map((r) => (
                     <SelectItem key={r.id} value={String(r.id)}>
                       {r.nome}
                     </SelectItem>

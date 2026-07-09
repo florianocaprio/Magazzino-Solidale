@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Truck, ClipboardList, Building2, Pencil, Plus, Trash2, CreditCard, History, RefreshCw } from "lucide-react";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
 import { SchedaExportButtons } from "@/components/scheda-export";
-import { loadAssociationLogo } from "@/lib/bolla-pdf";
+import { loadTesseraBrandingForPdf } from "@/lib/branding-ambiente";
 import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { format } from "date-fns";
@@ -148,11 +148,12 @@ export default function BeneficiarioDettaglio() {
             variant="outline"
             className="gap-2"
             onClick={async () => {
-              const logo = await loadAssociationLogo();
+              const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
               await generateTesseraPdf({
                 beneficiario: { codice: b.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
                 labels: buildTesseraLabels(t),
-                associationLogoDataUrl: logo,
+                associationLogoDataUrl: logoDataUrl,
+                branding,
               });
             }}
           >

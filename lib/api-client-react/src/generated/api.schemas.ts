@@ -1925,6 +1925,141 @@ export interface ImpostazioniModuliUpdate {
   unitaStradaAbilitata?: boolean;
 }
 
+export interface ConfigurazioneAmbiente {
+  id: number;
+  codiceAmbiente: string;
+  nomeAmbiente: string;
+  nomeAssociazione: string;
+  /** @nullable */
+  descrizione: string | null;
+  /** @nullable */
+  indirizzo: string | null;
+  /** @nullable */
+  comune: string | null;
+  /** @nullable */
+  provincia: string | null;
+  /** @nullable */
+  codiceFiscale: string | null;
+  /** @nullable */
+  partitaIva: string | null;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  telefono: string | null;
+  /** @nullable */
+  sitoWeb: string | null;
+  /** @nullable */
+  logoDocumentiUrl: string | null;
+  /** @nullable */
+  logoTessereUrl: string | null;
+  /** @nullable */
+  footerDocumenti: string | null;
+  /** @nullable */
+  noteLegali: string | null;
+  /** @nullable */
+  privacyTestoBreve: string | null;
+  attivo: boolean;
+  dataCreazione: string;
+  dataAggiornamento: string;
+  /** @nullable */
+  aggiornatoDaId: number | null;
+}
+
+export interface ConfigurazioneAmbienteUpdate {
+  /** @minLength 1 */
+  codiceAmbiente?: string;
+  /** @minLength 1 */
+  nomeAmbiente?: string;
+  /** @minLength 1 */
+  nomeAssociazione?: string;
+  /** @nullable */
+  descrizione?: string | null;
+  /** @nullable */
+  indirizzo?: string | null;
+  /** @nullable */
+  comune?: string | null;
+  /** @nullable */
+  provincia?: string | null;
+  /** @nullable */
+  codiceFiscale?: string | null;
+  /** @nullable */
+  partitaIva?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  sitoWeb?: string | null;
+  /** @nullable */
+  logoDocumentiUrl?: string | null;
+  /** @nullable */
+  logoTessereUrl?: string | null;
+  /** @nullable */
+  footerDocumenti?: string | null;
+  /** @nullable */
+  noteLegali?: string | null;
+  /** @nullable */
+  privacyTestoBreve?: string | null;
+  attivo?: boolean;
+}
+
+export interface ModuloFunzionale {
+  id: number;
+  codice: string;
+  nome: string;
+  /** @nullable */
+  descrizione: string | null;
+  categoria: string;
+  core: boolean;
+  ordine: number;
+  attivoDefault: boolean;
+  attivo: boolean;
+  dataCreazione: string;
+  dataAggiornamento: string;
+  /** @nullable */
+  ambienteModuloId: number | null;
+  /** @nullable */
+  abilitatoDaId: number | null;
+}
+
+export interface ModuloFunzionaleUpdate {
+  attivo: boolean;
+}
+
+export interface ConfigurazioneAmbientePubblica {
+  configurazione: ConfigurazioneAmbiente;
+  moduli: ModuloFunzionale[];
+  moduliAttivi: string[];
+}
+
+/**
+ * @nullable
+ */
+export type AuditConfigurazioneValorePrecedente = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type AuditConfigurazioneValoreNuovo = { [key: string]: unknown } | null;
+
+export interface AuditConfigurazione {
+  id: number;
+  area: string;
+  chiave: string;
+  /** @nullable */
+  valorePrecedente: AuditConfigurazioneValorePrecedente;
+  /** @nullable */
+  valoreNuovo: AuditConfigurazioneValoreNuovo;
+  /** @nullable */
+  utenteId: number | null;
+  azione: string;
+  dataOra: string;
+  /** @nullable */
+  ip: string | null;
+  /** @nullable */
+  note: string | null;
+}
+
 export interface EmailSendResult {
   sent: boolean;
   /** @nullable */
@@ -2914,6 +3049,7 @@ export interface AuthUser {
   zonaUdsId?: number | null;
   /** @nullable */
   zonaUdsNome?: string | null;
+  isSuperAdmin: boolean;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;
@@ -2955,6 +3091,7 @@ export interface Utente {
   zonaUdsId?: number | null;
   /** @nullable */
   zonaUdsNome?: string | null;
+  isSuperAdmin: boolean;
   attivo: boolean;
   mustChangePassword: boolean;
   /** @nullable */
@@ -3180,6 +3317,14 @@ centroAscoltoId?: number;
 
 export type ListZoneUdsParams = {
 cittaId?: number;
+};
+
+export type ListSuperAdminAuditConfigurazioniParams = {
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
 };
 
 export type ListCreditoSolidaleMovimentiParams = {

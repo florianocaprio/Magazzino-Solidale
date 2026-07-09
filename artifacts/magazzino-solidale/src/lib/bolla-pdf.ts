@@ -3,11 +3,12 @@ import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import type { BollaDettaglio } from "@workspace/api-client-react";
+import { loadFallbackLogoDataUrl, resolveBrandingAmbiente, type BrandingAmbiente } from "@/lib/branding-ambiente";
 
 export type BollaTemplate = "standard" | "moderno" | "minimal";
 
 export const BOLLA_TEMPLATES: { value: BollaTemplate; label: string; description: string }[] = [
-  { value: "standard", label: "Standard", description: "Intestazione classica con bordo e logo del centro." },
+  { value: "standard", label: "Standard", description: "Intestazione classica con bordo e logo documentale." },
   { value: "moderno", label: "Moderno", description: "Fascia colorata in testata, stile compatto." },
   { value: "minimal", label: "Minimal", description: "Solo testo, essenziale per stampa veloce." },
 ];
@@ -25,28 +26,12 @@ export interface BollaPdfOptions {
   footer?: string | null;
   template: BollaTemplate;
   associationLogoDataUrl?: string | null;
+  branding?: BrandingAmbiente | null;
 }
 
-async function urlToDataUrl(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
-
-/** Carica il logo dell'associazione (public/logo-aim.png) come data URL per jsPDF. */
+/** Carica il logo AIM statico di fallback come data URL per jsPDF. */
 export async function loadAssociationLogo(): Promise<string | null> {
-  const base = import.meta.env.BASE_URL || "/";
-  return urlToDataUrl(`${base.replace(/\/$/, "")}/logo-aim.png`);
+  return loadFallbackLogoDataUrl();
 }
 
 function imageSize(dataUrl: string): Promise<{ w: number; h: number }> {
@@ -91,8 +76,18 @@ async function drawImageFit(
   return drawH;
 }
 
+function firstTextLine(doc: jsPDF, text: string | null | undefined, maxWidth: number): string | null {
+  if (!text) return null;
+  const lines = doc.splitTextToSize(text, maxWidth) as string[];
+  return lines[0] ?? null;
+}
+
 export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   const { bolla, centro, footer, associationLogoDataUrl } = opts;
+  const branding = opts.branding ?? resolveBrandingAmbiente(null);
+  const documentLogoDataUrl = associationLogoDataUrl === undefined
+    ? await loadFallbackLogoDataUrl()
+    : associationLogoDataUrl;
   const template: BollaTemplate = opts.template in ACCENT ? opts.template : "standard";
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -108,18 +103,23 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     doc.setFillColor(accent[0], accent[1], accent[2]);
     doc.rect(0, 0, pageW, 32, "F");
     let textX = margin;
-    if (centro?.logoUrl) {
-      const drawn = await drawImageFit(doc, centro.logoUrl, margin, 6, 20, 20);
+    if (documentLogoDataUrl) {
+      const drawn = await drawImageFit(doc, documentLogoDataUrl, margin, 6, 20, 20);
       if (drawn) textX = margin + 24;
     }
+    const leftWidth = pageW - textX - margin - 58;
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text(centro?.nome || "Magazzino Solidale", textX, 13);
+    doc.text(firstTextLine(doc, branding.nomeDocumento, leftWidth) ?? branding.nomeDocumento, textX, 13);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    const addr = [centro?.indirizzo, centro?.comune].filter(Boolean).join(" — ");
-    if (addr) doc.text(addr, textX, 19);
+    const headerLine = firstTextLine(
+      doc,
+      branding.sottotitoloDocumento ?? branding.contattiDocumento,
+      leftWidth,
+    );
+    if (headerLine) doc.text(headerLine, textX, 19);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.text("BOLLA DI CONSEGNA", pageW - margin, 13, { align: "right" });
@@ -131,19 +131,28 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     y = 40;
   } else {
     let textX = margin;
-    if (centro?.logoUrl && template === "standard") {
-      const drawn = await drawImageFit(doc, centro.logoUrl, margin, y, 22, 22);
+    if (documentLogoDataUrl && template === "standard") {
+      const drawn = await drawImageFit(doc, documentLogoDataUrl, margin, y, 22, 22);
       if (drawn) textX = margin + 26;
     }
+    const leftWidth = pageW - textX - margin - 66;
     doc.setTextColor(accent[0], accent[1], accent[2]);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
-    doc.text(centro?.nome || "Magazzino Solidale", textX, y + 5);
+    doc.text(firstTextLine(doc, branding.nomeDocumento, leftWidth) ?? branding.nomeDocumento, textX, y + 5);
     doc.setTextColor(60, 60, 60);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    const addr = [centro?.indirizzo, centro?.comune].filter(Boolean).join(" — ");
-    if (addr) doc.text(addr, textX, y + 11);
+    const headerLine = firstTextLine(
+      doc,
+      branding.sottotitoloDocumento ?? branding.contattiDocumento,
+      leftWidth,
+    );
+    if (headerLine) doc.text(headerLine, textX, y + 11);
+    const contactLine = branding.sottotitoloDocumento
+      ? firstTextLine(doc, branding.contattiDocumento, leftWidth)
+      : null;
+    if (contactLine && template === "standard") doc.text(contactLine, textX, y + 16);
 
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "bold");
@@ -320,16 +329,17 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
 
   const footerTextX = margin;
   let footerTextRightPad = margin;
-  if (associationLogoDataUrl) {
+  if (documentLogoDataUrl) {
     const logoW = 24;
     const logoH = 20;
-    const drawn = await drawImageFit(doc, associationLogoDataUrl, pageW - margin - logoW, footerY - 10, logoW, logoH);
+    const drawn = await drawImageFit(doc, documentLogoDataUrl, pageW - margin - logoW, footerY - 10, logoW, logoH);
     if (drawn) footerTextRightPad = margin + logoW + 4;
   }
-  if (footer) {
+  const footerText = footer ?? branding.footerDocumenti;
+  if (footerText) {
     doc.setFontSize(8);
     doc.setTextColor(110, 110, 110);
-    const lines = doc.splitTextToSize(footer, pageW - footerTextX - footerTextRightPad);
+    const lines = doc.splitTextToSize(footerText, pageW - footerTextX - footerTextRightPad);
     doc.text(lines, footerTextX, footerY + 1);
   }
 

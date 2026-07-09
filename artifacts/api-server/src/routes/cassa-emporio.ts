@@ -27,6 +27,7 @@ import {
 } from "../lib/centroScope";
 import { calcolaDisponibilitaMagazzino, parseDbNumber } from "../lib/disponibilitaMagazzino";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
+import { requireModulo } from "../lib/featureFlags";
 import {
   chiudiSessioneCassaEmporio,
   getSpesaEmporio,
@@ -34,6 +35,10 @@ import {
 } from "../lib/speseEmporio";
 
 const router: IRouter = Router();
+router.use(
+  "/cassa-emporio",
+  requireModulo("EMPORIO_SOLIDALE", EMPORIO_DISABLED_MSG),
+);
 
 const TIPO_ACCESSO = "accesso_emporio";
 const STATI_ACCESSO_VALIDI = ["pianificato", "confermato", "effettuato"] as const;

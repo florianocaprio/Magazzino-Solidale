@@ -35,6 +35,7 @@ import { udsReportGiornaliero } from "./namespaces/udsReportGiornaliero";
 import { impostazioniStampa } from "./namespaces/impostazioniStampa";
 import { impostazioniEmail } from "./namespaces/impostazioniEmail";
 import { moduli } from "./namespaces/moduli";
+import { superAdmin } from "./namespaces/superAdmin";
 import { emporio } from "./namespaces/emporio";
 import { accessiEmporio } from "./namespaces/accessiEmporio";
 import { cassaEmporio } from "./namespaces/cassaEmporio";
@@ -89,6 +90,7 @@ const PAGE_NAMESPACES = {
   impostazioniStampa,
   impostazioniEmail,
   moduli,
+  superAdmin,
   emporio,
   accessiEmporio,
   cassaEmporio,

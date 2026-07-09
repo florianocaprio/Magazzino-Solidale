@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable, magazziniTable, impostazioniModuliTable, creditoSolidaleMovimentiTable } from "@workspace/db";
+import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable, magazziniTable, creditoSolidaleMovimentiTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
+import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
 /**
  * UDS unification: an explicit `uds` boolean flag (independent of zonaUdsId)
@@ -69,13 +70,7 @@ const creditoSolidaleCentroAscoltoRichiestoMsg =
   "ATTENZIONE: il beneficiario non ha un Centro di Ascolto assegnato. Non è possibile assegnare Credito Solidale.";
 
 async function setEmporioEnabled(enabled: boolean): Promise<void> {
-  await db
-    .insert(impostazioniModuliTable)
-    .values({ id: 1, emporioAbilitato: enabled, unitaStradaAbilitata: true })
-    .onConflictDoUpdate({
-      target: impostazioniModuliTable.id,
-      set: { emporioAbilitato: enabled, unitaStradaAbilitata: true },
-    });
+  await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
 beforeAll(async () => {
@@ -109,6 +104,7 @@ afterAll(async () => {
   if (cittaIds.length > 0) {
     await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds));
   }
+  await setEmporioEnabled(true);
   await pool.end();
 });
 

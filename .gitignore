@@ -12,6 +12,7 @@
 .env
 .env.*
 .env.docker
+!deploy/client-template/.env.client.example
 .expo
 .expo-shared
 .github/instructions/nx.instructions.md

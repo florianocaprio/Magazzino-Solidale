@@ -24,7 +24,7 @@ import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, 
 import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
-import { loadAssociationLogo } from "@/lib/bolla-pdf";
+import { loadTesseraBrandingForPdf } from "@/lib/branding-ambiente";
 import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { useTranslation } from "react-i18next";
@@ -540,11 +540,12 @@ export default function Beneficiari() {
                         <DropdownMenuItem
                           className="cursor-pointer"
                           onClick={async () => {
-                            const logo = await loadAssociationLogo();
+                            const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
                             await generateTesseraPdf({
                               beneficiario: { codice: b.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
                               labels: buildTesseraLabels(t),
-                              associationLogoDataUrl: logo,
+                              associationLogoDataUrl: logoDataUrl,
+                              branding,
                             });
                           }}
                         ><CreditCard className="mr-2 h-4 w-4" /> {t("beneficiari.stampaTessera")}</DropdownMenuItem>

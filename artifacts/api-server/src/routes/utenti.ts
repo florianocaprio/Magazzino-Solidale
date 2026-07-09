@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, ne, desc, ilike, or, type SQL } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable, zoneUdsTable } from "@workspace/db";
@@ -9,6 +9,8 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { callerCentroId, callerCittaId, callerZonaUdsId, andScoped } from "../lib/centroScope";
+import { isBootstrapMode } from "../lib/bootstrap";
+import { ensureSuperAdminRole, SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 
 const router: IRouter = Router();
 
@@ -28,6 +30,7 @@ type UtenteRow = {
   cittaNome: string | null;
   zonaUdsId: number | null;
   zonaUdsNome: string | null;
+  isSuperAdmin: boolean;
   attivo: boolean;
   mustChangePassword: boolean;
   ultimoAccesso: Date | null;
@@ -48,6 +51,7 @@ const fmt = (r: UtenteRow) => ({
   cittaNome: r.cittaNome ?? null,
   zonaUdsId: r.zonaUdsId ?? null,
   zonaUdsNome: r.zonaUdsNome ?? null,
+  isSuperAdmin: r.isSuperAdmin || r.ruoloNome === SUPER_ADMIN_ROLE_NAME,
   attivo: r.attivo,
   mustChangePassword: r.mustChangePassword,
   ultimoAccesso: r.ultimoAccesso ? r.ultimoAccesso.toISOString() : null,
@@ -70,6 +74,7 @@ const selectUtente = () =>
       cittaNome: cittaTable.nome,
       zonaUdsId: utentiTable.zonaUdsId,
       zonaUdsNome: zoneUdsTable.nome,
+      isSuperAdmin: utentiTable.isSuperAdmin,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
       ultimoAccesso: utentiTable.ultimoAccesso,
@@ -90,6 +95,20 @@ async function otherActiveAdminExists(excludeId: number): Promise<boolean> {
       and(
         eq(utentiTable.attivo, true),
         eq(ruoliTable.isAdmin, true),
+        ne(utentiTable.id, excludeId),
+      ),
+    );
+  return rows.length > 0;
+}
+
+async function otherActiveSuperAdminExists(excludeId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: utentiTable.id })
+    .from(utentiTable)
+    .where(
+      and(
+        eq(utentiTable.attivo, true),
+        eq(utentiTable.isSuperAdmin, true),
         ne(utentiTable.id, excludeId),
       ),
     );
@@ -175,6 +194,21 @@ async function roleIsAdmin(ruoloId: number | null): Promise<boolean> {
   return r?.isAdmin ?? false;
 }
 
+async function roleIsSuperAdmin(ruoloId: number | null): Promise<boolean> {
+  if (ruoloId == null) return false;
+  const [r] = await db
+    .select({ nome: ruoliTable.nome })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.id, ruoloId));
+  return r?.nome === SUPER_ADMIN_ROLE_NAME;
+}
+
+function requireCallerSuperAdmin(req: Request, res: Response): boolean {
+  if (req.user?.isSuperAdmin) return true;
+  res.status(403).json({ error: "Operazione riservata ai Super Admin" });
+  return false;
+}
+
 router.get("/utenti", async (req, res): Promise<void> => {
   const caller = callerCentroId(req);
   // STRICT città boundary on utenti: a città-bound admin sees ONLY users of
@@ -227,17 +261,31 @@ router.post("/utenti", async (req, res): Promise<void> => {
     return;
   }
   const { username, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId, cittaId, zonaUdsId } = parsed.data;
+  const bootstrap = await isBootstrapMode();
+  const finalRuoloId = bootstrap ? await ensureSuperAdminRole() : (ruoloId ?? null);
+  const finalIsSuperAdmin = await roleIsSuperAdmin(finalRuoloId);
+
+  if (finalIsSuperAdmin && !bootstrap && !req.user?.isSuperAdmin) {
+    res.status(403).json({ error: "Solo un Super Admin può creare un altro Super Admin" });
+    return;
+  }
 
   // A centro-bound admin can only create users inside their own centro; the
   // caller's centro is auto-assigned and locked (any body value is ignored).
   const caller = callerCentroId(req);
-  const finalCentroId = caller != null ? caller : (centroAscoltoId ?? null);
+  const finalCentroId = bootstrap || finalIsSuperAdmin
+    ? null
+    : caller != null ? caller : (centroAscoltoId ?? null);
   // Likewise a città-bound admin can only create users inside their own città;
   // the caller's città is auto-assigned and locked (any body value is ignored).
   const cittaCaller = callerCittaId(req);
-  const finalCittaId = cittaCaller != null ? cittaCaller : (cittaId ?? null);
+  const finalCittaId = bootstrap || finalIsSuperAdmin
+    ? null
+    : cittaCaller != null ? cittaCaller : (cittaId ?? null);
   const zonaCaller = callerZonaUdsId(req);
-  const finalZonaUdsId = zonaCaller != null
+  const finalZonaUdsId = bootstrap || finalIsSuperAdmin
+    ? null
+    : zonaCaller != null
     ? zonaCaller
     : finalCittaId == null
       ? null
@@ -269,11 +317,12 @@ router.post("/utenti", async (req, res): Promise<void> => {
       nome: nomeTrim,
       cognome: cognomeTrim,
       matricola: finalMatricola,
-      ruoloId: ruoloId ?? null,
+      ruoloId: finalRuoloId,
       centroAscoltoId: finalCentroId,
       cittaId: finalCittaId,
       zonaUdsId: finalZonaUdsId,
       attivo: attivo ?? true,
+      isSuperAdmin: finalIsSuperAdmin,
       mustChangePassword: false,
     })
     .returning({ id: utentiTable.id });
@@ -330,6 +379,10 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Utente non trovato" });
     return;
   }
+  if (target.isSuperAdmin && !req.user?.isSuperAdmin) {
+    res.status(403).json({ error: "Operazione riservata ai Super Admin" });
+    return;
+  }
 
   const caller = callerCentroId(req);
   if (caller != null && target.centroAscoltoId !== caller) {
@@ -363,6 +416,18 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   }
 
   const updates: Partial<typeof utentiTable.$inferInsert> = {};
+  if (body.ruoloId !== undefined) {
+    const nextIsSuperAdmin = await roleIsSuperAdmin(body.ruoloId);
+    if ((nextIsSuperAdmin || target.isSuperAdmin) && !requireCallerSuperAdmin(req, res)) {
+      return;
+    }
+    updates.isSuperAdmin = nextIsSuperAdmin;
+    if (nextIsSuperAdmin) {
+      updates.centroAscoltoId = null;
+      updates.cittaId = null;
+      updates.zonaUdsId = null;
+    }
+  }
   if (body.nome !== undefined) updates.nome = body.nome;
   if (body.cognome !== undefined) updates.cognome = body.cognome;
   if (body.matricola !== undefined) updates.matricola = normalizeMatricola(body.matricola);
@@ -370,17 +435,17 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   if (body.attivo !== undefined) updates.attivo = body.attivo;
   // A centro-bound admin cannot move users to another centro; only a global
   // admin may (re)assign the centro.
-  if (caller == null && body.centroAscoltoId !== undefined) {
+  if (caller == null && body.centroAscoltoId !== undefined && updates.isSuperAdmin !== true) {
     updates.centroAscoltoId = body.centroAscoltoId;
   }
   // A città-bound admin cannot move users to another città; only a città-global
   // admin may (re)assign the città.
-  if (cittaCaller == null && body.cittaId !== undefined) {
+  if (cittaCaller == null && body.cittaId !== undefined && updates.isSuperAdmin !== true) {
     updates.cittaId = body.cittaId;
   }
   // A zona-bound admin cannot move users to another zona; only a zona-global
   // admin may (re)assign the UDS zona. A user without città cannot keep a zona.
-  if (zonaCaller == null && body.zonaUdsId !== undefined) {
+  if (zonaCaller == null && body.zonaUdsId !== undefined && updates.isSuperAdmin !== true) {
     const effectiveCittaId =
       updates.cittaId !== undefined ? (updates.cittaId ?? null) : target.cittaId;
     updates.zonaUdsId = effectiveCittaId == null ? null : body.zonaUdsId;
@@ -390,6 +455,21 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   }
   if (updates.cittaId === null) {
     updates.zonaUdsId = null;
+  }
+  const effectiveIsSuperAdmin = updates.isSuperAdmin ?? target.isSuperAdmin;
+  if (effectiveIsSuperAdmin) {
+    updates.centroAscoltoId = null;
+    updates.cittaId = null;
+    updates.zonaUdsId = null;
+  }
+  const effectiveActive = updates.attivo ?? target.attivo;
+  if (target.isSuperAdmin && (!effectiveIsSuperAdmin || !effectiveActive)) {
+    if (!(await otherActiveSuperAdminExists(id))) {
+      res.status(409).json({
+        error: "Deve restare almeno un Super Admin attivo",
+      });
+      return;
+    }
   }
 
   // If the user would be left without a matricola (legacy record, or the edit
@@ -445,6 +525,16 @@ router.delete("/utenti/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Utente non trovato" });
     return;
   }
+  if (target.isSuperAdmin && !req.user?.isSuperAdmin) {
+    res.status(403).json({ error: "Operazione riservata ai Super Admin" });
+    return;
+  }
+  if (target.isSuperAdmin && !(await otherActiveSuperAdminExists(id))) {
+    res.status(409).json({
+      error: "Deve restare almeno un Super Admin attivo",
+    });
+    return;
+  }
 
   const caller = callerCentroId(req);
   if (caller != null && target.centroAscoltoId !== caller) {
@@ -492,11 +582,16 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
       centroAscoltoId: utentiTable.centroAscoltoId,
       cittaId: utentiTable.cittaId,
       zonaUdsId: utentiTable.zonaUdsId,
+      isSuperAdmin: utentiTable.isSuperAdmin,
     })
     .from(utentiTable)
     .where(eq(utentiTable.id, id));
   if (!target) {
     res.status(404).json({ error: "Utente non trovato" });
+    return;
+  }
+  if (target.isSuperAdmin && !req.user?.isSuperAdmin) {
+    res.status(403).json({ error: "Operazione riservata ai Super Admin" });
     return;
   }
 

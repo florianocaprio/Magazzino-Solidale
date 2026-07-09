@@ -3,18 +3,48 @@ import { db, ruoliTable } from "@workspace/db";
 import { ALL_AREA_KEYS } from "./areas";
 import { logger } from "./logger";
 
-const ADMIN_ROLE_NAME = "Amministratore";
+export const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
+export const ADMIN_ROLE_NAME = "Amministratore";
 const UDS_ROLE_NAME = "Operatore UDS";
 
+export async function ensureSuperAdminRole(): Promise<number> {
+  const [existing] = await db
+    .select({ id: ruoliTable.id })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.nome, SUPER_ADMIN_ROLE_NAME));
+
+  if (existing) {
+    await db
+      .update(ruoliTable)
+      .set({
+        descrizione: "Accesso completo a tutte le aree e alla configurazione ambiente",
+        aree: ALL_AREA_KEYS,
+        isAdmin: true,
+      })
+      .where(eq(ruoliTable.id, existing.id));
+    return existing.id;
+  }
+
+  const [created] = await db
+    .insert(ruoliTable)
+    .values({
+      nome: SUPER_ADMIN_ROLE_NAME,
+      descrizione: "Accesso completo a tutte le aree e alla configurazione ambiente",
+      aree: ALL_AREA_KEYS,
+      isAdmin: true,
+    })
+    .returning({ id: ruoliTable.id });
+  logger.info("Seeded SuperAdmin role");
+  return created.id;
+}
+
 /**
- * Idempotently ensures the default roles exist so the first-run setup screen has
- * an administrator role to assign. Safe to run on every startup.
- *
- * NOTE: this intentionally does NOT seed any user. The portal ships with no
- * default account; the first administrator is created through the first-run
- * bootstrap setup screen (see `lib/bootstrap.ts`).
+ * Idempotently ensures the default roles exist so first-run setup and
+ * environment bootstrap always have stable roles to assign.
  */
 export async function seedRoles(): Promise<void> {
+  await ensureSuperAdminRole();
+
   const [adminRole] = await db
     .select({ id: ruoliTable.id })
     .from(ruoliTable)

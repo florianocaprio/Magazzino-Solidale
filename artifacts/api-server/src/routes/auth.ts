@@ -36,6 +36,7 @@ function authUserResponse(u: SessionUser) {
     cittaNome: u.cittaNome,
     zonaUdsId: u.zonaUdsId,
     zonaUdsNome: u.zonaUdsNome,
+    isSuperAdmin: u.isSuperAdmin,
     isAdmin: u.isAdmin,
     aree: u.aree,
     mustChangePassword: u.mustChangePassword,

@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
 import { isBootstrapMode } from "../lib/bootstrap";
+import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 
 export interface SessionUser {
   id: number;
@@ -25,6 +26,7 @@ export interface SessionUser {
   cittaNome: string | null;
   zonaUdsId: number | null;
   zonaUdsNome: string | null;
+  isSuperAdmin: boolean;
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;
@@ -65,6 +67,7 @@ export async function loadSessionUser(
       cittaNome: cittaTable.nome,
       zonaUdsId: utentiTable.zonaUdsId,
       zonaUdsNome: zoneUdsTable.nome,
+      isSuperAdmin: utentiTable.isSuperAdmin,
       isAdmin: ruoliTable.isAdmin,
       aree: ruoliTable.aree,
     })
@@ -94,6 +97,7 @@ export async function loadSessionUser(
     cittaNome: row.cittaNome ?? null,
     zonaUdsId: row.zonaUdsId ?? null,
     zonaUdsNome: row.zonaUdsNome ?? null,
+    isSuperAdmin: (row.isSuperAdmin ?? false) || row.ruoloNome === SUPER_ADMIN_ROLE_NAME,
     isAdmin: row.isAdmin ?? false,
     aree: row.aree ?? [],
     mustChangePassword: row.mustChangePassword,
@@ -122,6 +126,7 @@ const BOOTSTRAP_ADMIN: SessionUser = {
   cittaNome: null,
   zonaUdsId: null,
   zonaUdsNome: null,
+  isSuperAdmin: false,
   isAdmin: true,
   aree: ALL_AREA_KEYS,
   mustChangePassword: false,
@@ -188,8 +193,8 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
  * When the authenticated user is flagged `mustChangePassword`, blocks every
  * protected route except the auth self-service endpoints needed to actually
  * change the password (`/auth/me`, `/auth/change-password`, `/auth/logout`).
- * Frontend gating is UX only — this is the real enforcement boundary so a user
- * with the known bootstrap credential cannot operate before rotating it.
+ * Frontend gating is UX only — this is the real enforcement boundary for users
+ * whose password was explicitly marked as temporary.
  */
 const PASSWORD_CHANGE_ALLOWLIST = new Set([
   "/auth/me",
@@ -208,6 +213,18 @@ export const requirePasswordChange: RequestHandler = (req, res, next) => {
 export const requireAdmin: RequestHandler = (req, res, next) => {
   if (!req.user?.isAdmin) {
     res.status(403).json({ error: "Accesso riservato agli amministratori" });
+    return;
+  }
+  next();
+};
+
+export const requireSuperAdmin: RequestHandler = (req, res, next) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Non autenticato" });
+    return;
+  }
+  if (!req.user.isSuperAdmin) {
+    res.status(403).json({ error: "Accesso riservato ai Super Admin" });
     return;
   }
   next();

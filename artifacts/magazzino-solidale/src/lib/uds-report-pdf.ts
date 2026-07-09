@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable, { type CellHookData } from "jspdf-autotable";
-import { loadAssociationLogo } from "@/lib/bolla-pdf";
+import { loadDocumentLogoDataUrl, resolveBrandingAmbiente, type BrandingAmbiente } from "@/lib/branding-ambiente";
 
 export type UdsReportPdfRow = {
   numeroIntervento: number;
@@ -55,7 +55,7 @@ function imageSize(dataUrl: string): Promise<{ w: number; h: number }> {
  * intervention number is printed in RED whenever it is that person's first-ever
  * intervention (primoIntervento). The generic exportToPdf cannot color cells, so
  * this uses autoTable's didParseCell hook to override the first column's text color.
- * The association logo (public/logo-aim.png) is drawn at the top-right.
+ * The document logo is drawn at the top-right.
  */
 export async function exportUdsReportGiornalieroPdf(opts: {
   filename: string;
@@ -63,14 +63,19 @@ export async function exportUdsReportGiornalieroPdf(opts: {
   meta: UdsReportPdfMeta;
   labels: UdsReportPdfLabels;
   rows: UdsReportPdfRow[];
+  branding?: BrandingAmbiente | null;
+  associationLogoDataUrl?: string | null;
 }): Promise<void> {
   const { filename, title, meta, labels, rows } = opts;
+  const branding = opts.branding ?? resolveBrandingAmbiente(null);
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const marginX = 40;
 
-  // ---- Association logo (top-right) ----
-  const logo = await loadAssociationLogo();
+  // ---- Document logo (top-right) ----
+  const logo = opts.associationLogoDataUrl === undefined
+    ? await loadDocumentLogoDataUrl(branding)
+    : opts.associationLogoDataUrl;
   if (logo) {
     const { w, h } = await imageSize(logo);
     if (w && h) {
@@ -91,9 +96,20 @@ export async function exportUdsReportGiornalieroPdf(opts: {
     }
   }
 
+  doc.setFontSize(11);
+  doc.setTextColor(20);
+  doc.setFont("helvetica", "bold");
+  doc.text(branding.nomeDocumento, marginX, 34);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(110);
+  if (branding.sottotitoloDocumento) {
+    doc.text(branding.sottotitoloDocumento, marginX, 47);
+  }
+
   doc.setFontSize(16);
   doc.setTextColor(20);
-  doc.text(title, marginX, 48);
+  doc.text(title, marginX, 66);
 
   const metaParts: string[] = [];
   if (meta.period) metaParts.push(`${labels.metaPeriod}: ${meta.period}`);
@@ -105,14 +121,14 @@ export async function exportUdsReportGiornalieroPdf(opts: {
   doc.text(
     `${metaParts.join("  •  ")}  •  ${new Date().toLocaleString("it-IT")}  •  ${rows.length}`,
     marginX,
-    64,
+    82,
   );
 
   doc.setTextColor(200, 30, 30);
-  doc.text(labels.legend, marginX, 78);
+  doc.text(labels.legend, marginX, 96);
 
   autoTable(doc, {
-    startY: 90,
+    startY: 108,
     head: [[
       labels.colN,
       labels.colData,

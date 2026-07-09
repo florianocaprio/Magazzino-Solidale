@@ -11,7 +11,6 @@ import {
   consegneTable,
   creditoSolidaleMovimentiTable,
   db,
-  impostazioniModuliTable,
   lottiTable,
   magazziniTable,
   movimentiTable,
@@ -28,6 +27,7 @@ import cassaEmporioRouter from "../src/routes/cassa-emporio";
 import bolleRouter from "../src/routes/bolle";
 import speseEmporioRouter from "../src/routes/spese-emporio";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
+import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
@@ -64,13 +64,7 @@ function makeApp(): Express {
 }
 
 async function setEmporioEnabled(enabled: boolean): Promise<void> {
-  await db
-    .insert(impostazioniModuliTable)
-    .values({ id: 1, emporioAbilitato: enabled, unitaStradaAbilitata: true })
-    .onConflictDoUpdate({
-      target: impostazioniModuliTable.id,
-      set: { emporioAbilitato: enabled, unitaStradaAbilitata: true },
-    });
+  await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
 async function createCitta(): Promise<number> {
@@ -284,6 +278,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await setEmporioEnabled(true);
   await pool.end();
 });
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useListRuoli,
   useListUtenti,
@@ -39,10 +39,18 @@ export default function Setup() {
 
   const roles = rolesQuery.data ?? [];
   const users = usersQuery.data ?? [];
+  const superAdminRole = roles.find((r) => r.nome === "SuperAdmin");
+  const isFirstUser = users.length === 0;
   const adminExists = users.some((u) => {
     const role = roles.find((r) => r.id === u.ruoloId);
     return role?.isAdmin ?? false;
   });
+
+  useEffect(() => {
+    if (isFirstUser && superAdminRole && !ruoloId) {
+      setRuoloId(String(superAdminRole.id));
+    }
+  }, [isFirstUser, ruoloId, superAdminRole]);
 
   const selectedRole = useMemo(
     () => roles.find((r) => String(r.id) === ruoloId),

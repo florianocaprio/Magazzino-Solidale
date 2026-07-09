@@ -11,8 +11,10 @@ import {
   inVisibleCentroSet,
   andScoped,
 } from "../lib/centroScope";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+router.use("/mezzi", requireModulo("MEZZI"));
 
 /** True when an error is a Postgres unique-constraint violation (SQLSTATE 23505).
  * Drizzle wraps driver errors, so the pg error may be nested under `.cause`. */

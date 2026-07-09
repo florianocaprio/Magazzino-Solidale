@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import JsBarcode from "jsbarcode";
 import { format, type Locale } from "date-fns";
 import { it } from "date-fns/locale";
+import type { BrandingAmbiente } from "@/lib/branding-ambiente";
 
 export interface TesseraBeneficiario {
   codice: string;
@@ -94,12 +95,31 @@ export interface TesseraPdfOptions {
   beneficiario: TesseraBeneficiario;
   labels: TesseraLabels;
   associationLogoDataUrl?: string | null;
+  branding?: BrandingAmbiente | null;
   locale?: Locale;
+}
+
+function drawCenteredFitText(
+  doc: jsPDF,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  maxFontSize: number,
+  minFontSize: number,
+): void {
+  let fontSize = maxFontSize;
+  doc.setFontSize(fontSize);
+  while (fontSize > minFontSize && doc.getTextWidth(text) > maxWidth) {
+    fontSize -= 0.5;
+    doc.setFontSize(fontSize);
+  }
+  doc.text(text, x, y, { align: "center" });
 }
 
 /** Genera una tessera beneficiario formato CR80 (85.6 x 54 mm) con QR e codice a barre. */
 export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void> {
-  const { beneficiario: b, labels, associationLogoDataUrl } = opts;
+  const { beneficiario: b, labels, associationLogoDataUrl, branding } = opts;
   const locale = opts.locale ?? it;
   const W = 85.6;
   const H = 54;
@@ -121,14 +141,14 @@ export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void>
 
   // Header — title + subtitle centered in the area left of the top-right QR
   const headerCenterX = (5 + (W - 24)) / 2;
+  const title = branding?.nomeAssociazione ?? labels.title;
+  const subtitle = branding?.nomeAmbiente ?? labels.subtitle;
   doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2]);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text(labels.title, headerCenterX, 8, { align: "center" });
+  drawCenteredFitText(doc, title, headerCenterX, 8, W - 34, 10, 7.5);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
   doc.setTextColor(90, 90, 90);
-  doc.text(labels.subtitle, headerCenterX, 12.5, { align: "center" });
+  drawCenteredFitText(doc, subtitle, headerCenterX, 12.5, W - 34, 7, 5.5);
 
   // Beneficiary details
   y = 22;

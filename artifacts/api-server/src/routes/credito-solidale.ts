@@ -18,9 +18,12 @@ import {
   centroScopeFilter,
   cittaScopeFilter,
 } from "../lib/centroScope";
+import { requireModulo } from "../lib/featureFlags";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
 
 const router: IRouter = Router();
+
+router.use("/credito-solidale", requireModulo("CREDITO_SOLIDALE"));
 
 const BENEFICIARIO_NOT_FOUND_MSG = "Beneficiario non trovato.";
 const MOVIMENTO_NOT_FOUND_MSG = "Movimento Credito Solidale non trovato.";
