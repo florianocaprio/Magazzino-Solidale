@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DEBUG_POSTGRES_DB:?DEBUG_POSTGRES_DB non configurato}
+      POSTGRES_USER: ${DEBUG_POSTGRES_USER:?DEBUG_POSTGRES_USER non configurato}
+      POSTGRES_PASSWORD: ${DEBUG_POSTGRES_PASSWORD:?DEBUG_POSTGRES_PASSWORD non configurata}
+    volumes:
+      - type: bind
+        source: /data/magazzino-debug/Bug-Prod-01/postgres
+        target: /var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    platform: linux/amd64
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.debug
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+    volumes:
+      - type: bind
+        source: /data/magazzino-debug/Bug-Prod-01/uploads
+        target: /data/uploads
+      - type: bind
+        source: /data/magazzino-debug/Bug-Prod-01/backups
+        target: /data/backups
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(''net'').connect(8080, ''127.0.0.1'').on(''connect'', function(){process.exit(0)}).on(''error'', function(){process.exit(1)})"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    platform: linux/amd64
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8083:80"
+    restart: unless-stopped

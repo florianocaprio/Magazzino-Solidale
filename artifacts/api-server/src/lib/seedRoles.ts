@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, ruoliTable } from "@workspace/db";
-import { ALL_AREA_KEYS } from "./areas";
+import { ALL_AREA_KEYS, EMPORIO_AREA_KEY } from "./areas";
 import { logger } from "./logger";
 
 export const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
@@ -110,19 +110,25 @@ export async function seedRoles(): Promise<void> {
   }
 
   // Operational Emporio role. Keep it non-admin and grant only the areas used
-  // by the current Emporio UI/API flows. Existing rows are intentionally not
-  // overwritten so local permission customizations remain untouched.
+  // by the current Emporio UI/API flows. Existing customizations are preserved;
+  // only the newly required Emporio area is appended when missing.
   const [emporioRole] = await db
-    .select({ id: ruoliTable.id })
+    .select({ id: ruoliTable.id, aree: ruoliTable.aree })
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, EMPORIO_ROLE_NAME));
   if (!emporioRole) {
     await db.insert(ruoliTable).values({
       nome: EMPORIO_ROLE_NAME,
       descrizione: "Operatore Emporio Solidale",
-      aree: ["generale", "magazzino", "sociale"],
+      aree: ["generale", "magazzino", "sociale", EMPORIO_AREA_KEY],
       isAdmin: false,
     });
     logger.info("Seeded Emporio role");
+  } else if (!emporioRole.aree.includes(EMPORIO_AREA_KEY)) {
+    await db
+      .update(ruoliTable)
+      .set({ aree: [...emporioRole.aree, EMPORIO_AREA_KEY] })
+      .where(eq(ruoliTable.id, emporioRole.id));
+    logger.info("Added Emporio access area to existing Emporio role");
   }
 }

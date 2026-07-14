@@ -3,6 +3,14 @@ import { db, pool, ruoliTable, utentiTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { initializeBaseData } from "../lib/baseData";
 import {
+  previewDemoReset,
+  resetAllDemoData,
+  resetDemoBeneficiaryData,
+  resetDemoEmporioData,
+  resetDemoUdsData,
+  seedDemoEnvironmentData,
+} from "../lib/demoEnvironment";
+import {
   resetDemoWarehouseData,
   resetOperationalEnvironment,
   resetWarehouseData,
@@ -12,12 +20,22 @@ import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 
 type Command =
   | "seed-base"
+  | "seed-demo"
   | "seed-demo-magazzino"
+  | "preview-reset-demo"
+  | "reset-demo"
+  | "reset-demo-emporio"
+  | "reset-demo-uds"
+  | "reset-demo-beneficiari"
   | "reset-demo-magazzino"
   | "reset-magazzino"
   | "reset-ambiente";
 
 const CONFIRMATIONS: Partial<Record<Command, string>> = {
+  "reset-demo": "RESET DATI DEMO",
+  "reset-demo-emporio": "RESET EMPORIO DEMO",
+  "reset-demo-uds": "RESET UDS DEMO",
+  "reset-demo-beneficiari": "RESET BENEFICIARI DEMO",
   "reset-demo-magazzino": "RESET MAGAZZINO DEMO",
   "reset-magazzino": "RESET MAGAZZINO",
   "reset-ambiente": "RESET AMBIENTE",
@@ -27,7 +45,13 @@ function usage(): string {
   return [
     "Uso:",
     "  pnpm --filter @workspace/api-server environment:data seed-base",
+    "  pnpm --filter @workspace/api-server environment:data seed-demo --super-admin=<username>",
     "  pnpm --filter @workspace/api-server environment:data seed-demo-magazzino --super-admin=<username>",
+    "  pnpm --filter @workspace/api-server environment:data preview-reset-demo --super-admin=<username>",
+    '  pnpm --filter @workspace/api-server environment:data reset-demo --super-admin=<username> --confirm="RESET DATI DEMO"',
+    '  pnpm --filter @workspace/api-server environment:data reset-demo-emporio --super-admin=<username> --confirm="RESET EMPORIO DEMO"',
+    '  pnpm --filter @workspace/api-server environment:data reset-demo-uds --super-admin=<username> --confirm="RESET UDS DEMO"',
+    '  pnpm --filter @workspace/api-server environment:data reset-demo-beneficiari --super-admin=<username> --confirm="RESET BENEFICIARI DEMO"',
     '  pnpm --filter @workspace/api-server environment:data reset-demo-magazzino --super-admin=<username> --confirm="RESET MAGAZZINO DEMO"',
     '  pnpm --filter @workspace/api-server environment:data reset-magazzino --super-admin=<username> --backup-confirmed --confirm="RESET MAGAZZINO"',
     '  pnpm --filter @workspace/api-server environment:data reset-ambiente --super-admin=<username> --backup-confirmed --confirm="RESET AMBIENTE"',
@@ -123,7 +147,13 @@ export async function runEnvironmentDataCli(args: string[]): Promise<unknown> {
   const [rawCommand, ...rawOptions] = args;
   const commands: Command[] = [
     "seed-base",
+    "seed-demo",
     "seed-demo-magazzino",
+    "preview-reset-demo",
+    "reset-demo",
+    "reset-demo-emporio",
+    "reset-demo-uds",
+    "reset-demo-beneficiari",
     "reset-demo-magazzino",
     "reset-magazzino",
     "reset-ambiente",
@@ -142,11 +172,23 @@ export async function runEnvironmentDataCli(args: string[]): Promise<unknown> {
     return { baseDataInitialized: true };
   }
 
+  const commandsWithoutConfirmation: Command[] = [
+    "seed-demo",
+    "seed-demo-magazzino",
+    "preview-reset-demo",
+  ];
+  const demoResetCommands: Command[] = [
+    "reset-demo",
+    "reset-demo-emporio",
+    "reset-demo-uds",
+    "reset-demo-beneficiari",
+    "reset-demo-magazzino",
+  ];
   validateOptions(
     options,
-    command === "seed-demo-magazzino"
+    commandsWithoutConfirmation.includes(command)
       ? ["super-admin"]
-      : command === "reset-demo-magazzino"
+      : demoResetCommands.includes(command)
         ? ["super-admin", "confirm"]
         : ["super-admin", "confirm", "backup-confirmed"],
   );
@@ -157,8 +199,20 @@ export async function runEnvironmentDataCli(args: string[]): Promise<unknown> {
   requireConfirmation(command, options);
 
   switch (command) {
+    case "seed-demo":
+      return seedDemoEnvironmentData(actorUserId);
     case "seed-demo-magazzino":
       return seedDemoWarehouseData(actorUserId);
+    case "preview-reset-demo":
+      return previewDemoReset();
+    case "reset-demo":
+      return resetAllDemoData(actorUserId);
+    case "reset-demo-emporio":
+      return resetDemoEmporioData(actorUserId);
+    case "reset-demo-uds":
+      return resetDemoUdsData(actorUserId);
+    case "reset-demo-beneficiari":
+      return resetDemoBeneficiaryData(actorUserId);
     case "reset-demo-magazzino":
       return resetDemoWarehouseData(actorUserId);
     case "reset-magazzino":

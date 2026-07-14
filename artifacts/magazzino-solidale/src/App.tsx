@@ -103,7 +103,9 @@ function RequireModulo({
     return (
       <div className="flex min-h-[60vh] items-center justify-center p-6 text-center">
         <div className="max-w-md space-y-2">
-          <h1 className="text-2xl font-semibold">{t("superAdmin.moduleDisabled.title")}</h1>
+          <h1 className="text-2xl font-semibold">
+            {t("superAdmin.moduleDisabled.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {t("superAdmin.moduleDisabled.description")}
           </p>
@@ -189,7 +191,7 @@ function AppRoutes() {
 
         <Route path="/emporio/cassa">
           {() => (
-            <Guard area="sociale">
+            <Guard area="emporio">
               <RequireModulo codice="EMPORIO_SOLIDALE">
                 <EmporioCassa />
               </RequireModulo>
@@ -198,7 +200,7 @@ function AppRoutes() {
         </Route>
         <Route path="/emporio/crediti-saldo">
           {() => (
-            <Guard area="sociale">
+            <Guard area="emporio">
               <RequireModulo codice="CREDITO_SOLIDALE">
                 <EmporioCreditiSaldo />
               </RequireModulo>
@@ -207,7 +209,7 @@ function AppRoutes() {
         </Route>
         <Route path="/emporio/accessi">
           {() => (
-            <Guard area="sociale">
+            <Guard area="emporio">
               <RequireModulo codice="EMPORIO_SOLIDALE">
                 <EmporioAccessi />
               </RequireModulo>
@@ -216,7 +218,7 @@ function AppRoutes() {
         </Route>
         <Route path="/emporio/spese">
           {() => (
-            <Guard area="sociale">
+            <Guard area="emporio">
               <RequireModulo codice="EMPORIO_SOLIDALE">
                 <EmporioSpese />
               </RequireModulo>

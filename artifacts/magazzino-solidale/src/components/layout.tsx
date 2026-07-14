@@ -1,12 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { 
-  LayoutDashboard, 
-  Warehouse, 
-  Package, 
+import {
+  LayoutDashboard,
+  Warehouse,
+  Package,
   PackageMinus,
-  Boxes, 
+  Boxes,
   PackageCheck,
-  ArrowRightLeft, 
+  ArrowRightLeft,
   TrendingUpDown,
   Users,
   ClipboardList,
@@ -38,19 +38,19 @@ import {
   LogOut,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { 
-  Sidebar, 
-  SidebarContent, 
+import {
+  Sidebar,
+  SidebarContent,
   SidebarFooter,
-  SidebarGroup, 
-  SidebarGroupContent, 
-  SidebarGroupLabel, 
-  SidebarMenu, 
-  SidebarMenuButton, 
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
-  useSidebar
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   Collapsible,
@@ -81,54 +81,317 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { key: "dashboard", url: "/", icon: LayoutDashboard, groupKey: "generale", area: "generale" },
-  { key: "magazzini", url: "/magazzini", icon: Warehouse, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "prodotti", url: "/prodotti", icon: Package, groupKey: "magazzino", area: "magazzino" },
-  { key: "lotti", url: "/lotti", icon: Boxes, groupKey: "magazzino", area: "magazzino", moduloCodice: "LOTTI" },
-  { key: "movimenti", url: "/movimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino" },
-  { key: "giacenze", url: "/giacenze", icon: TrendingUpDown, groupKey: "magazzino", area: "magazzino" },
-  { key: "trasferimenti", url: "/trasferimenti", icon: ArrowRightLeft, groupKey: "magazzino", area: "magazzino", moduloCodice: "TRASFERIMENTI" },
-  { key: "preparazioneConsegne", url: "/preparazione-consegne", icon: PackageCheck, groupKey: "magazzino", area: "magazzino" },
-  
-  { key: "centriAscolto", url: "/centri-ascolto", icon: Building2, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "beneficiari", url: "/beneficiari", icon: Users, groupKey: "sociale", area: "sociale" },
-  { key: "interventi", url: "/interventi", icon: ClipboardList, groupKey: "sociale", area: "sociale" },
-  { key: "consegne", url: "/consegne", icon: Truck, groupKey: "sociale", area: "sociale", moduloCodice: "CONSEGNE" },
-  { key: "bolle", url: "/bolle", icon: FileText, groupKey: "magazzino", area: "sociale", moduloCodice: "BOLLE" },
-  { key: "turni", url: "/turni", icon: CalendarDays, groupKey: "sociale", area: "sociale" },
-  { key: "scarichi", url: "/scarichi", icon: PackageMinus, groupKey: "sociale", area: "sociale" },
+  {
+    key: "dashboard",
+    url: "/",
+    icon: LayoutDashboard,
+    groupKey: "generale",
+    area: "generale",
+  },
+  {
+    key: "magazzini",
+    url: "/magazzini",
+    icon: Warehouse,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+  {
+    key: "prodotti",
+    url: "/prodotti",
+    icon: Package,
+    groupKey: "magazzino",
+    area: "magazzino",
+  },
+  {
+    key: "lotti",
+    url: "/lotti",
+    icon: Boxes,
+    groupKey: "magazzino",
+    area: "magazzino",
+    moduloCodice: "LOTTI",
+  },
+  {
+    key: "movimenti",
+    url: "/movimenti",
+    icon: ArrowRightLeft,
+    groupKey: "magazzino",
+    area: "magazzino",
+  },
+  {
+    key: "giacenze",
+    url: "/giacenze",
+    icon: TrendingUpDown,
+    groupKey: "magazzino",
+    area: "magazzino",
+  },
+  {
+    key: "trasferimenti",
+    url: "/trasferimenti",
+    icon: ArrowRightLeft,
+    groupKey: "magazzino",
+    area: "magazzino",
+    moduloCodice: "TRASFERIMENTI",
+  },
+  {
+    key: "preparazioneConsegne",
+    url: "/preparazione-consegne",
+    icon: PackageCheck,
+    groupKey: "magazzino",
+    area: "magazzino",
+  },
 
-  { key: "emporioCassa", url: "/emporio/cassa", icon: Store, groupKey: "emporio", area: "sociale", moduloCodice: "EMPORIO_SOLIDALE" },
-  { key: "emporioCreditiSaldo", url: "/emporio/crediti-saldo", icon: CreditCard, groupKey: "emporio", area: "sociale", moduloCodice: "CREDITO_SOLIDALE" },
-  { key: "politicheCreditoSolidale", url: "/politiche-credito-solidale", icon: SlidersHorizontal, groupKey: "emporio", area: "amministrazione", moduloCodice: "CREDITO_SOLIDALE" },
-  { key: "emporioAccessi", url: "/emporio/accessi", icon: CalendarClock, groupKey: "emporio", area: "sociale", moduloCodice: "EMPORIO_SOLIDALE" },
-  { key: "emporioSpese", url: "/emporio/spese", icon: ReceiptText, groupKey: "emporio", area: "sociale", moduloCodice: "EMPORIO_SOLIDALE" },
+  {
+    key: "centriAscolto",
+    url: "/centri-ascolto",
+    icon: Building2,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+  {
+    key: "beneficiari",
+    url: "/beneficiari",
+    icon: Users,
+    groupKey: "sociale",
+    area: "sociale",
+  },
+  {
+    key: "interventi",
+    url: "/interventi",
+    icon: ClipboardList,
+    groupKey: "sociale",
+    area: "sociale",
+  },
+  {
+    key: "consegne",
+    url: "/consegne",
+    icon: Truck,
+    groupKey: "sociale",
+    area: "sociale",
+    moduloCodice: "CONSEGNE",
+  },
+  {
+    key: "bolle",
+    url: "/bolle",
+    icon: FileText,
+    groupKey: "magazzino",
+    area: "sociale",
+    moduloCodice: "BOLLE",
+  },
+  {
+    key: "turni",
+    url: "/turni",
+    icon: CalendarDays,
+    groupKey: "sociale",
+    area: "sociale",
+  },
+  {
+    key: "scarichi",
+    url: "/scarichi",
+    icon: PackageMinus,
+    groupKey: "sociale",
+    area: "sociale",
+  },
 
-  { key: "udsAnagrafica", url: "/uds/anagrafica", icon: Footprints, groupKey: "uds", area: "uds", moduloCodice: "UDS" },
-  { key: "udsInterventi", url: "/uds/interventi", icon: HeartHandshake, groupKey: "uds", area: "uds", moduloCodice: "UDS" },
-  { key: "udsReportGiornaliero", url: "/uds/report-giornaliero", icon: CalendarClock, groupKey: "uds", area: "uds", moduloCodice: "UDS" },
+  {
+    key: "emporioCassa",
+    url: "/emporio/cassa",
+    icon: Store,
+    groupKey: "emporio",
+    area: "emporio",
+    moduloCodice: "EMPORIO_SOLIDALE",
+  },
+  {
+    key: "emporioCreditiSaldo",
+    url: "/emporio/crediti-saldo",
+    icon: CreditCard,
+    groupKey: "emporio",
+    area: "emporio",
+    moduloCodice: "CREDITO_SOLIDALE",
+  },
+  {
+    key: "politicheCreditoSolidale",
+    url: "/politiche-credito-solidale",
+    icon: SlidersHorizontal,
+    groupKey: "emporio",
+    area: "amministrazione",
+    moduloCodice: "CREDITO_SOLIDALE",
+  },
+  {
+    key: "emporioAccessi",
+    url: "/emporio/accessi",
+    icon: CalendarClock,
+    groupKey: "emporio",
+    area: "emporio",
+    moduloCodice: "EMPORIO_SOLIDALE",
+  },
+  {
+    key: "emporioSpese",
+    url: "/emporio/spese",
+    icon: ReceiptText,
+    groupKey: "emporio",
+    area: "emporio",
+    moduloCodice: "EMPORIO_SOLIDALE",
+  },
 
-  { key: "volontari", url: "/volontari", icon: UsersRound, groupKey: "logistica", area: "logistica", moduloCodice: "VOLONTARI" },
-  { key: "mezzi", url: "/mezzi", icon: Car, groupKey: "logistica", area: "logistica", moduloCodice: "MEZZI" },
-  { key: "approvazioniLogistica", url: "/approvazioni-logistica", icon: ClipboardCheck, groupKey: "logistica", area: "logistica" },
-  { key: "fornitori", url: "/fornitori", icon: Store, groupKey: "logistica", area: "logistica" },
-  { key: "approvvigionamenti", url: "/approvvigionamenti", icon: ShoppingCart, groupKey: "logistica", area: "logistica", moduloCodice: "APPROVVIGIONAMENTI" },
-  
-  { key: "report", url: "/report", icon: BarChart3, groupKey: "analisi", area: "analisi" },
-  { key: "reportUds", url: "/report-uds", icon: Footprints, groupKey: "analisi", area: "analisi", moduloCodice: "UDS" },
+  {
+    key: "udsAnagrafica",
+    url: "/uds/anagrafica",
+    icon: Footprints,
+    groupKey: "uds",
+    area: "uds",
+    moduloCodice: "UDS",
+  },
+  {
+    key: "udsInterventi",
+    url: "/uds/interventi",
+    icon: HeartHandshake,
+    groupKey: "uds",
+    area: "uds",
+    moduloCodice: "UDS",
+  },
+  {
+    key: "udsReportGiornaliero",
+    url: "/uds/report-giornaliero",
+    icon: CalendarClock,
+    groupKey: "uds",
+    area: "uds",
+    moduloCodice: "UDS",
+  },
 
-  { key: "citta", url: "/citta", icon: MapPin, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "zoneUds", url: "/zone-uds", icon: Map, groupKey: "amministrazione", area: "amministrazione", moduloCodice: "UDS" },
-  { key: "utenti", url: "/utenti", icon: UserCog, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "ruoli", url: "/ruoli", icon: ShieldCheck, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "ruoliVolontari", url: "/ruoli-volontari", icon: Contact, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "tipiIntervento", url: "/tipi-intervento", icon: ListChecks, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "tipologieFornitore", url: "/tipologie-fornitore", icon: Truck, groupKey: "amministrazione", area: "amministrazione" },
-  { key: "impostazioniStampa", url: "/impostazioni-stampa", icon: Printer, groupKey: "amministrazione", area: "amministrazione" },
+  {
+    key: "volontari",
+    url: "/volontari",
+    icon: UsersRound,
+    groupKey: "logistica",
+    area: "logistica",
+    moduloCodice: "VOLONTARI",
+  },
+  {
+    key: "mezzi",
+    url: "/mezzi",
+    icon: Car,
+    groupKey: "logistica",
+    area: "logistica",
+    moduloCodice: "MEZZI",
+  },
+  {
+    key: "approvazioniLogistica",
+    url: "/approvazioni-logistica",
+    icon: ClipboardCheck,
+    groupKey: "logistica",
+    area: "logistica",
+  },
+  {
+    key: "fornitori",
+    url: "/fornitori",
+    icon: Store,
+    groupKey: "logistica",
+    area: "logistica",
+  },
+  {
+    key: "approvvigionamenti",
+    url: "/approvvigionamenti",
+    icon: ShoppingCart,
+    groupKey: "logistica",
+    area: "logistica",
+    moduloCodice: "APPROVVIGIONAMENTI",
+  },
 
-  { key: "superAdminConfigurazioneAmbiente", url: "/super-admin/configurazione-ambiente", icon: Building2, groupKey: "superAdmin", superAdmin: true },
-  { key: "superAdminModuli", url: "/super-admin/moduli", icon: SlidersHorizontal, groupKey: "superAdmin", superAdmin: true },
-  { key: "superAdminAudit", url: "/super-admin/audit-configurazioni", icon: FileText, groupKey: "superAdmin", superAdmin: true },
+  {
+    key: "report",
+    url: "/report",
+    icon: BarChart3,
+    groupKey: "analisi",
+    area: "analisi",
+  },
+  {
+    key: "reportUds",
+    url: "/report-uds",
+    icon: Footprints,
+    groupKey: "analisi",
+    area: "analisi",
+    moduloCodice: "UDS",
+  },
+
+  {
+    key: "citta",
+    url: "/citta",
+    icon: MapPin,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+  {
+    key: "zoneUds",
+    url: "/zone-uds",
+    icon: Map,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+    moduloCodice: "UDS",
+  },
+  {
+    key: "utenti",
+    url: "/utenti",
+    icon: UserCog,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+  {
+    key: "ruoli",
+    url: "/ruoli",
+    icon: ShieldCheck,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+  {
+    key: "ruoliVolontari",
+    url: "/ruoli-volontari",
+    icon: Contact,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+  {
+    key: "tipiIntervento",
+    url: "/tipi-intervento",
+    icon: ListChecks,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+  {
+    key: "tipologieFornitore",
+    url: "/tipologie-fornitore",
+    icon: Truck,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+  {
+    key: "impostazioniStampa",
+    url: "/impostazioni-stampa",
+    icon: Printer,
+    groupKey: "amministrazione",
+    area: "amministrazione",
+  },
+
+  {
+    key: "superAdminConfigurazioneAmbiente",
+    url: "/super-admin/configurazione-ambiente",
+    icon: Building2,
+    groupKey: "superAdmin",
+    superAdmin: true,
+  },
+  {
+    key: "superAdminModuli",
+    url: "/super-admin/moduli",
+    icon: SlidersHorizontal,
+    groupKey: "superAdmin",
+    superAdmin: true,
+  },
+  {
+    key: "superAdminAudit",
+    url: "/super-admin/audit-configurazioni",
+    icon: FileText,
+    groupKey: "superAdmin",
+    superAdmin: true,
+  },
 ];
 
 function LanguageSelector() {
@@ -178,26 +441,39 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
 
-  const visibleItems = NAV_ITEMS
-    .filter((item) => item.superAdmin ? user?.isSuperAdmin === true : !!item.area && hasArea(item.area))
-    .filter((item) => isModuloAttivo(item.moduloCodice));
+  const visibleItems = NAV_ITEMS.filter((item) =>
+    item.superAdmin
+      ? user?.isSuperAdmin === true
+      : !!item.area && hasArea(item.area),
+  ).filter((item) => isModuloAttivo(item.moduloCodice));
 
-  const groupedNav = visibleItems.reduce((acc, item) => {
-    if (!acc[item.groupKey]) acc[item.groupKey] = [];
-    acc[item.groupKey].push(item);
-    return acc;
-  }, {} as Record<string, NavItem[]>);
+  const groupedNav = visibleItems.reduce(
+    (acc, item) => {
+      if (!acc[item.groupKey]) acc[item.groupKey] = [];
+      acc[item.groupKey].push(item);
+      return acc;
+    },
+    {} as Record<string, NavItem[]>,
+  );
 
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full bg-background overflow-hidden">
         <Sidebar className="border-r border-border">
           <div className="px-4 py-3 flex items-center border-b border-border">
-            <img src="/logo-aim.png" alt="Angeli in Moto" className="h-8 w-auto object-contain" />
+            <img
+              src="/logo-aim.png"
+              alt="Angeli in Moto"
+              className="h-8 w-auto object-contain"
+            />
           </div>
           <SidebarContent>
             {Object.entries(groupedNav).map(([group, items]) => (
-              <Collapsible key={group} defaultOpen className="group/collapsible">
+              <Collapsible
+                key={group}
+                defaultOpen
+                className="group/collapsible"
+              >
                 <SidebarGroup>
                   <SidebarGroupLabel asChild>
                     <CollapsibleTrigger className="flex w-full items-center justify-between text-xs uppercase tracking-wider text-muted-foreground font-medium px-4 py-2 hover:text-foreground transition-colors">
@@ -212,7 +488,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuItem key={item.url}>
                             <NavMenuLink
                               item={item}
-                              isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}
+                              isActive={
+                                location === item.url ||
+                                (item.url !== "/" &&
+                                  location.startsWith(item.url))
+                              }
                             />
                           </SidebarMenuItem>
                         ))}
@@ -229,7 +509,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center justify-between gap-2 px-2 py-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{[user?.nome, user?.cognome].filter(Boolean).join(" ")}</p>
+                <p className="truncate text-sm font-medium">
+                  {[user?.nome, user?.cognome].filter(Boolean).join(" ")}
+                </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {user?.ruoloNome ?? t("common.noRole")}
                 </p>
@@ -252,11 +534,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               className="h-9 w-9"
               aria-label={t("common.openMenu")}
             />
-            <img src="/logo-aim.png" alt="Angeli in Moto" className="h-7 w-auto object-contain" />
+            <img
+              src="/logo-aim.png"
+              alt="Angeli in Moto"
+              className="h-7 w-auto object-contain"
+            />
           </header>
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
+          <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
     </SidebarProvider>

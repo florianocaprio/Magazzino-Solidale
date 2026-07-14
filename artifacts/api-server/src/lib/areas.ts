@@ -1,7 +1,10 @@
+export const EMPORIO_AREA_KEY = "emporio";
+
 export const ALL_AREAS = [
   { key: "generale", label: "Generale" },
   { key: "magazzino", label: "Magazzino" },
   { key: "sociale", label: "Sociale" },
+  { key: EMPORIO_AREA_KEY, label: "Emporio" },
   { key: "uds", label: "Unità di Strada" },
   { key: "logistica", label: "Logistica" },
   { key: "analisi", label: "Analisi" },
@@ -19,7 +22,7 @@ export const ALL_AREA_KEYS: string[] = ALL_AREAS.map((a) => a.key);
 export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   dashboard: "generale",
 
-  magazzini: "magazzino",
+  magazzini: ["magazzino", EMPORIO_AREA_KEY],
   prodotti: "magazzino",
   lotti: "magazzino",
   movimenti: "magazzino",
@@ -29,8 +32,15 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
 
   // Read by several operational areas to populate filters/forms; mutations are
   // admin-gated in the route.
-  "centri-ascolto": ["sociale", "uds", "magazzino", "logistica", "analisi"],
-  beneficiari: ["sociale", "uds"],
+  "centri-ascolto": [
+    "sociale",
+    "uds",
+    "magazzino",
+    "logistica",
+    "analisi",
+    EMPORIO_AREA_KEY,
+  ],
+  beneficiari: ["sociale", "uds", EMPORIO_AREA_KEY],
   interventi: ["sociale", "uds"],
   consegne: "sociale",
   bolle: "sociale",
@@ -62,10 +72,12 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   "impostazioni-email": "amministrazione",
   "impostazioni-moduli": ALL_AREA_KEYS,
   "politiche-credito-solidale": "amministrazione",
-  "credito-solidale": ["sociale", "uds"],
-  "accessi-emporio": ["sociale", "uds"],
-  "cassa-emporio": ["sociale", "uds"],
-  "spese-emporio": ["sociale", "uds"],
+  "credito-solidale": ["sociale", "uds", EMPORIO_AREA_KEY],
+  // Keep the legacy Sociale/UDS grants valid while exposing Emporio as its own
+  // assignable macro-area for new and updated roles.
+  "accessi-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
+  "cassa-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
+  "spese-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",
