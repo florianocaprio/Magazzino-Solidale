@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, ruoliTable, utentiTable } from "@workspace/db";
 
 /**
@@ -18,7 +18,9 @@ export async function isBootstrapMode(): Promise<boolean> {
     .select({ id: utentiTable.id })
     .from(utentiTable)
     .innerJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
-    .where(eq(ruoliTable.isAdmin, true))
+    .where(
+      and(eq(ruoliTable.isAdmin, true), eq(utentiTable.attivo, true)),
+    )
     .limit(1);
   return !row;
 }

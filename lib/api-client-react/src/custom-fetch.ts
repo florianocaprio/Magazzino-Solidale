@@ -359,8 +359,12 @@ export async function customFetch<T = unknown>(
   }
 
   const requestInfo = { method, url: resolveUrl(input) };
+  // Session authentication is cookie-based. Be explicit so cookies are also
+  // preserved when a web deployment configures a permitted API base URL on a
+  // different origin; callers can still override this per request.
+  const credentials = init.credentials ?? "include";
 
-  const response = await fetch(input, { ...init, method, headers });
+  const response = await fetch(input, { ...init, method, headers, credentials });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

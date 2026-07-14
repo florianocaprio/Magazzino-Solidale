@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db, politicheCreditoSolidaleTable } from "@workspace/db";
 import { logger } from "./logger";
 
-const DEFAULT_POLICY_NAME = "Politica globale Credito Solidale";
+export const DEFAULT_POLICY_NAME = "Politica globale Credito Solidale";
 
 export async function seedPoliticheCreditoSolidale(): Promise<void> {
   const [existing] = await db

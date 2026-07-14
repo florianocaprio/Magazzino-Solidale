@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
@@ -22,6 +22,7 @@ import {
   sessioniCassaEmporioTable,
   speseEmporioRigheTable,
   speseEmporioTable,
+  utentiTable,
 } from "@workspace/db";
 import cassaEmporioRouter from "../src/routes/cassa-emporio";
 import bolleRouter from "../src/routes/bolle";
@@ -43,13 +44,14 @@ const rigaIds: number[] = [];
 const spesaIds: number[] = [];
 const bollaIds: number[] = [];
 const scaricoIds: number[] = [];
+let operatorUserId: number;
 
 function makeApp(): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     (req as unknown as { user: { id: number; centroAscoltoId: number | null; cittaId: number | null; isAdmin: boolean } }).user = {
-      id: 1,
+      id: operatorUserId,
       centroAscoltoId: null,
       cittaId: null,
       isAdmin: true,
@@ -243,6 +245,19 @@ async function trackSpesa(spesaId: number): Promise<void> {
   if (spesa?.scaricoId != null) scaricoIds.push(spesa.scaricoId);
 }
 
+beforeAll(async () => {
+  const [operator] = await db
+    .insert(utentiTable)
+    .values({
+      username: `cassa_test_${rnd()}`,
+      passwordHash: "test-only",
+      nome: "Operatore Cassa Test",
+      attivo: true,
+    })
+    .returning({ id: utentiTable.id });
+  operatorUserId = operator.id;
+});
+
 beforeEach(async () => {
   await setEmporioEnabled(true);
 });
@@ -279,6 +294,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await setEmporioEnabled(true);
+  await db.delete(utentiTable).where(eq(utentiTable.id, operatorUserId));
   await pool.end();
 });
 
@@ -798,7 +814,7 @@ describe("Cassa Emporio", () => {
     expect(spesa.emailBollaStato).toBe("invio_manuale_avviato");
     expect(spesa.emailBollaDestinatari).toContain(centroEmail);
     expect(spesa.emailBollaDataUltimoClick).toBeTruthy();
-    expect(spesa.emailBollaOperatoreId).toBe(1);
+    expect(spesa.emailBollaOperatoreId).toBe(operatorUserId);
     expect(spesa.emailBollaOggetto).toBe(res.body.oggetto);
   });
 

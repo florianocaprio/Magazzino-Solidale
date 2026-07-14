@@ -2,7 +2,6 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
-import bcrypt from "bcryptjs";
 import {
   auditConfigurazioniTable,
   db,
@@ -188,7 +187,26 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     expect(res.body.isAdmin).toBe(true);
   });
 
-  it("seeda l'utente tecnico sadmin come SuperAdmin globale", async () => {
+  it("non sovrascrive le credenziali di un eventuale SuperAdmin tecnico", async () => {
+    const [before] = await db
+      .select({
+        id: utentiTable.id,
+        username: utentiTable.username,
+        passwordHash: utentiTable.passwordHash,
+        isSuperAdmin: utentiTable.isSuperAdmin,
+        centroAscoltoId: utentiTable.centroAscoltoId,
+        cittaId: utentiTable.cittaId,
+        zonaUdsId: utentiTable.zonaUdsId,
+        ruoloNome: ruoliTable.nome,
+        attivo: utentiTable.attivo,
+        mustChangePassword: utentiTable.mustChangePassword,
+      })
+      .from(utentiTable)
+      .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
+      .where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
+
+    await ensureFase5Bootstrap();
+
     const [seeded] = await db
       .select({
         id: utentiTable.id,
@@ -199,10 +217,17 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
         cittaId: utentiTable.cittaId,
         zonaUdsId: utentiTable.zonaUdsId,
         ruoloNome: ruoliTable.nome,
+        attivo: utentiTable.attivo,
+        mustChangePassword: utentiTable.mustChangePassword,
       })
       .from(utentiTable)
       .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
       .where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
+
+    if (!before) {
+      expect(seeded).toBeUndefined();
+      return;
+    }
 
     expect(seeded).toBeTruthy();
     expect(seeded.ruoloNome).toBe("SuperAdmin");
@@ -210,7 +235,9 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     expect(seeded.centroAscoltoId).toBeNull();
     expect(seeded.cittaId).toBeNull();
     expect(seeded.zonaUdsId).toBeNull();
-    expect(await bcrypt.compare("Apollo13!", seeded.passwordHash)).toBe(true);
+    expect(seeded.passwordHash).toBe(before.passwordHash);
+    expect(seeded.attivo).toBe(before.attivo);
+    expect(seeded.mustChangePassword).toBe(before.mustChangePassword);
 
     const sessionUser = await loadSessionUser(seeded.id);
     expect(sessionUser?.isSuperAdmin).toBe(true);
@@ -231,18 +258,13 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
   });
 
   it("impedisce a un admin normale di modificare o resettare un SuperAdmin", async () => {
-    const [seeded] = await db
-      .select({ id: utentiTable.id })
-      .from(utentiTable)
-      .where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
-
     const patch = await request(appAs(adminUser))
-      .patch(`/utenti/${seeded.id}`)
+      .patch(`/utenti/${superUser.id}`)
       .send({ nome: "Non autorizzato" });
     expect(patch.status).toBe(403);
 
     const reset = await request(appAs(adminUser))
-      .post(`/utenti/${seeded.id}/reset-password`)
+      .post(`/utenti/${superUser.id}/reset-password`)
       .send({ newPassword: "NuovaPassword1" });
     expect(reset.status).toBe(403);
   });

@@ -1,13 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedRoles } from "./lib/seedRoles";
-import { seedRuoliVolontari } from "./lib/seedRuoliVolontari";
-import { seedTipiIntervento } from "./lib/seedTipiIntervento";
-import { seedTipologieFornitore } from "./lib/seedTipologieFornitore";
-import { seedPoliticheCreditoSolidale } from "./lib/seedPoliticheCreditoSolidale";
 import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
-import { initDbExtensions } from "./lib/dbInit";
-import { ensureFase5Bootstrap } from "./lib/configurazioneAmbiente";
+import { initializeBaseData } from "./lib/baseData";
 
 const rawPort = process.env["PORT"];
 
@@ -23,39 +17,25 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
+async function start(): Promise<void> {
+  // A fresh deployment must not accept requests before roles, configuration,
+  // modules and print defaults exist. This removes the first-start race where
+  // the UI could observe a partially initialized database.
+  await initializeBaseData();
 
-  logger.info({ port }, "Server listening");
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
 
-  initDbExtensions().catch((err) => {
-    logger.error({ err }, "Failed to initialize DB extensions");
+    logger.info({ port }, "Server listening");
+
+    schedulePriorityDowngrade();
   });
+}
 
-  seedRoles()
-    .then(() => ensureFase5Bootstrap())
-    .catch((err) => {
-      logger.error({ err }, "Failed to seed default roles or Fase 5 config");
-    });
-
-  seedRuoliVolontari().catch((err) => {
-    logger.error({ err }, "Failed to seed volunteer roles");
-  });
-
-  seedTipiIntervento().catch((err) => {
-    logger.error({ err }, "Failed to seed intervention types");
-  });
-
-  seedTipologieFornitore().catch((err) => {
-    logger.error({ err }, "Failed to seed supplier types");
-  });
-
-  seedPoliticheCreditoSolidale().catch((err) => {
-    logger.error({ err }, "Failed to seed Credito Solidale policy");
-  });
-
-  schedulePriorityDowngrade();
+start().catch((error) => {
+  logger.fatal({ err: error }, "Failed to initialize base data");
+  process.exit(1);
 });

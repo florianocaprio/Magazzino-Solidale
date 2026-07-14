@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useTranslation } from "react-i18next";
+import { errorMessage } from "@/lib/api-error";
 
 function makeSchema(t: (k: string) => string) {
   return z.object({
@@ -32,15 +33,6 @@ function makeSchema(t: (k: string) => string) {
 
 type FormValues = z.infer<ReturnType<typeof makeSchema>>;
 
-function extractError(err: unknown, fallback: string): string {
-  const data = (err as { data?: unknown })?.data;
-  if (data && typeof data === "object" && "error" in data) {
-    const msg = (data as { error?: unknown }).error;
-    if (typeof msg === "string") return msg;
-  }
-  return fallback;
-}
-
 export default function Citta() {
   const { t } = useTranslation();
   const schema = makeSchema(t);
@@ -51,6 +43,7 @@ export default function Citta() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const createCitta = useCreateCitta();
   const updateCitta = useUpdateCitta();
@@ -65,17 +58,20 @@ export default function Citta() {
 
   const handleCreate = () => {
     setEditingId(null);
+    setFormError(null);
     form.reset({ nome: "", provincia: "", sigla: "", attivo: true, note: "" });
     setIsFormOpen(true);
   };
 
   const handleEdit = (c: any) => {
     setEditingId(c.id);
+    setFormError(null);
     form.reset({ nome: c.nome, provincia: c.provincia || "", sigla: c.sigla || "", attivo: c.attivo, note: c.note || "" });
     setIsFormOpen(true);
   };
 
   const onSubmit = (data: FormValues) => {
+    setFormError(null);
     if (editingId) {
       updateCitta.mutate({ id: editingId, data }, {
         onSuccess: () => {
@@ -83,6 +79,7 @@ export default function Citta() {
           toast({ title: t("citta.toastUpdated") });
           setIsFormOpen(false);
         },
+        onError: (err) => setFormError(errorMessage(err, t("citta.saveError"))),
       });
     } else {
       createCitta.mutate({ data }, {
@@ -91,6 +88,7 @@ export default function Citta() {
           toast({ title: t("citta.toastCreated") });
           setIsFormOpen(false);
         },
+        onError: (err) => setFormError(errorMessage(err, t("citta.saveError"))),
       });
     }
   };
@@ -104,7 +102,7 @@ export default function Citta() {
         setDeletingId(null);
       },
       onError: (err) => {
-        toast({ title: t("citta.deleteTitle"), description: extractError(err, t("citta.deleteDescription")), variant: "destructive" });
+        toast({ title: t("citta.deleteTitle"), description: errorMessage(err, t("citta.deleteDescription")), variant: "destructive" });
         setDeletingId(null);
       },
     });
@@ -229,6 +227,8 @@ export default function Citta() {
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
                 )} />
+
+                {formError && <p className="text-sm text-destructive">{formError}</p>}
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
