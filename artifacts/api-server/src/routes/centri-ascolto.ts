@@ -1,7 +1,15 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { centriAscoltoTable, beneficiariTable } from "@workspace/db";
+import {
+  centriAscoltoTable,
+  beneficiariTable,
+  cittaTable,
+} from "@workspace/db";
 import { eq, count } from "drizzle-orm";
+import {
+  CreateCentroAscoltoBody,
+  UpdateCentroAscoltoBody,
+} from "@workspace/api-zod";
 import {
   callerCittaId,
   cittaScopeFilter,
@@ -33,6 +41,14 @@ function fmt(r: typeof centriAscoltoTable.$inferSelect, beneficiariCount = 0) {
   };
 }
 
+async function cittaExists(cittaId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ id: cittaTable.id })
+    .from(cittaTable)
+    .where(eq(cittaTable.id, cittaId));
+  return Boolean(row);
+}
+
 router.get("/centri-ascolto", async (req, res) => {
   const rows = await db
     .select()
@@ -48,9 +64,18 @@ router.get("/centri-ascolto", async (req, res) => {
 });
 
 router.post("/centri-ascolto", requireAdmin, async (req, res) => {
+  const parsed = CreateCentroAscoltoBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Inserimento centro di ascolto non valido" });
+    return;
+  }
   const cid = callerCittaId(req);
-  const values = { ...req.body };
+  const values = { ...parsed.data };
   if (cid != null) values.cittaId = cid;
+  if (values.cittaId != null && !(await cittaExists(values.cittaId))) {
+    res.status(400).json({ error: "L'area selezionata non esiste" });
+    return;
+  }
   const [row] = await db.insert(centriAscoltoTable).values(values).returning();
   res.status(201).json(fmt(row));
 });
@@ -76,8 +101,17 @@ router.patch("/centri-ascolto/:id", requireAdmin, async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
-  const updates = { ...req.body };
+  const parsed = UpdateCentroAscoltoBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Modifica centro di ascolto non valida" });
+    return;
+  }
+  const updates = { ...parsed.data };
   if (cid != null) delete updates.cittaId;
+  if (updates.cittaId != null && !(await cittaExists(updates.cittaId))) {
+    res.status(400).json({ error: "L'area selezionata non esiste" });
+    return;
+  }
   const [row] = await db.update(centriAscoltoTable).set(updates).where(eq(centriAscoltoTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json(fmt(row));

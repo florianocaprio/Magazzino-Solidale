@@ -26,6 +26,7 @@ export const centriAscolto = {
     toastCreated: "Centro creato",
     toastUpdated: "Centro aggiornato",
     toastDeleted: "Centro eliminato",
+    saveError: "Impossibile salvare il centro di ascolto. Verifica area e dati inseriti.",
   },
   es: {
     title: "Centros de Escucha",
@@ -54,6 +55,7 @@ export const centriAscolto = {
     toastCreated: "Centro creado",
     toastUpdated: "Centro actualizado",
     toastDeleted: "Centro eliminado",
+    saveError: "No se puede guardar el centro. Comprueba el área y los datos introducidos.",
   },
   en: {
     title: "Listening Centres",
@@ -82,6 +84,7 @@ export const centriAscolto = {
     toastCreated: "Centre created",
     toastUpdated: "Centre updated",
     toastDeleted: "Centre deleted",
+    saveError: "Unable to save the centre. Check the selected area and entered data.",
   },
   fr: {
     title: "Centres d'écoute",
@@ -110,6 +113,7 @@ export const centriAscolto = {
     toastCreated: "Centre créé",
     toastUpdated: "Centre mis à jour",
     toastDeleted: "Centre supprimé",
+    saveError: "Impossible d'enregistrer le centre. Vérifiez le secteur et les données saisies.",
   },
   de: {
     title: "Anlaufstellen",
@@ -138,6 +142,7 @@ export const centriAscolto = {
     toastCreated: "Anlaufstelle erstellt",
     toastUpdated: "Anlaufstelle aktualisiert",
     toastDeleted: "Anlaufstelle gelöscht",
+    saveError: "Die Anlaufstelle konnte nicht gespeichert werden. Prüfen Sie Gebiet und Eingaben.",
   },
   ar: {
     title: "مراكز الاستماع",
@@ -166,5 +171,6 @@ export const centriAscolto = {
     toastCreated: "تم إنشاء المركز",
     toastUpdated: "تم تحديث المركز",
     toastDeleted: "تم حذف المركز",
+    saveError: "تعذر حفظ المركز. تحقق من الإقليم والبيانات المدخلة.",
   },
 } as const;

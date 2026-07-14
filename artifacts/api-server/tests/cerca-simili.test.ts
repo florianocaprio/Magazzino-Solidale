@@ -4,6 +4,7 @@ import express, { type Express } from "express";
 import { db, pool, beneficiariTable, cittaTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
+import { initDbExtensions } from "../src/lib/dbInit";
 
 /**
  * Fuzzy anti-duplicate search (GET /beneficiari/cerca-simili). pg_trgm-backed
@@ -64,6 +65,7 @@ let cittaA: number;
 let cittaB: number;
 
 beforeAll(async () => {
+  await initDbExtensions();
   cittaA = await createCitta();
   cittaB = await createCitta();
 });

@@ -55,7 +55,7 @@ import { volontarioLabel } from "@/lib/volontari-label";
 import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowLeft, ArrowRightLeft, ScanLine, CalendarClock } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { generateBollaPdf, BOLLA_TEMPLATES, type BollaTemplate } from "@/lib/bolla-pdf";
+import { generateBollaPdf, type BollaTemplate } from "@/lib/bolla-pdf";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { generateScaricoPdf, causaleLabel } from "@/lib/scarico-pdf";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
@@ -703,8 +703,6 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
   const [assegnaOpen, setAssegnaOpen] = useState(false);
-  const [printOpen, setPrintOpen] = useState(false);
-  const [printTemplate, setPrintTemplate] = useState<BollaTemplate>("standard");
   const [printing, setPrinting] = useState(false);
   const { data: bolla, isLoading } = useGetBolla(bollaId);
   const { data: beneficiari } = useListBeneficiari();
@@ -712,7 +710,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const volontariDettaglioParams = bollaCentroId != null ? { centroAscoltoId: bollaCentroId } : undefined;
   const { data: volontari } = useListVolontari(volontariDettaglioParams, { query: { queryKey: getListVolontariQueryKey(volontariDettaglioParams), enabled: bolla != null && beneficiari != null } });
   const { data: centri } = useListCentriAscolto();
-  const { data: impostazioni } = useGetImpostazioniStampa();
+  const { data: impostazioni, isLoading: impostazioniLoading } = useGetImpostazioniStampa();
   const deleteRiga = useDeleteBollaRiga();
   const confermaBolla = useConfermaBolla();
   const consegnaBolla = useConsegnaBolla();
@@ -842,11 +840,6 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
         ? "__centro__"
         : "";
 
-  const openPrint = () => {
-    setPrintTemplate((impostazioni?.templateBolla as BollaTemplate) ?? "standard");
-    setPrintOpen(true);
-  };
-
   const handleDownloadPdf = async () => {
     if (!bolla) return;
     setPrinting(true);
@@ -862,11 +855,10 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
           ? { nome: centro.nome, indirizzo: centro.indirizzo, comune: centro.comune, logoUrl: centro.logoUrl }
           : null,
         footer: impostazioni?.footerBolla ?? null,
-        template: printTemplate,
+        template: (impostazioni?.templateBolla as BollaTemplate) ?? "standard",
         associationLogoDataUrl: logoDataUrl,
         branding,
       });
-      setPrintOpen(false);
     } catch {
       toast({ title: t("bolle.error"), description: t("bolle.pdfError"), variant: "destructive" });
     } finally {
@@ -905,7 +897,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
             {format(new Date(bolla.dataBolla), "dd MMMM yyyy", { locale: it })}
           </p>
         </div>
-        <Button size="sm" variant="outline" className="gap-1.5 h-8 shrink-0" onClick={openPrint}>
+        <Button size="sm" variant="outline" className="gap-1.5 h-8 shrink-0" onClick={handleDownloadPdf} disabled={printing || impostazioniLoading}>
           <Download className="h-3.5 w-3.5" /> {t("bolle.scaricaPdf")}
         </Button>
       </div>
@@ -1217,40 +1209,6 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
         </DialogContent>
       </Dialog>
 
-      <Dialog open={printOpen} onOpenChange={setPrintOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("bolle.printTitle")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Label className="text-sm">{t("bolle.modello")}</Label>
-            <div className="grid gap-2">
-              {BOLLA_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.value}
-                  type="button"
-                  onClick={() => setPrintTemplate(tpl.value)}
-                  className={`text-left rounded-lg border p-3 transition-colors ${
-                    printTemplate === tpl.value ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "hover:border-muted-foreground/40"
-                  }`}
-                >
-                  <p className="font-medium text-sm">{tpl.label}</p>
-                  <p className="text-xs text-muted-foreground">{tpl.description}</p>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t("bolle.modelloHint1")}<span className="font-medium">{t("bolle.modelloHintBold")}</span>{t("bolle.modelloHint2")}
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPrintOpen(false)}>{t("common.cancel")}</Button>
-            <Button onClick={handleDownloadPdf} disabled={printing} className="gap-1.5">
-              <Download className="h-4 w-4" /> {printing ? t("bolle.generazione") : t("bolle.scaricaPdf")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

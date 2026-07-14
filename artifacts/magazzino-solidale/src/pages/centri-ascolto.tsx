@@ -21,6 +21,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useTranslation } from "react-i18next";
+import { errorMessage } from "@/lib/api-error";
 
 const NO_CITTA = "__none__";
 
@@ -59,6 +60,7 @@ export default function CentriAscolto() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const createCentro = useCreateCentroAscolto();
   const updateCentro = useUpdateCentroAscolto();
@@ -73,12 +75,14 @@ export default function CentriAscolto() {
 
   const handleCreate = () => {
     setEditingId(null);
+    setFormError(null);
     form.reset({ nome: "", cittaId: NO_CITTA, logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: "" });
     setIsFormOpen(true);
   };
 
   const handleEdit = (c: any) => {
     setEditingId(c.id);
+    setFormError(null);
     form.reset({
       nome: c.nome,
       cittaId: c.cittaId != null ? String(c.cittaId) : NO_CITTA,
@@ -95,6 +99,7 @@ export default function CentriAscolto() {
   };
 
   const onSubmit = (formData: z.infer<typeof formSchema>) => {
+    setFormError(null);
     const { cittaId: cittaIdRaw, ...rest } = formData;
     const data = {
       ...rest,
@@ -106,7 +111,8 @@ export default function CentriAscolto() {
           queryClient.invalidateQueries({ queryKey: getListCentriAscoltoQueryKey() });
           toast({ title: t("centriAscolto.toastUpdated") });
           setIsFormOpen(false);
-        }
+        },
+        onError: (err) => setFormError(errorMessage(err, t("centriAscolto.saveError"))),
       });
     } else {
       createCentro.mutate({ data }, {
@@ -114,7 +120,8 @@ export default function CentriAscolto() {
           queryClient.invalidateQueries({ queryKey: getListCentriAscoltoQueryKey() });
           toast({ title: t("centriAscolto.toastCreated") });
           setIsFormOpen(false);
-        }
+        },
+        onError: (err) => setFormError(errorMessage(err, t("centriAscolto.saveError"))),
       });
     }
   };
@@ -126,7 +133,14 @@ export default function CentriAscolto() {
         queryClient.invalidateQueries({ queryKey: getListCentriAscoltoQueryKey() });
         toast({ title: t("centriAscolto.toastDeleted") });
         setDeletingId(null);
-      }
+      },
+      onError: (err) => {
+        toast({
+          title: t("centriAscolto.deleteTitle"),
+          description: errorMessage(err, t("centriAscolto.deleteDescription")),
+          variant: "destructive",
+        });
+      },
     });
   };
 
@@ -338,6 +352,8 @@ export default function CentriAscolto() {
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
                 )} />
+
+                {formError && <p className="text-sm text-destructive">{formError}</p>}
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>

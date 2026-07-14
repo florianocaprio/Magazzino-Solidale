@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, interventiTable } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { db, pool, beneficiariTable, interventiTable, utentiTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
 
 /**
@@ -13,13 +13,14 @@ import interventiRouter from "../src/routes/interventi";
  */
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
+let operatorUserId: number;
 
 function makeApp(): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     (req as unknown as { user: { id: number; centroAscoltoId: number | null; cittaId: number | null } }).user = {
-      id: 1,
+      id: operatorUserId,
       centroAscoltoId: null,
       cittaId: null,
     };
@@ -34,6 +35,17 @@ const beneficiarioIds: number[] = [];
 let beneficiarioId: number;
 
 beforeAll(async () => {
+  const [operator] = await db
+    .insert(utentiTable)
+    .values({
+      username: `interventi_test_${rnd()}`,
+      passwordHash: "test-only",
+      nome: "Operatore Interventi Test",
+      attivo: true,
+    })
+    .returning({ id: utentiTable.id });
+  operatorUserId = operator.id;
+
   const [b] = await db
     .insert(beneficiariTable)
     .values({ codice: `BEN-${rnd()}`, nome: "NoteUds", cognome: rnd(), sesso: "M", uds: true, cittaId: null })
@@ -49,6 +61,7 @@ afterAll(async () => {
   if (beneficiarioIds.length > 0) {
     await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiarioIds));
   }
+  await db.delete(utentiTable).where(eq(utentiTable.id, operatorUserId));
   await pool.end();
 });
 

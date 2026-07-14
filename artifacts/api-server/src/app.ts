@@ -5,6 +5,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { resolveSessionRuntimeConfig } from "./lib/sessionConfig";
 
 const app: Express = express();
 
@@ -14,6 +15,7 @@ if (!sessionSecret) {
 }
 
 const PgSession = connectPgSimple(session);
+const sessionConfig = resolveSessionRuntimeConfig();
 
 app.use(
   pinoHttp({
@@ -34,7 +36,21 @@ app.use(
     },
   }),
 );
-app.use(cors());
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      // Requests without Origin include same-origin server calls, curl and
+      // health probes. Cross-origin browser calls are allowed only when the
+      // deployment explicitly lists their origin.
+      if (!origin || sessionConfig.allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -48,17 +64,9 @@ app.use(express.urlencoded({ extended: true }));
 //   a non-Secure, SameSite=Lax cookie (works fine for same-origin self-hosting).
 // Override the auto-detection with COOKIE_SECURE=true|false (e.g. set it to
 // "true" when self-hosting behind your own HTTPS reverse proxy).
-const onReplit = Boolean(
-  process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN,
-);
-const cookieSecure =
-  process.env.COOKIE_SECURE != null
-    ? process.env.COOKIE_SECURE === "true"
-    : onReplit;
-// SameSite=None is only valid alongside Secure; otherwise use Lax.
-const cookieSameSite: "none" | "lax" = cookieSecure ? "none" : "lax";
+const { cookieSecure, cookieSameSite } = sessionConfig;
 
-app.set("trust proxy", cookieSecure ? 1 : false);
+app.set("trust proxy", sessionConfig.trustProxy);
 app.use(
   session({
     store: new PgSession({
@@ -90,31 +98,12 @@ app.use(
 // cross-site mutating requests, so a forged cross-site POST is rejected.
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-function allowedOrigins(): Set<string> {
-  const set = new Set<string>();
-  const domains = (process.env.REPLIT_DOMAINS ?? "")
-    .split(",")
-    .map((d) => d.trim())
-    .filter(Boolean);
-  for (const d of domains) set.add(`https://${d}`);
-  const dev = process.env.REPLIT_DEV_DOMAIN;
-  if (dev) set.add(`https://${dev}`);
-  // Extra origins for self-hosting: comma-separated full origins, e.g.
-  // "https://magazzino.example.org,http://localhost:8082".
-  const extra = (process.env.APP_ORIGINS ?? "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
-  for (const o of extra) set.add(o);
-  return set;
-}
-
 app.use("/api", (req, res, next) => {
   if (SAFE_METHODS.has(req.method)) {
     next();
     return;
   }
-  const allow = allowedOrigins();
+  const allow = sessionConfig.allowedOrigins;
   if (allow.size === 0) {
     // No allowlist configured. Failing open is only safe when the session
     // cookie is SameSite=Lax (the browser already refuses to send it on

@@ -57,19 +57,29 @@ router.get("/citta/:id", async (req, res) => {
 });
 
 router.post("/citta", requireAdmin, async (req, res) => {
-  const parsed = CreateCittaBody.parse(req.body);
-  if (parsed.sigla) parsed.sigla = parsed.sigla.toUpperCase();
-  const [row] = await db.insert(cittaTable).values(parsed).returning();
+  const result = CreateCittaBody.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({ error: "Inserimento area non valido" });
+    return;
+  }
+  const values = result.data;
+  if (values.sigla) values.sigla = values.sigla.toUpperCase();
+  const [row] = await db.insert(cittaTable).values(values).returning();
   res.status(201).json(fmt(row));
 });
 
 router.patch("/citta/:id", requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const parsed = UpdateCittaBody.parse(req.body);
-  if (parsed.sigla) parsed.sigla = parsed.sigla.toUpperCase();
+  const result = UpdateCittaBody.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({ error: "Modifica area non valida" });
+    return;
+  }
+  const values = result.data;
+  if (values.sigla) values.sigla = values.sigla.toUpperCase();
   const [row] = await db
     .update(cittaTable)
-    .set(parsed)
+    .set(values)
     .where(eq(cittaTable.id, id))
     .returning();
   if (!row) {

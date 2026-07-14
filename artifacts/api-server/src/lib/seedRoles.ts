@@ -5,6 +5,9 @@ import { logger } from "./logger";
 
 export const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
 export const ADMIN_ROLE_NAME = "Amministratore";
+export const EMPORIO_ROLE_NAME = "Emporio";
+const OPERATOR_ROLE_NAME = "Operatore";
+const VOLUNTEER_ROLE_NAME = "Volontario";
 const UDS_ROLE_NAME = "Operatore UDS";
 
 export async function ensureSuperAdminRole(): Promise<number> {
@@ -17,7 +20,8 @@ export async function ensureSuperAdminRole(): Promise<number> {
     await db
       .update(ruoliTable)
       .set({
-        descrizione: "Accesso completo a tutte le aree e alla configurazione ambiente",
+        descrizione:
+          "Accesso completo a tutte le aree e alla configurazione ambiente",
         aree: ALL_AREA_KEYS,
         isAdmin: true,
       })
@@ -29,7 +33,8 @@ export async function ensureSuperAdminRole(): Promise<number> {
     .insert(ruoliTable)
     .values({
       nome: SUPER_ADMIN_ROLE_NAME,
-      descrizione: "Accesso completo a tutte le aree e alla configurazione ambiente",
+      descrizione:
+        "Accesso completo a tutte le aree e alla configurazione ambiente",
       aree: ALL_AREA_KEYS,
       isAdmin: true,
     })
@@ -60,6 +65,34 @@ export async function seedRoles(): Promise<void> {
     logger.info("Seeded admin role");
   }
 
+  const [operatorRole] = await db
+    .select({ id: ruoliTable.id })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.nome, OPERATOR_ROLE_NAME));
+  if (!operatorRole) {
+    await db.insert(ruoliTable).values({
+      nome: OPERATOR_ROLE_NAME,
+      descrizione: "Operatore delle attività generali e sociali",
+      aree: ["generale", "sociale"],
+      isAdmin: false,
+    });
+    logger.info("Seeded operator role");
+  }
+
+  const [volunteerRole] = await db
+    .select({ id: ruoliTable.id })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.nome, VOLUNTEER_ROLE_NAME));
+  if (!volunteerRole) {
+    await db.insert(ruoliTable).values({
+      nome: VOLUNTEER_ROLE_NAME,
+      descrizione: "Volontario per attività generali e logistiche",
+      aree: ["generale", "logistica"],
+      isAdmin: false,
+    });
+    logger.info("Seeded volunteer role");
+  }
+
   // Provide a ready-to-assign "Operatore UDS" role so a street-unit operator can
   // be created out of the box (admin can still edit/remove it). Idempotent.
   const [udsRole] = await db
@@ -74,5 +107,22 @@ export async function seedRoles(): Promise<void> {
       isAdmin: false,
     });
     logger.info("Seeded UDS operator role");
+  }
+
+  // Operational Emporio role. Keep it non-admin and grant only the areas used
+  // by the current Emporio UI/API flows. Existing rows are intentionally not
+  // overwritten so local permission customizations remain untouched.
+  const [emporioRole] = await db
+    .select({ id: ruoliTable.id })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.nome, EMPORIO_ROLE_NAME));
+  if (!emporioRole) {
+    await db.insert(ruoliTable).values({
+      nome: EMPORIO_ROLE_NAME,
+      descrizione: "Operatore Emporio Solidale",
+      aree: ["generale", "magazzino", "sociale"],
+      isAdmin: false,
+    });
+    logger.info("Seeded Emporio role");
   }
 }

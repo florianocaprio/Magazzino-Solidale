@@ -17,6 +17,7 @@ export const citta = {
     toastCreated: "Area creata",
     toastUpdated: "Area aggiornata",
     toastDeleted: "Area eliminata",
+    saveError: "Impossibile salvare l'area. Verifica i dati e riprova.",
   },
   es: {
     title: "Áreas",
@@ -36,6 +37,7 @@ export const citta = {
     toastCreated: "Área creada",
     toastUpdated: "Área actualizada",
     toastDeleted: "Área eliminada",
+    saveError: "No se puede guardar el área. Comprueba los datos e inténtalo de nuevo.",
   },
   en: {
     title: "Areas",
@@ -55,6 +57,7 @@ export const citta = {
     toastCreated: "Area created",
     toastUpdated: "Area updated",
     toastDeleted: "Area deleted",
+    saveError: "Unable to save the area. Check the data and try again.",
   },
   fr: {
     title: "Secteurs",
@@ -74,6 +77,7 @@ export const citta = {
     toastCreated: "Secteur créé",
     toastUpdated: "Secteur mis à jour",
     toastDeleted: "Secteur supprimé",
+    saveError: "Impossible d'enregistrer le secteur. Vérifiez les données et réessayez.",
   },
   de: {
     title: "Gebiete",
@@ -93,6 +97,7 @@ export const citta = {
     toastCreated: "Gebiet erstellt",
     toastUpdated: "Gebiet aktualisiert",
     toastDeleted: "Gebiet gelöscht",
+    saveError: "Das Gebiet konnte nicht gespeichert werden. Prüfen Sie die Daten und versuchen Sie es erneut.",
   },
   ar: {
     title: "الأقاليم",
@@ -112,5 +117,6 @@ export const citta = {
     toastCreated: "تم إنشاء الإقليم",
     toastUpdated: "تم تحديث الإقليم",
     toastDeleted: "تم حذف الإقليم",
+    saveError: "تعذر حفظ الإقليم. تحقق من البيانات وحاول مرة أخرى.",
   },
 } as const;

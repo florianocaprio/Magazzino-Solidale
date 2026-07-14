@@ -13,7 +13,7 @@ import { ensureSuperAdminRole } from "./seedRoles";
 
 export const CONFIGURAZIONE_AMBIENTE_ID = 1;
 export const DEFAULT_SUPER_ADMIN_USERNAME = "sadmin";
-const DEFAULT_SUPER_ADMIN_PASSWORD = "Apollo13!";
+export const SUPER_ADMIN_INITIAL_PASSWORD_ENV = "SUPER_ADMIN_INITIAL_PASSWORD";
 
 type ModuloSeed = {
   codice: string;
@@ -198,21 +198,19 @@ export async function ensureAmbienteModuli(): Promise<void> {
 
 export async function ensureDefaultSuperAdminUser(): Promise<void> {
   const superAdminRoleId = await ensureSuperAdminRole();
-  const passwordHash = await bcrypt.hash(DEFAULT_SUPER_ADMIN_PASSWORD, 10);
   const [existing] = await db
     .select({ id: utentiTable.id })
     .from(utentiTable)
     .where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
 
   if (existing) {
+    // Never reset credentials or activation flags during application startup.
+    // Operators may have rotated or intentionally disabled this technical user.
     await db
       .update(utentiTable)
       .set({
-        passwordHash,
         ruoloId: superAdminRoleId,
         isSuperAdmin: true,
-        attivo: true,
-        mustChangePassword: false,
         centroAscoltoId: null,
         cittaId: null,
         zonaUdsId: null,
@@ -220,6 +218,17 @@ export async function ensureDefaultSuperAdminUser(): Promise<void> {
       .where(eq(utentiTable.id, existing.id));
     return;
   }
+
+  const initialPassword = process.env[SUPER_ADMIN_INITIAL_PASSWORD_ENV]?.trim();
+  if (!initialPassword) {
+    logger.warn(
+      { env: SUPER_ADMIN_INITIAL_PASSWORD_ENV },
+      "Technical SuperAdmin not created; first-run setup remains enabled",
+    );
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(initialPassword, 10);
 
   await db.insert(utentiTable).values({
     username: DEFAULT_SUPER_ADMIN_USERNAME,
@@ -232,7 +241,7 @@ export async function ensureDefaultSuperAdminUser(): Promise<void> {
     zonaUdsId: null,
     attivo: true,
     isSuperAdmin: true,
-    mustChangePassword: false,
+    mustChangePassword: true,
   });
   logger.info({ username: DEFAULT_SUPER_ADMIN_USERNAME }, "Seeded default SuperAdmin user");
 }
