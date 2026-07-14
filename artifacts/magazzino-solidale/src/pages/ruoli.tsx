@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   useListRuoli,
+  useListAree,
   useCreateRuolo,
   useUpdateRuolo,
   useDeleteRuolo,
@@ -8,7 +9,6 @@ import {
   type Ruolo,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ALL_AREAS } from "@/lib/areas";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,8 +48,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
-import { AREA_LABEL } from "@/lib/areas";
+import {
+  MoreHorizontal,
+  Plus,
+  Pencil,
+  Trash2,
+  ShieldCheck,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -60,6 +65,7 @@ export default function Ruoli() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { data: ruoli, isLoading } = useListRuoli();
+  const { data: catalogoAree = [] } = useListAree();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -76,6 +82,9 @@ export default function Ruoli() {
   const [aree, setAree] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const areaLabels = Object.fromEntries(
+    catalogoAree.map((area) => [area.key, area.label]),
+  );
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: getListRuoliQueryKey() });
@@ -170,9 +179,7 @@ export default function Ruoli() {
       <div className="flex justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{t("ruoli.title")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("ruoli.subtitle")}
-          </p>
+          <p className="text-sm text-muted-foreground">{t("ruoli.subtitle")}</p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
@@ -224,7 +231,7 @@ export default function Ruoli() {
                           )}
                           {r.aree.map((a) => (
                             <Badge key={a} variant="secondary">
-                              {AREA_LABEL[a] ?? a}
+                              {areaLabels[a] ?? a}
                             </Badge>
                           ))}
                         </div>
@@ -254,7 +261,10 @@ export default function Ruoli() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            disabled={r.nome === SUPER_ADMIN_ROLE_NAME && !user?.isSuperAdmin}
+                            disabled={
+                              r.nome === SUPER_ADMIN_ROLE_NAME &&
+                              !user?.isSuperAdmin
+                            }
                             onClick={() => openEdit(r)}
                           >
                             <Pencil className="mr-2 h-4 w-4" />
@@ -333,15 +343,14 @@ export default function Ruoli() {
               <div className="space-y-2">
                 <Label>{t("ruoli.accessibleAreas")}</Label>
                 <div className="space-y-2 rounded-md border p-3">
-                  {ALL_AREAS.filter((a) => a.key !== "amministrazione").map(
-                    (a) => (
+                  {catalogoAree
+                    .filter((a) => a.key !== "amministrazione")
+                    .map((a) => (
                       <div key={a.key} className="flex items-center gap-2">
                         <Checkbox
                           id={`area-${a.key}`}
                           checked={aree.includes(a.key)}
-                          onCheckedChange={(c) =>
-                            toggleArea(a.key, c === true)
-                          }
+                          onCheckedChange={(c) => toggleArea(a.key, c === true)}
                         />
                         <Label
                           htmlFor={`area-${a.key}`}
@@ -350,8 +359,7 @@ export default function Ruoli() {
                           {a.label}
                         </Label>
                       </div>
-                    ),
-                  )}
+                    ))}
                 </div>
               </div>
             )}
