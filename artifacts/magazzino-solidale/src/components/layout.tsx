@@ -24,6 +24,7 @@ import {
   Map,
   Footprints,
   HeartHandshake,
+  HandHeart,
   CalendarClock,
   CalendarDays,
   Printer,
@@ -78,6 +79,7 @@ type NavItem = {
   area?: string;
   moduloCodice?: string;
   superAdmin?: boolean;
+  public?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -372,6 +374,14 @@ const NAV_ITEMS: NavItem[] = [
   },
 
   {
+    key: "sostieniProgetto",
+    url: "/sostieni-progetto",
+    icon: HandHeart,
+    groupKey: "supporto",
+    public: true,
+  },
+
+  {
     key: "superAdminConfigurazioneAmbiente",
     url: "/super-admin/configurazione-ambiente",
     icon: Building2,
@@ -441,11 +451,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
 
-  const visibleItems = NAV_ITEMS.filter((item) =>
-    item.superAdmin
-      ? user?.isSuperAdmin === true
-      : !!item.area && hasArea(item.area),
-  ).filter((item) => isModuloAttivo(item.moduloCodice));
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (item.superAdmin) return user?.isSuperAdmin === true;
+    if (item.public) return true;
+    return !!item.area && hasArea(item.area);
+  }).filter((item) => isModuloAttivo(item.moduloCodice));
 
   const groupedNav = visibleItems.reduce(
     (acc, item) => {
