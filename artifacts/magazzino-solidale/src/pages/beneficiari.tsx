@@ -31,13 +31,14 @@ import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 
 const makeFormSchema = (t: (k: string) => string) => z.object({
   cognome: z.string().min(2),
   nome: z.string().min(2),
   soprannome: z.string().optional(),
   codiceFiscale: z.string().optional(),
-  dataNascita: z.string().optional(),
+  dataNascita: z.string().optional().refine(isNotFutureDateOnly, "La data di nascita non può essere successiva alla data odierna."),
   sesso: z.string().min(1, t("beneficiari.sessoRequired")),
   cittadinanza: z.string().optional(),
   areaProvenienza: z.string().min(1, t("common.requiredField")),
@@ -617,7 +618,7 @@ export default function Beneficiari() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="dataNascita" render={({ field }) => (
-                    <FormItem><FormLabel>{t("beneficiarioDettaglio.dataNascita")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("beneficiarioDettaglio.dataNascita")}</FormLabel><FormControl><Input type="date" max={todayDateOnly()} {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="sesso" render={({ field }) => (
                     <FormItem>

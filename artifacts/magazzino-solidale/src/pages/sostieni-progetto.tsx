@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { sostieniProgettoConfig } from "@/lib/sostieni-progetto";
+import { buildSupportMailto, sostieniProgettoConfig } from "@/lib/sostieni-progetto";
 
 const supportItems = [
   "itemAssistenza",
@@ -70,17 +70,13 @@ async function copyText(text: string): Promise<void> {
   copyWithFallback(text);
 }
 
-function buildMailto(email: string, subject: string, body: string): string {
-  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
 export default function SostieniProgetto() {
   const { t } = useTranslation();
   const { toast } = useToast();
 
   const supportMailto = useMemo(
     () =>
-      buildMailto(
+      buildSupportMailto(
         sostieniProgettoConfig.supportEmail,
         t("sostieniProgetto.support.emailSubject"),
         t("sostieniProgetto.support.emailBody"),

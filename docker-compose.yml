@@ -30,8 +30,11 @@ services:
       - .env.docker
     environment:
       PORT: 8080
+      UPLOAD_DIR: /app/uploads
       COOKIE_SAMESITE: lax
       COOKIE_SECURE: "false"
+    volumes:
+      - magazzino_uploads:/app/uploads
     expose:
       - "8080"
     healthcheck:
@@ -57,3 +60,4 @@ services:
 
 volumes:
   magazzino_pgdata:
+  magazzino_uploads:

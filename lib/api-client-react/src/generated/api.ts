@@ -9642,6 +9642,72 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getDeleteCentroAscoltoMutationOptions(options));
     }
 
+export const getUploadCentroAscoltoLogoUrl = (id: number,) => {
+
+
+
+
+  return `/api/centri-ascolto/${id}/logo`
+}
+
+export const uploadCentroAscoltoLogo = async (id: number,
+    uploadCentroAscoltoLogoBody: Blob, options?: RequestInit): Promise<CentroAscolto> => {
+
+  return customFetch<CentroAscolto>(getUploadCentroAscoltoLogoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'image/png', ...options?.headers },
+    body: JSON.stringify(
+      uploadCentroAscoltoLogoBody,)
+  }
+);}
+
+
+
+
+export const getUploadCentroAscoltoLogoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadCentroAscoltoLogo>>, TError,{id: number;data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadCentroAscoltoLogo>>, TError,{id: number;data: BodyType<Blob>}, TContext> => {
+
+const mutationKey = ['uploadCentroAscoltoLogo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadCentroAscoltoLogo>>, {id: number;data: BodyType<Blob>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  uploadCentroAscoltoLogo(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadCentroAscoltoLogoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadCentroAscoltoLogo>>>
+    export type UploadCentroAscoltoLogoMutationBody = BodyType<Blob>
+    export type UploadCentroAscoltoLogoMutationError = ErrorType<void>
+
+    export const useUploadCentroAscoltoLogo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadCentroAscoltoLogo>>, TError,{id: number;data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadCentroAscoltoLogo>>,
+        TError,
+        {id: number;data: BodyType<Blob>},
+        TContext
+      > => {
+      return useMutation(getUploadCentroAscoltoLogoMutationOptions(options));
+    }
+
 export const getGetImpostazioniStampaUrl = () => {
 
 

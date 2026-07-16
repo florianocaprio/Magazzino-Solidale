@@ -12,6 +12,7 @@ import {
   andScoped,
 } from "../lib/centroScope";
 import { requireModulo } from "../lib/featureFlags";
+import { validateCapacita } from "../lib/bug5Validation";
 
 const router: IRouter = Router();
 router.use("/mezzi", requireModulo("MEZZI"));
@@ -194,6 +195,8 @@ async function createMezzoOne(
   req: Request,
 ): Promise<{ id: number } | { error: string; status?: number }> {
   const b = body as Record<string, any>;
+  const capacitaError = validateCapacita(b);
+  if (capacitaError) return { error: capacitaError, status: 400 };
   const caller = callerCentroId(req);
   const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
   const resolved = await resolveCentro(b, caller, cittaCentroIds);
@@ -282,6 +285,8 @@ router.patch("/mezzi/:id", async (req, res) => {
     return;
   }
   const body = req.body;
+  const capacitaError = validateCapacita(body);
+  if (capacitaError) { res.status(400).json({ error: capacitaError }); return; }
   // Determine the post-update owner link to recompute the effective centro.
   const volontarioId =
     body.volontarioId !== undefined ? body.volontarioId : existing.m.volontarioId;
@@ -301,7 +306,7 @@ router.patch("/mezzi/:id", async (req, res) => {
   const update = {
     ...body,
     centroAscoltoId: resolved.ownCentro,
-    capacitaKg: body.capacitaKg?.toString(),
+    capacitaKg: body.capacitaKg === null ? null : body.capacitaKg === undefined ? undefined : body.capacitaKg.toString(),
   };
   await db.update(mezziTable).set(update).where(eq(mezziTable.id, id));
   res.json(await loadMezzo(id));

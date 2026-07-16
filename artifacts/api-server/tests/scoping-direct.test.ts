@@ -522,12 +522,15 @@ describe("Approvvigionamenti — scoping per centro", () => {
   it("POST auto-assegna il centro del caller", async () => {
     const mag = await createMagazzino(scope, null);
     const prod = await createProdotto(scope);
+    const fornitore = await createFornitore(scope, cittaA);
     const res = await request(
       makeScopedApp(approvvigionamentiRouter, { id: operatoreId, centroAscoltoId: centroA }),
     )
       .post("/approvvigionamenti")
       .send({
         dataRichiesta: "2026-06-24",
+        cittaId: cittaA,
+        fornitoreId: fornitore,
         magazzinoId: mag,
         righe: [{ prodottoId: prod, quantitaRichiesta: 10, unitaMisura: "kg" }],
       });

@@ -42,8 +42,8 @@ export default function Mezzi() {
     proprietarioNome: z.string().optional(),
     volontarioId: z.string().optional(),
     centroAscoltoId: z.string().optional(),
-    capacitaColli: z.coerce.number().optional(),
-    capacitaKg: z.coerce.number().optional(),
+    capacitaColli: z.coerce.number().int().min(0, t("mezzi.valCapacitaColli")).optional(),
+    capacitaKg: z.coerce.number().min(0, t("mezzi.valCapacitaKg")).optional(),
     descrizione: z.string().optional(),
     scadenzaAssicurazione: z.string().optional(),
     scadenzaRevisione: z.string().optional(),
@@ -87,8 +87,8 @@ export default function Mezzi() {
       proprietarioNome: mezzo.proprietarioNome || "",
       volontarioId: mezzo.volontarioId != null ? String(mezzo.volontarioId) : NO_VOLONTARIO,
       centroAscoltoId: mezzo.centroAscoltoId != null ? String(mezzo.centroAscoltoId) : NO_CENTRO,
-      capacitaColli: mezzo.capacitaColli || 0,
-      capacitaKg: mezzo.capacitaKg || 0,
+      capacitaColli: mezzo.capacitaColli ?? 0,
+      capacitaKg: mezzo.capacitaKg ?? 0,
       descrizione: mezzo.descrizione || "",
       scadenzaAssicurazione: mezzo.scadenzaAssicurazione ? mezzo.scadenzaAssicurazione.substring(0, 10) : "",
       scadenzaRevisione: mezzo.scadenzaRevisione ? mezzo.scadenzaRevisione.substring(0, 10) : "",
@@ -361,7 +361,7 @@ export default function Mezzi() {
                     </TableCell>
                   )}
                   <TableCell className="text-sm text-muted-foreground">
-                    {m.capacitaColli ? `${m.capacitaColli} ${t("mezzi.colliUnit")}` : '-'} / {m.capacitaKg ? `${m.capacitaKg} kg` : '-'}
+                    {m.capacitaColli != null ? `${m.capacitaColli} ${t("mezzi.colliUnit")}` : '-'} / {m.capacitaKg != null ? `${m.capacitaKg} kg` : '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 text-xs">
@@ -507,10 +507,10 @@ export default function Mezzi() {
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <FormField control={form.control} name="capacitaColli" render={({ field }) => (
-                    <FormItem><FormLabel>{t("mezzi.capacitaColli")}</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("mezzi.capacitaColli")}</FormLabel><FormControl><Input type="number" min="0" step="1" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="capacitaKg" render={({ field }) => (
-                    <FormItem><FormLabel>{t("mezzi.capacitaKg")}</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("mezzi.capacitaKg")}</FormLabel><FormControl><Input type="number" min="0" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
 

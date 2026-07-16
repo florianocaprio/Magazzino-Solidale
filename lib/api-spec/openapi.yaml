@@ -2800,6 +2800,43 @@ paths:
         "204":
           description: Deleted
 
+  /centri-ascolto/{id}/logo:
+    post:
+      operationId: uploadCentroAscoltoLogo
+      tags: [centri-ascolto]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Logo saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CentroAscolto"
+        "400":
+          description: Invalid image
+        "403":
+          description: Not authorized
+
   /impostazioni-stampa:
     get:
       operationId: getImpostazioniStampa
@@ -5255,6 +5292,10 @@ components:
           type: ["integer", "null"]
         fornitoreNome:
           type: ["string", "null"]
+        fornitoreEmail:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
         magazzinoId:
           type: ["integer", "null"]
         magazzinoNome:
@@ -5284,6 +5325,8 @@ components:
       properties:
         fornitoreId:
           type: integer
+        cittaId:
+          type: integer
         magazzinoId:
           type: integer
         centroAscoltoId:
@@ -5298,7 +5341,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ApprovvigionamentoRigaInput"
-      required: [dataRichiesta, righe]
+      required: [fornitoreId, cittaId, dataRichiesta, righe]
 
     ApprovvigionamentoUpdate:
       type: object
@@ -5307,6 +5350,8 @@ components:
           type: string
         fornitoreId:
           type: ["integer", "null"]
+        cittaId:
+          type: integer
         magazzinoId:
           type: ["integer", "null"]
         centroAscoltoId:

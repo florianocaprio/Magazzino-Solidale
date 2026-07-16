@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, ne } from "drizzle-orm";
 import { db, ruoliTable, utentiTable } from "@workspace/db";
 import { CreateRuoloBody, UpdateRuoloBody } from "@workspace/api-zod";
@@ -9,6 +9,12 @@ import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 const router: IRouter = Router();
 
 router.use("/ruoli", requireAuth, requireAdmin);
+
+function rejectLimitedAdminRoleMutation(req: Request, res: Response): boolean {
+  if (req.user?.isSuperAdmin || req.user?.cittaId == null) return false;
+  res.status(403).json({ error: "Un amministratore limitato non può modificare ruoli e permessi condivisi" });
+  return true;
+}
 
 const fmt = (r: typeof ruoliTable.$inferSelect) => ({
   id: r.id,
@@ -59,6 +65,7 @@ router.get("/ruoli", async (_req, res): Promise<void> => {
 });
 
 router.post("/ruoli", async (req, res): Promise<void> => {
+  if (rejectLimitedAdminRoleMutation(req, res)) return;
   const parsed = CreateRuoloBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -106,6 +113,7 @@ router.get("/ruoli/:id", async (req, res): Promise<void> => {
 });
 
 router.patch("/ruoli/:id", async (req, res): Promise<void> => {
+  if (rejectLimitedAdminRoleMutation(req, res)) return;
   const id = parseInt(
     Array.isArray(req.params.id) ? req.params.id[0] : req.params.id,
     10,
@@ -174,6 +182,7 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/ruoli/:id", async (req, res): Promise<void> => {
+  if (rejectLimitedAdminRoleMutation(req, res)) return;
   const id = parseInt(
     Array.isArray(req.params.id) ? req.params.id[0] : req.params.id,
     10,

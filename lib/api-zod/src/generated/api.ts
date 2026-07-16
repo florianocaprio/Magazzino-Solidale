@@ -1047,6 +1047,8 @@ export const ListApprovvigionamentiResponseItem = zod.object({
   "codice": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
+  "fornitoreEmail": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
   "magazzinoId": zod.number().nullish(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -1070,7 +1072,8 @@ export const ListApprovvigionamentiResponse = zod.array(ListApprovvigionamentiRe
 
 
 export const CreateApprovvigionamentoBody = zod.object({
-  "fornitoreId": zod.number().optional(),
+  "fornitoreId": zod.number(),
+  "cittaId": zod.number(),
   "magazzinoId": zod.number().optional(),
   "centroAscoltoId": zod.number().optional(),
   "dataRichiesta": zod.string(),
@@ -1094,6 +1097,8 @@ export const GetApprovvigionamentoResponse = zod.object({
   "codice": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
+  "fornitoreEmail": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
   "magazzinoId": zod.number().nullish(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -1122,6 +1127,7 @@ export const UpdateApprovvigionamentoParams = zod.object({
 export const UpdateApprovvigionamentoBody = zod.object({
   "stato": zod.string().optional(),
   "fornitoreId": zod.number().nullish(),
+  "cittaId": zod.number().optional(),
   "magazzinoId": zod.number().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "dataRichiesta": zod.string().optional(),
@@ -1134,6 +1140,8 @@ export const UpdateApprovvigionamentoResponse = zod.object({
   "codice": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
+  "fornitoreEmail": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
   "magazzinoId": zod.number().nullish(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -1167,6 +1175,8 @@ export const SubmitApprovvigionamentoResponse = zod.object({
   "codice": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
+  "fornitoreEmail": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
   "magazzinoId": zod.number().nullish(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -4104,6 +4114,27 @@ export const UpdateCentroAscoltoResponse = zod.object({
 
 export const DeleteCentroAscoltoParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+export const UploadCentroAscoltoLogoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UploadCentroAscoltoLogoResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "beneficiariCount": zod.number().optional(),
+  "dataCreazione": zod.string()
 })
 
 
