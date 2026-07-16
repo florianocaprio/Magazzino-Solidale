@@ -780,6 +780,10 @@ export interface Approvvigionamento {
   /** @nullable */
   fornitoreNome?: string | null;
   /** @nullable */
+  fornitoreEmail?: string | null;
+  /** @nullable */
+  cittaId?: number | null;
+  /** @nullable */
   magazzinoId?: number | null;
   /** @nullable */
   magazzinoNome?: string | null;
@@ -805,7 +809,8 @@ export interface ApprovvigionamentoRigaInput {
 }
 
 export interface ApprovvigionamentoInput {
-  fornitoreId?: number;
+  fornitoreId: number;
+  cittaId: number;
   magazzinoId?: number;
   centroAscoltoId?: number;
   dataRichiesta: string;
@@ -818,6 +823,7 @@ export interface ApprovvigionamentoUpdate {
   stato?: string;
   /** @nullable */
   fornitoreId?: number | null;
+  cittaId?: number;
   /** @nullable */
   magazzinoId?: number | null;
   /** @nullable */

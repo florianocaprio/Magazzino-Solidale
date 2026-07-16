@@ -38,15 +38,6 @@ const formSchema = z.object({
   note: z.string().optional()
 });
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function CentriAscolto() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -61,6 +52,8 @@ export default function CentriAscolto() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const createCentro = useCreateCentroAscolto();
   const updateCentro = useUpdateCentroAscolto();
@@ -76,6 +69,8 @@ export default function CentriAscolto() {
   const handleCreate = () => {
     setEditingId(null);
     setFormError(null);
+    setLogoFile(null);
+    setLogoPreview(null);
     form.reset({ nome: "", cittaId: NO_CITTA, logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: "" });
     setIsFormOpen(true);
   };
@@ -83,6 +78,8 @@ export default function CentriAscolto() {
   const handleEdit = (c: any) => {
     setEditingId(c.id);
     setFormError(null);
+    setLogoFile(null);
+    setLogoPreview(c.logoUrl || null);
     form.reset({
       nome: c.nome,
       cittaId: c.cittaId != null ? String(c.cittaId) : NO_CITTA,
@@ -98,16 +95,32 @@ export default function CentriAscolto() {
     setIsFormOpen(true);
   };
 
+  const uploadLogo = async (id: number) => {
+    if (!logoFile) return;
+    const response = await fetch(`/api/centri-ascolto/${id}/logo`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": logoFile.type },
+      body: logoFile,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      throw new Error(payload?.error ?? t("centriAscolto.saveError"));
+    }
+  };
+
   const onSubmit = (formData: z.infer<typeof formSchema>) => {
     setFormError(null);
     const { cittaId: cittaIdRaw, ...rest } = formData;
     const data = {
       ...rest,
+      logoUrl: rest.logoUrl?.trim() || null,
       cittaId: cittaIdRaw && cittaIdRaw !== NO_CITTA ? parseInt(cittaIdRaw, 10) : null,
     };
     if (editingId) {
       updateCentro.mutate({ id: editingId, data }, {
-        onSuccess: () => {
+        onSuccess: async () => {
+          try { await uploadLogo(editingId); } catch (err) { setFormError(errorMessage(err, t("centriAscolto.saveError"))); return; }
           queryClient.invalidateQueries({ queryKey: getListCentriAscoltoQueryKey() });
           toast({ title: t("centriAscolto.toastUpdated") });
           setIsFormOpen(false);
@@ -116,7 +129,8 @@ export default function CentriAscolto() {
       });
     } else {
       createCentro.mutate({ data }, {
-        onSuccess: () => {
+        onSuccess: async (created) => {
+          try { await uploadLogo(created.id); } catch (err) { setEditingId(created.id); setFormError(errorMessage(err, t("centriAscolto.saveError"))); return; }
           queryClient.invalidateQueries({ queryKey: getListCentriAscoltoQueryKey() });
           toast({ title: t("centriAscolto.toastCreated") });
           setIsFormOpen(false);
@@ -292,8 +306,8 @@ export default function CentriAscolto() {
                   <FormItem>
                     <FormLabel>{t("centriAscolto.logoLabel")}</FormLabel>
                     <div className="flex items-center gap-3">
-                      {field.value ? (
-                        <img src={field.value} alt={t("centriAscolto.logoAlt")} className="h-14 w-14 object-contain rounded border bg-white" />
+                      {(logoPreview || field.value) ? (
+                        <img src={logoPreview || field.value} alt={t("centriAscolto.logoAlt")} className="h-14 w-14 object-contain rounded border bg-white" />
                       ) : (
                         <div className="h-14 w-14 rounded border border-dashed flex items-center justify-center text-muted-foreground">
                           <Building2 className="h-5 w-5" />
@@ -303,21 +317,26 @@ export default function CentriAscolto() {
                         <FormControl>
                           <Input
                             type="file"
-                            accept="image/*"
+                            accept="image/png,image/jpeg,image/webp"
                             className="text-xs"
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              if (file.size > 500 * 1024) {
+                              if (file.size > 2 * 1024 * 1024) {
                                 toast({ title: t("centriAscolto.logoTooBig"), description: t("centriAscolto.logoTooBigDesc"), variant: "destructive" });
                                 return;
                               }
-                              field.onChange(await fileToDataUrl(file));
+                              if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+                                setFormError("Il logo deve essere un'immagine PNG, JPEG o WebP.");
+                                return;
+                              }
+                              setLogoFile(file);
+                              setLogoPreview(URL.createObjectURL(file));
                             }}
                           />
                         </FormControl>
-                        {field.value && (
-                          <Button type="button" variant="ghost" size="sm" className="h-7 justify-start px-2 text-destructive hover:text-destructive" onClick={() => field.onChange("")}>
+                        {(logoPreview || field.value) && (
+                          <Button type="button" variant="ghost" size="sm" className="h-7 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { field.onChange(""); setLogoFile(null); setLogoPreview(null); }}>
                             <Trash2 className="mr-1 h-3.5 w-3.5" /> {t("centriAscolto.removeLogo")}
                           </Button>
                         )}

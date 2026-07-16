@@ -16,8 +16,18 @@ import {
   canAccessCitta,
 } from "../lib/centroScope";
 import { requireAdmin } from "../middlewares/auth";
+import express from "express";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 const router: IRouter = Router();
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const LOGO_TYPES = new Map([
+  ["image/png", ".png"],
+  ["image/jpeg", ".jpg"],
+  ["image/webp", ".webp"],
+]);
 
 function paramId(v: string | string[]): number {
   return parseInt(Array.isArray(v) ? v[0] : v, 10);
@@ -116,6 +126,34 @@ router.patch("/centri-ascolto/:id", requireAdmin, async (req, res) => {
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json(fmt(row));
 });
+
+router.post(
+  "/centri-ascolto/:id/logo",
+  requireAdmin,
+  express.raw({ type: ["image/png", "image/jpeg", "image/webp"], limit: MAX_LOGO_BYTES }),
+  async (req, res) => {
+    const id = paramId(req.params.id);
+    const [existing] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
+    if (!existing) { res.status(404).json({ error: "Centro di ascolto non trovato" }); return; }
+    if (!canAccessCitta(existing.cittaId, callerCittaId(req))) {
+      res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+      return;
+    }
+    const extension = LOGO_TYPES.get(req.get("content-type")?.split(";")[0] ?? "");
+    if (!extension || !Buffer.isBuffer(req.body) || req.body.length === 0) {
+      res.status(400).json({ error: "Il logo deve essere un'immagine PNG, JPEG o WebP valida" });
+      return;
+    }
+    const relativeDir = path.join("centri", String(id));
+    const uploadRoot = process.env.UPLOAD_DIR ?? "/app/uploads";
+    await mkdir(path.join(uploadRoot, relativeDir), { recursive: true });
+    const fileName = `${randomUUID()}${extension}`;
+    await writeFile(path.join(uploadRoot, relativeDir, fileName), req.body, { flag: "wx" });
+    const logoUrl = `/uploads/${relativeDir.split(path.sep).join("/")}/${fileName}`;
+    const [row] = await db.update(centriAscoltoTable).set({ logoUrl }).where(eq(centriAscoltoTable.id, id)).returning();
+    res.json(fmt(row));
+  },
+);
 
 router.delete("/centri-ascolto/:id", requireAdmin, async (req, res) => {
   const id = paramId(req.params.id);

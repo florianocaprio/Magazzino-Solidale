@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { approvvigionamentiTable, approvvigionamentoRigheTable, fornitoriTable, prodottiTable, magazziniTable, centriAscoltoTable } from "@workspace/db";
+import { approvvigionamentiTable, approvvigionamentoRigheTable, fornitoriTable, prodottiTable, magazziniTable, centriAscoltoTable, cittaTable } from "@workspace/db";
 import { eq, and, desc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
@@ -18,10 +18,25 @@ import { requireModulo } from "../lib/featureFlags";
 const router: IRouter = Router();
 router.use("/approvvigionamenti", requireModulo("APPROVVIGIONAMENTI"));
 
+async function validateFornitoreArea(fornitoreId: unknown, cittaId: unknown): Promise<string | null> {
+  if (!Number.isInteger(Number(cittaId)) || Number(cittaId) <= 0) return "L'area è obbligatoria";
+  if (!Number.isInteger(Number(fornitoreId)) || Number(fornitoreId) <= 0) return "Il fornitore è obbligatorio";
+  const [area] = await db.select({ id: cittaTable.id }).from(cittaTable).where(eq(cittaTable.id, Number(cittaId)));
+  if (!area) return "L'area selezionata non esiste";
+  const [fornitore] = await db.select({ cittaId: fornitoriTable.cittaId, attivo: fornitoriTable.attivo })
+    .from(fornitoriTable).where(eq(fornitoriTable.id, Number(fornitoreId)));
+  if (!fornitore) return "Il fornitore selezionato non esiste";
+  if (!fornitore.attivo) return "Il fornitore selezionato non è attivo";
+  if (fornitore.cittaId !== Number(cittaId)) return "Il fornitore selezionato non è associato all'area indicata";
+  return null;
+}
+
 async function getWithRighe(id: number) {
   const [a] = await db.select({
     a: approvvigionamentiTable,
     fornitoreNome: fornitoriTable.nome,
+    fornitoreEmail: fornitoriTable.email,
+    fornitoreCittaId: fornitoriTable.cittaId,
     magazzinoNome: magazziniTable.nome,
     centroAscoltoNome: centriAscoltoTable.nome,
   })
@@ -45,6 +60,8 @@ async function getWithRighe(id: number) {
     codice: a.a.codice,
     fornitoreId: a.a.fornitoreId ?? null,
     fornitoreNome: a.fornitoreNome ?? null,
+    fornitoreEmail: a.fornitoreEmail ?? null,
+    cittaId: a.fornitoreCittaId ?? null,
     magazzinoId: a.a.magazzinoId ?? null,
     magazzinoNome: a.magazzinoNome ?? null,
     centroAscoltoId: a.a.centroAscoltoId ?? null,
@@ -90,6 +107,8 @@ router.get("/approvvigionamenti", async (req, res) => {
     .select({
       a: approvvigionamentiTable,
       fornitoreNome: fornitoriTable.nome,
+      fornitoreEmail: fornitoriTable.email,
+      fornitoreCittaId: fornitoriTable.cittaId,
       magazzinoNome: magazziniTable.nome,
       centroAscoltoNome: centriAscoltoTable.nome,
     })
@@ -106,6 +125,8 @@ router.get("/approvvigionamenti", async (req, res) => {
     codice: r.a.codice,
     fornitoreId: r.a.fornitoreId ?? null,
     fornitoreNome: r.fornitoreNome ?? null,
+    fornitoreEmail: r.fornitoreEmail ?? null,
+    cittaId: r.fornitoreCittaId ?? null,
     magazzinoId: r.a.magazzinoId ?? null,
     magazzinoNome: r.magazzinoNome ?? null,
     centroAscoltoId: r.a.centroAscoltoId ?? null,
@@ -121,6 +142,12 @@ router.get("/approvvigionamenti", async (req, res) => {
 
 router.post("/approvvigionamenti", async (req, res) => {
   const body = req.body;
+  const callerCitta = callerCittaId(req);
+  if (callerCitta != null && Number(body.cittaId) !== callerCitta) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" }); return;
+  }
+  const relationError = await validateFornitoreArea(body.fornitoreId, body.cittaId);
+  if (relationError) { res.status(400).json({ error: relationError }); return; }
   const caller = callerCentroId(req);
   if (body.magazzinoId != null && !(await canAccessMagazzino(body.magazzinoId, caller, callerCittaId(req)))) {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
@@ -213,7 +240,16 @@ router.patch("/approvvigionamenti/:id", async (req, res) => {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
+  const targetFornitoreId = req.body.fornitoreId !== undefined ? req.body.fornitoreId : current.fornitoreId;
+  const targetCittaId = req.body.cittaId;
+  const callerCitta = callerCittaId(req);
+  if (callerCitta != null && Number(targetCittaId) !== callerCitta) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" }); return;
+  }
+  const relationError = await validateFornitoreArea(targetFornitoreId, targetCittaId);
+  if (relationError) { res.status(400).json({ error: relationError }); return; }
   const updates = { ...req.body };
+  delete updates.cittaId;
   if (caller != null) delete updates.centroAscoltoId;
   if (caller == null && updates.centroAscoltoId != null && updates.centroAscoltoId !== current.centroAscoltoId
       && !inVisibleCentroSet(updates.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {

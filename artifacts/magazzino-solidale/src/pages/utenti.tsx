@@ -69,6 +69,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus, Pencil, Trash2, KeyRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
+import { ruoliNelPerimetro } from "@/lib/admin-scope";
 
 const NO_ROLE = "none";
 const NO_CENTRO = "__none__";
@@ -83,6 +84,7 @@ export default function Utenti() {
   const isCentroLocked = lockedCentroId != null;
   const lockedCittaId = currentUser?.cittaId ?? null;
   const isCittaLocked = lockedCittaId != null;
+  const isZonaLocked = currentUser?.zonaUdsId != null;
   const canFilterAreaGeografica = currentUser?.isAdmin ?? false;
   const [cittaFilter, setCittaFilter] = useState("all");
   const [matricolaFilter, setMatricolaFilter] = useState("");
@@ -128,9 +130,8 @@ export default function Utenti() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const selectedCittaNum = cittaId === NO_CITTA ? undefined : parseInt(cittaId, 10);
-  const visibleRoles = currentUser?.isSuperAdmin
-    ? ruoli
-    : ruoli?.filter((r) => r.nome !== SUPER_ADMIN_ROLE_NAME);
+  const visibleRoles = ruoliNelPerimetro(ruoli ?? [], currentUser?.aree ?? [], currentUser?.isSuperAdmin ?? false);
+  const editingSelf = editing?.id === currentUser?.id;
   const { data: zoneUds } = useListZoneUds(
     { cittaId: selectedCittaNum },
     { query: { enabled: selectedCittaNum != null, queryKey: ["zoneUds", selectedCittaNum] } },
@@ -533,7 +534,7 @@ export default function Utenti() {
             )}
             <div className="space-y-2">
               <Label>{t("utenti.colRuolo")}</Label>
-              <Select value={ruoloId} onValueChange={setRuoloId}>
+              <Select value={ruoloId} onValueChange={setRuoloId} disabled={editingSelf && !currentUser?.isSuperAdmin}>
                 <SelectTrigger>
                   <SelectValue placeholder={t("utenti.selezionaRuolo")} />
                 </SelectTrigger>
@@ -546,6 +547,9 @@ export default function Utenti() {
                   ))}
                 </SelectContent>
               </Select>
+              {editingSelf && !currentUser?.isSuperAdmin && (
+                <p className="text-xs text-muted-foreground">Non sei autorizzato a modificare il ruolo assegnato al tuo profilo.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>{t("common.centro")}</Label>
@@ -586,8 +590,8 @@ export default function Utenti() {
                   <SelectValue placeholder={t("utenti.selezionaCitta")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_CITTA}>{t("utenti.cittaGlobale")}</SelectItem>
-                  {citta?.map((c) => (
+                  {!isCittaLocked && <SelectItem value={NO_CITTA}>{t("utenti.cittaGlobale")}</SelectItem>}
+                  {(isCittaLocked ? citta?.filter((c) => c.id === lockedCittaId) : citta)?.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       {c.nome}
                     </SelectItem>
@@ -600,7 +604,7 @@ export default function Utenti() {
               <Select
                 value={zonaUdsId}
                 onValueChange={setZonaUdsId}
-                disabled={cittaId === NO_CITTA}
+                disabled={cittaId === NO_CITTA || isZonaLocked}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={t("utenti.selezionaZona")} />

@@ -31,10 +31,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: 8080
+      UPLOAD_DIR: /app/uploads
     volumes:
       - type: bind
         source: /data/magazzino-debug/Bug-Prod-01/uploads
-        target: /data/uploads
+        target: /app/uploads
       - type: bind
         source: /data/magazzino-debug/Bug-Prod-01/backups
         target: /data/backups

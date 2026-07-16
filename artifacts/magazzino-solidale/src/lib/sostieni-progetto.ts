@@ -9,3 +9,7 @@ export const sostieniProgettoConfig = {
   supportEmail: "supporto@angeliinmoto.it",
   logoUrl: "/logo-aim.png",
 } as const;
+
+export function buildSupportMailto(email: string, subject: string, body: string): string {
+  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}

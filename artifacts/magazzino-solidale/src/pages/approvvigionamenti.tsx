@@ -5,8 +5,8 @@ import {
   useCreateApprovvigionamento,
   useUpdateApprovvigionamento,
   useSubmitApprovvigionamento,
-  useSendApprovvigionamentoEmail,
   useListFornitori,
+  useListCitta,
   useListMagazzini,
   useListCentriAscolto,
   getListApprovvigionamentiQueryKey,
@@ -32,9 +32,11 @@ import * as z from "zod";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
+import { fornitoriAttiviPerArea } from "@/lib/approvvigionamenti-area";
 
 const formSchema = z.object({
-  fornitoreId: z.coerce.number().optional(),
+  cittaId: z.coerce.number().positive(),
+  fornitoreId: z.coerce.number().positive(),
   magazzinoId: z.coerce.number().optional(),
   centroAscoltoId: z.coerce.number().optional(),
   dataRichiesta: z.string().min(1),
@@ -50,6 +52,8 @@ interface OrderRow {
   stato: string;
   fornitoreId?: number | null;
   fornitoreNome?: string | null;
+  fornitoreEmail?: string | null;
+  cittaId?: number | null;
   magazzinoId?: number | null;
   magazzinoNome?: string | null;
   centroAscoltoId?: number | null;
@@ -83,6 +87,7 @@ export default function Approvvigionamenti() {
 
   const { data: approvvigionamenti, isLoading } = useListApprovvigionamenti(hasParams ? listParams : undefined);
   const { data: fornitori } = useListFornitori();
+  const { data: citta } = useListCitta();
   const { data: magazzini } = useListMagazzini();
   const { data: centri } = useListCentriAscolto();
 
@@ -94,7 +99,6 @@ export default function Approvvigionamenti() {
   const createApprovvigionamento = useCreateApprovvigionamento();
   const updateApprovvigionamento = useUpdateApprovvigionamento();
   const submitApprovvigionamento = useSubmitApprovvigionamento();
-  const sendEmail = useSendApprovvigionamentoEmail();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -106,9 +110,9 @@ export default function Approvvigionamenti() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListApprovvigionamentiQueryKey() });
 
-  const selectedFornitoreId = form.watch("fornitoreId");
-  const selectedFornitore = (fornitori ?? []).find((f) => f.id === Number(selectedFornitoreId));
-  const fornitoreCittaId = selectedFornitore?.cittaId ?? null;
+  const selectedCittaId = form.watch("cittaId");
+  const fornitoriArea = fornitoriAttiviPerArea(fornitori ?? [], selectedCittaId);
+  const fornitoreCittaId = selectedCittaId ?? null;
   const matchesCitta = (cittaId?: number | null) =>
     fornitoreCittaId == null || cittaId == null || cittaId === fornitoreCittaId;
   const filteredMagazzini = (magazzini ?? []).filter((m) => matchesCitta(m.cittaId));
@@ -133,9 +137,16 @@ export default function Approvvigionamenti() {
     }
   };
 
+  const handleCittaChange = (val: string) => {
+    form.setValue("cittaId", Number(val), { shouldValidate: true });
+    form.resetField("fornitoreId");
+    form.setValue("magazzinoId", undefined);
+    if (!isCentroLocked) form.setValue("centroAscoltoId", undefined);
+  };
+
   const openCreate = () => {
     setEditingId(null);
-    form.reset({ dataRichiesta: new Date().toISOString().substring(0, 10), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
+    form.reset({ cittaId: user?.cittaId ?? undefined, dataRichiesta: new Date().toISOString().substring(0, 10), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
     setIsFormOpen(true);
   };
 
@@ -143,6 +154,7 @@ export default function Approvvigionamenti() {
     setEditingId(a.id);
     form.reset({
       fornitoreId: a.fornitoreId ?? undefined,
+      cittaId: a.cittaId ?? undefined,
       magazzinoId: a.magazzinoId ?? undefined,
       centroAscoltoId: a.centroAscoltoId ?? undefined,
       dataRichiesta: a.dataRichiesta ? a.dataRichiesta.substring(0, 10) : new Date().toISOString().substring(0, 10),
@@ -202,20 +214,19 @@ export default function Approvvigionamenti() {
     );
   };
 
-  const handleInviaEmail = (a: OrderRow) => {
-    sendEmail.mutate(
-      { id: a.id },
-      {
-        onSuccess: (res) => {
-          if (res.sent) {
-            toast({ title: t("approvvigionamenti.toastEmailSent") });
-          } else {
-            toast({ title: t("approvvigionamenti.toastEmailError"), description: res.error ?? undefined, variant: "destructive" });
-          }
-        },
-        onError: () => toast({ title: t("approvvigionamenti.toastEmailError"), variant: "destructive" }),
-      },
-    );
+  const orderMailto = (a: OrderRow) => {
+    if (!a.fornitoreEmail) return null;
+    const subject = `Richiesta ordine ${a.codice} - Magazzino Solidale`;
+    const lines = [
+      "Buongiorno,",
+      "",
+      `trasmettiamo la richiesta ${a.codice} di Magazzino Solidale.`,
+      a.note ? `Note: ${a.note}` : "",
+      "",
+      "Grazie.",
+      "Magazzino Solidale",
+    ].filter(Boolean);
+    return `mailto:${a.fornitoreEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
   };
 
   const getStatusBadge = (stato: string) => {
@@ -378,15 +389,17 @@ export default function Approvvigionamenti() {
                       )}
                       {a.stato === "sottomesso" && (
                         <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="gap-1.5"
-                            disabled={sendEmail.isPending}
-                            onClick={() => handleInviaEmail(a)}
-                          >
-                            <Mail className="h-3.5 w-3.5" /> {t("approvvigionamenti.inviaEmail")}
-                          </Button>
+                          {orderMailto(a) ? (
+                            <Button asChild size="sm" variant="ghost" className="gap-1.5">
+                              <a href={orderMailto(a)!} aria-label={`Prepara email per l'ordine ${a.codice}`}>
+                                <Mail className="h-3.5 w-3.5" /> {t("approvvigionamenti.inviaEmail")}
+                              </a>
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="ghost" className="gap-1.5" disabled title="Il fornitore selezionato non dispone di un indirizzo e-mail.">
+                              <Mail className="h-3.5 w-3.5" /> {t("approvvigionamenti.inviaEmail")}
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
@@ -420,15 +433,26 @@ export default function Approvvigionamenti() {
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField control={form.control} name="cittaId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Area</FormLabel>
+                    <Select onValueChange={handleCittaChange} value={field.value ? String(field.value) : undefined}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Seleziona prima l'area" /></SelectTrigger></FormControl>
+                      <SelectContent>{(citta ?? []).map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormField control={form.control} name="fornitoreId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("approvvigionamenti.fornitoreDonatore")}</FormLabel>
-                    <Select onValueChange={handleFornitoreChange} value={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
+                    <Select onValueChange={handleFornitoreChange} value={field.value ? String(field.value) : undefined} disabled={!selectedCittaId}>
+                      <FormControl><SelectTrigger><SelectValue placeholder={selectedCittaId ? t("approvvigionamenti.seleziona") : "Seleziona prima l'area"} /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {fornitori?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                        {fornitoriArea.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    {selectedCittaId && fornitoriArea.length === 0 && <p className="text-sm text-muted-foreground">Nessun fornitore associato all'area selezionata.</p>}
                   </FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">

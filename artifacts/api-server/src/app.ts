@@ -53,6 +53,11 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static(process.env.UPLOAD_DIR ?? "/app/uploads", {
+  fallthrough: false,
+  index: false,
+  maxAge: "1d",
+}));
 
 // Session cookie / proxy configuration adapts to the runtime environment:
 // - On Replit the app is served over HTTPS behind a reverse proxy and rendered

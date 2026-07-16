@@ -27,6 +27,8 @@ import {
 
 const router: IRouter = Router();
 
+import { DATA_NASCITA_FUTURA_MSG, hasFutureBirthDate } from "../lib/bug5Validation";
+
 const CODICE_BENEFICIARIO_DUPLICATO_MSG = "Il codice beneficiario indicato è già associato a un altro beneficiario.";
 const SESSO_OBBLIGATORIO_MSG = "Il campo Sesso è obbligatorio.";
 const CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG =
@@ -387,6 +389,9 @@ async function createBeneficiarioOne(
   req: Request,
 ): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string; status?: number }> {
   const b = body as Record<string, any>;
+  if (hasFutureBirthDate(b.dataNascita)) {
+    return { error: DATA_NASCITA_FUTURA_MSG, status: 400 };
+  }
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
@@ -624,6 +629,10 @@ router.patch("/beneficiari/:id", async (req, res) => {
     return;
   }
   const updates = { ...req.body, dataAggiornamento: new Date() };
+  if (hasFutureBirthDate(updates.dataNascita)) {
+    res.status(400).json({ error: DATA_NASCITA_FUTURA_MSG });
+    return;
+  }
   delete updates.creditoSolidaleSaldo;
   delete updates.creditoSolidaleDataUltimoMovimento;
   if ("uds" in updates) updates.uds = toBool(updates.uds);

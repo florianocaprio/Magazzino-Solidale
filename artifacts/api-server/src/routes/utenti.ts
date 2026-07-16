@@ -203,6 +203,34 @@ async function roleIsSuperAdmin(ruoloId: number | null): Promise<boolean> {
   return r?.nome === SUPER_ADMIN_ROLE_NAME;
 }
 
+async function roleScope(ruoloId: number | null): Promise<{ exists: boolean; isAdmin: boolean; aree: string[] }> {
+  if (ruoloId == null) return { exists: true, isAdmin: false, aree: [] };
+  const [r] = await db
+    .select({ isAdmin: ruoliTable.isAdmin, aree: ruoliTable.aree })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.id, ruoloId));
+  return r
+    ? { exists: true, isAdmin: r.isAdmin, aree: r.aree ?? [] }
+    : { exists: false, isAdmin: false, aree: [] };
+}
+
+async function validateAssignableRole(req: Request, ruoloId: number | null): Promise<string | null> {
+  const role = await roleScope(ruoloId);
+  if (!role.exists) return "Il ruolo selezionato non esiste";
+  if (req.user?.isSuperAdmin) return null;
+  const callerAree = new Set(req.user?.aree ?? []);
+  if (role.aree.some((area) => !callerAree.has(area))) {
+    return "Non puoi assegnare un ruolo con permessi più ampi dei tuoi";
+  }
+  return null;
+}
+
+async function cittaExists(cittaId: number | null): Promise<boolean> {
+  if (cittaId == null) return true;
+  const [row] = await db.select({ id: cittaTable.id }).from(cittaTable).where(eq(cittaTable.id, cittaId));
+  return Boolean(row);
+}
+
 function requireCallerSuperAdmin(req: Request, res: Response): boolean {
   if (req.user?.isSuperAdmin) return true;
   res.status(403).json({ error: "Operazione riservata ai Super Admin" });
@@ -269,6 +297,10 @@ router.post("/utenti", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Solo un Super Admin può creare un altro Super Admin" });
     return;
   }
+  if (!bootstrap) {
+    const roleError = await validateAssignableRole(req, finalRuoloId);
+    if (roleError) { res.status(403).json({ error: roleError }); return; }
+  }
 
   // A centro-bound admin can only create users inside their own centro; the
   // caller's centro is auto-assigned and locked (any body value is ignored).
@@ -290,6 +322,10 @@ router.post("/utenti", async (req, res): Promise<void> => {
     : finalCittaId == null
       ? null
       : (zonaUdsId ?? null);
+  if (!(await cittaExists(finalCittaId))) {
+    res.status(400).json({ error: "L'area geografica selezionata non esiste" });
+    return;
+  }
 
   const [existing] = await db
     .select({ id: utentiTable.id })
@@ -370,6 +406,10 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     return;
   }
   const body = parsed.data;
+  if (body.cittaId !== undefined && !(await cittaExists(body.cittaId))) {
+    res.status(400).json({ error: "L'area geografica selezionata non esiste" });
+    return;
+  }
 
   const [target] = await db
     .select()
@@ -394,9 +434,21 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per la tua città" });
     return;
   }
+  if (cittaCaller != null && body.cittaId !== undefined && body.cittaId !== target.cittaId) {
+    res.status(403).json({ error: "Non sei autorizzato a modificare le aree assegnate al tuo profilo." });
+    return;
+  }
   const zonaCaller = callerZonaUdsId(req);
   if (zonaCaller != null && target.zonaUdsId !== zonaCaller) {
     res.status(403).json({ error: "Utente non accessibile per la tua zona" });
+    return;
+  }
+  if (zonaCaller != null && body.zonaUdsId !== undefined && body.zonaUdsId !== target.zonaUdsId) {
+    res.status(403).json({ error: "Non sei autorizzato a modificare la zona assegnata al tuo profilo." });
+    return;
+  }
+  if (caller != null && body.centroAscoltoId !== undefined && body.centroAscoltoId !== target.centroAscoltoId) {
+    res.status(403).json({ error: "Non sei autorizzato a modificare il centro assegnato al tuo profilo." });
     return;
   }
 
@@ -417,6 +469,12 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
 
   const updates: Partial<typeof utentiTable.$inferInsert> = {};
   if (body.ruoloId !== undefined) {
+    if (id === req.user!.id && body.ruoloId !== target.ruoloId && !req.user?.isSuperAdmin) {
+      res.status(403).json({ error: "Non sei autorizzato a modificare il ruolo assegnato al tuo profilo." });
+      return;
+    }
+    const roleError = await validateAssignableRole(req, body.ruoloId);
+    if (roleError) { res.status(403).json({ error: roleError }); return; }
     const nextIsSuperAdmin = await roleIsSuperAdmin(body.ruoloId);
     if ((nextIsSuperAdmin || target.isSuperAdmin) && !requireCallerSuperAdmin(req, res)) {
       return;

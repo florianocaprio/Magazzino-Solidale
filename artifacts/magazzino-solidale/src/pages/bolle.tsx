@@ -883,12 +883,22 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const isConsegnato = bolla.stato === "consegnato";
   const isAnnullato = bolla.stato === "annullato";
   const modificabile = isBozza; // le prenotazioni si ricalcolano solo confermando una bozza
+  const centroBolla = bollaCentroId != null ? centri?.find((c) => c.id === bollaCentroId) : undefined;
 
   return (
     <div className="mt-4 space-y-5">
       {/* Header info */}
       <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1">
+        <div className="flex items-start gap-3">
+          {centroBolla?.logoUrl && (
+            <img
+              src={centroBolla.logoUrl}
+              alt={`Logo ${centroBolla.nome}`}
+              className="h-14 w-20 shrink-0 rounded border bg-white object-contain p-1"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          )}
+          <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="font-mono font-semibold text-lg">{bolla.numeroBolla}</span>
             {statoBadge(bolla.stato)}
@@ -896,6 +906,8 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
           <p className="text-sm text-muted-foreground">
             {format(new Date(bolla.dataBolla), "dd MMMM yyyy", { locale: it })}
           </p>
+          {centroBolla && <p className="text-sm font-medium">{centroBolla.nome}</p>}
+          </div>
         </div>
         <Button size="sm" variant="outline" className="gap-1.5 h-8 shrink-0" onClick={handleDownloadPdf} disabled={printing || impostazioniLoading}>
           <Download className="h-3.5 w-3.5" /> {t("bolle.scaricaPdf")}

@@ -47,6 +47,7 @@ import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 
@@ -61,7 +62,7 @@ function makeSchema(t: (k: string) => string, isGlobal: boolean) {
       cognome: z.string().min(1, t("common.requiredField")),
       soprannome: z.string().optional(),
       codiceFiscale: z.string().optional(),
-      dataNascita: z.string().optional(),
+      dataNascita: z.string().optional().refine(isNotFutureDateOnly, "La data di nascita non può essere successiva alla data odierna."),
       sesso: z.string().min(1, t("beneficiari.sessoRequired")),
       cittadinanza: z.string().optional(),
       areaProvenienza: z.string().min(1, t("common.requiredField")),
@@ -575,7 +576,7 @@ export default function UdsAnagrafica() {
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="dataNascita" render={({ field }) => (
-                    <FormItem><FormLabel>{t("udsAnagrafica.fDataNascita")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                    <FormItem><FormLabel>{t("udsAnagrafica.fDataNascita")}</FormLabel><FormControl><Input type="date" max={todayDateOnly()} {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="sesso" render={({ field }) => (
                     <FormItem>

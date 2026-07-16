@@ -8,7 +8,8 @@
 import type { ApprovvigionamentoRigaInput } from './approvvigionamentoRigaInput';
 
 export interface ApprovvigionamentoInput {
-  fornitoreId?: number;
+  fornitoreId: number;
+  cittaId: number;
   magazzinoId?: number;
   centroAscoltoId?: number;
   dataRichiesta: string;

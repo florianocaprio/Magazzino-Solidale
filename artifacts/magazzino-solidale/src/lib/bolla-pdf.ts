@@ -43,6 +43,25 @@ function imageSize(dataUrl: string): Promise<{ w: number; h: number }> {
   });
 }
 
+async function loadImageDataUrl(url: string | null | undefined): Promise<string | null> {
+  if (!url) return null;
+  if (url.startsWith("data:image/")) return url;
+  try {
+    const response = await fetch(url, { credentials: "include" });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob.type.startsWith("image/")) return null;
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 type RGB = [number, number, number];
 
 const ACCENT: Record<BollaTemplate, RGB> = {
@@ -88,6 +107,7 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   const documentLogoDataUrl = associationLogoDataUrl === undefined
     ? await loadFallbackLogoDataUrl()
     : associationLogoDataUrl;
+  const headerLogoDataUrl = (await loadImageDataUrl(centro?.logoUrl)) ?? documentLogoDataUrl;
   const template: BollaTemplate = opts.template in ACCENT ? opts.template : "standard";
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -103,8 +123,8 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     doc.setFillColor(accent[0], accent[1], accent[2]);
     doc.rect(0, 0, pageW, 32, "F");
     let textX = margin;
-    if (documentLogoDataUrl) {
-      const drawn = await drawImageFit(doc, documentLogoDataUrl, margin, 6, 20, 20);
+    if (headerLogoDataUrl) {
+      const drawn = await drawImageFit(doc, headerLogoDataUrl, margin, 6, 20, 20);
       if (drawn) textX = margin + 24;
     }
     const leftWidth = pageW - textX - margin - 58;
@@ -131,8 +151,8 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     y = 40;
   } else {
     let textX = margin;
-    if (documentLogoDataUrl && template === "standard") {
-      const drawn = await drawImageFit(doc, documentLogoDataUrl, margin, y, 22, 22);
+    if (headerLogoDataUrl && template === "standard") {
+      const drawn = await drawImageFit(doc, headerLogoDataUrl, margin, y, 22, 22);
       if (drawn) textX = margin + 26;
     }
     const leftWidth = pageW - textX - margin - 66;
