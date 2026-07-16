@@ -61,6 +61,7 @@ import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
 import SuperAdminConfigurazioneAmbiente from "@/pages/super-admin-configurazione-ambiente";
 import SuperAdminModuli from "@/pages/super-admin-moduli";
 import SuperAdminAuditConfigurazioni from "@/pages/super-admin-audit-configurazioni";
+import SostieniProgetto from "@/pages/sostieni-progetto";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -463,6 +464,8 @@ function AppRoutes() {
             </Guard>
           )}
         </Route>
+
+        <Route path="/sostieni-progetto">{() => <SostieniProgetto />}</Route>
 
         <Route component={NotFound} />
       </Switch>
