@@ -9,6 +9,8 @@
 export interface UtenteUpdate {
   /** @minLength 1 */
   nome?: string;
+  /** @minLength 1 */
+  email?: string;
   /** @nullable */
   cognome?: string | null;
   /** @nullable */

@@ -1,19 +1,14 @@
 import bcrypt from "bcryptjs";
-import { and, asc, desc, eq } from "drizzle-orm";
-import {
-  ambienteModuliTable,
-  auditConfigurazioniTable,
-  configurazioneAmbienteTable,
-  db,
-  moduliFunzionaliTable,
-  utentiTable,
-} from "@workspace/db";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
+import { ambienteModuliTable, auditConfigurazioniTable, configurazioneAmbienteTable, db, moduliFunzionaliTable, utentiTable } from "@workspace/db";
 import { logger } from "./logger";
 import { ensureSuperAdminRole } from "./seedRoles";
+import { isValidUserEmail, normalizeEmail } from "./userEmail";
 
 export const CONFIGURAZIONE_AMBIENTE_ID = 1;
 export const DEFAULT_SUPER_ADMIN_USERNAME = "sadmin";
 export const SUPER_ADMIN_INITIAL_PASSWORD_ENV = "SUPER_ADMIN_INITIAL_PASSWORD";
+export const SUPER_ADMIN_INITIAL_EMAIL_ENV = "SUPER_ADMIN_INITIAL_EMAIL";
 
 type ModuloSeed = {
   codice: string;
@@ -127,10 +122,7 @@ function fmtConfigurazione(row: typeof configurazioneAmbienteTable.$inferSelect)
   };
 }
 
-function fmtModulo(row: {
-  m: typeof moduliFunzionaliTable.$inferSelect;
-  am: typeof ambienteModuliTable.$inferSelect | null;
-}): ModuloFunzionaleDto {
+function fmtModulo(row: { m: typeof moduliFunzionaliTable.$inferSelect; am: typeof ambienteModuliTable.$inferSelect | null }): ModuloFunzionaleDto {
   return {
     id: row.m.id,
     codice: row.m.codice,
@@ -149,14 +141,8 @@ function fmtModulo(row: {
 }
 
 export async function ensureConfigurazioneAmbiente(): Promise<typeof configurazioneAmbienteTable.$inferSelect> {
-  await db
-    .insert(configurazioneAmbienteTable)
-    .values({ id: CONFIGURAZIONE_AMBIENTE_ID })
-    .onConflictDoNothing();
-  const [row] = await db
-    .select()
-    .from(configurazioneAmbienteTable)
-    .where(eq(configurazioneAmbienteTable.id, CONFIGURAZIONE_AMBIENTE_ID));
+  await db.insert(configurazioneAmbienteTable).values({ id: CONFIGURAZIONE_AMBIENTE_ID }).onConflictDoNothing();
+  const [row] = await db.select().from(configurazioneAmbienteTable).where(eq(configurazioneAmbienteTable.id, CONFIGURAZIONE_AMBIENTE_ID));
   return row;
 }
 
@@ -198,33 +184,47 @@ export async function ensureAmbienteModuli(): Promise<void> {
 
 export async function ensureDefaultSuperAdminUser(): Promise<void> {
   const superAdminRoleId = await ensureSuperAdminRole();
-  const [existing] = await db
-    .select({ id: utentiTable.id })
-    .from(utentiTable)
-    .where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
+  const initialEmail = process.env[SUPER_ADMIN_INITIAL_EMAIL_ENV]?.trim();
+  const normalizedInitialEmail = initialEmail && isValidUserEmail(initialEmail) ? normalizeEmail(initialEmail) : null;
+  const [existing] = await db.select({ id: utentiTable.id, email: utentiTable.email }).from(utentiTable).where(eq(utentiTable.username, DEFAULT_SUPER_ADMIN_USERNAME));
 
   if (existing) {
+    const updates: Partial<typeof utentiTable.$inferInsert> = {
+      ruoloId: superAdminRoleId,
+      isSuperAdmin: true,
+      centroAscoltoId: null,
+      cittaId: null,
+      zonaUdsId: null,
+    };
+    if (normalizedInitialEmail && !existing.email) {
+      const [emailOwner] = await db
+        .select({ id: utentiTable.id })
+        .from(utentiTable)
+        .where(and(eq(utentiTable.email, normalizedInitialEmail), ne(utentiTable.id, existing.id)));
+      if (!emailOwner) {
+        updates.email = normalizedInitialEmail;
+        updates.emailDaAggiornare = false;
+      }
+    }
     // Never reset credentials or activation flags during application startup.
     // Operators may have rotated or intentionally disabled this technical user.
-    await db
-      .update(utentiTable)
-      .set({
-        ruoloId: superAdminRoleId,
-        isSuperAdmin: true,
-        centroAscoltoId: null,
-        cittaId: null,
-        zonaUdsId: null,
-      })
-      .where(eq(utentiTable.id, existing.id));
+    await db.update(utentiTable).set(updates).where(eq(utentiTable.id, existing.id));
     return;
   }
 
   const initialPassword = process.env[SUPER_ADMIN_INITIAL_PASSWORD_ENV]?.trim();
   if (!initialPassword) {
-    logger.warn(
-      { env: SUPER_ADMIN_INITIAL_PASSWORD_ENV },
-      "Technical SuperAdmin not created; first-run setup remains enabled",
-    );
+    logger.warn({ env: SUPER_ADMIN_INITIAL_PASSWORD_ENV }, "Technical SuperAdmin not created; first-run setup remains enabled");
+    return;
+  }
+  if (!normalizedInitialEmail) {
+    logger.warn({ env: SUPER_ADMIN_INITIAL_EMAIL_ENV }, "Technical SuperAdmin not created; a valid initial email is required");
+    return;
+  }
+
+  const [emailOwner] = await db.select({ id: utentiTable.id }).from(utentiTable).where(eq(utentiTable.email, normalizedInitialEmail));
+  if (emailOwner) {
+    logger.warn({ env: SUPER_ADMIN_INITIAL_EMAIL_ENV }, "Technical SuperAdmin not created; initial email already belongs to another user");
     return;
   }
 
@@ -232,6 +232,8 @@ export async function ensureDefaultSuperAdminUser(): Promise<void> {
 
   await db.insert(utentiTable).values({
     username: DEFAULT_SUPER_ADMIN_USERNAME,
+    email: normalizedInitialEmail,
+    emailDaAggiornare: false,
     passwordHash,
     nome: "Super",
     cognome: "Admin",
@@ -242,6 +244,7 @@ export async function ensureDefaultSuperAdminUser(): Promise<void> {
     attivo: true,
     isSuperAdmin: true,
     mustChangePassword: true,
+    lastPasswordChangeAt: new Date(),
   });
   logger.info({ username: DEFAULT_SUPER_ADMIN_USERNAME }, "Seeded default SuperAdmin user");
 }
@@ -262,13 +265,7 @@ export async function listModuliFunzionali(): Promise<ModuloFunzionaleDto[]> {
   const rows = await db
     .select({ m: moduliFunzionaliTable, am: ambienteModuliTable })
     .from(moduliFunzionaliTable)
-    .leftJoin(
-      ambienteModuliTable,
-      and(
-        eq(ambienteModuliTable.moduloId, moduliFunzionaliTable.id),
-        eq(ambienteModuliTable.configurazioneAmbienteId, configurazione.id),
-      ),
-    )
+    .leftJoin(ambienteModuliTable, and(eq(ambienteModuliTable.moduloId, moduliFunzionaliTable.id), eq(ambienteModuliTable.configurazioneAmbienteId, configurazione.id)))
     .orderBy(asc(moduliFunzionaliTable.ordine), asc(moduliFunzionaliTable.codice));
   return rows.map(fmtModulo);
 }
@@ -283,9 +280,7 @@ export async function getConfigurazioneAmbientePubblica(): Promise<Configurazion
   };
 }
 
-export async function updateConfigurazioneAmbiente(
-  updates: Partial<typeof configurazioneAmbienteTable.$inferInsert>,
-): Promise<ConfigurazioneAmbienteDto> {
+export async function updateConfigurazioneAmbiente(updates: Partial<typeof configurazioneAmbienteTable.$inferInsert>): Promise<ConfigurazioneAmbienteDto> {
   await ensureConfigurazioneAmbiente();
   const [row] = await db
     .update(configurazioneAmbienteTable)
@@ -295,20 +290,16 @@ export async function updateConfigurazioneAmbiente(
   return fmtConfigurazione(row);
 }
 
-export async function updateModuloAmbiente(
-  codice: string,
-  attivo: boolean,
-  abilitatoDaId: number | null,
-): Promise<ModuloFunzionaleDto | { error: string; status: number }> {
+export async function updateModuloAmbiente(codice: string, attivo: boolean, abilitatoDaId: number | null): Promise<ModuloFunzionaleDto | { error: string; status: number }> {
   await ensureAmbienteModuli();
   const normalized = codice.trim().toUpperCase();
-  const [modulo] = await db
-    .select()
-    .from(moduliFunzionaliTable)
-    .where(eq(moduliFunzionaliTable.codice, normalized));
+  const [modulo] = await db.select().from(moduliFunzionaliTable).where(eq(moduliFunzionaliTable.codice, normalized));
   if (!modulo) return { error: "Modulo funzionale non trovato", status: 404 };
   if (modulo.core && !attivo) {
-    return { error: "I moduli core non possono essere disabilitati", status: 400 };
+    return {
+      error: "I moduli core non possono essere disabilitati",
+      status: 400,
+    };
   }
 
   const configurazione = await ensureConfigurazioneAmbiente();
@@ -334,24 +325,14 @@ export async function updateModuloAmbiente(
   const [row] = await db
     .select({ m: moduliFunzionaliTable, am: ambienteModuliTable })
     .from(moduliFunzionaliTable)
-    .leftJoin(
-      ambienteModuliTable,
-      and(
-        eq(ambienteModuliTable.moduloId, moduliFunzionaliTable.id),
-        eq(ambienteModuliTable.configurazioneAmbienteId, configurazione.id),
-      ),
-    )
+    .leftJoin(ambienteModuliTable, and(eq(ambienteModuliTable.moduloId, moduliFunzionaliTable.id), eq(ambienteModuliTable.configurazioneAmbienteId, configurazione.id)))
     .where(eq(moduliFunzionaliTable.id, modulo.id));
   return fmtModulo(row);
 }
 
 export async function listAuditConfigurazioni(limit = 100) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 200) : 100;
-  const rows = await db
-    .select()
-    .from(auditConfigurazioniTable)
-    .orderBy(desc(auditConfigurazioniTable.dataOra), desc(auditConfigurazioniTable.id))
-    .limit(safeLimit);
+  const rows = await db.select().from(auditConfigurazioniTable).orderBy(desc(auditConfigurazioniTable.dataOra), desc(auditConfigurazioniTable.id)).limit(safeLimit);
   return rows.map((r) => ({
     id: r.id,
     area: r.area,

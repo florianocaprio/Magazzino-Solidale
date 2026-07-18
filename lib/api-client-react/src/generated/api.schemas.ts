@@ -3034,6 +3034,8 @@ export interface BootstrapStatus {
 export interface AuthUser {
   id: number;
   username: string;
+  /** @nullable */
+  email?: string | null;
   nome: string;
   /** @nullable */
   cognome?: string | null;
@@ -3059,6 +3061,7 @@ export interface AuthUser {
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;
+  emailDaAggiornare: boolean;
 }
 
 export interface LoginInput {
@@ -3076,6 +3079,8 @@ export interface ChangePasswordInput {
 export interface Utente {
   id: number;
   username: string;
+  /** @nullable */
+  email?: string | null;
   nome: string;
   /** @nullable */
   cognome?: string | null;
@@ -3100,6 +3105,11 @@ export interface Utente {
   isSuperAdmin: boolean;
   attivo: boolean;
   mustChangePassword: boolean;
+  emailDaAggiornare: boolean;
+  /** @nullable */
+  emailVerifiedAt?: string | null;
+  /** @nullable */
+  lastPasswordChangeAt?: string | null;
   /** @nullable */
   ultimoAccesso?: string | null;
   dataCreazione: string;
@@ -3108,6 +3118,8 @@ export interface Utente {
 export interface UtenteInput {
   /** @minLength 1 */
   username: string;
+  /** @minLength 1 */
+  email: string;
   /** @minLength 6 */
   password: string;
   /** @minLength 1 */
@@ -3130,6 +3142,8 @@ export interface UtenteInput {
 export interface UtenteUpdate {
   /** @minLength 1 */
   nome?: string;
+  /** @minLength 1 */
+  email?: string;
   /** @nullable */
   cognome?: string | null;
   /** @nullable */

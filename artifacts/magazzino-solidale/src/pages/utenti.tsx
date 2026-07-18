@@ -1,17 +1,5 @@
 import { useState } from "react";
-import {
-  useListUtenti,
-  useCreateUtente,
-  useUpdateUtente,
-  useDeleteUtente,
-  useResetUtentePassword,
-  useListRuoli,
-  useListCentriAscolto,
-  useListCitta,
-  useListZoneUds,
-  getListUtentiQueryKey,
-  type Utente,
-} from "@workspace/api-client-react";
+import { useListUtenti, useCreateUtente, useUpdateUtente, useDeleteUtente, useResetUtentePassword, useListRuoli, useListCentriAscolto, useListCitta, useListZoneUds, getListUtentiQueryKey, type Utente } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -19,50 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -96,10 +46,9 @@ export default function Utenti() {
     ...(nomeFilter.trim() ? { query: nomeFilter.trim() } : {}),
   };
   const listUtentiParams = Object.keys(utentiParams).length > 0 ? utentiParams : undefined;
-  const { data: utenti, isLoading } = useListUtenti(
-    listUtentiParams,
-    { query: { queryKey: getListUtentiQueryKey(listUtentiParams) } },
-  );
+  const { data: utenti, isLoading } = useListUtenti(listUtentiParams, {
+    query: { queryKey: getListUtentiQueryKey(listUtentiParams) },
+  });
   const { data: ruoli } = useListRuoli();
   const { data: centri } = useListCentriAscolto();
   const { data: citta } = useListCitta();
@@ -117,6 +66,7 @@ export default function Utenti() {
   const [resetting, setResetting] = useState<Utente | null>(null);
 
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
   const [cognome, setCognome] = useState("");
   const [matricola, setMatricola] = useState("");
@@ -134,15 +84,20 @@ export default function Utenti() {
   const editingSelf = editing?.id === currentUser?.id;
   const { data: zoneUds } = useListZoneUds(
     { cittaId: selectedCittaNum },
-    { query: { enabled: selectedCittaNum != null, queryKey: ["zoneUds", selectedCittaNum] } },
+    {
+      query: {
+        enabled: selectedCittaNum != null,
+        queryKey: ["zoneUds", selectedCittaNum],
+      },
+    },
   );
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: getListUtentiQueryKey() });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListUtentiQueryKey() });
 
   const openCreate = () => {
     setEditing(null);
     setUsername("");
+    setEmail("");
     setNome("");
     setCognome("");
     setMatricola("");
@@ -160,6 +115,7 @@ export default function Utenti() {
     if (u.isSuperAdmin && !currentUser?.isSuperAdmin) return;
     setEditing(u);
     setUsername(u.username);
+    setEmail(u.email ?? "");
     setNome(u.nome);
     setCognome(u.cognome ?? "");
     setMatricola(u.matricola ?? "");
@@ -177,24 +133,25 @@ export default function Utenti() {
     e.preventDefault();
     setFormError(null);
     const ruoloIdValue = ruoloId === NO_ROLE ? null : parseInt(ruoloId, 10);
-    const centroIdValue = isCentroLocked
-      ? lockedCentroId
-      : centroId === NO_CENTRO
-        ? null
-        : parseInt(centroId, 10);
-    const cittaIdValue = isCittaLocked
-      ? lockedCittaId
-      : cittaId === NO_CITTA
-        ? null
-        : parseInt(cittaId, 10);
-    const zonaUdsIdValue =
-      cittaIdValue == null || zonaUdsId === ALL_ZONE ? null : parseInt(zonaUdsId, 10);
+    const centroIdValue = isCentroLocked ? lockedCentroId : centroId === NO_CENTRO ? null : parseInt(centroId, 10);
+    const cittaIdValue = isCittaLocked ? lockedCittaId : cittaId === NO_CITTA ? null : parseInt(cittaId, 10);
+    const zonaUdsIdValue = cittaIdValue == null || zonaUdsId === ALL_ZONE ? null : parseInt(zonaUdsId, 10);
 
     if (editing) {
       updateUtente.mutate(
         {
           id: editing.id,
-          data: { nome, cognome: cognome.trim() || null, matricola: matricola.trim() || null, ruoloId: ruoloIdValue, centroAscoltoId: centroIdValue, cittaId: cittaIdValue, zonaUdsId: zonaUdsIdValue, attivo },
+          data: {
+            nome,
+            email: email.trim(),
+            cognome: cognome.trim() || null,
+            matricola: matricola.trim() || null,
+            ruoloId: ruoloIdValue,
+            centroAscoltoId: centroIdValue,
+            cittaId: cittaIdValue,
+            zonaUdsId: zonaUdsIdValue,
+            attivo,
+          },
         },
         {
           onSuccess: () => {
@@ -214,6 +171,7 @@ export default function Utenti() {
         {
           data: {
             username: username.trim(),
+            email: email.trim(),
             nome,
             cognome: cognome.trim(),
             matricola: matricola.trim() || null,
@@ -299,9 +257,7 @@ export default function Utenti() {
       <div className="flex justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{t("utenti.title")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("utenti.subtitle")}
-          </p>
+          <p className="text-sm text-muted-foreground">{t("utenti.subtitle")}</p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
@@ -314,13 +270,27 @@ export default function Utenti() {
           <div className="grid gap-3 md:grid-cols-3">
             {canFilterAreaGeografica && (
               <div className="space-y-2">
-                <Label>{t("utenti.areaGeografica", { defaultValue: "Area geografica" })}</Label>
+                <Label>
+                  {t("utenti.areaGeografica", {
+                    defaultValue: "Area geografica",
+                  })}
+                </Label>
                 <Select value={effectiveCittaFilter} onValueChange={setCittaFilter} disabled={isCittaLocked}>
                   <SelectTrigger>
-                    <SelectValue placeholder={t("common.tutteCitta", { defaultValue: "Tutte le aree" })} />
+                    <SelectValue
+                      placeholder={t("common.tutteCitta", {
+                        defaultValue: "Tutte le aree",
+                      })}
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {!isCittaLocked && <SelectItem value="all">{t("common.tutteCitta", { defaultValue: "Tutte le aree" })}</SelectItem>}
+                    {!isCittaLocked && (
+                      <SelectItem value="all">
+                        {t("common.tutteCitta", {
+                          defaultValue: "Tutte le aree",
+                        })}
+                      </SelectItem>
+                    )}
                     {citta?.map((area) => (
                       <SelectItem key={area.id} value={String(area.id)}>
                         {area.nome}
@@ -332,12 +302,7 @@ export default function Utenti() {
             )}
             <div className="space-y-2">
               <Label htmlFor="utenti-filter-matricola">{t("utenti.colMatricola")}</Label>
-              <Input
-                id="utenti-filter-matricola"
-                value={matricolaFilter}
-                onChange={(e) => setMatricolaFilter(e.target.value)}
-                placeholder={t("utenti.matricolaPlaceholder")}
-              />
+              <Input id="utenti-filter-matricola" value={matricolaFilter} onChange={(e) => setMatricolaFilter(e.target.value)} placeholder={t("utenti.matricolaPlaceholder")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="utenti-filter-nome">{t("common.name")}</Label>
@@ -345,7 +310,9 @@ export default function Utenti() {
                 id="utenti-filter-nome"
                 value={nomeFilter}
                 onChange={(e) => setNomeFilter(e.target.value)}
-                placeholder={t("utenti.searchNamePlaceholder", { defaultValue: "Nome, cognome o username" })}
+                placeholder={t("utenti.searchNamePlaceholder", {
+                  defaultValue: "Nome, cognome o username",
+                })}
               />
             </div>
           </div>
@@ -362,6 +329,7 @@ export default function Utenti() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("utenti.colUsername")}</TableHead>
+                  <TableHead>{t("common.email")}</TableHead>
                   <TableHead>{t("common.name")}</TableHead>
                   <TableHead>{t("utenti.colMatricola")}</TableHead>
                   <TableHead>{t("utenti.colRuolo")}</TableHead>
@@ -377,41 +345,20 @@ export default function Utenti() {
                 {utenti?.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.username}</TableCell>
+                    <TableCell className="text-muted-foreground">{u.email ?? "—"}</TableCell>
                     <TableCell>{[u.nome, u.cognome].filter(Boolean).join(" ")}</TableCell>
                     <TableCell>{u.matricola ?? "—"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span>{u.ruoloNome ?? "—"}</span>
-                        {u.isSuperAdmin && (
-                          <Badge className="bg-amber-500/10 text-amber-700">
-                            SuperAdmin
-                          </Badge>
-                        )}
+                        {u.isSuperAdmin && <Badge className="bg-amber-500/10 text-amber-700">SuperAdmin</Badge>}
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.centroAscoltoNome ?? t("common.centroComune")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.cittaNome ?? t("utenti.cittaGlobale")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.zonaUdsNome ?? t("utenti.tutteLeZone")}
-                    </TableCell>
-                    <TableCell>
-                      {u.attivo ? (
-                        <Badge className="bg-emerald-500/10 text-emerald-700">
-                          {t("common.active")}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">{t("utenti.disattivato")}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.ultimoAccesso
-                        ? new Date(u.ultimoAccesso).toLocaleString("it-IT")
-                        : t("utenti.never")}
-                    </TableCell>
+                    <TableCell className="text-muted-foreground">{u.centroAscoltoNome ?? t("common.centroComune")}</TableCell>
+                    <TableCell className="text-muted-foreground">{u.cittaNome ?? t("utenti.cittaGlobale")}</TableCell>
+                    <TableCell className="text-muted-foreground">{u.zonaUdsNome ?? t("utenti.tutteLeZone")}</TableCell>
+                    <TableCell>{u.attivo ? <Badge className="bg-emerald-500/10 text-emerald-700">{t("common.active")}</Badge> : <Badge variant="secondary">{t("utenti.disattivato")}</Badge>}</TableCell>
+                    <TableCell className="text-muted-foreground">{u.ultimoAccesso ? new Date(u.ultimoAccesso).toLocaleString("it-IT") : t("utenti.never")}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -420,10 +367,7 @@ export default function Utenti() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            disabled={u.isSuperAdmin && !currentUser?.isSuperAdmin}
-                            onClick={() => openEdit(u)}
-                          >
+                          <DropdownMenuItem disabled={u.isSuperAdmin && !currentUser?.isSuperAdmin} onClick={() => openEdit(u)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             {t("common.edit")}
                           </DropdownMenuItem>
@@ -437,11 +381,7 @@ export default function Utenti() {
                             <KeyRound className="mr-2 h-4 w-4" />
                             {t("utenti.resetPassword")}
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            disabled={u.id === currentUser?.id || (u.isSuperAdmin && !currentUser?.isSuperAdmin)}
-                            onClick={() => setDeleting(u)}
-                          >
+                          <DropdownMenuItem className="text-destructive" disabled={u.id === currentUser?.id || (u.isSuperAdmin && !currentUser?.isSuperAdmin)} onClick={() => setDeleting(u)}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             {t("common.delete")}
                           </DropdownMenuItem>
@@ -452,10 +392,7 @@ export default function Utenti() {
                 ))}
                 {utenti?.length === 0 && (
                   <TableRow>
-                    <TableCell
-                      colSpan={10}
-                      className="text-center text-muted-foreground py-8"
-                    >
+                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                       {t("utenti.emptyUsers")}
                     </TableCell>
                   </TableRow>
@@ -469,67 +406,37 @@ export default function Utenti() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>
-              {editing ? t("utenti.editUser") : t("utenti.nuovoUtente")}
-            </SheetTitle>
+            <SheetTitle>{editing ? t("utenti.editUser") : t("utenti.nuovoUtente")}</SheetTitle>
           </SheetHeader>
           <form onSubmit={onSubmit} className="space-y-4 mt-6">
             <div className="space-y-2">
               <Label htmlFor="u-username">{t("utenti.colUsername")}</Label>
-              <Input
-                id="u-username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={!!editing}
-                required
-              />
+              <Input id="u-username" value={username} onChange={(e) => setUsername(e.target.value)} disabled={!!editing} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="u-email">{t("common.email")}</Label>
+              <Input id="u-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="u-nome">{t("common.name")}</Label>
-                <Input
-                  id="u-nome"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  required
-                />
+                <Input id="u-nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="u-cognome">{t("common.surname")}</Label>
-                <Input
-                  id="u-cognome"
-                  value={cognome}
-                  onChange={(e) => setCognome(e.target.value)}
-                  required
-                />
+                <Input id="u-cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} required />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="u-matricola">{t("utenti.colMatricola")}</Label>
-              <Input
-                id="u-matricola"
-                value={matricola}
-                onChange={(e) => setMatricola(e.target.value)}
-                placeholder={t("utenti.matricolaPlaceholder")}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("utenti.matricolaHint")}
-              </p>
+              <Input id="u-matricola" value={matricola} onChange={(e) => setMatricola(e.target.value)} placeholder={t("utenti.matricolaPlaceholder")} />
+              <p className="text-xs text-muted-foreground">{t("utenti.matricolaHint")}</p>
             </div>
             {!editing && (
               <div className="space-y-2">
                 <Label htmlFor="u-password">{t("utenti.passwordIniziale")}</Label>
-                <Input
-                  id="u-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("utenti.passwordHint")}
-                </p>
+                <Input id="u-password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <p className="text-xs text-muted-foreground">{t("utenti.passwordHint")}</p>
               </div>
             )}
             <div className="space-y-2">
@@ -547,17 +454,11 @@ export default function Utenti() {
                   ))}
                 </SelectContent>
               </Select>
-              {editingSelf && !currentUser?.isSuperAdmin && (
-                <p className="text-xs text-muted-foreground">Non sei autorizzato a modificare il ruolo assegnato al tuo profilo.</p>
-              )}
+              {editingSelf && !currentUser?.isSuperAdmin && <p className="text-xs text-muted-foreground">Non sei autorizzato a modificare il ruolo assegnato al tuo profilo.</p>}
             </div>
             <div className="space-y-2">
               <Label>{t("common.centro")}</Label>
-              <Select
-                value={centroId}
-                onValueChange={setCentroId}
-                disabled={isCentroLocked}
-              >
+              <Select value={centroId} onValueChange={setCentroId} disabled={isCentroLocked}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -570,11 +471,7 @@ export default function Utenti() {
                   ))}
                 </SelectContent>
               </Select>
-              {isCentroLocked && (
-                <p className="text-xs text-muted-foreground">
-                  {t("common.centroLocked")}
-                </p>
-              )}
+              {isCentroLocked && <p className="text-xs text-muted-foreground">{t("common.centroLocked")}</p>}
             </div>
             <div className="space-y-2">
               <Label>{t("utenti.colCitta")}</Label>
@@ -601,11 +498,7 @@ export default function Utenti() {
             </div>
             <div className="space-y-2">
               <Label>{t("utenti.colZona")}</Label>
-              <Select
-                value={zonaUdsId}
-                onValueChange={setZonaUdsId}
-                disabled={cittaId === NO_CITTA || isZonaLocked}
-              >
+              <Select value={zonaUdsId} onValueChange={setZonaUdsId} disabled={cittaId === NO_CITTA || isZonaLocked}>
                 <SelectTrigger>
                   <SelectValue placeholder={t("utenti.selezionaZona")} />
                 </SelectTrigger>
@@ -621,57 +514,32 @@ export default function Utenti() {
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="u-attivo">{t("utenti.accountAttivo")}</Label>
-              <Switch
-                id="u-attivo"
-                checked={attivo}
-                onCheckedChange={setAttivo}
-              />
+              <Switch id="u-attivo" checked={attivo} onCheckedChange={setAttivo} />
             </div>
-            {formError && (
-              <p className="text-sm text-destructive">{formError}</p>
-            )}
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={createUtente.isPending || updateUtente.isPending}
-            >
+            {formError && <p className="text-sm text-destructive">{formError}</p>}
+            <Button type="submit" className="w-full" disabled={createUtente.isPending || updateUtente.isPending}>
               {editing ? t("utenti.saveChanges") : t("utenti.createUser")}
             </Button>
           </form>
         </SheetContent>
       </Sheet>
 
-      <Dialog
-        open={!!resetting}
-        onOpenChange={(open) => !open && setResetting(null)}
-      >
+      <Dialog open={!!resetting} onOpenChange={(open) => !open && setResetting(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("utenti.resetTitle")}</DialogTitle>
           </DialogHeader>
           <form onSubmit={confirmReset} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {t("utenti.resetDescBefore")}{" "}
-              <span className="font-medium">{resetting?.username}</span>
+              {t("utenti.resetDescBefore")} <span className="font-medium">{resetting?.username}</span>
               {t("utenti.resetDescAfter")}
             </p>
             <div className="space-y-2">
               <Label htmlFor="reset-pwd">{t("utenti.nuovaPassword")}</Label>
-              <Input
-                id="reset-pwd"
-                type="password"
-                autoComplete="new-password"
-                value={resetPwd}
-                onChange={(e) => setResetPwd(e.target.value)}
-                required
-              />
+              <Input id="reset-pwd" type="password" autoComplete="new-password" value={resetPwd} onChange={(e) => setResetPwd(e.target.value)} required />
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setResetting(null)}
-              >
+              <Button type="button" variant="outline" onClick={() => setResetting(null)}>
                 {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={resetPassword.isPending}>
@@ -682,25 +550,17 @@ export default function Utenti() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
-        open={!!deleting}
-        onOpenChange={(open) => !open && setDeleting(null)}
-      >
+      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("utenti.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("utenti.deleteDescBefore")}{" "}
-              <span className="font-medium">{deleting?.username}</span>{" "}
-              {t("utenti.deleteDescAfter")}
+              {t("utenti.deleteDescBefore")} <span className="font-medium">{deleting?.username}</span> {t("utenti.deleteDescAfter")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>

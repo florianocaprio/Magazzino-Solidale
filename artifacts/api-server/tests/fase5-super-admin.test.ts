@@ -2,27 +2,14 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
-import {
-  auditConfigurazioniTable,
-  db,
-  pool,
-  ruoliTable,
-  utentiTable,
-} from "@workspace/db";
+import { auditConfigurazioniTable, db, pool, ruoliTable, utentiTable } from "@workspace/db";
 import authRouter from "../src/routes/auth";
 import configurazioneAmbienteRouter from "../src/routes/configurazione-ambiente";
 import impostazioniModuliRouter from "../src/routes/impostazioni-moduli";
 import superAdminRouter from "../src/routes/super-admin";
 import utentiRouter from "../src/routes/utenti";
 import { requireModulo } from "../src/lib/featureFlags";
-import {
-  ensureFase5Bootstrap,
-  getConfigurazioneAmbiente,
-  listModuliFunzionali,
-  updateConfigurazioneAmbiente,
-  updateModuloAmbiente,
-  type ConfigurazioneAmbienteDto,
-} from "../src/lib/configurazioneAmbiente";
+import { ensureFase5Bootstrap, getConfigurazioneAmbiente, listModuliFunzionali, updateConfigurazioneAmbiente, updateModuloAmbiente, type ConfigurazioneAmbienteDto } from "../src/lib/configurazioneAmbiente";
 import type { SessionUser } from "../src/middlewares/auth";
 import { loadSessionUser } from "../src/middlewares/auth";
 import { DEFAULT_SUPER_ADMIN_USERNAME } from "../src/lib/configurazioneAmbiente";
@@ -75,17 +62,17 @@ function authApp(sessionUserId: number): Express {
 async function createAdminUser(isSuperAdmin: boolean): Promise<SessionUser> {
   const suffix = rnd();
   const ruoloNome = `Fase5 Admin ${suffix}`;
-  const [role] = await db
-    .insert(ruoliTable)
-    .values({ nome: ruoloNome, isAdmin: true, aree: [] })
-    .returning({ id: ruoliTable.id });
+  const [role] = await db.insert(ruoliTable).values({ nome: ruoloNome, isAdmin: true, aree: [] }).returning({ id: ruoliTable.id });
   createdRoleIds.push(role.id);
 
   const username = `fase5_${suffix}`;
+  const email = `${username}@example.org`;
   const [user] = await db
     .insert(utentiTable)
     .values({
       username,
+      email,
+      emailDaAggiornare: false,
       passwordHash: "test-hash",
       nome: "Fase5",
       cognome: "Admin",
@@ -100,6 +87,8 @@ async function createAdminUser(isSuperAdmin: boolean): Promise<SessionUser> {
   return {
     id: user.id,
     username,
+    email,
+    emailDaAggiornare: false,
     nome: "Fase5",
     cognome: "Admin",
     matricola: null,
@@ -145,15 +134,10 @@ async function restoreConfig(): Promise<void> {
 beforeEach(async () => {
   await ensureFase5Bootstrap();
   originalConfig = await getConfigurazioneAmbiente();
-  const predittivo = (await listModuliFunzionali()).find(
-    (m) => m.codice === "PREDITTIVO",
-  );
+  const predittivo = (await listModuliFunzionali()).find((m) => m.codice === "PREDITTIVO");
   originalPredittivoAttivo = predittivo?.attivo ?? true;
-  originalEmporioAttivo =
-    (await listModuliFunzionali()).find((m) => m.codice === "EMPORIO_SOLIDALE")
-      ?.attivo ?? true;
-  originalUdsAttivo =
-    (await listModuliFunzionali()).find((m) => m.codice === "UDS")?.attivo ?? true;
+  originalEmporioAttivo = (await listModuliFunzionali()).find((m) => m.codice === "EMPORIO_SOLIDALE")?.attivo ?? true;
+  originalUdsAttivo = (await listModuliFunzionali()).find((m) => m.codice === "UDS")?.attivo ?? true;
   superUser = await createAdminUser(true);
   adminUser = await createAdminUser(false);
 });
@@ -164,9 +148,7 @@ afterEach(async () => {
   await updateModuloAmbiente("EMPORIO_SOLIDALE", originalEmporioAttivo, null);
   await updateModuloAmbiente("UDS", originalUdsAttivo, null);
   if (createdUserIds.length > 0) {
-    await db
-      .delete(auditConfigurazioniTable)
-      .where(inArray(auditConfigurazioniTable.utenteId, createdUserIds));
+    await db.delete(auditConfigurazioniTable).where(inArray(auditConfigurazioniTable.utenteId, createdUserIds));
     await db.delete(utentiTable).where(inArray(utentiTable.id, createdUserIds.splice(0)));
   }
   if (createdRoleIds.length > 0) {
@@ -245,53 +227,34 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
   });
 
   it("riserva gli endpoint /super-admin ai soli Super Admin", async () => {
-    const forbidden = await request(appAs(adminUser)).get(
-      "/super-admin/configurazione-ambiente",
-    );
+    const forbidden = await request(appAs(adminUser)).get("/super-admin/configurazione-ambiente");
     expect(forbidden.status).toBe(403);
 
-    const allowed = await request(appAs(superUser)).get(
-      "/super-admin/configurazione-ambiente",
-    );
+    const allowed = await request(appAs(superUser)).get("/super-admin/configurazione-ambiente");
     expect(allowed.status).toBe(200);
     expect(allowed.body.id).toBe(1);
   });
 
   it("impedisce a un admin normale di modificare o resettare un SuperAdmin", async () => {
-    const patch = await request(appAs(adminUser))
-      .patch(`/utenti/${superUser.id}`)
-      .send({ nome: "Non autorizzato" });
+    const patch = await request(appAs(adminUser)).patch(`/utenti/${superUser.id}`).send({ nome: "Non autorizzato" });
     expect(patch.status).toBe(403);
 
-    const reset = await request(appAs(adminUser))
-      .post(`/utenti/${superUser.id}/reset-password`)
-      .send({ newPassword: "NuovaPassword1" });
+    const reset = await request(appAs(adminUser)).post(`/utenti/${superUser.id}/reset-password`).send({ newPassword: "NuovaPassword1" });
     expect(reset.status).toBe(403);
   });
 
   it("aggiorna la configurazione ambiente e registra audit", async () => {
     const nomeAmbiente = `Ambiente ${rnd()}`;
 
-    const patch = await request(appAs(superUser))
-      .patch("/super-admin/configurazione-ambiente")
-      .send({ nomeAmbiente });
+    const patch = await request(appAs(superUser)).patch("/super-admin/configurazione-ambiente").send({ nomeAmbiente });
 
     expect(patch.status).toBe(200);
     expect(patch.body.nomeAmbiente).toBe(nomeAmbiente);
     expect(patch.body.aggiornatoDaId).toBe(superUser.id);
 
-    const audit = await request(appAs(superUser))
-      .get("/super-admin/audit-configurazioni")
-      .query({ limit: "20" });
+    const audit = await request(appAs(superUser)).get("/super-admin/audit-configurazioni").query({ limit: "20" });
     expect(audit.status).toBe(200);
-    expect(
-      audit.body.some(
-        (row: { area: string; chiave: string; utenteId: number | null }) =>
-          row.area === "configurazione_ambiente" &&
-          row.chiave === "singleton" &&
-          row.utenteId === superUser.id,
-      ),
-    ).toBe(true);
+    expect(audit.body.some((row: { area: string; chiave: string; utenteId: number | null }) => row.area === "configurazione_ambiente" && row.chiave === "singleton" && row.utenteId === superUser.id)).toBe(true);
   });
 
   it("gestisce catalogo moduli, toggle e blocco dei moduli core", async () => {
@@ -300,9 +263,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     expect(list.body.some((m: { codice: string }) => m.codice === "DASHBOARD")).toBe(true);
     expect(list.body.some((m: { codice: string }) => m.codice === "PREDITTIVO")).toBe(true);
 
-    const disabled = await request(appAs(superUser))
-      .patch("/super-admin/moduli/PREDITTIVO")
-      .send({ attivo: false });
+    const disabled = await request(appAs(superUser)).patch("/super-admin/moduli/PREDITTIVO").send({ attivo: false });
     expect(disabled.status).toBe(200);
     expect(disabled.body.attivo).toBe(false);
 
@@ -310,52 +271,29 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     expect(publicConfig.status).toBe(200);
     expect(publicConfig.body.moduliAttivi).not.toContain("PREDITTIVO");
 
-    const core = await request(appAs(superUser))
-      .patch("/super-admin/moduli/DASHBOARD")
-      .send({ attivo: false });
+    const core = await request(appAs(superUser)).patch("/super-admin/moduli/DASHBOARD").send({ attivo: false });
     expect(core.status).toBe(400);
   });
 
   it("mantiene il PATCH legacy coerente, riservato al Super Admin e con audit", async () => {
-    const forbidden = await request(appAs(adminUser))
-      .patch("/impostazioni-moduli")
-      .send({ emporioAbilitato: !originalEmporioAttivo });
+    const forbidden = await request(appAs(adminUser)).patch("/impostazioni-moduli").send({ emporioAbilitato: !originalEmporioAttivo });
     expect(forbidden.status).toBe(403);
 
-    const updated = await request(appAs(superUser))
-      .patch("/impostazioni-moduli")
-      .send({
-        emporioAbilitato: !originalEmporioAttivo,
-        unitaStradaAbilitata: !originalUdsAttivo,
-      });
+    const updated = await request(appAs(superUser)).patch("/impostazioni-moduli").send({
+      emporioAbilitato: !originalEmporioAttivo,
+      unitaStradaAbilitata: !originalUdsAttivo,
+    });
     expect(updated.status).toBe(200);
     expect(updated.body.emporioAbilitato).toBe(!originalEmporioAttivo);
     expect(updated.body.unitaStradaAbilitata).toBe(!originalUdsAttivo);
 
     const publicConfig = await request(appAs(superUser)).get("/configurazione-ambiente");
-    expect(publicConfig.body.moduliAttivi.includes("EMPORIO_SOLIDALE")).toBe(
-      !originalEmporioAttivo,
-    );
+    expect(publicConfig.body.moduliAttivi.includes("EMPORIO_SOLIDALE")).toBe(!originalEmporioAttivo);
     expect(publicConfig.body.moduliAttivi.includes("UDS")).toBe(!originalUdsAttivo);
 
-    const audit = await request(appAs(superUser))
-      .get("/super-admin/audit-configurazioni")
-      .query({ limit: "20" });
+    const audit = await request(appAs(superUser)).get("/super-admin/audit-configurazioni").query({ limit: "20" });
     for (const codice of ["EMPORIO_SOLIDALE", "UDS"]) {
-      expect(
-        audit.body.some(
-          (row: {
-            area: string;
-            chiave: string;
-            azione: string;
-            utenteId: number | null;
-          }) =>
-            row.area === "moduli_funzionali" &&
-            row.chiave === codice &&
-            row.azione === "toggle" &&
-            row.utenteId === superUser.id,
-        ),
-      ).toBe(true);
+      expect(audit.body.some((row: { area: string; chiave: string; azione: string; utenteId: number | null }) => row.area === "moduli_funzionali" && row.chiave === codice && row.azione === "toggle" && row.utenteId === superUser.id)).toBe(true);
     }
   });
 
@@ -374,8 +312,6 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     const denied = await request(appAs(superUser)).get("/test-modulo-inesistente");
 
     expect(denied.status).toBe(403);
-    expect(denied.body.error).toBe(
-      "Modulo NON_ESISTE non abilitato per questo ambiente",
-    );
+    expect(denied.body.error).toBe("Modulo NON_ESISTE non abilitato per questo ambiente");
   });
 });

@@ -1,22 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  useListRuoli,
-  useListUtenti,
-  useCreateUtente,
-} from "@workspace/api-client-react";
+import { useListRuoli, useListUtenti, useCreateUtente } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +21,7 @@ export default function Setup() {
   const createUser = useCreateUtente();
 
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
   const [cognome, setCognome] = useState("");
   const [password, setPassword] = useState("");
@@ -52,14 +43,12 @@ export default function Setup() {
     }
   }, [isFirstUser, ruoloId, superAdminRole]);
 
-  const selectedRole = useMemo(
-    () => roles.find((r) => String(r.id) === ruoloId),
-    [roles, ruoloId],
-  );
+  const selectedRole = useMemo(() => roles.find((r) => String(r.id) === ruoloId), [roles, ruoloId]);
   const creatingAdmin = selectedRole?.isAdmin ?? false;
 
   const resetForm = () => {
     setUsername("");
+    setEmail("");
     setNome("");
     setCognome("");
     setPassword("");
@@ -82,6 +71,7 @@ export default function Setup() {
       {
         data: {
           username: username.trim(),
+          email: email.trim(),
           nome: nome.trim(),
           cognome: cognome.trim(),
           password,
@@ -90,7 +80,9 @@ export default function Setup() {
       },
       {
         onSuccess: () => {
-          toast({ title: t("setup.toastCreated", { username: username.trim() }) });
+          toast({
+            title: t("setup.toastCreated", { username: username.trim() }),
+          });
           resetForm();
           if (willBeAdmin) {
             // Creating the first admin ends bootstrap mode: switch to login.
@@ -101,9 +93,7 @@ export default function Setup() {
           }
         },
         onError: (err) => {
-          const message =
-            (err as { error?: string } | undefined)?.error ??
-            t("setup.errorGeneric");
+          const message = (err as { error?: string } | undefined)?.error ?? t("setup.errorGeneric");
           setError(message);
         },
       },
@@ -115,11 +105,7 @@ export default function Setup() {
       <div className="w-full max-w-3xl grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-col items-center gap-3 pt-8">
-            <img
-              src="/logo-aim.png"
-              alt="Angeli in Moto"
-              className="h-12 w-auto object-contain"
-            />
+            <img src="/logo-aim.png" alt="Angeli in Moto" className="h-12 w-auto object-contain" />
             <div className="text-center">
               <h1 className="text-lg font-semibold">{t("setup.title")}</h1>
               <p className="text-sm text-muted-foreground">{t("setup.subtitle")}</p>
@@ -136,47 +122,25 @@ export default function Setup() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="nome">{t("setup.nome")}</Label>
-                  <Input
-                    id="nome"
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    required
-                    autoFocus
-                  />
+                  <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} required autoFocus />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="cognome">{t("setup.cognome")}</Label>
-                  <Input
-                    id="cognome"
-                    value={cognome}
-                    onChange={(e) => setCognome(e.target.value)}
-                    required
-                  />
+                  <Input id="cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} required />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="username">{t("setup.username")}</Label>
-                <Input
-                  id="username"
-                  autoComplete="off"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
+                <Input id="username" autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">{t("common.email")}</Label>
+                <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">{t("setup.password")}</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("setup.passwordHint")}
-                </p>
+                <Input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <p className="text-xs text-muted-foreground">{t("setup.passwordHint")}</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ruolo">{t("setup.role")}</Label>
@@ -193,23 +157,11 @@ export default function Setup() {
                     ))}
                   </SelectContent>
                 </Select>
-                {creatingAdmin && (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
-                    {t("setup.adminLockWarning")}
-                  </p>
-                )}
+                {creatingAdmin && <p className="text-xs text-amber-700 dark:text-amber-300">{t("setup.adminLockWarning")}</p>}
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={createUser.isPending}
-              >
-                {createUser.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <UserPlus className="mr-2 h-4 w-4" />
-                )}
+              <Button type="submit" className="w-full" disabled={createUser.isPending}>
+                {createUser.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
                 {t("setup.createButton")}
               </Button>
             </form>
@@ -222,26 +174,17 @@ export default function Setup() {
               <Users className="h-5 w-5 text-muted-foreground" />
               <h2 className="text-base font-semibold">{t("setup.createdTitle")}</h2>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {adminExists
-                ? t("setup.statusAdminReady")
-                : t("setup.statusNoAdmin")}
-            </p>
+            <p className="text-sm text-muted-foreground">{adminExists ? t("setup.statusAdminReady") : t("setup.statusNoAdmin")}</p>
           </CardHeader>
           <CardContent>
             {users.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("setup.emptyList")}
-              </p>
+              <p className="text-sm text-muted-foreground">{t("setup.emptyList")}</p>
             ) : (
               <ul className="space-y-2">
                 {users.map((u) => {
                   const role = roles.find((r) => r.id === u.ruoloId);
                   return (
-                    <li
-                      key={u.id}
-                      className="flex items-center justify-between rounded-md border p-2 text-sm"
-                    >
+                    <li key={u.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
                       <div>
                         <div className="font-medium">{u.username}</div>
                         <div className="text-xs text-muted-foreground">

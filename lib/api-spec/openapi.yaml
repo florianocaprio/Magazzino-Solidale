@@ -8583,6 +8583,8 @@ components:
           type: integer
         username:
           type: string
+        email:
+          type: ["string", "null"]
         nome:
           type: string
         cognome:
@@ -8615,7 +8617,9 @@ components:
             type: string
         mustChangePassword:
           type: boolean
-      required: [id, username, nome, isSuperAdmin, isAdmin, aree, mustChangePassword]
+        emailDaAggiornare:
+          type: boolean
+      required: [id, username, nome, isSuperAdmin, isAdmin, aree, mustChangePassword, emailDaAggiornare]
 
     LoginInput:
       type: object
@@ -8643,6 +8647,8 @@ components:
           type: integer
         username:
           type: string
+        email:
+          type: ["string", "null"]
         nome:
           type: string
         cognome:
@@ -8671,16 +8677,25 @@ components:
           type: boolean
         mustChangePassword:
           type: boolean
+        emailDaAggiornare:
+          type: boolean
+        emailVerifiedAt:
+          type: ["string", "null"]
+        lastPasswordChangeAt:
+          type: ["string", "null"]
         ultimoAccesso:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, username, nome, isSuperAdmin, attivo, mustChangePassword, dataCreazione]
+      required: [id, username, nome, isSuperAdmin, attivo, mustChangePassword, emailDaAggiornare, dataCreazione]
 
     UtenteInput:
       type: object
       properties:
         username:
+          type: string
+          minLength: 1
+        email:
           type: string
           minLength: 1
         password:
@@ -8704,12 +8719,15 @@ components:
           type: ["integer", "null"]
         attivo:
           type: boolean
-      required: [username, password, nome, cognome]
+      required: [username, email, password, nome, cognome]
 
     UtenteUpdate:
       type: object
       properties:
         nome:
+          type: string
+          minLength: 1
+        email:
           type: string
           minLength: 1
         cognome:

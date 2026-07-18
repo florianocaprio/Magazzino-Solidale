@@ -27,15 +27,7 @@ function makeApp(sessionUserId: number): Express {
 }
 
 /** Inserts a user directly in the DB (bypassing the API) and tracks cleanup. */
-async function insertUser(values: {
-  username: string;
-  nome: string;
-  cognome?: string | null;
-  matricola?: string | null;
-  cittaId?: number | null;
-  zonaUdsId?: number | null;
-  dataCreazione?: Date;
-}): Promise<number> {
+async function insertUser(values: { username: string; nome: string; cognome?: string | null; matricola?: string | null; cittaId?: number | null; zonaUdsId?: number | null; dataCreazione?: Date }): Promise<number> {
   const [row] = await db
     .insert(utentiTable)
     .values({
@@ -112,10 +104,7 @@ describe("PATCH /utenti/:id — auto-generazione matricola in modifica", () => {
     // Iniziali MR, anno 2024 → "24", sigla "MI", coda di 6 caratteri.
     expect(res.body.matricola).toMatch(/^MR24-MI-[0-9A-Z][0-9]{5}$/);
 
-    const [row] = await db
-      .select({ matricola: utentiTable.matricola })
-      .from(utentiTable)
-      .where(eq(utentiTable.id, id));
+    const [row] = await db.select({ matricola: utentiTable.matricola }).from(utentiTable).where(eq(utentiTable.id, id));
     expect(row.matricola).toBe(res.body.matricola);
   });
 
@@ -157,9 +146,7 @@ describe("PATCH /utenti/:id — auto-generazione matricola in modifica", () => {
       cittaId,
     });
 
-    const res = await request(app)
-      .patch(`/utenti/${id}`)
-      .send({ matricola: "MANUALE-9" });
+    const res = await request(app).patch(`/utenti/${id}`).send({ matricola: "MANUALE-9" });
     expect(res.status).toBe(200);
     expect(res.body.matricola).toBe("MANUALE-9");
   });
@@ -171,6 +158,7 @@ describe("POST /utenti — accesso immediato", () => {
       .post("/utenti")
       .send({
         username: `immediato-${Date.now()}`,
+        email: `immediato-${Date.now()}@example.org`,
         password: "passwordIniziale1",
         nome: "Accesso",
         cognome: "Immediato",
@@ -180,10 +168,7 @@ describe("POST /utenti — accesso immediato", () => {
     createdUserIds.push(res.body.id);
     expect(res.body.mustChangePassword).toBe(false);
 
-    const [row] = await db
-      .select({ mustChangePassword: utentiTable.mustChangePassword })
-      .from(utentiTable)
-      .where(eq(utentiTable.id, res.body.id));
+    const [row] = await db.select({ mustChangePassword: utentiTable.mustChangePassword }).from(utentiTable).where(eq(utentiTable.id, res.body.id));
     expect(row.mustChangePassword).toBe(false);
   });
 
@@ -192,6 +177,7 @@ describe("POST /utenti — accesso immediato", () => {
       .post("/utenti")
       .send({
         username: `zona-${Date.now()}`,
+        email: `zona-${Date.now()}@example.org`,
         password: "passwordIniziale1",
         nome: "Utente",
         cognome: "Zona",
@@ -207,7 +193,10 @@ describe("POST /utenti — accesso immediato", () => {
     expect(res.body.zonaUdsNome).toContain("Zona Test");
 
     const [row] = await db
-      .select({ cittaId: utentiTable.cittaId, zonaUdsId: utentiTable.zonaUdsId })
+      .select({
+        cittaId: utentiTable.cittaId,
+        zonaUdsId: utentiTable.zonaUdsId,
+      })
       .from(utentiTable)
       .where(eq(utentiTable.id, res.body.id));
     expect(row.cittaId).toBe(cittaId);
@@ -230,6 +219,7 @@ describe("Utenti — matricola univoca", () => {
       .post("/utenti")
       .send({
         username: `dup-b-${Date.now()}`,
+        email: `dup-b-${Date.now()}@example.org`,
         password: "passwordIniziale1",
         nome: "Dup",
         cognome: "Due",
@@ -260,9 +250,7 @@ describe("Utenti — matricola univoca", () => {
       cittaId,
     });
 
-    const res = await request(app)
-      .patch(`/utenti/${id}`)
-      .send({ matricola: matricolaA });
+    const res = await request(app).patch(`/utenti/${id}`).send({ matricola: matricolaA });
 
     expect(res.status).toBe(409);
     expect(res.body.error).toBe("Matricola già assegnata a un altro utente");
