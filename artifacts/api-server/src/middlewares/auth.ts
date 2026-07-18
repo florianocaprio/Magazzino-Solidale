@@ -1,13 +1,6 @@
 import type { RequestHandler } from "express";
 import { eq } from "drizzle-orm";
-import {
-  db,
-  utentiTable,
-  ruoliTable,
-  centriAscoltoTable,
-  cittaTable,
-  zoneUdsTable,
-} from "@workspace/db";
+import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable, zoneUdsTable } from "@workspace/db";
 import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
@@ -15,6 +8,8 @@ import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 export interface SessionUser {
   id: number;
   username: string;
+  email: string | null;
+  emailDaAggiornare: boolean;
   nome: string;
   cognome: string | null;
   matricola: string | null;
@@ -47,13 +42,13 @@ declare global {
   }
 }
 
-export async function loadSessionUser(
-  userId: number,
-): Promise<SessionUser | null> {
+export async function loadSessionUser(userId: number): Promise<SessionUser | null> {
   const [row] = await db
     .select({
       id: utentiTable.id,
       username: utentiTable.username,
+      email: utentiTable.email,
+      emailDaAggiornare: utentiTable.emailDaAggiornare,
       nome: utentiTable.nome,
       cognome: utentiTable.cognome,
       matricola: utentiTable.matricola,
@@ -73,10 +68,7 @@ export async function loadSessionUser(
     })
     .from(utentiTable)
     .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
-    .leftJoin(
-      centriAscoltoTable,
-      eq(utentiTable.centroAscoltoId, centriAscoltoTable.id),
-    )
+    .leftJoin(centriAscoltoTable, eq(utentiTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(cittaTable, eq(utentiTable.cittaId, cittaTable.id))
     .leftJoin(zoneUdsTable, eq(utentiTable.zonaUdsId, zoneUdsTable.id))
     .where(eq(utentiTable.id, userId));
@@ -86,6 +78,8 @@ export async function loadSessionUser(
   return {
     id: row.id,
     username: row.username,
+    email: row.email ?? null,
+    emailDaAggiornare: row.emailDaAggiornare,
     nome: row.nome,
     cognome: row.cognome ?? null,
     matricola: row.matricola ?? null,
@@ -115,6 +109,8 @@ export async function loadSessionUser(
 const BOOTSTRAP_ADMIN: SessionUser = {
   id: 0,
   username: "__bootstrap__",
+  email: null,
+  emailDaAggiornare: true,
   nome: "Configurazione iniziale",
   cognome: null,
   matricola: null,
@@ -177,10 +173,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   // No valid session. On a fresh install (no admin user yet) allow a synthetic
   // bootstrap admin, but ONLY for the minimal setup requests (read roles, read
   // users, create a user) — never the full user/role CRUD surface.
-  if (
-    isBootstrapAllowedRequest(req.method, req.path) &&
-    (await isBootstrapMode())
-  ) {
+  if (isBootstrapAllowedRequest(req.method, req.path) && (await isBootstrapMode())) {
     req.user = BOOTSTRAP_ADMIN;
     next();
     return;
@@ -196,11 +189,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
  * Frontend gating is UX only — this is the real enforcement boundary for users
  * whose password was explicitly marked as temporary.
  */
-const PASSWORD_CHANGE_ALLOWLIST = new Set([
-  "/auth/me",
-  "/auth/change-password",
-  "/auth/logout",
-]);
+const PASSWORD_CHANGE_ALLOWLIST = new Set(["/auth/me", "/auth/change-password", "/auth/logout"]);
 
 export const requirePasswordChange: RequestHandler = (req, res, next) => {
   if (req.user?.mustChangePassword && !PASSWORD_CHANGE_ALLOWLIST.has(req.path)) {

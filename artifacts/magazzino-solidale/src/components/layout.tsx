@@ -402,6 +402,13 @@ const NAV_ITEMS: NavItem[] = [
     groupKey: "superAdmin",
     superAdmin: true,
   },
+  {
+    key: "superAdminLogSistema",
+    url: "/super-admin/log-sistema",
+    icon: ClipboardList,
+    groupKey: "superAdmin",
+    superAdmin: true,
+  },
 ];
 
 function LanguageSelector() {

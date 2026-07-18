@@ -9,6 +9,8 @@
 export interface AuthUser {
   id: number;
   username: string;
+  /** @nullable */
+  email?: string | null;
   nome: string;
   /** @nullable */
   cognome?: string | null;
@@ -34,4 +36,5 @@ export interface AuthUser {
   isAdmin: boolean;
   aree: string[];
   mustChangePassword: boolean;
+  emailDaAggiornare: boolean;
 }

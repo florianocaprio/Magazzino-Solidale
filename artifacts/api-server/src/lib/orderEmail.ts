@@ -1,5 +1,5 @@
-// Builds and sends the procurement order email via the shared email service
-// (Gmail connector by default, or custom SMTP — configured in Impostazioni).
+// Builds and sends the procurement order email via the shared SMTP email service.
+// The amministrazione recipient can still come from Impostazioni Email.
 import { sendEmail, getEmailSettings } from "./emailService.js";
 
 // Default recipient when no adminEmail is configured in Impostazioni Email.
@@ -22,7 +22,9 @@ function formatDate(value?: string | null): string {
   return d.toLocaleDateString("it-IT");
 }
 
-export function buildApprovvigionamentoEmail(order: ApprovvigionamentoEmailData): {
+export function buildApprovvigionamentoEmail(
+  order: ApprovvigionamentoEmailData,
+): {
   subject: string;
   text: string;
 } {
@@ -47,12 +49,13 @@ export function buildApprovvigionamentoEmail(order: ApprovvigionamentoEmailData)
 }
 
 /**
- * Sends the procurement order email to amministrazione via the configured
- * provider (Gmail connector by default, or custom SMTP). Recipient is the
+ * Sends the procurement order email to amministrazione. Recipient is the
  * adminEmail from Impostazioni Email, falling back to AMMINISTRAZIONE_EMAIL.
  * Throws on failure; callers wrap this in try/catch when submission must not fail.
  */
-export async function sendApprovvigionamentoEmail(order: ApprovvigionamentoEmailData): Promise<void> {
+export async function sendApprovvigionamentoEmail(
+  order: ApprovvigionamentoEmailData,
+): Promise<void> {
   const { subject, text } = buildApprovvigionamentoEmail(order);
   const settings = await getEmailSettings();
   const to = settings.adminEmail?.trim() || AMMINISTRAZIONE_EMAIL;

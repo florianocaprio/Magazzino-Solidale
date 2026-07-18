@@ -4404,6 +4404,47 @@ export const ListSuperAdminAuditConfigurazioniResponseItem = zod.object({
 export const ListSuperAdminAuditConfigurazioniResponse = zod.array(ListSuperAdminAuditConfigurazioniResponseItem)
 
 
+export const listSuperAdminLogSistemaQueryLimitDefault = 50;
+export const listSuperAdminLogSistemaQueryLimitMax = 100;
+
+export const listSuperAdminLogSistemaQueryOffsetDefault = 0;
+export const listSuperAdminLogSistemaQueryOffsetMin = 0;
+
+
+
+export const ListSuperAdminLogSistemaQueryParams = zod.object({
+  "dateFrom": zod.coerce.string().optional().describe('Data\/ora iniziale filtro log'),
+  "dateTo": zod.coerce.string().optional().describe('Data\/ora finale filtro log'),
+  "search": zod.coerce.string().optional().describe('Ricerca per username o email snapshot'),
+  "email": zod.coerce.string().optional().describe('Filtro email snapshot'),
+  "eventType": zod.enum(['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_EMAIL_SENT', 'PASSWORD_RESET_COMPLETED', 'PASSWORD_CHANGED_BY_USER', 'PASSWORD_CHANGED_BY_ADMIN', 'USER_CREATED', 'USER_DISABLED', 'USER_ROLE_CHANGED', 'ACCOUNT_LOCKED', 'ACCOUNT_UNLOCKED']).optional(),
+  "eventStatus": zod.enum(['SUCCESS', 'FAILED', 'INFO']).optional(),
+  "ipAddress": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().min(1).max(listSuperAdminLogSistemaQueryLimitMax).default(listSuperAdminLogSistemaQueryLimitDefault),
+  "offset": zod.coerce.number().min(listSuperAdminLogSistemaQueryOffsetMin).default(listSuperAdminLogSistemaQueryOffsetDefault)
+})
+
+export const ListSuperAdminLogSistemaResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "eventType": zod.enum(['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_EMAIL_SENT', 'PASSWORD_RESET_COMPLETED', 'PASSWORD_CHANGED_BY_USER', 'PASSWORD_CHANGED_BY_ADMIN', 'USER_CREATED', 'USER_DISABLED', 'USER_ROLE_CHANGED', 'ACCOUNT_LOCKED', 'ACCOUNT_UNLOCKED']),
+  "eventStatus": zod.enum(['SUCCESS', 'FAILED', 'INFO']),
+  "actorUserId": zod.number().nullable(),
+  "targetUserId": zod.number().nullable(),
+  "username": zod.string().nullable(),
+  "userEmail": zod.string().nullable(),
+  "ipAddress": zod.string().nullable(),
+  "userAgent": zod.string().nullable(),
+  "details": zod.record(zod.string(), zod.unknown()).nullable(),
+  "note": zod.string().nullable()
+})),
+  "total": zod.number(),
+  "limit": zod.number(),
+  "offset": zod.number()
+})
+
+
 export const ListPoliticheCreditoSolidaleResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
@@ -5458,6 +5499,7 @@ export const LoginUserBody = zod.object({
 export const LoginUserResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
+  "email": zod.string().nullish(),
   "nome": zod.string(),
   "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
@@ -5472,13 +5514,15 @@ export const LoginUserResponse = zod.object({
   "isSuperAdmin": zod.boolean(),
   "isAdmin": zod.boolean(),
   "aree": zod.array(zod.string()),
-  "mustChangePassword": zod.boolean()
+  "mustChangePassword": zod.boolean(),
+  "emailDaAggiornare": zod.boolean()
 })
 
 
 export const GetCurrentUserResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
+  "email": zod.string().nullish(),
   "nome": zod.string(),
   "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
@@ -5493,12 +5537,42 @@ export const GetCurrentUserResponse = zod.object({
   "isSuperAdmin": zod.boolean(),
   "isAdmin": zod.boolean(),
   "aree": zod.array(zod.string()),
-  "mustChangePassword": zod.boolean()
+  "mustChangePassword": zod.boolean(),
+  "emailDaAggiornare": zod.boolean()
 })
 
 
 export const GetBootstrapStatusResponse = zod.object({
   "bootstrap": zod.boolean()
+})
+
+
+
+
+
+export const ForgotPasswordBody = zod.object({
+  "email": zod.string().min(1)
+})
+
+export const ForgotPasswordResponse = zod.object({
+  "message": zod.string()
+})
+
+
+
+export const resetPasswordBodyNewPasswordMin = 8;
+
+
+
+
+export const ResetPasswordBody = zod.object({
+  "token": zod.string().min(1),
+  "newPassword": zod.string().min(resetPasswordBodyNewPasswordMin),
+  "confirmPassword": zod.string().min(1).optional()
+})
+
+export const ResetPasswordResponse = zod.object({
+  "message": zod.string()
 })
 
 
@@ -5592,6 +5666,7 @@ export const ListUtentiQueryParams = zod.object({
 export const ListUtentiResponseItem = zod.object({
   "id": zod.number(),
   "username": zod.string(),
+  "email": zod.string().nullish(),
   "nome": zod.string(),
   "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
@@ -5606,10 +5681,14 @@ export const ListUtentiResponseItem = zod.object({
   "isSuperAdmin": zod.boolean(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
+  "emailDaAggiornare": zod.boolean(),
+  "emailVerifiedAt": zod.string().nullish(),
+  "lastPasswordChangeAt": zod.string().nullish(),
   "ultimoAccesso": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 export const ListUtentiResponse = zod.array(ListUtentiResponseItem)
+
 
 
 
@@ -5621,6 +5700,7 @@ export const createUtenteBodyPasswordMin = 6;
 
 export const CreateUtenteBody = zod.object({
   "username": zod.string().min(1),
+  "email": zod.string().min(1),
   "password": zod.string().min(createUtenteBodyPasswordMin),
   "nome": zod.string().min(1),
   "cognome": zod.string().min(1),
@@ -5640,6 +5720,7 @@ export const GetUtenteParams = zod.object({
 export const GetUtenteResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
+  "email": zod.string().nullish(),
   "nome": zod.string(),
   "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
@@ -5654,6 +5735,9 @@ export const GetUtenteResponse = zod.object({
   "isSuperAdmin": zod.boolean(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
+  "emailDaAggiornare": zod.boolean(),
+  "emailVerifiedAt": zod.string().nullish(),
+  "lastPasswordChangeAt": zod.string().nullish(),
   "ultimoAccesso": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
@@ -5666,8 +5750,10 @@ export const UpdateUtenteParams = zod.object({
 
 
 
+
 export const UpdateUtenteBody = zod.object({
   "nome": zod.string().min(1).optional(),
+  "email": zod.string().min(1).optional(),
   "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
@@ -5680,6 +5766,7 @@ export const UpdateUtenteBody = zod.object({
 export const UpdateUtenteResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
+  "email": zod.string().nullish(),
   "nome": zod.string(),
   "cognome": zod.string().nullish(),
   "matricola": zod.string().nullish(),
@@ -5694,6 +5781,9 @@ export const UpdateUtenteResponse = zod.object({
   "isSuperAdmin": zod.boolean(),
   "attivo": zod.boolean(),
   "mustChangePassword": zod.boolean(),
+  "emailDaAggiornare": zod.boolean(),
+  "emailVerifiedAt": zod.string().nullish(),
+  "lastPasswordChangeAt": zod.string().nullish(),
   "ultimoAccesso": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
@@ -5708,12 +5798,8 @@ export const ResetUtentePasswordParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const resetUtentePasswordBodyNewPasswordMin = 6;
-
-
-
-export const ResetUtentePasswordBody = zod.object({
-  "newPassword": zod.string().min(resetUtentePasswordBodyNewPasswordMin)
+export const ResetUtentePasswordResponse = zod.object({
+  "message": zod.string()
 })
 
 

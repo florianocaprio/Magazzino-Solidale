@@ -9,6 +9,8 @@
 export interface Utente {
   id: number;
   username: string;
+  /** @nullable */
+  email?: string | null;
   nome: string;
   /** @nullable */
   cognome?: string | null;
@@ -33,6 +35,11 @@ export interface Utente {
   isSuperAdmin: boolean;
   attivo: boolean;
   mustChangePassword: boolean;
+  emailDaAggiornare: boolean;
+  /** @nullable */
+  emailVerifiedAt?: string | null;
+  /** @nullable */
+  lastPasswordChangeAt?: string | null;
   /** @nullable */
   ultimoAccesso?: string | null;
   dataCreazione: string;

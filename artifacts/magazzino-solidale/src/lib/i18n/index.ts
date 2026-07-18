@@ -44,6 +44,8 @@ import { speseEmporio } from "./namespaces/speseEmporio";
 import { utenti } from "./namespaces/utenti";
 import { ruoli } from "./namespaces/ruoli";
 import { login } from "./namespaces/login";
+import { passwordRecovery } from "./namespaces/passwordRecovery";
+import { logSistema } from "./namespaces/logSistema";
 import { setup } from "./namespaces/setup";
 import { changePassword } from "./namespaces/changePassword";
 import { notAuthorized } from "./namespaces/notAuthorized";
@@ -100,6 +102,8 @@ const PAGE_NAMESPACES = {
   utenti,
   ruoli,
   login,
+  passwordRecovery,
+  logSistema,
   setup,
   changePassword,
   notAuthorized,

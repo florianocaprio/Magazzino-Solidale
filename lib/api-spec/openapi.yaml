@@ -3021,6 +3021,73 @@ paths:
                 items:
                   $ref: "#/components/schemas/AuditConfigurazione"
 
+  /super-admin/log-sistema:
+    get:
+      operationId: listSuperAdminLogSistema
+      tags: [super-admin]
+      parameters:
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Data/ora iniziale filtro log
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Data/ora finale filtro log
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Ricerca per username o email snapshot
+        - name: email
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filtro email snapshot
+        - name: eventType
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/SystemLogEventType"
+        - name: eventStatus
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/SystemLogEventStatus"
+        - name: ipAddress
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: System security and administration logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemLogListResponse"
+
   /politiche-credito-solidale:
     get:
       operationId: listPoliticheCreditoSolidale
@@ -4034,6 +4101,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/BootstrapStatus"
 
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordInput"
+      responses:
+        "200":
+          description: Neutral password recovery response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessageResponse"
+        "400":
+          description: Invalid input
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessageResponse"
+        "400":
+          description: Invalid or expired token
+
   /auth/change-password:
     post:
       operationId: changePassword
@@ -4260,15 +4367,17 @@ paths:
           required: true
           schema:
             type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ResetPasswordInput"
       responses:
-        "204":
-          description: Password reset
+        "200":
+          description: Password reset link sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessageResponse"
+        "400":
+          description: User has no valid email address
+        "403":
+          description: Not authorized
 
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
@@ -6966,6 +7075,88 @@ components:
         - ip
         - note
 
+    SystemLogEventType:
+      type: string
+      enum:
+        - LOGIN_SUCCESS
+        - LOGIN_FAILED
+        - LOGOUT
+        - PASSWORD_RESET_REQUESTED
+        - PASSWORD_RESET_EMAIL_SENT
+        - PASSWORD_RESET_COMPLETED
+        - PASSWORD_CHANGED_BY_USER
+        - PASSWORD_CHANGED_BY_ADMIN
+        - USER_CREATED
+        - USER_DISABLED
+        - USER_ROLE_CHANGED
+        - ACCOUNT_LOCKED
+        - ACCOUNT_UNLOCKED
+
+    SystemLogEventStatus:
+      type: string
+      enum:
+        - SUCCESS
+        - FAILED
+        - INFO
+
+    SystemLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        eventType:
+          $ref: "#/components/schemas/SystemLogEventType"
+        eventStatus:
+          $ref: "#/components/schemas/SystemLogEventStatus"
+        actorUserId:
+          type: ["integer", "null"]
+        targetUserId:
+          type: ["integer", "null"]
+        username:
+          type: ["string", "null"]
+        userEmail:
+          type: ["string", "null"]
+        ipAddress:
+          type: ["string", "null"]
+        userAgent:
+          type: ["string", "null"]
+        details:
+          type: ["object", "null"]
+          additionalProperties: true
+        note:
+          type: ["string", "null"]
+      required:
+        - id
+        - createdAt
+        - eventType
+        - eventStatus
+        - actorUserId
+        - targetUserId
+        - username
+        - userEmail
+        - ipAddress
+        - userAgent
+        - details
+        - note
+
+    SystemLogListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SystemLogEntry"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required: [items, total, limit, offset]
+
     EmailSendResult:
       type: object
       properties:
@@ -8576,6 +8767,13 @@ components:
           type: boolean
       required: [bootstrap]
 
+    AuthMessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
     AuthUser:
       type: object
       properties:
@@ -8583,6 +8781,8 @@ components:
           type: integer
         username:
           type: string
+        email:
+          type: ["string", "null"]
         nome:
           type: string
         cognome:
@@ -8615,7 +8815,9 @@ components:
             type: string
         mustChangePassword:
           type: boolean
-      required: [id, username, nome, isSuperAdmin, isAdmin, aree, mustChangePassword]
+        emailDaAggiornare:
+          type: boolean
+      required: [id, username, nome, isSuperAdmin, isAdmin, aree, mustChangePassword, emailDaAggiornare]
 
     LoginInput:
       type: object
@@ -8636,6 +8838,28 @@ components:
           minLength: 8
       required: [newPassword]
 
+    ForgotPasswordInput:
+      type: object
+      properties:
+        email:
+          type: string
+          minLength: 1
+      required: [email]
+
+    ResetPasswordInput:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 8
+        confirmPassword:
+          type: string
+          minLength: 1
+      required: [token, newPassword]
+
     Utente:
       type: object
       properties:
@@ -8643,6 +8867,8 @@ components:
           type: integer
         username:
           type: string
+        email:
+          type: ["string", "null"]
         nome:
           type: string
         cognome:
@@ -8671,16 +8897,25 @@ components:
           type: boolean
         mustChangePassword:
           type: boolean
+        emailDaAggiornare:
+          type: boolean
+        emailVerifiedAt:
+          type: ["string", "null"]
+        lastPasswordChangeAt:
+          type: ["string", "null"]
         ultimoAccesso:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, username, nome, isSuperAdmin, attivo, mustChangePassword, dataCreazione]
+      required: [id, username, nome, isSuperAdmin, attivo, mustChangePassword, emailDaAggiornare, dataCreazione]
 
     UtenteInput:
       type: object
       properties:
         username:
+          type: string
+          minLength: 1
+        email:
           type: string
           minLength: 1
         password:
@@ -8704,12 +8939,15 @@ components:
           type: ["integer", "null"]
         attivo:
           type: boolean
-      required: [username, password, nome, cognome]
+      required: [username, email, password, nome, cognome]
 
     UtenteUpdate:
       type: object
       properties:
         nome:
+          type: string
+          minLength: 1
+        email:
           type: string
           minLength: 1
         cognome:
@@ -8726,14 +8964,6 @@ components:
           type: ["integer", "null"]
         attivo:
           type: boolean
-
-    ResetPasswordInput:
-      type: object
-      properties:
-        newPassword:
-          type: string
-          minLength: 6
-      required: [newPassword]
 
     Ruolo:
       type: object

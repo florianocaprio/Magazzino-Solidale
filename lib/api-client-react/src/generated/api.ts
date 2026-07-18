@@ -36,6 +36,7 @@ import type {
   Area,
   AssociaBollaInput,
   AuditConfigurazione,
+  AuthMessageResponse,
   AuthUser,
   BeneficiariBulkInput,
   Beneficiario,
@@ -87,6 +88,7 @@ import type {
   CreditoSolidaleStornoInput,
   DashboardStats,
   EmailSendResult,
+  ForgotPasswordInput,
   Fornitore,
   FornitoreInput,
   FornitoreUpdate,
@@ -121,6 +123,7 @@ import type {
   ListSessioniCassaEmporioParams,
   ListSpeseEmporioParams,
   ListSuperAdminAuditConfigurazioniParams,
+  ListSuperAdminLogSistemaParams,
   ListTrasferimentiParams,
   ListTurniParams,
   ListUtentiParams,
@@ -186,6 +189,7 @@ import type {
   SpesaEmporio,
   SpesaEmporioChiusuraInput,
   SpesaEmporioChiusuraResult,
+  SystemLogListResponse,
   TipoIntervento,
   TipoInterventoInput,
   TipoInterventoUpdate,
@@ -10538,6 +10542,84 @@ export function useListSuperAdminAuditConfigurazioni<TData = Awaited<ReturnType<
 
 
 
+export const getListSuperAdminLogSistemaUrl = (params?: ListSuperAdminLogSistemaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/super-admin/log-sistema?${stringifiedParams}` : `/api/super-admin/log-sistema`
+}
+
+export const listSuperAdminLogSistema = async (params?: ListSuperAdminLogSistemaParams, options?: RequestInit): Promise<SystemLogListResponse> => {
+
+  return customFetch<SystemLogListResponse>(getListSuperAdminLogSistemaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSuperAdminLogSistemaQueryKey = (params?: ListSuperAdminLogSistemaParams,) => {
+    return [
+    `/api/super-admin/log-sistema`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSuperAdminLogSistemaQueryOptions = <TData = Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError = ErrorType<unknown>>(params?: ListSuperAdminLogSistemaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSuperAdminLogSistemaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSuperAdminLogSistema>>> = ({ signal }) => listSuperAdminLogSistema(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSuperAdminLogSistemaQueryResult = NonNullable<Awaited<ReturnType<typeof listSuperAdminLogSistema>>>
+export type ListSuperAdminLogSistemaQueryError = ErrorType<unknown>
+
+
+
+export function useListSuperAdminLogSistema<TData = Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError = ErrorType<unknown>>(
+ params?: ListSuperAdminLogSistemaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSuperAdminLogSistemaQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListPoliticheCreditoSolidaleUrl = () => {
 
 
@@ -13893,6 +13975,136 @@ export function useGetBootstrapStatus<TData = Awaited<ReturnType<typeof getBoots
 
 
 
+export const getForgotPasswordUrl = () => {
+
+
+
+
+  return `/api/auth/forgot-password`
+}
+
+export const forgotPassword = async (forgotPasswordInput: ForgotPasswordInput, options?: RequestInit): Promise<AuthMessageResponse> => {
+
+  return customFetch<AuthMessageResponse>(getForgotPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      forgotPasswordInput,)
+  }
+);}
+
+
+
+
+export const getForgotPasswordMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof forgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof forgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext> => {
+
+const mutationKey = ['forgotPassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof forgotPassword>>, {data: BodyType<ForgotPasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  forgotPassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ForgotPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof forgotPassword>>>
+    export type ForgotPasswordMutationBody = BodyType<ForgotPasswordInput>
+    export type ForgotPasswordMutationError = ErrorType<void>
+
+    export const useForgotPassword = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof forgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof forgotPassword>>,
+        TError,
+        {data: BodyType<ForgotPasswordInput>},
+        TContext
+      > => {
+      return useMutation(getForgotPasswordMutationOptions(options));
+    }
+
+export const getResetPasswordUrl = () => {
+
+
+
+
+  return `/api/auth/reset-password`
+}
+
+export const resetPassword = async (resetPasswordInput: ResetPasswordInput, options?: RequestInit): Promise<AuthMessageResponse> => {
+
+  return customFetch<AuthMessageResponse>(getResetPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      resetPasswordInput,)
+  }
+);}
+
+
+
+
+export const getResetPasswordMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext> => {
+
+const mutationKey = ['resetPassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetPassword>>, {data: BodyType<ResetPasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  resetPassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof resetPassword>>>
+    export type ResetPasswordMutationBody = BodyType<ResetPasswordInput>
+    export type ResetPasswordMutationError = ErrorType<void>
+
+    export const useResetPassword = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetPassword>>,
+        TError,
+        {data: BodyType<ResetPasswordInput>},
+        TContext
+      > => {
+      return useMutation(getResetPasswordMutationOptions(options));
+    }
+
 export const getChangePasswordUrl = () => {
 
 
@@ -14718,25 +14930,23 @@ export const getResetUtentePasswordUrl = (id: number,) => {
   return `/api/utenti/${id}/reset-password`
 }
 
-export const resetUtentePassword = async (id: number,
-    resetPasswordInput: ResetPasswordInput, options?: RequestInit): Promise<void> => {
+export const resetUtentePassword = async (id: number, options?: RequestInit): Promise<AuthMessageResponse> => {
 
-  return customFetch<void>(getResetUtentePasswordUrl(id),
+  return customFetch<AuthMessageResponse>(getResetUtentePasswordUrl(id),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      resetPasswordInput,)
+    method: 'POST'
+
+
   }
 );}
 
 
 
 
-export const getResetUtentePasswordMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetUtentePassword>>, TError,{id: number;data: BodyType<ResetPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof resetUtentePassword>>, TError,{id: number;data: BodyType<ResetPasswordInput>}, TContext> => {
+export const getResetUtentePasswordMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetUtentePassword>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetUtentePassword>>, TError,{id: number}, TContext> => {
 
 const mutationKey = ['resetUtentePassword'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -14748,10 +14958,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetUtentePassword>>, {id: number;data: BodyType<ResetPasswordInput>}> = (props) => {
-          const {id,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetUtentePassword>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
 
-          return  resetUtentePassword(id,data,requestOptions)
+          return  resetUtentePassword(id,requestOptions)
         }
 
 
@@ -14762,15 +14972,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ResetUtentePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof resetUtentePassword>>>
-    export type ResetUtentePasswordMutationBody = BodyType<ResetPasswordInput>
-    export type ResetUtentePasswordMutationError = ErrorType<unknown>
 
-    export const useResetUtentePassword = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetUtentePassword>>, TError,{id: number;data: BodyType<ResetPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    export type ResetUtentePasswordMutationError = ErrorType<void>
+
+    export const useResetUtentePassword = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetUtentePassword>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof resetUtentePassword>>,
         TError,
-        {id: number;data: BodyType<ResetPasswordInput>},
+        {id: number},
         TContext
       > => {
       return useMutation(getResetUtentePasswordMutationOptions(options));

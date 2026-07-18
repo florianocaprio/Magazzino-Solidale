@@ -9,6 +9,8 @@
 export interface UtenteInput {
   /** @minLength 1 */
   username: string;
+  /** @minLength 1 */
+  email: string;
   /** @minLength 6 */
   password: string;
   /** @minLength 1 */
