@@ -3031,6 +3031,10 @@ export interface BootstrapStatus {
   bootstrap: boolean;
 }
 
+export interface AuthMessageResponse {
+  message: string;
+}
+
 export interface AuthUser {
   id: number;
   username: string;
@@ -3074,6 +3078,20 @@ export interface LoginInput {
 export interface ChangePasswordInput {
   /** @minLength 8 */
   newPassword: string;
+}
+
+export interface ForgotPasswordInput {
+  /** @minLength 1 */
+  email: string;
+}
+
+export interface ResetPasswordInput {
+  /** @minLength 1 */
+  token: string;
+  /** @minLength 8 */
+  newPassword: string;
+  /** @minLength 1 */
+  confirmPassword?: string;
 }
 
 export interface Utente {
@@ -3157,11 +3175,6 @@ export interface UtenteUpdate {
   /** @nullable */
   zonaUdsId?: number | null;
   attivo?: boolean;
-}
-
-export interface ResetPasswordInput {
-  /** @minLength 6 */
-  newPassword: string;
 }
 
 export interface Ruolo {

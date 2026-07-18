@@ -2,13 +2,15 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, ne, desc, ilike, or, type SQL } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable, zoneUdsTable } from "@workspace/db";
-import { CreateUtenteBody, UpdateUtenteBody, ResetUtentePasswordBody } from "@workspace/api-zod";
+import { CreateUtenteBody, UpdateUtenteBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { callerCentroId, callerCittaId, callerZonaUdsId, andScoped } from "../lib/centroScope";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { ensureSuperAdminRole, SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 import { logSystemEvent, systemLogMetaFromRequest } from "../lib/systemLog";
 import { isValidUserEmail, normalizeEmail } from "../lib/userEmail";
+import { sendPasswordResetEmail } from "../lib/emailService";
+import { ADMIN_RESET_EMAIL_INVALID_MESSAGE, ADMIN_RESET_LINK_SENT_MESSAGE, createPasswordResetLinkForUser, invalidateActivePasswordResetTokens } from "../lib/passwordReset";
 
 const router: IRouter = Router();
 
@@ -627,11 +629,6 @@ router.delete("/utenti/:id", async (req, res): Promise<void> => {
 
 router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
-  const parsed = ResetUtentePasswordBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
 
   const [target] = await db
     .select({
@@ -641,7 +638,10 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
       zonaUdsId: utentiTable.zonaUdsId,
       isSuperAdmin: utentiTable.isSuperAdmin,
       email: utentiTable.email,
+      emailDaAggiornare: utentiTable.emailDaAggiornare,
       username: utentiTable.username,
+      nome: utentiTable.nome,
+      attivo: utentiTable.attivo,
     })
     .from(utentiTable)
     .where(eq(utentiTable.id, id));
@@ -670,26 +670,84 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
-  await db
-    .update(utentiTable)
-    .set({
-      passwordHash,
-      mustChangePassword: true,
-      lastPasswordChangeAt: new Date(),
-    })
-    .where(eq(utentiTable.id, id));
+  if (!target.attivo) {
+    res.status(400).json({ error: "L'utente non è attivo" });
+    return;
+  }
+
+  const targetEmail = target.email ? normalizeEmail(target.email) : "";
+  if (target.emailDaAggiornare || !isValidUserEmail(targetEmail)) {
+    res.status(400).json({ error: ADMIN_RESET_EMAIL_INVALID_MESSAGE });
+    return;
+  }
 
   await logSystemEvent({
-    evento: "PASSWORD_CHANGED_BY_ADMIN",
+    evento: "PASSWORD_RESET_REQUESTED",
     esito: "SUCCESS",
     targetUserId: id,
-    userEmail: target.email,
+    userEmail: targetEmail,
     username: target.username,
     ...systemLogMetaFromRequest(req),
+    details: { source: "admin" },
   });
 
-  res.status(204).send();
+  const meta = systemLogMetaFromRequest(req);
+  let resetLink: Awaited<ReturnType<typeof createPasswordResetLinkForUser>>;
+  try {
+    resetLink = await createPasswordResetLinkForUser({
+      utenteId: id,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+  } catch (error) {
+    req.log.error({ err: error, userId: id }, "Admin password reset token creation failed");
+    await logSystemEvent({
+      evento: "PASSWORD_RESET_EMAIL_SENT",
+      esito: "FAILED",
+      targetUserId: id,
+      userEmail: targetEmail,
+      username: target.username,
+      ...meta,
+      details: { source: "admin", reason: "token_creation_failed" },
+    });
+    res.status(500).json({ error: "Creazione link reset non riuscita" });
+    return;
+  }
+
+  try {
+    const result = await sendPasswordResetEmail({
+      to: targetEmail,
+      nome: target.nome,
+      username: target.username,
+      resetUrl: resetLink.resetUrl,
+      expiresInMinutes: resetLink.expiresInMinutes,
+    });
+    await logSystemEvent({
+      evento: "PASSWORD_RESET_EMAIL_SENT",
+      esito: result.sent ? "SUCCESS" : "INFO",
+      targetUserId: id,
+      userEmail: targetEmail,
+      username: target.username,
+      ...meta,
+      details: { source: "admin", mode: result.mode },
+    });
+  } catch (error) {
+    req.log.error({ err: error, userId: id }, "Admin password reset email send failed");
+    await invalidateActivePasswordResetTokens(id);
+    await logSystemEvent({
+      evento: "PASSWORD_RESET_EMAIL_SENT",
+      esito: "FAILED",
+      targetUserId: id,
+      userEmail: targetEmail,
+      username: target.username,
+      ...meta,
+      details: { source: "admin", reason: "send_failed" },
+    });
+    res.status(502).json({ error: "Invio email reset non riuscito" });
+    return;
+  }
+
+  res.json({ message: ADMIN_RESET_LINK_SENT_MESSAGE });
 });
 
 export default router;

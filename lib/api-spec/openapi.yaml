@@ -4034,6 +4034,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/BootstrapStatus"
 
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordInput"
+      responses:
+        "200":
+          description: Neutral password recovery response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessageResponse"
+        "400":
+          description: Invalid input
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessageResponse"
+        "400":
+          description: Invalid or expired token
+
   /auth/change-password:
     post:
       operationId: changePassword
@@ -4260,15 +4300,17 @@ paths:
           required: true
           schema:
             type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ResetPasswordInput"
       responses:
-        "204":
-          description: Password reset
+        "200":
+          description: Password reset link sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessageResponse"
+        "400":
+          description: User has no valid email address
+        "403":
+          description: Not authorized
 
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
@@ -8576,6 +8618,13 @@ components:
           type: boolean
       required: [bootstrap]
 
+    AuthMessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
     AuthUser:
       type: object
       properties:
@@ -8639,6 +8688,28 @@ components:
           type: string
           minLength: 8
       required: [newPassword]
+
+    ForgotPasswordInput:
+      type: object
+      properties:
+        email:
+          type: string
+          minLength: 1
+      required: [email]
+
+    ResetPasswordInput:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 8
+        confirmPassword:
+          type: string
+          minLength: 1
+      required: [token, newPassword]
 
     Utente:
       type: object
@@ -8744,14 +8815,6 @@ components:
           type: ["integer", "null"]
         attivo:
           type: boolean
-
-    ResetPasswordInput:
-      type: object
-      properties:
-        newPassword:
-          type: string
-          minLength: 6
-      required: [newPassword]
 
     Ruolo:
       type: object

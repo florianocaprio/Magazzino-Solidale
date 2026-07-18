@@ -76,7 +76,6 @@ export default function Utenti() {
   const [cittaId, setCittaId] = useState<string>(NO_CITTA);
   const [zonaUdsId, setZonaUdsId] = useState<string>(ALL_ZONE);
   const [attivo, setAttivo] = useState(true);
-  const [resetPwd, setResetPwd] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   const selectedCittaNum = cittaId === NO_CITTA ? undefined : parseInt(cittaId, 10);
@@ -223,24 +222,15 @@ export default function Utenti() {
   const confirmReset = (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetting) return;
-    if (resetPwd.length < 8) {
-      toast({
-        title: t("utenti.pwdTooShort"),
-        description: t("utenti.minChars"),
-        variant: "destructive",
-      });
-      return;
-    }
     resetPassword.mutate(
-      { id: resetting.id, data: { newPassword: resetPwd } },
+      { id: resetting.id },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toast({
             title: t("utenti.pwdReset"),
-            description: t("utenti.pwdResetDesc"),
+            description: data.message || t("utenti.pwdResetDesc"),
           });
           setResetting(null);
-          setResetPwd("");
         },
         onError: (err) =>
           toast({
@@ -371,13 +361,7 @@ export default function Utenti() {
                             <Pencil className="mr-2 h-4 w-4" />
                             {t("common.edit")}
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={u.isSuperAdmin && !currentUser?.isSuperAdmin}
-                            onClick={() => {
-                              setResetting(u);
-                              setResetPwd("");
-                            }}
-                          >
+                          <DropdownMenuItem disabled={u.isSuperAdmin && !currentUser?.isSuperAdmin} onClick={() => setResetting(u)}>
                             <KeyRound className="mr-2 h-4 w-4" />
                             {t("utenti.resetPassword")}
                           </DropdownMenuItem>
@@ -534,10 +518,6 @@ export default function Utenti() {
               {t("utenti.resetDescBefore")} <span className="font-medium">{resetting?.username}</span>
               {t("utenti.resetDescAfter")}
             </p>
-            <div className="space-y-2">
-              <Label htmlFor="reset-pwd">{t("utenti.nuovaPassword")}</Label>
-              <Input id="reset-pwd" type="password" autoComplete="new-password" value={resetPwd} onChange={(e) => setResetPwd(e.target.value)} required />
-            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setResetting(null)}>
                 {t("common.cancel")}

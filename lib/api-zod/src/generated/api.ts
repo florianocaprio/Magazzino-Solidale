@@ -5506,6 +5506,35 @@ export const GetBootstrapStatusResponse = zod.object({
 })
 
 
+
+
+
+export const ForgotPasswordBody = zod.object({
+  "email": zod.string().min(1)
+})
+
+export const ForgotPasswordResponse = zod.object({
+  "message": zod.string()
+})
+
+
+
+export const resetPasswordBodyNewPasswordMin = 8;
+
+
+
+
+export const ResetPasswordBody = zod.object({
+  "token": zod.string().min(1),
+  "newPassword": zod.string().min(resetPasswordBodyNewPasswordMin),
+  "confirmPassword": zod.string().min(1).optional()
+})
+
+export const ResetPasswordResponse = zod.object({
+  "message": zod.string()
+})
+
+
 export const changePasswordBodyNewPasswordMin = 8;
 
 
@@ -5728,12 +5757,8 @@ export const ResetUtentePasswordParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const resetUtentePasswordBodyNewPasswordMin = 6;
-
-
-
-export const ResetUtentePasswordBody = zod.object({
-  "newPassword": zod.string().min(resetUtentePasswordBodyNewPasswordMin)
+export const ResetUtentePasswordResponse = zod.object({
+  "message": zod.string()
 })
 
 

@@ -6,11 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ResetPasswordInput {
+export interface ForgotPasswordInput {
   /** @minLength 1 */
-  token: string;
-  /** @minLength 8 */
-  newPassword: string;
-  /** @minLength 1 */
-  confirmPassword?: string;
+  email: string;
 }
