@@ -63,6 +63,7 @@ import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
 import SuperAdminConfigurazioneAmbiente from "@/pages/super-admin-configurazione-ambiente";
 import SuperAdminModuli from "@/pages/super-admin-moduli";
 import SuperAdminAuditConfigurazioni from "@/pages/super-admin-audit-configurazioni";
+import SuperAdminLogSistema from "@/pages/super-admin-log-sistema";
 import SostieniProgetto from "@/pages/sostieni-progetto";
 
 const queryClient = new QueryClient({
@@ -448,6 +449,13 @@ function AppRoutes() {
           {() => (
             <RequireSuperAdmin>
               <SuperAdminAuditConfigurazioni />
+            </RequireSuperAdmin>
+          )}
+        </Route>
+        <Route path="/super-admin/log-sistema">
+          {() => (
+            <RequireSuperAdmin>
+              <SuperAdminLogSistema />
             </RequireSuperAdmin>
           )}
         </Route>

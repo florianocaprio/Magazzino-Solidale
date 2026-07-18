@@ -4404,6 +4404,47 @@ export const ListSuperAdminAuditConfigurazioniResponseItem = zod.object({
 export const ListSuperAdminAuditConfigurazioniResponse = zod.array(ListSuperAdminAuditConfigurazioniResponseItem)
 
 
+export const listSuperAdminLogSistemaQueryLimitDefault = 50;
+export const listSuperAdminLogSistemaQueryLimitMax = 100;
+
+export const listSuperAdminLogSistemaQueryOffsetDefault = 0;
+export const listSuperAdminLogSistemaQueryOffsetMin = 0;
+
+
+
+export const ListSuperAdminLogSistemaQueryParams = zod.object({
+  "dateFrom": zod.coerce.string().optional().describe('Data\/ora iniziale filtro log'),
+  "dateTo": zod.coerce.string().optional().describe('Data\/ora finale filtro log'),
+  "search": zod.coerce.string().optional().describe('Ricerca per username o email snapshot'),
+  "email": zod.coerce.string().optional().describe('Filtro email snapshot'),
+  "eventType": zod.enum(['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_EMAIL_SENT', 'PASSWORD_RESET_COMPLETED', 'PASSWORD_CHANGED_BY_USER', 'PASSWORD_CHANGED_BY_ADMIN', 'USER_CREATED', 'USER_DISABLED', 'USER_ROLE_CHANGED', 'ACCOUNT_LOCKED', 'ACCOUNT_UNLOCKED']).optional(),
+  "eventStatus": zod.enum(['SUCCESS', 'FAILED', 'INFO']).optional(),
+  "ipAddress": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().min(1).max(listSuperAdminLogSistemaQueryLimitMax).default(listSuperAdminLogSistemaQueryLimitDefault),
+  "offset": zod.coerce.number().min(listSuperAdminLogSistemaQueryOffsetMin).default(listSuperAdminLogSistemaQueryOffsetDefault)
+})
+
+export const ListSuperAdminLogSistemaResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "eventType": zod.enum(['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_EMAIL_SENT', 'PASSWORD_RESET_COMPLETED', 'PASSWORD_CHANGED_BY_USER', 'PASSWORD_CHANGED_BY_ADMIN', 'USER_CREATED', 'USER_DISABLED', 'USER_ROLE_CHANGED', 'ACCOUNT_LOCKED', 'ACCOUNT_UNLOCKED']),
+  "eventStatus": zod.enum(['SUCCESS', 'FAILED', 'INFO']),
+  "actorUserId": zod.number().nullable(),
+  "targetUserId": zod.number().nullable(),
+  "username": zod.string().nullable(),
+  "userEmail": zod.string().nullable(),
+  "ipAddress": zod.string().nullable(),
+  "userAgent": zod.string().nullable(),
+  "details": zod.record(zod.string(), zod.unknown()).nullable(),
+  "note": zod.string().nullable()
+})),
+  "total": zod.number(),
+  "limit": zod.number(),
+  "offset": zod.number()
+})
+
+
 export const ListPoliticheCreditoSolidaleResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),

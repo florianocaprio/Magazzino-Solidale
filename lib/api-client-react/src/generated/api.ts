@@ -123,6 +123,7 @@ import type {
   ListSessioniCassaEmporioParams,
   ListSpeseEmporioParams,
   ListSuperAdminAuditConfigurazioniParams,
+  ListSuperAdminLogSistemaParams,
   ListTrasferimentiParams,
   ListTurniParams,
   ListUtentiParams,
@@ -188,6 +189,7 @@ import type {
   SpesaEmporio,
   SpesaEmporioChiusuraInput,
   SpesaEmporioChiusuraResult,
+  SystemLogListResponse,
   TipoIntervento,
   TipoInterventoInput,
   TipoInterventoUpdate,
@@ -10528,6 +10530,84 @@ export function useListSuperAdminAuditConfigurazioni<TData = Awaited<ReturnType<
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListSuperAdminAuditConfigurazioniQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListSuperAdminLogSistemaUrl = (params?: ListSuperAdminLogSistemaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/super-admin/log-sistema?${stringifiedParams}` : `/api/super-admin/log-sistema`
+}
+
+export const listSuperAdminLogSistema = async (params?: ListSuperAdminLogSistemaParams, options?: RequestInit): Promise<SystemLogListResponse> => {
+
+  return customFetch<SystemLogListResponse>(getListSuperAdminLogSistemaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSuperAdminLogSistemaQueryKey = (params?: ListSuperAdminLogSistemaParams,) => {
+    return [
+    `/api/super-admin/log-sistema`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSuperAdminLogSistemaQueryOptions = <TData = Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError = ErrorType<unknown>>(params?: ListSuperAdminLogSistemaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSuperAdminLogSistemaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSuperAdminLogSistema>>> = ({ signal }) => listSuperAdminLogSistema(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSuperAdminLogSistemaQueryResult = NonNullable<Awaited<ReturnType<typeof listSuperAdminLogSistema>>>
+export type ListSuperAdminLogSistemaQueryError = ErrorType<unknown>
+
+
+
+export function useListSuperAdminLogSistema<TData = Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError = ErrorType<unknown>>(
+ params?: ListSuperAdminLogSistemaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSuperAdminLogSistema>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSuperAdminLogSistemaQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

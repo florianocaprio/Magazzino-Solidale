@@ -2066,6 +2066,69 @@ export interface AuditConfigurazione {
   note: string | null;
 }
 
+export type SystemLogEventType = typeof SystemLogEventType[keyof typeof SystemLogEventType];
+
+
+export const SystemLogEventType = {
+  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+  LOGIN_FAILED: 'LOGIN_FAILED',
+  LOGOUT: 'LOGOUT',
+  PASSWORD_RESET_REQUESTED: 'PASSWORD_RESET_REQUESTED',
+  PASSWORD_RESET_EMAIL_SENT: 'PASSWORD_RESET_EMAIL_SENT',
+  PASSWORD_RESET_COMPLETED: 'PASSWORD_RESET_COMPLETED',
+  PASSWORD_CHANGED_BY_USER: 'PASSWORD_CHANGED_BY_USER',
+  PASSWORD_CHANGED_BY_ADMIN: 'PASSWORD_CHANGED_BY_ADMIN',
+  USER_CREATED: 'USER_CREATED',
+  USER_DISABLED: 'USER_DISABLED',
+  USER_ROLE_CHANGED: 'USER_ROLE_CHANGED',
+  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
+  ACCOUNT_UNLOCKED: 'ACCOUNT_UNLOCKED',
+} as const;
+
+export type SystemLogEventStatus = typeof SystemLogEventStatus[keyof typeof SystemLogEventStatus];
+
+
+export const SystemLogEventStatus = {
+  SUCCESS: 'SUCCESS',
+  FAILED: 'FAILED',
+  INFO: 'INFO',
+} as const;
+
+/**
+ * @nullable
+ */
+export type SystemLogEntryDetails = { [key: string]: unknown } | null;
+
+export interface SystemLogEntry {
+  id: number;
+  createdAt: string;
+  eventType: SystemLogEventType;
+  eventStatus: SystemLogEventStatus;
+  /** @nullable */
+  actorUserId: number | null;
+  /** @nullable */
+  targetUserId: number | null;
+  /** @nullable */
+  username: string | null;
+  /** @nullable */
+  userEmail: string | null;
+  /** @nullable */
+  ipAddress: string | null;
+  /** @nullable */
+  userAgent: string | null;
+  /** @nullable */
+  details: SystemLogEntryDetails;
+  /** @nullable */
+  note: string | null;
+}
+
+export interface SystemLogListResponse {
+  items: SystemLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface EmailSendResult {
   sent: boolean;
   /** @nullable */
@@ -3358,6 +3421,37 @@ export type ListSuperAdminAuditConfigurazioniParams = {
  * @maximum 200
  */
 limit?: number;
+};
+
+export type ListSuperAdminLogSistemaParams = {
+/**
+ * Data/ora iniziale filtro log
+ */
+dateFrom?: string;
+/**
+ * Data/ora finale filtro log
+ */
+dateTo?: string;
+/**
+ * Ricerca per username o email snapshot
+ */
+search?: string;
+/**
+ * Filtro email snapshot
+ */
+email?: string;
+eventType?: SystemLogEventType;
+eventStatus?: SystemLogEventStatus;
+ipAddress?: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
 };
 
 export type ListCreditoSolidaleMovimentiParams = {
