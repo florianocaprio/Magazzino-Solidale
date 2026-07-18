@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useLoginUser } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -71,6 +72,14 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <div className="text-right">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  {t("login.forgotPassword")}
+                </Link>
+              </div>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button

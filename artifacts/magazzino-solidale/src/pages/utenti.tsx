@@ -26,6 +26,7 @@ const NO_CENTRO = "__none__";
 const NO_CITTA = "__nocitta__";
 const ALL_ZONE = "__allzone__";
 const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Utenti() {
   const { t } = useTranslation();
@@ -77,6 +78,7 @@ export default function Utenti() {
   const [zonaUdsId, setZonaUdsId] = useState<string>(ALL_ZONE);
   const [attivo, setAttivo] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
+  const resettingHasValidEmail = hasValidResetEmail(resetting);
 
   const selectedCittaNum = cittaId === NO_CITTA ? undefined : parseInt(cittaId, 10);
   const visibleRoles = ruoliNelPerimetro(ruoli ?? [], currentUser?.aree ?? [], currentUser?.isSuperAdmin ?? false);
@@ -222,13 +224,21 @@ export default function Utenti() {
   const confirmReset = (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetting) return;
+    if (!resettingHasValidEmail) {
+      toast({
+        title: t("utenti.error"),
+        description: t("utenti.emailInvalidForReset"),
+        variant: "destructive",
+      });
+      return;
+    }
     resetPassword.mutate(
       { id: resetting.id },
       {
-        onSuccess: (data) => {
+        onSuccess: () => {
           toast({
             title: t("utenti.pwdReset"),
-            description: data.message || t("utenti.pwdResetDesc"),
+            description: t("utenti.pwdResetDesc"),
           });
           setResetting(null);
         },
@@ -335,7 +345,16 @@ export default function Utenti() {
                 {utenti?.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.username}</TableCell>
-                    <TableCell className="text-muted-foreground">{u.email ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <div className="flex flex-col gap-1">
+                        <span>{u.email ?? "—"}</span>
+                        {u.emailDaAggiornare && (
+                          <Badge variant="secondary" className="w-fit">
+                            {t("utenti.emailDaAggiornare")}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{[u.nome, u.cognome].filter(Boolean).join(" ")}</TableCell>
                     <TableCell>{u.matricola ?? "—"}</TableCell>
                     <TableCell>
@@ -515,14 +534,19 @@ export default function Utenti() {
           </DialogHeader>
           <form onSubmit={confirmReset} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {t("utenti.resetDescBefore")} <span className="font-medium">{resetting?.username}</span>
-              {t("utenti.resetDescAfter")}
+              {t("utenti.resetConfirm")}
             </p>
+            <p className="text-sm font-medium">{resetting?.email ?? "—"}</p>
+            {!resettingHasValidEmail && (
+              <p className="text-sm text-destructive">
+                {t("utenti.emailInvalidForReset")}
+              </p>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setResetting(null)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" disabled={resetPassword.isPending}>
+              <Button type="submit" disabled={resetPassword.isPending || !resettingHasValidEmail}>
                 {t("utenti.resetButton")}
               </Button>
             </DialogFooter>
@@ -557,4 +581,9 @@ function extractError(err: unknown): string {
     if (typeof msg === "string") return msg;
   }
   return i18n.t("utenti.operationFailed");
+}
+
+function hasValidResetEmail(user: Utente | null) {
+  if (!user || user.emailDaAggiornare || !user.email) return false;
+  return EMAIL_PATTERN.test(user.email.trim());
 }

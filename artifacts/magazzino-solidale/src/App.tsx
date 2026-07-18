@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +7,8 @@ import NotFound from "@/pages/not-found";
 import NotAuthorized from "@/pages/not-authorized";
 import Login from "@/pages/login";
 import ChangePassword from "@/pages/change-password";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import Setup from "@/pages/setup";
 import { AppLayout } from "@/components/layout";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -473,11 +475,32 @@ function AppRoutes() {
   );
 }
 
+function PublicAuthRoutes() {
+  const [location] = useLocation();
+
+  if (isPublicRoute(location, "/forgot-password")) return <ForgotPassword />;
+  if (isPublicRoute(location, "/reset-password")) return <ResetPassword />;
+
+  return (
+    <Switch>
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/login" component={Login} />
+      <Route component={Login} />
+    </Switch>
+  );
+}
+
+function isPublicRoute(location: string, path: string) {
+  return location === path || location.startsWith(`${path}?`);
+}
+
 function AuthGate() {
   const { user, isLoading, bootstrap, bootstrapLoading, logout, refresh } =
     useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
+  const [location] = useLocation();
 
   useIdleLogout({
     enabled: !!user,
@@ -502,12 +525,19 @@ function AuthGate() {
     );
   }
 
+  if (
+    isPublicRoute(location, "/forgot-password") ||
+    isPublicRoute(location, "/reset-password")
+  ) {
+    return <PublicAuthRoutes />;
+  }
+
   if (!user) {
     // First-run: no administrator exists yet. Anyone may create the system
     // users (one of which must be an admin) until an admin exists, after which
     // the app locks down to the normal login.
     if (bootstrap) return <Setup />;
-    return <Login />;
+    return <PublicAuthRoutes />;
   }
   if (user.mustChangePassword) return <ChangePassword />;
 
