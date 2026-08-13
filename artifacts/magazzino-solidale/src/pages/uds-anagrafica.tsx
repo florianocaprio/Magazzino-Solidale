@@ -32,6 +32,16 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -102,6 +112,13 @@ function extractError(err: unknown, fallback: string): string {
   return fallback;
 }
 
+function maskPhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const compact = phone.trim();
+  if (compact.length <= 4) return compact;
+  return `•••• ${compact.slice(-4)}`;
+}
+
 export default function UdsAnagrafica() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -119,6 +136,7 @@ export default function UdsAnagrafica() {
   );
   const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [linkCandidate, setLinkCandidate] = useState<BeneficiarioSimile | null>(null);
 
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isGlobal } });
 
@@ -161,6 +179,9 @@ export default function UdsAnagrafica() {
   // Anti-duplicate fuzzy suggestions: debounce the identity fields and query the
   // città-scoped cerca-simili endpoint while the create form is open.
   const [dupDismissed, setDupDismissed] = useState(false);
+  const [existingSearch, setExistingSearch] = useState("");
+  const [debouncedExistingSearch, setDebouncedExistingSearch] = useState("");
+  const [dupDebouncing, setDupDebouncing] = useState(false);
   const [dupParams, setDupParams] = useState<{
     nome?: string; cognome?: string; soprannome?: string; telefono?: string; dataNascita?: string;
   }>({});
@@ -230,6 +251,10 @@ export default function UdsAnagrafica() {
     });
     setDupDismissed(false);
     setDupParams({});
+    setExistingSearch("");
+    setDebouncedExistingSearch("");
+    setDupDebouncing(false);
+    setLinkCandidate(null);
     setIsFormOpen(true);
   };
 
@@ -241,7 +266,14 @@ export default function UdsAnagrafica() {
   const wDataNascita = form.watch("dataNascita");
   useEffect(() => {
     if (!isFormOpen) return;
+    const rawIdentityLength = [wNome, wCognome, wSoprannome, wTelefono]
+      .map((value) => (value ?? "").trim())
+      .join("")
+      .length;
+    const hasRawLookup = existingSearch.trim().length >= 2 || rawIdentityLength >= 2;
+    setDupDebouncing(hasRawLookup);
     const handle = setTimeout(() => {
+      setDebouncedExistingSearch(existingSearch.trim());
       setDupParams({
         nome: (wNome ?? "").trim(),
         cognome: (wCognome ?? "").trim(),
@@ -249,50 +281,67 @@ export default function UdsAnagrafica() {
         telefono: (wTelefono ?? "").trim(),
         dataNascita: (wDataNascita ?? "").trim(),
       });
+      setDupDismissed(false);
+      setDupDebouncing(false);
     }, 300);
     return () => clearTimeout(handle);
-  }, [isFormOpen, wNome, wCognome, wSoprannome, wTelefono, wDataNascita]);
+  }, [isFormOpen, existingSearch, wNome, wCognome, wSoprannome, wTelefono, wDataNascita]);
 
-  // Need a real signal: full name (or soprannome/telefono) before querying.
+  // Two characters are enough for the assisted shared-directory lookup.
   const dupHasInput =
-    ((dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 3) ||
-    (dupParams.soprannome ?? "").length >= 3 ||
-    (dupParams.telefono ?? "").length >= 4;
+    debouncedExistingSearch.length >= 2 ||
+    ((dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 2) ||
+    (dupParams.soprannome ?? "").length >= 2 ||
+    (dupParams.telefono ?? "").length >= 2;
   const dupCitta = isGlobal && form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined;
-  const { data: dupMatches } = useCercaBeneficiariSimili(
-    { ...dupParams, ...(dupCitta != null ? { cittaId: dupCitta } : {}) },
+  const dupScopeReady = !isGlobal || dupCitta != null;
+  const dupQueryParams = {
+    ...dupParams,
+    ...(debouncedExistingSearch.length >= 2 ? { search: debouncedExistingSearch } : {}),
+    ...(dupCitta != null ? { cittaId: dupCitta } : {}),
+  };
+  const { data: dupMatches, isFetching: isDupFetching } = useCercaBeneficiariSimili(
+    dupQueryParams,
     {
       query: {
-        queryKey: getCercaBeneficiariSimiliQueryKey({ ...dupParams, ...(dupCitta != null ? { cittaId: dupCitta } : {}) }),
-        enabled: isFormOpen && !dupDismissed && dupHasInput,
+        queryKey: getCercaBeneficiariSimiliQueryKey(dupQueryParams),
+        enabled: isFormOpen && !dupDismissed && dupHasInput && dupScopeReady,
       },
     },
   );
   const suggestions = dupMatches ?? [];
 
-  // "Aggiungi a UDS": attach the chosen zona to an existing person (centro-only or
-  // unclassified) instead of creating a duplicate. If the person is already UDS,
-  // just acknowledge and close.
-  const linkToUds = (s: BeneficiarioSimile) => {
+  const requestLinkToUds = (s: BeneficiarioSimile) => {
+    if (s.uds) {
+      toast({
+        title: t("udsAnagrafica.dupAlreadyUds"),
+        description: `${s.cognome} ${s.nome} · ${s.codice}`,
+      });
+      return;
+    }
+    setLinkCandidate(s);
+  };
+
+  // "Aggiungi a UDS": after explicit confirmation, attach the operator's chosen
+  // zona to an existing same-città person instead of creating a duplicate.
+  const confirmLinkToUds = () => {
+    const s = linkCandidate;
+    if (!s) return;
     const zonaVal = form.getValues("zonaUdsId");
     const targetZona =
       zonaVal && zonaVal !== NO_ZONE ? parseInt(zonaVal) : user?.zonaUdsId ?? null;
-    if (s.uds) {
-      toast({ title: t("udsAnagrafica.dupAlreadyUds") });
-      setIsFormOpen(false);
-      setDupDismissed(false);
-      setDupParams({});
-      return;
-    }
     updateBenef.mutate(
       { id: s.id, data: { uds: true, ...(targetZona != null ? { zonaUdsId: targetZona } : {}) } as never },
       {
         onSuccess: () => {
           invalidate();
           toast({ title: t("udsAnagrafica.dupLinked") });
+          setLinkCandidate(null);
           setIsFormOpen(false);
           setDupDismissed(false);
           setDupParams({});
+          setExistingSearch("");
+          setDebouncedExistingSearch("");
         },
         onError: (err) => {
           toast({
@@ -306,6 +355,14 @@ export default function UdsAnagrafica() {
   };
 
   const onSubmit = (data: FormValues) => {
+    if (!dupDismissed && (dupDebouncing || isDupFetching || suggestions.length > 0)) {
+      toast({
+        title: t("udsAnagrafica.dupCheckRequired"),
+        description: t("udsAnagrafica.dupCheckRequiredHint"),
+        variant: "destructive",
+      });
+      return;
+    }
     const payload: Record<string, unknown> = {
       nome: data.nome,
       cognome: data.cognome,
@@ -346,6 +403,8 @@ export default function UdsAnagrafica() {
           setIsFormOpen(false);
           setDupDismissed(false);
           setDupParams({});
+          setExistingSearch("");
+          setDebouncedExistingSearch("");
         },
         onError: (err) => {
           toast({
@@ -520,7 +579,17 @@ export default function UdsAnagrafica() {
         </CardContent>
       </Card>
 
-      <Sheet open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setDupDismissed(false); setDupParams({}); } }}>
+      <Sheet open={isFormOpen} onOpenChange={(open) => {
+        setIsFormOpen(open);
+        if (!open) {
+          setDupDismissed(false);
+          setDupParams({});
+          setExistingSearch("");
+          setDebouncedExistingSearch("");
+          setDupDebouncing(false);
+          setLinkCandidate(null);
+        }
+      }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{t("udsAnagrafica.newTitle")}</SheetTitle>
@@ -528,13 +597,54 @@ export default function UdsAnagrafica() {
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="nome" render={({ field }) => (
-                    <FormItem><FormLabel>{t("udsAnagrafica.fNome")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                {isGlobal && (
+                  <FormField control={form.control} name="cittaId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
+                      <Select
+                        value={field.value || ""}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          form.setValue("zonaUdsId", NO_ZONE);
+                          setExistingSearch("");
+                          setDebouncedExistingSearch("");
+                          setDupDismissed(false);
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.selectCittaForSearch")} /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {cittaList?.map((c) => (
+                            <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                   )} />
-                  <FormField control={form.control} name="cognome" render={({ field }) => (
-                    <FormItem><FormLabel>{t("udsAnagrafica.fCognome")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
+                )}
+
+                <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                  <FormLabel>{t("udsAnagrafica.existingSearchLabel")}</FormLabel>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={existingSearch}
+                      onChange={(event) => {
+                        setExistingSearch(event.target.value);
+                        setDupDismissed(false);
+                      }}
+                      placeholder={t("udsAnagrafica.existingSearchPlaceholder")}
+                      className="pl-9"
+                      disabled={!dupScopeReady}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {!dupScopeReady
+                      ? t("udsAnagrafica.selectCittaForSearch")
+                      : t("udsAnagrafica.existingSearchHint")}
+                  </p>
                 </div>
 
                 {!dupDismissed && suggestions.length > 0 && (
@@ -550,15 +660,20 @@ export default function UdsAnagrafica() {
                         return (
                           <div key={s.id} className="flex items-center justify-between gap-2 rounded bg-white px-2 py-1.5 text-sm">
                             <div className="min-w-0">
-                              <div className="font-medium truncate">
-                                {s.cognome} {s.nome}
-                                {s.soprannome ? ` (${s.soprannome})` : ""}
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium truncate">
+                                  {s.cognome} {s.nome}
+                                  {s.soprannome ? ` (${s.soprannome})` : ""}
+                                </span>
+                                <Badge variant={isUds ? "secondary" : "outline"} className="shrink-0">
+                                  {isUds ? t("udsAnagrafica.dupStatusUds") : t("udsAnagrafica.dupStatusShared")}
+                                </Badge>
                               </div>
                               <div className="text-xs text-muted-foreground truncate">
-                                {[s.dataNascita, s.telefono, s.zonaUdsNome ?? s.centroAscoltoNome].filter(Boolean).join(" · ") || "—"}
+                                {[s.codice, s.dataNascita, maskPhone(s.telefono), s.cittaNome].filter(Boolean).join(" · ") || "—"}
                               </div>
                             </div>
-                            <Button type="button" size="sm" variant="outline" onClick={() => linkToUds(s)} disabled={updateBenef.isPending}>
+                            <Button type="button" size="sm" variant="outline" onClick={() => requestLinkToUds(s)} disabled={updateBenef.isPending}>
                               {isUds ? t("udsAnagrafica.dupOpen") : t("udsAnagrafica.dupAdd")}
                             </Button>
                           </div>
@@ -570,6 +685,15 @@ export default function UdsAnagrafica() {
                     </Button>
                   </div>
                 )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="nome" render={({ field }) => (
+                    <FormItem><FormLabel>{t("udsAnagrafica.fNome")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="cognome" render={({ field }) => (
+                    <FormItem><FormLabel>{t("udsAnagrafica.fCognome")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
 
                 <FormField control={form.control} name="soprannome" render={({ field }) => (
                   <FormItem><FormLabel>{t("udsAnagrafica.fSoprannome")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
@@ -690,24 +814,6 @@ export default function UdsAnagrafica() {
                   )} />
                   {watchUds && (
                     <>
-                      {isGlobal && (
-                        <FormField control={form.control} name="cittaId" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
-                            <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NO_ZONE); }}>
-                              <FormControl>
-                                <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {cittaList?.map((c) => (
-                                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                      )}
                       <FormField control={form.control} name="zonaUdsId" render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
@@ -730,13 +836,37 @@ export default function UdsAnagrafica() {
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setDupDismissed(false); setDupParams({}); }}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createBenef.isPending}>{t("common.save")}</Button>
+                  <Button
+                    type="submit"
+                    disabled={createBenef.isPending || (!dupDismissed && (dupDebouncing || isDupFetching || suggestions.length > 0))}
+                  >
+                    {t("common.save")}
+                  </Button>
                 </div>
               </form>
             </Form>
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={linkCandidate != null} onOpenChange={(open) => { if (!open) setLinkCandidate(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("udsAnagrafica.dupConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("udsAnagrafica.dupConfirmDescription", {
+                nome: linkCandidate ? `${linkCandidate.cognome} ${linkCandidate.nome}` : "",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLinkToUds} disabled={updateBenef.isPending}>
+              {t("udsAnagrafica.dupConfirmAction")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

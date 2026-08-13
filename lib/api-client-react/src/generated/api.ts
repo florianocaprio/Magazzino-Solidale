@@ -3861,7 +3861,7 @@ export const getCercaBeneficiariSimiliUrl = (params?: CercaBeneficiariSimiliPara
 }
 
 /**
- * @summary Fuzzy person-duplicate suggestions within the caller's città
+ * @summary Person lookup and fuzzy duplicate suggestions within the caller's città
  */
 export const cercaBeneficiariSimili = async (params?: CercaBeneficiariSimiliParams, options?: RequestInit): Promise<BeneficiarioSimile[]> => {
 
@@ -3908,7 +3908,7 @@ export type CercaBeneficiariSimiliQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Fuzzy person-duplicate suggestions within the caller's città
+ * @summary Person lookup and fuzzy duplicate suggestions within the caller's città
  */
 
 export function useCercaBeneficiariSimili<TData = Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError = ErrorType<unknown>>(

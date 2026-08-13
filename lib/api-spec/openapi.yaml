@@ -1050,8 +1050,14 @@ paths:
     get:
       operationId: cercaBeneficiariSimili
       tags: [beneficiari]
-      summary: Fuzzy person-duplicate suggestions within the caller's città
+      summary: Person lookup and fuzzy duplicate suggestions within the caller's città
       parameters:
+        - name: search
+          in: query
+          description: Free-text lookup over names in both orders, nickname, phone, beneficiary code and tax code; at least 2 characters
+          schema:
+            type: string
+            minLength: 2
         - name: nome
           in: query
           schema:

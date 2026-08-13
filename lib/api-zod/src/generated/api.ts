@@ -1415,9 +1415,14 @@ export const CreateBeneficiarioBody = zod.object({
 
 
 /**
- * @summary Fuzzy person-duplicate suggestions within the caller's città
+ * @summary Person lookup and fuzzy duplicate suggestions within the caller's città
  */
+export const cercaBeneficiariSimiliQuerySearchMin = 2;
+
+
+
 export const CercaBeneficiariSimiliQueryParams = zod.object({
+  "search": zod.coerce.string().min(cercaBeneficiariSimiliQuerySearchMin).optional().describe('Free-text lookup over names in both orders, nickname, phone, beneficiary code and tax code; at least 2 characters'),
   "nome": zod.coerce.string().optional(),
   "cognome": zod.coerce.string().optional(),
   "soprannome": zod.coerce.string().optional(),

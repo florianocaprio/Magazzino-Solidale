@@ -468,12 +468,14 @@ router.post("/beneficiari/bulk", async (req, res) => {
 });
 
 // Fuzzy person-duplicate suggestion (pg_trgm). Scoped HARD to the caller's città
-// so a duplicate is never surfaced across cities. Returns candidates ordered by a
-// combined similarity score over name(+reversed), soprannome, telefono and an
-// exact birthdate boost. MUST stay registered before "/beneficiari/:id" so the
-// literal segment is not captured as an id.
+// so a duplicate is never surfaced across cities. The UDS lookup deliberately
+// ignores centro/zona: an operator may find every shared person in their città,
+// including Sociale-only people and UDS people assigned to another zona.
+// MUST stay registered before "/beneficiari/:id" so the literal segment is not
+// captured as an id.
 router.get("/beneficiari/cerca-simili", async (req, res) => {
   const q = req.query as Record<string, string>;
+  const search = (q.search ?? "").trim().toLowerCase();
   const nome = (q.nome ?? "").trim();
   const cognome = (q.cognome ?? "").trim();
   const soprannome = (q.soprannome ?? "").trim().toLowerCase();
@@ -487,19 +489,25 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
   };
   const excludeId = toIntOrNull(q.excludeId);
 
-  // Nothing to match on → empty result (avoids returning the whole città).
-  if (!full && !soprannome && !telefono && !dataNascita) {
+  // The explicit lookup is intentionally unavailable for one-character queries:
+  // this limits broad enumeration and matches the UI's two-character threshold.
+  if (search.length === 1) {
     res.json([]);
     return;
   }
 
-  // Città is the HARD boundary: a scoped caller can only search their own città
-  // (or NULL/legacy rows); zona is HARD when present on the caller. Global
-  // callers may narrow with ?cittaId / ?zonaUdsId.
+  // Nothing to match on → empty result (avoids returning the whole città).
+  if (!search && !full && !soprannome && !telefono && !dataNascita) {
+    res.json([]);
+    return;
+  }
+
+  // Città is the only boundary for this lookup. A scoped caller sees exactly
+  // their own città: NULL legacy rows are excluded. Global callers may explicitly
+  // narrow the lookup with ?cittaId.
   const callerCitta = callerCittaId(req);
   const cittaId = callerCitta != null ? callerCitta : toIntOrNull(q.cittaId);
-  const callerZona = callerZonaUdsId(req);
-  const zonaId = callerZona != null ? callerZona : toIntOrNull(q.zonaUdsId);
+  const searchLike = `%${search}%`;
 
   const result = await db.execute(sql`
     SELECT * FROM (
@@ -511,6 +519,25 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
         b.centro_ascolto_id AS "centroAscoltoId", ca.nome AS "centroAscoltoNome",
         b.uds AS "uds",
         (
+          CASE WHEN ${search} <> '' THEN GREATEST(
+            similarity(lower(coalesce(b.nome, '')), ${search}),
+            similarity(lower(coalesce(b.cognome, '')), ${search}),
+            similarity(lower(coalesce(b.nome, '') || ' ' || coalesce(b.cognome, '')), ${search}),
+            similarity(lower(coalesce(b.cognome, '') || ' ' || coalesce(b.nome, '')), ${search}),
+            similarity(lower(coalesce(b.soprannome, '')), ${search}),
+            similarity(lower(coalesce(b.telefono, '')), ${search}),
+            similarity(lower(coalesce(b.codice, '')), ${search}),
+            similarity(lower(coalesce(b.codice_fiscale, '')), ${search}),
+            CASE WHEN lower(coalesce(b.nome, '')) LIKE ${searchLike} THEN 0.7 ELSE 0 END,
+            CASE WHEN lower(coalesce(b.cognome, '')) LIKE ${searchLike} THEN 0.7 ELSE 0 END,
+            CASE WHEN lower(coalesce(b.nome, '') || ' ' || coalesce(b.cognome, '')) LIKE ${searchLike} THEN 0.8 ELSE 0 END,
+            CASE WHEN lower(coalesce(b.cognome, '') || ' ' || coalesce(b.nome, '')) LIKE ${searchLike} THEN 0.8 ELSE 0 END,
+            CASE WHEN lower(coalesce(b.soprannome, '')) LIKE ${searchLike} THEN 0.7 ELSE 0 END,
+            CASE WHEN lower(coalesce(b.telefono, '')) LIKE ${searchLike} THEN 0.8 ELSE 0 END,
+            CASE WHEN lower(coalesce(b.codice, '')) LIKE ${searchLike} THEN 0.9 ELSE 0 END,
+            CASE WHEN lower(coalesce(b.codice_fiscale, '')) LIKE ${searchLike} THEN 0.9 ELSE 0 END
+          ) ELSE 0 END
+          +
           GREATEST(
             similarity(lower(coalesce(b.nome, '') || ' ' || coalesce(b.cognome, '')), ${full}),
             similarity(lower(coalesce(b.cognome, '') || ' ' || coalesce(b.nome, '')), ${full})
@@ -523,8 +550,7 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
       LEFT JOIN citta c ON c.id = b.citta_id
       LEFT JOIN zone_uds z ON z.id = b.zona_uds_id
       LEFT JOIN centri_di_ascolto ca ON ca.id = b.centro_ascolto_id
-      WHERE (${cittaId}::int IS NULL OR b.citta_id = ${cittaId}::int OR b.citta_id IS NULL)
-        AND (${zonaId}::int IS NULL OR b.zona_uds_id = ${zonaId}::int)
+      WHERE (${cittaId}::int IS NULL OR b.citta_id = ${cittaId}::int)
         AND (${excludeId}::int IS NULL OR b.id <> ${excludeId}::int)
     ) s
     WHERE s.score >= 0.2
@@ -616,17 +642,31 @@ router.patch("/beneficiari/:id", async (req, res) => {
   const zid = callerZonaUdsId(req);
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
-    return;
-  }
-  if (!canAccessCitta(existing.cittaId, cid)) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
-    return;
-  }
-  if (!canAccessZonaUds(existing.zonaUdsId, zid)) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua zona" });
-    return;
+  const patchKeys = Object.keys(req.body ?? {});
+  const isInitialUdsLink = !existing.uds
+    && toBool(req.body?.uds) === true
+    && patchKeys.length > 0
+    && patchKeys.every((key) => key === "uds" || key === "zonaUdsId");
+  const canLinkWithinCallerCitta = isInitialUdsLink
+    && cid != null
+    && existing.cittaId === cid;
+
+  // The shared-directory UDS action is the only mutation allowed across centro
+  // and zona boundaries, and only for a non-UDS person in the caller's exact
+  // città. Every other patch retains the standard territorial checks.
+  if (!canLinkWithinCallerCitta) {
+    if (!canAccessCentro(existing.centroAscoltoId, caller)) {
+      res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+      return;
+    }
+    if (!canAccessCitta(existing.cittaId, cid)) {
+      res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+      return;
+    }
+    if (!canAccessZonaUds(existing.zonaUdsId, zid)) {
+      res.status(403).json({ error: "Risorsa non accessibile per la tua zona" });
+      return;
+    }
   }
   const updates = { ...req.body, dataAggiornamento: new Date() };
   if (hasFutureBirthDate(updates.dataNascita)) {
