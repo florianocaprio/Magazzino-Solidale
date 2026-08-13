@@ -38,6 +38,7 @@ import {
 import { UdsPersonaSheet } from "@/components/uds-persona-sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
 
 const ALL_ZONE = "__all__";
 
@@ -121,6 +122,11 @@ export default function UdsAnagrafica() {
         accessor: (b: Beneficiario) => b.soprannome ?? "",
       },
       { header: t("udsAnagrafica.colTelefono"), accessor: (b: Beneficiario) => b.telefono ?? "" },
+      {
+        header: t("udsAnagrafica.colFasciaEta"),
+        accessor: (b: Beneficiario) =>
+          `${fasciaEtaLabel(t, b.fasciaEtaCorrente)} (${fasciaEtaOrigineLabel(t, b.fasciaEtaOrigine)})`,
+      },
       { header: t("udsAnagrafica.colZona"), accessor: (b: Beneficiario) => b.zonaUdsNome ?? "" },
       { header: t("udsAnagrafica.colCanale"), accessor: (b: Beneficiario) => canale(b).label },
     ],
@@ -220,6 +226,7 @@ export default function UdsAnagrafica() {
                 <TableHead>{t("common.name")}</TableHead>
                 <TableHead>{t("udsAnagrafica.colSoprannome")}</TableHead>
                 <TableHead>{t("udsAnagrafica.colTelefono")}</TableHead>
+                <TableHead>{t("udsAnagrafica.colFasciaEta")}</TableHead>
                 <TableHead>{t("udsAnagrafica.colZona")}</TableHead>
                 <TableHead className="text-center">{t("udsAnagrafica.colCanale")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
@@ -231,7 +238,7 @@ export default function UdsAnagrafica() {
                   .fill(0)
                   .map((_, rowIndex) => (
                     <TableRow key={rowIndex}>
-                      {Array(7)
+                      {Array(8)
                         .fill(0)
                         .map((_, cellIndex) => (
                           <TableCell key={cellIndex}><Skeleton className="h-5 w-24" /></TableCell>
@@ -240,7 +247,7 @@ export default function UdsAnagrafica() {
                   ))
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     {t("udsAnagrafica.noPersone")}
                   </TableCell>
                 </TableRow>
@@ -262,6 +269,12 @@ export default function UdsAnagrafica() {
                         {beneficiario.soprannome || "-"}
                       </TableCell>
                       <TableCell className="text-sm">{beneficiario.telefono || "-"}</TableCell>
+                      <TableCell className="text-sm">
+                        <div>{fasciaEtaLabel(t, beneficiario.fasciaEtaCorrente)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {fasciaEtaOrigineLabel(t, beneficiario.fasciaEtaOrigine)}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-sm">{beneficiario.zonaUdsNome || "-"}</TableCell>
                       <TableCell className="text-center">
                         <Badge variant="outline" className={`border-none ${channel.cls}`}>

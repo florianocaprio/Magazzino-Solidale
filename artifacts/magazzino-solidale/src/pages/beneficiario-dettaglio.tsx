@@ -30,6 +30,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
+import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
 
 const NONE_VALUE = "__none__";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -235,6 +236,15 @@ export default function BeneficiarioDettaglio() {
               <div className="flex items-center gap-3">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span>{t("beneficiarioDettaglio.bornOn", { date: b.dataNascita ? format(new Date(b.dataNascita), "dd/MM/yyyy") : "-" })}</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <Info className="w-4 h-4 text-muted-foreground mt-0.5" />
+                <div>
+                  <div>{fasciaEtaLabel(t, b.fasciaEtaCorrente)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {fasciaEtaOrigineLabel(t, b.fasciaEtaOrigine)}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -864,7 +874,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
     const payload: Record<string, unknown> = {
       ...rest,
       uds,
-      dataNascita: data.dataNascita || undefined,
+      dataNascita: data.dataNascita || null,
       sesso: data.sesso,
       areaProvenienza: data.areaProvenienza || undefined,
       codiceFiscale: data.codiceFiscale?.trim() ? data.codiceFiscale.trim().toUpperCase() : null,

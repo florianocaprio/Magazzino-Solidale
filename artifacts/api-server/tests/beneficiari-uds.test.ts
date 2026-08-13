@@ -5,6 +5,7 @@ import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTabl
 import { eq, inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
+import { calcolaEta, risolviFasciaEta } from "@workspace/api-zod";
 
 /**
  * UDS unification: an explicit `uds` boolean flag (independent of zonaUdsId)
@@ -172,6 +173,135 @@ describe("POST /beneficiari (uds)", () => {
     expect(res.body.uds).toBe(true);
     expect(res.body.cittaId).toBe(cittaA);
     beneficiarioIds.push(res.body.id);
+  });
+});
+
+describe("fascia d'età UDS", () => {
+  const referenceDate = new Date(2025, 5, 15);
+  const currentYear = new Date().getFullYear();
+  const birthDateAge26 = `${currentYear - 26}-01-01`;
+  const birthDateAge16 = `${currentYear - 16}-01-01`;
+
+  it.each([
+    ["il giorno prima del diciottesimo compleanno", "2007-06-16", 17, "0_17"],
+    ["il giorno del diciottesimo compleanno", "2007-06-15", 18, "18_29"],
+    ["il giorno dopo il diciottesimo compleanno", "2007-06-14", 18, "18_29"],
+    ["il limite dei 29 anni", "1995-06-16", 29, "18_29"],
+    ["il passaggio da 29 a 30 anni", "1995-06-15", 30, "30_64"],
+    ["il limite dei 64 anni", "1960-06-16", 64, "30_64"],
+    ["il passaggio da 64 a 65 anni", "1960-06-15", 65, "65_plus"],
+  ])("calcola %s usando giorno, mese e anno", (_label, birthDate, age, fascia) => {
+    expect(calcolaEta(birthDate, referenceDate)).toBe(age);
+    expect(risolviFasciaEta(birthDate, "0_17", referenceDate)).toEqual({
+      fascia,
+      origine: "calcolata",
+    });
+  });
+
+  it("usa la fascia presunta solo in assenza della data di nascita", () => {
+    expect(risolviFasciaEta(null, "30_64", referenceDate)).toEqual({
+      fascia: "30_64",
+      origine: "presunta",
+    });
+  });
+
+  it("restituisce non determinata per un record legacy senza entrambi i valori", () => {
+    expect(risolviFasciaEta(null, null, referenceDate)).toEqual({
+      fascia: "non_determinata",
+      origine: "non_determinata",
+    });
+  });
+
+  it("persiste la fascia presunta ma restituisce quella calcolata quando è presente la data", async () => {
+    const res = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({
+        nome: "Fascia",
+        cognome: rnd(),
+        sesso: "F",
+        uds: true,
+        dataNascita: birthDateAge26,
+        fasciaEtaPresunta: "65_plus",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.fasciaEtaPresunta).toBe("65_plus");
+    expect(res.body.fasciaEtaCorrente).toBe("18_29");
+    expect(res.body.fasciaEtaOrigine).toBe("calcolata");
+    beneficiarioIds.push(res.body.id);
+  });
+
+  it("dopo la rimozione della data torna alla fascia presunta conservata", async () => {
+    const created = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({
+        nome: "Ritorno",
+        cognome: rnd(),
+        sesso: "M",
+        dataNascita: birthDateAge26,
+        fasciaEtaPresunta: "30_64",
+      });
+    expect(created.status).toBe(201);
+    beneficiarioIds.push(created.body.id);
+
+    const patched = await request(appAs(cittaA))
+      .patch(`/beneficiari/${created.body.id}`)
+      .send({ dataNascita: null });
+
+    expect(patched.status).toBe(200);
+    expect(patched.body.dataNascita).toBeNull();
+    expect(patched.body.fasciaEtaPresunta).toBe("30_64");
+    expect(patched.body.fasciaEtaCorrente).toBe("30_64");
+    expect(patched.body.fasciaEtaOrigine).toBe("presunta");
+  });
+
+  it("ricalcola immediatamente la fascia quando cambia la data di nascita", async () => {
+    const created = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "Cambio", cognome: rnd(), sesso: "F", dataNascita: birthDateAge16 });
+    expect(created.status).toBe(201);
+    expect(created.body.fasciaEtaCorrente).toBe("0_17");
+    beneficiarioIds.push(created.body.id);
+
+    const patched = await request(appAs(cittaA))
+      .patch(`/beneficiari/${created.body.id}`)
+      .send({ dataNascita: birthDateAge26 });
+    expect(patched.status).toBe(200);
+    expect(patched.body.fasciaEtaCorrente).toBe("18_29");
+    expect(patched.body.fasciaEtaOrigine).toBe("calcolata");
+  });
+
+  it.each([`${currentYear + 1}-01-01`, "2025-02-30", "15/06/2000"])(
+    "rifiuta una data futura o non valida: %s",
+    async (dataNascita) => {
+      const res = await request(appAs(cittaA))
+        .post("/beneficiari")
+        .send({ nome: "Data", cognome: rnd(), sesso: "M", dataNascita });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/data di nascita/i);
+    },
+  );
+
+  it("rifiuta una fascia presunta fuori dall'insieme previsto", async () => {
+    const res = await request(appAs(cittaA))
+      .post("/beneficiari")
+      .send({ nome: "Fascia", cognome: rnd(), sesso: "M", fasciaEtaPresunta: "18_64" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/fascia d'età presunta/i);
+  });
+
+  it("espone come non determinato un beneficiario storico con valori null", async () => {
+    const [legacy] = await db
+      .insert(beneficiariTable)
+      .values({ codice: `BEN-${rnd()}`, nome: "Legacy", cognome: rnd(), sesso: "M", cittaId: cittaA })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(legacy.id);
+
+    const res = await request(appAs(cittaA)).get(`/beneficiari/${legacy.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.fasciaEtaPresunta).toBeNull();
+    expect(res.body.fasciaEtaCorrente).toBe("non_determinata");
+    expect(res.body.fasciaEtaOrigine).toBe("non_determinata");
   });
 });
 
@@ -351,19 +481,25 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
 
     const res = await request(appAsCentro(centroOperatore, cittaA, zonaOperatore))
       .patch(`/beneficiari/${sociale.id}`)
-      .send({ uds: true, zonaUdsId: zonaOperatore });
+      .send({ uds: true, zonaUdsId: zonaOperatore, fasciaEtaPresunta: "30_64" });
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(sociale.id);
     expect(res.body.uds).toBe(true);
     expect(res.body.centroAscoltoId).toBe(centroPersona);
     expect(res.body.zonaUdsId).toBe(zonaOperatore);
+    expect(res.body.fasciaEtaCorrente).toBe("30_64");
+    expect(res.body.fasciaEtaOrigine).toBe("presunta");
 
     const rows = await db
-      .select({ id: beneficiariTable.id, uds: beneficiariTable.uds })
+      .select({
+        id: beneficiariTable.id,
+        uds: beneficiariTable.uds,
+        fasciaEtaPresunta: beneficiariTable.fasciaEtaPresunta,
+      })
       .from(beneficiariTable)
       .where(eq(beneficiariTable.codice, codice));
-    expect(rows).toEqual([{ id: sociale.id, uds: true }]);
+    expect(rows).toEqual([{ id: sociale.id, uds: true, fasciaEtaPresunta: "30_64" }]);
   });
 
   it("non trasforma il collegamento UDS in un bypass generico per una persona già UDS di un'altra zona", async () => {

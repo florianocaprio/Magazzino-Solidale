@@ -5687,6 +5687,17 @@ components:
           type: string
         dataNascita:
           type: ["string", "null"]
+        fasciaEtaPresunta:
+          type: ["string", "null"]
+          enum: ["0_17", "18_29", "30_64", "65_plus", null]
+          description: Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+        fasciaEtaCorrente:
+          type: string
+          enum: ["0_17", "18_29", "30_64", "65_plus", "non_determinata"]
+          description: Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta.
+        fasciaEtaOrigine:
+          type: string
+          enum: [calcolata, presunta, non_determinata]
         sesso:
           type: ["string", "null"]
         cittadinanza:
@@ -5763,7 +5774,7 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleSaldo, creditoSolidaleDataUltimoMovimento, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, uds, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, fasciaEtaPresunta, fasciaEtaCorrente, fasciaEtaOrigine, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleSaldo, creditoSolidaleDataUltimoMovimento, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, uds, attivo, dataCreazione]
 
     BeneficiarioDettaglio:
       type: object
@@ -5780,6 +5791,17 @@ components:
           type: string
         dataNascita:
           type: ["string", "null"]
+        fasciaEtaPresunta:
+          type: ["string", "null"]
+          enum: ["0_17", "18_29", "30_64", "65_plus", null]
+          description: Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+        fasciaEtaCorrente:
+          type: string
+          enum: ["0_17", "18_29", "30_64", "65_plus", "non_determinata"]
+          description: Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta.
+        fasciaEtaOrigine:
+          type: string
+          enum: [calcolata, presunta, non_determinata]
         sesso:
           type: ["string", "null"]
         cittadinanza:
@@ -5888,7 +5910,7 @@ components:
             $ref: "#/components/schemas/Consegna"
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleSaldo, creditoSolidaleDataUltimoMovimento, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, attivo, dataCreazione]
+      required: [id, codice, cognome, nome, fasciaEtaPresunta, fasciaEtaCorrente, fasciaEtaOrigine, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleSaldo, creditoSolidaleDataUltimoMovimento, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, attivo, dataCreazione]
 
     BeneficiarioInput:
       type: object
@@ -5902,7 +5924,12 @@ components:
         nome:
           type: string
         dataNascita:
-          type: string
+          type: ["string", "null"]
+          format: date
+        fasciaEtaPresunta:
+          type: ["string", "null"]
+          enum: ["0_17", "18_29", "30_64", "65_plus", null]
+          description: Fascia d'età stimata dall'operatore; null indica che non è determinata.
         cittadinanza:
           type: string
         residenza:
@@ -5997,7 +6024,12 @@ components:
         nome:
           type: string
         dataNascita:
-          type: string
+          type: ["string", "null"]
+          format: date
+        fasciaEtaPresunta:
+          type: ["string", "null"]
+          enum: ["0_17", "18_29", "30_64", "65_plus", null]
+          description: Fascia d'età stimata dall'operatore; null indica che non è determinata.
         cittadinanza:
           type: string
         residenza:

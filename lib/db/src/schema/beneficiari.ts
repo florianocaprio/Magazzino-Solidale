@@ -13,6 +13,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   nome: varchar("nome", { length: 80 }).notNull(),
   soprannome: varchar("soprannome", { length: 80 }),
   dataNascita: date("data_nascita"),
+  fasciaEtaPresunta: varchar("fascia_eta_presunta", { length: 20 }),
   sesso: varchar("sesso", { length: 10 }),
   cittadinanza: varchar("cittadinanza", { length: 60 }),
   areaProvenienza: varchar("area_provenienza", { length: 10 }),
