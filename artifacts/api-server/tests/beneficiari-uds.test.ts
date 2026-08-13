@@ -330,6 +330,71 @@ describe("Credito Solidale beneficiari", () => {
 });
 
 describe("PATCH /beneficiari/:id (uds boundary)", () => {
+  it("collega a UDS un beneficiario Sociale della stessa città senza duplicarlo, ignorando centro e zona del caller", async () => {
+    const centroOperatore = await createCentro(cittaA);
+    const centroPersona = await createCentro(cittaA);
+    const zonaOperatore = await createZona(cittaA);
+    const codice = `BEN-${rnd()}`;
+    const [sociale] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice,
+        nome: "Sociale",
+        cognome: "DaCollegare",
+        sesso: "F",
+        cittaId: cittaA,
+        centroAscoltoId: centroPersona,
+        uds: false,
+      })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(sociale.id);
+
+    const res = await request(appAsCentro(centroOperatore, cittaA, zonaOperatore))
+      .patch(`/beneficiari/${sociale.id}`)
+      .send({ uds: true, zonaUdsId: zonaOperatore });
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(sociale.id);
+    expect(res.body.uds).toBe(true);
+    expect(res.body.centroAscoltoId).toBe(centroPersona);
+    expect(res.body.zonaUdsId).toBe(zonaOperatore);
+
+    const rows = await db
+      .select({ id: beneficiariTable.id, uds: beneficiariTable.uds })
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.codice, codice));
+    expect(rows).toEqual([{ id: sociale.id, uds: true }]);
+  });
+
+  it("non trasforma il collegamento UDS in un bypass generico per una persona già UDS di un'altra zona", async () => {
+    const zonaOperatore = await createZona(cittaA);
+    const altraZona = await createZona(cittaA);
+    const [uds] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-${rnd()}`,
+        nome: "Gia",
+        cognome: "Uds",
+        sesso: "M",
+        cittaId: cittaA,
+        zonaUdsId: altraZona,
+        uds: true,
+      })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(uds.id);
+
+    const res = await request(appAs(cittaA, zonaOperatore))
+      .patch(`/beneficiari/${uds.id}`)
+      .send({ uds: true, zonaUdsId: zonaOperatore });
+
+    expect(res.status).toBe(403);
+    const [unchanged] = await db
+      .select({ zonaUdsId: beneficiariTable.zonaUdsId })
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, uds.id));
+    expect(unchanged.zonaUdsId).toBe(altraZona);
+  });
+
   it("un caller globale non può attivare uds su una persona senza città (400)", async () => {
     const [b] = await db
       .insert(beneficiariTable)

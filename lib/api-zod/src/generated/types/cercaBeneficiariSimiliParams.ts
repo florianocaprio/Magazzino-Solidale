@@ -7,11 +7,20 @@
  */
 
 export type CercaBeneficiariSimiliParams = {
+/**
+ * Free-text lookup over names in both orders, nickname, phone, beneficiary code and tax code; at least 2 characters
+ * @minLength 2
+ */
+search?: string;
 nome?: string;
 cognome?: string;
 soprannome?: string;
 telefono?: string;
 dataNascita?: string;
+/**
+ * Required for global users; ignored for users already scoped to a città, whose own città is always used
+ * @minimum 1
+ */
 cittaId?: number;
 excludeId?: number;
 };

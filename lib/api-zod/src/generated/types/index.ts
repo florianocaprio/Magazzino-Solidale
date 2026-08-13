@@ -63,6 +63,7 @@ export * from './bulkImportResultErroriItem';
 export * from './centroAscolto';
 export * from './centroAscoltoInput';
 export * from './centroAscoltoUpdate';
+export * from './cercaBeneficiariSimili400';
 export * from './cercaBeneficiariSimiliParams';
 export * from './changePasswordInput';
 export * from './citta';

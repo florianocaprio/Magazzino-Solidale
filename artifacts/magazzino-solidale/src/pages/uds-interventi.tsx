@@ -2,14 +2,12 @@ import { useMemo, useState } from "react";
 import {
   useListBeneficiari,
   useListInterventi,
-  useCreateBeneficiario,
   useCreateIntervento,
   useUpdateIntervento,
   useListCitta,
   useListZoneUds,
   useListTipiIntervento,
   getListInterventiQueryKey,
-  getListBeneficiariQueryKey,
   getListCittaQueryKey,
   type Beneficiario,
   type Intervento,
@@ -42,7 +40,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
-import { SESSO_OPTIONS } from "@/lib/sesso-options";
+import {
+  UdsPersonaSheet,
+  type UdsPersonaSelection,
+} from "@/components/uds-persona-sheet";
 import { Plus, HeartHandshake, StickyNote, Pencil } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,27 +64,6 @@ function makeSchema(t: (k: string) => string) {
 
 type FormValues = z.infer<ReturnType<typeof makeSchema>>;
 
-function makeNewPersonSchema(t: (k: string) => string, isGlobal: boolean) {
-  return z
-    .object({
-      nome: z.string().min(1, t("common.requiredField")),
-      cognome: z.string().min(1, t("common.requiredField")),
-      sesso: z.string().min(1, t("beneficiari.sessoRequired")),
-      areaProvenienza: z.string().min(1, t("common.requiredField")),
-      soprannome: z.string().optional(),
-      telefono: z.string().optional(),
-      cittaId: z.string().optional(),
-      zonaUdsId: z.string().optional(),
-    })
-    .superRefine((data, ctx) => {
-      if (isGlobal && !data.cittaId) {
-        ctx.addIssue({ code: "custom", path: ["cittaId"], message: t("common.requiredField") });
-      }
-    });
-}
-
-type NewPersonValues = z.infer<ReturnType<typeof makeNewPersonSchema>>;
-
 function extractError(err: unknown, fallback: string): string {
   const data = (err as { data?: unknown })?.data;
   if (data && typeof data === "object" && "error" in data) {
@@ -93,7 +73,7 @@ function extractError(err: unknown, fallback: string): string {
   return fallback;
 }
 
-function personLabel(b: Beneficiario): string {
+function personLabel(b: { nome: string; cognome: string; soprannome?: string | null }): string {
   const base = `${b.cognome} ${b.nome}`;
   return b.soprannome ? `${base} (${b.soprannome})` : base;
 }
@@ -104,7 +84,6 @@ export default function UdsInterventi() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const schema = makeSchema(t);
-  const newPersonSchema = useMemo(() => makeNewPersonSchema(t, user?.cittaId == null), [t, user?.cittaId]);
   const canCreatePerson = hasArea("uds");
 
   const isGlobal = user?.cittaId == null;
@@ -116,6 +95,7 @@ export default function UdsInterventi() {
   );
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isNewPersonOpen, setIsNewPersonOpen] = useState(false);
+  const [selectedPersonFallback, setSelectedPersonFallback] = useState<UdsPersonaSelection | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [noteEditing, setNoteEditing] = useState<Intervento | null>(null);
   const [noteText, setNoteText] = useState("");
@@ -152,7 +132,6 @@ export default function UdsInterventi() {
     },
   );
 
-  const createBeneficiario = useCreateBeneficiario();
   const createIntervento = useCreateIntervento();
   const updateIntervento = useUpdateIntervento();
   const { data: tipiIntervento } = useListTipiIntervento();
@@ -167,31 +146,9 @@ export default function UdsInterventi() {
     },
   });
 
-  const newPersonForm = useForm<NewPersonValues>({
-    resolver: zodResolver(newPersonSchema),
-    defaultValues: {
-      nome: "",
-      cognome: "",
-      sesso: "",
-      areaProvenienza: "",
-      soprannome: "",
-      telefono: "",
-      cittaId: "",
-      zonaUdsId: "",
-    },
-  });
-
-  const newPersonCitta = isGlobal
-    ? newPersonForm.watch("cittaId")
-      ? parseInt(newPersonForm.watch("cittaId")!)
-      : undefined
-    : effectiveCitta;
-  const { data: newPersonZoneList } = useListZoneUds(
-    newPersonCitta ? { cittaId: newPersonCitta } : undefined,
-    { query: { queryKey: ["zoneUds", "udsIntNewPerson", newPersonCitta], enabled: newPersonCitta != null } },
-  );
-
   const selectedBenef = persone?.find((p) => p.id === personId);
+  const selectedPersonData =
+    selectedBenef ?? (selectedPersonFallback?.id === personId ? selectedPersonFallback : undefined);
 
   // Built-in type keys are translated; admin-added custom names display as typed.
   const tipoLabel = (tipo: string) => t(`tipiIntervento.opt.${tipo}`, { defaultValue: tipo.replace(/_/g, " ") });
@@ -201,59 +158,12 @@ export default function UdsInterventi() {
     tipiIntervento?.find((tp) => tp.attivo)?.nome ??
     "ascolto";
 
-  const handleNewPerson = () => {
-    newPersonForm.reset({
-      nome: "",
-      cognome: "",
-      sesso: "",
-      areaProvenienza: "",
-      soprannome: "",
-      telefono: "",
-      cittaId: isGlobal && filterCitta ? filterCitta : "",
-      zonaUdsId:
-        filterZona !== ALL_ZONE
-          ? filterZona
-          : user?.zonaUdsId != null
-            ? String(user.zonaUdsId)
-            : "",
-    });
-    setIsNewPersonOpen(true);
-  };
-
-  const onSubmitNewPerson = (data: NewPersonValues) => {
-    const payload: Record<string, unknown> = {
-      nome: data.nome,
-      cognome: data.cognome,
-      sesso: data.sesso,
-      areaProvenienza: data.areaProvenienza,
-      uds: true,
-    };
-    if (data.soprannome) payload.soprannome = data.soprannome;
-    if (data.telefono) payload.telefono = data.telefono;
-    if (isGlobal && data.cittaId) payload.cittaId = parseInt(data.cittaId);
-    if (data.zonaUdsId) payload.zonaUdsId = parseInt(data.zonaUdsId);
-
-    createBeneficiario.mutate(
-      { data: payload as never },
-      {
-        onSuccess: (created) => {
-          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
-          if (isGlobal && data.cittaId) setFilterCitta(data.cittaId);
-          setFilterZona(data.zonaUdsId || ALL_ZONE);
-          setPersonSearch("");
-          setSelectedPerson(String(created.id));
-          setIsNewPersonOpen(false);
-          toast({ title: t("udsAnagrafica.toastCreated") });
-        },
-        onError: (err) => {
-          toast({
-            title: t("udsAnagrafica.newTitle"),
-            description: extractError(err, t("common.requiredField")),
-            variant: "destructive",
-          });
-        },
-      },
-    );
+  const handlePersonReady = (person: UdsPersonaSelection) => {
+    if (isGlobal && person.cittaId != null) setFilterCitta(String(person.cittaId));
+    setFilterZona(person.zonaUdsId != null ? String(person.zonaUdsId) : ALL_ZONE);
+    setPersonSearch("");
+    setSelectedPersonFallback(person);
+    setSelectedPerson(String(person.id));
   };
 
   const handleCreate = () => {
@@ -375,8 +285,8 @@ export default function UdsInterventi() {
           <ExportButtons
             rows={rows}
             columns={exportColumns}
-            filename={`uds-interventi${selectedBenef ? "-" + selectedBenef.cognome : ""}`}
-            title={`${t("udsInterventi.exportTitle")}${selectedBenef ? " — " + personLabel(selectedBenef) : ""}`}
+            filename={`uds-interventi${selectedPersonData ? "-" + selectedPersonData.cognome : ""}`}
+            title={`${t("udsInterventi.exportTitle")}${selectedPersonData ? " — " + personLabel(selectedPersonData) : ""}`}
             disabled={personId == null}
           />
           <Button onClick={handleCreate} className="gap-2" disabled={personId == null}>
@@ -396,6 +306,7 @@ export default function UdsInterventi() {
                   setFilterCitta(v === ALL_ZONE ? "" : v);
                   setFilterZona(ALL_ZONE);
                   setSelectedPerson("");
+                  setSelectedPersonFallback(null);
                   setPersonSearch("");
                 }}
               >
@@ -413,7 +324,7 @@ export default function UdsInterventi() {
           )}
           <div className="space-y-1">
             <span className="text-sm font-medium">{t("udsAnagrafica.filterZona")}</span>
-            <Select value={filterZona} onValueChange={(v) => { setFilterZona(v); setSelectedPerson(""); setPersonSearch(""); }}>
+            <Select value={filterZona} onValueChange={(v) => { setFilterZona(v); setSelectedPerson(""); setSelectedPersonFallback(null); setPersonSearch(""); }}>
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder={t("udsAnagrafica.allZone")} />
               </SelectTrigger>
@@ -430,9 +341,12 @@ export default function UdsInterventi() {
             <BeneficiarioCombobox
               items={persone ?? []}
               value={selectedPerson}
-              onChange={(id) => setSelectedPerson(id)}
+              onChange={(id) => {
+                setSelectedPerson(id);
+                setSelectedPersonFallback(null);
+              }}
               placeholder={t("udsInterventi.selectPersonPlaceholder")}
-              selectedLabelFallback={selectedBenef ? personLabel(selectedBenef) : null}
+              selectedLabelFallback={selectedPersonData ? personLabel(selectedPersonData) : null}
               searchValue={personSearch}
               onSearchChange={setPersonSearch}
             />
@@ -440,7 +354,7 @@ export default function UdsInterventi() {
           {canCreatePerson && (
             <div className="space-y-1">
               <span className="text-sm font-medium">&nbsp;</span>
-              <Button type="button" onClick={handleNewPerson} className="gap-2">
+              <Button type="button" onClick={() => setIsNewPersonOpen(true)} className="gap-2">
                 <Plus className="h-4 w-4" /> {t("udsAnagrafica.newPerson")}
               </Button>
             </div>
@@ -448,101 +362,19 @@ export default function UdsInterventi() {
         </CardContent>
       </Card>
 
-      <Sheet open={isNewPersonOpen} onOpenChange={setIsNewPersonOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{t("udsAnagrafica.newTitle")}</SheetTitle>
-          </SheetHeader>
-          <div className="mt-6">
-            <Form {...newPersonForm}>
-              <form onSubmit={newPersonForm.handleSubmit(onSubmitNewPerson)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={newPersonForm.control} name="nome" render={({ field }) => (
-                    <FormItem><FormLabel>{t("udsAnagrafica.fNome")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={newPersonForm.control} name="cognome" render={({ field }) => (
-                    <FormItem><FormLabel>{t("udsAnagrafica.fCognome")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={newPersonForm.control} name="sesso" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("udsAnagrafica.fSesso")}</FormLabel>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.sessoNd")} /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {SESSO_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {t(`udsAnagrafica.${option.udsLabelKey}`)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={newPersonForm.control} name="areaProvenienza" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("beneficiarioDettaglio.areaProvenienza")}</FormLabel>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="UE">UE</SelectItem>
-                          <SelectItem value="Extra-UE">Extra-UE</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                <FormField control={newPersonForm.control} name="soprannome" render={({ field }) => (
-                  <FormItem><FormLabel>{t("udsAnagrafica.fSoprannome")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                )} />
-                <FormField control={newPersonForm.control} name="telefono" render={({ field }) => (
-                  <FormItem><FormLabel>{t("udsAnagrafica.fTelefono")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                )} />
-                {isGlobal && (
-                  <FormField control={newPersonForm.control} name="cittaId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
-                      <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); newPersonForm.setValue("zonaUdsId", ""); }}>
-                        <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {cittaList?.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                )}
-                <FormField control={newPersonForm.control} name="zonaUdsId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
-                    <Select value={field.value || ALL_ZONE} onValueChange={(v) => field.onChange(v === ALL_ZONE ? "" : v)}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.allZone")} /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>
-                        {newPersonZoneList?.map((z) => (
-                          <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-
-                <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsNewPersonOpen(false)}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createBeneficiario.isPending}>{t("common.save")}</Button>
-                </div>
-              </form>
-            </Form>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <UdsPersonaSheet
+        open={isNewPersonOpen}
+        onOpenChange={setIsNewPersonOpen}
+        initialCittaId={effectiveCitta}
+        initialZonaUdsId={
+          filterZona !== ALL_ZONE
+            ? parseInt(filterZona)
+            : user?.zonaUdsId != null
+              ? user.zonaUdsId
+              : null
+        }
+        onPersonReady={handlePersonReady}
+      />
 
       {personId == null ? (
         <Card>

@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { interventiTable, beneficiariTable, utentiTable } from "@workspace/db";
 import { eq, and, desc, or, ilike, type SQL } from "drizzle-orm";
@@ -20,23 +20,44 @@ import {
 
 const router: IRouter = Router();
 
+async function canUseUdsBeneficiarioInCallerCitta(
+  beneficiarioId: number,
+  req: Request,
+): Promise<boolean> {
+  const cittaId = callerCittaId(req);
+  if (cittaId == null || !Number.isInteger(beneficiarioId)) return false;
+  const [beneficiario] = await db
+    .select({ uds: beneficiariTable.uds, cittaId: beneficiariTable.cittaId })
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, beneficiarioId))
+    .limit(1);
+  return beneficiario?.uds === true && beneficiario.cittaId === cittaId;
+}
+
 router.get("/interventi", async (req, res) => {
   const { beneficiarioId, tipo, centroAscoltoId, cittaId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
-  if (beneficiarioId) conditions.push(eq(interventiTable.beneficiarioId, parseInt(beneficiarioId)));
+  const requestedBeneficiarioId = beneficiarioId ? parseInt(beneficiarioId) : null;
+  if (requestedBeneficiarioId != null) {
+    conditions.push(eq(interventiTable.beneficiarioId, requestedBeneficiarioId));
+  }
+  const udsBeneficiarioInCallerCitta = requestedBeneficiarioId != null
+    && await canUseUdsBeneficiarioInCallerCitta(requestedBeneficiarioId, req);
   const caller = callerCentroId(req);
-  if (caller != null) {
+  if (!udsBeneficiarioInCallerCitta && caller != null) {
     const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
     if (f) conditions.push(f);
-  } else if (centroAscoltoId) {
+  } else if (!udsBeneficiarioInCallerCitta && centroAscoltoId) {
     conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
   }
   const callerCitta = callerCittaId(req);
   if (callerCitta == null && cittaId) conditions.push(eq(beneficiariTable.cittaId, parseInt(cittaId)));
   const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCitta);
   if (cittaFilter) conditions.push(cittaFilter);
-  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
-  if (zonaFilter) conditions.push(zonaFilter);
+  if (!udsBeneficiarioInCallerCitta) {
+    const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
+    if (zonaFilter) conditions.push(zonaFilter);
+  }
   // tipoIntervento può essere una lista di etichette separate da virgola
   // (es. "pacco_alimentare,igiene"): il filtro deve trovare anche i valori multipli
   if (tipo) {
@@ -89,7 +110,12 @@ router.post("/interventi", async (req, res) => {
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
-  if ((caller != null || cid != null || zid != null) && !(await canUseBeneficiario(req.body.beneficiarioId, caller, cid, zid))) {
+  const canUseUdsInCitta = await canUseUdsBeneficiarioInCallerCitta(req.body.beneficiarioId, req);
+  if (
+    (caller != null || cid != null || zid != null) &&
+    !canUseUdsInCitta &&
+    !(await canUseBeneficiario(req.body.beneficiarioId, caller, cid, zid))
+  ) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
     return;
   }
@@ -100,9 +126,10 @@ router.post("/interventi", async (req, res) => {
 router.get("/interventi/:id", async (req, res) => {
   const [row] = await db.select().from(interventiTable).where(eq(interventiTable.id, parseInt(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))
+  const canUseUdsInCitta = await canUseUdsBeneficiarioInCallerCitta(row.beneficiarioId, req);
+  if (!canUseUdsInCitta && (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))
       || !canAccessCitta(await beneficiarioCittaId(row.beneficiarioId), callerCittaId(req))
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(row.beneficiarioId), callerZonaUdsId(req))) {
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(row.beneficiarioId), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -116,14 +143,17 @@ router.patch("/interventi/:id", async (req, res) => {
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
-  if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)
+  const canUseExistingUdsInCitta = await canUseUdsBeneficiarioInCallerCitta(existing.beneficiarioId, req);
+  if (!canUseExistingUdsInCitta && (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)
       || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), cid)
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), zid)) {
+      || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), zid))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  const canUseTargetUdsInCitta = req.body.beneficiarioId != null
+    && await canUseUdsBeneficiarioInCallerCitta(req.body.beneficiarioId, req);
   if ((caller != null || cid != null || zid != null) && req.body.beneficiarioId != null && req.body.beneficiarioId !== existing.beneficiarioId
-      && !(await canUseBeneficiario(req.body.beneficiarioId, caller, cid, zid))) {
+      && !canUseTargetUdsInCitta && !(await canUseBeneficiario(req.body.beneficiarioId, caller, cid, zid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
     return;
   }
