@@ -201,12 +201,45 @@ describe("GET /beneficiari/cerca-simili", () => {
     expect(idsOf(res.body)).not.toContain(id);
   });
 
-  it("un caller globale può restringere a una città con ?cittaId", async () => {
+  it("un caller globale deve indicare esplicitamente la città", async () => {
+    const res = await request(appAs(null))
+      .get("/beneficiari/cerca-simili")
+      .query({ search: "Anna Bianchi" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/città/i);
+  });
+
+  it("un caller globale ricerca soltanto nella città indicata", async () => {
     const inA = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaA });
     const inB = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaB });
     const res = await request(appAs(null))
       .get("/beneficiari/cerca-simili")
       .query({ nome: "Anna", cognome: "Bianchi", cittaId: String(cittaA) });
+    expect(res.status).toBe(200);
+    const ids = idsOf(res.body);
+    expect(ids).toContain(inA);
+    expect(ids).not.toContain(inB);
+  });
+
+  it.each(["abc", "12abc", "0", "-1", "1.5", "1e2", "2147483648"])(
+    "un cittaId globale malformato non avvia una ricerca globale: %s",
+    async (cittaId) => {
+      await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaA });
+      await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaB });
+      const res = await request(appAs(null))
+        .get("/beneficiari/cerca-simili")
+        .query({ search: "Anna Bianchi", cittaId });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/città/i);
+    },
+  );
+
+  it("un operatore territoriale usa sempre la propria città ignorando cittaId", async () => {
+    const inA = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaA });
+    const inB = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaB });
+    const res = await request(appAs(cittaA))
+      .get("/beneficiari/cerca-simili")
+      .query({ search: "Anna Bianchi", cittaId: String(cittaB) });
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(inA);

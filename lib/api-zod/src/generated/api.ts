@@ -1415,9 +1415,10 @@ export const CreateBeneficiarioBody = zod.object({
 
 
 /**
- * @summary Person lookup and fuzzy duplicate suggestions within the caller's città
+ * @summary Person lookup and fuzzy duplicate suggestions within one città
  */
 export const cercaBeneficiariSimiliQuerySearchMin = 2;
+
 
 
 
@@ -1428,7 +1429,7 @@ export const CercaBeneficiariSimiliQueryParams = zod.object({
   "soprannome": zod.coerce.string().optional(),
   "telefono": zod.coerce.string().optional(),
   "dataNascita": zod.coerce.string().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "cittaId": zod.coerce.number().min(1).optional().describe('Required for global users; ignored for users already scoped to a città, whose own città is always used'),
   "excludeId": zod.coerce.number().optional()
 })
 

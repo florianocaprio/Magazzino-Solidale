@@ -489,6 +489,32 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
   };
   const excludeId = toIntOrNull(q.excludeId);
 
+  // A global caller must always choose one valid città explicitly. Scoped
+  // callers cannot override their own città, even by sending another value.
+  const callerCitta = callerCittaId(req);
+  let cittaId: number;
+  if (callerCitta != null) {
+    cittaId = callerCitta;
+  } else {
+    const rawCitta = q.cittaId as unknown;
+    if (rawCitta == null || (typeof rawCitta === "string" && !rawCitta.trim())) {
+      res.status(400).json({ error: "Seleziona una città per cercare le persone." });
+      return;
+    }
+    const requestedCitta = typeof rawCitta === "string" ? rawCitta.trim() : "";
+    const parsedCitta = Number(requestedCitta);
+    if (
+      !/^\d+$/.test(requestedCitta) ||
+      !Number.isSafeInteger(parsedCitta) ||
+      parsedCitta <= 0 ||
+      parsedCitta > 2_147_483_647
+    ) {
+      res.status(400).json({ error: "La città selezionata non è valida." });
+      return;
+    }
+    cittaId = parsedCitta;
+  }
+
   // The explicit lookup is intentionally unavailable for one-character queries:
   // this limits broad enumeration and matches the UI's two-character threshold.
   if (search.length === 1) {
@@ -502,11 +528,8 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
     return;
   }
 
-  // Città is the only boundary for this lookup. A scoped caller sees exactly
-  // their own città: NULL legacy rows are excluded. Global callers may explicitly
-  // narrow the lookup with ?cittaId.
-  const callerCitta = callerCittaId(req);
-  const cittaId = callerCitta != null ? callerCitta : toIntOrNull(q.cittaId);
+  // Città is the only boundary for this lookup. The equality is intentional:
+  // NULL legacy rows and every other città remain excluded.
   const searchLike = `%${search}%`;
 
   const result = await db.execute(sql`
@@ -550,7 +573,7 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
       LEFT JOIN citta c ON c.id = b.citta_id
       LEFT JOIN zone_uds z ON z.id = b.zona_uds_id
       LEFT JOIN centri_di_ascolto ca ON ca.id = b.centro_ascolto_id
-      WHERE (${cittaId}::int IS NULL OR b.citta_id = ${cittaId}::int)
+      WHERE b.citta_id = ${cittaId}::int
         AND (${excludeId}::int IS NULL OR b.id <> ${excludeId}::int)
     ) s
     WHERE s.score >= 0.2

@@ -1050,7 +1050,7 @@ paths:
     get:
       operationId: cercaBeneficiariSimili
       tags: [beneficiari]
-      summary: Person lookup and fuzzy duplicate suggestions within the caller's città
+      summary: Person lookup and fuzzy duplicate suggestions within one città
       parameters:
         - name: search
           in: query
@@ -1080,8 +1080,10 @@ paths:
             type: string
         - name: cittaId
           in: query
+          description: Required for global users; ignored for users already scoped to a città, whose own città is always used
           schema:
             type: integer
+            minimum: 1
         - name: excludeId
           in: query
           schema:
@@ -1095,6 +1097,16 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/BeneficiarioSimile"
+        "400":
+          description: A global user omitted cittaId or supplied an invalid value
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required: [error]
 
   /beneficiari/bulk:
     post:

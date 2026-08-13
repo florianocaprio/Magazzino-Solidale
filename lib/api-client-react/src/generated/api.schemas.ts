@@ -3340,8 +3340,16 @@ cognome?: string;
 soprannome?: string;
 telefono?: string;
 dataNascita?: string;
+/**
+ * Required for global users; ignored for users already scoped to a città, whose own città is always used
+ * @minimum 1
+ */
 cittaId?: number;
 excludeId?: number;
+};
+
+export type CercaBeneficiariSimili400 = {
+  error: string;
 };
 
 export type ListInterventiParams = {

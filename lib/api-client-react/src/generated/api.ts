@@ -59,6 +59,7 @@ import type {
   CentroAscolto,
   CentroAscoltoInput,
   CentroAscoltoUpdate,
+  CercaBeneficiariSimili400,
   CercaBeneficiariSimiliParams,
   ChangePasswordInput,
   Citta,
@@ -3861,7 +3862,7 @@ export const getCercaBeneficiariSimiliUrl = (params?: CercaBeneficiariSimiliPara
 }
 
 /**
- * @summary Person lookup and fuzzy duplicate suggestions within the caller's città
+ * @summary Person lookup and fuzzy duplicate suggestions within one città
  */
 export const cercaBeneficiariSimili = async (params?: CercaBeneficiariSimiliParams, options?: RequestInit): Promise<BeneficiarioSimile[]> => {
 
@@ -3885,7 +3886,7 @@ export const getCercaBeneficiariSimiliQueryKey = (params?: CercaBeneficiariSimil
     }
 
 
-export const getCercaBeneficiariSimiliQueryOptions = <TData = Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError = ErrorType<unknown>>(params?: CercaBeneficiariSimiliParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getCercaBeneficiariSimiliQueryOptions = <TData = Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError = ErrorType<CercaBeneficiariSimili400>>(params?: CercaBeneficiariSimiliParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -3904,14 +3905,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type CercaBeneficiariSimiliQueryResult = NonNullable<Awaited<ReturnType<typeof cercaBeneficiariSimili>>>
-export type CercaBeneficiariSimiliQueryError = ErrorType<unknown>
+export type CercaBeneficiariSimiliQueryError = ErrorType<CercaBeneficiariSimili400>
 
 
 /**
- * @summary Person lookup and fuzzy duplicate suggestions within the caller's città
+ * @summary Person lookup and fuzzy duplicate suggestions within one città
  */
 
-export function useCercaBeneficiariSimili<TData = Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError = ErrorType<unknown>>(
+export function useCercaBeneficiariSimili<TData = Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError = ErrorType<CercaBeneficiariSimili400>>(
  params?: CercaBeneficiariSimiliParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
