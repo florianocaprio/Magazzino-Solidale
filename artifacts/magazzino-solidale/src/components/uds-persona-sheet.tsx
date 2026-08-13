@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getCercaBeneficiariSimiliQueryKey,
   getListBeneficiariQueryKey,
@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -38,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -85,7 +86,6 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
       }
     });
 }
-
 type FormValues = z.infer<ReturnType<typeof makeSchema>>;
 
 export type UdsPersonaOutcome = "created" | "linked" | "existing";
@@ -181,6 +181,8 @@ export function UdsPersonaSheet({
     resolver: zodResolver(schema),
     defaultValues: emptyFormValues(initialCittaId, initialZonaUdsId ?? user?.zonaUdsId),
   });
+  const { reset } = form;
+  const wasOpenRef = useRef(false);
 
   const { data: cittaList } = useListCitta({
     query: { queryKey: getListCittaQueryKey(), enabled: isGlobal },
@@ -199,15 +201,18 @@ export function UdsPersonaSheet({
   };
 
   useEffect(() => {
-    if (!open) return;
-    form.reset(emptyFormValues(initialCittaId, initialZonaUdsId ?? user?.zonaUdsId));
+    const hasJustOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
+    if (!hasJustOpened) return;
+
+    reset(emptyFormValues(initialCittaId, initialZonaUdsId ?? user?.zonaUdsId));
     setDupDismissed(false);
     setDupParams({});
     setExistingSearch("");
     setDebouncedExistingSearch("");
     setDupDebouncing(false);
     setLinkCandidate(null);
-  }, [form, initialCittaId, initialZonaUdsId, open, user?.zonaUdsId]);
+  }, [initialCittaId, initialZonaUdsId, open, reset, user?.zonaUdsId]);
 
   const wNome = form.watch("nome");
   const wCognome = form.watch("cognome");
@@ -389,6 +394,9 @@ export function UdsPersonaSheet({
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{t("udsAnagrafica.newTitle")}</SheetTitle>
+            <SheetDescription className="sr-only">
+              {t("udsAnagrafica.existingSearchHint")}
+            </SheetDescription>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
@@ -430,10 +438,13 @@ export function UdsPersonaSheet({
                 )}
 
                 <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-                  <FormLabel>{t("udsAnagrafica.existingSearchLabel")}</FormLabel>
+                  <Label htmlFor="uds-persona-existing-search">
+                    {t("udsAnagrafica.existingSearchLabel")}
+                  </Label>
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
+                      id="uds-persona-existing-search"
                       value={existingSearch}
                       onChange={(event) => {
                         setExistingSearch(event.target.value);
