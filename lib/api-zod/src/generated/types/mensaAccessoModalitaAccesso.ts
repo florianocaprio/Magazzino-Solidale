@@ -12,4 +12,5 @@ export type MensaAccessoModalitaAccesso = typeof MensaAccessoModalitaAccesso[key
 export const MensaAccessoModalitaAccesso = {
   tessera: 'tessera',
   manuale: 'manuale',
+  temporaneo: 'temporaneo',
 } as const;

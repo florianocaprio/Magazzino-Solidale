@@ -209,6 +209,14 @@ export interface ProdottiBulkInput {
   righe: ProdottoInput[];
 }
 
+export type BeneficiarioInputStatoAnagrafica = typeof BeneficiarioInputStatoAnagrafica[keyof typeof BeneficiarioInputStatoAnagrafica];
+
+
+export const BeneficiarioInputStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
+
 /**
  * Fascia d'età stimata dall'operatore; null indica che non è determinata.
  * @nullable
@@ -246,6 +254,7 @@ export interface BeneficiarioInput {
   codice?: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica?: BeneficiarioInputStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */
@@ -954,6 +963,14 @@ export interface BeneficiarioSimile {
   score: number;
 }
 
+export type BeneficiarioStatoAnagrafica = typeof BeneficiarioStatoAnagrafica[keyof typeof BeneficiarioStatoAnagrafica];
+
+
+export const BeneficiarioStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
+
 /**
  * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
  * @nullable
@@ -1006,6 +1023,7 @@ export interface Beneficiario {
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica: BeneficiarioStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */
@@ -1079,6 +1097,14 @@ export interface Beneficiario {
   dataPresaInCarico?: string | null;
   dataCreazione: string;
 }
+
+export type BeneficiarioDettaglioStatoAnagrafica = typeof BeneficiarioDettaglioStatoAnagrafica[keyof typeof BeneficiarioDettaglioStatoAnagrafica];
+
+
+export const BeneficiarioDettaglioStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
 
 /**
  * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
@@ -1323,6 +1349,7 @@ export interface BeneficiarioDettaglio {
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica: BeneficiarioDettaglioStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */
@@ -1417,6 +1444,14 @@ export interface BeneficiarioDettaglio {
   dataCreazione: string;
 }
 
+export type BeneficiarioUpdateStatoAnagrafica = typeof BeneficiarioUpdateStatoAnagrafica[keyof typeof BeneficiarioUpdateStatoAnagrafica];
+
+
+export const BeneficiarioUpdateStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
+
 /**
  * Fascia d'età stimata dall'operatore; null indica che non è determinata.
  * @nullable
@@ -1453,6 +1488,7 @@ export const BeneficiarioUpdateSesso = {
 export interface BeneficiarioUpdate {
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica?: BeneficiarioUpdateStatoAnagrafica;
   cognome?: string;
   nome?: string;
   /** @nullable */
@@ -4068,6 +4104,84 @@ export interface TesseraBeneficiarioInput {
   motivoSostituzione?: string | null;
 }
 
+export interface TesseraBeneficiarioAnagraficaInput {
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  motivoSostituzione?: string | null;
+}
+
+export type MensaNuovaPersonaTemporaneaInputSesso = typeof MensaNuovaPersonaTemporaneaInputSesso[keyof typeof MensaNuovaPersonaTemporaneaInputSesso];
+
+
+export const MensaNuovaPersonaTemporaneaInputSesso = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta = typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta[keyof typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta] | null;
+
+
+export const MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+} as const;
+
+export interface MensaNuovaPersonaTemporaneaInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  nome: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  cognome: string;
+  sesso: MensaNuovaPersonaTemporaneaInputSesso;
+  /** @nullable */
+  dataNascita?: string | null;
+  /** @nullable */
+  fasciaEtaPresunta?: MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta;
+  /**
+     * @maxLength 20
+     * @nullable
+     */
+  telefono?: string | null;
+  /**
+     * @maxLength 60
+     * @nullable
+     */
+  cittadinanza?: string | null;
+  /** @nullable */
+  allergie?: string | null;
+  /** @nullable */
+  restrizioniAlimentari?: string | null;
+}
+
+/**
+ * Indicare esattamente uno tra beneficiarioId e nuovaPersona. L'autorizzazione vale solo per la data civile corrente Europe/Rome.
+ */
+export interface MensaAccessoTemporaneoInput {
+  mensaId: number;
+  beneficiarioId?: number;
+  nuovaPersona?: MensaNuovaPersonaTemporaneaInput;
+  /** @nullable */
+  motivo?: string | null;
+  confermaDuplicato?: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+}
+
 export type MensaAccessoInputModalitaAccesso = typeof MensaAccessoInputModalitaAccesso[keyof typeof MensaAccessoInputModalitaAccesso];
 
 
@@ -4103,6 +4217,7 @@ export type MensaAccessoModalitaAccesso = typeof MensaAccessoModalitaAccesso[key
 export const MensaAccessoModalitaAccesso = {
   tessera: 'tessera',
   manuale: 'manuale',
+  temporaneo: 'temporaneo',
 } as const;
 
 export interface MensaAccesso {
@@ -4128,6 +4243,7 @@ export interface MensaAccesso {
   esito: MensaAccessoEsito;
   motivoEsito: string;
   modalitaAccesso: MensaAccessoModalitaAccesso;
+  temporaneo: boolean;
   dataOra: string;
   /** @nullable */
   eccezioneId?: number | null;

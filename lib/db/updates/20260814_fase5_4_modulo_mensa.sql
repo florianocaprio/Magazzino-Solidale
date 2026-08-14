@@ -13,6 +13,23 @@ $update$;
 ALTER TABLE public.ruoli
   ADD COLUMN IF NOT EXISTS permessi jsonb NOT NULL DEFAULT '[]'::jsonb;
 
+ALTER TABLE public.beneficiari
+  ADD COLUMN IF NOT EXISTS stato_anagrafica varchar(20) NOT NULL DEFAULT 'completa';
+
+DO $update$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.beneficiari'::regclass
+      AND conname = 'beneficiari_stato_anagrafica_check'
+  ) THEN
+    ALTER TABLE public.beneficiari
+      ADD CONSTRAINT beneficiari_stato_anagrafica_check
+      CHECK (stato_anagrafica IN ('provvisoria', 'completa'));
+  END IF;
+END
+$update$;
+
 CREATE TABLE IF NOT EXISTS public.mense (
   id serial PRIMARY KEY,
   codice varchar(30) NOT NULL,
@@ -117,11 +134,28 @@ WHERE NOT EXISTS (
 )
 ON CONFLICT DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS public.mensa_autorizzazioni_temporanee (
+  id serial PRIMARY KEY,
+  beneficiario_id integer NOT NULL REFERENCES public.beneficiari(id),
+  mensa_id integer NOT NULL REFERENCES public.mense(id),
+  data_servizio date NOT NULL,
+  motivo text NOT NULL,
+  operatore_id integer NOT NULL REFERENCES public.utenti(id),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS mensa_autorizzazioni_temporanee_giorno_unique
+  ON public.mensa_autorizzazioni_temporanee
+    (beneficiario_id, mensa_id, data_servizio);
+CREATE INDEX IF NOT EXISTS mensa_autorizzazioni_temporanee_mensa_data_idx
+  ON public.mensa_autorizzazioni_temporanee (mensa_id, data_servizio);
+
 CREATE TABLE IF NOT EXISTS public.mensa_accessi (
   id serial PRIMARY KEY,
   mensa_id integer NOT NULL REFERENCES public.mense(id),
   beneficiario_id integer REFERENCES public.beneficiari(id),
   tessera_id integer REFERENCES public.tessere_beneficiari(id),
+  autorizzazione_temporanea_id integer,
   data_ora timestamptz NOT NULL DEFAULT now(),
   esito varchar(30) NOT NULL,
   motivo_esito varchar(50) NOT NULL,
@@ -133,8 +167,37 @@ CREATE TABLE IF NOT EXISTS public.mensa_accessi (
   CONSTRAINT mensa_accessi_esito_check
     CHECK (esito IN ('consentito', 'negato', 'consentito_eccezione')),
   CONSTRAINT mensa_accessi_modalita_check
-    CHECK (modalita_accesso IN ('tessera', 'manuale'))
+    CHECK (modalita_accesso IN ('tessera', 'manuale', 'temporaneo'))
 );
+
+ALTER TABLE public.mensa_accessi
+  ADD COLUMN IF NOT EXISTS autorizzazione_temporanea_id integer;
+
+DO $update$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_attribute a
+      ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+    WHERE c.conrelid = 'public.mensa_accessi'::regclass
+      AND c.confrelid = 'public.mensa_autorizzazioni_temporanee'::regclass
+      AND c.contype = 'f'
+      AND a.attname = 'autorizzazione_temporanea_id'
+  ) THEN
+    ALTER TABLE public.mensa_accessi
+      ADD CONSTRAINT mensa_accessi_temp_auth_fk
+      FOREIGN KEY (autorizzazione_temporanea_id)
+      REFERENCES public.mensa_autorizzazioni_temporanee(id);
+  END IF;
+
+  ALTER TABLE public.mensa_accessi
+    DROP CONSTRAINT IF EXISTS mensa_accessi_modalita_check;
+  ALTER TABLE public.mensa_accessi
+    ADD CONSTRAINT mensa_accessi_modalita_check
+    CHECK (modalita_accesso IN ('tessera', 'manuale', 'temporaneo'));
+END
+$update$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS mensa_accessi_idempotency_unique
   ON public.mensa_accessi (idempotency_key);
@@ -244,12 +307,13 @@ BEGIN
       'mense',
       'mensa_abilitazioni',
       'tessere_beneficiari',
+      'mensa_autorizzazioni_temporanee',
       'mensa_accessi',
       'mensa_eccezioni',
       'mensa_pasti'
     );
 
-  IF required_tables <> 6 THEN
+  IF required_tables <> 7 THEN
     RAISE EXCEPTION 'Aggiornamento Mensa incompleto: tabelle attese non disponibili';
   END IF;
 

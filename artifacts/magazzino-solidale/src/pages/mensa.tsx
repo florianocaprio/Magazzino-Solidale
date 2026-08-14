@@ -9,6 +9,7 @@ import {
   useAvviaTrasferimento,
   useConfermaTrasferimento,
   useCreateMensa,
+  useCreateAccessoTemporaneoMensa,
   useCreateMensaAbilitazione,
   useCreatePastoMensa,
   useCreateTesseraBeneficiario,
@@ -26,12 +27,14 @@ import {
   useVerificaAccessoMensa,
   type MensaAccesso,
   type MensaBeneficiarioSummary,
+  type BeneficiarioSimile,
 } from "@workspace/api-client-react";
 import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
   Search,
+  UserPlus,
   XCircle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -195,9 +198,28 @@ export function MensaPostazione() {
   const [access, setAccess] = useState<MensaAccesso | null>(null);
   const [reason, setReason] = useState("");
   const [manualSearch, setManualSearch] = useState("");
+  const [temporaryOpen, setTemporaryOpen] = useState(false);
+  const [temporaryReason, setTemporaryReason] = useState(
+    "Accesso temporaneo autorizzato dalla Postazione Mensa",
+  );
+  const [temporaryPerson, setTemporaryPerson] = useState({
+    nome: "",
+    cognome: "",
+    sesso: "",
+    dataNascita: "",
+    fasciaEtaPresunta: "",
+    telefono: "",
+    cittadinanza: "",
+    allergie: "",
+    restrizioniAlimentari: "",
+  });
+  const [temporaryDuplicates, setTemporaryDuplicates] = useState<
+    BeneficiarioSimile[]
+  >([]);
   const verify = useVerificaAccessoMensa();
   const exception = useAutorizzaEccezioneMensa();
   const meal = useCreatePastoMensa();
+  const temporaryAccess = useCreateAccessoTemporaneoMensa();
   const search = useSearchMensaBeneficiari(
     { search: manualSearch },
     {
@@ -213,6 +235,36 @@ export function MensaPostazione() {
   useEffect(() => {
     inputRef.current?.focus();
   }, [verify.isPending, access]);
+
+  const focusScanner = () => {
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const resetTemporaryForm = () => {
+    setTemporaryOpen(false);
+    setTemporaryDuplicates([]);
+    setTemporaryReason("Accesso temporaneo autorizzato dalla Postazione Mensa");
+    setTemporaryPerson({
+      nome: "",
+      cognome: "",
+      sesso: "",
+      dataNascita: "",
+      fasciaEtaPresunta: "",
+      telefono: "",
+      cittadinanza: "",
+      allergie: "",
+      restrizioniAlimentari: "",
+    });
+  };
+
+  const readyForNextPerson = () => {
+    setAccess(null);
+    setReason("");
+    setCode("");
+    setManualSearch("");
+    resetTemporaryForm();
+    focusScanner();
+  };
 
   const scan = (event: React.FormEvent) => {
     event.preventDefault();
@@ -290,13 +342,96 @@ export function MensaPostazione() {
         },
       },
       {
-        onSuccess: () => toast({ title: "Pasto registrato" }),
+        onSuccess: () => {
+          toast({ title: "Pasto registrato" });
+          readyForNextPerson();
+        },
         onError: (error) =>
           toast({
             title: "Pasto non registrato",
             description: errorMessage(error),
             variant: "destructive",
           }),
+      },
+    );
+  };
+
+  const onTemporarySuccess = (result: MensaAccesso) => {
+    setAccess(result);
+    resetTemporaryForm();
+  };
+
+  const authorizeTemporaryBeneficiary = (
+    beneficiary: MensaBeneficiarioSummary | BeneficiarioSimile,
+  ) => {
+    if (!mensaId || temporaryAccess.isPending) return;
+    temporaryAccess.mutate(
+      {
+        data: {
+          mensaId,
+          beneficiarioId: beneficiary.id,
+          motivo: temporaryReason.trim() || null,
+          idempotencyKey: requestKey("temporary-existing"),
+        },
+      },
+      {
+        onSuccess: onTemporarySuccess,
+        onError: (error) =>
+          toast({
+            title: "Accesso temporaneo non autorizzato",
+            description: errorMessage(error),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  const createTemporaryPerson = (confirmDuplicate = false) => {
+    if (!mensaId || temporaryAccess.isPending) return;
+    temporaryAccess.mutate(
+      {
+        data: {
+          mensaId,
+          motivo: temporaryReason.trim() || null,
+          confermaDuplicato: confirmDuplicate,
+          idempotencyKey: requestKey("temporary-new"),
+          nuovaPersona: {
+            nome: temporaryPerson.nome.trim(),
+            cognome: temporaryPerson.cognome.trim(),
+            sesso: temporaryPerson.sesso as "M" | "F" | "ALTRO",
+            dataNascita: temporaryPerson.dataNascita || null,
+            fasciaEtaPresunta:
+              (temporaryPerson.fasciaEtaPresunta as
+                | "0_17"
+                | "18_29"
+                | "30_64"
+                | "65_plus") || null,
+            telefono: temporaryPerson.telefono.trim() || null,
+            cittadinanza: temporaryPerson.cittadinanza.trim() || null,
+            allergie: temporaryPerson.allergie.trim() || null,
+            restrizioniAlimentari:
+              temporaryPerson.restrizioniAlimentari.trim() || null,
+          },
+        },
+      },
+      {
+        onSuccess: onTemporarySuccess,
+        onError: (error) => {
+          const data = (
+            error as {
+              data?: { possibiliDuplicati?: BeneficiarioSimile[] };
+            }
+          ).data;
+          if (data?.possibiliDuplicati?.length) {
+            setTemporaryDuplicates(data.possibiliDuplicati);
+            return;
+          }
+          toast({
+            title: "Persona non registrata",
+            description: errorMessage(error),
+            variant: "destructive",
+          });
+        },
       },
     );
   };
@@ -385,18 +520,229 @@ export function MensaPostazione() {
               />
             </div>
             {search.data?.map((beneficiary) => (
-              <Button
+              <div
                 key={beneficiary.id}
-                variant="outline"
-                className="w-full justify-between"
-                onClick={() => verifyManual(beneficiary)}
+                className="flex flex-col gap-2 rounded-md border p-2 sm:flex-row"
               >
-                <span>
-                  {beneficiary.nome} {beneficiary.cognome}
-                </span>
-                <span>{beneficiary.codice}</span>
-              </Button>
+                <Button
+                  variant="ghost"
+                  className="flex-1 justify-between"
+                  onClick={() => verifyManual(beneficiary)}
+                >
+                  <span>
+                    {beneficiary.nome} {beneficiary.cognome}
+                  </span>
+                  <span>{beneficiary.codice}</span>
+                </Button>
+                {hasPermission("mensa.access.temporary") && (
+                  <Button
+                    variant="outline"
+                    onClick={() => authorizeTemporaryBeneficiary(beneficiary)}
+                    disabled={!mensaId || temporaryAccess.isPending}
+                  >
+                    Accesso temporaneo
+                  </Button>
+                )}
+              </div>
             ))}
+            {hasPermission("mensa.access.temporary") && (
+              <Button
+                variant="secondary"
+                className="w-full gap-2"
+                onClick={() => setTemporaryOpen(true)}
+                disabled={!mensaId}
+              >
+                <UserPlus className="h-4 w-4" />
+                NUOVA PERSONA – ACCESSO TEMPORANEO
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      {!hasPermission("mensa.access.manual") &&
+        hasPermission("mensa.access.temporary") && (
+          <Button
+            variant="secondary"
+            className="w-full gap-2"
+            onClick={() => setTemporaryOpen(true)}
+            disabled={!mensaId}
+          >
+            <UserPlus className="h-4 w-4" />
+            NUOVA PERSONA – ACCESSO TEMPORANEO
+          </Button>
+        )}
+      {temporaryOpen && hasPermission("mensa.access.temporary") && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Nuova persona – accesso temporaneo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              L'anagrafica sarà registrata come provvisoria, senza tessera né
+              abilitazione permanente. L'accesso vale solo per oggi.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="temporary-name">Nome</Label>
+                <Input
+                  id="temporary-name"
+                  value={temporaryPerson.nome}
+                  onChange={(event) =>
+                    setTemporaryPerson((value) => ({
+                      ...value,
+                      nome: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="temporary-surname">Cognome</Label>
+                <Input
+                  id="temporary-surname"
+                  value={temporaryPerson.cognome}
+                  onChange={(event) =>
+                    setTemporaryPerson((value) => ({
+                      ...value,
+                      cognome: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Sesso</Label>
+                <Select
+                  value={temporaryPerson.sesso}
+                  onValueChange={(sesso) =>
+                    setTemporaryPerson((value) => ({ ...value, sesso }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleziona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="M">Maschio</SelectItem>
+                    <SelectItem value="F">Femmina</SelectItem>
+                    <SelectItem value="ALTRO">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="temporary-birth-date">Data di nascita</Label>
+                <Input
+                  id="temporary-birth-date"
+                  type="date"
+                  value={temporaryPerson.dataNascita}
+                  disabled={!!temporaryPerson.fasciaEtaPresunta}
+                  onChange={(event) =>
+                    setTemporaryPerson((value) => ({
+                      ...value,
+                      dataNascita: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Fascia d'età presunta</Label>
+                <Select
+                  value={temporaryPerson.fasciaEtaPresunta}
+                  disabled={!!temporaryPerson.dataNascita}
+                  onValueChange={(fasciaEtaPresunta) =>
+                    setTemporaryPerson((value) => ({
+                      ...value,
+                      fasciaEtaPresunta,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="In alternativa alla data" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0_17">0–17</SelectItem>
+                    <SelectItem value="18_29">18–29</SelectItem>
+                    <SelectItem value="30_64">30–64</SelectItem>
+                    <SelectItem value="65_plus">65+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {[
+                ["telefono", "Telefono"],
+                ["cittadinanza", "Cittadinanza"],
+                ["allergie", "Allergie"],
+                ["restrizioniAlimentari", "Restrizioni alimentari"],
+              ].map(([field, label]) => (
+                <div key={field} className="space-y-1">
+                  <Label htmlFor={`temporary-${field}`}>{label}</Label>
+                  <Input
+                    id={`temporary-${field}`}
+                    value={
+                      temporaryPerson[field as keyof typeof temporaryPerson]
+                    }
+                    onChange={(event) =>
+                      setTemporaryPerson((value) => ({
+                        ...value,
+                        [field]: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="temporary-reason">Motivazione</Label>
+              <Textarea
+                id="temporary-reason"
+                value={temporaryReason}
+                onChange={(event) => setTemporaryReason(event.target.value)}
+              />
+            </div>
+            {temporaryDuplicates.length > 0 && (
+              <div className="space-y-2 rounded-md border border-amber-500 p-3">
+                <p className="font-medium">
+                  Possibili persone già presenti nella stessa città
+                </p>
+                {temporaryDuplicates.map((duplicate) => (
+                  <Button
+                    key={duplicate.id}
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => authorizeTemporaryBeneficiary(duplicate)}
+                  >
+                    <span>
+                      Usa {duplicate.nome} {duplicate.cognome}
+                    </span>
+                    <span>{duplicate.codice}</span>
+                  </Button>
+                ))}
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => createTemporaryPerson(true)}
+                  disabled={temporaryAccess.isPending}
+                >
+                  Conferma che è una persona diversa e crea comunque
+                </Button>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={resetTemporaryForm}>
+                Annulla
+              </Button>
+              <Button
+                onClick={() => createTemporaryPerson(false)}
+                disabled={
+                  temporaryAccess.isPending ||
+                  !temporaryPerson.nome.trim() ||
+                  !temporaryPerson.cognome.trim() ||
+                  !temporaryPerson.sesso ||
+                  (!temporaryPerson.dataNascita &&
+                    !temporaryPerson.fasciaEtaPresunta)
+                }
+              >
+                Verifica e autorizza per oggi
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

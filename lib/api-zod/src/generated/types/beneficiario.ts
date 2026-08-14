@@ -9,12 +9,14 @@ import type { BeneficiarioCreditoSolidaleStato } from './beneficiarioCreditoSoli
 import type { BeneficiarioFasciaEtaCorrente } from './beneficiarioFasciaEtaCorrente';
 import type { BeneficiarioFasciaEtaOrigine } from './beneficiarioFasciaEtaOrigine';
 import type { BeneficiarioFasciaEtaPresunta } from './beneficiarioFasciaEtaPresunta';
+import type { BeneficiarioStatoAnagrafica } from './beneficiarioStatoAnagrafica';
 
 export interface Beneficiario {
   id: number;
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica: BeneficiarioStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */

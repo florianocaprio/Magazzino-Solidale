@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, useCreateTesseraBeneficiarioDaAnagrafica, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,7 +66,8 @@ export default function BeneficiarioDettaglio() {
   const updateBeneficiario = useUpdateBeneficiario();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const createTessera = useCreateTesseraBeneficiarioDaAnagrafica();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const [editing, setEditing] = useState(false);
   const { data: accessiEmporio } = useListAccessiEmporio(
@@ -139,6 +140,7 @@ export default function BeneficiarioDettaglio() {
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold tracking-tight">{b.cognome} {b.nome}</h1>
             <Badge variant="outline" className="font-mono text-muted-foreground">{b.codice}</Badge>
+            {b.statoAnagrafica === "provvisoria" && <Badge variant="secondary">Anagrafica provvisoria</Badge>}
             {!b.attivo && <Badge variant="destructive">{t("common.inactive")}</Badge>}
           </div>
           <p className="text-muted-foreground flex items-center gap-2">
@@ -147,21 +149,43 @@ export default function BeneficiarioDettaglio() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={async () => {
-              const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
-              await generateTesseraPdf({
-                beneficiario: { codice: b.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
-                labels: buildTesseraLabels(t),
-                associationLogoDataUrl: logoDataUrl,
-                branding,
-              });
-            }}
-          >
-            <CreditCard className="w-4 h-4" /> {t("tessera.generate")}
-          </Button>
+          {b.statoAnagrafica === "provvisoria" && (
+            <Button variant="outline" onClick={() => updateBeneficiario.mutate(
+              { id: numId, data: { statoAnagrafica: "completa" } },
+              {
+                onSuccess: () => {
+                  queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) });
+                  toast({ title: "Anagrafica completata" });
+                },
+                onError: (error) => toast({ title: "Anagrafica non aggiornata", description: apiErrorMessage(error, "Controlla i dati obbligatori"), variant: "destructive" }),
+              },
+            )}>Segna anagrafica completa</Button>
+          )}
+          {hasPermission("beneficiari.cards.manage") && b.statoAnagrafica === "completa" && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={createTessera.isPending}
+              onClick={() => createTessera.mutate(
+                { id: numId, data: {} },
+                {
+                  onSuccess: async (card) => {
+                    const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
+                    await generateTesseraPdf({
+                      beneficiario: { codice: card.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
+                      labels: buildTesseraLabels(t),
+                      associationLogoDataUrl: logoDataUrl,
+                      branding,
+                    });
+                    toast({ title: "Tessera emessa e pronta per la stampa" });
+                  },
+                  onError: (error) => toast({ title: "Tessera non emessa", description: apiErrorMessage(error, "Operazione non riuscita"), variant: "destructive" }),
+                },
+              )}
+            >
+              <CreditCard className="w-4 h-4" /> {t("tessera.generate")}
+            </Button>
+          )}
           <SchedaExportButtons b={b} size="default" />
           <Button variant="outline" className="gap-2" onClick={() => setEditing(true)}>
             <Pencil className="w-4 h-4" /> {t("beneficiarioDettaglio.editAnagrafica")}

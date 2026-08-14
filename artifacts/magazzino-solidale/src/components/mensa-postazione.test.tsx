@@ -3,6 +3,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const verifyMutate = vi.fn();
+const mealMutate = vi.fn();
+const temporaryMutate = vi.fn();
 
 vi.mock("@workspace/api-client-react", () => ({
   getSearchMensaBeneficiariQueryKey: () => ["mensa-beneficiari"],
@@ -13,7 +15,11 @@ vi.mock("@workspace/api-client-react", () => ({
   }),
   useVerificaAccessoMensa: () => ({ mutate: verifyMutate, isPending: false }),
   useAutorizzaEccezioneMensa: () => ({ mutate: vi.fn(), isPending: false }),
-  useCreatePastoMensa: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreatePastoMensa: () => ({ mutate: mealMutate, isPending: false }),
+  useCreateAccessoTemporaneoMensa: () => ({
+    mutate: temporaryMutate,
+    isPending: false,
+  }),
   useSearchMensaBeneficiari: () => ({ data: [] }),
   useListPastiMensa: () => ({ data: [] }),
   useCreateMensa: () => ({ mutate: vi.fn(), isPending: false }),
@@ -113,5 +119,72 @@ describe("Postazione Mensa", () => {
       },
     });
     expect(document.body.textContent).not.toContain("mensa.manualSearch");
+  });
+
+  it("dopo scansione valida e pasto torna pronta e focalizzata sulla persona successiva", async () => {
+    verifyMutate.mockImplementation(
+      (_input, options: { onSuccess?: (value: unknown) => void }) =>
+        options.onSuccess?.({
+          id: 101,
+          mensaId: 10,
+          mensaNome: "Mensa Roma",
+          beneficiarioId: 22,
+          beneficiarioNome: "Mario Rossi",
+          beneficiarioCodice: "BEN-22",
+          esito: "consentito",
+          motivoEsito: "CONSENTITO",
+          modalitaAccesso: "tessera",
+          temporaneo: false,
+          dataOra: new Date().toISOString(),
+          eccezionePossibile: false,
+        }),
+    );
+    mealMutate.mockImplementation(
+      (_input, options: { onSuccess?: () => void }) => options.onSuccess?.(),
+    );
+    await act(async () => root.render(<MensaPostazione />));
+    const input = document.querySelector<HTMLInputElement>("#mensa-scan")!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "CARD-VALID");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input
+        .closest("form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+    });
+    expect(document.body.textContent).toContain("Mario Rossi");
+    const mealButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "mensa.registerMeal",
+    );
+    await act(async () => mealButton?.click());
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    expect(mealMutate).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toContain("Mario Rossi");
+    expect(input.value).toBe("");
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("offre il form minimo di nuova persona quando l'operatore ha il permesso temporaneo", async () => {
+    await act(async () => root.render(<MensaPostazione />));
+    const openButton = Array.from(document.querySelectorAll("button")).find(
+      (button) =>
+        button.textContent?.includes("NUOVA PERSONA – ACCESSO TEMPORANEO"),
+    );
+    expect(openButton).toBeDefined();
+    await act(async () => openButton?.click());
+    expect(document.querySelector("#temporary-name")).not.toBeNull();
+    expect(document.querySelector("#temporary-surname")).not.toBeNull();
+    expect(document.querySelector("#temporary-birth-date")).not.toBeNull();
+    expect(document.querySelector("#temporary-reason")).not.toBeNull();
+    expect(document.body.textContent).toContain(
+      "senza tessera né abilitazione permanente",
+    );
   });
 });

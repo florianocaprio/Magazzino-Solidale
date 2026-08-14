@@ -1379,6 +1379,7 @@ export const ListBeneficiariResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
@@ -1428,6 +1429,7 @@ export const ListBeneficiariResponse = zod.array(ListBeneficiariResponseItem)
 export const CreateBeneficiarioBody = zod.object({
   "codice": zod.string().optional(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional(),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.coerce.date().nullish(),
@@ -1517,6 +1519,7 @@ export const BulkBeneficiariBody = zod.object({
   "righe": zod.array(zod.object({
   "codice": zod.string().optional(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional(),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.coerce.date().nullish(),
@@ -1580,6 +1583,7 @@ export const GetBeneficiarioResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
@@ -1728,6 +1732,7 @@ export const UpdateBeneficiarioParams = zod.object({
 
 export const UpdateBeneficiarioBody = zod.object({
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional(),
   "cognome": zod.string().optional(),
   "nome": zod.string().optional(),
   "dataNascita": zod.coerce.date().nullish(),
@@ -1777,6 +1782,7 @@ export const UpdateBeneficiarioResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
@@ -1869,6 +1875,19 @@ export const AddNucleoFamiliareBody = zod.object({
 export const DeleteNucleoFamiliareParams = zod.object({
   "id": zod.coerce.number(),
   "membroId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Emette una tessera trasversale opaca da un'anagrafica autorizzata
+ */
+export const CreateTesseraBeneficiarioDaAnagraficaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateTesseraBeneficiarioDaAnagraficaBody = zod.object({
+  "dataScadenza": zod.coerce.date().nullish(),
+  "motivoSostituzione": zod.string().nullish()
 })
 
 
@@ -7067,7 +7086,66 @@ export const VerificaAccessoMensaResponse = zod.object({
   "allergie": zod.string().nullish(),
   "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
   "motivoEsito": zod.string(),
-  "modalitaAccesso": zod.enum(['tessera', 'manuale']),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "temporaneo": zod.boolean(),
+  "dataOra": zod.coerce.date(),
+  "eccezioneId": zod.number().nullish(),
+  "eccezionePossibile": zod.boolean(),
+  "idempotentReplay": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Crea un accesso giornaliero motivato per una persona esistente o una nuova anagrafica provvisoria
+ */
+export const createAccessoTemporaneoMensaBodyNuovaPersonaNomeMax = 80;
+
+export const createAccessoTemporaneoMensaBodyNuovaPersonaCognomeMax = 80;
+
+export const createAccessoTemporaneoMensaBodyNuovaPersonaTelefonoMax = 20;
+
+export const createAccessoTemporaneoMensaBodyNuovaPersonaCittadinanzaMax = 60;
+
+export const createAccessoTemporaneoMensaBodyConfermaDuplicatoDefault = false;
+export const createAccessoTemporaneoMensaBodyIdempotencyKeyMax = 80;
+
+
+
+export const CreateAccessoTemporaneoMensaBody = zod.object({
+  "mensaId": zod.number(),
+  "beneficiarioId": zod.number().optional(),
+  "nuovaPersona": zod.object({
+  "nome": zod.string().min(1).max(createAccessoTemporaneoMensaBodyNuovaPersonaNomeMax),
+  "cognome": zod.string().min(1).max(createAccessoTemporaneoMensaBodyNuovaPersonaCognomeMax),
+  "sesso": zod.enum(['M', 'F', 'ALTRO']),
+  "dataNascita": zod.coerce.date().nullish(),
+  "fasciaEtaPresunta": zod.union([zod.literal('0_17'),zod.literal('18_29'),zod.literal('30_64'),zod.literal('65_plus'),zod.literal(null)]).nullish(),
+  "telefono": zod.string().max(createAccessoTemporaneoMensaBodyNuovaPersonaTelefonoMax).nullish(),
+  "cittadinanza": zod.string().max(createAccessoTemporaneoMensaBodyNuovaPersonaCittadinanzaMax).nullish(),
+  "allergie": zod.string().nullish(),
+  "restrizioniAlimentari": zod.string().nullish()
+}).optional(),
+  "motivo": zod.string().nullish(),
+  "confermaDuplicato": zod.boolean().default(createAccessoTemporaneoMensaBodyConfermaDuplicatoDefault),
+  "idempotencyKey": zod.string().min(1).max(createAccessoTemporaneoMensaBodyIdempotencyKeyMax)
+}).describe('Indicare esattamente uno tra beneficiarioId e nuovaPersona. L\'autorizzazione vale solo per la data civile corrente Europe\/Rome.')
+
+export const CreateAccessoTemporaneoMensaResponse = zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string(),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "mensaPrincipaleId": zod.number().nullish(),
+  "mensaPrincipaleNome": zod.string().nullish(),
+  "statoAbilitazione": zod.string().nullish(),
+  "restrizioniAlimentari": zod.string().nullish(),
+  "allergie": zod.string().nullish(),
+  "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
+  "motivoEsito": zod.string(),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "temporaneo": zod.boolean(),
   "dataOra": zod.coerce.date(),
   "eccezioneId": zod.number().nullish(),
   "eccezionePossibile": zod.boolean(),
@@ -7093,7 +7171,8 @@ export const ListAccessiMensaResponseItem = zod.object({
   "allergie": zod.string().nullish(),
   "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
   "motivoEsito": zod.string(),
-  "modalitaAccesso": zod.enum(['tessera', 'manuale']),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "temporaneo": zod.boolean(),
   "dataOra": zod.coerce.date(),
   "eccezioneId": zod.number().nullish(),
   "eccezionePossibile": zod.boolean(),
@@ -7128,7 +7207,8 @@ export const AutorizzaEccezioneMensaResponse = zod.object({
   "allergie": zod.string().nullish(),
   "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
   "motivoEsito": zod.string(),
-  "modalitaAccesso": zod.enum(['tessera', 'manuale']),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "temporaneo": zod.boolean(),
   "dataOra": zod.coerce.date(),
   "eccezioneId": zod.number().nullish(),
   "eccezionePossibile": zod.boolean(),

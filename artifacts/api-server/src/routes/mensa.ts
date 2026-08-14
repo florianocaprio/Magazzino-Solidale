@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import {
   auditConfigurazioniTable,
@@ -9,6 +8,7 @@ import {
   magazziniTable,
   mensaAbilitazioniTable,
   mensaAccessiTable,
+  mensaAutorizzazioniTemporaneeTable,
   mensaEccezioniTable,
   mensaPastiTable,
   menseTable,
@@ -47,6 +47,12 @@ import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
 import { canUseMensaException, dataServizioMensa } from "../lib/mensaWorkflow";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
+import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
+import { createBeneficiarioOne } from "./beneficiari";
+import {
+  issueTesseraBeneficiario,
+  TesseraBeneficiarioError,
+} from "../lib/tesseraBeneficiarioService";
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
@@ -73,6 +79,7 @@ const ACCESSO_MOTIVI = {
   AREA_NON_COMPATIBILE: "AREA_NON_COMPATIBILE",
   MENSA_NON_ATTIVA: "MENSA_NON_ATTIVA",
   ECCEZIONE_STESSA_AREA: "ECCEZIONE_STESSA_AREA",
+  ACCESSO_TEMPORANEO: "ACCESSO_TEMPORANEO",
 } as const;
 
 type AbilitazioneStato = (typeof ABILITAZIONE_STATI)[number];
@@ -348,10 +355,6 @@ function formatTessera(row: typeof tessereBeneficiariTable.$inferSelect) {
   };
 }
 
-function generaCodiceTessera(): string {
-  return `MS-${randomBytes(24).toString("base64url")}`;
-}
-
 async function expireEndedPrincipalEligibilities(
   tx: Tx,
   beneficiarioId: number,
@@ -492,6 +495,7 @@ async function loadAccessoDto(id: number) {
     esito: row.accesso.esito,
     motivoEsito: row.accesso.motivoEsito,
     modalitaAccesso: row.accesso.modalitaAccesso,
+    temporaneo: row.accesso.autorizzazioneTemporaneaId != null,
     dataOra: row.accesso.dataOra.toISOString(),
     eccezioneId: row.accesso.eccezioneId ?? null,
     eccezionePossibile:
@@ -705,64 +709,20 @@ router.post(
         "Il motivo della sostituzione",
         1000,
       );
-      const [active] = await db
-        .select()
-        .from(tessereBeneficiariTable)
-        .where(
-          and(
-            eq(tessereBeneficiariTable.beneficiarioId, beneficiarioId),
-            eq(tessereBeneficiariTable.stato, "attiva"),
-          ),
-        );
-      if (active && !motivoSostituzione)
-        throw new MensaError(
-          409,
-          "Esiste già una tessera attiva; indicare il motivo della sostituzione",
-        );
-      const created = await db.transaction(async (tx) => {
-        if (active) {
-          await tx
-            .update(tessereBeneficiariTable)
-            .set({
-              stato: "revocata",
-              dataRevoca: new Date(),
-              motivoRevoca: motivoSostituzione,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(tessereBeneficiariTable.id, active.id),
-                eq(tessereBeneficiariTable.stato, "attiva"),
-              ),
-            );
-        }
-        const [row] = await tx
-          .insert(tessereBeneficiariTable)
-          .values({
-            beneficiarioId,
-            codice: generaCodiceTessera(),
-            dataScadenza,
-            createdBy: req.user!.id,
-          })
-          .returning();
-        await tx
-          .insert(auditConfigurazioniTable)
-          .values(
-            auditValues(
-              req,
-              `tessera-beneficiario:${row.id}`,
-              active ? "sostituzione" : "emissione",
-              active
-                ? (formatTessera(active) as Record<string, unknown>)
-                : null,
-              formatTessera(row) as Record<string, unknown>,
-              motivoSostituzione,
-            ),
-          );
-        return row;
+      const created = await issueTesseraBeneficiario({
+        beneficiarioId,
+        dataScadenza,
+        motivoSostituzione,
+        operatoreId: req.user!.id,
+        ip: req.ip ?? req.socket.remoteAddress ?? null,
+        areaAudit: "mensa",
       });
       res.status(201).json(formatTessera(created));
     } catch (error) {
+      if (error instanceof TesseraBeneficiarioError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       if (isUniqueViolation(error)) {
         res.status(409).json({ error: "Esiste già una tessera attiva" });
         return;
@@ -996,6 +956,239 @@ router.post(
           });
           return;
         }
+      }
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.post(
+  "/mensa/accessi/temporaneo",
+  requirePermission("mensa.access.temporary"),
+  async (req, res) => {
+    try {
+      const mensaId = positiveInt(req.body?.mensaId, "mensaId");
+      const idempotencyKey = text(
+        req.body?.idempotencyKey,
+        "La chiave di idempotenza",
+        80,
+      );
+      const [replay] = await db
+        .select({ id: mensaAccessiTable.id })
+        .from(mensaAccessiTable)
+        .where(eq(mensaAccessiTable.idempotencyKey, idempotencyKey));
+      if (replay) {
+        res.json({
+          ...(await loadAccessoDto(replay.id)),
+          idempotentReplay: true,
+        });
+        return;
+      }
+      const mensa = await requireMensa(mensaId, req, true);
+      const nuovaPersona = req.body?.nuovaPersona as
+        | Record<string, unknown>
+        | undefined;
+      const beneficiarioIdInput = req.body?.beneficiarioId;
+      if (!!nuovaPersona === (beneficiarioIdInput != null)) {
+        throw new MensaError(
+          400,
+          "Indicare una nuova persona oppure un beneficiario esistente",
+        );
+      }
+      const motivo =
+        optionalText(req.body?.motivo, "Il motivo", 2000) ??
+        "Accesso temporaneo autorizzato dalla Postazione Mensa";
+      const today = dataServizioMensa(new Date());
+      let duplicates: Awaited<ReturnType<typeof searchBeneficiariDuplicates>> =
+        [];
+      let newPersonValues: Record<string, unknown> | null = null;
+      if (nuovaPersona) {
+        const nome = text(nuovaPersona.nome, "Il nome", 80);
+        const cognome = text(nuovaPersona.cognome, "Il cognome", 80);
+        const hasBirthDate =
+          typeof nuovaPersona.dataNascita === "string" &&
+          nuovaPersona.dataNascita.trim().length > 0;
+        const hasEstimatedBand =
+          typeof nuovaPersona.fasciaEtaPresunta === "string" &&
+          nuovaPersona.fasciaEtaPresunta.trim().length > 0;
+        if (hasBirthDate === hasEstimatedBand) {
+          throw new MensaError(
+            400,
+            "Indicare la data di nascita oppure una fascia d'età presunta",
+          );
+        }
+        newPersonValues = {
+          nome,
+          cognome,
+          sesso: nuovaPersona.sesso,
+          dataNascita: hasBirthDate ? nuovaPersona.dataNascita : null,
+          fasciaEtaPresunta: hasEstimatedBand
+            ? nuovaPersona.fasciaEtaPresunta
+            : null,
+          telefono: optionalText(nuovaPersona.telefono, "Il telefono", 20),
+          cittadinanza: optionalText(
+            nuovaPersona.cittadinanza,
+            "La cittadinanza",
+            60,
+          ),
+          allergie: optionalText(nuovaPersona.allergie, "Le allergie", 4000),
+          restrizioniAlimentari: optionalText(
+            nuovaPersona.restrizioniAlimentari,
+            "Le restrizioni alimentari",
+            4000,
+          ),
+          statoAnagrafica: "provvisoria",
+          uds: false,
+          attivo: true,
+        };
+        duplicates = await searchBeneficiariDuplicates({
+          cittaId: mensa.mensa.cittaId,
+          search: `${nome} ${cognome}`,
+          nome,
+          cognome,
+          telefono: (newPersonValues.telefono as string | null) ?? "",
+          dataNascita: (newPersonValues.dataNascita as string | null) ?? "",
+        });
+        if (duplicates.length && req.body?.confermaDuplicato !== true) {
+          res.status(409).json({
+            error:
+              "Sono presenti possibili duplicati. Seleziona una persona esistente oppure conferma esplicitamente la nuova registrazione.",
+            possibiliDuplicati: duplicates,
+          });
+          return;
+        }
+      }
+
+      const createdAccessId = await db.transaction(async (tx) => {
+        let beneficiario: typeof beneficiariTable.$inferSelect;
+        if (newPersonValues) {
+          const created = await createBeneficiarioOne(newPersonValues, req, {
+            executor: tx,
+            cittaId: mensa.mensa.cittaId,
+            centroAscoltoId: null,
+            zonaUdsId: null,
+          });
+          if ("error" in created) {
+            throw new MensaError(created.status ?? 400, created.error);
+          }
+          beneficiario = created.row;
+          await tx.insert(auditConfigurazioniTable).values({
+            ...auditValues(
+              req,
+              `beneficiario:${beneficiario.id}`,
+              "creazione-provvisoria-mensa",
+              null,
+              {
+                beneficiarioId: beneficiario.id,
+                cittaId: beneficiario.cittaId,
+                statoAnagrafica: beneficiario.statoAnagrafica,
+              },
+              motivo,
+            ),
+            area: "beneficiari",
+          });
+          if (duplicates.length) {
+            await tx.insert(auditConfigurazioniTable).values({
+              ...auditValues(
+                req,
+                `beneficiario:${beneficiario.id}`,
+                "duplicato-potenziale-confermato",
+                { possibiliDuplicatiIds: duplicates.map((item) => item.id) },
+                { beneficiarioId: beneficiario.id },
+                motivo,
+              ),
+              area: "beneficiari",
+            });
+          }
+        } else {
+          const beneficiarioId = positiveInt(
+            beneficiarioIdInput,
+            "beneficiarioId",
+          );
+          const [existing] = await tx
+            .select()
+            .from(beneficiariTable)
+            .where(eq(beneficiariTable.id, beneficiarioId))
+            .for("update");
+          if (!existing || existing.cittaId !== mensa.mensa.cittaId) {
+            throw new MensaError(404, "Beneficiario non disponibile");
+          }
+          if (!existing.attivo) {
+            throw new MensaError(409, "Il beneficiario non è attivo");
+          }
+          if (await activeEligibility(existing.id, today)) {
+            throw new MensaError(
+              409,
+              "Il beneficiario dispone già di un'abilitazione Mensa valida",
+            );
+          }
+          beneficiario = existing;
+        }
+        const [authorization] = await tx
+          .insert(mensaAutorizzazioniTemporaneeTable)
+          .values({
+            beneficiarioId: beneficiario.id,
+            mensaId,
+            dataServizio: today,
+            motivo,
+            operatoreId: req.user!.id,
+          })
+          .returning();
+        const [access] = await tx
+          .insert(mensaAccessiTable)
+          .values({
+            mensaId,
+            beneficiarioId: beneficiario.id,
+            tesseraId: null,
+            autorizzazioneTemporaneaId: authorization.id,
+            esito: "consentito",
+            motivoEsito: ACCESSO_MOTIVI.ACCESSO_TEMPORANEO,
+            operatoreId: req.user!.id,
+            modalitaAccesso: "temporaneo",
+            idempotencyKey,
+          })
+          .returning();
+        await tx.insert(auditConfigurazioniTable).values(
+          auditValues(
+            req,
+            `mensa-accesso:${access.id}`,
+            "autorizzazione-temporanea",
+            null,
+            {
+              autorizzazioneId: authorization.id,
+              beneficiarioId: beneficiario.id,
+              mensaId,
+              dataServizio: today,
+            },
+            motivo,
+          ),
+        );
+        return access.id;
+      });
+      res.status(201).json(await loadAccessoDto(createdAccessId));
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        const key =
+          typeof req.body?.idempotencyKey === "string"
+            ? req.body.idempotencyKey
+            : "";
+        const [existing] = await db
+          .select({ id: mensaAccessiTable.id })
+          .from(mensaAccessiTable)
+          .where(eq(mensaAccessiTable.idempotencyKey, key));
+        if (existing) {
+          res.json({
+            ...(await loadAccessoDto(existing.id)),
+            idempotentReplay: true,
+          });
+          return;
+        }
+        res.status(409).json({
+          error:
+            "Esiste già un'autorizzazione temporanea per questa persona nella giornata corrente",
+        });
+        return;
       }
       if (sendMensaError(error, res)) return;
       throw error;

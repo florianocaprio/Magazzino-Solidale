@@ -31,6 +31,7 @@ export interface MensaAccesso {
   esito: MensaAccessoEsito;
   motivoEsito: string;
   modalitaAccesso: MensaAccessoModalitaAccesso;
+  temporaneo: boolean;
   dataOra: Date;
   /** @nullable */
   eccezioneId?: number | null;

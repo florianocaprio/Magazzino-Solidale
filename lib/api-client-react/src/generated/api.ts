@@ -173,6 +173,7 @@ import type {
   MensaAbilitazioneInput,
   MensaAccesso,
   MensaAccessoInput,
+  MensaAccessoTemporaneoInput,
   MensaBeneficiarioSummary,
   MensaEccezione,
   MensaEccezioneInput,
@@ -242,6 +243,7 @@ import type {
   SpesaEmporioChiusuraResult,
   SystemLogListResponse,
   TesseraBeneficiario,
+  TesseraBeneficiarioAnagraficaInput,
   TesseraBeneficiarioInput,
   TipoIntervento,
   TipoInterventoInput,
@@ -4526,6 +4528,78 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteNucleoFamiliareMutationOptions(options));
+    }
+
+export const getCreateTesseraBeneficiarioDaAnagraficaUrl = (id: number,) => {
+
+
+
+
+  return `/api/beneficiari/${id}/tessere`
+}
+
+/**
+ * @summary Emette una tessera trasversale opaca da un'anagrafica autorizzata
+ */
+export const createTesseraBeneficiarioDaAnagrafica = async (id: number,
+    tesseraBeneficiarioAnagraficaInput: TesseraBeneficiarioAnagraficaInput, options?: RequestInit): Promise<TesseraBeneficiario> => {
+
+  return customFetch<TesseraBeneficiario>(getCreateTesseraBeneficiarioDaAnagraficaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      tesseraBeneficiarioAnagraficaInput,)
+  }
+);}
+
+
+
+
+export const getCreateTesseraBeneficiarioDaAnagraficaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTesseraBeneficiarioDaAnagrafica>>, TError,{id: number;data: BodyType<TesseraBeneficiarioAnagraficaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTesseraBeneficiarioDaAnagrafica>>, TError,{id: number;data: BodyType<TesseraBeneficiarioAnagraficaInput>}, TContext> => {
+
+const mutationKey = ['createTesseraBeneficiarioDaAnagrafica'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTesseraBeneficiarioDaAnagrafica>>, {id: number;data: BodyType<TesseraBeneficiarioAnagraficaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createTesseraBeneficiarioDaAnagrafica(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTesseraBeneficiarioDaAnagraficaMutationResult = NonNullable<Awaited<ReturnType<typeof createTesseraBeneficiarioDaAnagrafica>>>
+    export type CreateTesseraBeneficiarioDaAnagraficaMutationBody = BodyType<TesseraBeneficiarioAnagraficaInput>
+    export type CreateTesseraBeneficiarioDaAnagraficaMutationError = ErrorType<void>
+
+    /**
+ * @summary Emette una tessera trasversale opaca da un'anagrafica autorizzata
+ */
+export const useCreateTesseraBeneficiarioDaAnagrafica = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTesseraBeneficiarioDaAnagrafica>>, TError,{id: number;data: BodyType<TesseraBeneficiarioAnagraficaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTesseraBeneficiarioDaAnagrafica>>,
+        TError,
+        {id: number;data: BodyType<TesseraBeneficiarioAnagraficaInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTesseraBeneficiarioDaAnagraficaMutationOptions(options));
     }
 
 export const getListInterventiUrl = (params?: ListInterventiParams,) => {
@@ -16286,6 +16360,77 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getVerificaAccessoMensaMutationOptions(options));
+    }
+
+export const getCreateAccessoTemporaneoMensaUrl = () => {
+
+
+
+
+  return `/api/mensa/accessi/temporaneo`
+}
+
+/**
+ * @summary Crea un accesso giornaliero motivato per una persona esistente o una nuova anagrafica provvisoria
+ */
+export const createAccessoTemporaneoMensa = async (mensaAccessoTemporaneoInput: MensaAccessoTemporaneoInput, options?: RequestInit): Promise<MensaAccesso> => {
+
+  return customFetch<MensaAccesso>(getCreateAccessoTemporaneoMensaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mensaAccessoTemporaneoInput,)
+  }
+);}
+
+
+
+
+export const getCreateAccessoTemporaneoMensaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAccessoTemporaneoMensa>>, TError,{data: BodyType<MensaAccessoTemporaneoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAccessoTemporaneoMensa>>, TError,{data: BodyType<MensaAccessoTemporaneoInput>}, TContext> => {
+
+const mutationKey = ['createAccessoTemporaneoMensa'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAccessoTemporaneoMensa>>, {data: BodyType<MensaAccessoTemporaneoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAccessoTemporaneoMensa(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAccessoTemporaneoMensaMutationResult = NonNullable<Awaited<ReturnType<typeof createAccessoTemporaneoMensa>>>
+    export type CreateAccessoTemporaneoMensaMutationBody = BodyType<MensaAccessoTemporaneoInput>
+    export type CreateAccessoTemporaneoMensaMutationError = ErrorType<void>
+
+    /**
+ * @summary Crea un accesso giornaliero motivato per una persona esistente o una nuova anagrafica provvisoria
+ */
+export const useCreateAccessoTemporaneoMensa = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAccessoTemporaneoMensa>>, TError,{data: BodyType<MensaAccessoTemporaneoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAccessoTemporaneoMensa>>,
+        TError,
+        {data: BodyType<MensaAccessoTemporaneoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateAccessoTemporaneoMensaMutationOptions(options));
     }
 
 export const getListAccessiMensaUrl = (params?: ListAccessiMensaParams,) => {

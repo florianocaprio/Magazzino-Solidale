@@ -128,6 +128,38 @@ export const tessereBeneficiariTable = pgTable(
   ],
 );
 
+export const mensaAutorizzazioniTemporaneeTable = pgTable(
+  "mensa_autorizzazioni_temporanee",
+  {
+    id: serial("id").primaryKey(),
+    beneficiarioId: integer("beneficiario_id")
+      .notNull()
+      .references(() => beneficiariTable.id),
+    mensaId: integer("mensa_id")
+      .notNull()
+      .references(() => menseTable.id),
+    dataServizio: date("data_servizio").notNull(),
+    motivo: text("motivo").notNull(),
+    operatoreId: integer("operatore_id")
+      .notNull()
+      .references(() => utentiTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("mensa_autorizzazioni_temporanee_giorno_unique").on(
+      table.beneficiarioId,
+      table.mensaId,
+      table.dataServizio,
+    ),
+    index("mensa_autorizzazioni_temporanee_mensa_data_idx").on(
+      table.mensaId,
+      table.dataServizio,
+    ),
+  ],
+);
+
 export const mensaAccessiTable = pgTable(
   "mensa_accessi",
   {
@@ -141,6 +173,9 @@ export const mensaAccessiTable = pgTable(
     tesseraId: integer("tessera_id").references(
       () => tessereBeneficiariTable.id,
     ),
+    autorizzazioneTemporaneaId: integer(
+      "autorizzazione_temporanea_id",
+    ).references(() => mensaAutorizzazioniTemporaneeTable.id),
     dataOra: timestamp("data_ora", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -169,7 +204,7 @@ export const mensaAccessiTable = pgTable(
     ),
     check(
       "mensa_accessi_modalita_check",
-      sql`${table.modalitaAccesso} in ('tessera', 'manuale')`,
+      sql`${table.modalitaAccesso} in ('tessera', 'manuale', 'temporaneo')`,
     ),
   ],
 );
@@ -274,6 +309,8 @@ export const mensaPastiTable = pgTable(
 export type Mensa = typeof menseTable.$inferSelect;
 export type MensaAbilitazione = typeof mensaAbilitazioniTable.$inferSelect;
 export type TesseraBeneficiario = typeof tessereBeneficiariTable.$inferSelect;
+export type MensaAutorizzazioneTemporanea =
+  typeof mensaAutorizzazioniTemporaneeTable.$inferSelect;
 export type MensaAccesso = typeof mensaAccessiTable.$inferSelect;
 export type MensaEccezione = typeof mensaEccezioniTable.$inferSelect;
 export type MensaPasto = typeof mensaPastiTable.$inferSelect;

@@ -1,11 +1,11 @@
 import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable } from "@workspace/db";
+import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable } from "@workspace/db";
 import { calcolaEta, isFasciaEtaPresunta, risolviFasciaEta } from "@workspace/api-zod";
 import { runBulk } from "../lib/bulk";
 import { eq, and, or, ilike, inArray, sql, desc, ne, type SQL } from "drizzle-orm";
-import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
+import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
   callerCentroId,
   callerCittaId,
@@ -26,6 +26,9 @@ import {
   isEmporioEnabled,
   isUnitaStradaEnabled,
 } from "../lib/impostazioniModuli";
+import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
+import { formatTesseraBeneficiario, issueTesseraBeneficiario, TesseraBeneficiarioError } from "../lib/tesseraBeneficiarioService";
+import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -320,6 +323,7 @@ function fmtBenef(
     id: r.id,
     codice: r.codice,
     codiceFiscale: r.codiceFiscale ?? null,
+    statoAnagrafica: r.statoAnagrafica,
     soprannome: r.soprannome ?? null,
     cognome: r.cognome,
     nome: r.nome,
@@ -424,9 +428,18 @@ router.get("/beneficiari", async (req, res) => {
   res.json(rows.map(r => fmtBenef(r.b, r.centroNome, r.cittaNome, r.magazzinoEmporioPreferitoNome)));
 });
 
-async function createBeneficiarioOne(
+type BeneficiarioTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+interface BeneficiarioCreationOptions {
+  executor?: typeof db | BeneficiarioTx;
+  cittaId?: number;
+  centroAscoltoId?: number | null;
+  zonaUdsId?: number | null;
+}
+
+export async function createBeneficiarioOne(
   body: Record<string, unknown>,
   req: Request,
+  options: BeneficiarioCreationOptions = {},
 ): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string; status?: number }> {
   const b = body as Record<string, any>;
   const caller = callerCentroId(req);
@@ -437,6 +450,9 @@ async function createBeneficiarioOne(
   const sesso = normalizzaSesso(b.sesso);
   if (!sesso) return { error: SESSO_OBBLIGATORIO_MSG, status: 400 };
   const values: Record<string, any> = { ...b, codice, sesso };
+  if ("statoAnagrafica" in values && !["provvisoria", "completa"].includes(values.statoAnagrafica)) {
+    return { error: "Stato anagrafica non valido", status: 400 };
+  }
   const eta = normalizeEtaFields(values, b);
   if (eta.error) return { error: eta.error, status: 400 };
   delete values.creditoSolidaleSaldo;
@@ -445,6 +461,9 @@ async function createBeneficiarioOne(
   if (caller != null) values.centroAscoltoId = caller;
   if (cid != null) values.cittaId = cid;
   if (zid != null) values.zonaUdsId = zid;
+  if (options.cittaId != null) values.cittaId = options.cittaId;
+  if ("centroAscoltoId" in options) values.centroAscoltoId = options.centroAscoltoId;
+  if ("zonaUdsId" in options) values.zonaUdsId = options.zonaUdsId;
   // Città is the HARD UDS boundary: a città-global caller must pin a città when
   // creating a UDS person, otherwise the row would be visible across all cities.
   if (values.uds === true && cid == null && values.cittaId == null) {
@@ -478,7 +497,8 @@ async function createBeneficiarioOne(
     return { error: UNITA_STRADA_DISABLED_MSG, status: 403 };
   }
   try {
-    const [row] = await db.insert(beneficiariTable).values(values as typeof beneficiariTable.$inferInsert).returning();
+    const executor = options.executor ?? db;
+    const [row] = await executor.insert(beneficiariTable).values(values as typeof beneficiariTable.$inferInsert).returning();
     return { row };
   } catch (e) {
     if (isCodiceBeneficiarioUniqueViolation(e)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
@@ -520,7 +540,6 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
   const soprannome = (q.soprannome ?? "").trim().toLowerCase();
   const telefono = (q.telefono ?? "").trim();
   const dataNascita = (q.dataNascita ?? "").trim();
-  const full = `${nome} ${cognome}`.trim().toLowerCase();
   const toIntOrNull = (v: string | undefined): number | null => {
     if (!v) return null;
     const n = parseInt(v);
@@ -554,90 +573,49 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
     cittaId = parsedCitta;
   }
 
-  // The explicit lookup is intentionally unavailable for one-character queries:
-  // this limits broad enumeration and matches the UI's two-character threshold.
-  if (search.length === 1) {
-    res.json([]);
-    return;
+  res.json(await searchBeneficiariDuplicates({
+    cittaId,
+    search,
+    nome,
+    cognome,
+    soprannome,
+    telefono,
+    dataNascita,
+    excludeId,
+  }));
+});
+
+router.post("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.manage"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
+  const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
+  if (!beneficiario) { res.status(404).json({ error: "Beneficiario non trovato" }); return; }
+  if (!canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req)) || !canAccessCitta(beneficiario.cittaId, callerCittaId(req))) {
+    res.status(403).json({ error: "Beneficiario non accessibile" }); return;
   }
-
-  // Nothing to match on → empty result (avoids returning the whole città).
-  if (!search && !full && !soprannome && !telefono && !dataNascita) {
-    res.json([]);
-    return;
+  if (!beneficiario.attivo) { res.status(409).json({ error: "Il beneficiario non è attivo" }); return; }
+  if (beneficiario.statoAnagrafica !== "completa") {
+    res.status(409).json({ error: "Completa l'anagrafica prima di emettere la tessera" }); return;
   }
-
-  // Città is the only boundary for this lookup. The equality is intentional:
-  // NULL legacy rows and every other città remain excluded.
-  const searchLike = `%${search}%`;
-
-  const result = await db.execute(sql`
-    SELECT * FROM (
-      SELECT
-        b.id, b.codice, b.nome, b.cognome, b.soprannome,
-        b.data_nascita::text AS "dataNascita", b.telefono,
-        b.citta_id AS "cittaId", c.nome AS "cittaNome",
-        b.zona_uds_id AS "zonaUdsId", z.nome AS "zonaUdsNome",
-        b.centro_ascolto_id AS "centroAscoltoId", ca.nome AS "centroAscoltoNome",
-        b.uds AS "uds",
-        (
-          CASE WHEN ${search} <> '' THEN GREATEST(
-            similarity(lower(coalesce(b.nome, '')), ${search}),
-            similarity(lower(coalesce(b.cognome, '')), ${search}),
-            similarity(lower(coalesce(b.nome, '') || ' ' || coalesce(b.cognome, '')), ${search}),
-            similarity(lower(coalesce(b.cognome, '') || ' ' || coalesce(b.nome, '')), ${search}),
-            similarity(lower(coalesce(b.soprannome, '')), ${search}),
-            similarity(lower(coalesce(b.telefono, '')), ${search}),
-            similarity(lower(coalesce(b.codice, '')), ${search}),
-            similarity(lower(coalesce(b.codice_fiscale, '')), ${search}),
-            CASE WHEN lower(coalesce(b.nome, '')) LIKE ${searchLike} THEN 0.7 ELSE 0 END,
-            CASE WHEN lower(coalesce(b.cognome, '')) LIKE ${searchLike} THEN 0.7 ELSE 0 END,
-            CASE WHEN lower(coalesce(b.nome, '') || ' ' || coalesce(b.cognome, '')) LIKE ${searchLike} THEN 0.8 ELSE 0 END,
-            CASE WHEN lower(coalesce(b.cognome, '') || ' ' || coalesce(b.nome, '')) LIKE ${searchLike} THEN 0.8 ELSE 0 END,
-            CASE WHEN lower(coalesce(b.soprannome, '')) LIKE ${searchLike} THEN 0.7 ELSE 0 END,
-            CASE WHEN lower(coalesce(b.telefono, '')) LIKE ${searchLike} THEN 0.8 ELSE 0 END,
-            CASE WHEN lower(coalesce(b.codice, '')) LIKE ${searchLike} THEN 0.9 ELSE 0 END,
-            CASE WHEN lower(coalesce(b.codice_fiscale, '')) LIKE ${searchLike} THEN 0.9 ELSE 0 END
-          ) ELSE 0 END
-          +
-          GREATEST(
-            similarity(lower(coalesce(b.nome, '') || ' ' || coalesce(b.cognome, '')), ${full}),
-            similarity(lower(coalesce(b.cognome, '') || ' ' || coalesce(b.nome, '')), ${full})
-          )
-          + CASE WHEN ${soprannome} <> '' THEN similarity(lower(coalesce(b.soprannome, '')), ${soprannome}) * 0.5 ELSE 0 END
-          + CASE WHEN ${telefono} <> '' THEN (CASE WHEN b.telefono = ${telefono} THEN 0.5 ELSE similarity(coalesce(b.telefono, ''), ${telefono}) * 0.3 END) ELSE 0 END
-          + CASE WHEN ${dataNascita} <> '' AND b.data_nascita IS NOT NULL AND b.data_nascita::text = ${dataNascita} THEN 0.4 ELSE 0 END
-        )::float8 AS score
-      FROM beneficiari b
-      LEFT JOIN citta c ON c.id = b.citta_id
-      LEFT JOIN zone_uds z ON z.id = b.zona_uds_id
-      LEFT JOIN centri_di_ascolto ca ON ca.id = b.centro_ascolto_id
-      WHERE b.citta_id = ${cittaId}::int
-        AND (${excludeId}::int IS NULL OR b.id <> ${excludeId}::int)
-    ) s
-    WHERE s.score >= 0.2
-    ORDER BY s.score DESC
-    LIMIT 10
-  `);
-
-  const rows = result.rows as Array<Record<string, unknown>>;
-  res.json(rows.map(r => ({
-    id: r.id,
-    codice: r.codice,
-    nome: r.nome,
-    cognome: r.cognome,
-    soprannome: (r.soprannome as string | null) ?? null,
-    dataNascita: (r.dataNascita as string | null) ?? null,
-    telefono: (r.telefono as string | null) ?? null,
-    cittaId: (r.cittaId as number | null) ?? null,
-    cittaNome: (r.cittaNome as string | null) ?? null,
-    zonaUdsId: (r.zonaUdsId as number | null) ?? null,
-    zonaUdsNome: (r.zonaUdsNome as string | null) ?? null,
-    centroAscoltoId: (r.centroAscoltoId as number | null) ?? null,
-    centroAscoltoNome: (r.centroAscoltoNome as string | null) ?? null,
-    uds: Boolean(r.uds),
-    score: Math.round(Number(r.score) * 100) / 100,
-  })));
+  const dataScadenza = req.body?.dataScadenza;
+  if (dataScadenza != null && dataScadenza !== "" && (typeof dataScadenza !== "string" || !isDateOnly(dataScadenza))) {
+    res.status(400).json({ error: "La scadenza non è valida" }); return;
+  }
+  const motivo = typeof req.body?.motivoSostituzione === "string" ? req.body.motivoSostituzione.trim() || null : null;
+  try {
+    const row = await issueTesseraBeneficiario({
+      beneficiarioId: id,
+      dataScadenza: dataScadenza || null,
+      motivoSostituzione: motivo,
+      operatoreId: req.user!.id,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+      areaAudit: "beneficiari",
+    });
+    res.status(201).json(formatTesseraBeneficiario(row));
+  } catch (error) {
+    if (error instanceof TesseraBeneficiarioError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
 });
 
 router.get("/beneficiari/:id", async (req, res) => {
@@ -761,6 +739,9 @@ router.patch("/beneficiari/:id", async (req, res) => {
     }
   }
   const updates = { ...req.body, dataAggiornamento: new Date() };
+  if ("statoAnagrafica" in updates && !["provvisoria", "completa"].includes(String(updates.statoAnagrafica))) {
+    res.status(400).json({ error: "Stato anagrafica non valido" }); return;
+  }
   const eta = normalizeEtaFields(updates, req.body as Record<string, unknown>);
   if (eta.error) {
     res.status(400).json({ error: eta.error });
@@ -855,7 +836,21 @@ router.patch("/beneficiari/:id", async (req, res) => {
     }
   }
   try {
-    const [row] = await db.update(beneficiariTable).set(updates).where(eq(beneficiariTable.id, id)).returning();
+    const row = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(beneficiariTable).set(updates).where(eq(beneficiariTable.id, id)).returning();
+      if (updated.statoAnagrafica !== existing.statoAnagrafica && updated.statoAnagrafica === "completa") {
+        await tx.insert(auditConfigurazioniTable).values({
+          area: "beneficiari",
+          chiave: `beneficiario:${id}`,
+          azione: "completamento-anagrafica",
+          valorePrecedente: { statoAnagrafica: existing.statoAnagrafica },
+          valoreNuovo: { statoAnagrafica: updated.statoAnagrafica, centroAscoltoId: updated.centroAscoltoId },
+          utenteId: req.user?.id ?? null,
+          ip: req.ip ?? req.socket.remoteAddress ?? null,
+        });
+      }
+      return updated;
+    });
     res.json(fmtBenef(
       row,
       null,

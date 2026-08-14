@@ -8,10 +8,12 @@
 import type { BeneficiarioUpdateCreditoSolidaleStato } from './beneficiarioUpdateCreditoSolidaleStato';
 import type { BeneficiarioUpdateFasciaEtaPresunta } from './beneficiarioUpdateFasciaEtaPresunta';
 import type { BeneficiarioUpdateSesso } from './beneficiarioUpdateSesso';
+import type { BeneficiarioUpdateStatoAnagrafica } from './beneficiarioUpdateStatoAnagrafica';
 
 export interface BeneficiarioUpdate {
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica?: BeneficiarioUpdateStatoAnagrafica;
   cognome?: string;
   nome?: string;
   /** @nullable */

@@ -10,6 +10,7 @@ import {
   magazziniTable,
   mensaAbilitazioniTable,
   mensaAccessiTable,
+  mensaAutorizzazioniTemporaneeTable,
   mensaEccezioniTable,
   mensaPastiTable,
   menseTable,
@@ -19,6 +20,7 @@ import {
   utentiTable,
 } from "@workspace/db";
 import mensaRouter, { activeEligibility } from "../src/routes/mensa";
+import beneficiariRouter from "../src/routes/beneficiari";
 import trasferimentiRouter from "../src/routes/trasferimenti";
 import {
   ensureAmbienteModuli,
@@ -47,7 +49,7 @@ type Fixture = Awaited<ReturnType<typeof createFixture>>;
 
 function makeApp(
   fixture: Fixture,
-  permissions = MENSA_PERMISSIONS.map((item) => item.key),
+  permissions: string[] = MENSA_PERMISSIONS.map((item) => item.key),
 ): Express {
   const app = express();
   app.use(express.json());
@@ -64,6 +66,7 @@ function makeApp(
     } as NonNullable<typeof req.user>;
     next();
   });
+  app.use(beneficiariRouter);
   app.use(mensaRouter);
   app.use(trasferimentiRouter);
   return app;
@@ -201,6 +204,7 @@ async function createFixture() {
     mensaB: canteens[1].id,
     mensaMilan: canteens[2].id,
     beneficiaryId: beneficiary.id,
+    milanBeneficiaryId: milanBeneficiary.id,
     cardId: card.id,
     cardCode: card.codice,
     milanCardCode: milanCard.codice,
@@ -257,6 +261,9 @@ afterEach(async () => {
     await db
       .delete(mensaAccessiTable)
       .where(inArray(mensaAccessiTable.mensaId, ids.canteens));
+    await db
+      .delete(mensaAutorizzazioniTemporaneeTable)
+      .where(inArray(mensaAutorizzazioniTemporaneeTable.mensaId, ids.canteens));
   }
   if (ids.beneficiaries.length) {
     await db
@@ -842,6 +849,190 @@ describe("Modulo Mensa", () => {
         eq(auditConfigurazioniTable.chiave, `mensa-pasto:${override.body.id}`),
       );
     expect(audits).toHaveLength(1);
+  });
+
+  it("crea una persona provvisoria e un accesso temporaneo senza tessera o abilitazione permanente", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const key = `temporary-new-${rnd()}`;
+    const first = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        idempotencyKey: key,
+        motivo: "Persona priva di presa in carico permanente",
+        nuovaPersona: {
+          nome: `Nuovo${rnd()}`,
+          cognome: `Temporaneo${rnd()}`,
+          sesso: "M",
+          fasciaEtaPresunta: "30_64",
+          allergie: "lattosio",
+        },
+      });
+    expect(first.status).toBe(201);
+    expect(first.body.esito).toBe("consentito");
+    expect(first.body.modalitaAccesso).toBe("temporaneo");
+    expect(first.body.temporaneo).toBe(true);
+    const createdId = Number(first.body.beneficiarioId);
+    ids.beneficiaries.push(createdId);
+
+    const [created] = await db
+      .select()
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, createdId));
+    expect(created.statoAnagrafica).toBe("provvisoria");
+    expect(created.cittaId).toBe(fixture.romeId);
+    expect(created.centroAscoltoId).toBeNull();
+    expect(created.uds).toBe(false);
+    expect(
+      await activeEligibility(createdId, dataServizioMensa(new Date())),
+    ).toBeNull();
+    expect(
+      await db
+        .select()
+        .from(tessereBeneficiariTable)
+        .where(eq(tessereBeneficiariTable.beneficiarioId, createdId)),
+    ).toHaveLength(0);
+
+    const meal = await request(app)
+      .post("/mensa/pasti")
+      .send({
+        accessoMensaId: first.body.id,
+        tipoServizio: "pranzo",
+        idempotencyKey: `meal-temp-${rnd()}`,
+      });
+    expect(meal.status).toBe(201);
+    const replay = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        idempotencyKey: key,
+        nuovaPersona: {
+          nome: "Non deve",
+          cognome: "Duplicare",
+          sesso: "F",
+          fasciaEtaPresunta: "18_29",
+        },
+      });
+    expect(replay.status).toBe(200);
+    expect(replay.body.id).toBe(first.body.id);
+    expect(replay.body.idempotentReplay).toBe(true);
+  });
+
+  it("impone la conferma dei duplicati e permette di scegliere un esistente senza abilitazione", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const duplicate = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        idempotencyKey: `duplicate-${rnd()}`,
+        nuovaPersona: {
+          nome: "Mario",
+          cognome: "Rossi",
+          sesso: "M",
+          fasciaEtaPresunta: "30_64",
+        },
+      });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.possibiliDuplicati).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: fixture.beneficiaryId }),
+      ]),
+    );
+
+    const [existing] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-TEMP-${rnd()}`,
+        nome: "Esistente",
+        cognome: "Senza Abilitazione",
+        sesso: "F",
+        cittaId: fixture.romeId,
+      })
+      .returning({ id: beneficiariTable.id });
+    ids.beneficiaries.push(existing.id);
+    const allowed = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        beneficiarioId: existing.id,
+        motivo: "Accesso straordinario documentato",
+        idempotencyKey: `existing-${rnd()}`,
+      });
+    expect(allowed.status).toBe(201);
+    expect(allowed.body.beneficiarioId).toBe(existing.id);
+    expect(allowed.body.temporaneo).toBe(true);
+
+    const normalTomorrowIndependentCheck = await request(app)
+      .post("/mensa/accessi/verifica")
+      .send({
+        mensaId: fixture.mensaA,
+        modalitaAccesso: "manuale",
+        beneficiarioId: existing.id,
+        idempotencyKey: `normal-${rnd()}`,
+      });
+    expect(normalTomorrowIndependentCheck.status).toBe(201);
+    expect(normalTomorrowIndependentCheck.body.esito).toBe("negato");
+    expect(normalTomorrowIndependentCheck.body.motivoEsito).toBe(
+      "ABILITAZIONE_NON_PRESENTE",
+    );
+  });
+
+  it("protegge accessi temporanei con permesso dedicato e scope città", async () => {
+    const fixture = await createFixture();
+    const noTemporary = MENSA_PERMISSIONS.map((item) => item.key).filter(
+      (key) => key !== "mensa.access.temporary",
+    );
+    const forbidden = await request(makeApp(fixture, noTemporary))
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        beneficiarioId: fixture.beneficiaryId,
+        idempotencyKey: `forbidden-${rnd()}`,
+      });
+    expect(forbidden.status).toBe(403);
+
+    const crossCity = await request(makeApp(fixture))
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        beneficiarioId: fixture.milanBeneficiaryId,
+        motivo: "Tentativo fuori scope",
+        idempotencyKey: `cross-city-${rnd()}`,
+      });
+    expect(crossCity.status).toBe(404);
+    expect(crossCity.body.error).toBe("Beneficiario non disponibile");
+  });
+
+  it("emette dal Sociale solo tessere opache e soltanto dopo il completamento dell'anagrafica", async () => {
+    const fixture = await createFixture();
+    const permissions = [
+      ...MENSA_PERMISSIONS.map((item) => item.key),
+      "beneficiari.cards.manage",
+    ];
+    const app = makeApp(fixture, permissions);
+    await db
+      .update(beneficiariTable)
+      .set({ statoAnagrafica: "provvisoria" })
+      .where(eq(beneficiariTable.id, fixture.beneficiaryId));
+    const provisional = await request(app)
+      .post(`/beneficiari/${fixture.beneficiaryId}/tessere`)
+      .send({ motivoSostituzione: "Test anagrafica provvisoria" });
+    expect(provisional.status).toBe(409);
+
+    const completed = await request(app)
+      .patch(`/beneficiari/${fixture.beneficiaryId}`)
+      .send({ statoAnagrafica: "completa" });
+    expect(completed.status).toBe(200);
+    expect(completed.body.statoAnagrafica).toBe("completa");
+    const issued = await request(app)
+      .post(`/beneficiari/${fixture.beneficiaryId}/tessere`)
+      .send({ motivoSostituzione: "Sostituzione tessera legacy" });
+    expect(issued.status).toBe(201);
+    expect(issued.body.codice).toMatch(/^MS-[A-Za-z0-9_-]+$/);
+    expect(issued.body.codice).not.toContain("BEN-");
+    expect(issued.body.codice).not.toContain("Mario");
   });
 
   it("conta un beneficiario una sola volta nel report anche se servito in più Mense", async () => {

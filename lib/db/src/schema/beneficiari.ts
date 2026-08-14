@@ -1,4 +1,5 @@
-import { pgTable, serial, varchar, text, boolean, timestamp, integer, date, decimal } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, serial, varchar, text, boolean, timestamp, integer, date, decimal, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cittaTable } from "./citta";
@@ -9,6 +10,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   id: serial("id").primaryKey(),
   codice: varchar("codice", { length: 20 }).notNull().unique(),
   codiceFiscale: varchar("codice_fiscale", { length: 16 }),
+  statoAnagrafica: varchar("stato_anagrafica", { length: 20 }).notNull().default("completa"),
   cognome: varchar("cognome", { length: 80 }).notNull(),
   nome: varchar("nome", { length: 80 }).notNull(),
   soprannome: varchar("soprannome", { length: 80 }),
@@ -56,7 +58,9 @@ export const beneficiariTable = pgTable("beneficiari", {
   noteInterne: text("note_interne"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
-});
+}, (table) => [
+  check("beneficiari_stato_anagrafica_check", sql`${table.statoAnagrafica} in ('provvisoria', 'completa')`),
+]);
 
 export const nucleoFamiliareTable = pgTable("nucleo_familiare", {
   id: serial("id").primaryKey(),

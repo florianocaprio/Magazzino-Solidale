@@ -1259,6 +1259,33 @@ paths:
         "204":
           description: Deleted
 
+  /beneficiari/{id}/tessere:
+    post:
+      operationId: createTesseraBeneficiarioDaAnagrafica
+      tags: [beneficiari]
+      summary: Emette una tessera trasversale opaca da un'anagrafica autorizzata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                $ref: "#/components/schemas/TesseraBeneficiarioAnagraficaInput",
+              }
+      responses:
+        "201":
+          description: Tessera emessa senza dati personali nel token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TesseraBeneficiario" }
+        "403": { description: Permesso o scope territoriale non consentito }
+        "409": { description: Esiste già una tessera attiva }
+
   # ─── INTERVENTI ──────────────────────────────────────────────────────────────
   /interventi:
     get:
@@ -4771,7 +4798,8 @@ paths:
           description: Mense visibili nello scope territoriale
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/Mensa" } }
+              schema:
+                { type: array, items: { $ref: "#/components/schemas/Mensa" } }
     post:
       operationId: createMensa
       tags: [mensa]
@@ -4820,13 +4848,23 @@ paths:
       operationId: searchMensaBeneficiari
       tags: [mensa]
       parameters:
-        - { name: search, in: query, required: true, schema: { type: string, minLength: 2 } }
+        - {
+            name: search,
+            in: query,
+            required: true,
+            schema: { type: string, minLength: 2 },
+          }
       responses:
         "200":
           description: Risultati minimali, privi di dati sociali riservati
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MensaBeneficiarioSummary" } }
+              schema:
+                {
+                  type: array,
+                  items:
+                    { $ref: "#/components/schemas/MensaBeneficiarioSummary" },
+                }
 
   /mensa/abilitazioni:
     get:
@@ -4840,7 +4878,11 @@ paths:
           description: Storico abilitazioni
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MensaAbilitazione" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MensaAbilitazione" },
+                }
     post:
       operationId: createMensaAbilitazione
       tags: [mensa]
@@ -4880,13 +4922,22 @@ paths:
       operationId: listTessereBeneficiario
       tags: [mensa]
       parameters:
-        - { name: beneficiarioId, in: query, required: true, schema: { type: integer } }
+        - {
+            name: beneficiarioId,
+            in: query,
+            required: true,
+            schema: { type: integer },
+          }
       responses:
         "200":
           description: Storico tessere trasversali
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/TesseraBeneficiario" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/TesseraBeneficiario" },
+                }
     post:
       operationId: createTesseraBeneficiario
       tags: [mensa]
@@ -4941,6 +4992,30 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MensaAccesso" }
 
+  /mensa/accessi/temporaneo:
+    post:
+      operationId: createAccessoTemporaneoMensa
+      tags: [mensa]
+      summary: Crea un accesso giornaliero motivato per una persona esistente o una nuova anagrafica provvisoria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaAccessoTemporaneoInput" }
+      responses:
+        "200":
+          description: Replay idempotente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaAccesso" }
+        "201":
+          description: Autorizzazione temporanea e accesso registrati
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaAccesso" }
+        "409":
+          description: Possibili duplicati o autorizzazione già presente
+
   /mensa/accessi:
     get:
       operationId: listAccessiMensa
@@ -4952,7 +5027,11 @@ paths:
           description: Accessi recenti
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MensaAccesso" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MensaAccesso" },
+                }
 
   /mensa/accessi/{id}/eccezione:
     post:
@@ -4985,7 +5064,11 @@ paths:
           description: Pasti operativi
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MensaPasto" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MensaPasto" },
+                }
     post:
       operationId: createPastoMensa
       tags: [mensa]
@@ -5016,7 +5099,11 @@ paths:
           description: Eccezioni auditate
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MensaEccezione" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MensaEccezione" },
+                }
 
   /mensa/logistica/magazzini:
     get:
@@ -5027,20 +5114,33 @@ paths:
           description: Magazzini origine accessibili
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MensaMagazzinoSummary" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MensaMagazzinoSummary" },
+                }
 
   /mensa/logistica/giacenze:
     get:
       operationId: listGiacenzeMensa
       tags: [mensa]
       parameters:
-        - { name: magazzinoId, in: query, required: true, schema: { type: integer } }
+        - {
+            name: magazzinoId,
+            in: query,
+            required: true,
+            schema: { type: integer },
+          }
       responses:
         "200":
           description: Disponibilità FEFO non scaduta
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MensaGiacenza" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MensaGiacenza" },
+                }
 
   /mensa/trasferimenti:
     get:
@@ -5051,7 +5151,11 @@ paths:
           description: Trasferimenti associati alle Mense
           content:
             application/json:
-              schema: { type: array, items: { type: object, additionalProperties: true } }
+              schema:
+                {
+                  type: array,
+                  items: { type: object, additionalProperties: true },
+                }
     post:
       operationId: createTrasferimentoMensa
       tags: [mensa]
@@ -5077,8 +5181,18 @@ paths:
       operationId: getMensaReport
       tags: [mensa]
       parameters:
-        - { name: dal, in: query, required: true, schema: { type: string, format: date } }
-        - { name: al, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: dal,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: al,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: mensaId, in: query, schema: { type: integer } }
         - { name: tipoServizio, in: query, schema: { type: string } }
       responses:
@@ -6748,6 +6862,9 @@ components:
           type: string
         codiceFiscale:
           type: ["string", "null"]
+        statoAnagrafica:
+          type: string
+          enum: [provvisoria, completa]
         cognome:
           type: string
         nome:
@@ -6845,6 +6962,7 @@ components:
         [
           id,
           codice,
+          statoAnagrafica,
           cognome,
           nome,
           fasciaEtaPresunta,
@@ -6877,6 +6995,9 @@ components:
           type: string
         codiceFiscale:
           type: ["string", "null"]
+        statoAnagrafica:
+          type: string
+          enum: [provvisoria, completa]
         cognome:
           type: string
         nome:
@@ -7006,6 +7127,7 @@ components:
         [
           id,
           codice,
+          statoAnagrafica,
           cognome,
           nome,
           fasciaEtaPresunta,
@@ -7038,6 +7160,9 @@ components:
           type: string
         codiceFiscale:
           type: ["string", "null"]
+        statoAnagrafica:
+          type: string
+          enum: [provvisoria, completa]
         cognome:
           type: string
         nome:
@@ -7138,6 +7263,9 @@ components:
       properties:
         codiceFiscale:
           type: ["string", "null"]
+        statoAnagrafica:
+          type: string
+          enum: [provvisoria, completa]
         cognome:
           type: string
         nome:
@@ -10931,7 +11059,8 @@ components:
     # ── Mensa ─────────────────────────────────────────────────────────────
     Mensa:
       type: object
-      required: [id, codice, nome, cittaId, magazzinoId, attiva, createdAt, versione]
+      required:
+        [id, codice, nome, cittaId, magazzinoId, attiva, createdAt, versione]
       properties:
         id: { type: integer }
         codice: { type: string }
@@ -10986,7 +11115,17 @@ components:
 
     MensaAbilitazione:
       type: object
-      required: [id, beneficiarioId, mensaId, dataInizio, stato, mensaPrincipale, createdAt, versione]
+      required:
+        [
+          id,
+          beneficiarioId,
+          mensaId,
+          dataInizio,
+          stato,
+          mensaPrincipale,
+          createdAt,
+          versione,
+        ]
       properties:
         id: { type: integer }
         beneficiarioId: { type: integer }
@@ -11024,7 +11163,8 @@ components:
 
     TesseraBeneficiario:
       type: object
-      required: [id, beneficiarioId, codice, stato, dataEmissione, createdAt, versione]
+      required:
+        [id, beneficiarioId, codice, stato, dataEmissione, createdAt, versione]
       properties:
         id: { type: integer }
         beneficiarioId: { type: integer }
@@ -11046,6 +11186,41 @@ components:
         dataScadenza: { type: ["string", "null"], format: date }
         motivoSostituzione: { type: ["string", "null"] }
 
+    TesseraBeneficiarioAnagraficaInput:
+      type: object
+      properties:
+        dataScadenza: { type: ["string", "null"], format: date }
+        motivoSostituzione: { type: ["string", "null"] }
+
+    MensaNuovaPersonaTemporaneaInput:
+      type: object
+      required: [nome, cognome, sesso]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 80 }
+        cognome: { type: string, minLength: 1, maxLength: 80 }
+        sesso: { type: string, enum: [M, F, ALTRO] }
+        dataNascita: { type: ["string", "null"], format: date }
+        fasciaEtaPresunta:
+          type: ["string", "null"]
+          enum: ["0_17", "18_29", "30_64", "65_plus", null]
+        telefono: { type: ["string", "null"], maxLength: 20 }
+        cittadinanza: { type: ["string", "null"], maxLength: 60 }
+        allergie: { type: ["string", "null"] }
+        restrizioniAlimentari: { type: ["string", "null"] }
+
+    MensaAccessoTemporaneoInput:
+      type: object
+      required: [mensaId, idempotencyKey]
+      description: Indicare esattamente uno tra beneficiarioId e nuovaPersona. L'autorizzazione vale solo per la data civile corrente Europe/Rome.
+      properties:
+        mensaId: { type: integer }
+        beneficiarioId: { type: integer }
+        nuovaPersona:
+          { $ref: "#/components/schemas/MensaNuovaPersonaTemporaneaInput" }
+        motivo: { type: ["string", "null"] }
+        confermaDuplicato: { type: boolean, default: false }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
+
     MensaAccessoInput:
       type: object
       required: [mensaId, modalitaAccesso, idempotencyKey]
@@ -11058,7 +11233,18 @@ components:
 
     MensaAccesso:
       type: object
-      required: [id, mensaId, mensaNome, esito, motivoEsito, modalitaAccesso, dataOra, eccezionePossibile]
+      required:
+        [
+          id,
+          mensaId,
+          mensaNome,
+          esito,
+          motivoEsito,
+          modalitaAccesso,
+          temporaneo,
+          dataOra,
+          eccezionePossibile,
+        ]
       properties:
         id: { type: integer }
         mensaId: { type: integer }
@@ -11071,9 +11257,11 @@ components:
         statoAbilitazione: { type: ["string", "null"] }
         restrizioniAlimentari: { type: ["string", "null"] }
         allergie: { type: ["string", "null"] }
-        esito: { type: string, enum: [consentito, negato, consentito_eccezione] }
+        esito:
+          { type: string, enum: [consentito, negato, consentito_eccezione] }
         motivoEsito: { type: string }
-        modalitaAccesso: { type: string, enum: [tessera, manuale] }
+        modalitaAccesso: { type: string, enum: [tessera, manuale, temporaneo] }
+        temporaneo: { type: boolean }
         dataOra: { type: string, format: date-time }
         eccezioneId: { type: ["integer", "null"] }
         eccezionePossibile: { type: boolean }
@@ -11093,7 +11281,16 @@ components:
     MensaPasto:
       type: object
       additionalProperties: true
-      required: [id, mensaId, beneficiarioId, accessoMensaId, dataOra, dataServizio, tipoServizio]
+      required:
+        [
+          id,
+          mensaId,
+          beneficiarioId,
+          accessoMensaId,
+          dataOra,
+          dataServizio,
+          tipoServizio,
+        ]
       properties:
         id: { type: integer }
         mensaId: { type: integer }
@@ -11113,7 +11310,16 @@ components:
     MensaEccezione:
       type: object
       additionalProperties: true
-      required: [id, beneficiarioId, mensaPrincipaleId, mensaDestinazioneId, cittaId, motivo, dataOra]
+      required:
+        [
+          id,
+          beneficiarioId,
+          mensaPrincipaleId,
+          mensaDestinazioneId,
+          cittaId,
+          motivo,
+          dataOra,
+        ]
       properties:
         id: { type: integer }
         beneficiarioId: { type: integer }
@@ -11152,7 +11358,8 @@ components:
 
     MensaTrasferimentoInput:
       type: object
-      required: [mensaId, magazzinoOrigineId, dataRichiesta, idempotencyKey, righe]
+      required:
+        [mensaId, magazzinoOrigineId, dataRichiesta, idempotencyKey, righe]
       properties:
         mensaId: { type: integer }
         magazzinoOrigineId: { type: integer }
@@ -11175,7 +11382,18 @@ components:
     MensaReport:
       type: object
       additionalProperties: true
-      required: [dal, al, totalePasti, beneficiariDistinti, accessiOrdinari, accessiEccezione, accessiNegati, mediaPastiGiorno, distribuzione]
+      required:
+        [
+          dal,
+          al,
+          totalePasti,
+          beneficiariDistinti,
+          accessiOrdinari,
+          accessiEccezione,
+          accessiNegati,
+          mediaPastiGiorno,
+          distribuzione,
+        ]
       properties:
         dal: { type: string, format: date }
         al: { type: string, format: date }
@@ -11189,7 +11407,14 @@ components:
           type: array
           items:
             type: object
-            required: [mensaId, mensaNome, totalePasti, beneficiariDistinti, pastiEccezione]
+            required:
+              [
+                mensaId,
+                mensaNome,
+                totalePasti,
+                beneficiariDistinti,
+                pastiEccezione,
+              ]
             properties:
               mensaId: { type: integer }
               mensaNome: { type: string }
