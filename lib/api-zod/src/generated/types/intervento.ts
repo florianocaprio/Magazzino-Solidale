@@ -5,6 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { InterventoAmbito } from './interventoAmbito';
+import type { InterventoPriorita } from './interventoPriorita';
+import type { InterventoStato } from './interventoStato';
 
 export interface Intervento {
   id: number;
@@ -17,7 +20,8 @@ export interface Intervento {
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
-  dataIntervento: string;
+  /** @nullable */
+  dataIntervento: Date | null;
   tipoIntervento: string;
   /** @nullable */
   descrizione?: string | null;
@@ -37,7 +41,26 @@ export interface Intervento {
   scadenzaRinnovo?: string | null;
   /** @nullable */
   scadenzaAutodichiarazioneIndigenza?: string | null;
-  dataCreazione: string;
+  stato: InterventoStato;
+  ambito: InterventoAmbito | null;
+  priorita: InterventoPriorita;
+  /** @nullable */
+  dataOraPianificata: Date | null;
+  /** @nullable */
+  dataOraAvvio: Date | null;
+  /** @nullable */
+  dataOraConclusione: Date | null;
+  /** @nullable */
+  interventoPrecedenteId: number | null;
+  successoriIds: number[];
+  numeroSuccessori: number;
+  /** @nullable */
+  sede: string | null;
+  /** @nullable */
+  motivoAnnullamento: string | null;
+  dataCreazione: Date;
+  /** @nullable */
+  dataAggiornamento: Date | null;
   bisogniPianificatiTotale: number;
   bisogniPianificatiAperti: number;
   bisogniPianificatiScaduti: number;

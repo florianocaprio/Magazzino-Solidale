@@ -1,10 +1,11 @@
 import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable } from "@workspace/db";
+import { beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable } from "@workspace/db";
 import { calcolaEta, isFasciaEtaPresunta, risolviFasciaEta } from "@workspace/api-zod";
 import { runBulk } from "../lib/bulk";
-import { eq, and, or, ilike, sql, desc, ne, type SQL } from "drizzle-orm";
+import { eq, and, or, ilike, inArray, sql, desc, ne, type SQL } from "drizzle-orm";
+import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import {
   callerCentroId,
   callerCittaId,
@@ -664,6 +665,14 @@ router.get("/beneficiari/:id", async (req, res) => {
 
   const nucleo = await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, id));
   const interventi = await db.select().from(interventiTable).where(eq(interventiTable.beneficiarioId, id)).limit(20);
+  const interventoIds = interventi.map((intervento) => intervento.id);
+  const successori = interventoIds.length > 0
+    ? await db.select({ id: interventiTable.id, precedenteId: interventiTable.interventoPrecedenteId }).from(interventiTable).where(inArray(interventiTable.interventoPrecedenteId, interventoIds))
+    : [];
+  const bisogni = interventoIds.length > 0
+    ? await db.select().from(bisogniPianificatiTable).where(inArray(bisogniPianificatiTable.interventoId, interventoIds))
+    : [];
+  const today = dataCivileEuropeRome();
   const consegne = await db.select().from(consegneTable).where(eq(consegneTable.beneficiarioId, id)).limit(20);
 
   res.json({
@@ -674,14 +683,36 @@ router.get("/beneficiari/:id", async (req, res) => {
       beneficiarioId: i.beneficiarioId,
       beneficiarioNome: `${row.cognome} ${row.nome}`,
       bollaId: i.bollaId ?? null,
-      dataIntervento: i.dataIntervento,
+      operatoreId: i.operatoreId ?? null,
+      operatoreCodice: null,
+      dataIntervento: i.dataIntervento ?? null,
       tipoIntervento: i.tipoIntervento,
       descrizione: i.descrizione ?? null,
       esito: i.esito ?? null,
       prossimAzione: i.prossimAzione ?? null,
       note: i.note ?? null,
+      noteUds: i.noteUds ?? null,
       dataFollowup: i.dataFollowup ?? null,
+      scadenzaIsee: i.scadenzaIsee ?? null,
+      scadenzaRinnovo: i.scadenzaRinnovo ?? null,
+      scadenzaAutodichiarazioneIndigenza: i.scadenzaAutodichiarazioneIndigenza ?? null,
+      stato: i.stato,
+      ambito: i.ambito ?? null,
+      priorita: i.priorita,
+      dataOraPianificata: i.dataOraPianificata?.toISOString() ?? null,
+      dataOraAvvio: i.dataOraAvvio?.toISOString() ?? null,
+      dataOraConclusione: i.dataOraConclusione?.toISOString() ?? null,
+      interventoPrecedenteId: i.interventoPrecedenteId ?? null,
+      successoriIds: successori.filter((successivo) => successivo.precedenteId === i.id).map((successivo) => successivo.id),
+      numeroSuccessori: successori.filter((successivo) => successivo.precedenteId === i.id).length,
+      sede: i.sede ?? null,
+      motivoAnnullamento: i.motivoAnnullamento ?? null,
       dataCreazione: i.dataCreazione.toISOString(),
+      dataAggiornamento: i.dataAggiornamento?.toISOString() ?? null,
+      bisogniPianificatiTotale: bisogni.filter((bisogno) => bisogno.interventoId === i.id).length,
+      bisogniPianificatiAperti: bisogni.filter((bisogno) => bisogno.interventoId === i.id && (bisogno.stato === "da_pianificare" || bisogno.stato === "pianificato")).length,
+      bisogniPianificatiScaduti: bisogni.filter((bisogno) => bisogno.interventoId === i.id && (bisogno.stato === "da_pianificare" || bisogno.stato === "pianificato") && bisogno.dataPrevista != null && bisogno.dataPrevista < today).length,
+      bisogniPianificatiProssimaScadenza: bisogni.filter((bisogno) => bisogno.interventoId === i.id && (bisogno.stato === "da_pianificare" || bisogno.stato === "pianificato") && bisogno.dataPrevista != null).map((bisogno) => bisogno.dataPrevista!).sort()[0] ?? null,
     })),
     consegne: consegne.map(c => ({
       id: c.id,

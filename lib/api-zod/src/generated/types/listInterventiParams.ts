@@ -5,6 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { InterventoAmbito } from './interventoAmbito';
+import type { InterventoPriorita } from './interventoPriorita';
+import type { InterventoStato } from './interventoStato';
 import type { ListInterventiBisogni } from './listInterventiBisogni';
 
 export type ListInterventiParams = {
@@ -16,4 +19,21 @@ cittaId?: number;
  * Filtra gli interventi in base ai Bisogni Pianificati collegati.
  */
 bisogni?: ListInterventiBisogni;
+stato?: InterventoStato;
+ambito?: InterventoAmbito;
+/**
+ * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
+ */
+includiStorici?: boolean;
+operatoreId?: number;
+priorita?: InterventoPriorita;
+/**
+ * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
+ */
+pianificataDa?: Date;
+/**
+ * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
+ */
+pianificataA?: Date;
+interventoPrecedenteId?: number;
 };

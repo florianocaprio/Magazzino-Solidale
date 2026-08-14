@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { InterventoStatoBadge, interventoDataLabel, withInterventoAmbito } from "@/components/intervento-workflow";
 import { Plus, Filter, Calendar, StickyNote } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,6 +61,8 @@ export default function Interventi() {
     ? lockedCentroId
     : centroFilter !== "all" ? parseInt(centroFilter) : undefined;
   const { data: interventi, isLoading } = useListInterventi({
+    ambito: "sociale",
+    includiStorici: true,
     tipo: tipoFilter !== "all" ? tipoFilter : undefined,
     cittaId: effectiveCittaId,
     centroAscoltoId: effectiveCentroId ?? undefined,
@@ -153,13 +156,13 @@ export default function Interventi() {
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const data = {
+    const data = withInterventoAmbito({
       ...values,
       dataFollowup: values.dataFollowup || undefined,
       scadenzaIsee: values.scadenzaIsee || undefined,
       scadenzaRinnovo: values.scadenzaRinnovo || undefined,
       scadenzaAutodichiarazioneIndigenza: values.scadenzaAutodichiarazioneIndigenza || undefined,
-    };
+    }, "sociale");
     createIntervento.mutate({ data }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListInterventiQueryKey() });
@@ -198,7 +201,7 @@ export default function Interventi() {
             rows={interventi ?? []}
             columns={[
               { header: t("interventi.beneficiario"), accessor: (i) => i.beneficiarioNome },
-              { header: t("common.date"), accessor: (i) => i.dataIntervento ? new Date(i.dataIntervento).toLocaleDateString("it-IT") : "" },
+              { header: t("common.date"), accessor: (i: Intervento) => interventoDataLabel(i) },
               { header: t("interventi.tipoIntervento"), accessor: (i) => i.tipoIntervento },
               { header: t("interventi.operatore"), accessor: (i) => i.operatoreCodice },
               { header: t("common.description"), accessor: (i) => i.descrizione },
@@ -259,6 +262,7 @@ export default function Interventi() {
                 <TableHead>{t("common.date")}</TableHead>
                 <TableHead>{t("interventi.beneficiario")}</TableHead>
                 <TableHead>{t("interventi.tipoIntervento")}</TableHead>
+                <TableHead>{t("interventi.workflowState")}</TableHead>
                 <TableHead>{t("interventi.operatore")}</TableHead>
                 <TableHead>{t("common.description")}</TableHead>
                 <TableHead>{t("interventi.thScadenze")}</TableHead>
@@ -274,6 +278,7 @@ export default function Interventi() {
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
@@ -282,15 +287,16 @@ export default function Interventi() {
                 ))
               ) : interventi?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">{t("interventi.emptyState")}</TableCell>
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">{t("interventi.emptyState")}</TableCell>
                 </TableRow>
               ) : interventi?.map((i) => (
                 <TableRow key={i.id} className={i.note ? "bg-amber-50/60" : ""}>
                   <TableCell className="text-sm font-medium">
-                    {format(new Date(i.dataIntervento), "dd/MM/yyyy")}
+                    {interventoDataLabel(i)}
                   </TableCell>
                   <TableCell className="font-medium">{i.beneficiarioNome}</TableCell>
                   <TableCell>{getTipoBadge(i.tipoIntervento)}</TableCell>
+                  <TableCell><InterventoStatoBadge stato={i.stato} /></TableCell>
                   <TableCell className="text-sm">
                     {i.operatoreCodice ? (
                       <Badge variant="secondary" className="font-mono">{i.operatoreCodice}</Badge>
@@ -438,7 +444,7 @@ export default function Interventi() {
           </DialogHeader>
           {noteEditing && (
             <p className="text-sm text-muted-foreground -mt-2">
-              {noteEditing.beneficiarioNome} · {format(new Date(noteEditing.dataIntervento), "dd/MM/yyyy")}
+              {noteEditing.beneficiarioNome} · {interventoDataLabel(noteEditing)}
             </p>
           )}
           <Textarea

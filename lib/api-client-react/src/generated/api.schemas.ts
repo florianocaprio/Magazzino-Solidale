@@ -1145,6 +1145,42 @@ export interface NucleoFamiliare {
   note?: string | null;
 }
 
+/**
+ * Stato canonico del ciclo di vita dell'intervento.
+ */
+export type InterventoStato = typeof InterventoStato[keyof typeof InterventoStato];
+
+
+export const InterventoStato = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  in_corso: 'in_corso',
+  concluso: 'concluso',
+  annullato: 'annullato',
+  mancata_presentazione: 'mancata_presentazione',
+} as const;
+
+/**
+ * Ambito esplicito; i record storici non classificabili mantengono null.
+ */
+export type InterventoAmbito = typeof InterventoAmbito[keyof typeof InterventoAmbito];
+
+
+export const InterventoAmbito = {
+  sociale: 'sociale',
+  uds: 'uds',
+} as const;
+
+export type InterventoPriorita = typeof InterventoPriorita[keyof typeof InterventoPriorita];
+
+
+export const InterventoPriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
 export interface Intervento {
   id: number;
   beneficiarioId: number;
@@ -1156,7 +1192,8 @@ export interface Intervento {
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
-  dataIntervento: string;
+  /** @nullable */
+  dataIntervento: string | null;
   tipoIntervento: string;
   /** @nullable */
   descrizione?: string | null;
@@ -1176,7 +1213,26 @@ export interface Intervento {
   scadenzaRinnovo?: string | null;
   /** @nullable */
   scadenzaAutodichiarazioneIndigenza?: string | null;
+  stato: InterventoStato;
+  ambito: InterventoAmbito | null;
+  priorita: InterventoPriorita;
+  /** @nullable */
+  dataOraPianificata: string | null;
+  /** @nullable */
+  dataOraAvvio: string | null;
+  /** @nullable */
+  dataOraConclusione: string | null;
+  /** @nullable */
+  interventoPrecedenteId: number | null;
+  successoriIds: number[];
+  numeroSuccessori: number;
+  /** @nullable */
+  sede: string | null;
+  /** @nullable */
+  motivoAnnullamento: string | null;
   dataCreazione: string;
+  /** @nullable */
+  dataAggiornamento: string | null;
   bisogniPianificatiTotale: number;
   bisogniPianificatiAperti: number;
   bisogniPianificatiScaduti: number;
@@ -2341,8 +2397,31 @@ export interface BisognoPianificatoUpsert {
 
 export interface InterventoInput {
   beneficiarioId: number;
-  dataIntervento: string;
+  /** @nullable */
+  dataIntervento?: string | null;
   tipoIntervento: string;
+  /** Se omesso, il payload è trattato esplicitamente come legacy e l'intervento come già concluso. */
+  stato?: InterventoStato;
+  ambito?: InterventoAmbito;
+  priorita?: InterventoPriorita;
+  /** @nullable */
+  dataOraPianificata?: string | null;
+  /** @nullable */
+  dataOraAvvio?: string | null;
+  /** @nullable */
+  dataOraConclusione?: string | null;
+  /** @nullable */
+  interventoPrecedenteId?: number | null;
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  sede?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivoAnnullamento?: string | null;
   descrizione?: string;
   esito?: string;
   prossimAzione?: string;
@@ -2356,8 +2435,19 @@ export interface InterventoInput {
 }
 
 export interface InterventoUpdate {
-  dataIntervento?: string;
+  /** @nullable */
+  dataIntervento?: string | null;
   tipoIntervento?: string;
+  priorita?: InterventoPriorita;
+  /** @nullable */
+  dataOraPianificata?: string | null;
+  /** @nullable */
+  interventoPrecedenteId?: number | null;
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  sede?: string | null;
   descrizione?: string;
   esito?: string;
   prossimAzione?: string;
@@ -2368,6 +2458,56 @@ export interface InterventoUpdate {
   scadenzaRinnovo?: string;
   scadenzaAutodichiarazioneIndigenza?: string;
   bisogniPianificati?: BisognoPianificatoUpsert[];
+}
+
+export interface InterventoTransizioneInput {
+  stato: InterventoStato;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
+  /** Timestamp effettivo con offset; se omesso viene usato l'istante corrente del server. */
+  dataOraTransizione?: string;
+  /** Obbligatorio quando la destinazione è pianificato e non esiste già una pianificazione. */
+  dataOraPianificata?: string;
+}
+
+export interface InterventoStoricoStato {
+  id: number;
+  interventoId: number;
+  statoPrecedente: InterventoStato | null;
+  statoNuovo: InterventoStato;
+  /** @nullable */
+  operatoreId: number | null;
+  dataTransizione: string;
+  /** @nullable */
+  motivo: string | null;
+}
+
+export interface InterventoSuccessivoInput {
+  tipoIntervento: string;
+  stato: InterventoStato;
+  ambito: InterventoAmbito;
+  priorita?: InterventoPriorita;
+  /** @nullable */
+  dataIntervento?: string | null;
+  /** @nullable */
+  dataOraPianificata?: string | null;
+  /** @nullable */
+  dataOraAvvio?: string | null;
+  /** @nullable */
+  dataOraConclusione?: string | null;
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  sede?: string | null;
+  descrizione?: string;
+  esito?: string;
+  prossimAzione?: string;
+  note?: string;
+  noteUds?: string;
 }
 
 export type BisognoPianificatoTipo = typeof BisognoPianificatoTipo[keyof typeof BisognoPianificatoTipo];
@@ -3686,6 +3826,23 @@ cittaId?: number;
  * Filtra gli interventi in base ai Bisogni Pianificati collegati.
  */
 bisogni?: ListInterventiBisogni;
+stato?: InterventoStato;
+ambito?: InterventoAmbito;
+/**
+ * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
+ */
+includiStorici?: boolean;
+operatoreId?: number;
+priorita?: InterventoPriorita;
+/**
+ * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
+ */
+pianificataDa?: string;
+/**
+ * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
+ */
+pianificataA?: string;
+interventoPrecedenteId?: number;
 };
 
 export type ListInterventiBisogni = typeof ListInterventiBisogni[keyof typeof ListInterventiBisogni];

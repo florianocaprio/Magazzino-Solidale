@@ -5,46 +5,31 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BisognoPianificatoUpsert } from './bisognoPianificatoUpsert';
 import type { InterventoAmbito } from './interventoAmbito';
 import type { InterventoPriorita } from './interventoPriorita';
 import type { InterventoStato } from './interventoStato';
 
-export interface InterventoInput {
-  beneficiarioId: number;
+export interface InterventoSuccessivoInput {
+  tipoIntervento: string;
+  stato: InterventoStato;
+  ambito: InterventoAmbito;
+  priorita?: InterventoPriorita;
   /** @nullable */
   dataIntervento?: Date | null;
-  tipoIntervento: string;
-  /** Se omesso, il payload è trattato esplicitamente come legacy e l'intervento come già concluso. */
-  stato?: InterventoStato;
-  ambito?: InterventoAmbito;
-  priorita?: InterventoPriorita;
   /** @nullable */
   dataOraPianificata?: Date | null;
   /** @nullable */
   dataOraAvvio?: Date | null;
   /** @nullable */
   dataOraConclusione?: Date | null;
-  /** @nullable */
-  interventoPrecedenteId?: number | null;
   /**
      * @maxLength 255
      * @nullable
      */
   sede?: string | null;
-  /**
-     * @maxLength 2000
-     * @nullable
-     */
-  motivoAnnullamento?: string | null;
   descrizione?: string;
   esito?: string;
   prossimAzione?: string;
   note?: string;
   noteUds?: string;
-  dataFollowup?: string;
-  scadenzaIsee?: string;
-  scadenzaRinnovo?: string;
-  scadenzaAutodichiarazioneIndigenza?: string;
-  bisogniPianificati?: BisognoPianificatoUpsert[];
 }

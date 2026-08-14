@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
+import { InterventoStatoBadge, interventoDataLabel } from "@/components/intervento-workflow";
 
 const NONE_VALUE = "__none__";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -327,7 +328,7 @@ export default function BeneficiarioDettaglio() {
                   <ExportButtons
                     rows={b.interventi ?? []}
                     columns={[
-                      { header: t("common.date"), accessor: (i) => i.dataIntervento ? new Date(i.dataIntervento).toLocaleDateString("it-IT") : "" },
+                      { header: t("common.date"), accessor: (i: Intervento) => interventoDataLabel(i) },
                       { header: t("beneficiarioDettaglio.colTipoIntervento"), accessor: (i) => i.tipoIntervento },
                       { header: t("beneficiarioDettaglio.colDescrizione"), accessor: (i) => i.descrizione },
                       { header: t("beneficiarioDettaglio.colEsito"), accessor: (i) => i.esito },
@@ -345,11 +346,12 @@ export default function BeneficiarioDettaglio() {
                         <div key={i.id} className="relative">
                           <div className="absolute -left-6 mt-1.5 w-3 h-3 bg-primary rounded-full ring-4 ring-background"></div>
                           <div className="text-sm font-medium text-muted-foreground mb-1">
-                            {format(new Date(i.dataIntervento), "dd MMM yyyy", { locale: it })}
+                            {interventoDataLabel(i)}
                           </div>
                           <div className="bg-muted/30 p-3 rounded-md border">
-                            <div className="flex justify-between items-start mb-2">
+                            <div className="flex justify-between items-start mb-2 gap-2">
                               <Badge className="capitalize bg-primary/10 text-primary hover:bg-primary/20">{i.tipoIntervento.replace('_', ' ')}</Badge>
+                              <InterventoStatoBadge stato={i.stato} />
                             </div>
                             <p className="text-sm">{i.descrizione}</p>
                             {i.esito && <p className="text-xs text-muted-foreground mt-2 border-t pt-2"><strong>{t("beneficiarioDettaglio.esito")}</strong> {i.esito}</p>}

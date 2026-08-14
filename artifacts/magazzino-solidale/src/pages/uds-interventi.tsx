@@ -62,6 +62,7 @@ import {
   BisogniPianificatiEditor,
   type BisognoPianificatoDraft,
 } from "@/components/bisogni-pianificati-editor";
+import { InterventoStatoBadge, interventoDataLabel, withInterventoAmbito } from "@/components/intervento-workflow";
 import {
   AlertTriangle,
   CalendarClock,
@@ -203,6 +204,9 @@ export default function UdsInterventi() {
 
   const interventiParams = {
     beneficiarioId: personId,
+    ambito: "uds" as const,
+    includiStorici: true,
+    ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
     ...(bisogniFilter !== "tutti" ? { bisogni: bisogniFilter } : {}),
   };
   const { data: interventi, isLoading } = useListInterventi(interventiParams, {
@@ -265,7 +269,7 @@ export default function UdsInterventi() {
     const requestId = ++bisogniLoadRequest.current;
     setEditingId(i.id);
     form.reset({
-      dataIntervento: i.dataIntervento.slice(0, 10),
+      dataIntervento: i.dataIntervento?.slice(0, 10) ?? "",
       tipoIntervento: i.tipoIntervento,
       descrizione: i.descrizione ?? "",
       note: i.note ?? "",
@@ -341,7 +345,7 @@ export default function UdsInterventi() {
       );
     } else {
       createIntervento.mutate(
-        { data: payload as never },
+        { data: withInterventoAmbito(payload, "uds") as never },
         {
           onSuccess: () => {
             invalidateList();
@@ -381,7 +385,7 @@ export default function UdsInterventi() {
     () => [
       {
         header: t("udsInterventi.colData"),
-        accessor: (i: Intervento) => i.dataIntervento,
+        accessor: (i: Intervento) => interventoDataLabel(i),
       },
       {
         header: t("udsInterventi.colTipo"),
@@ -557,6 +561,7 @@ export default function UdsInterventi() {
                 <TableRow>
                   <TableHead className="w-[120px]">{t("udsInterventi.colData")}</TableHead>
                   <TableHead>{t("udsInterventi.colTipo")}</TableHead>
+                  <TableHead>{t("interventi.workflowState")}</TableHead>
                   <TableHead>{t("udsInterventi.colBisogni")}</TableHead>
                   <TableHead>
                     {t("udsInterventi.colBisogniPianificati")}
@@ -573,7 +578,7 @@ export default function UdsInterventi() {
                     .fill(0)
                     .map((_, i) => (
                       <TableRow key={i}>
-                        {Array(8)
+                        {Array(9)
                           .fill(0)
                           .map((_, j) => (
                             <TableCell key={j}>
@@ -585,7 +590,7 @@ export default function UdsInterventi() {
                 ) : rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={9}
                       className="h-32 text-center text-muted-foreground"
                     >
                       {t("udsInterventi.noIntervento")}
@@ -604,7 +609,7 @@ export default function UdsInterventi() {
                       }
                     >
                       <TableCell className="text-sm">
-                        {i.dataIntervento}
+                        {interventoDataLabel(i)}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -615,6 +620,7 @@ export default function UdsInterventi() {
                           {tipoLabel(i.tipoIntervento)}
                         </Badge>
                       </TableCell>
+                      <TableCell><InterventoStatoBadge stato={i.stato} /></TableCell>
                       <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
                         {i.descrizione || "-"}
                       </TableCell>

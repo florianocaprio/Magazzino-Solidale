@@ -41,19 +41,30 @@ import { inArray } from "drizzle-orm";
 /** Mounts `router` behind a stub auth middleware injecting the given caller. */
 export function makeScopedApp(
   router: Router,
-  user: { id: number; centroAscoltoId: number | null; cittaId?: number | null },
+  user: {
+    id: number;
+    centroAscoltoId: number | null;
+    cittaId?: number | null;
+    aree?: string[];
+  },
 ): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     (
       req as unknown as {
-        user: { id: number; centroAscoltoId: number | null; cittaId: number | null };
+        user: {
+          id: number;
+          centroAscoltoId: number | null;
+          cittaId: number | null;
+          aree: string[];
+        };
       }
     ).user = {
       id: user.id,
       centroAscoltoId: user.centroAscoltoId,
       cittaId: user.cittaId ?? null,
+      aree: user.aree ?? ["sociale", "uds"],
     };
     next();
   });
