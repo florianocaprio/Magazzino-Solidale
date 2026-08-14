@@ -1,5 +1,6 @@
 import {
   getGetInterventiRiepilogoVisteQueryKey,
+  getGetMaterialeDaPreparareQueryKey,
   getGetInterventoOperativitaQueryKey,
   getGetInterventoQueryKey,
   getListBeneficiariQueryKey,
@@ -9,12 +10,14 @@ import {
   getListInterventoStoricoStatiQueryKey,
   getListCittaQueryKey,
   useCreateIntervento,
+  useAggiornaStatoPreparazioneMateriale,
   useAnnullaIntervento,
   useAvviaIntervento,
   useConcludiIntervento,
   useGetIntervento,
   useGetInterventoOperativita,
   useGetInterventiRiepilogoViste,
+  useGetMaterialeDaPreparare,
   useListBeneficiari,
   useListBisogniPianificati,
   useListCentriAscolto,
@@ -30,13 +33,15 @@ import {
   transitionIntervento,
   updateIntervento,
   type GetInterventiRiepilogoVisteParams,
+  type GetMaterialeDaPreparareParams,
+  type GetMaterialeDaPrepararePeriodo,
   type Intervento,
   type InterventoConclusioneInput,
   type InterventoInput,
   type ListInterventiParams,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, PackageOpen, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ExportButtons } from "@/components/export-buttons";
@@ -49,6 +54,7 @@ import {
   type InterventoSocialeCreateMode,
 } from "@/components/intervento-sociale-form-sheet";
 import { InterventiSocialiWorkspace } from "@/components/interventi-sociali-workspace";
+import { MaterialeDaPreparareView } from "@/components/materiale-da-preparare";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -58,7 +64,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { monthRange } from "@/lib/europe-rome";
+import { monthRange, todayEuropeRome } from "@/lib/europe-rome";
 import { invalidateInterventiSociali } from "@/lib/interventi-sociali-cache";
 import {
   clearInterventiSocialiFilters,
@@ -116,6 +122,14 @@ export default function Interventi() {
     number | null
   >(null);
   const [planningPending, setPlanningPending] = useState(false);
+  const [preparationMode, setPreparationMode] = useState(false);
+  const [preparationPeriod, setPreparationPeriod] =
+    useState<GetMaterialeDaPrepararePeriodo>("7");
+  const [preparationFrom, setPreparationFrom] = useState(todayEuropeRome());
+  const [preparationTo, setPreparationTo] = useState(todayEuropeRome());
+  const [pendingMaterialId, setPendingMaterialId] = useState<number | null>(
+    null,
+  );
   const debouncedSearch = useDebouncedValue(filters.ricerca, 300);
   const debouncedBeneficiarySearch = useDebouncedValue(beneficiarySearch, 250);
 
@@ -271,6 +285,24 @@ export default function Interventi() {
   const mancataPresentazione = useRegistraMancataPresentazione();
   const prodottiQuery = useListProdotti();
   const magazziniQuery = useListMagazzini();
+  const aggiornaPreparazione = useAggiornaStatoPreparazioneMateriale();
+  const preparationIntervalValid =
+    preparationPeriod !== "personalizzato" ||
+    (!!preparationFrom && !!preparationTo && preparationFrom <= preparationTo);
+  const preparationParams: GetMaterialeDaPreparareParams = {
+    periodo: preparationPeriod,
+    ...(preparationPeriod === "personalizzato"
+      ? { da: preparationFrom, a: preparationTo }
+      : {}),
+    cittaId: effectiveCittaId,
+    centroAscoltoId: effectiveCentroId,
+  };
+  const preparationQuery = useGetMaterialeDaPreparare(preparationParams, {
+    query: {
+      queryKey: getGetMaterialeDaPreparareQueryKey(preparationParams),
+      enabled: preparationMode && !cityRequired && preparationIntervalValid,
+    },
+  });
 
   const openForm = (mode: InterventoSocialeCreateMode) => {
     setFormMode(mode);
@@ -367,35 +399,48 @@ export default function Interventi() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ExportButtons
-            rows={interventi}
-            columns={[
-              {
-                header: t("interventi.beneficiario"),
-                accessor: (row: Intervento) => row.beneficiarioNome,
-              },
-              {
-                header: t("interventi.tipoIntervento"),
-                accessor: (row: Intervento) => row.tipoIntervento,
-              },
-              {
-                header: t("interventi.detail.state"),
-                accessor: (row: Intervento) => row.stato,
-              },
-              {
-                header: t("interventi.detail.priority"),
-                accessor: (row: Intervento) => row.priorita,
-              },
-              {
-                header: t("interventi.operatore"),
-                accessor: (row: Intervento) =>
-                  row.operatoreNome ?? row.operatoreCodice,
-              },
-            ]}
-            filename="interventi-sociali"
-            title={t("interventi.exportTitle")}
-            orientation="landscape"
-          />
+          <Button
+            type="button"
+            variant={preparationMode ? "default" : "outline"}
+            disabled={cityRequired}
+            onClick={() => setPreparationMode((current) => !current)}
+          >
+            <PackageOpen className="mr-2 h-4 w-4" />
+            {preparationMode
+              ? t("interventi.preparation.back")
+              : t("interventi.preparation.title")}
+          </Button>
+          {!preparationMode && (
+            <ExportButtons
+              rows={interventi}
+              columns={[
+                {
+                  header: t("interventi.beneficiario"),
+                  accessor: (row: Intervento) => row.beneficiarioNome,
+                },
+                {
+                  header: t("interventi.tipoIntervento"),
+                  accessor: (row: Intervento) => row.tipoIntervento,
+                },
+                {
+                  header: t("interventi.detail.state"),
+                  accessor: (row: Intervento) => row.stato,
+                },
+                {
+                  header: t("interventi.detail.priority"),
+                  accessor: (row: Intervento) => row.priorita,
+                },
+                {
+                  header: t("interventi.operatore"),
+                  accessor: (row: Intervento) =>
+                    row.operatoreNome ?? row.operatoreCodice,
+                },
+              ]}
+              filename="interventi-sociali"
+              title={t("interventi.exportTitle")}
+              orientation="landscape"
+            />
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button disabled={cityRequired} className="gap-2">
@@ -418,25 +463,73 @@ export default function Interventi() {
         </div>
       </header>
 
-      <InterventiSocialiWorkspace
-        filters={filters}
-        interventi={interventi}
-        counts={summaryQuery.data}
-        citta={cittaQuery.data ?? []}
-        centri={centers}
-        tipi={typesQuery.data ?? []}
-        operatori={operatorsQuery.data ?? []}
-        isGlobal={isGlobal}
-        isCentroLocked={isCentroLocked}
-        cityRequired={cityRequired}
-        isLoading={interventiQuery.isLoading}
-        isError={interventiQuery.isError || !interval.valid}
-        onFiltersChange={setFilters}
-        onReset={() => setFilters(clearInterventiSocialiFilters(filters))}
-        onOpenIntervento={(intervento) =>
-          setSelectedInterventoId(intervento.id)
-        }
-      />
+      {preparationMode ? (
+        <MaterialeDaPreparareView
+          data={preparationQuery.data}
+          periodo={preparationPeriod}
+          da={preparationFrom}
+          a={preparationTo}
+          isLoading={preparationQuery.isLoading}
+          isError={preparationQuery.isError || !preparationIntervalValid}
+          pendingMaterialId={pendingMaterialId}
+          onPeriodoChange={setPreparationPeriod}
+          onDaChange={setPreparationFrom}
+          onAChange={setPreparationTo}
+          onOpenIntervento={setSelectedInterventoId}
+          onChangeState={(detail, state) => {
+            setPendingMaterialId(detail.materialeId);
+            aggiornaPreparazione.mutate(
+              {
+                id: detail.interventoId,
+                materialeId: detail.materialeId,
+                data: {
+                  statoPreparazione: state,
+                  versione: detail.versione,
+                },
+              },
+              {
+                onSuccess: async () => {
+                  await Promise.all([
+                    queryClient.invalidateQueries({
+                      queryKey:
+                        getGetMaterialeDaPreparareQueryKey(preparationParams),
+                    }),
+                    invalidateInterventiSociali(
+                      queryClient,
+                      detail.interventoId,
+                    ),
+                  ]);
+                  toast({
+                    title: t("interventi.preparation.stateUpdated"),
+                  });
+                },
+                onError: mutationError,
+                onSettled: () => setPendingMaterialId(null),
+              },
+            );
+          }}
+        />
+      ) : (
+        <InterventiSocialiWorkspace
+          filters={filters}
+          interventi={interventi}
+          counts={summaryQuery.data}
+          citta={cittaQuery.data ?? []}
+          centri={centers}
+          tipi={typesQuery.data ?? []}
+          operatori={operatorsQuery.data ?? []}
+          isGlobal={isGlobal}
+          isCentroLocked={isCentroLocked}
+          cityRequired={cityRequired}
+          isLoading={interventiQuery.isLoading}
+          isError={interventiQuery.isError || !interval.valid}
+          onFiltersChange={setFilters}
+          onReset={() => setFilters(clearInterventiSocialiFilters(filters))}
+          onOpenIntervento={(intervento) =>
+            setSelectedInterventoId(intervento.id)
+          }
+        />
+      )}
 
       <InterventoSocialeFormSheet
         open={formOpen}

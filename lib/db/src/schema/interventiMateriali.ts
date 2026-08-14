@@ -61,6 +61,12 @@ export const interventiMaterialiTable = pgTable(
     index("interventi_materiali_prodotto_idx").on(table.prodottoId),
     index("interventi_materiali_magazzino_idx").on(table.magazzinoId),
     index("interventi_materiali_stato_idx").on(table.statoPreparazione),
+    index("interventi_materiali_preparazione_idx").on(
+      table.statoPreparazione,
+      table.prodottoId,
+      table.magazzinoId,
+      table.interventoId,
+    ),
     check(
       "interventi_materiali_quantita_check",
       sql`${table.quantitaPrevista} >= 0 and ${table.quantitaConsegnata} >= 0`,

@@ -27,6 +27,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   lt,
   lte,
@@ -47,6 +48,7 @@ import {
   canAccessZonaUds,
 } from "../lib/centroScope";
 import {
+  avvisoInterventoEuropeRome,
   canTransitionIntervento,
   dataCivileEuropeRome,
   isDateOnly,
@@ -580,6 +582,7 @@ function formatIntervento(
     dataOraPianificata: row.dataOraPianificata?.toISOString() ?? null,
     dataOraAvvio: row.dataOraAvvio?.toISOString() ?? null,
     dataOraConclusione: row.dataOraConclusione?.toISOString() ?? null,
+    avviso: avvisoInterventoEuropeRome(row.dataOraPianificata, row.stato),
     interventoPrecedenteId: row.interventoPrecedenteId ?? null,
     successoriIds,
     numeroSuccessori: successoriIds.length,
@@ -1191,6 +1194,54 @@ async function formattedInterventoFor(row: InterventoRow) {
   );
 }
 
+function addCivilDays(value: string, days: number): string {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function preparazioneRange(query: Record<string, string | undefined>): {
+  da: string;
+  a: string;
+  start: Date;
+  end: Date;
+} {
+  const periodo = query.periodo ?? "7";
+  let da: string;
+  let a: string;
+  if (periodo === "personalizzato") {
+    if (!query.da || !query.a)
+      throw new RouteError(400, "L'intervallo personalizzato richiede da e a");
+    da = query.da;
+    a = query.a;
+  } else {
+    const days = periodo === "oggi" ? 1 : Number(periodo);
+    if (![1, 3, 7, 14].includes(days))
+      throw new RouteError(400, "periodo non valido");
+    da = oggiEuropeRome();
+    a = addCivilDays(da, days - 1);
+  }
+  if (!isDateOnly(da) || !isDateOnly(a) || a < da)
+    throw new RouteError(400, "Intervallo date non valido");
+  const [fromYear, fromMonth, fromDay] = da.split("-").map(Number);
+  const [toYear, toMonth, toDay] = a.split("-").map(Number);
+  const span =
+    (Date.UTC(toYear, toMonth - 1, toDay) -
+      Date.UTC(fromYear, fromMonth - 1, fromDay)) /
+    86_400_000;
+  if (span > 30)
+    throw new RouteError(400, "L'intervallo massimo è di 31 giorni");
+  const range = intervalloDateEuropeRome(da, a);
+  return { da, a, ...range };
+}
+
+const PRIORITA_RANK: Record<string, number> = {
+  urgente: 1,
+  alta: 2,
+  normale: 3,
+  bassa: 4,
+};
+
 async function canManageBisogniForBeneficiario(
   beneficiarioId: number,
   req: Request,
@@ -1770,6 +1821,7 @@ router.get("/interventi", async (req, res) => {
     conditions.push(eq(beneficiariTable.cittaId, parsedCitta));
   }
   if (caller != null || callerCitta != null || callerZona != null) {
+    conditions.push(isNotNull(beneficiariTable.id));
     const scopeAlternatives: SQL[] = [];
     if (canUseInterventoArea(req, "sociale")) {
       const socialConditions = [
@@ -2171,6 +2223,198 @@ router.post("/interventi", async (req, res) => {
     .json(formatIntervento(intervento, summarizeBisogni(bisogniCreati)));
 });
 
+router.get("/interventi/materiale-da-preparare", async (req, res) => {
+  const query = req.query as Record<string, string | undefined>;
+  try {
+    const range = preparazioneRange(query);
+    const conditions: SQL[] = [
+      eq(interventiTable.ambito, "sociale"),
+      inArray(interventiTable.stato, ["pianificato", "in_corso"]),
+      gte(interventiTable.dataOraPianificata, range.start),
+      lt(interventiTable.dataOraPianificata, range.end),
+      inArray(interventiMaterialiTable.statoPreparazione, [
+        "da_preparare",
+        "pronto",
+      ]),
+      sql`${interventiMaterialiTable.quantitaPrevista} > ${interventiMaterialiTable.quantitaConsegnata}`,
+      ...socialScopeConditions(req, query),
+    ];
+    const rows = await db
+      .select({
+        materialeId: interventiMaterialiTable.id,
+        materialeAggiornato: interventiMaterialiTable.dataAggiornamento,
+        interventoId: interventiTable.id,
+        prodottoId: interventiMaterialiTable.prodottoId,
+        descrizione: interventiMaterialiTable.descrizioneSnapshot,
+        unitaMisura: interventiMaterialiTable.unitaMisuraSnapshot,
+        magazzinoId: interventiMaterialiTable.magazzinoId,
+        magazzinoNome: magazziniTable.nome,
+        quantitaPrevista: interventiMaterialiTable.quantitaPrevista,
+        quantitaConsegnata: interventiMaterialiTable.quantitaConsegnata,
+        statoPreparazione: interventiMaterialiTable.statoPreparazione,
+        note: interventiMaterialiTable.note,
+        statoIntervento: interventiTable.stato,
+        priorita: interventiTable.priorita,
+        dataOraPianificata: interventiTable.dataOraPianificata,
+        sede: interventiTable.sede,
+        beneficiarioNome: sql<string>`${beneficiariTable.cognome} || ' ' || ${beneficiariTable.nome}`,
+        beneficiarioCodice: beneficiariTable.codice,
+        operatoreNome: sql<
+          string | null
+        >`nullif(trim(coalesce(${utentiTable.nome}, '') || ' ' || coalesce(${utentiTable.cognome}, '')), '')`,
+      })
+      .from(interventiMaterialiTable)
+      .innerJoin(
+        interventiTable,
+        eq(interventiMaterialiTable.interventoId, interventiTable.id),
+      )
+      .innerJoin(
+        beneficiariTable,
+        eq(interventiTable.beneficiarioId, beneficiariTable.id),
+      )
+      .leftJoin(
+        magazziniTable,
+        eq(interventiMaterialiTable.magazzinoId, magazziniTable.id),
+      )
+      .leftJoin(utentiTable, eq(interventiTable.operatoreId, utentiTable.id))
+      .where(and(...conditions))
+      .orderBy(
+        interventiTable.dataOraPianificata,
+        prioritaOrdineSql(),
+        interventiMaterialiTable.id,
+      );
+
+    type Detail = {
+      materialeId: number;
+      interventoId: number;
+      beneficiarioNome: string;
+      beneficiarioCodice: string;
+      dataOraPianificata: string;
+      sede: string | null;
+      operatoreNome: string | null;
+      quantitaResidua: number;
+      statoPreparazione: string;
+      note: string | null;
+      versione: string;
+      avviso: ReturnType<typeof avvisoInterventoEuropeRome>;
+    };
+    type Group = {
+      chiave: string;
+      prodottoId: number | null;
+      descrizione: string;
+      unitaMisura: string;
+      magazzinoId: number | null;
+      magazzinoNome: string | null;
+      quantitaTotale: number;
+      quantitaPronta: number;
+      quantitaDaPreparare: number;
+      numeroInterventi: number;
+      primaScadenza: string;
+      prioritaPiuAlta: string;
+      avviso: ReturnType<typeof avvisoInterventoEuropeRome>;
+      interventi: Detail[];
+      interventoIds: Set<number>;
+    };
+    const grouped = new Map<string, Group>();
+    const now = new Date();
+    for (const row of rows) {
+      if (row.dataOraPianificata == null) continue;
+      const residual = Math.max(
+        Number(row.quantitaPrevista) - Number(row.quantitaConsegnata),
+        0,
+      );
+      if (residual <= 0) continue;
+      const normalizedDescription = row.descrizione
+        .trim()
+        .toLocaleLowerCase("it-IT");
+      const normalizedUnit = row.unitaMisura.trim().toLocaleLowerCase("it-IT");
+      const key = row.prodottoId
+        ? `catalogo:${row.prodottoId}:${normalizedUnit}:${row.magazzinoId ?? "none"}`
+        : `generico:${normalizedDescription}:${normalizedUnit}:${row.magazzinoId ?? "none"}`;
+      const warning = avvisoInterventoEuropeRome(
+        row.dataOraPianificata,
+        row.statoIntervento,
+        now,
+      );
+      const detail: Detail = {
+        materialeId: row.materialeId,
+        interventoId: row.interventoId,
+        beneficiarioNome: row.beneficiarioNome,
+        beneficiarioCodice: row.beneficiarioCodice,
+        dataOraPianificata: row.dataOraPianificata.toISOString(),
+        sede: row.sede ?? null,
+        operatoreNome: row.operatoreNome ?? null,
+        quantitaResidua: residual,
+        statoPreparazione: row.statoPreparazione,
+        note: row.note ?? null,
+        versione: row.materialeAggiornato.toISOString(),
+        avviso: warning,
+      };
+      const existing = grouped.get(key);
+      if (!existing) {
+        grouped.set(key, {
+          chiave: key,
+          prodottoId: row.prodottoId ?? null,
+          descrizione: row.descrizione,
+          unitaMisura: row.unitaMisura,
+          magazzinoId: row.magazzinoId ?? null,
+          magazzinoNome: row.magazzinoNome ?? null,
+          quantitaTotale: residual,
+          quantitaPronta: row.statoPreparazione === "pronto" ? residual : 0,
+          quantitaDaPreparare:
+            row.statoPreparazione === "pronto" ? 0 : residual,
+          numeroInterventi: 1,
+          primaScadenza: row.dataOraPianificata.toISOString(),
+          prioritaPiuAlta: row.priorita,
+          avviso: warning,
+          interventi: [detail],
+          interventoIds: new Set([row.interventoId]),
+        });
+        continue;
+      }
+      existing.quantitaTotale += residual;
+      if (row.statoPreparazione === "pronto")
+        existing.quantitaPronta += residual;
+      else existing.quantitaDaPreparare += residual;
+      existing.interventoIds.add(row.interventoId);
+      existing.numeroInterventi = existing.interventoIds.size;
+      if (detail.dataOraPianificata < existing.primaScadenza)
+        existing.primaScadenza = detail.dataOraPianificata;
+      if (
+        (PRIORITA_RANK[row.priorita] ?? 99) <
+        (PRIORITA_RANK[existing.prioritaPiuAlta] ?? 99)
+      )
+        existing.prioritaPiuAlta = row.priorita;
+      const warningRank = { scaduto: 1, oggi: 2, imminente: 3, prossimo: 4 };
+      if (
+        warning &&
+        (!existing.avviso ||
+          warningRank[warning] < warningRank[existing.avviso])
+      )
+        existing.avviso = warning;
+      existing.interventi.push(detail);
+    }
+    const groups = [...grouped.values()]
+      .map(({ interventoIds: _interventoIds, ...group }) => group)
+      .sort(
+        (left, right) =>
+          left.primaScadenza.localeCompare(right.primaScadenza) ||
+          (PRIORITA_RANK[left.prioritaPiuAlta] ?? 99) -
+            (PRIORITA_RANK[right.prioritaPiuAlta] ?? 99) ||
+          left.descrizione.localeCompare(right.descrizione, "it"),
+      );
+    res.json({
+      da: range.da,
+      a: range.a,
+      fusoOrario: "Europe/Rome",
+      gruppi: groups,
+    });
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
+});
+
 router.get("/interventi/:id", async (req, res) => {
   const id = parsePositiveInteger(req.params.id);
   if (id == null) {
@@ -2210,6 +2454,96 @@ router.get("/interventi/:id/operativita", async (req, res) => {
   } catch (error) {
     if (sendRouteError(error, res)) return;
     throw error;
+  }
+});
+
+router.patch("/interventi/:id/materiali/:materialeId", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  const materialeId = parsePositiveInteger(req.params.materialeId);
+  if (id == null || materialeId == null) {
+    res.status(400).json({ error: "Identificativo non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  if (
+    body.statoPreparazione !== "pronto" &&
+    body.statoPreparazione !== "da_preparare"
+  ) {
+    res.status(400).json({
+      error: "statoPreparazione deve essere pronto o da_preparare",
+    });
+    return;
+  }
+  try {
+    const expected = parseIsoTimestamp(body.versione, "versione");
+    if (expected == null)
+      throw new RouteError(400, "La versione del materiale è obbligatoria");
+    await requireAccessibleIntervento(id, req, "sociale");
+    const now = new Date();
+    const updated = await db.transaction(async (tx) => {
+      const [intervento] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (!intervento) throw new RouteError(404, "Intervento non trovato");
+      if (!["pianificato", "in_corso"].includes(intervento.stato))
+        throw new RouteError(
+          409,
+          "Lo stato di preparazione non è modificabile per questo intervento",
+        );
+      const [materiale] = await tx
+        .select()
+        .from(interventiMaterialiTable)
+        .where(
+          and(
+            eq(interventiMaterialiTable.id, materialeId),
+            eq(interventiMaterialiTable.interventoId, id),
+          ),
+        )
+        .for("update");
+      if (!materiale)
+        throw new RouteError(404, "Materiale non appartenente all'intervento");
+      if (
+        materiale.statoPreparazione === "annullato" ||
+        materiale.statoPreparazione === "consegnato"
+      )
+        throw new RouteError(409, "Il materiale non è più preparabile");
+      if (materiale.dataAggiornamento.getTime() !== expected.getTime())
+        throw new RouteError(
+          409,
+          "Il materiale è stato modificato da un altro operatore",
+        );
+      const [row] = await tx
+        .update(interventiMaterialiTable)
+        .set({
+          statoPreparazione: body.statoPreparazione as MaterialeStato,
+          dataAggiornamento: now,
+        })
+        .where(
+          and(
+            eq(interventiMaterialiTable.id, materialeId),
+            eq(interventiMaterialiTable.interventoId, id),
+            eq(interventiMaterialiTable.dataAggiornamento, expected),
+          ),
+        )
+        .returning();
+      if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
+      await tx
+        .update(interventiTable)
+        .set({ dataAggiornamento: now })
+        .where(eq(interventiTable.id, id));
+      return row;
+    });
+    res.json(formatMateriale(updated));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    res.status(400).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "Aggiornamento materiale non valido",
+    });
   }
 });
 

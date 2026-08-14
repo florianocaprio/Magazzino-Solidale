@@ -2,6 +2,7 @@ import type { Intervento } from "@workspace/api-client-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { InterventoAvvisoBadge } from "@/components/intervento-avviso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,6 +74,10 @@ function EventButton({
         <Badge variant="outline" className="px-1 py-0 text-[10px]">
           {t(`interventi.priorita.${intervento.priorita}`)}
         </Badge>
+        <InterventoAvvisoBadge
+          avviso={intervento.avviso}
+          className="px-1 py-0 text-[10px]"
+        />
       </span>
     </button>
   );

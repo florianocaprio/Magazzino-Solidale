@@ -1181,6 +1181,8 @@ export const InterventoPriorita = {
   urgente: 'urgente',
 } as const;
 
+export type InterventoAvviso = 'scaduto' | 'oggi' | 'imminente' | 'prossimo' | null;
+
 export interface Intervento {
   id: number;
   beneficiarioId: number;
@@ -1237,6 +1239,7 @@ export interface Intervento {
   dataOraAvvio: string | null;
   /** @nullable */
   dataOraConclusione: string | null;
+  avviso: InterventoAvviso | null;
   /** @nullable */
   interventoPrecedenteId: number | null;
   successoriIds: number[];
@@ -2788,6 +2791,76 @@ export interface InterventoConclusioneResult {
   successivo: Intervento | null;
 }
 
+export interface MaterialeDaPreparareDettaglio {
+  materialeId: number;
+  interventoId: number;
+  beneficiarioNome: string;
+  beneficiarioCodice: string;
+  dataOraPianificata: string;
+  /** @nullable */
+  sede: string | null;
+  /** @nullable */
+  operatoreNome: string | null;
+  /** @minimum 0 */
+  quantitaResidua: number;
+  statoPreparazione: InterventoMaterialeStato;
+  /** @nullable */
+  note: string | null;
+  versione: string;
+  avviso: InterventoAvviso | null;
+}
+
+export interface MaterialeDaPreparareGruppo {
+  chiave: string;
+  /** @nullable */
+  prodottoId: number | null;
+  descrizione: string;
+  unitaMisura: string;
+  /** @nullable */
+  magazzinoId: number | null;
+  /** @nullable */
+  magazzinoNome: string | null;
+  /** @minimum 0 */
+  quantitaTotale: number;
+  /** @minimum 0 */
+  quantitaPronta: number;
+  /** @minimum 0 */
+  quantitaDaPreparare: number;
+  /** @minimum 1 */
+  numeroInterventi: number;
+  primaScadenza: string;
+  prioritaPiuAlta: InterventoPriorita;
+  avviso: InterventoAvviso | null;
+  interventi: MaterialeDaPreparareDettaglio[];
+}
+
+export type MaterialeDaPreparareFusoOrario = typeof MaterialeDaPreparareFusoOrario[keyof typeof MaterialeDaPreparareFusoOrario];
+
+
+export const MaterialeDaPreparareFusoOrario = {
+  'Europe/Rome': 'Europe/Rome',
+} as const;
+
+export interface MaterialeDaPreparare {
+  da: string;
+  a: string;
+  fusoOrario: MaterialeDaPreparareFusoOrario;
+  gruppi: MaterialeDaPreparareGruppo[];
+}
+
+export type MaterialePreparazioneUpdateInputStatoPreparazione = typeof MaterialePreparazioneUpdateInputStatoPreparazione[keyof typeof MaterialePreparazioneUpdateInputStatoPreparazione];
+
+
+export const MaterialePreparazioneUpdateInputStatoPreparazione = {
+  da_preparare: 'da_preparare',
+  pronto: 'pronto',
+} as const;
+
+export interface MaterialePreparazioneUpdateInput {
+  statoPreparazione: MaterialePreparazioneUpdateInputStatoPreparazione;
+  versione: string;
+}
+
 export type BisognoPianificatoTipo = typeof BisognoPianificatoTipo[keyof typeof BisognoPianificatoTipo];
 
 
@@ -4221,6 +4294,31 @@ export type ListInterventiOperatoriParams = {
 centroAscoltoId?: number;
 cittaId?: number;
 };
+
+export type GetMaterialeDaPreparareParams = {
+periodo?: GetMaterialeDaPrepararePeriodo;
+/**
+ * Data civile Europe/Rome, obbligatoria per periodo personalizzato.
+ */
+da?: string;
+/**
+ * Data civile Europe/Rome inclusiva; massimo 31 giorni.
+ */
+a?: string;
+cittaId?: number;
+centroAscoltoId?: number;
+};
+
+export type GetMaterialeDaPrepararePeriodo = typeof GetMaterialeDaPrepararePeriodo[keyof typeof GetMaterialeDaPrepararePeriodo];
+
+
+export const GetMaterialeDaPrepararePeriodo = {
+  oggi: 'oggi',
+  NUMBER_3: '3',
+  NUMBER_7: '7',
+  NUMBER_14: '14',
+  personalizzato: 'personalizzato',
+} as const;
 
 export type ListConsegneParams = {
 stato?: string;

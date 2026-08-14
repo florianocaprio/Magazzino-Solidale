@@ -98,6 +98,7 @@ import type {
   FornitoreUpdate,
   FornitoriBulkInput,
   GetInterventiRiepilogoVisteParams,
+  GetMaterialeDaPreparareParams,
   GetPreparazioneConsegneParams,
   GetVolontariCarico200Item,
   GetVolontariCaricoParams,
@@ -118,6 +119,7 @@ import type {
   InterventoConclusioneResult,
   InterventoInput,
   InterventoMancataPresentazioneInput,
+  InterventoMateriale,
   InterventoOperativita,
   InterventoOperativitaInput,
   InterventoOperatore,
@@ -154,6 +156,8 @@ import type {
   Magazzino,
   MagazzinoInput,
   MagazzinoUpdate,
+  MaterialeDaPreparare,
+  MaterialePreparazioneUpdateInput,
   MezziBulkInput,
   Mezzo,
   MezzoInput,
@@ -4721,6 +4725,87 @@ export function useListInterventiOperatori<TData = Awaited<ReturnType<typeof lis
 
 
 
+export const getGetMaterialeDaPreparareUrl = (params?: GetMaterialeDaPreparareParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/interventi/materiale-da-preparare?${stringifiedParams}` : `/api/interventi/materiale-da-preparare`
+}
+
+/**
+ * Aggrega in una singola lettura i materiali residui degli interventi Sociali futuri autorizzati. Non genera movimenti di magazzino.
+ */
+export const getMaterialeDaPreparare = async (params?: GetMaterialeDaPreparareParams, options?: RequestInit): Promise<MaterialeDaPreparare> => {
+
+  return customFetch<MaterialeDaPreparare>(getGetMaterialeDaPreparareUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMaterialeDaPreparareQueryKey = (params?: GetMaterialeDaPreparareParams,) => {
+    return [
+    `/api/interventi/materiale-da-preparare`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMaterialeDaPreparareQueryOptions = <TData = Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError = ErrorType<void>>(params?: GetMaterialeDaPreparareParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMaterialeDaPreparareQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMaterialeDaPreparare>>> = ({ signal }) => getMaterialeDaPreparare(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMaterialeDaPreparareQueryResult = NonNullable<Awaited<ReturnType<typeof getMaterialeDaPreparare>>>
+export type GetMaterialeDaPreparareQueryError = ErrorType<void>
+
+
+
+export function useGetMaterialeDaPreparare<TData = Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError = ErrorType<void>>(
+ params?: GetMaterialeDaPreparareParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMaterialeDaPreparareQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetInterventoUrl = (id: number,) => {
 
 
@@ -4931,6 +5016,77 @@ export function useGetInterventoOperativita<TData = Awaited<ReturnType<typeof ge
 
 
 
+
+export const getAggiornaStatoPreparazioneMaterialeUrl = (id: number,
+    materialeId: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/materiali/${materialeId}`
+}
+
+/**
+ * Aggiorna soltanto lo stato di preparazione del materiale con controllo di concorrenza; non modifica giacenze o movimenti.
+ */
+export const aggiornaStatoPreparazioneMateriale = async (id: number,
+    materialeId: number,
+    materialePreparazioneUpdateInput: MaterialePreparazioneUpdateInput, options?: RequestInit): Promise<InterventoMateriale> => {
+
+  return customFetch<InterventoMateriale>(getAggiornaStatoPreparazioneMaterialeUrl(id,materialeId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      materialePreparazioneUpdateInput,)
+  }
+);}
+
+
+
+
+export const getAggiornaStatoPreparazioneMaterialeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>, TError,{id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>, TError,{id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>}, TContext> => {
+
+const mutationKey = ['aggiornaStatoPreparazioneMateriale'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>, {id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>}> = (props) => {
+          const {id,materialeId,data} = props ?? {};
+
+          return  aggiornaStatoPreparazioneMateriale(id,materialeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AggiornaStatoPreparazioneMaterialeMutationResult = NonNullable<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>>
+    export type AggiornaStatoPreparazioneMaterialeMutationBody = BodyType<MaterialePreparazioneUpdateInput>
+    export type AggiornaStatoPreparazioneMaterialeMutationError = ErrorType<void>
+
+    export const useAggiornaStatoPreparazioneMateriale = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>, TError,{id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>,
+        TError,
+        {id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getAggiornaStatoPreparazioneMaterialeMutationOptions(options));
+    }
 
 export const getAvviaInterventoUrl = (id: number,) => {
 

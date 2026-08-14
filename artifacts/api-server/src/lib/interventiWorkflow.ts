@@ -18,6 +18,12 @@ export const INTERVENTO_PRIORITA = [
 export type InterventoStato = (typeof INTERVENTO_STATI)[number];
 export type InterventoAmbito = (typeof INTERVENTO_AMBITI)[number];
 export type InterventoPriorita = (typeof INTERVENTO_PRIORITA)[number];
+export type InterventoAvviso =
+  | "scaduto"
+  | "oggi"
+  | "imminente"
+  | "prossimo"
+  | null;
 
 const TRANSIZIONI: Readonly<
   Record<InterventoStato, readonly InterventoStato[]>
@@ -79,6 +85,36 @@ export function dataCivileEuropeRome(referenceDate = new Date()): string {
     ),
   );
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function avvisoInterventoEuropeRome(
+  dataOraPianificata: Date | null,
+  stato: string,
+  referenceDate = new Date(),
+): InterventoAvviso {
+  if (
+    dataOraPianificata == null ||
+    (stato !== "pianificato" && stato !== "in_corso")
+  )
+    return null;
+  if (stato === "pianificato" && dataOraPianificata < referenceDate) {
+    return "scaduto";
+  }
+  const today = dataCivileEuropeRome(referenceDate);
+  const plannedDay = dataCivileEuropeRome(dataOraPianificata);
+  if (plannedDay === today) return "oggi";
+  const elapsedHours =
+    (dataOraPianificata.getTime() - referenceDate.getTime()) / 3_600_000;
+  if (elapsedHours >= 0 && elapsedHours <= 48) return "imminente";
+  const [todayYear, todayMonth, todayDay] = today.split("-").map(Number);
+  const [plannedYear, plannedMonth, plannedDate] = plannedDay
+    .split("-")
+    .map(Number);
+  const civilDays =
+    (Date.UTC(plannedYear, plannedMonth - 1, plannedDate) -
+      Date.UTC(todayYear, todayMonth - 1, todayDay)) /
+    86_400_000;
+  return civilDays >= 0 && civilDays <= 7 ? "prossimo" : null;
 }
 
 export function parseIsoTimestamp(value: unknown, field: string): Date | null {

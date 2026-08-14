@@ -1454,6 +1454,41 @@ paths:
                 items:
                   $ref: "#/components/schemas/InterventoOperatore"
 
+  /interventi/materiale-da-preparare:
+    get:
+      operationId: getMaterialeDaPreparare
+      tags: [interventi]
+      description: Aggrega in una singola lettura i materiali residui degli interventi Sociali futuri autorizzati. Non genera movimenti di magazzino.
+      parameters:
+        - name: periodo
+          in: query
+          schema:
+            type: string
+            enum: [oggi, "3", "7", "14", personalizzato]
+            default: "7"
+        - name: da
+          in: query
+          description: Data civile Europe/Rome, obbligatoria per periodo personalizzato.
+          schema: { type: string, format: date }
+        - name: a
+          in: query
+          description: Data civile Europe/Rome inclusiva; massimo 31 giorni.
+          schema: { type: string, format: date }
+        - name: cittaId
+          in: query
+          schema: { type: integer }
+        - name: centroAscoltoId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Aggregazione dei materiali residui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaterialeDaPreparare" }
+        "400": { description: Intervallo non valido }
+        "403": { description: Ambito o territorio non consentiti }
+
   /interventi/{id}:
     get:
       operationId: getIntervento
@@ -1513,6 +1548,35 @@ paths:
                 $ref: "#/components/schemas/InterventoOperativita"
         "403": { description: Intervento Sociale non accessibile }
         "404": { description: Intervento non trovato }
+
+  /interventi/{id}/materiali/{materialeId}:
+    patch:
+      operationId: aggiornaStatoPreparazioneMateriale
+      tags: [interventi]
+      description: Aggiorna soltanto lo stato di preparazione del materiale con controllo di concorrenza; non modifica giacenze o movimenti.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: materialeId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              { $ref: "#/components/schemas/MaterialePreparazioneUpdateInput" }
+      responses:
+        "200":
+          description: Materiale aggiornato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InterventoMateriale" }
+        "404": { description: Materiale non appartenente all'intervento }
+        "409": { description: Stato o versione concorrente }
 
   /interventi/{id}/avvia:
     post:
@@ -8194,6 +8258,8 @@ components:
         dataOraConclusione:
           type: ["string", "null"]
           format: date-time
+        avviso:
+          $ref: "#/components/schemas/InterventoAvviso"
         interventoPrecedenteId:
           type: ["integer", "null"]
         successoriIds:
@@ -8239,6 +8305,7 @@ components:
           dataOraPianificata,
           dataOraAvvio,
           dataOraConclusione,
+          avviso,
           interventoPrecedenteId,
           successoriIds,
           numeroSuccessori,
@@ -8686,6 +8753,101 @@ components:
             - $ref: "#/components/schemas/Intervento"
             - type: "null"
       required: [intervento, operativita, successivo]
+
+    InterventoAvviso:
+      anyOf:
+        - type: string
+          enum: [scaduto, oggi, imminente, prossimo]
+        - type: "null"
+
+    MaterialeDaPreparareDettaglio:
+      type: object
+      properties:
+        materialeId: { type: integer }
+        interventoId: { type: integer }
+        beneficiarioNome: { type: string }
+        beneficiarioCodice: { type: string }
+        dataOraPianificata: { type: string, format: date-time }
+        sede: { type: ["string", "null"] }
+        operatoreNome: { type: ["string", "null"] }
+        quantitaResidua: { type: number, minimum: 0 }
+        statoPreparazione:
+          { $ref: "#/components/schemas/InterventoMaterialeStato" }
+        note: { type: ["string", "null"] }
+        versione: { type: string, format: date-time }
+        avviso: { $ref: "#/components/schemas/InterventoAvviso" }
+      required:
+        [
+          materialeId,
+          interventoId,
+          beneficiarioNome,
+          beneficiarioCodice,
+          dataOraPianificata,
+          sede,
+          operatoreNome,
+          quantitaResidua,
+          statoPreparazione,
+          note,
+          versione,
+          avviso,
+        ]
+
+    MaterialeDaPreparareGruppo:
+      type: object
+      properties:
+        chiave: { type: string }
+        prodottoId: { type: ["integer", "null"] }
+        descrizione: { type: string }
+        unitaMisura: { type: string }
+        magazzinoId: { type: ["integer", "null"] }
+        magazzinoNome: { type: ["string", "null"] }
+        quantitaTotale: { type: number, minimum: 0 }
+        quantitaPronta: { type: number, minimum: 0 }
+        quantitaDaPreparare: { type: number, minimum: 0 }
+        numeroInterventi: { type: integer, minimum: 1 }
+        primaScadenza: { type: string, format: date-time }
+        prioritaPiuAlta: { $ref: "#/components/schemas/InterventoPriorita" }
+        avviso: { $ref: "#/components/schemas/InterventoAvviso" }
+        interventi:
+          type: array
+          items: { $ref: "#/components/schemas/MaterialeDaPreparareDettaglio" }
+      required:
+        [
+          chiave,
+          prodottoId,
+          descrizione,
+          unitaMisura,
+          magazzinoId,
+          magazzinoNome,
+          quantitaTotale,
+          quantitaPronta,
+          quantitaDaPreparare,
+          numeroInterventi,
+          primaScadenza,
+          prioritaPiuAlta,
+          avviso,
+          interventi,
+        ]
+
+    MaterialeDaPreparare:
+      type: object
+      properties:
+        da: { type: string, format: date }
+        a: { type: string, format: date }
+        fusoOrario: { type: string, enum: [Europe/Rome] }
+        gruppi:
+          type: array
+          items: { $ref: "#/components/schemas/MaterialeDaPreparareGruppo" }
+      required: [da, a, fusoOrario, gruppi]
+
+    MaterialePreparazioneUpdateInput:
+      type: object
+      properties:
+        statoPreparazione:
+          type: string
+          enum: [da_preparare, pronto]
+        versione: { type: string, format: date-time }
+      required: [statoPreparazione, versione]
 
     BisognoPianificato:
       type: object

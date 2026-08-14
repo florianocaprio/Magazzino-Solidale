@@ -15,6 +15,7 @@ import type {
 import { ExternalLink } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { InterventoAvvisoBadge } from "@/components/intervento-avviso";
 import { InterventoSocialeOperativitaEditor } from "@/components/intervento-sociale-operativita-editor";
 import {
   InterventoStatoBadge,
@@ -315,7 +316,12 @@ export function InterventoSocialeDetailSheet({
             <dl className="divide-y">
               <DetailRow
                 label={t("interventi.detail.state")}
-                value={<InterventoStatoBadge stato={intervento.stato} />}
+                value={
+                  <span className="flex flex-wrap gap-2">
+                    <InterventoStatoBadge stato={intervento.stato} />
+                    <InterventoAvvisoBadge avviso={intervento.avviso} />
+                  </span>
+                }
               />
               <DetailRow
                 label={t("interventi.detail.scope")}

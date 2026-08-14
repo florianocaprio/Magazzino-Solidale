@@ -1621,6 +1621,7 @@ export const GetBeneficiarioResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -1882,6 +1883,7 @@ export const ListInterventiResponseItem = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -1993,6 +1995,66 @@ export const ListInterventiOperatoriResponseItem = zod.object({
 export const ListInterventiOperatoriResponse = zod.array(ListInterventiOperatoriResponseItem)
 
 
+/**
+ * Aggrega in una singola lettura i materiali residui degli interventi Sociali futuri autorizzati. Non genera movimenti di magazzino.
+ */
+export const getMaterialeDaPreparareQueryPeriodoDefault = `7`;
+
+export const GetMaterialeDaPreparareQueryParams = zod.object({
+  "periodo": zod.enum(['oggi', '3', '7', '14', 'personalizzato']).default(getMaterialeDaPreparareQueryPeriodoDefault),
+  "da": zod.date().optional().describe('Data civile Europe\/Rome, obbligatoria per periodo personalizzato.'),
+  "a": zod.date().optional().describe('Data civile Europe\/Rome inclusiva; massimo 31 giorni.'),
+  "cittaId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional()
+})
+
+export const getMaterialeDaPreparareResponseGruppiItemQuantitaTotaleMin = 0;
+
+export const getMaterialeDaPreparareResponseGruppiItemQuantitaProntaMin = 0;
+
+export const getMaterialeDaPreparareResponseGruppiItemQuantitaDaPreparareMin = 0;
+
+
+export const getMaterialeDaPreparareResponseGruppiItemInterventiItemQuantitaResiduaMin = 0;
+
+
+
+export const GetMaterialeDaPreparareResponse = zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "fusoOrario": zod.enum(['Europe/Rome']),
+  "gruppi": zod.array(zod.object({
+  "chiave": zod.string(),
+  "prodottoId": zod.number().nullable(),
+  "descrizione": zod.string(),
+  "unitaMisura": zod.string(),
+  "magazzinoId": zod.number().nullable(),
+  "magazzinoNome": zod.string().nullable(),
+  "quantitaTotale": zod.number().min(getMaterialeDaPreparareResponseGruppiItemQuantitaTotaleMin),
+  "quantitaPronta": zod.number().min(getMaterialeDaPreparareResponseGruppiItemQuantitaProntaMin),
+  "quantitaDaPreparare": zod.number().min(getMaterialeDaPreparareResponseGruppiItemQuantitaDaPreparareMin),
+  "numeroInterventi": zod.number().min(1),
+  "primaScadenza": zod.coerce.date(),
+  "prioritaPiuAlta": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
+  "interventi": zod.array(zod.object({
+  "materialeId": zod.number(),
+  "interventoId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "beneficiarioCodice": zod.string(),
+  "dataOraPianificata": zod.coerce.date(),
+  "sede": zod.string().nullable(),
+  "operatoreNome": zod.string().nullable(),
+  "quantitaResidua": zod.number().min(getMaterialeDaPreparareResponseGruppiItemInterventiItemQuantitaResiduaMin),
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto', 'consegnato', 'annullato']),
+  "note": zod.string().nullable(),
+  "versione": zod.coerce.date(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()])
+}))
+}))
+})
+
+
 export const GetInterventoParams = zod.object({
   "id": zod.coerce.number()
 })
@@ -2029,6 +2091,7 @@ export const GetInterventoResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -2116,6 +2179,7 @@ export const UpdateInterventoResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -2189,6 +2253,41 @@ export const GetInterventoOperativitaResponse = zod.object({
 
 
 /**
+ * Aggiorna soltanto lo stato di preparazione del materiale con controllo di concorrenza; non modifica giacenze o movimenti.
+ */
+export const AggiornaStatoPreparazioneMaterialeParams = zod.object({
+  "id": zod.coerce.number(),
+  "materialeId": zod.coerce.number()
+})
+
+export const AggiornaStatoPreparazioneMaterialeBody = zod.object({
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto']),
+  "versione": zod.coerce.date()
+})
+
+export const aggiornaStatoPreparazioneMaterialeResponseQuantitaPrevistaMin = 0;
+
+export const aggiornaStatoPreparazioneMaterialeResponseQuantitaConsegnataMin = 0;
+
+
+
+export const AggiornaStatoPreparazioneMaterialeResponse = zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "prodottoId": zod.number().nullable(),
+  "descrizioneSnapshot": zod.string(),
+  "unitaMisuraSnapshot": zod.string(),
+  "quantitaPrevista": zod.number().min(aggiornaStatoPreparazioneMaterialeResponseQuantitaPrevistaMin),
+  "quantitaConsegnata": zod.number().min(aggiornaStatoPreparazioneMaterialeResponseQuantitaConsegnataMin),
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto', 'consegnato', 'annullato']),
+  "magazzinoId": zod.number().nullable(),
+  "note": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})
+
+
+/**
  * Avvia atomicamente un intervento Sociale da pianificare o pianificato, senza modificare l'operatore assegnato.
  */
 export const AvviaInterventoParams = zod.object({
@@ -2232,6 +2331,7 @@ export const AvviaInterventoResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -2524,6 +2624,7 @@ export const ConcludiInterventoResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -2611,6 +2712,7 @@ export const ConcludiInterventoResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -2675,6 +2777,7 @@ export const AnnullaInterventoResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -2738,6 +2841,7 @@ export const RegistraMancataPresentazioneResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),
@@ -2802,6 +2906,7 @@ export const TransitionInterventoResponse = zod.object({
   "dataOraPianificata": zod.coerce.date().nullable(),
   "dataOraAvvio": zod.coerce.date().nullable(),
   "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
   "interventoPrecedenteId": zod.number().nullable(),
   "successoriIds": zod.array(zod.number()),
   "numeroSuccessori": zod.number(),

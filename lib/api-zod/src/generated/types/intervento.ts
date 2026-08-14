@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { InterventoAmbito } from './interventoAmbito';
+import type { InterventoAvviso } from './interventoAvviso';
 import type { InterventoPriorita } from './interventoPriorita';
 import type { InterventoStato } from './interventoStato';
 
@@ -65,6 +66,7 @@ export interface Intervento {
   dataOraAvvio: Date | null;
   /** @nullable */
   dataOraConclusione: Date | null;
+  avviso: InterventoAvviso | null;
   /** @nullable */
   interventoPrecedenteId: number | null;
   successoriIds: number[];
