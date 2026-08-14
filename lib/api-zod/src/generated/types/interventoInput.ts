@@ -15,6 +15,8 @@ export interface InterventoInput {
   /** @nullable */
   dataIntervento?: Date | null;
   tipoIntervento: string;
+  /** Operatore assegnato; se omesso viene usato il chiamante. Il backend valida area e territorio. */
+  operatoreId?: number;
   /** Se omesso, il payload è trattato esplicitamente come legacy e l'intervento come già concluso. */
   stato?: InterventoStato;
   ambito?: InterventoAmbito;
@@ -25,6 +27,8 @@ export interface InterventoInput {
   dataOraAvvio?: Date | null;
   /** @nullable */
   dataOraConclusione?: Date | null;
+  /** Compatibilità temporanea per registrare un intervento Sociale già effettuato senza inventare orari effettivi; richiede stato concluso e dataIntervento. */
+  registrazionePregressa?: boolean;
   /** @nullable */
   interventoPrecedenteId?: number | null;
   /**

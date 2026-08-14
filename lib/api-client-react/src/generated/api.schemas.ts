@@ -1187,11 +1187,23 @@ export interface Intervento {
   /** @nullable */
   beneficiarioNome?: string | null;
   /** @nullable */
+  beneficiarioCodice: string | null;
+  /** @nullable */
+  nucleoFamiliareSintesi: string | null;
+  /** @nullable */
   bollaId?: number | null;
   /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
+  /** @nullable */
+  operatoreNome: string | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  centroAscoltoNome: string | null;
+  /** @nullable */
+  cittaId: number | null;
   /** @nullable */
   dataIntervento: string | null;
   tipoIntervento: string;
@@ -1215,6 +1227,7 @@ export interface Intervento {
   scadenzaAutodichiarazioneIndigenza?: string | null;
   stato: InterventoStato;
   ambito: InterventoAmbito | null;
+  ambitoLegacy: boolean;
   priorita: InterventoPriorita;
   /** @nullable */
   dataOraPianificata: string | null;
@@ -2348,6 +2361,42 @@ export interface NucleoFamiliareInput {
   note?: string;
 }
 
+export type InterventoVista = typeof InterventoVista[keyof typeof InterventoVista];
+
+
+export const InterventoVista = {
+  da_pianificare: 'da_pianificare',
+  pianificati: 'pianificati',
+  oggi: 'oggi',
+  in_corso: 'in_corso',
+  conclusi: 'conclusi',
+  annullati: 'annullati',
+} as const;
+
+export type InterventiRiepilogoVisteFusoOrario = typeof InterventiRiepilogoVisteFusoOrario[keyof typeof InterventiRiepilogoVisteFusoOrario];
+
+
+export const InterventiRiepilogoVisteFusoOrario = {
+  'Europe/Rome': 'Europe/Rome',
+} as const;
+
+export interface InterventiRiepilogoViste {
+  daPianificare: number;
+  pianificati: number;
+  oggi: number;
+  inCorso: number;
+  conclusi: number;
+  annullati: number;
+  dataRiferimento: string;
+  fusoOrario: InterventiRiepilogoVisteFusoOrario;
+}
+
+export interface InterventoOperatore {
+  id: number;
+  nome: string;
+  codice: string;
+}
+
 export type BisognoPianificatoUpsertTipo = typeof BisognoPianificatoUpsertTipo[keyof typeof BisognoPianificatoUpsertTipo];
 
 
@@ -2400,6 +2449,8 @@ export interface InterventoInput {
   /** @nullable */
   dataIntervento?: string | null;
   tipoIntervento: string;
+  /** Operatore assegnato; se omesso viene usato il chiamante. Il backend valida area e territorio. */
+  operatoreId?: number;
   /** Se omesso, il payload è trattato esplicitamente come legacy e l'intervento come già concluso. */
   stato?: InterventoStato;
   ambito?: InterventoAmbito;
@@ -2410,6 +2461,8 @@ export interface InterventoInput {
   dataOraAvvio?: string | null;
   /** @nullable */
   dataOraConclusione?: string | null;
+  /** Compatibilità temporanea per registrare un intervento Sociale già effettuato senza inventare orari effettivi; richiede stato concluso e dataIntervento. */
+  registrazionePregressa?: boolean;
   /** @nullable */
   interventoPrecedenteId?: number | null;
   /**
@@ -3843,6 +3896,38 @@ pianificataDa?: string;
  */
 pianificataA?: string;
 interventoPrecedenteId?: number;
+/**
+ * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
+ */
+vista?: InterventoVista;
+/**
+ * Ricerca beneficiario per nome, cognome, nome completo o codice.
+ * @maxLength 120
+ */
+ricerca?: string;
+/**
+ * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
+ */
+da?: string;
+/**
+ * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
+ */
+a?: string;
+ordina?: ListInterventiOrdina;
+direzione?: ListInterventiDirezione;
+/**
+ * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
+ */
+ambitoLegacy?: ListInterventiAmbitoLegacy;
+/**
+ * @minimum 1
+ */
+pagina?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limite?: number;
 };
 
 export type ListInterventiBisogni = typeof ListInterventiBisogni[keyof typeof ListInterventiBisogni];
@@ -3853,6 +3938,64 @@ export const ListInterventiBisogni = {
   scaduti: 'scaduti',
   nessuno: 'nessuno',
 } as const;
+
+export type ListInterventiOrdina = typeof ListInterventiOrdina[keyof typeof ListInterventiOrdina];
+
+
+export const ListInterventiOrdina = {
+  data: 'data',
+  priorita: 'priorita',
+  beneficiario: 'beneficiario',
+  operatore: 'operatore',
+} as const;
+
+export type ListInterventiDirezione = typeof ListInterventiDirezione[keyof typeof ListInterventiDirezione];
+
+
+export const ListInterventiDirezione = {
+  asc: 'asc',
+  desc: 'desc',
+} as const;
+
+export type ListInterventiAmbitoLegacy = typeof ListInterventiAmbitoLegacy[keyof typeof ListInterventiAmbitoLegacy];
+
+
+export const ListInterventiAmbitoLegacy = {
+  tutti: 'tutti',
+  classificati: 'classificati',
+  legacy: 'legacy',
+} as const;
+
+export type GetInterventiRiepilogoVisteParams = {
+beneficiarioId?: number;
+/**
+ * @maxLength 120
+ */
+ricerca?: string;
+tipo?: string;
+priorita?: InterventoPriorita;
+operatoreId?: number;
+centroAscoltoId?: number;
+cittaId?: number;
+stato?: InterventoStato;
+ambitoLegacy?: GetInterventiRiepilogoVisteAmbitoLegacy;
+da?: string;
+a?: string;
+};
+
+export type GetInterventiRiepilogoVisteAmbitoLegacy = typeof GetInterventiRiepilogoVisteAmbitoLegacy[keyof typeof GetInterventiRiepilogoVisteAmbitoLegacy];
+
+
+export const GetInterventiRiepilogoVisteAmbitoLegacy = {
+  tutti: 'tutti',
+  classificati: 'classificati',
+  legacy: 'legacy',
+} as const;
+
+export type ListInterventiOperatoriParams = {
+centroAscoltoId?: number;
+cittaId?: number;
+};
 
 export type ListConsegneParams = {
 stato?: string;
