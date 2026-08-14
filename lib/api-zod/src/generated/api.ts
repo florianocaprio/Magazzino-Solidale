@@ -1607,7 +1607,11 @@ export const GetBeneficiarioResponse = zod.object({
   "scadenzaIsee": zod.string().nullish(),
   "scadenzaRinnovo": zod.string().nullish(),
   "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
-  "dataCreazione": zod.string()
+  "dataCreazione": zod.string(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
 })).optional(),
   "consegne": zod.array(zod.object({
   "id": zod.number(),
@@ -1795,7 +1799,8 @@ export const ListInterventiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
   "tipo": zod.coerce.string().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional()
+  "cittaId": zod.coerce.number().optional(),
+  "bisogni": zod.enum(['aperti', 'scaduti', 'nessuno']).optional().describe('Filtra gli interventi in base ai Bisogni Pianificati collegati.')
 })
 
 export const ListInterventiResponseItem = zod.object({
@@ -1816,9 +1821,19 @@ export const ListInterventiResponseItem = zod.object({
   "scadenzaIsee": zod.string().nullish(),
   "scadenzaRinnovo": zod.string().nullish(),
   "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
-  "dataCreazione": zod.string()
+  "dataCreazione": zod.string(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
 })
 export const ListInterventiResponse = zod.array(ListInterventiResponseItem)
+
+
+export const createInterventoBodyBisogniPianificatiItemDescrizioneMax = 500;
+
+export const createInterventoBodyBisogniPianificatiItemNoteMax = 2000;
+
 
 
 export const CreateInterventoBody = zod.object({
@@ -1833,7 +1848,16 @@ export const CreateInterventoBody = zod.object({
   "dataFollowup": zod.string().optional(),
   "scadenzaIsee": zod.string().optional(),
   "scadenzaRinnovo": zod.string().optional(),
-  "scadenzaAutodichiarazioneIndigenza": zod.string().optional()
+  "scadenzaAutodichiarazioneIndigenza": zod.string().optional(),
+  "bisogniPianificati": zod.array(zod.object({
+  "id": zod.number().optional(),
+  "tipo": zod.enum(['richiesta', 'azione']),
+  "descrizione": zod.string().min(1).max(createInterventoBodyBisogniPianificatiItemDescrizioneMax),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'completato', 'annullato']),
+  "dataPrevista": zod.string().nullish(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "note": zod.string().max(createInterventoBodyBisogniPianificatiItemNoteMax).nullish()
+})).optional()
 })
 
 
@@ -1859,13 +1883,23 @@ export const GetInterventoResponse = zod.object({
   "scadenzaIsee": zod.string().nullish(),
   "scadenzaRinnovo": zod.string().nullish(),
   "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
-  "dataCreazione": zod.string()
+  "dataCreazione": zod.string(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
 })
 
 
 export const UpdateInterventoParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const updateInterventoBodyBisogniPianificatiItemDescrizioneMax = 500;
+
+export const updateInterventoBodyBisogniPianificatiItemNoteMax = 2000;
+
+
 
 export const UpdateInterventoBody = zod.object({
   "dataIntervento": zod.string().optional(),
@@ -1878,7 +1912,16 @@ export const UpdateInterventoBody = zod.object({
   "dataFollowup": zod.string().optional(),
   "scadenzaIsee": zod.string().optional(),
   "scadenzaRinnovo": zod.string().optional(),
-  "scadenzaAutodichiarazioneIndigenza": zod.string().optional()
+  "scadenzaAutodichiarazioneIndigenza": zod.string().optional(),
+  "bisogniPianificati": zod.array(zod.object({
+  "id": zod.number().optional(),
+  "tipo": zod.enum(['richiesta', 'azione']),
+  "descrizione": zod.string().min(1).max(updateInterventoBodyBisogniPianificatiItemDescrizioneMax),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'completato', 'annullato']),
+  "dataPrevista": zod.string().nullish(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "note": zod.string().max(updateInterventoBodyBisogniPianificatiItemNoteMax).nullish()
+})).optional()
 })
 
 export const UpdateInterventoResponse = zod.object({
@@ -1899,7 +1942,100 @@ export const UpdateInterventoResponse = zod.object({
   "scadenzaIsee": zod.string().nullish(),
   "scadenzaRinnovo": zod.string().nullish(),
   "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
-  "dataCreazione": zod.string()
+  "dataCreazione": zod.string(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+})
+
+
+export const ListBisogniPianificatiParams = zod.object({
+  "interventoId": zod.coerce.number()
+})
+
+export const listBisogniPianificatiResponseDescrizioneMax = 500;
+
+export const listBisogniPianificatiResponseNoteMax = 2000;
+
+
+
+export const ListBisogniPianificatiResponseItem = zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "tipo": zod.enum(['richiesta', 'azione']),
+  "descrizione": zod.string().max(listBisogniPianificatiResponseDescrizioneMax),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'completato', 'annullato']),
+  "dataPrevista": zod.string().nullable(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "note": zod.string().max(listBisogniPianificatiResponseNoteMax).nullable(),
+  "dataCompletamento": zod.string().nullable(),
+  "dataCreazione": zod.string(),
+  "dataAggiornamento": zod.string()
+})
+export const ListBisogniPianificatiResponse = zod.array(ListBisogniPianificatiResponseItem)
+
+
+export const CreateBisognoPianificatoParams = zod.object({
+  "interventoId": zod.coerce.number()
+})
+
+export const createBisognoPianificatoBodyDescrizioneMax = 500;
+
+export const createBisognoPianificatoBodyStatoDefault = `da_pianificare`;
+export const createBisognoPianificatoBodyPrioritaDefault = `normale`;
+export const createBisognoPianificatoBodyNoteMax = 2000;
+
+
+
+export const CreateBisognoPianificatoBody = zod.object({
+  "tipo": zod.enum(['richiesta', 'azione']),
+  "descrizione": zod.string().min(1).max(createBisognoPianificatoBodyDescrizioneMax),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'completato', 'annullato']).default(createBisognoPianificatoBodyStatoDefault),
+  "dataPrevista": zod.string().nullish(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).default(createBisognoPianificatoBodyPrioritaDefault),
+  "note": zod.string().max(createBisognoPianificatoBodyNoteMax).nullish()
+})
+
+
+export const UpdateBisognoPianificatoParams = zod.object({
+  "interventoId": zod.coerce.number(),
+  "bisognoId": zod.coerce.number()
+})
+
+export const updateBisognoPianificatoBodyDescrizioneMax = 500;
+
+export const updateBisognoPianificatoBodyNoteMax = 2000;
+
+
+
+export const UpdateBisognoPianificatoBody = zod.object({
+  "tipo": zod.enum(['richiesta', 'azione']).optional(),
+  "descrizione": zod.string().min(1).max(updateBisognoPianificatoBodyDescrizioneMax).optional(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'completato', 'annullato']).optional(),
+  "dataPrevista": zod.string().nullish(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "note": zod.string().max(updateBisognoPianificatoBodyNoteMax).nullish()
+})
+
+export const updateBisognoPianificatoResponseDescrizioneMax = 500;
+
+export const updateBisognoPianificatoResponseNoteMax = 2000;
+
+
+
+export const UpdateBisognoPianificatoResponse = zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "tipo": zod.enum(['richiesta', 'azione']),
+  "descrizione": zod.string().max(updateBisognoPianificatoResponseDescrizioneMax),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'completato', 'annullato']),
+  "dataPrevista": zod.string().nullable(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "note": zod.string().max(updateBisognoPianificatoResponseNoteMax).nullable(),
+  "dataCompletamento": zod.string().nullable(),
+  "dataCreazione": zod.string(),
+  "dataAggiornamento": zod.string()
 })
 
 

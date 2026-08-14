@@ -1177,6 +1177,11 @@ export interface Intervento {
   /** @nullable */
   scadenzaAutodichiarazioneIndigenza?: string | null;
   dataCreazione: string;
+  bisogniPianificatiTotale: number;
+  bisogniPianificatiAperti: number;
+  bisogniPianificatiScaduti: number;
+  /** @nullable */
+  bisogniPianificatiProssimaScadenza: string | null;
 }
 
 export type ConsegnaTipoPianificazione = typeof ConsegnaTipoPianificazione[keyof typeof ConsegnaTipoPianificazione];
@@ -2287,6 +2292,53 @@ export interface NucleoFamiliareInput {
   note?: string;
 }
 
+export type BisognoPianificatoUpsertTipo = typeof BisognoPianificatoUpsertTipo[keyof typeof BisognoPianificatoUpsertTipo];
+
+
+export const BisognoPianificatoUpsertTipo = {
+  richiesta: 'richiesta',
+  azione: 'azione',
+} as const;
+
+export type BisognoPianificatoUpsertStato = typeof BisognoPianificatoUpsertStato[keyof typeof BisognoPianificatoUpsertStato];
+
+
+export const BisognoPianificatoUpsertStato = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+export type BisognoPianificatoUpsertPriorita = typeof BisognoPianificatoUpsertPriorita[keyof typeof BisognoPianificatoUpsertPriorita];
+
+
+export const BisognoPianificatoUpsertPriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export interface BisognoPianificatoUpsert {
+  id?: number;
+  tipo: BisognoPianificatoUpsertTipo;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  descrizione: string;
+  stato: BisognoPianificatoUpsertStato;
+  /** @nullable */
+  dataPrevista?: string | null;
+  priorita: BisognoPianificatoUpsertPriorita;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
+}
+
 export interface InterventoInput {
   beneficiarioId: number;
   dataIntervento: string;
@@ -2300,6 +2352,7 @@ export interface InterventoInput {
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;
   scadenzaAutodichiarazioneIndigenza?: string;
+  bisogniPianificati?: BisognoPianificatoUpsert[];
 }
 
 export interface InterventoUpdate {
@@ -2314,6 +2367,148 @@ export interface InterventoUpdate {
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;
   scadenzaAutodichiarazioneIndigenza?: string;
+  bisogniPianificati?: BisognoPianificatoUpsert[];
+}
+
+export type BisognoPianificatoTipo = typeof BisognoPianificatoTipo[keyof typeof BisognoPianificatoTipo];
+
+
+export const BisognoPianificatoTipo = {
+  richiesta: 'richiesta',
+  azione: 'azione',
+} as const;
+
+export type BisognoPianificatoStato = typeof BisognoPianificatoStato[keyof typeof BisognoPianificatoStato];
+
+
+export const BisognoPianificatoStato = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+export type BisognoPianificatoPriorita = typeof BisognoPianificatoPriorita[keyof typeof BisognoPianificatoPriorita];
+
+
+export const BisognoPianificatoPriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export interface BisognoPianificato {
+  id: number;
+  interventoId: number;
+  tipo: BisognoPianificatoTipo;
+  /** @maxLength 500 */
+  descrizione: string;
+  stato: BisognoPianificatoStato;
+  /** @nullable */
+  dataPrevista: string | null;
+  priorita: BisognoPianificatoPriorita;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note: string | null;
+  /** @nullable */
+  dataCompletamento: string | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export type BisognoPianificatoInputTipo = typeof BisognoPianificatoInputTipo[keyof typeof BisognoPianificatoInputTipo];
+
+
+export const BisognoPianificatoInputTipo = {
+  richiesta: 'richiesta',
+  azione: 'azione',
+} as const;
+
+export type BisognoPianificatoInputStato = typeof BisognoPianificatoInputStato[keyof typeof BisognoPianificatoInputStato];
+
+
+export const BisognoPianificatoInputStato = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+export type BisognoPianificatoInputPriorita = typeof BisognoPianificatoInputPriorita[keyof typeof BisognoPianificatoInputPriorita];
+
+
+export const BisognoPianificatoInputPriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export interface BisognoPianificatoInput {
+  tipo: BisognoPianificatoInputTipo;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  descrizione: string;
+  stato?: BisognoPianificatoInputStato;
+  /** @nullable */
+  dataPrevista?: string | null;
+  priorita?: BisognoPianificatoInputPriorita;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
+}
+
+export type BisognoPianificatoUpdateTipo = typeof BisognoPianificatoUpdateTipo[keyof typeof BisognoPianificatoUpdateTipo];
+
+
+export const BisognoPianificatoUpdateTipo = {
+  richiesta: 'richiesta',
+  azione: 'azione',
+} as const;
+
+export type BisognoPianificatoUpdateStato = typeof BisognoPianificatoUpdateStato[keyof typeof BisognoPianificatoUpdateStato];
+
+
+export const BisognoPianificatoUpdateStato = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+export type BisognoPianificatoUpdatePriorita = typeof BisognoPianificatoUpdatePriorita[keyof typeof BisognoPianificatoUpdatePriorita];
+
+
+export const BisognoPianificatoUpdatePriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export interface BisognoPianificatoUpdate {
+  tipo?: BisognoPianificatoUpdateTipo;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  descrizione?: string;
+  stato?: BisognoPianificatoUpdateStato;
+  /** @nullable */
+  dataPrevista?: string | null;
+  priorita?: BisognoPianificatoUpdatePriorita;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
 }
 
 export type AccessoEmporioStato = typeof AccessoEmporioStato[keyof typeof AccessoEmporioStato];
@@ -3487,7 +3682,20 @@ beneficiarioId?: number;
 tipo?: string;
 centroAscoltoId?: number;
 cittaId?: number;
+/**
+ * Filtra gli interventi in base ai Bisogni Pianificati collegati.
+ */
+bisogni?: ListInterventiBisogni;
 };
+
+export type ListInterventiBisogni = typeof ListInterventiBisogni[keyof typeof ListInterventiBisogni];
+
+
+export const ListInterventiBisogni = {
+  aperti: 'aperti',
+  scaduti: 'scaduti',
+  nessuno: 'nessuno',
+} as const;
 
 export type ListConsegneParams = {
 stato?: string;

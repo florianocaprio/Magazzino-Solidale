@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { BisognoPianificatoUpsert } from './bisognoPianificatoUpsert';
 
 export interface InterventoUpdate {
   dataIntervento?: string;
@@ -18,4 +19,5 @@ export interface InterventoUpdate {
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;
   scadenzaAutodichiarazioneIndigenza?: string;
+  bisogniPianificati?: BisognoPianificatoUpsert[];
 }

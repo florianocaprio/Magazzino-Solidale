@@ -45,6 +45,9 @@ import type {
   BeneficiarioInput,
   BeneficiarioSimile,
   BeneficiarioUpdate,
+  BisognoPianificato,
+  BisognoPianificatoInput,
+  BisognoPianificatoUpdate,
   Bolla,
   BollaDettaglio,
   BollaEmporioEmailResult,
@@ -4677,6 +4680,211 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateInterventoMutationOptions(options));
+    }
+
+export const getListBisogniPianificatiUrl = (interventoId: number,) => {
+
+
+
+
+  return `/api/interventi/${interventoId}/bisogni-pianificati`
+}
+
+export const listBisogniPianificati = async (interventoId: number, options?: RequestInit): Promise<BisognoPianificato[]> => {
+
+  return customFetch<BisognoPianificato[]>(getListBisogniPianificatiUrl(interventoId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBisogniPianificatiQueryKey = (interventoId: number,) => {
+    return [
+    `/api/interventi/${interventoId}/bisogni-pianificati`
+    ] as const;
+    }
+
+
+export const getListBisogniPianificatiQueryOptions = <TData = Awaited<ReturnType<typeof listBisogniPianificati>>, TError = ErrorType<void>>(interventoId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBisogniPianificati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBisogniPianificatiQueryKey(interventoId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBisogniPianificati>>> = ({ signal }) => listBisogniPianificati(interventoId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(interventoId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBisogniPianificati>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBisogniPianificatiQueryResult = NonNullable<Awaited<ReturnType<typeof listBisogniPianificati>>>
+export type ListBisogniPianificatiQueryError = ErrorType<void>
+
+
+
+export function useListBisogniPianificati<TData = Awaited<ReturnType<typeof listBisogniPianificati>>, TError = ErrorType<void>>(
+ interventoId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBisogniPianificati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBisogniPianificatiQueryOptions(interventoId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateBisognoPianificatoUrl = (interventoId: number,) => {
+
+
+
+
+  return `/api/interventi/${interventoId}/bisogni-pianificati`
+}
+
+export const createBisognoPianificato = async (interventoId: number,
+    bisognoPianificatoInput: BisognoPianificatoInput, options?: RequestInit): Promise<BisognoPianificato> => {
+
+  return customFetch<BisognoPianificato>(getCreateBisognoPianificatoUrl(interventoId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bisognoPianificatoInput,)
+  }
+);}
+
+
+
+
+export const getCreateBisognoPianificatoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBisognoPianificato>>, TError,{interventoId: number;data: BodyType<BisognoPianificatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBisognoPianificato>>, TError,{interventoId: number;data: BodyType<BisognoPianificatoInput>}, TContext> => {
+
+const mutationKey = ['createBisognoPianificato'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBisognoPianificato>>, {interventoId: number;data: BodyType<BisognoPianificatoInput>}> = (props) => {
+          const {interventoId,data} = props ?? {};
+
+          return  createBisognoPianificato(interventoId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBisognoPianificatoMutationResult = NonNullable<Awaited<ReturnType<typeof createBisognoPianificato>>>
+    export type CreateBisognoPianificatoMutationBody = BodyType<BisognoPianificatoInput>
+    export type CreateBisognoPianificatoMutationError = ErrorType<void>
+
+    export const useCreateBisognoPianificato = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBisognoPianificato>>, TError,{interventoId: number;data: BodyType<BisognoPianificatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBisognoPianificato>>,
+        TError,
+        {interventoId: number;data: BodyType<BisognoPianificatoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateBisognoPianificatoMutationOptions(options));
+    }
+
+export const getUpdateBisognoPianificatoUrl = (interventoId: number,
+    bisognoId: number,) => {
+
+
+
+
+  return `/api/interventi/${interventoId}/bisogni-pianificati/${bisognoId}`
+}
+
+export const updateBisognoPianificato = async (interventoId: number,
+    bisognoId: number,
+    bisognoPianificatoUpdate: BisognoPianificatoUpdate, options?: RequestInit): Promise<BisognoPianificato> => {
+
+  return customFetch<BisognoPianificato>(getUpdateBisognoPianificatoUrl(interventoId,bisognoId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bisognoPianificatoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateBisognoPianificatoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBisognoPianificato>>, TError,{interventoId: number;bisognoId: number;data: BodyType<BisognoPianificatoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBisognoPianificato>>, TError,{interventoId: number;bisognoId: number;data: BodyType<BisognoPianificatoUpdate>}, TContext> => {
+
+const mutationKey = ['updateBisognoPianificato'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBisognoPianificato>>, {interventoId: number;bisognoId: number;data: BodyType<BisognoPianificatoUpdate>}> = (props) => {
+          const {interventoId,bisognoId,data} = props ?? {};
+
+          return  updateBisognoPianificato(interventoId,bisognoId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBisognoPianificatoMutationResult = NonNullable<Awaited<ReturnType<typeof updateBisognoPianificato>>>
+    export type UpdateBisognoPianificatoMutationBody = BodyType<BisognoPianificatoUpdate>
+    export type UpdateBisognoPianificatoMutationError = ErrorType<void>
+
+    export const useUpdateBisognoPianificato = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBisognoPianificato>>, TError,{interventoId: number;bisognoId: number;data: BodyType<BisognoPianificatoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBisognoPianificato>>,
+        TError,
+        {interventoId: number;bisognoId: number;data: BodyType<BisognoPianificatoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateBisognoPianificatoMutationOptions(options));
     }
 
 export const getListConsegneUrl = (params?: ListConsegneParams,) => {
