@@ -42,6 +42,7 @@ export const CATALOGO_MODULI: ModuloSeed[] = [
   { codice: "UDS", nome: "Unità di Strada", descrizione: "Anagrafica, interventi e report Unità di Strada.", categoria: "uds", core: false, ordine: 190, attivoDefault: true },
   { codice: "EMPORIO_SOLIDALE", nome: "Emporio Solidale", descrizione: "Accessi, cassa e operatività Emporio.", categoria: "emporio", core: false, ordine: 200, attivoDefault: true },
   { codice: "CREDITO_SOLIDALE", nome: "Credito Solidale", descrizione: "Credito, saldi, ricariche e movimenti.", categoria: "emporio", core: false, ordine: 210, attivoDefault: true },
+  { codice: "MENSA", nome: "Mensa", descrizione: "Accessi, pasti, abilitazioni e rifornimenti delle mense.", categoria: "mensa", core: false, ordine: 215, attivoDefault: true },
   { codice: "REPORT", nome: "Report", descrizione: "Report operativi base.", categoria: "analisi", core: false, ordine: 220, attivoDefault: true },
   { codice: "REPORT_AVANZATI", nome: "Report avanzati", descrizione: "Analisi avanzate e viste specialistiche.", categoria: "analisi", core: false, ordine: 230, attivoDefault: true },
   { codice: "PREDITTIVO", nome: "Predittivo", descrizione: "Funzionalità predittive future.", categoria: "analisi", core: false, ordine: 240, attivoDefault: true },

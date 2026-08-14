@@ -46,6 +46,10 @@ export interface Trasferimento {
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
+  /** @nullable */
+  mensaId?: number | null;
+  /** @nullable */
+  idempotencyKey?: string | null;
   righe?: TrasferimentoRiga[];
   dataCreazione: string;
 }

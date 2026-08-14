@@ -12,6 +12,7 @@ export interface Ruolo {
   /** @nullable */
   descrizione?: string | null;
   aree: string[];
+  permessi: string[];
   isAdmin: boolean;
   dataCreazione: string;
 }

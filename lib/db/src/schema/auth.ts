@@ -19,6 +19,7 @@ export const ruoliTable = pgTable("ruoli", {
   nome: varchar("nome", { length: 60 }).notNull().unique(),
   descrizione: varchar("descrizione", { length: 200 }),
   aree: jsonb("aree").$type<string[]>().notNull().default([]),
+  permessi: jsonb("permessi").$type<string[]>().notNull().default([]),
   isAdmin: boolean("is_admin").notNull().default(false),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });

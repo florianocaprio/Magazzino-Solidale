@@ -35,6 +35,7 @@ export interface AuthUser {
   isSuperAdmin: boolean;
   isAdmin: boolean;
   aree: string[];
+  permessi: string[];
   mustChangePassword: boolean;
   emailDaAggiornare: boolean;
 }

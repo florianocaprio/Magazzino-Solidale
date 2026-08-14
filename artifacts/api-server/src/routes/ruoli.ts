@@ -5,8 +5,10 @@ import { CreateRuoloBody, UpdateRuoloBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { ALL_AREA_KEYS } from "../lib/areas";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
+import { ALL_PERMISSION_KEYS } from "../lib/permissions";
 
 const router: IRouter = Router();
+const permissionKeys = new Set<string>(ALL_PERMISSION_KEYS);
 
 router.use("/ruoli", requireAuth, requireAdmin);
 
@@ -21,6 +23,7 @@ const fmt = (r: typeof ruoliTable.$inferSelect) => ({
   nome: r.nome,
   descrizione: r.descrizione ?? null,
   aree: r.aree ?? [],
+  permessi: r.permessi ?? [],
   isAdmin: r.isAdmin,
   dataCreazione: r.dataCreazione.toISOString(),
 });
@@ -28,6 +31,11 @@ const fmt = (r: typeof ruoliTable.$inferSelect) => ({
 function sanitizeAree(aree: string[] | undefined): string[] {
   if (!aree) return [];
   return aree.filter((a) => ALL_AREA_KEYS.includes(a));
+}
+
+function sanitizePermessi(permessi: string[] | undefined): string[] {
+  if (!permessi) return [];
+  return permessi.filter((permission) => permissionKeys.has(permission));
 }
 
 function isSuperAdminRoleName(nome?: string | null): boolean {
@@ -71,7 +79,7 @@ router.post("/ruoli", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { nome, descrizione, aree, isAdmin } = parsed.data;
+  const { nome, descrizione, aree, permessi, isAdmin } = parsed.data;
   const creatingSuperAdminRole = isSuperAdminRoleName(nome);
   if (creatingSuperAdminRole && !req.user?.isSuperAdmin) {
     res.status(403).json({ error: "Operazione riservata ai Super Admin" });
@@ -93,6 +101,7 @@ router.post("/ruoli", async (req, res): Promise<void> => {
       nome,
       descrizione: descrizione ?? null,
       aree: creatingSuperAdminRole ? ALL_AREA_KEYS : sanitizeAree(aree),
+      permessi: creatingSuperAdminRole ? ALL_PERMISSION_KEYS : sanitizePermessi(permessi),
       isAdmin: creatingSuperAdminRole ? true : (isAdmin ?? false),
     })
     .returning();
@@ -160,6 +169,7 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
   if (isProtectedSuperAdminRole) {
     updates.nome = SUPER_ADMIN_ROLE_NAME;
     updates.aree = ALL_AREA_KEYS;
+    updates.permessi = ALL_PERMISSION_KEYS;
     updates.isAdmin = true;
   } else if (body.nome !== undefined) {
     updates.nome = body.nome;
@@ -167,6 +177,8 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
   if (body.descrizione !== undefined)
     updates.descrizione = body.descrizione ?? null;
   if (!isProtectedSuperAdminRole && body.aree !== undefined) updates.aree = sanitizeAree(body.aree);
+  if (!isProtectedSuperAdminRole && body.permessi !== undefined)
+    updates.permessi = sanitizePermessi(body.permessi);
   if (!isProtectedSuperAdminRole && body.isAdmin !== undefined) updates.isAdmin = body.isAdmin;
 
   const [row] = await db

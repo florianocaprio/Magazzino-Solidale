@@ -31,7 +31,7 @@ const formSchema = z.object({
   responsabile: z.string().optional(),
   telefono: z.string().optional(),
   email: z.string().email("Email non valida").optional().or(z.literal("")),
-  tipoMagazzino: z.enum(["logistico", "emporio", "misto"]).default("logistico"),
+  tipoMagazzino: z.enum(["logistico", "emporio", "misto", "mensa"]).default("logistico"),
   stato: z.string().default("attivo"),
   centroAscoltoId: z.string().optional(),
   cittaId: z.string().optional(),
@@ -45,6 +45,7 @@ const tipoMagazzinoBadgeClasses: Record<string, string> = {
   logistico: "bg-slate-500/10 text-slate-700 hover:bg-slate-500/20",
   emporio: "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20",
   misto: "bg-sky-500/10 text-sky-700 hover:bg-sky-500/20",
+  mensa: "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20",
 };
 
 export default function Magazzini() {
@@ -414,6 +415,7 @@ export default function Magazzini() {
                         <SelectItem value="logistico">{t("magazzini.tipo_logistico")}</SelectItem>
                         <SelectItem value="emporio" disabled={!emporioAbilitato}>{t("magazzini.tipo_emporio")}</SelectItem>
                         <SelectItem value="misto" disabled={!emporioAbilitato}>{t("magazzini.tipo_misto")}</SelectItem>
+                        <SelectItem value="mensa">{t("magazzini.tipo_mensa")}</SelectItem>
                       </SelectContent>
                     </Select>
                     {!emporioAbilitato && (

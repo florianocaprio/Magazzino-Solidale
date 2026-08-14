@@ -37,6 +37,10 @@ import {
   Languages,
   ChevronDown,
   LogOut,
+  Utensils,
+  ScanLine,
+  Soup,
+  FileWarning,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -80,6 +84,7 @@ type NavItem = {
   moduloCodice?: string;
   superAdmin?: boolean;
   public?: boolean;
+  permission?: string;
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -233,6 +238,70 @@ const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
+  },
+
+  {
+    key: "mensaPostazione",
+    url: "/mensa/postazione",
+    icon: ScanLine,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.access.scan",
+  },
+  {
+    key: "mensaPasti",
+    url: "/mensa/pasti",
+    icon: Soup,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.view",
+  },
+  {
+    key: "mensaMense",
+    url: "/mensa/mense",
+    icon: Utensils,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.manage",
+  },
+  {
+    key: "mensaAbilitazioni",
+    url: "/mensa/abilitazioni",
+    icon: ShieldCheck,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.eligibility.manage",
+  },
+  {
+    key: "mensaTrasferimenti",
+    url: "/mensa/trasferimenti",
+    icon: ArrowRightLeft,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.transfers.manage",
+  },
+  {
+    key: "mensaEccezioni",
+    url: "/mensa/eccezioni",
+    icon: FileWarning,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.view",
+  },
+  {
+    key: "mensaReport",
+    url: "/mensa/report",
+    icon: BarChart3,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.reports.view",
   },
 
   {
@@ -446,7 +515,11 @@ function NavMenuLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
         className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors"
       >
         <item.icon className="h-4 w-4" />
-        <span>{t(`nav.items.${item.key}`)}</span>
+        <span>{
+          item.groupKey === "mensa"
+            ? t(`mensa.nav.${item.key}`)
+            : t(`nav.items.${item.key}`)
+        }</span>
       </Link>
     </SidebarMenuButton>
   );
@@ -454,14 +527,14 @@ function NavMenuLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { user, hasArea, logout } = useAuth();
+  const { user, hasArea, hasPermission, logout } = useAuth();
   const { t } = useTranslation();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.superAdmin) return user?.isSuperAdmin === true;
     if (item.public) return true;
-    return !!item.area && hasArea(item.area);
+    return !!item.area && hasArea(item.area) && (!item.permission || hasPermission(item.permission));
   }).filter((item) => isModuloAttivo(item.moduloCodice));
 
   const groupedNav = visibleItems.reduce(
@@ -494,7 +567,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarGroup>
                   <SidebarGroupLabel asChild>
                     <CollapsibleTrigger className="flex w-full items-center justify-between text-xs uppercase tracking-wider text-muted-foreground font-medium px-4 py-2 hover:text-foreground transition-colors">
-                      {t(`nav.groups.${group}`)}
+                      {group === "mensa" ? t("mensa.nav.group") : t(`nav.groups.${group}`)}
                       <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=closed]/collapsible:-rotate-90" />
                     </CollapsibleTrigger>
                   </SidebarGroupLabel>

@@ -16,7 +16,7 @@ import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModul
 
 const router: IRouter = Router();
 
-const TIPI_MAGAZZINO = ["logistico", "emporio", "misto"] as const;
+const TIPI_MAGAZZINO = ["logistico", "emporio", "misto", "mensa"] as const;
 type TipoMagazzino = (typeof TIPI_MAGAZZINO)[number];
 
 function paramId(v: string | string[]): number {

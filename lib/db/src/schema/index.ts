@@ -34,3 +34,4 @@ export * from "./impostazioni";
 export * from "./configurazioneAmbiente";
 export * from "./auth";
 export * from "./systemLogs";
+export * from "./mensa";

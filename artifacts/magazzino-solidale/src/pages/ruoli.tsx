@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   useListRuoli,
   useListAree,
+  useListPermessi,
   useCreateRuolo,
   useUpdateRuolo,
   useDeleteRuolo,
@@ -66,6 +67,7 @@ export default function Ruoli() {
   const { user } = useAuth();
   const { data: ruoli, isLoading } = useListRuoli();
   const { data: catalogoAree = [] } = useListAree();
+  const { data: catalogoPermessi = [] } = useListPermessi();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -80,6 +82,7 @@ export default function Ruoli() {
   const [nome, setNome] = useState("");
   const [descrizione, setDescrizione] = useState("");
   const [aree, setAree] = useState<string[]>([]);
+  const [permessi, setPermessi] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const areaLabels = Object.fromEntries(
@@ -94,6 +97,7 @@ export default function Ruoli() {
     setNome("");
     setDescrizione("");
     setAree([]);
+    setPermessi([]);
     setIsAdmin(false);
     setFormError(null);
     setIsFormOpen(true);
@@ -105,6 +109,7 @@ export default function Ruoli() {
     setNome(r.nome);
     setDescrizione(r.descrizione ?? "");
     setAree(r.aree ?? []);
+    setPermessi(r.permessi ?? []);
     setIsAdmin(r.isAdmin);
     setFormError(null);
     setIsFormOpen(true);
@@ -116,6 +121,12 @@ export default function Ruoli() {
     );
   };
 
+  const togglePermesso = (key: string, checked: boolean) => {
+    setPermessi((prev) =>
+      checked ? [...new Set([...prev, key])] : prev.filter((p) => p !== key),
+    );
+  };
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -123,6 +134,7 @@ export default function Ruoli() {
       nome: nome.trim(),
       descrizione: descrizione.trim() || undefined,
       aree,
+      permessi,
       isAdmin,
     };
     if (editing) {
@@ -300,7 +312,7 @@ export default function Ruoli() {
       </Card>
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <SheetContent>
+        <SheetContent className="overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
               {editing ? t("ruoli.editRole") : t("ruoli.newRole")}
@@ -340,7 +352,8 @@ export default function Ruoli() {
               />
             </div>
             {!isAdmin && (
-              <div className="space-y-2">
+              <div className="space-y-4">
+                <div className="space-y-2">
                 <Label>{t("ruoli.accessibleAreas")}</Label>
                 <div className="space-y-2 rounded-md border p-3">
                   {catalogoAree
@@ -361,6 +374,31 @@ export default function Ruoli() {
                       </div>
                     ))}
                 </div>
+                </div>
+                {catalogoPermessi.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>{t("ruoli.permissions", "Permessi operativi")}</Label>
+                    <div className="space-y-2 rounded-md border p-3">
+                      {catalogoPermessi.map((permission) => (
+                        <div key={permission.key} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`permission-${permission.key}`}
+                            checked={permessi.includes(permission.key)}
+                            onCheckedChange={(checked) =>
+                              togglePermesso(permission.key, checked === true)
+                            }
+                          />
+                          <Label
+                            htmlFor={`permission-${permission.key}`}
+                            className="cursor-pointer font-normal"
+                          >
+                            {permission.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {formError && (

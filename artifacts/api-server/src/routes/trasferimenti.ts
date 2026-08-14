@@ -1,7 +1,7 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTable, lottiTable, movimentiTable, utentiTable, volontariTable, prenotazioniMagazzinoTable } from "@workspace/db";
-import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
+import { trasferimentiTable, trasferimentoRigheTable, magazziniTable, prodottiTable, lottiTable, movimentiTable, utentiTable, volontariTable, prenotazioniMagazzinoTable, auditConfigurazioniTable, menseTable } from "@workspace/db";
+import { eq, and, desc, inArray, gt, sum, asc, gte, isNull, or, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -14,11 +14,47 @@ import {
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
 import { requireModulo } from "../lib/featureFlags";
+import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function isMensaOnly(req: Request): boolean {
+  return (
+    !req.user?.isAdmin &&
+    (req.user?.aree ?? []).includes("mensa") &&
+    !(req.user?.aree ?? []).includes("magazzino")
+  );
+}
+
+function canManageMensaTransfers(req: Request): boolean {
+  return (
+    !!req.user?.isAdmin ||
+    (req.user?.permessi ?? []).includes("mensa.transfers.manage")
+  );
+}
+
+async function enforceMensaTransfer(
+  req: Request,
+  mensaId: number | null,
+): Promise<string | null> {
+  if (!isMensaOnly(req)) return null;
+  if (!canManageMensaTransfers(req)) return "Permesso Mensa non consentito";
+  if (mensaId == null) return "Trasferimento non associato a una Mensa";
+  const ownCity = callerCittaId(req);
+  if (ownCity != null) {
+    const [mensa] = await db
+      .select({ cittaId: menseTable.cittaId })
+      .from(menseTable)
+      .where(eq(menseTable.id, mensaId));
+    if (!mensa || mensa.cittaId !== ownCity) {
+      return "Trasferimento non accessibile per la tua città";
+    }
+  }
+  return null;
+}
 
 async function disponibileRealeProdotto(prodottoId: number, magazzinoId: number): Promise<number> {
   const disponibilita = await calcolaDisponibilitaMagazzino(prodottoId, magazzinoId);
@@ -62,9 +98,14 @@ async function trasferimentoUscitaFEFO(tx: Tx, opts: {
         eq(lottiTable.prodottoId, opts.prodottoId),
         eq(lottiTable.magazzinoId, opts.magazzinoId),
         gt(lottiTable.quantitaResidua, "0"),
+        or(
+          isNull(lottiTable.dataScadenza),
+          gte(lottiTable.dataScadenza, opts.dataMovimento),
+        ),
       ),
     )
-    .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.dataCarico));
+    .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.dataCarico))
+    .for("update");
 
   for (const lotto of lotti) {
     if (rimanente <= 0) break;
@@ -94,6 +135,9 @@ async function trasferimentoUscitaFEFO(tx: Tx, opts: {
     });
 
     rimanente = Math.round((rimanente - scala) * 100) / 100;
+  }
+  if (rimanente > 0) {
+    throw new Error("Disponibilità FEFO insufficiente o composta solo da lotti scaduti");
   }
 }
 
@@ -181,6 +225,8 @@ async function getTrasferimentoWithRighe(id: number) {
     note: t.t.note ?? null,
     operatoreId: t.t.operatoreId ?? null,
     operatoreCodice: t.operatoreMatricola ?? t.operatoreUsername ?? null,
+    mensaId: t.t.mensaId ?? null,
+    idempotencyKey: t.t.idempotencyKey ?? null,
     righe: righe.map(r => ({
       id: r.r.id,
       prodottoId: r.r.prodottoId,
@@ -199,6 +245,24 @@ router.get("/trasferimenti", async (req, res) => {
   const { stato } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(trasferimentiTable.stato, stato));
+  if (isMensaOnly(req)) {
+    if (!canManageMensaTransfers(req)) {
+      res.status(403).json({ error: "Permesso Mensa non consentito" });
+      return;
+    }
+    conditions.push(sql`${trasferimentiTable.mensaId} is not null`);
+    const ownCity = callerCittaId(req);
+    if (ownCity != null) {
+      const visibleMense = await db
+        .select({ id: menseTable.id })
+        .from(menseTable)
+        .where(eq(menseTable.cittaId, ownCity));
+      const ids = visibleMense.map((row) => row.id);
+      conditions.push(
+        ids.length ? inArray(trasferimentiTable.mensaId, ids) : sql`false`,
+      );
+    }
+  }
   const scope = trasferimentoScopeFilter(
     trasferimentiTable.magazzinoOrigineId,
     trasferimentiTable.magazzinoDestinoId,
@@ -291,6 +355,8 @@ router.get("/trasferimenti", async (req, res) => {
       note: r.note ?? null,
       operatoreId: r.operatoreId ?? null,
       operatoreCodice: r.operatoreId != null ? (opMap.get(r.operatoreId) ?? null) : null,
+      mensaId: r.mensaId ?? null,
+      idempotencyKey: r.idempotencyKey ?? null,
       righe: righeByT.get(r.id) ?? [],
       dataCreazione: r.dataCreazione.toISOString(),
     };
@@ -299,6 +365,10 @@ router.get("/trasferimenti", async (req, res) => {
 
 router.post("/trasferimenti", async (req, res) => {
   const body = req.body;
+  if (isMensaOnly(req)) {
+    res.status(403).json({ error: "Usare il flusso Rifornimenti del modulo Mensa" });
+    return;
+  }
   if (body.magazzinoOrigineId === body.magazzinoDestinoId) {
     res.status(400).json({ error: "Origine e destinazione devono essere diverse" });
     return;
@@ -350,11 +420,54 @@ router.post("/trasferimenti", async (req, res) => {
 router.get("/trasferimenti/:id", async (req, res) => {
   const result = await getTrasferimentoWithRighe(parseInt(req.params.id));
   if (!result) { res.status(404).json({ error: "Not found" }); return; }
+  const mensaError = await enforceMensaTransfer(req, result.mensaId);
+  if (mensaError) { res.status(403).json({ error: mensaError }); return; }
   const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   if (visIds != null && !visIds.includes(result.magazzinoOrigineId) && !visIds.includes(result.magazzinoDestinoId)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  res.json(result);
+});
+
+router.get("/trasferimenti/:id/documento", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const result = await getTrasferimentoWithRighe(id);
+  if (!result) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const mensaError = await enforceMensaTransfer(req, result.mensaId);
+  if (mensaError) {
+    res.status(403).json({ error: mensaError });
+    return;
+  }
+  const visible = await visibleMagazzinoIds(
+    callerCentroId(req),
+    callerCittaId(req),
+  );
+  if (
+    visible != null &&
+    !visible.includes(result.magazzinoOrigineId) &&
+    !visible.includes(result.magazzinoDestinoId)
+  ) {
+    res
+      .status(403)
+      .json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  await db.insert(auditConfigurazioniTable).values({
+    area: result.mensaId == null ? "magazzino" : "mensa",
+    chiave: `trasferimento:${id}:documento`,
+    azione: "emissione-documento",
+    valoreNuovo: {
+      codice: result.codice,
+      stato: result.stato,
+      mensaId: result.mensaId,
+    },
+    utenteId: req.user!.id,
+    ip: req.ip ?? null,
+  });
   res.json(result);
 });
 
@@ -364,6 +477,8 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 
   const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  if (mensaError) { res.status(403).json({ error: mensaError }); return; }
   const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
   if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
@@ -441,11 +556,31 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 // trasferimento "in_transito". Da qui in poi le righe non sono più modificabili.
 router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const id = parseInt(req.params.id);
-  const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
-  if (!current) { res.status(404).json({ error: "Not found" }); return; }
-  const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
-  if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+  const [current] = await db
+    .select()
+    .from(trasferimentiTable)
+    .where(eq(trasferimentiTable.id, id));
+  if (!current) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  if (mensaError) {
+    res.status(403).json({ error: mensaError });
+    return;
+  }
+  const visIds = await visibleMagazzinoIds(
+    callerCentroId(req),
+    callerCittaId(req),
+  );
+  if (
+    visIds != null &&
+    !visIds.includes(current.magazzinoOrigineId) &&
+    !visIds.includes(current.magazzinoDestinoId)
+  ) {
+    res
+      .status(403)
+      .json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
   if (current.stato !== "richiesto" && current.stato !== "preparato") {
@@ -453,9 +588,14 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     return;
   }
 
-  const righe = await db.select().from(trasferimentoRigheTable).where(eq(trasferimentoRigheTable.trasferimentoId, id));
+  const righe = await db
+    .select()
+    .from(trasferimentoRigheTable)
+    .where(eq(trasferimentoRigheTable.trasferimentoId, id));
   if (righe.length === 0) {
-    res.status(400).json({ error: "Il trasferimento non ha prodotti da trasferire" });
+    res
+      .status(400)
+      .json({ error: "Il trasferimento non ha prodotti da trasferire" });
     return;
   }
 
@@ -470,10 +610,16 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
   // Valida la disponibilità all'origine sommando per prodotto.
   const richiestaPerProdotto = new Map<number, number>();
   for (const r of righe) {
-    richiestaPerProdotto.set(r.prodottoId, (richiestaPerProdotto.get(r.prodottoId) ?? 0) + parseFloat(r.quantita));
+    richiestaPerProdotto.set(
+      r.prodottoId,
+      (richiestaPerProdotto.get(r.prodottoId) ?? 0) + parseFloat(r.quantita),
+    );
   }
   for (const [prodottoId, richiesta] of richiestaPerProdotto) {
-    const disp = await disponibileRealeProdotto(prodottoId, current.magazzinoOrigineId);
+    const disp = await disponibileRealeProdotto(
+      prodottoId,
+      current.magazzinoOrigineId,
+    );
     if (richiesta > disp) {
       res.status(400).json({
         error: `Disponibilità insufficiente all'origine per ${prodottoMap.get(prodottoId) ?? `prodotto #${prodottoId}`}: ${disp} disponibili, richiesti ${richiesta}`,
@@ -482,25 +628,59 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     }
   }
 
-  const dataEsecuzione = new Date().toISOString().split("T")[0];
+  const dataEsecuzione = dataCivileEuropeRome(new Date());
 
-  await db.transaction(async (tx) => {
-    for (const r of righe) {
-      await trasferimentoUscitaFEFO(tx, {
-        prodottoId: r.prodottoId,
-        magazzinoId: current.magazzinoOrigineId,
-        quantita: parseFloat(r.quantita),
-        unitaMisura: r.unitaMisura,
-        dataMovimento: dataEsecuzione,
-        trasferimentoId: id,
-        trasferimentoCodice: current.codice,
-      });
+  try {
+    await db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(trasferimentiTable)
+        .set({
+          stato: "in_transito",
+          dataEsecuzione,
+          operatoreId: req.user!.id,
+        })
+        .where(
+          and(
+            eq(trasferimentiTable.id, id),
+            inArray(trasferimentiTable.stato, ["richiesto", "preparato"]),
+          ),
+        )
+        .returning({ id: trasferimentiTable.id });
+      if (!claimed) throw new Error("TRASFERIMENTO_GIA_AVVIATO");
+      for (const r of righe) {
+        await trasferimentoUscitaFEFO(tx, {
+          prodottoId: r.prodottoId,
+          magazzinoId: current.magazzinoOrigineId,
+          quantita: parseFloat(r.quantita),
+          unitaMisura: r.unitaMisura,
+          dataMovimento: dataEsecuzione,
+          trasferimentoId: id,
+          trasferimentoCodice: current.codice,
+        });
+      }
+      if (current.mensaId != null) {
+        await tx.insert(auditConfigurazioniTable).values({
+          area: "mensa",
+          chiave: `mensa-trasferimento:${id}`,
+          azione: "avvio",
+          valoreNuovo: { stato: "in_transito", dataEsecuzione },
+          utenteId: req.user!.id,
+          ip: req.ip ?? null,
+        });
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("TRASFERIMENTO_GIA_AVVIATO")) {
+      res.status(409).json({ error: "Il trasferimento è già stato avviato" });
+      return;
     }
-    await tx
-      .update(trasferimentiTable)
-      .set({ stato: "in_transito", dataEsecuzione, operatoreId: req.user!.id })
-      .where(eq(trasferimentiTable.id, id));
-  });
+    if (message.includes("Disponibilità FEFO insufficiente")) {
+      res.status(409).json({ error: message });
+      return;
+    }
+    throw error;
+  }
 
   const result = await getTrasferimentoWithRighe(id);
   res.json(result);
@@ -511,79 +691,133 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
 router.post("/trasferimenti/:id/conferma", async (req, res) => {
   const id = parseInt(req.params.id);
   const body = req.body ?? {};
-  const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
-  if (!current) { res.status(404).json({ error: "Not found" }); return; }
-  const visIds = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
-  if (visIds != null && !visIds.includes(current.magazzinoOrigineId) && !visIds.includes(current.magazzinoDestinoId)) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+  const [current] = await db
+    .select()
+    .from(trasferimentiTable)
+    .where(eq(trasferimentiTable.id, id));
+  if (!current) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  if (mensaError) {
+    res.status(403).json({ error: mensaError });
+    return;
+  }
+  const visIds = await visibleMagazzinoIds(
+    callerCentroId(req),
+    callerCittaId(req),
+  );
+  if (
+    visIds != null &&
+    !visIds.includes(current.magazzinoOrigineId) &&
+    !visIds.includes(current.magazzinoDestinoId)
+  ) {
+    res
+      .status(403)
+      .json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
   if (current.stato !== "in_transito") {
-    res.status(400).json({ error: "Solo un trasferimento in transito può essere confermato" });
+    res
+      .status(400)
+      .json({
+        error: "Solo un trasferimento in transito può essere confermato",
+      });
     return;
   }
 
-  const dataConferma = body.dataConferma ?? new Date().toISOString().split("T")[0];
+  const dataConferma = body.dataConferma ?? dataCivileEuropeRome(new Date());
 
-  await db.transaction(async (tx) => {
-    // I movimenti di uscita portano il lotto origine: lo si rilegge per copiare
-    // scadenza, codice lotto e provenienza nei lotti creati a destinazione.
-    const uscite = await tx
-      .select({ m: movimentiTable, lotto: lottiTable })
-      .from(movimentiTable)
-      .leftJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
-      .where(
-        and(
-          eq(movimentiTable.trasferimentoId, id),
-          eq(movimentiTable.tipoMovimento, "trasferimento"),
-          eq(movimentiTable.tipoDettaglio, "uscita"),
-        ),
-      );
-
-    for (const u of uscite) {
-      const qty = u.m.quantita;
-      const [destLotto] = await tx
-        .insert(lottiTable)
-        .values({
-          prodottoId: u.m.prodottoId,
-          codiceLotto: u.lotto?.codiceLotto ?? null,
-          dataScadenza: u.lotto?.dataScadenza ?? null,
-          dataCarico: dataConferma,
-          quantitaCaricata: qty,
-          quantitaResidua: qty,
-          magazzinoId: current.magazzinoDestinoId,
-          fornitoreId: u.lotto?.fornitoreId ?? null,
-          fsePlus: u.lotto?.fsePlus ?? false,
-          note: `Da trasferimento ${current.codice}`,
+  try {
+    await db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(trasferimentiTable)
+        .set({
+          stato: "completato",
+          dataConfermaRicezione: dataConferma,
+          note: body.note,
+          operatoreId: req.user!.id,
         })
-        .returning();
+        .where(
+          and(
+            eq(trasferimentiTable.id, id),
+            eq(trasferimentiTable.stato, "in_transito"),
+          ),
+        )
+        .returning({ id: trasferimentiTable.id });
+      if (!claimed) throw new Error("TRASFERIMENTO_GIA_CONFERMATO");
+      // I movimenti di uscita portano il lotto origine: lo si rilegge per copiare
+      // scadenza, codice lotto e provenienza nei lotti creati a destinazione.
+      const uscite = await tx
+        .select({ m: movimentiTable, lotto: lottiTable })
+        .from(movimentiTable)
+        .leftJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
+        .where(
+          and(
+            eq(movimentiTable.trasferimentoId, id),
+            eq(movimentiTable.tipoMovimento, "trasferimento"),
+            eq(movimentiTable.tipoDettaglio, "uscita"),
+          ),
+        );
 
-      await tx.insert(movimentiTable).values({
-        tipoMovimento: "trasferimento",
-        tipoDettaglio: "entrata",
-        dataMovimento: dataConferma,
-        magazzinoId: current.magazzinoDestinoId,
-        prodottoId: u.m.prodottoId,
-        lottoId: destLotto.id,
-        quantita: qty,
-        unitaMisura: u.m.unitaMisura,
-        fornitoreId: u.lotto?.fornitoreId ?? null,
-        trasferimentoId: id,
-        documentoRiferimento: current.codice,
-        note: `Trasferimento ${current.codice} — entrata`,
-      });
+      for (const u of uscite) {
+        const qty = u.m.quantita;
+        const [destLotto] = await tx
+          .insert(lottiTable)
+          .values({
+            prodottoId: u.m.prodottoId,
+            codiceLotto: u.lotto?.codiceLotto ?? null,
+            dataScadenza: u.lotto?.dataScadenza ?? null,
+            dataCarico: dataConferma,
+            quantitaCaricata: qty,
+            quantitaResidua: qty,
+            magazzinoId: current.magazzinoDestinoId,
+            fornitoreId: u.lotto?.fornitoreId ?? null,
+            fsePlus: u.lotto?.fsePlus ?? false,
+            note: `Da trasferimento ${current.codice}`,
+          })
+          .returning();
+
+        await tx.insert(movimentiTable).values({
+          tipoMovimento: "trasferimento",
+          tipoDettaglio: "entrata",
+          dataMovimento: dataConferma,
+          magazzinoId: current.magazzinoDestinoId,
+          prodottoId: u.m.prodottoId,
+          lottoId: destLotto.id,
+          quantita: qty,
+          unitaMisura: u.m.unitaMisura,
+          fornitoreId: u.lotto?.fornitoreId ?? null,
+          trasferimentoId: id,
+          documentoRiferimento: current.codice,
+          note: `Trasferimento ${current.codice} — entrata`,
+        });
+      }
+
+      if (current.mensaId != null) {
+        await tx.insert(auditConfigurazioniTable).values({
+          area: "mensa",
+          chiave: `mensa-trasferimento:${id}`,
+          azione: "conferma-ricezione",
+          valoreNuovo: { stato: "completato", dataConferma },
+          utenteId: req.user!.id,
+          ip: req.ip ?? null,
+        });
+      }
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("TRASFERIMENTO_GIA_CONFERMATO")
+    ) {
+      res
+        .status(409)
+        .json({ error: "Il trasferimento è già stato confermato" });
+      return;
     }
-
-    await tx
-      .update(trasferimentiTable)
-      .set({
-        stato: "completato",
-        dataConfermaRicezione: dataConferma,
-        note: body.note,
-        operatoreId: req.user!.id,
-      })
-      .where(eq(trasferimentiTable.id, id));
-  });
+    throw error;
+  }
 
   const result = await getTrasferimentoWithRighe(id);
   res.json(result);

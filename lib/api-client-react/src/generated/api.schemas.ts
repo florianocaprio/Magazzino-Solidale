@@ -82,6 +82,7 @@ export const MagazzinoTipoMagazzino = {
   logistico: 'logistico',
   emporio: 'emporio',
   misto: 'misto',
+  mensa: 'mensa',
 } as const;
 
 export interface Magazzino {
@@ -326,6 +327,7 @@ export const MagazzinoInputTipoMagazzino = {
   logistico: 'logistico',
   emporio: 'emporio',
   misto: 'misto',
+  mensa: 'mensa',
 } as const;
 
 export interface MagazzinoInput {
@@ -351,6 +353,7 @@ export const MagazzinoUpdateTipoMagazzino = {
   logistico: 'logistico',
   emporio: 'emporio',
   misto: 'misto',
+  mensa: 'mensa',
 } as const;
 
 export interface MagazzinoUpdate {
@@ -626,6 +629,10 @@ export interface Trasferimento {
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
+  /** @nullable */
+  mensaId?: number | null;
+  /** @nullable */
+  idempotencyKey?: string | null;
   righe?: TrasferimentoRiga[];
   dataCreazione: string;
 }
@@ -3897,7 +3904,362 @@ export interface UdsPersonePerZonaReport {
   udsConCentro: number;
 }
 
+export interface Mensa {
+  id: number;
+  codice: string;
+  nome: string;
+  cittaId: number;
+  /** @nullable */
+  cittaNome?: string | null;
+  magazzinoId: number;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  /** @nullable */
+  indirizzo?: string | null;
+  attiva: boolean;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+  versione: string;
+}
+
+export interface MensaInput {
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  codice: string;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  nome: string;
+  cittaId: number;
+  magazzinoId: number;
+  /** @nullable */
+  indirizzo?: string | null;
+  attiva?: boolean;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface MensaUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  nome?: string;
+  /** @nullable */
+  indirizzo?: string | null;
+  attiva?: boolean;
+  /** @nullable */
+  note?: string | null;
+  versione: string;
+}
+
+export interface MensaBeneficiarioSummary {
+  id: number;
+  nome: string;
+  cognome: string;
+  codice: string;
+  attivo: boolean;
+  /** @nullable */
+  cittaId?: number | null;
+}
+
+export type MensaAbilitazioneStato = typeof MensaAbilitazioneStato[keyof typeof MensaAbilitazioneStato];
+
+
+export const MensaAbilitazioneStato = {
+  attiva: 'attiva',
+  sospesa: 'sospesa',
+  revocata: 'revocata',
+  scaduta: 'scaduta',
+} as const;
+
+export interface MensaAbilitazione {
+  id: number;
+  beneficiarioId: number;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  beneficiarioCodice?: string | null;
+  mensaId: number;
+  /** @nullable */
+  mensaNome?: string | null;
+  dataInizio: string;
+  /** @nullable */
+  dataFine?: string | null;
+  stato: MensaAbilitazioneStato;
+  mensaPrincipale: boolean;
+  /** @nullable */
+  motivo?: string | null;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+  versione: string;
+}
+
+export interface MensaAbilitazioneInput {
+  beneficiarioId: number;
+  mensaId: number;
+  dataInizio: string;
+  /** @nullable */
+  dataFine?: string | null;
+  mensaPrincipale?: boolean;
+  /** @nullable */
+  motivo?: string | null;
+}
+
+export type MensaStatoInputStato = typeof MensaStatoInputStato[keyof typeof MensaStatoInputStato];
+
+
+export const MensaStatoInputStato = {
+  attiva: 'attiva',
+  sospesa: 'sospesa',
+  revocata: 'revocata',
+  scaduta: 'scaduta',
+} as const;
+
+export interface MensaStatoInput {
+  stato: MensaStatoInputStato;
+  /** @nullable */
+  motivo?: string | null;
+  versione: string;
+}
+
+export type TesseraBeneficiarioStato = typeof TesseraBeneficiarioStato[keyof typeof TesseraBeneficiarioStato];
+
+
+export const TesseraBeneficiarioStato = {
+  attiva: 'attiva',
+  sospesa: 'sospesa',
+  revocata: 'revocata',
+  scaduta: 'scaduta',
+} as const;
+
+export interface TesseraBeneficiario {
+  id: number;
+  beneficiarioId: number;
+  codice: string;
+  stato: TesseraBeneficiarioStato;
+  dataEmissione: string;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  dataRevoca?: string | null;
+  /** @nullable */
+  motivoRevoca?: string | null;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+  versione: string;
+}
+
+export interface TesseraBeneficiarioInput {
+  beneficiarioId: number;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  motivoSostituzione?: string | null;
+}
+
+export type MensaAccessoInputModalitaAccesso = typeof MensaAccessoInputModalitaAccesso[keyof typeof MensaAccessoInputModalitaAccesso];
+
+
+export const MensaAccessoInputModalitaAccesso = {
+  tessera: 'tessera',
+  manuale: 'manuale',
+} as const;
+
+export interface MensaAccessoInput {
+  mensaId: number;
+  modalitaAccesso: MensaAccessoInputModalitaAccesso;
+  codiceTessera?: string;
+  beneficiarioId?: number;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+}
+
+export type MensaAccessoEsito = typeof MensaAccessoEsito[keyof typeof MensaAccessoEsito];
+
+
+export const MensaAccessoEsito = {
+  consentito: 'consentito',
+  negato: 'negato',
+  consentito_eccezione: 'consentito_eccezione',
+} as const;
+
+export type MensaAccessoModalitaAccesso = typeof MensaAccessoModalitaAccesso[keyof typeof MensaAccessoModalitaAccesso];
+
+
+export const MensaAccessoModalitaAccesso = {
+  tessera: 'tessera',
+  manuale: 'manuale',
+} as const;
+
+export interface MensaAccesso {
+  id: number;
+  mensaId: number;
+  mensaNome: string;
+  /** @nullable */
+  beneficiarioId?: number | null;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  beneficiarioCodice?: string | null;
+  /** @nullable */
+  mensaPrincipaleId?: number | null;
+  /** @nullable */
+  mensaPrincipaleNome?: string | null;
+  /** @nullable */
+  statoAbilitazione?: string | null;
+  /** @nullable */
+  restrizioniAlimentari?: string | null;
+  /** @nullable */
+  allergie?: string | null;
+  esito: MensaAccessoEsito;
+  motivoEsito: string;
+  modalitaAccesso: MensaAccessoModalitaAccesso;
+  dataOra: string;
+  /** @nullable */
+  eccezioneId?: number | null;
+  eccezionePossibile: boolean;
+  idempotentReplay?: boolean;
+}
+
+export interface MensaPastoInput {
+  accessoMensaId: number;
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  tipoServizio: string;
+  /** @nullable */
+  note?: string | null;
+  override?: boolean;
+  /** @nullable */
+  motivoOverride?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+}
+
+export interface MensaPasto {
+  id: number;
+  mensaId: number;
+  mensaNome?: string;
+  beneficiarioId: number;
+  beneficiarioNome?: string;
+  beneficiarioCodice?: string;
+  accessoMensaId: number;
+  dataOra: string;
+  dataServizio: string;
+  tipoServizio: string;
+  eccezione?: boolean;
+  override?: boolean;
+  operatore?: string;
+  idempotentReplay?: boolean;
+  [key: string]: unknown;
+ }
+
+export interface MensaEccezione {
+  id: number;
+  beneficiarioId: number;
+  beneficiarioNome?: string;
+  mensaPrincipaleId: number;
+  mensaDestinazioneId: number;
+  cittaId: number;
+  motivo: string;
+  dataOra: string;
+  [key: string]: unknown;
+ }
+
+export interface MensaEccezioneInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+}
+
+export interface MensaMagazzinoSummary {
+  id: number;
+  codice: string;
+  nome: string;
+  /** @nullable */
+  cittaId?: number | null;
+  tipoMagazzino: string;
+}
+
+export interface MensaGiacenza {
+  prodottoId: number;
+  codice: string;
+  nome: string;
+  unitaMisura: string;
+  quantita: number;
+}
+
+export type MensaTrasferimentoInputRigheItem = {
+  prodottoId: number;
+  /** @exclusiveMinimum 0 */
+  quantita: number;
+  unitaMisura: string;
+  /** @nullable */
+  note?: string | null;
+};
+
+export interface MensaTrasferimentoInput {
+  mensaId: number;
+  magazzinoOrigineId: number;
+  dataRichiesta: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+  /** @nullable */
+  trasportatoreNome?: string | null;
+  /** @nullable */
+  note?: string | null;
+  /** @minItems 1 */
+  righe: MensaTrasferimentoInputRigheItem[];
+}
+
+export type MensaReportDistribuzioneItem = {
+  mensaId: number;
+  mensaNome: string;
+  totalePasti: number;
+  beneficiariDistinti: number;
+  pastiEccezione: number;
+};
+
+export interface MensaReport {
+  dal: string;
+  al: string;
+  totalePasti: number;
+  beneficiariDistinti: number;
+  accessiOrdinari: number;
+  accessiEccezione: number;
+  accessiNegati: number;
+  mediaPastiGiorno: number;
+  distribuzione: MensaReportDistribuzioneItem[];
+  [key: string]: unknown;
+ }
+
 export interface Area {
+  key: string;
+  label: string;
+}
+
+export interface Permission {
   key: string;
   label: string;
 }
@@ -3939,6 +4301,7 @@ export interface AuthUser {
   isSuperAdmin: boolean;
   isAdmin: boolean;
   aree: string[];
+  permessi: string[];
   mustChangePassword: boolean;
   emailDaAggiornare: boolean;
 }
@@ -4058,6 +4421,7 @@ export interface Ruolo {
   /** @nullable */
   descrizione?: string | null;
   aree: string[];
+  permessi: string[];
   isAdmin: boolean;
   dataCreazione: string;
 }
@@ -4067,6 +4431,7 @@ export interface RuoloInput {
   nome: string;
   descrizione?: string;
   aree: string[];
+  permessi?: string[];
   isAdmin?: boolean;
 }
 
@@ -4075,6 +4440,7 @@ export interface RuoloUpdate {
   nome?: string;
   descrizione?: string;
   aree?: string[];
+  permessi?: string[];
   isAdmin?: boolean;
 }
 
@@ -4536,6 +4902,54 @@ zonaUdsId?: number;
 export type ReportUdsPersonePerZonaParams = {
 cittaId?: number;
 zonaUdsId?: number;
+};
+
+export type ListMenseParams = {
+cittaId?: number;
+attiva?: boolean;
+};
+
+export type SearchMensaBeneficiariParams = {
+/**
+ * @minLength 2
+ */
+search: string;
+};
+
+export type ListMensaAbilitazioniParams = {
+beneficiarioId?: number;
+mensaId?: number;
+};
+
+export type ListTessereBeneficiarioParams = {
+beneficiarioId: number;
+};
+
+export type ListAccessiMensaParams = {
+mensaId?: number;
+};
+
+export type ListPastiMensaParams = {
+mensaId?: number;
+data?: string;
+tipoServizio?: string;
+};
+
+export type ListGiacenzeMensaParams = {
+magazzinoId: number;
+};
+
+export type ListTrasferimentiMensa200Item = { [key: string]: unknown };
+
+export type CreateTrasferimentoMensa200 = { [key: string]: unknown };
+
+export type CreateTrasferimentoMensa201 = { [key: string]: unknown };
+
+export type GetMensaReportParams = {
+dal: string;
+al: string;
+mensaId?: number;
+tipoServizio?: string;
 };
 
 export type ListUtentiParams = {

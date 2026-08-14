@@ -4,6 +4,7 @@ import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable, zoneUdsTab
 import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
+import type { PermissionKey } from "../lib/permissions";
 
 export interface SessionUser {
   id: number;
@@ -24,6 +25,7 @@ export interface SessionUser {
   isSuperAdmin: boolean;
   isAdmin: boolean;
   aree: string[];
+  permessi: string[];
   mustChangePassword: boolean;
 }
 
@@ -65,6 +67,7 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
       isSuperAdmin: utentiTable.isSuperAdmin,
       isAdmin: ruoliTable.isAdmin,
       aree: ruoliTable.aree,
+      permessi: ruoliTable.permessi,
     })
     .from(utentiTable)
     .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
@@ -94,6 +97,7 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
     isSuperAdmin: (row.isSuperAdmin ?? false) || row.ruoloNome === SUPER_ADMIN_ROLE_NAME,
     isAdmin: row.isAdmin ?? false,
     aree: row.aree ?? [],
+    permessi: row.permessi ?? [],
     mustChangePassword: row.mustChangePassword,
   };
 }
@@ -125,6 +129,7 @@ const BOOTSTRAP_ADMIN: SessionUser = {
   isSuperAdmin: false,
   isAdmin: true,
   aree: ALL_AREA_KEYS,
+  permessi: [],
   mustChangePassword: false,
 };
 
@@ -206,6 +211,20 @@ export const requireAdmin: RequestHandler = (req, res, next) => {
   }
   next();
 };
+
+export function requirePermission(permission: PermissionKey): RequestHandler {
+  return (req, res, next) => {
+    if (!req.user) {
+      res.status(401).json({ error: "Non autenticato" });
+      return;
+    }
+    if (req.user.isAdmin || req.user.permessi.includes(permission)) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "Permesso non consentito per il ruolo" });
+  };
+}
 
 export const requireSuperAdmin: RequestHandler = (req, res, next) => {
   if (!req.user) {

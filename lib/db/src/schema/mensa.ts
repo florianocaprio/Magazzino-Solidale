@@ -1,0 +1,279 @@
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  date,
+  index,
+  integer,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
+import { beneficiariTable } from "./beneficiari";
+import { cittaTable } from "./citta";
+import { magazziniTable } from "./magazzini";
+import { utentiTable } from "./auth";
+
+export const menseTable = pgTable(
+  "mense",
+  {
+    id: serial("id").primaryKey(),
+    codice: varchar("codice", { length: 30 }).notNull(),
+    nome: varchar("nome", { length: 160 }).notNull(),
+    cittaId: integer("citta_id")
+      .notNull()
+      .references(() => cittaTable.id),
+    magazzinoId: integer("magazzino_id")
+      .notNull()
+      .references(() => magazziniTable.id),
+    indirizzo: varchar("indirizzo", { length: 255 }),
+    attiva: boolean("attiva").notNull().default(true),
+    note: text("note"),
+    createdBy: integer("created_by").references(() => utentiTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("mense_codice_unique").on(table.codice),
+    uniqueIndex("mense_magazzino_unique").on(table.magazzinoId),
+    index("mense_citta_idx").on(table.cittaId),
+    index("mense_attiva_idx").on(table.attiva),
+  ],
+);
+
+export const mensaAbilitazioniTable = pgTable(
+  "mensa_abilitazioni",
+  {
+    id: serial("id").primaryKey(),
+    beneficiarioId: integer("beneficiario_id")
+      .notNull()
+      .references(() => beneficiariTable.id),
+    mensaId: integer("mensa_id")
+      .notNull()
+      .references(() => menseTable.id),
+    dataInizio: date("data_inizio").notNull(),
+    dataFine: date("data_fine"),
+    stato: varchar("stato", { length: 20 }).notNull().default("attiva"),
+    mensaPrincipale: boolean("mensa_principale").notNull().default(true),
+    motivo: text("motivo"),
+    createdBy: integer("created_by").references(() => utentiTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("mensa_abilitazioni_beneficiario_idx").on(table.beneficiarioId),
+    index("mensa_abilitazioni_mensa_idx").on(table.mensaId),
+    index("mensa_abilitazioni_stato_idx").on(table.stato),
+    uniqueIndex("mensa_abilitazioni_principale_attiva_unique")
+      .on(table.beneficiarioId)
+      .where(
+        sql`${table.stato} = 'attiva' and ${table.mensaPrincipale} = true`,
+      ),
+    check(
+      "mensa_abilitazioni_stato_check",
+      sql`${table.stato} in ('attiva', 'sospesa', 'revocata', 'scaduta')`,
+    ),
+    check(
+      "mensa_abilitazioni_date_check",
+      sql`${table.dataFine} is null or ${table.dataFine} >= ${table.dataInizio}`,
+    ),
+  ],
+);
+
+export const tessereBeneficiariTable = pgTable(
+  "tessere_beneficiari",
+  {
+    id: serial("id").primaryKey(),
+    beneficiarioId: integer("beneficiario_id")
+      .notNull()
+      .references(() => beneficiariTable.id),
+    codice: varchar("codice", { length: 64 }).notNull(),
+    stato: varchar("stato", { length: 20 }).notNull().default("attiva"),
+    dataEmissione: timestamp("data_emissione", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    dataScadenza: date("data_scadenza"),
+    dataRevoca: timestamp("data_revoca", { withTimezone: true }),
+    motivoRevoca: text("motivo_revoca"),
+    createdBy: integer("created_by").references(() => utentiTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("tessere_beneficiari_codice_unique").on(table.codice),
+    uniqueIndex("tessere_beneficiari_attiva_unique")
+      .on(table.beneficiarioId)
+      .where(sql`${table.stato} = 'attiva'`),
+    index("tessere_beneficiari_beneficiario_idx").on(table.beneficiarioId),
+    index("tessere_beneficiari_stato_idx").on(table.stato),
+    check(
+      "tessere_beneficiari_stato_check",
+      sql`${table.stato} in ('attiva', 'sospesa', 'revocata', 'scaduta')`,
+    ),
+  ],
+);
+
+export const mensaAccessiTable = pgTable(
+  "mensa_accessi",
+  {
+    id: serial("id").primaryKey(),
+    mensaId: integer("mensa_id")
+      .notNull()
+      .references(() => menseTable.id),
+    beneficiarioId: integer("beneficiario_id").references(
+      () => beneficiariTable.id,
+    ),
+    tesseraId: integer("tessera_id").references(
+      () => tessereBeneficiariTable.id,
+    ),
+    dataOra: timestamp("data_ora", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    esito: varchar("esito", { length: 30 }).notNull(),
+    motivoEsito: varchar("motivo_esito", { length: 50 }).notNull(),
+    operatoreId: integer("operatore_id")
+      .notNull()
+      .references(() => utentiTable.id),
+    eccezioneId: integer("eccezione_id"),
+    modalitaAccesso: varchar("modalita_accesso", { length: 20 }).notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 80 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("mensa_accessi_idempotency_unique").on(table.idempotencyKey),
+    index("mensa_accessi_mensa_data_idx").on(table.mensaId, table.dataOra),
+    index("mensa_accessi_beneficiario_data_idx").on(
+      table.beneficiarioId,
+      table.dataOra,
+    ),
+    check(
+      "mensa_accessi_esito_check",
+      sql`${table.esito} in ('consentito', 'negato', 'consentito_eccezione')`,
+    ),
+    check(
+      "mensa_accessi_modalita_check",
+      sql`${table.modalitaAccesso} in ('tessera', 'manuale')`,
+    ),
+  ],
+);
+
+export const mensaEccezioniTable = pgTable(
+  "mensa_eccezioni",
+  {
+    id: serial("id").primaryKey(),
+    beneficiarioId: integer("beneficiario_id")
+      .notNull()
+      .references(() => beneficiariTable.id),
+    mensaPrincipaleId: integer("mensa_principale_id")
+      .notNull()
+      .references(() => menseTable.id),
+    mensaDestinazioneId: integer("mensa_destinazione_id")
+      .notNull()
+      .references(() => menseTable.id),
+    cittaId: integer("citta_id")
+      .notNull()
+      .references(() => cittaTable.id),
+    motivo: text("motivo").notNull(),
+    operatoreId: integer("operatore_id")
+      .notNull()
+      .references(() => utentiTable.id),
+    dataOra: timestamp("data_ora", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    accessoMensaId: integer("accesso_mensa_id")
+      .notNull()
+      .references(() => mensaAccessiTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("mensa_eccezioni_accesso_unique").on(table.accessoMensaId),
+    index("mensa_eccezioni_beneficiario_idx").on(table.beneficiarioId),
+    index("mensa_eccezioni_mensa_data_idx").on(
+      table.mensaDestinazioneId,
+      table.dataOra,
+    ),
+  ],
+);
+
+export const mensaPastiTable = pgTable(
+  "mensa_pasti",
+  {
+    id: serial("id").primaryKey(),
+    mensaId: integer("mensa_id")
+      .notNull()
+      .references(() => menseTable.id),
+    beneficiarioId: integer("beneficiario_id")
+      .notNull()
+      .references(() => beneficiariTable.id),
+    accessoMensaId: integer("accesso_mensa_id")
+      .notNull()
+      .references(() => mensaAccessiTable.id),
+    dataOra: timestamp("data_ora", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    dataServizio: date("data_servizio").notNull(),
+    tipoServizio: varchar("tipo_servizio", { length: 40 }).notNull(),
+    operatoreId: integer("operatore_id")
+      .notNull()
+      .references(() => utentiTable.id),
+    eccezioneId: integer("eccezione_id").references(
+      () => mensaEccezioniTable.id,
+    ),
+    note: text("note"),
+    override: boolean("override").notNull().default(false),
+    motivoOverride: text("motivo_override"),
+    idempotencyKey: varchar("idempotency_key", { length: 80 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("mensa_pasti_accesso_unique").on(table.accessoMensaId),
+    uniqueIndex("mensa_pasti_idempotency_unique").on(table.idempotencyKey),
+    uniqueIndex("mensa_pasti_servizio_giorno_unique")
+      .on(table.beneficiarioId, table.dataServizio, table.tipoServizio)
+      .where(sql`${table.override} = false`),
+    index("mensa_pasti_mensa_servizio_idx").on(
+      table.mensaId,
+      table.dataServizio,
+    ),
+    index("mensa_pasti_beneficiario_servizio_idx").on(
+      table.beneficiarioId,
+      table.dataServizio,
+    ),
+    check(
+      "mensa_pasti_tipo_check",
+      sql`length(trim(${table.tipoServizio})) > 0`,
+    ),
+    check(
+      "mensa_pasti_override_motivo_check",
+      sql`${table.override} = false or length(trim(coalesce(${table.motivoOverride}, ''))) > 0`,
+    ),
+  ],
+);
+
+export type Mensa = typeof menseTable.$inferSelect;
+export type MensaAbilitazione = typeof mensaAbilitazioniTable.$inferSelect;
+export type TesseraBeneficiario = typeof tessereBeneficiariTable.$inferSelect;
+export type MensaAccesso = typeof mensaAccessiTable.$inferSelect;
+export type MensaEccezione = typeof mensaEccezioniTable.$inferSelect;
+export type MensaPasto = typeof mensaPastiTable.$inferSelect;
