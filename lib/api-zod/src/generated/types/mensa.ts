@@ -13,6 +13,7 @@ export interface Mensa {
   cittaId: number;
   /** @nullable */
   cittaNome?: string | null;
+  /** Magazzino attivo già configurato esplicitamente con tipo `mensa`; non viene effettuata alcuna conversione automatica. */
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;

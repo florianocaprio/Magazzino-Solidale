@@ -18,7 +18,7 @@ import {
   trasferimentiTable,
   utentiTable,
 } from "@workspace/db";
-import mensaRouter from "../src/routes/mensa";
+import mensaRouter, { activeEligibility } from "../src/routes/mensa";
 import trasferimentiRouter from "../src/routes/trasferimenti";
 import {
   ensureAmbienteModuli,
@@ -36,6 +36,12 @@ const ids = {
   transfers: [] as number[],
 };
 const rnd = () => Math.random().toString(36).slice(2, 9);
+
+function shiftDate(date: string, days: number): string {
+  const shifted = new Date(`${date}T12:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted.toISOString().slice(0, 10);
+}
 
 type Fixture = Awaited<ReturnType<typeof createFixture>>;
 
@@ -301,6 +307,105 @@ describe("Modulo Mensa", () => {
     },
   );
 
+  it("scade la principale terminata ieri e consente una nuova abilitazione oggi", async () => {
+    const fixture = await createFixture();
+    const today = dataServizioMensa();
+    await db
+      .update(mensaAbilitazioniTable)
+      .set({ dataFine: shiftDate(today, -1), stato: "attiva" })
+      .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+
+    const response = await request(makeApp(fixture))
+      .post("/mensa/abilitazioni")
+      .send({
+        beneficiarioId: fixture.beneficiaryId,
+        mensaId: fixture.mensaB,
+        dataInizio: today,
+        mensaPrincipale: true,
+      });
+
+    expect(response.status).toBe(201);
+    const history = await db
+      .select({
+        id: mensaAbilitazioniTable.id,
+        stato: mensaAbilitazioniTable.stato,
+      })
+      .from(mensaAbilitazioniTable)
+      .where(eq(mensaAbilitazioniTable.beneficiarioId, fixture.beneficiaryId));
+    expect(history).toEqual(
+      expect.arrayContaining([
+        { id: fixture.eligibilityId, stato: "scaduta" },
+        { id: response.body.id, stato: "attiva" },
+      ]),
+    );
+  });
+
+  it("rifiuta una nuova principale se quella esistente è ancora temporalmente valida", async () => {
+    const fixture = await createFixture();
+    const today = dataServizioMensa();
+    await db
+      .update(mensaAbilitazioniTable)
+      .set({ dataFine: shiftDate(today, 1), stato: "attiva" })
+      .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+
+    const response = await request(makeApp(fixture))
+      .post("/mensa/abilitazioni")
+      .send({
+        beneficiarioId: fixture.beneficiaryId,
+        mensaId: fixture.mensaB,
+        dataInizio: today,
+        mensaPrincipale: true,
+      });
+
+    expect(response.status).toBe(409);
+  });
+
+  it.each(["sospesa", "revocata"] as const)(
+    "non considera bloccante una principale %s",
+    async (stato) => {
+      const fixture = await createFixture();
+      const today = dataServizioMensa();
+      await db
+        .update(mensaAbilitazioniTable)
+        .set({ stato })
+        .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+
+      const response = await request(makeApp(fixture))
+        .post("/mensa/abilitazioni")
+        .send({
+          beneficiarioId: fixture.beneficiaryId,
+          mensaId: fixture.mensaB,
+          dataInizio: today,
+          mensaPrincipale: true,
+        });
+
+      expect(response.status).toBe(201);
+    },
+  );
+
+  it("activeEligibility applica la data civile Europe/Rome vicino a mezzanotte", async () => {
+    const fixture = await createFixture();
+    await db
+      .update(mensaAbilitazioniTable)
+      .set({ dataInizio: "2026-01-15", dataFine: "2026-01-15" })
+      .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+
+    const beforeRomeMidnight = dataServizioMensa(
+      new Date("2026-01-14T22:59:59Z"),
+    );
+    const afterRomeMidnight = dataServizioMensa(
+      new Date("2026-01-14T23:00:00Z"),
+    );
+    expect(
+      await activeEligibility(fixture.beneficiaryId, beforeRomeMidnight),
+    ).toBeNull();
+    expect(
+      await activeEligibility(fixture.beneficiaryId, afterRomeMidnight),
+    ).toMatchObject({
+      abilitazione: { id: fixture.eligibilityId },
+    });
+  });
+
   it("gestisce più Mense nella stessa città e non espone quelle di altre città", async () => {
     const fixture = await createFixture();
     const response = await request(makeApp(fixture)).get("/mensa/mense");
@@ -335,7 +440,7 @@ describe("Modulo Mensa", () => {
     );
   });
 
-  it("protegge la configurazione e non riconverte magazzini di altri servizi", async () => {
+  it("associa solo magazzini Mensa attivi e non riconverte magazzini logistici", async () => {
     const fixture = await createFixture();
     const withoutManage = MENSA_PERMISSIONS.map((item) => item.key).filter(
       (key) => key !== "mensa.manage",
@@ -371,6 +476,67 @@ describe("Modulo Mensa", () => {
       .from(magazziniTable)
       .where(eq(magazziniTable.id, emporioWarehouse.id));
     expect(unchanged.tipoMagazzino).toBe("emporio");
+
+    const [logisticsWarehouse] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `LOG-${rnd()}`,
+        nome: "Magazzino centrale logistico",
+        cittaId: fixture.romeId,
+        tipoMagazzino: "logistico",
+      })
+      .returning({ id: magazziniTable.id });
+    ids.warehouses.push(logisticsWarehouse.id);
+    const logisticsResponse = await request(makeApp(fixture))
+      .post("/mensa/mense")
+      .send({
+        codice: `MENSA-LOG-${rnd()}`,
+        nome: "Mensa su magazzino logistico",
+        magazzinoId: logisticsWarehouse.id,
+      });
+    expect(logisticsResponse.status).toBe(409);
+    const [logisticsUnchanged] = await db
+      .select({ tipoMagazzino: magazziniTable.tipoMagazzino })
+      .from(magazziniTable)
+      .where(eq(magazziniTable.id, logisticsWarehouse.id));
+    expect(logisticsUnchanged.tipoMagazzino).toBe("logistico");
+
+    const [inactiveWarehouse] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `MEN-INACTIVE-${rnd()}`,
+        nome: "Magazzino Mensa inattivo",
+        cittaId: fixture.romeId,
+        tipoMagazzino: "mensa",
+        stato: "inattivo",
+      })
+      .returning({ id: magazziniTable.id });
+    ids.warehouses.push(inactiveWarehouse.id);
+    const inactiveResponse = await request(makeApp(fixture))
+      .post("/mensa/mense")
+      .send({
+        codice: `MENSA-INACTIVE-${rnd()}`,
+        nome: "Mensa inattiva",
+        magazzinoId: inactiveWarehouse.id,
+      });
+    expect(inactiveResponse.status).toBe(409);
+  });
+
+  it("impedisce operazioni Mensa quando il magazzino associato è inattivo", async () => {
+    const fixture = await createFixture();
+    await db
+      .update(magazziniTable)
+      .set({ stato: "inattivo" })
+      .where(eq(magazziniTable.id, fixture.warehouseIds[0]));
+
+    const access = await verify(makeApp(fixture), fixture);
+    expect(access.status).toBe(201);
+    expect(access.body.motivoEsito).toBe("MENSA_NON_ATTIVA");
+
+    const stock = await request(makeApp(fixture)).get(
+      `/mensa/logistica/giacenze?magazzinoId=${fixture.warehouseIds[0]}`,
+    );
+    expect(stock.status).toBe(409);
   });
 
   it("esclude i magazzini senza città dallo scope logistico territoriale", async () => {
@@ -547,7 +713,10 @@ describe("Modulo Mensa", () => {
         cittaId: fixture.romeId,
         attivo: true,
       })
-      .returning({ id: beneficiariTable.id });
+      .returning({
+        id: beneficiariTable.id,
+        codice: beneficiariTable.codice,
+      });
     ids.beneficiaries.push(beneficiary.id);
     const app = makeApp(fixture);
     const eligibility = await request(app).post("/mensa/abilitazioni").send({
@@ -580,6 +749,10 @@ describe("Modulo Mensa", () => {
     });
     expect(card.status).toBe(201);
     expect(card.body.codice).toMatch(/^MS-[A-Za-z0-9_-]+$/);
+    expect(card.body.codice).not.toBe(beneficiary.codice);
+    expect(card.body.codice).not.toContain(beneficiary.codice);
+    expect(card.body.codice).not.toContain("Storico");
+    expect(card.body.codice).not.toContain("Mensa");
     const revoked = await request(app)
       .post(`/mensa/tessere/${card.body.id}/stato`)
       .send({

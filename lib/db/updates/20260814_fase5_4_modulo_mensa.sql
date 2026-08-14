@@ -88,8 +88,11 @@ CREATE INDEX IF NOT EXISTS tessere_beneficiari_beneficiario_idx
 CREATE INDEX IF NOT EXISTS tessere_beneficiari_stato_idx
   ON public.tessere_beneficiari (stato);
 
--- Il codice beneficiario già stampato sulle tessere storiche diventa il primo
--- token trasversale. Il payload resta opaco e non contiene dati personali.
+-- Compatibilità legacy: il codice beneficiario già stampato sulle tessere
+-- storiche viene accettato una sola volta come primo token trasversale. Questo
+-- backfill non definisce il formato delle nuove emissioni: l'API genera sempre
+-- token casuali opachi con prefisso MS- e non inserisce dati personali nel
+-- QR/barcode.
 INSERT INTO public.tessere_beneficiari (
   beneficiario_id,
   codice,

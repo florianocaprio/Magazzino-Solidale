@@ -10938,7 +10938,9 @@ components:
         nome: { type: string }
         cittaId: { type: integer }
         cittaNome: { type: ["string", "null"] }
-        magazzinoId: { type: integer }
+        magazzinoId:
+          type: integer
+          description: Magazzino attivo già configurato esplicitamente con tipo `mensa`; non viene effettuata alcuna conversione automatica.
         magazzinoNome: { type: ["string", "null"] }
         indirizzo: { type: ["string", "null"] }
         attiva: { type: boolean }
@@ -10954,7 +10956,9 @@ components:
         codice: { type: string, minLength: 1, maxLength: 30 }
         nome: { type: string, minLength: 1, maxLength: 160 }
         cittaId: { type: integer }
-        magazzinoId: { type: integer }
+        magazzinoId:
+          type: integer
+          description: Deve riferirsi a un magazzino attivo già configurato esplicitamente con tipo `mensa`; l'API non converte magazzini logistici esistenti.
         indirizzo: { type: ["string", "null"] }
         attiva: { type: boolean }
         note: { type: ["string", "null"] }

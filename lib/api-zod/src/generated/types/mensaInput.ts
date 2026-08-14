@@ -18,6 +18,7 @@ export interface MensaInput {
      */
   nome: string;
   cittaId: number;
+  /** Deve riferirsi a un magazzino attivo già configurato esplicitamente con tipo `mensa`; l'API non converte magazzini logistici esistenti. */
   magazzinoId: number;
   /** @nullable */
   indirizzo?: string | null;

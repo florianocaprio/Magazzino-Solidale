@@ -44,7 +44,7 @@ import {
 } from "../lib/centroScope";
 import { isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
-import { dataServizioMensa } from "../lib/mensaWorkflow";
+import { canUseMensaException, dataServizioMensa } from "../lib/mensaWorkflow";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 
@@ -233,6 +233,8 @@ async function loadMensa(id: number) {
       mensa: menseTable,
       cittaNome: cittaTable.nome,
       magazzinoNome: magazziniTable.nome,
+      magazzinoStato: magazziniTable.stato,
+      magazzinoTipo: magazziniTable.tipoMagazzino,
     })
     .from(menseTable)
     .leftJoin(cittaTable, eq(menseTable.cittaId, cittaTable.id))
@@ -247,8 +249,13 @@ async function requireMensa(id: number, req: Request, active = false) {
   if (!canAccessCitta(row.mensa.cittaId, callerCittaId(req))) {
     throw new MensaError(403, "Mensa non accessibile per la tua città");
   }
-  if (active && !row.mensa.attiva) {
-    throw new MensaError(409, "La Mensa non è attiva");
+  if (
+    active &&
+    (!row.mensa.attiva ||
+      row.magazzinoStato !== "attivo" ||
+      row.magazzinoTipo !== "mensa")
+  ) {
+    throw new MensaError(409, "La Mensa o il magazzino associato non è attivo");
   }
   return row;
 }
@@ -270,6 +277,9 @@ async function requireMensaLogisticsWarehouse(id: number, req: Request) {
     !(await canAccessMagazzino(id, callerCentroId(req), ownCity))
   ) {
     throw new MensaError(403, "Magazzino non accessibile per la tua città");
+  }
+  if (warehouse.stato !== "attivo") {
+    throw new MensaError(409, "Il magazzino non è attivo");
   }
   return warehouse;
 }
@@ -342,7 +352,55 @@ function generaCodiceTessera(): string {
   return `MS-${randomBytes(24).toString("base64url")}`;
 }
 
-async function activeEligibility(beneficiarioId: number, today: string) {
+async function expireEndedPrincipalEligibilities(
+  tx: Tx,
+  beneficiarioId: number,
+  today: string,
+  req: Request,
+): Promise<void> {
+  const ended = await tx
+    .select()
+    .from(mensaAbilitazioniTable)
+    .where(
+      and(
+        eq(mensaAbilitazioniTable.beneficiarioId, beneficiarioId),
+        eq(mensaAbilitazioniTable.stato, "attiva"),
+        eq(mensaAbilitazioniTable.mensaPrincipale, true),
+        lt(mensaAbilitazioniTable.dataFine, today),
+      ),
+    )
+    .for("update");
+  if (!ended.length) return;
+
+  const updatedAt = new Date();
+  await tx
+    .update(mensaAbilitazioniTable)
+    .set({ stato: "scaduta", updatedAt })
+    .where(
+      inArray(
+        mensaAbilitazioniTable.id,
+        ended.map((row) => row.id),
+      ),
+    );
+  await tx.insert(auditConfigurazioniTable).values(
+    ended.map((row) =>
+      auditValues(
+        req,
+        `mensa-abilitazione:${row.id}`,
+        "scadenza-automatica",
+        row as unknown as Record<string, unknown>,
+        {
+          ...(row as unknown as Record<string, unknown>),
+          stato: "scaduta",
+          updatedAt,
+        },
+        `Data fine ${row.dataFine}; data servizio Europe/Rome ${today}`,
+      ),
+    ),
+  );
+}
+
+export async function activeEligibility(beneficiarioId: number, today: string) {
   const [active] = await db
     .select({ abilitazione: mensaAbilitazioniTable, mensa: menseTable })
     .from(mensaAbilitazioniTable)
@@ -438,7 +496,11 @@ async function loadAccessoDto(id: number) {
     eccezioneId: row.accesso.eccezioneId ?? null,
     eccezionePossibile:
       row.accesso.esito === "negato" &&
-      row.accesso.motivoEsito === ACCESSO_MOTIVI.MENSA_NON_AUTORIZZATA,
+      row.accesso.motivoEsito === ACCESSO_MOTIVI.MENSA_NON_AUTORIZZATA &&
+      canUseMensaException(
+        eligibility?.mensa.cittaId ?? null,
+        row.mensa.cittaId,
+      ),
   };
 }
 
@@ -529,10 +591,16 @@ router.post(
           "Mensa e magazzino devono appartenere alla stessa città",
         );
       }
-      if (!["logistico", "mensa"].includes(warehouse.tipoMagazzino)) {
+      if (warehouse.stato !== "attivo") {
         throw new MensaError(
           409,
-          "Il magazzino è già dedicato a un altro servizio e non può essere associato alla Mensa",
+          "Un magazzino non attivo non può essere associato a una Mensa",
+        );
+      }
+      if (warehouse.tipoMagazzino !== "mensa") {
+        throw new MensaError(
+          409,
+          "Il magazzino deve essere esplicitamente configurato come Mensa",
         );
       }
       const created = await db.transaction(async (tx) => {
@@ -549,10 +617,6 @@ router.post(
             createdBy: req.user!.id,
           })
           .returning();
-        await tx
-          .update(magazziniTable)
-          .set({ tipoMagazzino: "mensa" })
-          .where(eq(magazziniTable.id, magazzinoId));
         await tx.insert(auditConfigurazioniTable).values(
           auditValues(req, `mensa:${row.id}`, "creazione", null, {
             codice,
@@ -847,7 +911,11 @@ router.post(
       let motivoEsito: string = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
       let eligibility: Awaited<ReturnType<typeof activeEligibility>> | null =
         null;
-      if (!mensa.mensa.attiva) {
+      if (
+        !mensa.mensa.attiva ||
+        mensa.magazzinoStato !== "attivo" ||
+        mensa.magazzinoTipo !== "mensa"
+      ) {
         motivoEsito = ACCESSO_MOTIVI.MENSA_NON_ATTIVA;
       } else if (modalita === "tessera" && !tessera) {
         motivoEsito = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
@@ -944,14 +1012,32 @@ router.post(
       const motivo = text(req.body?.motivo, "Il motivo", 2000);
       const result = await db.transaction(async (tx) => {
         const [row] = await tx
-          .select({ accesso: mensaAccessiTable, destinazione: menseTable })
+          .select({
+            accesso: mensaAccessiTable,
+            destinazione: menseTable,
+            magazzinoStato: magazziniTable.stato,
+            magazzinoTipo: magazziniTable.tipoMagazzino,
+          })
           .from(mensaAccessiTable)
           .innerJoin(menseTable, eq(mensaAccessiTable.mensaId, menseTable.id))
+          .innerJoin(
+            magazziniTable,
+            eq(menseTable.magazzinoId, magazziniTable.id),
+          )
           .where(eq(mensaAccessiTable.id, accessoId))
           .for("update");
         if (!row) throw new MensaError(404, "Accesso non trovato");
         if (!canAccessCitta(row.destinazione.cittaId, callerCittaId(req)))
           throw new MensaError(403, "Accesso non disponibile");
+        if (
+          !row.destinazione.attiva ||
+          row.magazzinoStato !== "attivo" ||
+          row.magazzinoTipo !== "mensa"
+        )
+          throw new MensaError(
+            409,
+            "La Mensa o il magazzino associato non è attivo",
+          );
         if (
           row.accesso.esito !== "negato" ||
           row.accesso.motivoEsito !== ACCESSO_MOTIVI.MENSA_NON_AUTORIZZATA ||
@@ -964,11 +1050,14 @@ router.post(
         );
         if (
           !eligibility ||
-          eligibility.mensa.cittaId !== row.destinazione.cittaId
+          !canUseMensaException(
+            eligibility.mensa.cittaId,
+            row.destinazione.cittaId,
+          )
         )
           throw new MensaError(
             403,
-            "L'eccezione è consentita solo nella stessa città",
+            "L'eccezione è consentita solo nella stessa area territoriale",
           );
         const [exception] = await tx
           .insert(mensaEccezioniTable)
@@ -1004,7 +1093,7 @@ router.post(
             auditValues(
               req,
               `mensa-accesso:${accessoId}`,
-              "eccezione-stessa-citta",
+              "eccezione-stessa-area",
               row.accesso as unknown as Record<string, unknown>,
               access as unknown as Record<string, unknown>,
               motivo,
@@ -1092,6 +1181,7 @@ router.post(
       if (!access) throw new MensaError(404, "Accesso non trovato");
       if (!canAccessCitta(access.mensa.cittaId, callerCittaId(req)))
         throw new MensaError(403, "Accesso non disponibile");
+      await requireMensa(access.mensa.id, req, true);
       if (
         !["consentito", "consentito_eccezione"].includes(
           access.accesso.esito,
@@ -1761,6 +1851,7 @@ router.post(
         true,
       )!;
       const dataFine = dateOnly(req.body?.dataFine, "La data di fine");
+      const mensaPrincipale = req.body?.mensaPrincipale !== false;
       if (dataFine && dataFine < dataInizio)
         throw new MensaError(400, "La data di fine precede la data di inizio");
       const mensa = await requireMensa(mensaId, req, true);
@@ -1776,23 +1867,32 @@ router.post(
           400,
           "Beneficiario e Mensa devono appartenere alla stessa città",
         );
-      const [current] = await db
-        .select({ id: mensaAbilitazioniTable.id })
-        .from(mensaAbilitazioniTable)
-        .where(
-          and(
-            eq(mensaAbilitazioniTable.beneficiarioId, beneficiarioId),
-            eq(mensaAbilitazioniTable.stato, "attiva"),
-            eq(mensaAbilitazioniTable.mensaPrincipale, true),
-          ),
-        )
-        .limit(1);
-      if (current)
-        throw new MensaError(
-          409,
-          "Esiste già un'abilitazione principale attiva",
-        );
       const created = await db.transaction(async (tx) => {
+        if (mensaPrincipale) {
+          const today = dataServizioMensa();
+          await expireEndedPrincipalEligibilities(
+            tx,
+            beneficiarioId,
+            today,
+            req,
+          );
+          const [current] = await tx
+            .select({ id: mensaAbilitazioniTable.id })
+            .from(mensaAbilitazioniTable)
+            .where(
+              and(
+                eq(mensaAbilitazioniTable.beneficiarioId, beneficiarioId),
+                eq(mensaAbilitazioniTable.stato, "attiva"),
+                eq(mensaAbilitazioniTable.mensaPrincipale, true),
+              ),
+            )
+            .limit(1);
+          if (current)
+            throw new MensaError(
+              409,
+              "Esiste già un'abilitazione principale attiva",
+            );
+        }
         const [row] = await tx
           .insert(mensaAbilitazioniTable)
           .values({
@@ -1801,7 +1901,7 @@ router.post(
             dataInizio,
             dataFine,
             stato: "attiva",
-            mensaPrincipale: req.body?.mensaPrincipale !== false,
+            mensaPrincipale,
             motivo: optionalText(req.body?.motivo, "Il motivo", 2000),
             createdBy: req.user!.id,
           })

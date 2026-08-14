@@ -566,6 +566,7 @@ function MenseView() {
                 {warehouses
                   .filter(
                     (warehouse) =>
+                      warehouse.tipoMagazzino === "mensa" &&
                       !mense.some(
                         (mensa) => mensa.magazzinoId === warehouse.id,
                       ),

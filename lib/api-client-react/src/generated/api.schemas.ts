@@ -3911,6 +3911,7 @@ export interface Mensa {
   cittaId: number;
   /** @nullable */
   cittaNome?: string | null;
+  /** Magazzino attivo già configurato esplicitamente con tipo `mensa`; non viene effettuata alcuna conversione automatica. */
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
@@ -3937,6 +3938,7 @@ export interface MensaInput {
      */
   nome: string;
   cittaId: number;
+  /** Deve riferirsi a un magazzino attivo già configurato esplicitamente con tipo `mensa`; l'API non converte magazzini logistici esistenti. */
   magazzinoId: number;
   /** @nullable */
   indirizzo?: string | null;
