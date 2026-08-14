@@ -1,464 +1,397 @@
-import { useState, useEffect, useMemo } from "react";
-import { useListInterventi, useCreateIntervento, useUpdateIntervento, useListBeneficiari, useListCentriAscolto, useListTipiIntervento, useListCitta, getListInterventiQueryKey, getListCittaQueryKey, type Intervento } from "@workspace/api-client-react";
-import { useAuth } from "@/lib/auth";
+import {
+  getGetInterventiRiepilogoVisteQueryKey,
+  getGetInterventoQueryKey,
+  getListBeneficiariQueryKey,
+  getListBisogniPianificatiQueryKey,
+  getListInterventiOperatoriQueryKey,
+  getListInterventiQueryKey,
+  getListInterventoStoricoStatiQueryKey,
+  getListCittaQueryKey,
+  useCreateIntervento,
+  useGetIntervento,
+  useGetInterventiRiepilogoViste,
+  useListBeneficiari,
+  useListBisogniPianificati,
+  useListCentriAscolto,
+  useListCitta,
+  useListInterventi,
+  useListInterventiOperatori,
+  useListInterventoStoricoStati,
+  useListTipiIntervento,
+  type GetInterventiRiepilogoVisteParams,
+  type Intervento,
+  type InterventoInput,
+  type ListInterventiParams,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ExportButtons } from "@/components/export-buttons";
-import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
-import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
-import { InterventoStatoBadge, interventoDataLabel, withInterventoAmbito } from "@/components/intervento-workflow";
-import { Plus, Filter, Calendar, StickyNote } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { format } from "date-fns";
+import { ChevronDown, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ExportButtons } from "@/components/export-buttons";
+import { InterventoSocialeDetailSheet } from "@/components/intervento-sociale-detail-sheet";
+import {
+  InterventoSocialeFormSheet,
+  type InterventoSocialeCreateMode,
+} from "@/components/intervento-sociale-form-sheet";
+import { InterventiSocialiWorkspace } from "@/components/interventi-sociali-workspace";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
+import { monthRange } from "@/lib/europe-rome";
+import { invalidateInterventiSociali } from "@/lib/interventi-sociali-cache";
+import {
+  clearInterventiSocialiFilters,
+  parseInterventiSocialiFilters,
+  serializeInterventiSocialiFilters,
+  type InterventiSocialiFilters,
+} from "@/lib/interventi-sociali-filters";
 
-const formSchema = z.object({
-  beneficiarioId: z.coerce.number().min(1),
-  tipoIntervento: z.string().min(1),
-  dataIntervento: z.string().min(1),
-  descrizione: z.string().min(1),
-  esito: z.string().optional(),
-  note: z.string().optional(),
-  prossimAzione: z.string().optional(),
-  dataFollowup: z.string().optional(),
-  scadenzaIsee: z.string().optional(),
-  scadenzaRinnovo: z.string().optional(),
-  scadenzaAutodichiarazioneIndigenza: z.string().optional()
-});
+function optionalId(value: string): number | undefined {
+  return value ? Number(value) : undefined;
+}
+
+function useDebouncedValue(value: string, delay: number): string {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timeout);
+  }, [delay, value]);
+  return debounced;
+}
+
+function calendarInterval(filters: InterventiSocialiFilters): {
+  da?: string;
+  a?: string;
+  valid: boolean;
+} {
+  if (filters.modo !== "calendario") {
+    return filters.da && filters.a
+      ? { da: filters.da, a: filters.a, valid: filters.da <= filters.a }
+      : { valid: true };
+  }
+  const month = monthRange(filters.mese);
+  const da = filters.da
+    ? filters.da > month.da
+      ? filters.da
+      : month.da
+    : month.da;
+  const a = filters.a ? (filters.a < month.a ? filters.a : month.a) : month.a;
+  return { da, a, valid: da <= a };
+}
 
 export default function Interventi() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [filters, setFiltersState] = useState(() =>
+    parseInterventiSocialiFilters(window.location.search),
+  );
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] =
+    useState<InterventoSocialeCreateMode>("da_pianificare");
+  const [beneficiarySearch, setBeneficiarySearch] = useState("");
+  const [selectedInterventoId, setSelectedInterventoId] = useState<
+    number | null
+  >(null);
+  const debouncedSearch = useDebouncedValue(filters.ricerca, 300);
+  const debouncedBeneficiarySearch = useDebouncedValue(beneficiarySearch, 250);
+
+  const isGlobal = user?.cittaId == null;
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
-  const isCittaGlobal = user?.cittaId == null;
-  const isCittaFilterVisible = !isCentroLocked && isCittaGlobal;
-  const [cittaFilter, setCittaFilter] = useState("all");
-  const [tipoFilter, setTipoFilter] = useState("all");
-  const [centroFilter, setCentroFilter] = useState("all");
-  useEffect(() => {
-    if (isCentroLocked && lockedCentroId != null) {
-      setCentroFilter(String(lockedCentroId));
-    }
-  }, [isCentroLocked, lockedCentroId]);
-  const effectiveCittaId = isCittaGlobal
-    ? cittaFilter !== "all" ? parseInt(cittaFilter) : undefined
-    : user?.cittaId ?? undefined;
+  const cityRequired = isGlobal && !filters.cittaId;
+  const effectiveCittaId = isGlobal
+    ? optionalId(filters.cittaId)
+    : (user?.cittaId ?? undefined);
   const effectiveCentroId = isCentroLocked
     ? lockedCentroId
-    : centroFilter !== "all" ? parseInt(centroFilter) : undefined;
-  const { data: interventi, isLoading } = useListInterventi({
-    ambito: "sociale",
-    includiStorici: true,
-    tipo: tipoFilter !== "all" ? tipoFilter : undefined,
-    cittaId: effectiveCittaId,
-    centroAscoltoId: effectiveCentroId ?? undefined,
-  });
-  const { data: beneficiari } = useListBeneficiari({
-    attivo: true,
-    cittaId: effectiveCittaId,
-    centroAscoltoId: effectiveCentroId ?? undefined,
-  });
-  const { data: centri } = useListCentriAscolto();
-  const { data: cittaList } = useListCitta({
-    query: { queryKey: getListCittaQueryKey(), enabled: isCittaFilterVisible },
-  });
-  const { data: tipiIntervento } = useListTipiIntervento();
-  const cittaNotChosen = isCittaFilterVisible && cittaFilter === "all";
-  const centriFiltrati = useMemo(() => (centri ?? []).filter((c) => {
-    if (isCentroLocked) return true;
-    if (!isCittaGlobal) return true;
-    if (cittaFilter === "all") return false;
-    return c.cittaId != null && String(c.cittaId) === cittaFilter;
-  }), [centri, cittaFilter, isCentroLocked, isCittaGlobal]);
+    : optionalId(filters.centroAscoltoId);
 
-  const handleCittaFilterChange = (value: string) => {
-    setCittaFilter(value);
-    setCentroFilter("all");
+  useEffect(() => {
+    const onPopState = () =>
+      setFiltersState(parseInterventiSocialiFilters(window.location.search));
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const setFilters = (next: InterventiSocialiFilters) => {
+    setFiltersState(next);
+    window.history.pushState(
+      null,
+      "",
+      `${window.location.pathname}${serializeInterventiSocialiFilters(next)}`,
+    );
   };
 
-  // Built-in type keys are translated; admin-added custom names display as typed.
-  const tipoLabel = (nome: string) => t(`tipiIntervento.opt.${nome}`, { defaultValue: nome.replace(/_/g, " ") });
+  const interval = useMemo(() => calendarInterval(filters), [filters]);
+  const baseFilterParams = useMemo(
+    () => ({
+      ricerca: debouncedSearch || undefined,
+      tipo: filters.tipo || undefined,
+      priorita: (filters.priorita ||
+        undefined) as ListInterventiParams["priorita"],
+      operatoreId: optionalId(filters.operatoreId),
+      centroAscoltoId: effectiveCentroId,
+      cittaId: effectiveCittaId,
+      stato: (filters.stato || undefined) as ListInterventiParams["stato"],
+      ambitoLegacy: filters.ambitoLegacy,
+      da: interval.da,
+      a: interval.a,
+    }),
+    [
+      debouncedSearch,
+      effectiveCentroId,
+      effectiveCittaId,
+      filters.ambitoLegacy,
+      filters.operatoreId,
+      filters.priorita,
+      filters.stato,
+      filters.tipo,
+      interval.a,
+      interval.da,
+    ],
+  );
+  const listParams: ListInterventiParams = {
+    ...baseFilterParams,
+    ambito: "sociale",
+    includiStorici: true,
+    vista: filters.vista,
+    ordina: filters.ordina === "default" ? undefined : filters.ordina,
+    direzione: filters.ordina === "default" ? undefined : filters.direzione,
+  };
+  const summaryParams: GetInterventiRiepilogoVisteParams = {
+    ricerca: debouncedSearch || undefined,
+    tipo: filters.tipo || undefined,
+    priorita: (filters.priorita ||
+      undefined) as GetInterventiRiepilogoVisteParams["priorita"],
+    operatoreId: optionalId(filters.operatoreId),
+    centroAscoltoId: effectiveCentroId,
+    cittaId: effectiveCittaId,
+    stato: (filters.stato ||
+      undefined) as GetInterventiRiepilogoVisteParams["stato"],
+    ambitoLegacy: filters.ambitoLegacy,
+    ...(filters.da && filters.a ? { da: filters.da, a: filters.a } : {}),
+  };
+  const queryEnabled = !cityRequired && interval.valid;
 
-  const defaultTipo =
-    tipiIntervento?.find((tp) => tp.attivo && tp.nome === "colloquio")?.nome ??
-    tipiIntervento?.find((tp) => tp.attivo)?.nome ??
-    "colloquio";
-  
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const interventiQuery = useListInterventi(listParams, {
+    query: {
+      queryKey: getListInterventiQueryKey(listParams),
+      enabled: queryEnabled,
+    },
+  });
+  const summaryQuery = useGetInterventiRiepilogoViste(summaryParams, {
+    query: {
+      queryKey: getGetInterventiRiepilogoVisteQueryKey(summaryParams),
+      enabled:
+        !cityRequired && (!filters.da || !filters.a || filters.da <= filters.a),
+    },
+  });
+  const operatorParams = {
+    cittaId: effectiveCittaId,
+    centroAscoltoId: effectiveCentroId,
+  };
+  const operatorsQuery = useListInterventiOperatori(operatorParams, {
+    query: {
+      queryKey: getListInterventiOperatoriQueryKey(operatorParams),
+      enabled: !cityRequired,
+    },
+  });
+  const beneficiaryParams = {
+    attivo: true,
+    search: debouncedBeneficiarySearch || undefined,
+    cittaId: effectiveCittaId,
+    centroAscoltoId: effectiveCentroId,
+  };
+  const beneficiariesQuery = useListBeneficiari(beneficiaryParams, {
+    query: {
+      queryKey: getListBeneficiariQueryKey(beneficiaryParams),
+      enabled: !cityRequired,
+    },
+  });
+  const cittaQuery = useListCitta({
+    query: { queryKey: getListCittaQueryKey(), enabled: isGlobal },
+  });
+  const centersQuery = useListCentriAscolto();
+  const typesQuery = useListTipiIntervento();
 
+  const detailId = selectedInterventoId ?? 0;
+  const detailQuery = useGetIntervento(detailId, {
+    query: {
+      queryKey: getGetInterventoQueryKey(detailId),
+      enabled: selectedInterventoId != null,
+    },
+  });
+  const historyQuery = useListInterventoStoricoStati(detailId, {
+    query: {
+      queryKey: getListInterventoStoricoStatiQueryKey(detailId),
+      enabled: selectedInterventoId != null,
+    },
+  });
+  const needsQuery = useListBisogniPianificati(detailId, {
+    query: {
+      queryKey: getListBisogniPianificatiQueryKey(detailId),
+      enabled: selectedInterventoId != null,
+    },
+  });
   const createIntervento = useCreateIntervento();
-  const updateIntervento = useUpdateIntervento();
-  const [noteEditing, setNoteEditing] = useState<Intervento | null>(null);
-  const [noteText, setNoteText] = useState("");
 
-  const saveNote = () => {
-    if (!noteEditing) return;
-    updateIntervento.mutate(
-      { id: noteEditing.id, data: { note: noteText } },
+  const openForm = (mode: InterventoSocialeCreateMode) => {
+    setFormMode(mode);
+    setBeneficiarySearch("");
+    setFormOpen(true);
+  };
+
+  const create = (data: InterventoInput) => {
+    createIntervento.mutate(
+      { data },
       {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListInterventiQueryKey() });
-          toast({ title: t("interventi.toastNoteSaved") });
-          setNoteEditing(null);
+        onSuccess: async () => {
+          await invalidateInterventiSociali(queryClient);
+          toast({ title: t("interventi.toastRegistered") });
+          setFormOpen(false);
+        },
+        onError: (error) => {
+          const candidate = error as {
+            data?: { error?: string };
+            message?: string;
+          };
+          toast({
+            title: t("interventi.form.saveError"),
+            description: candidate.data?.error ?? candidate.message,
+            variant: "destructive",
+          });
         },
       },
     );
   };
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      beneficiarioId: 0,
-      tipoIntervento: "colloquio",
-      dataIntervento: new Date().toISOString().substring(0, 10),
-      descrizione: "",
-      esito: "",
-      note: "",
-      prossimAzione: "",
-      dataFollowup: "",
-      scadenzaIsee: "",
-      scadenzaRinnovo: "",
-      scadenzaAutodichiarazioneIndigenza: ""
-    }
+  const interventi = interventiQuery.data ?? [];
+  const allCenters = centersQuery.data ?? [];
+  const centers = allCenters.filter((center) => {
+    if (isCentroLocked) return center.id === lockedCentroId;
+    if (!effectiveCittaId) return true;
+    return center.cittaId == null || center.cittaId === effectiveCittaId;
   });
 
-  const selectedBeneficiarioId = form.watch("beneficiarioId");
-  const selectedBeneficiario = useMemo(
-    () => (beneficiari ?? []).find((b) => b.id === Number(selectedBeneficiarioId)),
-    [beneficiari, selectedBeneficiarioId],
-  );
-
-  const handleBeneficiarioScan = (value: string) => {
-    const scanned = value.trim();
-    const found = (beneficiari ?? []).find((b) => (b.codice ?? "").trim().toLowerCase() === scanned.toLowerCase());
-    if (!found) {
-      form.setError("beneficiarioId", { type: "manual", message: `${t("common.noResults")} (${scanned})` });
-      return;
-    }
-    form.setValue("beneficiarioId", found.id, { shouldDirty: true, shouldValidate: true });
-    form.clearErrors("beneficiarioId");
-  };
-
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const data = withInterventoAmbito({
-      ...values,
-      dataFollowup: values.dataFollowup || undefined,
-      scadenzaIsee: values.scadenzaIsee || undefined,
-      scadenzaRinnovo: values.scadenzaRinnovo || undefined,
-      scadenzaAutodichiarazioneIndigenza: values.scadenzaAutodichiarazioneIndigenza || undefined,
-    }, "sociale");
-    createIntervento.mutate({ data }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListInterventiQueryKey() });
-        toast({ title: t("interventi.toastRegistered") });
-        setIsFormOpen(false);
-      }
-    });
-  };
-
-  const getSingleBadge = (tipo: string) => {
-    switch(tipo) {
-      case 'colloquio': return <Badge key={tipo} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t("interventi.colloquio")}</Badge>;
-      case 'pacco_alimentare': return <Badge key={tipo} variant="outline" className="bg-green-50 text-green-700 border-green-200">{t("interventi.paccoAlimentare")}</Badge>;
-      case 'vestiti':
-      case 'vestiario': return <Badge key={tipo} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{t("interventi.badgeVestiti")}</Badge>;
-      case 'igiene': return <Badge key={tipo} variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">{t("interventi.igiene")}</Badge>;
-      case 'medicinali': return <Badge key={tipo} variant="outline" className="bg-red-50 text-red-700 border-red-200">{t("interventi.medicinali")}</Badge>;
-      default: return <Badge key={tipo} variant="outline" className="capitalize">{tipo.replace('_', ' ')}</Badge>;
-    }
-  };
-
-  const getTipoBadge = (tipo: string) => {
-    const tipi = tipo.split(",").map(t => t.trim()).filter(Boolean);
-    return <div className="flex flex-wrap gap-1">{tipi.map(getSingleBadge)}</div>;
-  };
-
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
+    <div className="mx-auto max-w-[96rem] space-y-6 p-4 sm:p-6">
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("interventi.title")}</h1>
-          <p className="text-muted-foreground">{t("interventi.subtitle")}</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("interventi.title")}
+          </h1>
+          <p className="text-muted-foreground">
+            {t("interventi.unifiedSubtitle")}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap gap-2">
           <ExportButtons
-            rows={interventi ?? []}
+            rows={interventi}
             columns={[
-              { header: t("interventi.beneficiario"), accessor: (i) => i.beneficiarioNome },
-              { header: t("common.date"), accessor: (i: Intervento) => interventoDataLabel(i) },
-              { header: t("interventi.tipoIntervento"), accessor: (i) => i.tipoIntervento },
-              { header: t("interventi.operatore"), accessor: (i) => i.operatoreCodice },
-              { header: t("common.description"), accessor: (i) => i.descrizione },
-              { header: t("interventi.esito"), accessor: (i) => i.esito },
-              { header: t("interventi.scadenzaIseeCol"), accessor: (i) => i.scadenzaIsee ? new Date(i.scadenzaIsee).toLocaleDateString("it-IT") : "" },
-              { header: t("interventi.scadenzaRinnovoCol"), accessor: (i) => i.scadenzaRinnovo ? new Date(i.scadenzaRinnovo).toLocaleDateString("it-IT") : "" },
-              { header: t("interventi.scadenzaAutodichCol"), accessor: (i) => i.scadenzaAutodichiarazioneIndigenza ? new Date(i.scadenzaAutodichiarazioneIndigenza).toLocaleDateString("it-IT") : "" },
+              {
+                header: t("interventi.beneficiario"),
+                accessor: (row: Intervento) => row.beneficiarioNome,
+              },
+              {
+                header: t("interventi.tipoIntervento"),
+                accessor: (row: Intervento) => row.tipoIntervento,
+              },
+              {
+                header: t("interventi.detail.state"),
+                accessor: (row: Intervento) => row.stato,
+              },
+              {
+                header: t("interventi.detail.priority"),
+                accessor: (row: Intervento) => row.priorita,
+              },
+              {
+                header: t("interventi.operatore"),
+                accessor: (row: Intervento) =>
+                  row.operatoreNome ?? row.operatoreCodice,
+              },
             ]}
-            filename="interventi"
+            filename="interventi-sociali"
             title={t("interventi.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => { form.setValue("tipoIntervento", defaultTipo); form.clearErrors("beneficiarioId"); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("interventi.registerIntervention")}</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button disabled={cityRequired} className="gap-2">
+                <Plus className="h-4 w-4" /> {t("interventi.newAction")}
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => openForm("da_pianificare")}>
+                {t("interventi.form.actions.da_pianificare")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openForm("pianificato")}>
+                {t("interventi.form.actions.pianificato")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openForm("gia_effettuato")}>
+                {t("interventi.form.actions.gia_effettuato")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
+      </header>
 
-      <Card>
-        <CardHeader className="py-4 border-b">
-          <div className="flex flex-wrap items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            {isCittaFilterVisible && (
-              <Select value={cittaFilter} onValueChange={handleCittaFilterChange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder={t("udsAnagrafica.allCitta")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("udsAnagrafica.allCitta")}</SelectItem>
-                  {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-            <Select value={tipoFilter} onValueChange={setTipoFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder={t("interventi.filterAllTypes")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("interventi.filterAllTypes")}</SelectItem>
-                {tipiIntervento?.filter((tp) => tp.attivo).map((tp) => (
-                  <SelectItem key={tp.id} value={tp.nome}>{tipoLabel(tp.nome)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={centroFilter} onValueChange={setCentroFilter} disabled={isCentroLocked || cittaNotChosen}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t("interventi.filterAllCenters")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("interventi.filterAllCenters")}</SelectItem>
-                {centriFiltrati.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("common.date")}</TableHead>
-                <TableHead>{t("interventi.beneficiario")}</TableHead>
-                <TableHead>{t("interventi.tipoIntervento")}</TableHead>
-                <TableHead>{t("interventi.workflowState")}</TableHead>
-                <TableHead>{t("interventi.operatore")}</TableHead>
-                <TableHead>{t("common.description")}</TableHead>
-                <TableHead>{t("interventi.thScadenze")}</TableHead>
-                <TableHead>{t("interventi.thFollowup")}</TableHead>
-                <TableHead className="text-right">{t("interventi.thAzioni")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array(5).fill(0).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
-                  </TableRow>
-                ))
-              ) : interventi?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">{t("interventi.emptyState")}</TableCell>
-                </TableRow>
-              ) : interventi?.map((i) => (
-                <TableRow key={i.id} className={i.note ? "bg-amber-50/60" : ""}>
-                  <TableCell className="text-sm font-medium">
-                    {interventoDataLabel(i)}
-                  </TableCell>
-                  <TableCell className="font-medium">{i.beneficiarioNome}</TableCell>
-                  <TableCell>{getTipoBadge(i.tipoIntervento)}</TableCell>
-                  <TableCell><InterventoStatoBadge stato={i.stato} /></TableCell>
-                  <TableCell className="text-sm">
-                    {i.operatoreCodice ? (
-                      <Badge variant="secondary" className="font-mono">{i.operatoreCodice}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground truncate max-w-[300px]">
-                    {i.descrizione}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {(i.scadenzaIsee || i.scadenzaRinnovo || i.scadenzaAutodichiarazioneIndigenza) ? (
-                      <div className="flex flex-col gap-0.5">
-                        {i.scadenzaIsee && <span><span className="text-muted-foreground">{t("interventi.labelIsee")}</span> {format(new Date(i.scadenzaIsee), "dd/MM/yyyy")}</span>}
-                        {i.scadenzaRinnovo && <span><span className="text-muted-foreground">{t("interventi.labelRinnovo")}</span> {format(new Date(i.scadenzaRinnovo), "dd/MM/yyyy")}</span>}
-                        {i.scadenzaAutodichiarazioneIndigenza && <span><span className="text-muted-foreground">{t("interventi.labelAutodich")}</span> {format(new Date(i.scadenzaAutodichiarazioneIndigenza), "dd/MM/yyyy")}</span>}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {i.dataFollowup ? (
-                      <div className="flex items-center gap-1 text-amber-600">
-                        <Calendar className="h-3 w-3" /> {format(new Date(i.dataFollowup), "dd/MM")}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant={i.note ? "secondary" : "ghost"}
-                      size="sm"
-                      className={`gap-1 ${i.note ? "bg-amber-100 text-amber-900 hover:bg-amber-200" : ""}`}
-                      onClick={() => { setNoteEditing(i); setNoteText(i.note ?? ""); }}
-                    >
-                      <StickyNote className="h-3.5 w-3.5" />
-                      {i.note ? t("interventi.editNote") : t("interventi.addNote")}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <InterventiSocialiWorkspace
+        filters={filters}
+        interventi={interventi}
+        counts={summaryQuery.data}
+        citta={cittaQuery.data ?? []}
+        centri={centers}
+        tipi={typesQuery.data ?? []}
+        operatori={operatorsQuery.data ?? []}
+        isGlobal={isGlobal}
+        isCentroLocked={isCentroLocked}
+        cityRequired={cityRequired}
+        isLoading={interventiQuery.isLoading}
+        isError={interventiQuery.isError || !interval.valid}
+        onFiltersChange={setFilters}
+        onReset={() => setFilters(clearInterventiSocialiFilters(filters))}
+        onOpenIntervento={(intervento) =>
+          setSelectedInterventoId(intervento.id)
+        }
+      />
 
-      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{t("interventi.newIntervention")}</SheetTitle>
-          </SheetHeader>
-          <div className="mt-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="beneficiarioId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("interventi.beneficiario")}</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <BeneficiarioCombobox
-                          items={beneficiari ?? []}
-                          value={field.value ? String(field.value) : ""}
-                          onChange={(value) => {
-                            field.onChange(Number(value));
-                            form.clearErrors("beneficiarioId");
-                          }}
-                          placeholder={t("interventi.selectPlaceholder")}
-                          disabled={createIntervento.isPending}
-                          selectedLabelFallback={selectedBeneficiario ? `${selectedBeneficiario.cognome} ${selectedBeneficiario.nome}` : null}
-                        />
-                      </FormControl>
-                      <BarcodeScannerButton onScan={handleBeneficiarioScan} disabled={createIntervento.isPending} />
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+      <InterventoSocialeFormSheet
+        open={formOpen}
+        mode={formMode}
+        beneficiari={beneficiariesQuery.data ?? []}
+        tipi={typesQuery.data ?? []}
+        operatori={operatorsQuery.data ?? []}
+        currentOperatorId={user?.id}
+        beneficiarySearch={beneficiarySearch}
+        isPending={createIntervento.isPending}
+        onBeneficiarySearch={setBeneficiarySearch}
+        onOpenChange={setFormOpen}
+        onSubmit={create}
+      />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="tipoIntervento" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("common.type")}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {tipiIntervento?.filter((tp) => tp.attivo).map((tp) => (
-                            <SelectItem key={tp.id} value={tp.nome}>{tipoLabel(tp.nome)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="dataIntervento" render={({ field }) => (
-                    <FormItem><FormLabel>{t("common.date")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
-                  )} />
-                </div>
-
-                <FormField control={form.control} name="descrizione" render={({ field }) => (
-                  <FormItem><FormLabel>{t("interventi.descrizioneLabel")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                )} />
-                <FormField control={form.control} name="esito" render={({ field }) => (
-                  <FormItem><FormLabel>{t("interventi.esito")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                )} />
-                <FormField control={form.control} name="note" render={({ field }) => (
-                  <FormItem><FormLabel>{t("interventi.noteFormLabel")}</FormLabel><FormControl><Textarea rows={3} placeholder={t("interventi.notePlaceholder")} {...field} /></FormControl></FormItem>
-                )} />
-                
-                <div className="pt-4 border-t space-y-4">
-                  <FormField control={form.control} name="prossimAzione" render={({ field }) => (
-                    <FormItem><FormLabel>{t("interventi.prossimaAzione")}</FormLabel><FormControl><Input placeholder={t("interventi.prossimaAzionePlaceholder")} {...field} /></FormControl></FormItem>
-                  )} />
-                  <FormField control={form.control} name="dataFollowup" render={({ field }) => (
-                    <FormItem><FormLabel>{t("interventi.dataFollowup")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
-                  )} />
-                </div>
-
-                <div className="pt-4 border-t space-y-4">
-                  <h4 className="text-sm font-semibold text-muted-foreground">{t("interventi.scadenzeDocumenti")}</h4>
-                  <FormField control={form.control} name="scadenzaIsee" render={({ field }) => (
-                    <FormItem><FormLabel>{t("interventi.scadenzaIseeCol")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
-                  )} />
-                  <FormField control={form.control} name="scadenzaRinnovo" render={({ field }) => (
-                    <FormItem><FormLabel>{t("interventi.scadenzaRinnovoForm")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
-                  )} />
-                  <FormField control={form.control} name="scadenzaAutodichiarazioneIndigenza" render={({ field }) => (
-                    <FormItem><FormLabel>{t("interventi.scadenzaAutodichForm")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
-                  )} />
-                </div>
-
-                <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createIntervento.isPending}>{t("common.save")}</Button>
-                </div>
-              </form>
-            </Form>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <Dialog open={noteEditing != null} onOpenChange={(open) => !open && setNoteEditing(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("interventi.noteDialogTitle")}</DialogTitle>
-          </DialogHeader>
-          {noteEditing && (
-            <p className="text-sm text-muted-foreground -mt-2">
-              {noteEditing.beneficiarioNome} · {interventoDataLabel(noteEditing)}
-            </p>
-          )}
-          <Textarea
-            rows={5}
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            placeholder={t("interventi.notePlaceholder")}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNoteEditing(null)}>{t("common.cancel")}</Button>
-            <Button onClick={saveNote} disabled={updateIntervento.isPending}>{t("common.save")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <InterventoSocialeDetailSheet
+        open={selectedInterventoId != null}
+        intervento={detailQuery.data}
+        storico={historyQuery.data}
+        bisogni={needsQuery.data}
+        isLoading={
+          detailQuery.isLoading ||
+          historyQuery.isLoading ||
+          needsQuery.isLoading
+        }
+        onOpenChange={(open) => {
+          if (!open) setSelectedInterventoId(null);
+        }}
+      />
     </div>
   );
 }

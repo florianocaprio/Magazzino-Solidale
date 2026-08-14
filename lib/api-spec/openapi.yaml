@@ -1305,6 +1305,58 @@ paths:
           in: query
           schema:
             type: integer
+        - name: vista
+          in: query
+          description: Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
+          schema:
+            $ref: "#/components/schemas/InterventoVista"
+        - name: ricerca
+          in: query
+          description: Ricerca beneficiario per nome, cognome, nome completo o codice.
+          schema:
+            type: string
+            maxLength: 120
+        - name: da
+          in: query
+          description: Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
+          schema:
+            type: string
+            format: date
+        - name: a
+          in: query
+          description: Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
+          schema:
+            type: string
+            format: date
+        - name: ordina
+          in: query
+          schema:
+            type: string
+            enum: [data, priorita, beneficiario, operatore]
+        - name: direzione
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+        - name: ambitoLegacy
+          in: query
+          description: Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
+          schema:
+            type: string
+            enum: [tutti, classificati, legacy]
+        - name: pagina
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limite
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 200
       responses:
         "200":
           description: List of interventions
@@ -1330,6 +1382,77 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Intervento"
+
+  /interventi/riepilogo-viste:
+    get:
+      operationId: getInterventiRiepilogoViste
+      tags: [interventi]
+      description: Restituisce in una singola query aggregata i contatori delle viste Sociali autorizzate, includendo conservativamente i record legacy.
+      parameters:
+        - name: beneficiarioId
+          in: query
+          schema: { type: integer }
+        - name: ricerca
+          in: query
+          schema: { type: string, maxLength: 120 }
+        - name: tipo
+          in: query
+          schema: { type: string }
+        - name: priorita
+          in: query
+          schema: { $ref: "#/components/schemas/InterventoPriorita" }
+        - name: operatoreId
+          in: query
+          schema: { type: integer }
+        - name: centroAscoltoId
+          in: query
+          schema: { type: integer }
+        - name: cittaId
+          in: query
+          schema: { type: integer }
+        - name: stato
+          in: query
+          schema: { $ref: "#/components/schemas/InterventoStato" }
+        - name: ambitoLegacy
+          in: query
+          schema:
+            type: string
+            enum: [tutti, classificati, legacy]
+        - name: da
+          in: query
+          schema: { type: string, format: date }
+        - name: a
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Contatori delle viste Sociali
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterventiRiepilogoViste"
+
+  /interventi/operatori:
+    get:
+      operationId: listInterventiOperatori
+      tags: [interventi]
+      description: Operatori assegnabili o già presenti negli interventi Sociali visibili al chiamante.
+      parameters:
+        - name: centroAscoltoId
+          in: query
+          schema: { type: integer }
+        - name: cittaId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Operatori autorizzati
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterventoOperatore"
 
   /interventi/{id}:
     get:
@@ -3448,7 +3571,15 @@ paths:
           required: false
           schema:
             type: string
-            enum: [ricarica_mensile, ricarica_manuale, rettifica_positiva, rettifica_negativa, storno, consumo_spesa]
+            enum:
+              [
+                ricarica_mensile,
+                ricarica_manuale,
+                rettifica_positiva,
+                rettifica_negativa,
+                storno,
+                consumo_spesa,
+              ]
         - name: periodoRiferimento
           in: query
           required: false
@@ -4643,7 +4774,8 @@ components:
                 type: number
               pesoKg:
                 type: number
-            required: [prodottoId, prodottoNome, unitaMisura, quantitaTotale, pesoKg]
+            required:
+              [prodottoId, prodottoNome, unitaMisura, quantitaTotale, pesoKg]
         persone:
           type: object
           properties:
@@ -4671,8 +4803,30 @@ components:
               type: integer
             extraUeFemmine:
               type: integer
-          required: [maschi, femmine, ue, extraUe, maschiAdulti, maschiMinori, femmineAdulte, femmineMinori, ueMaschi, ueFemmine, extraUeMaschi, extraUeFemmine]
-      required: [anno, pesoTotaleKg, beneficiariTotali, personeTotali, prodotti, persone]
+          required:
+            [
+              maschi,
+              femmine,
+              ue,
+              extraUe,
+              maschiAdulti,
+              maschiMinori,
+              femmineAdulte,
+              femmineMinori,
+              ueMaschi,
+              ueFemmine,
+              extraUeMaschi,
+              extraUeFemmine,
+            ]
+      required:
+        [
+          anno,
+          pesoTotaleKg,
+          beneficiariTotali,
+          personeTotali,
+          prodotti,
+          persone,
+        ]
 
     HealthStatus:
       type: object
@@ -4705,7 +4859,19 @@ components:
           type: integer
         interventiMese:
           type: integer
-      required: [totMagazzini, totProdotti, totBeneficiari, totVolontari, consegneOggi, consegneMese, lottiInScadenza, prodottiSottoscorta, trasferimentiInCorso, interventiMese]
+      required:
+        [
+          totMagazzini,
+          totProdotti,
+          totBeneficiari,
+          totVolontari,
+          consegneOggi,
+          consegneMese,
+          lottiInScadenza,
+          prodottiSottoscorta,
+          trasferimentiInCorso,
+          interventiMese,
+        ]
 
     Alert:
       type: object
@@ -4743,7 +4909,17 @@ components:
           type: string
         dataMovimento:
           type: string
-      required: [id, tipo, tipoDettaglio, prodottoNome, magazzinoNome, quantita, unitaMisura, dataMovimento]
+      required:
+        [
+          id,
+          tipo,
+          tipoDettaglio,
+          prodottoNome,
+          magazzinoNome,
+          quantita,
+          unitaMisura,
+          dataMovimento,
+        ]
 
     # ── Magazzini ──────────────────────────────────────────────────────────
     Magazzino:
@@ -4957,7 +5133,25 @@ components:
           type: string
         fornitoreId:
           type: ["integer", "null"]
-      required: [id, codice, nome, tipoProdotto, unitaMisura, gestioneLotto, gestioneScadenza, fsePlus, scortaMinima, scortaConsigliata, abilitatoEmporio, creditoSolidaleValore, quantitaMassimaPerSpesa, quantitaMassimaMensile, attivo, dataCreazione]
+      required:
+        [
+          id,
+          codice,
+          nome,
+          tipoProdotto,
+          unitaMisura,
+          gestioneLotto,
+          gestioneScadenza,
+          fsePlus,
+          scortaMinima,
+          scortaConsigliata,
+          abilitatoEmporio,
+          creditoSolidaleValore,
+          quantitaMassimaPerSpesa,
+          quantitaMassimaMensile,
+          attivo,
+          dataCreazione,
+        ]
 
     ProdottoInput:
       type: object
@@ -5094,7 +5288,17 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, prodottoId, dataCarico, quantitaCaricata, quantitaResidua, magazzinoId, fsePlus, dataCreazione]
+      required:
+        [
+          id,
+          prodottoId,
+          dataCarico,
+          quantitaCaricata,
+          quantitaResidua,
+          magazzinoId,
+          fsePlus,
+          dataCreazione,
+        ]
 
     LottoInput:
       type: object
@@ -5169,7 +5373,18 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, tipoMovimento, tipoDettaglio, dataMovimento, magazzinoId, prodottoId, quantita, unitaMisura, dataCreazione]
+      required:
+        [
+          id,
+          tipoMovimento,
+          tipoDettaglio,
+          dataMovimento,
+          magazzinoId,
+          prodottoId,
+          quantita,
+          unitaMisura,
+          dataCreazione,
+        ]
 
     MovimentoInput:
       type: object
@@ -5198,7 +5413,16 @@ components:
           type: string
         note:
           type: string
-      required: [tipoMovimento, tipoDettaglio, dataMovimento, magazzinoId, prodottoId, quantita, unitaMisura]
+      required:
+        [
+          tipoMovimento,
+          tipoDettaglio,
+          dataMovimento,
+          magazzinoId,
+          prodottoId,
+          quantita,
+          unitaMisura,
+        ]
 
     # ── Giacenze ──────────────────────────────────────────────────────────
     Giacenza:
@@ -5236,7 +5460,24 @@ components:
           type: integer
         prossimaScadenza:
           type: ["string", "null"]
-      required: [prodottoId, prodottoNome, prodottoCodice, tipoProdotto, unitaMisura, magazzinoId, magazzinoNome, quantitaTotale, giacenzaFisica, impegnato, disponibileReale, scortaMinima, scortaConsigliata, sottoscorta, lottiAttivi]
+      required:
+        [
+          prodottoId,
+          prodottoNome,
+          prodottoCodice,
+          tipoProdotto,
+          unitaMisura,
+          magazzinoId,
+          magazzinoNome,
+          quantitaTotale,
+          giacenzaFisica,
+          impegnato,
+          disponibileReale,
+          scortaMinima,
+          scortaConsigliata,
+          sottoscorta,
+          lottiAttivi,
+        ]
 
     # ── Preparazione Consegne ─────────────────────────────────────────────
     PreparazioneRiga:
@@ -5258,7 +5499,16 @@ components:
           type: number
         sufficiente:
           type: boolean
-      required: [prodottoId, prodottoNome, unitaMisura, quantitaRichiesta, numConsegne, quantitaDisponibile, sufficiente]
+      required:
+        [
+          prodottoId,
+          prodottoNome,
+          unitaMisura,
+          quantitaRichiesta,
+          numConsegne,
+          quantitaDisponibile,
+          sufficiente,
+        ]
     PreparazioneConsegnaRef:
       type: object
       properties:
@@ -5278,7 +5528,15 @@ components:
           type: integer
         bollaNumero:
           type: string
-      required: [consegnaId, beneficiarioId, beneficiarioNome, tipoConsegna, bollaId, bollaNumero]
+      required:
+        [
+          consegnaId,
+          beneficiarioId,
+          beneficiarioNome,
+          tipoConsegna,
+          bollaId,
+          bollaNumero,
+        ]
     PreparazioneConsegne:
       type: object
       properties:
@@ -5346,7 +5604,16 @@ components:
             $ref: "#/components/schemas/TrasferimentoRiga"
         dataCreazione:
           type: string
-      required: [id, codice, magazzinoOrigineId, magazzinoDestinoId, dataRichiesta, stato, dataCreazione]
+      required:
+        [
+          id,
+          codice,
+          magazzinoOrigineId,
+          magazzinoDestinoId,
+          dataRichiesta,
+          stato,
+          dataCreazione,
+        ]
 
     TrasferimentoInput:
       type: object
@@ -5724,7 +5991,8 @@ components:
           type: string
         note:
           type: ["string", "null"]
-      required: [id, prodottoId, quantitaRichiesta, quantitaRicevuta, unitaMisura]
+      required:
+        [id, prodottoId, quantitaRichiesta, quantitaRicevuta, unitaMisura]
 
     ApprovvigionamentoRigaInput:
       type: object
@@ -5991,7 +6259,32 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, fasciaEtaPresunta, fasciaEtaCorrente, fasciaEtaOrigine, numComponenti, numMinori, numAnziani, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleSaldo, creditoSolidaleDataUltimoMovimento, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, uds, attivo, dataCreazione]
+      required:
+        [
+          id,
+          codice,
+          cognome,
+          nome,
+          fasciaEtaPresunta,
+          fasciaEtaCorrente,
+          fasciaEtaOrigine,
+          numComponenti,
+          numMinori,
+          numAnziani,
+          priorita,
+          consegnaDomicilio,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          creditoSolidaleMensileAssegnato,
+          creditoSolidaleSaldo,
+          creditoSolidaleDataUltimoMovimento,
+          creditoSolidaleMensileManuale,
+          creditoSolidaleMotivoModifica,
+          creditoSolidaleDataUltimaModificaQuota,
+          uds,
+          attivo,
+          dataCreazione,
+        ]
 
     BeneficiarioDettaglio:
       type: object
@@ -6127,7 +6420,34 @@ components:
             $ref: "#/components/schemas/Consegna"
         dataCreazione:
           type: string
-      required: [id, codice, cognome, nome, fasciaEtaPresunta, fasciaEtaCorrente, fasciaEtaOrigine, numComponenti, numFigliMaschi, numFiglieFemmine, numMinori, numAnziani, numDisabili, priorita, consegnaDomicilio, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleMensileAssegnato, creditoSolidaleSaldo, creditoSolidaleDataUltimoMovimento, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota, attivo, dataCreazione]
+      required:
+        [
+          id,
+          codice,
+          cognome,
+          nome,
+          fasciaEtaPresunta,
+          fasciaEtaCorrente,
+          fasciaEtaOrigine,
+          numComponenti,
+          numFigliMaschi,
+          numFiglieFemmine,
+          numMinori,
+          numAnziani,
+          numDisabili,
+          priorita,
+          consegnaDomicilio,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          creditoSolidaleMensileAssegnato,
+          creditoSolidaleSaldo,
+          creditoSolidaleDataUltimoMovimento,
+          creditoSolidaleMensileManuale,
+          creditoSolidaleMotivoModifica,
+          creditoSolidaleDataUltimaModificaQuota,
+          attivo,
+          dataCreazione,
+        ]
 
     BeneficiarioInput:
       type: object
@@ -6376,7 +6696,27 @@ components:
           type: string
         dataAggiornamento:
           type: ["string", "null"]
-      required: [id, nome, centroAscoltoId, centroAscoltoNome, cittaId, cittaNome, attiva, creditoBaseNucleo, creditoPerComponente, bonusMinore, bonusAnziano, bonusDisabile, creditoMinimoMensile, creditoMassimoMensile, giornoRicaricaMensile, ricaricaAutomaticaAbilitata, arrotondamento, dataCreazione]
+      required:
+        [
+          id,
+          nome,
+          centroAscoltoId,
+          centroAscoltoNome,
+          cittaId,
+          cittaNome,
+          attiva,
+          creditoBaseNucleo,
+          creditoPerComponente,
+          bonusMinore,
+          bonusAnziano,
+          bonusDisabile,
+          creditoMinimoMensile,
+          creditoMassimoMensile,
+          giornoRicaricaMensile,
+          ricaricaAutomaticaAbilitata,
+          arrotondamento,
+          dataCreazione,
+        ]
 
     PoliticaCreditoSolidaleInput:
       type: object
@@ -6499,7 +6839,19 @@ components:
           enum: [nessuno, intero_superiore, intero_inferiore, intero_piu_vicino]
         totaleSuggerito:
           type: number
-      required: [creditoBaseNucleo, quotaComponenti, quotaMinori, quotaAnziani, quotaDisabili, totalePrimaDeiLimiti, creditoMinimoApplicato, creditoMassimoApplicato, arrotondamentoApplicato, totaleSuggerito]
+      required:
+        [
+          creditoBaseNucleo,
+          quotaComponenti,
+          quotaMinori,
+          quotaAnziani,
+          quotaDisabili,
+          totalePrimaDeiLimiti,
+          creditoMinimoApplicato,
+          creditoMassimoApplicato,
+          arrotondamentoApplicato,
+          totaleSuggerito,
+        ]
 
     CreditoSolidaleCalcolo:
       type: object
@@ -6521,7 +6873,17 @@ components:
           type: number
         dettaglio:
           $ref: "#/components/schemas/CreditoSolidaleCalcoloDettaglio"
-      required: [beneficiarioId, politicaId, politicaNome, politicaOrigine, giornoRicaricaMensile, ricaricaAutomaticaAbilitata, totaleSuggerito, dettaglio]
+      required:
+        [
+          beneficiarioId,
+          politicaId,
+          politicaNome,
+          politicaOrigine,
+          giornoRicaricaMensile,
+          ricaricaAutomaticaAbilitata,
+          totaleSuggerito,
+          dettaglio,
+        ]
 
     CreditoSolidaleMovimento:
       type: object
@@ -6542,7 +6904,15 @@ components:
           type: ["string", "null"]
         tipoMovimento:
           type: string
-          enum: [ricarica_mensile, ricarica_manuale, rettifica_positiva, rettifica_negativa, storno, consumo_spesa]
+          enum:
+            [
+              ricarica_mensile,
+              ricarica_manuale,
+              rettifica_positiva,
+              rettifica_negativa,
+              storno,
+              consumo_spesa,
+            ]
         variazioneCredito:
           type: number
         saldoPrima:
@@ -6575,7 +6945,32 @@ components:
           type: boolean
         annullatoDaMovimentoId:
           type: ["integer", "null"]
-      required: [id, beneficiarioId, beneficiarioNome, centroAscoltoId, centroAscoltoNome, cittaId, cittaNome, tipoMovimento, variazioneCredito, saldoPrima, saldoDopo, periodoRiferimento, politicaCreditoSolidaleId, quotaMensileAssegnata, origine, riferimentoId, riferimentoTipo, note, motivo, dataMovimento, dataCreazione, annullato, annullatoDaMovimentoId]
+      required:
+        [
+          id,
+          beneficiarioId,
+          beneficiarioNome,
+          centroAscoltoId,
+          centroAscoltoNome,
+          cittaId,
+          cittaNome,
+          tipoMovimento,
+          variazioneCredito,
+          saldoPrima,
+          saldoDopo,
+          periodoRiferimento,
+          politicaCreditoSolidaleId,
+          quotaMensileAssegnata,
+          origine,
+          riferimentoId,
+          riferimentoTipo,
+          note,
+          motivo,
+          dataMovimento,
+          dataCreazione,
+          annullato,
+          annullatoDaMovimentoId,
+        ]
 
     CreditoSolidaleSaldo:
       type: object
@@ -6596,7 +6991,16 @@ components:
         dataUltimoMovimento:
           type: ["string", "null"]
           format: date-time
-      required: [beneficiarioId, beneficiarioNome, creditoSolidaleAbilitato, creditoSolidaleStato, saldoAttuale, creditoSolidaleMensileAssegnato, dataUltimoMovimento]
+      required:
+        [
+          beneficiarioId,
+          beneficiarioNome,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          saldoAttuale,
+          creditoSolidaleMensileAssegnato,
+          dataUltimoMovimento,
+        ]
 
     CreditoSolidaleRefreshInput:
       type: object
@@ -6624,7 +7028,8 @@ components:
             - type: "null"
         messaggio:
           type: string
-      required: [periodoRiferimento, ricaricaEseguita, movimento, saldo, messaggio]
+      required:
+        [periodoRiferimento, ricaricaEseguita, movimento, saldo, messaggio]
 
     CreditoSolidaleRicaricaManualeInput:
       type: object
@@ -6697,7 +7102,21 @@ components:
           type: ["string", "null"]
         saldoPrevistoDopoRicarica:
           type: ["number", "null"]
-      required: [beneficiarioId, beneficiarioNome, centroAscoltoId, centroAscoltoNome, cittaId, cittaNome, creditoSolidaleMensileAssegnato, saldoAttuale, ricaricabile, giaRicaricato, motivoEsclusione, saldoPrevistoDopoRicarica]
+      required:
+        [
+          beneficiarioId,
+          beneficiarioNome,
+          centroAscoltoId,
+          centroAscoltoNome,
+          cittaId,
+          cittaNome,
+          creditoSolidaleMensileAssegnato,
+          saldoAttuale,
+          ricaricabile,
+          giaRicaricato,
+          motivoEsclusione,
+          saldoPrevistoDopoRicarica,
+        ]
 
     CreditoSolidaleRicaricaMensilePreview:
       type: object
@@ -6718,7 +7137,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CreditoSolidaleRicaricaMensilePreviewRiga"
-      required: [periodoRiferimento, totaleBeneficiari, totaleRicaricabili, totaleGiaRicaricati, totaleEsclusi, totaleCreditoDaRicaricare, righe]
+      required:
+        [
+          periodoRiferimento,
+          totaleBeneficiari,
+          totaleRicaricabili,
+          totaleGiaRicaricati,
+          totaleEsclusi,
+          totaleCreditoDaRicaricare,
+          righe,
+        ]
 
     CreditoSolidaleRicaricaMensileEsecuzioneInput:
       type: object
@@ -6751,7 +7179,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CreditoSolidaleMovimento"
-      required: [periodoRiferimento, creati, saltatiGiaRicaricati, saltatiNonRicaricabili, totaleCreditoRicaricato, movimentiCreati]
+      required:
+        [
+          periodoRiferimento,
+          creati,
+          saltatiGiaRicaricati,
+          saltatiNonRicaricabili,
+          totaleCreditoRicaricato,
+          movimentiCreati,
+        ]
 
     # ── Ruoli Volontari ──────────────────────────────────────────────────
     RuoloVolontario:
@@ -7510,6 +7946,41 @@ components:
       type: string
       enum: [bassa, normale, alta, urgente]
 
+    InterventoVista:
+      type: string
+      enum: [da_pianificare, pianificati, oggi, in_corso, conclusi, annullati]
+
+    InterventiRiepilogoViste:
+      type: object
+      properties:
+        daPianificare: { type: integer }
+        pianificati: { type: integer }
+        oggi: { type: integer }
+        inCorso: { type: integer }
+        conclusi: { type: integer }
+        annullati: { type: integer }
+        dataRiferimento: { type: string, format: date }
+        fusoOrario: { type: string, enum: [Europe/Rome] }
+      required:
+        [
+          daPianificare,
+          pianificati,
+          oggi,
+          inCorso,
+          conclusi,
+          annullati,
+          dataRiferimento,
+          fusoOrario,
+        ]
+
+    InterventoOperatore:
+      type: object
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        codice: { type: string }
+      required: [id, nome, codice]
+
     Intervento:
       type: object
       properties:
@@ -7519,12 +7990,24 @@ components:
           type: integer
         beneficiarioNome:
           type: ["string", "null"]
+        beneficiarioCodice:
+          type: ["string", "null"]
+        nucleoFamiliareSintesi:
+          type: ["string", "null"]
         bollaId:
           type: ["integer", "null"]
         operatoreId:
           type: ["integer", "null"]
         operatoreCodice:
           type: ["string", "null"]
+        operatoreNome:
+          type: ["string", "null"]
+        centroAscoltoId:
+          type: ["integer", "null"]
+        centroAscoltoNome:
+          type: ["string", "null"]
+        cittaId:
+          type: ["integer", "null"]
         dataIntervento:
           type: ["string", "null"]
           format: date
@@ -7554,6 +8037,8 @@ components:
           anyOf:
             - $ref: "#/components/schemas/InterventoAmbito"
             - type: "null"
+        ambitoLegacy:
+          type: boolean
         priorita:
           $ref: "#/components/schemas/InterventoPriorita"
         dataOraPianificata:
@@ -7595,10 +8080,17 @@ components:
         [
           id,
           beneficiarioId,
+          beneficiarioCodice,
+          nucleoFamiliareSintesi,
+          operatoreNome,
+          centroAscoltoId,
+          centroAscoltoNome,
+          cittaId,
           dataIntervento,
           tipoIntervento,
           stato,
           ambito,
+          ambitoLegacy,
           priorita,
           dataOraPianificata,
           dataOraAvvio,
@@ -7626,6 +8118,9 @@ components:
           format: date
         tipoIntervento:
           type: string
+        operatoreId:
+          type: integer
+          description: Operatore assegnato; se omesso viene usato il chiamante. Il backend valida area e territorio.
         stato:
           allOf:
             - $ref: "#/components/schemas/InterventoStato"
@@ -7643,6 +8138,9 @@ components:
         dataOraConclusione:
           type: ["string", "null"]
           format: date-time
+        registrazionePregressa:
+          type: boolean
+          description: Compatibilità temporanea per registrare un intervento Sociale già effettuato senza inventare orari effettivi; richiede stato concluso e dataIntervento.
         interventoPrecedenteId:
           type: ["integer", "null"]
         sede:
@@ -7976,7 +8474,18 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, beneficiarioId, tipoPianificazione, tipoConsegna, dataPrevista, magazzinoId, stato, dataCreazione]
+      required:
+        [
+          id,
+          codice,
+          beneficiarioId,
+          tipoPianificazione,
+          tipoConsegna,
+          dataPrevista,
+          magazzinoId,
+          stato,
+          dataCreazione,
+        ]
 
     AccessoEmporioStato:
       type: string
@@ -8044,7 +8553,19 @@ components:
         dataCreazione:
           type: string
           format: date-time
-      required: [id, codice, beneficiarioId, tipoPianificazione, magazzinoEmporioId, dataOraInizio, statoAccessoEmporio, saldoCreditoSolidale, quotaMensileAssegnata, dataCreazione]
+      required:
+        [
+          id,
+          codice,
+          beneficiarioId,
+          tipoPianificazione,
+          magazzinoEmporioId,
+          dataOraInizio,
+          statoAccessoEmporio,
+          saldoCreditoSolidale,
+          quotaMensileAssegnata,
+          dataCreazione,
+        ]
 
     AccessoEmporioInput:
       type: object
@@ -8125,7 +8646,16 @@ components:
           type: ["string", "null"]
         attivo:
           type: boolean
-      required: [beneficiarioId, beneficiarioNome, beneficiarioCodice, creditoSolidaleAbilitato, creditoSolidaleStato, saldoCreditoSolidale, attivo]
+      required:
+        [
+          beneficiarioId,
+          beneficiarioNome,
+          beneficiarioCodice,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          saldoCreditoSolidale,
+          attivo,
+        ]
 
     SessioneCassaEmporioStato:
       type: string
@@ -8172,7 +8702,21 @@ components:
         dataAggiornamento:
           type: string
           format: date-time
-      required: [id, sessioneCassaId, prodottoId, descrizioneProdotto, quantita, creditoUnitario, creditoTotale, superaLimitePerSpesa, superaLimiteMensile, superaGiacenza, dataCreazione, dataAggiornamento]
+      required:
+        [
+          id,
+          sessioneCassaId,
+          prodottoId,
+          descrizioneProdotto,
+          quantita,
+          creditoUnitario,
+          creditoTotale,
+          superaLimitePerSpesa,
+          superaLimiteMensile,
+          superaGiacenza,
+          dataCreazione,
+          dataAggiornamento,
+        ]
 
     SessioneCassaEmporio:
       type: object
@@ -8245,7 +8789,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SessioneCassaEmporioRiga"
-      required: [id, accessoEmporioId, beneficiarioId, magazzinoEmporioId, statoSessione, saldoCreditoIniziale, totaleCreditoPrevisto, creditoResiduoPrevisto, dataApertura, dataUltimaModifica, righe]
+      required:
+        [
+          id,
+          accessoEmporioId,
+          beneficiarioId,
+          magazzinoEmporioId,
+          statoSessione,
+          saldoCreditoIniziale,
+          totaleCreditoPrevisto,
+          creditoResiduoPrevisto,
+          dataApertura,
+          dataUltimaModifica,
+          righe,
+        ]
 
     SessioneCassaEmporioInput:
       type: object
@@ -8344,7 +8901,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SessioneCassaEmporioAccessoValido"
-      required: [beneficiarioId, beneficiarioNome, beneficiarioCodice, saldoCreditoSolidale, creditoSolidaleAbilitato, creditoSolidaleStato, attivo, accessi]
+      required:
+        [
+          beneficiarioId,
+          beneficiarioNome,
+          beneficiarioCodice,
+          saldoCreditoSolidale,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          attivo,
+          accessi,
+        ]
 
     AccessoEmporioForzatoInput:
       type: object
@@ -8440,7 +9007,16 @@ components:
           type: ["integer", "null"]
         bollaRigaId:
           type: ["integer", "null"]
-      required: [id, spesaEmporioId, prodottoId, descrizioneProdotto, quantita, creditoUnitario, creditoTotale]
+      required:
+        [
+          id,
+          spesaEmporioId,
+          prodottoId,
+          descrizioneProdotto,
+          quantita,
+          creditoUnitario,
+          creditoTotale,
+        ]
 
     SpesaEmporio:
       type: object
@@ -8496,7 +9072,8 @@ components:
           type: ["string", "null"]
         emailBollaStato:
           type: string
-          enum: [non_preparata, invio_manuale_avviato, nessun_destinatario, errore]
+          enum:
+            [non_preparata, invio_manuale_avviato, nessun_destinatario, errore]
         emailBollaDestinatari:
           type: ["string", "null"]
         emailBollaDataInvio:
@@ -8523,7 +9100,24 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, sessioneCassaId, accessoEmporioId, beneficiarioId, magazzinoEmporioId, numeroSpesa, dataChiusura, totaleCreditoConsumati, saldoPrima, saldoDopo, statoSpesa, emailBollaStato, righe, createdAt, updatedAt]
+      required:
+        [
+          id,
+          sessioneCassaId,
+          accessoEmporioId,
+          beneficiarioId,
+          magazzinoEmporioId,
+          numeroSpesa,
+          dataChiusura,
+          totaleCreditoConsumati,
+          saldoPrima,
+          saldoDopo,
+          statoSpesa,
+          emailBollaStato,
+          righe,
+          createdAt,
+          updatedAt,
+        ]
 
     SpesaEmporioChiusuraInput:
       type: object
@@ -8542,7 +9136,8 @@ components:
       properties:
         stato:
           type: string
-          enum: [non_preparata, invio_manuale_avviato, nessun_destinatario, errore]
+          enum:
+            [non_preparata, invio_manuale_avviato, nessun_destinatario, errore]
         destinatari:
           type: array
           items:
@@ -8622,7 +9217,16 @@ components:
           type: number
         note:
           type: ["string", "null"]
-      required: [intestazione, numeroSpesa, dataChiusura, righe, totaleCreditoConsumati, saldoPrima, saldoDopo]
+      required:
+        [
+          intestazione,
+          numeroSpesa,
+          dataChiusura,
+          righe,
+          totaleCreditoConsumati,
+          saldoPrima,
+          saldoDopo,
+        ]
 
     AssociaBollaInput:
       type: object
@@ -8735,7 +9339,17 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, numeroBolla, dataBolla, beneficiarioId, magazzinoId, stato, confermaRicezione, dataCreazione]
+      required:
+        [
+          id,
+          numeroBolla,
+          dataBolla,
+          beneficiarioId,
+          magazzinoId,
+          stato,
+          confermaRicezione,
+          dataCreazione,
+        ]
 
     BollaDettaglio:
       type: object
@@ -8796,7 +9410,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BollaRiga"
-      required: [id, numeroBolla, dataBolla, beneficiarioId, magazzinoId, stato, confermaRicezione, dataCreazione, righe]
+      required:
+        [
+          id,
+          numeroBolla,
+          dataBolla,
+          beneficiarioId,
+          magazzinoId,
+          stato,
+          confermaRicezione,
+          dataCreazione,
+          righe,
+        ]
 
     BollaRiga:
       type: object
@@ -8931,7 +9556,18 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, nome, cognome, ruolo, patente, mezzoPersonale, maxConsegneTurno, attivo, dataCreazione]
+      required:
+        [
+          id,
+          nome,
+          cognome,
+          ruolo,
+          patente,
+          mezzoPersonale,
+          maxConsegneTurno,
+          attivo,
+          dataCreazione,
+        ]
 
     VolontarioInput:
       type: object
@@ -9140,7 +9776,8 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, nome, cognome, ruolo, attivo, statoApprovazione, dataCreazione]
+      required:
+        [id, nome, cognome, ruolo, attivo, statoApprovazione, dataCreazione]
 
     ApprovazioneMezzo:
       type: object
@@ -9171,7 +9808,8 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, tipo, proprieta, stato, statoApprovazione, dataCreazione]
+      required:
+        [id, codice, tipo, proprieta, stato, statoApprovazione, dataCreazione]
 
     ApprovazioniLogistica:
       type: object
@@ -9198,7 +9836,8 @@ components:
           type: integer
         lottiInScadenza:
           type: integer
-      required: [magazzinoNome, totProdotti, prodottiSottoscorta, lottiInScadenza]
+      required:
+        [magazzinoNome, totProdotti, prodottiSottoscorta, lottiInScadenza]
 
     ConsegneMeseReport:
       type: object
@@ -9249,7 +9888,8 @@ components:
           type: integer
         totale:
           type: integer
-      required: [mezzoId, mezzoCodice, mezzoTipo, consegne, bolle, turni, totale]
+      required:
+        [mezzoId, mezzoCodice, mezzoTipo, consegne, bolle, turni, totale]
 
     AllocazioneMezziReport:
       type: object
@@ -9307,7 +9947,15 @@ components:
           type: integer
         primoIntervento:
           type: boolean
-      required: [id, beneficiarioId, dataIntervento, tipoIntervento, numeroIntervento, primoIntervento]
+      required:
+        [
+          id,
+          beneficiarioId,
+          dataIntervento,
+          tipoIntervento,
+          numeroIntervento,
+          primoIntervento,
+        ]
 
     UdsInterventiMeseReport:
       type: object
@@ -9419,7 +10067,17 @@ components:
           type: boolean
         emailDaAggiornare:
           type: boolean
-      required: [id, username, nome, isSuperAdmin, isAdmin, aree, mustChangePassword, emailDaAggiornare]
+      required:
+        [
+          id,
+          username,
+          nome,
+          isSuperAdmin,
+          isAdmin,
+          aree,
+          mustChangePassword,
+          emailDaAggiornare,
+        ]
 
     LoginInput:
       type: object
@@ -9509,7 +10167,17 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, username, nome, isSuperAdmin, attivo, mustChangePassword, emailDaAggiornare, dataCreazione]
+      required:
+        [
+          id,
+          username,
+          nome,
+          isSuperAdmin,
+          attivo,
+          mustChangePassword,
+          emailDaAggiornare,
+          dataCreazione,
+        ]
 
     UtenteInput:
       type: object

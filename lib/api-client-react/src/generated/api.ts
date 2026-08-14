@@ -97,6 +97,7 @@ import type {
   FornitoreInput,
   FornitoreUpdate,
   FornitoriBulkInput,
+  GetInterventiRiepilogoVisteParams,
   GetPreparazioneConsegneParams,
   GetVolontariCarico200Item,
   GetVolontariCaricoParams,
@@ -109,8 +110,10 @@ import type {
   ImpostazioniModuliUpdate,
   ImpostazioniStampa,
   ImpostazioniStampaUpdate,
+  InterventiRiepilogoViste,
   Intervento,
   InterventoInput,
+  InterventoOperatore,
   InterventoStoricoStato,
   InterventoSuccessivoInput,
   InterventoTransizioneInput,
@@ -123,6 +126,7 @@ import type {
   ListCreditoSolidaleMovimentiParams,
   ListFornitoriParams,
   ListGiacenzeParams,
+  ListInterventiOperatoriParams,
   ListInterventiParams,
   ListLottiParams,
   ListMovimentiParams,
@@ -4547,6 +4551,168 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateInterventoMutationOptions(options));
     }
+
+export const getGetInterventiRiepilogoVisteUrl = (params?: GetInterventiRiepilogoVisteParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/interventi/riepilogo-viste?${stringifiedParams}` : `/api/interventi/riepilogo-viste`
+}
+
+/**
+ * Restituisce in una singola query aggregata i contatori delle viste Sociali autorizzate, includendo conservativamente i record legacy.
+ */
+export const getInterventiRiepilogoViste = async (params?: GetInterventiRiepilogoVisteParams, options?: RequestInit): Promise<InterventiRiepilogoViste> => {
+
+  return customFetch<InterventiRiepilogoViste>(getGetInterventiRiepilogoVisteUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInterventiRiepilogoVisteQueryKey = (params?: GetInterventiRiepilogoVisteParams,) => {
+    return [
+    `/api/interventi/riepilogo-viste`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetInterventiRiepilogoVisteQueryOptions = <TData = Awaited<ReturnType<typeof getInterventiRiepilogoViste>>, TError = ErrorType<unknown>>(params?: GetInterventiRiepilogoVisteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInterventiRiepilogoViste>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInterventiRiepilogoVisteQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInterventiRiepilogoViste>>> = ({ signal }) => getInterventiRiepilogoViste(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInterventiRiepilogoViste>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInterventiRiepilogoVisteQueryResult = NonNullable<Awaited<ReturnType<typeof getInterventiRiepilogoViste>>>
+export type GetInterventiRiepilogoVisteQueryError = ErrorType<unknown>
+
+
+
+export function useGetInterventiRiepilogoViste<TData = Awaited<ReturnType<typeof getInterventiRiepilogoViste>>, TError = ErrorType<unknown>>(
+ params?: GetInterventiRiepilogoVisteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInterventiRiepilogoViste>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInterventiRiepilogoVisteQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListInterventiOperatoriUrl = (params?: ListInterventiOperatoriParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/interventi/operatori?${stringifiedParams}` : `/api/interventi/operatori`
+}
+
+/**
+ * Operatori assegnabili o già presenti negli interventi Sociali visibili al chiamante.
+ */
+export const listInterventiOperatori = async (params?: ListInterventiOperatoriParams, options?: RequestInit): Promise<InterventoOperatore[]> => {
+
+  return customFetch<InterventoOperatore[]>(getListInterventiOperatoriUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInterventiOperatoriQueryKey = (params?: ListInterventiOperatoriParams,) => {
+    return [
+    `/api/interventi/operatori`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListInterventiOperatoriQueryOptions = <TData = Awaited<ReturnType<typeof listInterventiOperatori>>, TError = ErrorType<unknown>>(params?: ListInterventiOperatoriParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInterventiOperatori>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInterventiOperatoriQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInterventiOperatori>>> = ({ signal }) => listInterventiOperatori(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInterventiOperatori>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInterventiOperatoriQueryResult = NonNullable<Awaited<ReturnType<typeof listInterventiOperatori>>>
+export type ListInterventiOperatoriQueryError = ErrorType<unknown>
+
+
+
+export function useListInterventiOperatori<TData = Awaited<ReturnType<typeof listInterventiOperatori>>, TError = ErrorType<unknown>>(
+ params?: ListInterventiOperatoriParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInterventiOperatori>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInterventiOperatoriQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetInterventoUrl = (id: number,) => {
 

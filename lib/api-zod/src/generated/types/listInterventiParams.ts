@@ -8,7 +8,11 @@
 import type { InterventoAmbito } from './interventoAmbito';
 import type { InterventoPriorita } from './interventoPriorita';
 import type { InterventoStato } from './interventoStato';
+import type { InterventoVista } from './interventoVista';
+import type { ListInterventiAmbitoLegacy } from './listInterventiAmbitoLegacy';
 import type { ListInterventiBisogni } from './listInterventiBisogni';
+import type { ListInterventiDirezione } from './listInterventiDirezione';
+import type { ListInterventiOrdina } from './listInterventiOrdina';
 
 export type ListInterventiParams = {
 beneficiarioId?: number;
@@ -36,4 +40,36 @@ pianificataDa?: Date;
  */
 pianificataA?: Date;
 interventoPrecedenteId?: number;
+/**
+ * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
+ */
+vista?: InterventoVista;
+/**
+ * Ricerca beneficiario per nome, cognome, nome completo o codice.
+ * @maxLength 120
+ */
+ricerca?: string;
+/**
+ * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
+ */
+da?: Date;
+/**
+ * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
+ */
+a?: Date;
+ordina?: ListInterventiOrdina;
+direzione?: ListInterventiDirezione;
+/**
+ * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
+ */
+ambitoLegacy?: ListInterventiAmbitoLegacy;
+/**
+ * @minimum 1
+ */
+pagina?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limite?: number;
 };

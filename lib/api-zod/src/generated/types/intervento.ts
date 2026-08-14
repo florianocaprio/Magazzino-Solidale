@@ -15,11 +15,23 @@ export interface Intervento {
   /** @nullable */
   beneficiarioNome?: string | null;
   /** @nullable */
+  beneficiarioCodice: string | null;
+  /** @nullable */
+  nucleoFamiliareSintesi: string | null;
+  /** @nullable */
   bollaId?: number | null;
   /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
+  /** @nullable */
+  operatoreNome: string | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  centroAscoltoNome: string | null;
+  /** @nullable */
+  cittaId: number | null;
   /** @nullable */
   dataIntervento: Date | null;
   tipoIntervento: string;
@@ -43,6 +55,7 @@ export interface Intervento {
   scadenzaAutodichiarazioneIndigenza?: string | null;
   stato: InterventoStato;
   ambito: InterventoAmbito | null;
+  ambitoLegacy: boolean;
   priorita: InterventoPriorita;
   /** @nullable */
   dataOraPianificata: Date | null;
