@@ -98,6 +98,7 @@ import type {
   FornitoreUpdate,
   FornitoriBulkInput,
   GetInterventiRiepilogoVisteParams,
+  GetMaterialeDaPreparareParams,
   GetPreparazioneConsegneParams,
   GetVolontariCarico200Item,
   GetVolontariCaricoParams,
@@ -112,7 +113,15 @@ import type {
   ImpostazioniStampaUpdate,
   InterventiRiepilogoViste,
   Intervento,
+  InterventoAnnullamentoInput,
+  InterventoAvvioInput,
+  InterventoConclusioneInput,
+  InterventoConclusioneResult,
   InterventoInput,
+  InterventoMancataPresentazioneInput,
+  InterventoMateriale,
+  InterventoOperativita,
+  InterventoOperativitaInput,
   InterventoOperatore,
   InterventoStoricoStato,
   InterventoSuccessivoInput,
@@ -147,6 +156,8 @@ import type {
   Magazzino,
   MagazzinoInput,
   MagazzinoUpdate,
+  MaterialeDaPreparare,
+  MaterialePreparazioneUpdateInput,
   MezziBulkInput,
   Mezzo,
   MezzoInput,
@@ -4714,6 +4725,87 @@ export function useListInterventiOperatori<TData = Awaited<ReturnType<typeof lis
 
 
 
+export const getGetMaterialeDaPreparareUrl = (params?: GetMaterialeDaPreparareParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/interventi/materiale-da-preparare?${stringifiedParams}` : `/api/interventi/materiale-da-preparare`
+}
+
+/**
+ * Aggrega in una singola lettura i materiali residui degli interventi Sociali futuri autorizzati. Non genera movimenti di magazzino.
+ */
+export const getMaterialeDaPreparare = async (params?: GetMaterialeDaPreparareParams, options?: RequestInit): Promise<MaterialeDaPreparare> => {
+
+  return customFetch<MaterialeDaPreparare>(getGetMaterialeDaPreparareUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMaterialeDaPreparareQueryKey = (params?: GetMaterialeDaPreparareParams,) => {
+    return [
+    `/api/interventi/materiale-da-preparare`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMaterialeDaPreparareQueryOptions = <TData = Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError = ErrorType<void>>(params?: GetMaterialeDaPreparareParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMaterialeDaPreparareQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMaterialeDaPreparare>>> = ({ signal }) => getMaterialeDaPreparare(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMaterialeDaPreparareQueryResult = NonNullable<Awaited<ReturnType<typeof getMaterialeDaPreparare>>>
+export type GetMaterialeDaPreparareQueryError = ErrorType<void>
+
+
+
+export function useGetMaterialeDaPreparare<TData = Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError = ErrorType<void>>(
+ params?: GetMaterialeDaPreparareParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMaterialeDaPreparare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMaterialeDaPreparareQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetInterventoUrl = (id: number,) => {
 
 
@@ -4849,6 +4941,496 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateInterventoMutationOptions(options));
+    }
+
+export const getGetInterventoOperativitaUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/operativita`
+}
+
+/**
+ * Restituisce attività, materiali e documenti dell'intervento Sociale applicando lo stesso scope territoriale dell'intervento.
+ */
+export const getInterventoOperativita = async (id: number, options?: RequestInit): Promise<InterventoOperativita> => {
+
+  return customFetch<InterventoOperativita>(getGetInterventoOperativitaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInterventoOperativitaQueryKey = (id: number,) => {
+    return [
+    `/api/interventi/${id}/operativita`
+    ] as const;
+    }
+
+
+export const getGetInterventoOperativitaQueryOptions = <TData = Awaited<ReturnType<typeof getInterventoOperativita>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInterventoOperativita>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInterventoOperativitaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInterventoOperativita>>> = ({ signal }) => getInterventoOperativita(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInterventoOperativita>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInterventoOperativitaQueryResult = NonNullable<Awaited<ReturnType<typeof getInterventoOperativita>>>
+export type GetInterventoOperativitaQueryError = ErrorType<void>
+
+
+
+export function useGetInterventoOperativita<TData = Awaited<ReturnType<typeof getInterventoOperativita>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInterventoOperativita>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInterventoOperativitaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAggiornaStatoPreparazioneMaterialeUrl = (id: number,
+    materialeId: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/materiali/${materialeId}`
+}
+
+/**
+ * Aggiorna soltanto lo stato di preparazione del materiale con controllo di concorrenza; non modifica giacenze o movimenti.
+ */
+export const aggiornaStatoPreparazioneMateriale = async (id: number,
+    materialeId: number,
+    materialePreparazioneUpdateInput: MaterialePreparazioneUpdateInput, options?: RequestInit): Promise<InterventoMateriale> => {
+
+  return customFetch<InterventoMateriale>(getAggiornaStatoPreparazioneMaterialeUrl(id,materialeId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      materialePreparazioneUpdateInput,)
+  }
+);}
+
+
+
+
+export const getAggiornaStatoPreparazioneMaterialeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>, TError,{id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>, TError,{id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>}, TContext> => {
+
+const mutationKey = ['aggiornaStatoPreparazioneMateriale'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>, {id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>}> = (props) => {
+          const {id,materialeId,data} = props ?? {};
+
+          return  aggiornaStatoPreparazioneMateriale(id,materialeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AggiornaStatoPreparazioneMaterialeMutationResult = NonNullable<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>>
+    export type AggiornaStatoPreparazioneMaterialeMutationBody = BodyType<MaterialePreparazioneUpdateInput>
+    export type AggiornaStatoPreparazioneMaterialeMutationError = ErrorType<void>
+
+    export const useAggiornaStatoPreparazioneMateriale = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>, TError,{id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof aggiornaStatoPreparazioneMateriale>>,
+        TError,
+        {id: number;materialeId: number;data: BodyType<MaterialePreparazioneUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getAggiornaStatoPreparazioneMaterialeMutationOptions(options));
+    }
+
+export const getAvviaInterventoUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/avvia`
+}
+
+/**
+ * Avvia atomicamente un intervento Sociale da pianificare o pianificato, senza modificare l'operatore assegnato.
+ */
+export const avviaIntervento = async (id: number,
+    interventoAvvioInput: InterventoAvvioInput, options?: RequestInit): Promise<Intervento> => {
+
+  return customFetch<Intervento>(getAvviaInterventoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      interventoAvvioInput,)
+  }
+);}
+
+
+
+
+export const getAvviaInterventoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data: BodyType<InterventoAvvioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data: BodyType<InterventoAvvioInput>}, TContext> => {
+
+const mutationKey = ['avviaIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof avviaIntervento>>, {id: number;data: BodyType<InterventoAvvioInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  avviaIntervento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AvviaInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof avviaIntervento>>>
+    export type AvviaInterventoMutationBody = BodyType<InterventoAvvioInput>
+    export type AvviaInterventoMutationError = ErrorType<void>
+
+    export const useAvviaIntervento = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data: BodyType<InterventoAvvioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof avviaIntervento>>,
+        TError,
+        {id: number;data: BodyType<InterventoAvvioInput>},
+        TContext
+      > => {
+      return useMutation(getAvviaInterventoMutationOptions(options));
+    }
+
+export const getSalvaInterventoOperativitaUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/salva-operativita`
+}
+
+/**
+ * Salva in una transazione i dati operativi senza chiudere l'intervento. È utilizzabile prima dell'avvio per materiali e documenti previsti.
+ */
+export const salvaInterventoOperativita = async (id: number,
+    interventoOperativitaInput: InterventoOperativitaInput, options?: RequestInit): Promise<InterventoOperativita> => {
+
+  return customFetch<InterventoOperativita>(getSalvaInterventoOperativitaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      interventoOperativitaInput,)
+  }
+);}
+
+
+
+
+export const getSalvaInterventoOperativitaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof salvaInterventoOperativita>>, TError,{id: number;data: BodyType<InterventoOperativitaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof salvaInterventoOperativita>>, TError,{id: number;data: BodyType<InterventoOperativitaInput>}, TContext> => {
+
+const mutationKey = ['salvaInterventoOperativita'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof salvaInterventoOperativita>>, {id: number;data: BodyType<InterventoOperativitaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  salvaInterventoOperativita(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SalvaInterventoOperativitaMutationResult = NonNullable<Awaited<ReturnType<typeof salvaInterventoOperativita>>>
+    export type SalvaInterventoOperativitaMutationBody = BodyType<InterventoOperativitaInput>
+    export type SalvaInterventoOperativitaMutationError = ErrorType<void>
+
+    export const useSalvaInterventoOperativita = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof salvaInterventoOperativita>>, TError,{id: number;data: BodyType<InterventoOperativitaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof salvaInterventoOperativita>>,
+        TError,
+        {id: number;data: BodyType<InterventoOperativitaInput>},
+        TContext
+      > => {
+      return useMutation(getSalvaInterventoOperativitaMutationOptions(options));
+    }
+
+export const getConcludiInterventoUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/concludi`
+}
+
+/**
+ * Salva i dati operativi, conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato.
+ */
+export const concludiIntervento = async (id: number,
+    interventoConclusioneInput: InterventoConclusioneInput, options?: RequestInit): Promise<InterventoConclusioneResult> => {
+
+  return customFetch<InterventoConclusioneResult>(getConcludiInterventoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      interventoConclusioneInput,)
+  }
+);}
+
+
+
+
+export const getConcludiInterventoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof concludiIntervento>>, TError,{id: number;data: BodyType<InterventoConclusioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof concludiIntervento>>, TError,{id: number;data: BodyType<InterventoConclusioneInput>}, TContext> => {
+
+const mutationKey = ['concludiIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof concludiIntervento>>, {id: number;data: BodyType<InterventoConclusioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  concludiIntervento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConcludiInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof concludiIntervento>>>
+    export type ConcludiInterventoMutationBody = BodyType<InterventoConclusioneInput>
+    export type ConcludiInterventoMutationError = ErrorType<void>
+
+    export const useConcludiIntervento = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof concludiIntervento>>, TError,{id: number;data: BodyType<InterventoConclusioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof concludiIntervento>>,
+        TError,
+        {id: number;data: BodyType<InterventoConclusioneInput>},
+        TContext
+      > => {
+      return useMutation(getConcludiInterventoMutationOptions(options));
+    }
+
+export const getAnnullaInterventoUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/annulla`
+}
+
+/**
+ * Annulla l'intervento con motivazione obbligatoria e storico.
+ */
+export const annullaIntervento = async (id: number,
+    interventoAnnullamentoInput: InterventoAnnullamentoInput, options?: RequestInit): Promise<Intervento> => {
+
+  return customFetch<Intervento>(getAnnullaInterventoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      interventoAnnullamentoInput,)
+  }
+);}
+
+
+
+
+export const getAnnullaInterventoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaIntervento>>, TError,{id: number;data: BodyType<InterventoAnnullamentoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annullaIntervento>>, TError,{id: number;data: BodyType<InterventoAnnullamentoInput>}, TContext> => {
+
+const mutationKey = ['annullaIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annullaIntervento>>, {id: number;data: BodyType<InterventoAnnullamentoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  annullaIntervento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnnullaInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof annullaIntervento>>>
+    export type AnnullaInterventoMutationBody = BodyType<InterventoAnnullamentoInput>
+    export type AnnullaInterventoMutationError = ErrorType<void>
+
+    export const useAnnullaIntervento = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaIntervento>>, TError,{id: number;data: BodyType<InterventoAnnullamentoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof annullaIntervento>>,
+        TError,
+        {id: number;data: BodyType<InterventoAnnullamentoInput>},
+        TContext
+      > => {
+      return useMutation(getAnnullaInterventoMutationOptions(options));
+    }
+
+export const getRegistraMancataPresentazioneUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/mancata-presentazione`
+}
+
+/**
+ * Registra la mancata presentazione di un intervento pianificato senza creare un falso avvio.
+ */
+export const registraMancataPresentazione = async (id: number,
+    interventoMancataPresentazioneInput: InterventoMancataPresentazioneInput, options?: RequestInit): Promise<Intervento> => {
+
+  return customFetch<Intervento>(getRegistraMancataPresentazioneUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      interventoMancataPresentazioneInput,)
+  }
+);}
+
+
+
+
+export const getRegistraMancataPresentazioneMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registraMancataPresentazione>>, TError,{id: number;data: BodyType<InterventoMancataPresentazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registraMancataPresentazione>>, TError,{id: number;data: BodyType<InterventoMancataPresentazioneInput>}, TContext> => {
+
+const mutationKey = ['registraMancataPresentazione'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registraMancataPresentazione>>, {id: number;data: BodyType<InterventoMancataPresentazioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  registraMancataPresentazione(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegistraMancataPresentazioneMutationResult = NonNullable<Awaited<ReturnType<typeof registraMancataPresentazione>>>
+    export type RegistraMancataPresentazioneMutationBody = BodyType<InterventoMancataPresentazioneInput>
+    export type RegistraMancataPresentazioneMutationError = ErrorType<void>
+
+    export const useRegistraMancataPresentazione = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registraMancataPresentazione>>, TError,{id: number;data: BodyType<InterventoMancataPresentazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registraMancataPresentazione>>,
+        TError,
+        {id: number;data: BodyType<InterventoMancataPresentazioneInput>},
+        TContext
+      > => {
+      return useMutation(getRegistraMancataPresentazioneMutationOptions(options));
     }
 
 export const getTransitionInterventoUrl = (id: number,) => {

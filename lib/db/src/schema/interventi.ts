@@ -25,6 +25,7 @@ export const interventiTable = pgTable(
     dataIntervento: date("data_intervento"),
     tipoIntervento: varchar("tipo_intervento", { length: 120 }).notNull(),
     descrizione: text("descrizione"),
+    risultato: text("risultato"),
     esito: text("esito"),
     prossimAzione: text("prossim_azione"),
     note: text("note"),
@@ -62,6 +63,11 @@ export const interventiTable = pgTable(
     index("interventi_ambito_idx").on(table.ambito),
     index("interventi_priorita_idx").on(table.priorita),
     index("interventi_data_ora_pianificata_idx").on(table.dataOraPianificata),
+    index("interventi_ambito_stato_pianificata_idx").on(
+      table.ambito,
+      table.stato,
+      table.dataOraPianificata,
+    ),
     index("interventi_precedente_idx").on(table.interventoPrecedenteId),
     check(
       "interventi_stato_check",

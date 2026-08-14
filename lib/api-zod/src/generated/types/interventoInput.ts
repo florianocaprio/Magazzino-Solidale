@@ -42,6 +42,7 @@ export interface InterventoInput {
      */
   motivoAnnullamento?: string | null;
   descrizione?: string;
+  risultato?: string;
   esito?: string;
   prossimAzione?: string;
   note?: string;

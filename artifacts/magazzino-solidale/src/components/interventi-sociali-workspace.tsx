@@ -5,6 +5,7 @@ import type {
 } from "@workspace/api-client-react";
 import { CalendarDays, List, RotateCcw, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { InterventoAvvisoBadge } from "@/components/intervento-avviso";
 import { InterventoStatoBadge } from "@/components/intervento-workflow";
 import { InterventiSocialiCalendar } from "@/components/interventi-sociali-calendar";
 import { Badge } from "@/components/ui/badge";
@@ -240,6 +241,10 @@ export function InterventiSocialiWorkspace({
                   </TableCell>
                   <TableCell>
                     <InterventoPriority value={intervento.priorita} />
+                    <InterventoAvvisoBadge
+                      avviso={intervento.avviso}
+                      className="ml-1"
+                    />
                   </TableCell>
                   <TableCell>
                     <p>{intervento.sede || "–"}</p>
@@ -306,6 +311,7 @@ export function InterventiSocialiWorkspace({
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <InterventoPriority value={intervento.priorita} />
+                <InterventoAvvisoBadge avviso={intervento.avviso} />
                 <LegacyBadge legacy={intervento.ambitoLegacy} />
                 <Badge variant="secondary">{intervento.tipoIntervento}</Badge>
               </div>

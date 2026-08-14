@@ -9,6 +9,8 @@ import type { BisognoPianificatoUpsert } from './bisognoPianificatoUpsert';
 import type { InterventoPriorita } from './interventoPriorita';
 
 export interface InterventoUpdate {
+  /** Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato. */
+  operatoreId?: number;
   /** @nullable */
   dataIntervento?: Date | null;
   tipoIntervento?: string;
@@ -23,6 +25,7 @@ export interface InterventoUpdate {
      */
   sede?: string | null;
   descrizione?: string;
+  risultato?: string;
   esito?: string;
   prossimAzione?: string;
   note?: string;

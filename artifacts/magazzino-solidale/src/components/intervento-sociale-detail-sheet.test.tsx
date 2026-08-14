@@ -1,7 +1,10 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Intervento } from "@workspace/api-client-react";
+import type {
+  Intervento,
+  InterventoOperativita,
+} from "@workspace/api-client-react";
 import { InterventoSocialeDetailSheet } from "./intervento-sociale-detail-sheet";
 
 vi.mock("react-i18next", () => ({
@@ -34,6 +37,7 @@ const intervento = {
   operatoreNome: "Operatore Test",
   operatoreCodice: "OP-4",
   descrizione: "Descrizione sintetica",
+  risultato: "Risultato finale",
   esito: "Concluso positivamente",
   note: "Nota operativa",
   dataCreazione: "2026-08-14T08:00:00Z",
@@ -44,6 +48,27 @@ const intervento = {
   bisogniPianificatiScaduti: 0,
   bisogniPianificatiProssimaScadenza: "2026-08-20",
 } as Intervento;
+
+const operativita: InterventoOperativita = {
+  interventoId: 20,
+  stato: "concluso",
+  versione: "2026-08-14T09:00:00Z",
+  risultato: "Risultato finale",
+  esito: "Concluso positivamente",
+  note: "Nota operativa",
+  attivita: [],
+  materiali: [],
+  documenti: [],
+};
+
+const callbacks = {
+  onPianifica: vi.fn(),
+  onAvvia: vi.fn(),
+  onSalva: vi.fn(),
+  onConcludi: vi.fn(),
+  onAnnulla: vi.fn(),
+  onMancataPresentazione: vi.fn(),
+};
 
 describe("InterventoSocialeDetailSheet", () => {
   let container: HTMLDivElement;
@@ -64,12 +89,13 @@ describe("InterventoSocialeDetailSheet", () => {
     document.body.innerHTML = "";
   });
 
-  it("mostra dettaglio, ambito legacy, storico e Bisogni Pianificati senza azioni 5-3C", async () => {
+  it("mostra dettaglio terminale, storico e dati operativi in sola lettura", async () => {
     await act(async () => {
       root.render(
         <InterventoSocialeDetailSheet
           open
           intervento={intervento}
+          operativita={operativita}
           storico={[
             {
               id: 1,
@@ -97,6 +123,7 @@ describe("InterventoSocialeDetailSheet", () => {
             },
           ]}
           onOpenChange={vi.fn()}
+          {...callbacks}
         />,
       );
     });
@@ -104,7 +131,86 @@ describe("InterventoSocialeDetailSheet", () => {
     expect(document.body.textContent).toContain("interventi.legacy.label");
     expect(document.body.textContent).toContain("Creazione pregressa");
     expect(document.body.textContent).toContain("Contattare il servizio");
-    expect(document.body.textContent).not.toContain("Avvia intervento");
-    expect(document.body.textContent).not.toContain("Concludi intervento");
+    expect(document.body.textContent).not.toContain(
+      "interventi.operational.start",
+    );
+    expect(document.body.textContent).not.toContain(
+      "interventi.operational.conclude",
+    );
+  });
+
+  it("inizializza il workspace una volta per apertura e conserva il form dopo un errore", async () => {
+    const onOpenChange = vi.fn();
+    const running = {
+      ...intervento,
+      stato: "in_corso",
+      ambito: "sociale",
+      ambitoLegacy: false,
+      dataOraAvvio: "2026-08-14T08:30:00Z",
+    } as Intervento;
+    const runningOperational = {
+      ...operativita,
+      stato: "in_corso",
+      risultato: null,
+      esito: null,
+      attivita: [
+        {
+          id: 1,
+          interventoId: 20,
+          tipologiaId: null,
+          tipologiaSnapshot: "Colloquio",
+          descrizione: "Descrizione iniziale",
+          risultato: null,
+          operatoreId: 4,
+          dataCreazione: "2026-08-14T08:30:00Z",
+          dataAggiornamento: "2026-08-14T08:30:00Z",
+        },
+      ],
+    } satisfies InterventoOperativita;
+
+    const render = (open: boolean) => (
+      <InterventoSocialeDetailSheet
+        open={open}
+        intervento={running}
+        operativita={runningOperational}
+        onOpenChange={onOpenChange}
+        {...callbacks}
+      />
+    );
+    await act(async () => root.render(render(false)));
+    await act(async () => root.render(render(true)));
+    expect(onOpenChange).not.toHaveBeenCalled();
+    const concludedAt = Array.from(document.body.querySelectorAll("dt")).find(
+      (element) =>
+        element.textContent === "interventi.detail.concludedAt",
+    )?.nextElementSibling;
+    expect(concludedAt?.textContent).toBe("–");
+    const description = Array.from(
+      document.body.querySelectorAll("textarea"),
+    ).find(
+      (element) =>
+        (element as HTMLTextAreaElement).value === "Descrizione iniziale",
+    ) as HTMLTextAreaElement;
+    expect(description).toBeTruthy();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(description, "Modifica non salvata");
+      description.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => root.render(render(true)));
+    expect(description.value).toBe("Modifica non salvata");
+
+    await act(async () => root.render(render(false)));
+    await act(async () => root.render(render(true)));
+    const reopenedDescription = Array.from(
+      document.body.querySelectorAll("textarea"),
+    ).find(
+      (element) =>
+        (element as HTMLTextAreaElement).value === "Descrizione iniziale",
+    );
+    expect(reopenedDescription).toBeTruthy();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 });

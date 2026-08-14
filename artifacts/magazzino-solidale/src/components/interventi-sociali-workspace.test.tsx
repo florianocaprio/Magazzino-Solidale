@@ -37,6 +37,7 @@ const sample: Intervento = {
   dataOraPianificata: dateTimeEuropeRomeToIso(today, "10:00"),
   dataOraAvvio: null,
   dataOraConclusione: null,
+  avviso: "imminente",
   interventoPrecedenteId: 9,
   successoriIds: [2],
   numeroSuccessori: 1,

@@ -28,6 +28,7 @@ export interface InterventoSuccessivoInput {
      */
   sede?: string | null;
   descrizione?: string;
+  risultato?: string;
   esito?: string;
   prossimAzione?: string;
   note?: string;

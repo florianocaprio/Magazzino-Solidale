@@ -4,10 +4,19 @@ import {
   bisogniPianificatiTable,
   centriAscoltoTable,
   db,
+  interventiAttivitaTable,
+  interventiDocumentiTable,
+  interventiMaterialiTable,
   interventiStoricoStatiTable,
   interventiTable,
+  magazziniTable,
+  prodottiTable,
   ruoliTable,
+  tipiInterventoTable,
   utentiTable,
+  type InterventoAttivita,
+  type InterventoDocumento,
+  type InterventoMateriale,
   type BisognoPianificato,
 } from "@workspace/db";
 import {
@@ -18,6 +27,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   lt,
   lte,
@@ -38,6 +48,7 @@ import {
   canAccessZonaUds,
 } from "../lib/centroScope";
 import {
+  avvisoInterventoEuropeRome,
   canTransitionIntervento,
   dataCivileEuropeRome,
   isDateOnly,
@@ -75,6 +86,50 @@ type BisognoTipo = (typeof BISOGNO_TIPI)[number];
 type BisognoStato = (typeof BISOGNO_STATI)[number];
 type BisognoPriorita = (typeof BISOGNO_PRIORITA)[number];
 type InterventoRow = typeof interventiTable.$inferSelect;
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const MATERIALE_STATI = [
+  "da_preparare",
+  "pronto",
+  "consegnato",
+  "annullato",
+] as const;
+const DOCUMENTO_STATI = [
+  "da_acquisire",
+  "da_verificare",
+  "acquisito",
+  "verificato",
+  "non_disponibile",
+  "annullato",
+] as const;
+
+type MaterialeStato = (typeof MATERIALE_STATI)[number];
+type DocumentoStato = (typeof DOCUMENTO_STATI)[number];
+
+interface AttivitaOperativaInput {
+  tipologiaId?: unknown;
+  tipologiaSnapshot?: unknown;
+  descrizione?: unknown;
+  risultato?: unknown;
+}
+
+interface MaterialeOperativoInput {
+  prodottoId?: unknown;
+  descrizioneSnapshot?: unknown;
+  unitaMisuraSnapshot?: unknown;
+  quantitaPrevista?: unknown;
+  quantitaConsegnata?: unknown;
+  statoPreparazione?: unknown;
+  magazzinoId?: unknown;
+  note?: unknown;
+}
+
+interface DocumentoOperativoInput {
+  tipoDescrizione?: unknown;
+  stato?: unknown;
+  dataScadenza?: unknown;
+  note?: unknown;
+}
 
 interface BisognoInput {
   id?: number;
@@ -436,6 +491,7 @@ function cleanInterventoBody(
     "dataIntervento",
     "tipoIntervento",
     "descrizione",
+    "risultato",
     "esito",
     "prossimAzione",
     "note",
@@ -509,6 +565,7 @@ function formatIntervento(
     dataIntervento: row.dataIntervento ?? null,
     tipoIntervento: row.tipoIntervento,
     descrizione: row.descrizione ?? null,
+    risultato: row.risultato ?? null,
     esito: row.esito ?? null,
     prossimAzione: row.prossimAzione ?? null,
     note: row.note ?? null,
@@ -525,6 +582,7 @@ function formatIntervento(
     dataOraPianificata: row.dataOraPianificata?.toISOString() ?? null,
     dataOraAvvio: row.dataOraAvvio?.toISOString() ?? null,
     dataOraConclusione: row.dataOraConclusione?.toISOString() ?? null,
+    avviso: avvisoInterventoEuropeRome(row.dataOraPianificata, row.stato),
     interventoPrecedenteId: row.interventoPrecedenteId ?? null,
     successoriIds,
     numeroSuccessori: successoriIds.length,
@@ -537,6 +595,327 @@ function formatIntervento(
     bisogniPianificatiScaduti: summary.scaduti,
     bisogniPianificatiProssimaScadenza: summary.prossimaScadenza,
   };
+}
+
+function requiredText(
+  value: unknown,
+  field: string,
+  maxLength: number,
+): string {
+  const normalized = nullableText(value, field, maxLength);
+  if (normalized == null) throw new RouteError(400, `${field} è obbligatorio`);
+  return normalized;
+}
+
+function optionalPositiveInteger(value: unknown, field: string): number | null {
+  if (value == null || value === "") return null;
+  const parsed = parsePositiveInteger(value);
+  if (parsed == null) throw new RouteError(400, `${field} non valido`);
+  return parsed;
+}
+
+function nonNegativeQuantity(value: unknown, field: string): string {
+  if (value == null || value === "") return "0";
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 999_999_999) {
+    throw new RouteError(400, `${field} deve essere una quantità non negativa`);
+  }
+  return parsed.toFixed(3);
+}
+
+function inputArray<T>(
+  body: Record<string, unknown>,
+  key: string,
+): T[] | undefined {
+  if (!hasOwn(body, key)) return undefined;
+  if (!Array.isArray(body[key])) {
+    throw new RouteError(400, `${key} non valido`);
+  }
+  return body[key] as T[];
+}
+
+function formatAttivita(row: InterventoAttivita) {
+  return {
+    ...row,
+    tipologiaId: row.tipologiaId ?? null,
+    risultato: row.risultato ?? null,
+    operatoreId: row.operatoreId ?? null,
+    dataCreazione: row.dataCreazione.toISOString(),
+    dataAggiornamento: row.dataAggiornamento.toISOString(),
+  };
+}
+
+function formatMateriale(row: InterventoMateriale) {
+  return {
+    ...row,
+    prodottoId: row.prodottoId ?? null,
+    magazzinoId: row.magazzinoId ?? null,
+    quantitaPrevista: Number(row.quantitaPrevista),
+    quantitaConsegnata: Number(row.quantitaConsegnata),
+    note: row.note ?? null,
+    dataCreazione: row.dataCreazione.toISOString(),
+    dataAggiornamento: row.dataAggiornamento.toISOString(),
+  };
+}
+
+function formatDocumento(row: InterventoDocumento) {
+  return {
+    ...row,
+    dataScadenza: row.dataScadenza ?? null,
+    note: row.note ?? null,
+    dataCreazione: row.dataCreazione.toISOString(),
+    dataAggiornamento: row.dataAggiornamento.toISOString(),
+  };
+}
+
+async function operativitaFor(intervento: InterventoRow) {
+  const [attivita, materiali, documenti] = await Promise.all([
+    db
+      .select()
+      .from(interventiAttivitaTable)
+      .where(eq(interventiAttivitaTable.interventoId, intervento.id))
+      .orderBy(interventiAttivitaTable.id),
+    db
+      .select()
+      .from(interventiMaterialiTable)
+      .where(eq(interventiMaterialiTable.interventoId, intervento.id))
+      .orderBy(interventiMaterialiTable.id),
+    db
+      .select()
+      .from(interventiDocumentiTable)
+      .where(eq(interventiDocumentiTable.interventoId, intervento.id))
+      .orderBy(interventiDocumentiTable.id),
+  ]);
+  return {
+    interventoId: intervento.id,
+    stato: intervento.stato,
+    versione: intervento.dataAggiornamento?.toISOString() ?? null,
+    risultato: intervento.risultato ?? null,
+    esito: intervento.esito ?? null,
+    note: intervento.note ?? null,
+    attivita: attivita.map(formatAttivita),
+    materiali: materiali.map(formatMateriale),
+    documenti: documenti.map(formatDocumento),
+  };
+}
+
+function assertExpectedVersion(
+  body: Record<string, unknown>,
+  current: InterventoRow,
+): void {
+  if (!hasOwn(body, "versione") || body.versione == null) {
+    throw new RouteError(400, "La versione è obbligatoria");
+  }
+  let expected: Date | null;
+  try {
+    expected = parseIsoTimestamp(body.versione, "versione");
+  } catch (error) {
+    throw new RouteError(
+      400,
+      error instanceof Error ? error.message : "Versione non valida",
+    );
+  }
+  if (expected == null) {
+    throw new RouteError(400, "La versione è obbligatoria");
+  }
+  if (
+    current.dataAggiornamento == null ||
+    expected.getTime() !== current.dataAggiornamento.getTime()
+  ) {
+    throw new RouteError(
+      409,
+      "L'intervento è stato modificato da un altro operatore. Ricarica i dati prima di continuare.",
+    );
+  }
+}
+
+async function replaceOperativita(
+  tx: DbTransaction,
+  interventoId: number,
+  body: Record<string, unknown>,
+  operatoreId: number,
+  now: Date,
+): Promise<void> {
+  const attivitaInput = inputArray<AttivitaOperativaInput>(body, "attivita");
+  const materialiInput = inputArray<MaterialeOperativoInput>(body, "materiali");
+  const documentiInput = inputArray<DocumentoOperativoInput>(body, "documenti");
+
+  if (attivitaInput) {
+    const tipologiaIds = [
+      ...new Set(
+        attivitaInput
+          .map((item) =>
+            optionalPositiveInteger(item.tipologiaId, "tipologiaId"),
+          )
+          .filter((id): id is number => id != null),
+      ),
+    ];
+    const tipi =
+      tipologiaIds.length === 0
+        ? []
+        : await tx
+            .select({
+              id: tipiInterventoTable.id,
+              nome: tipiInterventoTable.nome,
+            })
+            .from(tipiInterventoTable)
+            .where(inArray(tipiInterventoTable.id, tipologiaIds));
+    const tipiMap = new Map(tipi.map((tipo) => [tipo.id, tipo.nome]));
+    if (tipiMap.size !== tipologiaIds.length) {
+      throw new RouteError(400, "Una tipologia di attività non esiste");
+    }
+    const values = attivitaInput.map((item) => {
+      const tipologiaId = optionalPositiveInteger(
+        item.tipologiaId,
+        "tipologiaId",
+      );
+      return {
+        interventoId,
+        tipologiaId,
+        tipologiaSnapshot:
+          (tipologiaId == null ? null : tipiMap.get(tipologiaId)) ??
+          requiredText(
+            item.tipologiaSnapshot,
+            "La tipologia dell'attività",
+            120,
+          ),
+        descrizione: requiredText(
+          item.descrizione,
+          "La descrizione dell'attività",
+          4000,
+        ),
+        risultato: nullableText(
+          item.risultato,
+          "Il risultato dell'attività",
+          4000,
+        ),
+        operatoreId,
+        dataAggiornamento: now,
+      };
+    });
+    await tx
+      .delete(interventiAttivitaTable)
+      .where(eq(interventiAttivitaTable.interventoId, interventoId));
+    if (values.length > 0)
+      await tx.insert(interventiAttivitaTable).values(values);
+  }
+
+  if (materialiInput) {
+    const prodottoIds = [
+      ...new Set(
+        materialiInput
+          .map((item) => optionalPositiveInteger(item.prodottoId, "prodottoId"))
+          .filter((id): id is number => id != null),
+      ),
+    ];
+    const magazzinoIds = [
+      ...new Set(
+        materialiInput
+          .map((item) =>
+            optionalPositiveInteger(item.magazzinoId, "magazzinoId"),
+          )
+          .filter((id): id is number => id != null),
+      ),
+    ];
+    const [prodotti, magazzini] = await Promise.all([
+      prodottoIds.length === 0
+        ? Promise.resolve([])
+        : tx
+            .select({
+              id: prodottiTable.id,
+              nome: prodottiTable.nome,
+              unitaMisura: prodottiTable.unitaMisura,
+            })
+            .from(prodottiTable)
+            .where(inArray(prodottiTable.id, prodottoIds)),
+      magazzinoIds.length === 0
+        ? Promise.resolve([])
+        : tx
+            .select({ id: magazziniTable.id })
+            .from(magazziniTable)
+            .where(inArray(magazziniTable.id, magazzinoIds)),
+    ]);
+    if (prodotti.length !== prodottoIds.length)
+      throw new RouteError(400, "Un prodotto selezionato non esiste");
+    if (magazzini.length !== magazzinoIds.length)
+      throw new RouteError(400, "Un magazzino selezionato non esiste");
+    const prodottiMap = new Map(
+      prodotti.map((prodotto) => [prodotto.id, prodotto]),
+    );
+    const values = materialiInput.map((item) => {
+      const prodottoId = optionalPositiveInteger(item.prodottoId, "prodottoId");
+      const prodotto = prodottoId == null ? null : prodottiMap.get(prodottoId);
+      const statoPreparazione = enumValue(
+        item.statoPreparazione ?? "da_preparare",
+        MATERIALE_STATI,
+        "statoPreparazione",
+      );
+      return {
+        interventoId,
+        prodottoId,
+        descrizioneSnapshot:
+          prodotto?.nome ??
+          requiredText(
+            item.descrizioneSnapshot,
+            "La descrizione del materiale",
+            255,
+          ),
+        unitaMisuraSnapshot:
+          prodotto?.unitaMisura ??
+          requiredText(item.unitaMisuraSnapshot, "L'unità di misura", 40),
+        quantitaPrevista: nonNegativeQuantity(
+          item.quantitaPrevista,
+          "quantitaPrevista",
+        ),
+        quantitaConsegnata: nonNegativeQuantity(
+          item.quantitaConsegnata,
+          "quantitaConsegnata",
+        ),
+        statoPreparazione,
+        magazzinoId: optionalPositiveInteger(item.magazzinoId, "magazzinoId"),
+        note: nullableText(item.note, "Le note del materiale", 2000),
+        dataAggiornamento: now,
+      };
+    });
+    await tx
+      .delete(interventiMaterialiTable)
+      .where(eq(interventiMaterialiTable.interventoId, interventoId));
+    if (values.length > 0)
+      await tx.insert(interventiMaterialiTable).values(values);
+  }
+
+  if (documentiInput) {
+    const values = documentiInput.map((item) => {
+      const dataScadenza =
+        item.dataScadenza == null || item.dataScadenza === ""
+          ? null
+          : String(item.dataScadenza);
+      if (dataScadenza != null && !isDateOnly(dataScadenza)) {
+        throw new RouteError(400, "dataScadenza non valida");
+      }
+      return {
+        interventoId,
+        tipoDescrizione: requiredText(
+          item.tipoDescrizione,
+          "Il documento",
+          200,
+        ),
+        stato: enumValue(
+          item.stato ?? "da_acquisire",
+          DOCUMENTO_STATI,
+          "stato documento",
+        ),
+        dataScadenza,
+        note: nullableText(item.note, "Le note del documento", 2000),
+        dataAggiornamento: now,
+      };
+    });
+    await tx
+      .delete(interventiDocumentiTable)
+      .where(eq(interventiDocumentiTable.interventoId, interventoId));
+    if (values.length > 0)
+      await tx.insert(interventiDocumentiTable).values(values);
+  }
 }
 
 async function orderedBisogni(
@@ -810,6 +1189,70 @@ async function displayDetailsForIntervento(interventoId: number) {
     } satisfies InterventoDisplayDetails,
   };
 }
+
+async function formattedInterventoFor(row: InterventoRow) {
+  const [needs, successori, display] = await Promise.all([
+    orderedBisogni([row.id]),
+    successoriFor([row.id]),
+    displayDetailsForIntervento(row.id),
+  ]);
+  return formatIntervento(
+    row,
+    summarizeBisogni(needs),
+    display?.beneficiarioNome ?? null,
+    display?.operatoreCodice ?? null,
+    successori.get(row.id) ?? [],
+    display?.details,
+  );
+}
+
+function addCivilDays(value: string, days: number): string {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function preparazioneRange(query: Record<string, string | undefined>): {
+  da: string;
+  a: string;
+  start: Date;
+  end: Date;
+} {
+  const periodo = query.periodo ?? "7";
+  let da: string;
+  let a: string;
+  if (periodo === "personalizzato") {
+    if (!query.da || !query.a)
+      throw new RouteError(400, "L'intervallo personalizzato richiede da e a");
+    da = query.da;
+    a = query.a;
+  } else {
+    const days = periodo === "oggi" ? 1 : Number(periodo);
+    if (![1, 3, 7, 14].includes(days))
+      throw new RouteError(400, "periodo non valido");
+    da = oggiEuropeRome();
+    a = addCivilDays(da, days - 1);
+  }
+  if (!isDateOnly(da) || !isDateOnly(a) || a < da)
+    throw new RouteError(400, "Intervallo date non valido");
+  const [fromYear, fromMonth, fromDay] = da.split("-").map(Number);
+  const [toYear, toMonth, toDay] = a.split("-").map(Number);
+  const span =
+    (Date.UTC(toYear, toMonth - 1, toDay) -
+      Date.UTC(fromYear, fromMonth - 1, fromDay)) /
+    86_400_000;
+  if (span > 30)
+    throw new RouteError(400, "L'intervallo massimo è di 31 giorni");
+  const range = intervalloDateEuropeRome(da, a);
+  return { da, a, ...range };
+}
+
+const PRIORITA_RANK: Record<string, number> = {
+  urgente: 1,
+  alta: 2,
+  normale: 3,
+  bassa: 4,
+};
 
 async function canManageBisogniForBeneficiario(
   beneficiarioId: number,
@@ -1390,6 +1833,7 @@ router.get("/interventi", async (req, res) => {
     conditions.push(eq(beneficiariTable.cittaId, parsedCitta));
   }
   if (caller != null || callerCitta != null || callerZona != null) {
+    conditions.push(isNotNull(beneficiariTable.id));
     const scopeAlternatives: SQL[] = [];
     if (canUseInterventoArea(req, "sociale")) {
       const socialConditions = [
@@ -1791,6 +2235,198 @@ router.post("/interventi", async (req, res) => {
     .json(formatIntervento(intervento, summarizeBisogni(bisogniCreati)));
 });
 
+router.get("/interventi/materiale-da-preparare", async (req, res) => {
+  const query = req.query as Record<string, string | undefined>;
+  try {
+    const range = preparazioneRange(query);
+    const conditions: SQL[] = [
+      eq(interventiTable.ambito, "sociale"),
+      inArray(interventiTable.stato, ["pianificato", "in_corso"]),
+      gte(interventiTable.dataOraPianificata, range.start),
+      lt(interventiTable.dataOraPianificata, range.end),
+      inArray(interventiMaterialiTable.statoPreparazione, [
+        "da_preparare",
+        "pronto",
+      ]),
+      sql`${interventiMaterialiTable.quantitaPrevista} > ${interventiMaterialiTable.quantitaConsegnata}`,
+      ...socialScopeConditions(req, query),
+    ];
+    const rows = await db
+      .select({
+        materialeId: interventiMaterialiTable.id,
+        materialeAggiornato: interventiMaterialiTable.dataAggiornamento,
+        interventoId: interventiTable.id,
+        prodottoId: interventiMaterialiTable.prodottoId,
+        descrizione: interventiMaterialiTable.descrizioneSnapshot,
+        unitaMisura: interventiMaterialiTable.unitaMisuraSnapshot,
+        magazzinoId: interventiMaterialiTable.magazzinoId,
+        magazzinoNome: magazziniTable.nome,
+        quantitaPrevista: interventiMaterialiTable.quantitaPrevista,
+        quantitaConsegnata: interventiMaterialiTable.quantitaConsegnata,
+        statoPreparazione: interventiMaterialiTable.statoPreparazione,
+        note: interventiMaterialiTable.note,
+        statoIntervento: interventiTable.stato,
+        priorita: interventiTable.priorita,
+        dataOraPianificata: interventiTable.dataOraPianificata,
+        sede: interventiTable.sede,
+        beneficiarioNome: sql<string>`${beneficiariTable.cognome} || ' ' || ${beneficiariTable.nome}`,
+        beneficiarioCodice: beneficiariTable.codice,
+        operatoreNome: sql<
+          string | null
+        >`nullif(trim(coalesce(${utentiTable.nome}, '') || ' ' || coalesce(${utentiTable.cognome}, '')), '')`,
+      })
+      .from(interventiMaterialiTable)
+      .innerJoin(
+        interventiTable,
+        eq(interventiMaterialiTable.interventoId, interventiTable.id),
+      )
+      .innerJoin(
+        beneficiariTable,
+        eq(interventiTable.beneficiarioId, beneficiariTable.id),
+      )
+      .leftJoin(
+        magazziniTable,
+        eq(interventiMaterialiTable.magazzinoId, magazziniTable.id),
+      )
+      .leftJoin(utentiTable, eq(interventiTable.operatoreId, utentiTable.id))
+      .where(and(...conditions))
+      .orderBy(
+        interventiTable.dataOraPianificata,
+        prioritaOrdineSql(),
+        interventiMaterialiTable.id,
+      );
+
+    type Detail = {
+      materialeId: number;
+      interventoId: number;
+      beneficiarioNome: string;
+      beneficiarioCodice: string;
+      dataOraPianificata: string;
+      sede: string | null;
+      operatoreNome: string | null;
+      quantitaResidua: number;
+      statoPreparazione: string;
+      note: string | null;
+      versione: string;
+      avviso: ReturnType<typeof avvisoInterventoEuropeRome>;
+    };
+    type Group = {
+      chiave: string;
+      prodottoId: number | null;
+      descrizione: string;
+      unitaMisura: string;
+      magazzinoId: number | null;
+      magazzinoNome: string | null;
+      quantitaTotale: number;
+      quantitaPronta: number;
+      quantitaDaPreparare: number;
+      numeroInterventi: number;
+      primaScadenza: string;
+      prioritaPiuAlta: string;
+      avviso: ReturnType<typeof avvisoInterventoEuropeRome>;
+      interventi: Detail[];
+      interventoIds: Set<number>;
+    };
+    const grouped = new Map<string, Group>();
+    const now = new Date();
+    for (const row of rows) {
+      if (row.dataOraPianificata == null) continue;
+      const residual = Math.max(
+        Number(row.quantitaPrevista) - Number(row.quantitaConsegnata),
+        0,
+      );
+      if (residual <= 0) continue;
+      const normalizedDescription = row.descrizione
+        .trim()
+        .toLocaleLowerCase("it-IT");
+      const normalizedUnit = row.unitaMisura.trim().toLocaleLowerCase("it-IT");
+      const key = row.prodottoId
+        ? `catalogo:${row.prodottoId}:${normalizedUnit}:${row.magazzinoId ?? "none"}`
+        : `generico:${normalizedDescription}:${normalizedUnit}:${row.magazzinoId ?? "none"}`;
+      const warning = avvisoInterventoEuropeRome(
+        row.dataOraPianificata,
+        row.statoIntervento,
+        now,
+      );
+      const detail: Detail = {
+        materialeId: row.materialeId,
+        interventoId: row.interventoId,
+        beneficiarioNome: row.beneficiarioNome,
+        beneficiarioCodice: row.beneficiarioCodice,
+        dataOraPianificata: row.dataOraPianificata.toISOString(),
+        sede: row.sede ?? null,
+        operatoreNome: row.operatoreNome ?? null,
+        quantitaResidua: residual,
+        statoPreparazione: row.statoPreparazione,
+        note: row.note ?? null,
+        versione: row.materialeAggiornato.toISOString(),
+        avviso: warning,
+      };
+      const existing = grouped.get(key);
+      if (!existing) {
+        grouped.set(key, {
+          chiave: key,
+          prodottoId: row.prodottoId ?? null,
+          descrizione: row.descrizione,
+          unitaMisura: row.unitaMisura,
+          magazzinoId: row.magazzinoId ?? null,
+          magazzinoNome: row.magazzinoNome ?? null,
+          quantitaTotale: residual,
+          quantitaPronta: row.statoPreparazione === "pronto" ? residual : 0,
+          quantitaDaPreparare:
+            row.statoPreparazione === "pronto" ? 0 : residual,
+          numeroInterventi: 1,
+          primaScadenza: row.dataOraPianificata.toISOString(),
+          prioritaPiuAlta: row.priorita,
+          avviso: warning,
+          interventi: [detail],
+          interventoIds: new Set([row.interventoId]),
+        });
+        continue;
+      }
+      existing.quantitaTotale += residual;
+      if (row.statoPreparazione === "pronto")
+        existing.quantitaPronta += residual;
+      else existing.quantitaDaPreparare += residual;
+      existing.interventoIds.add(row.interventoId);
+      existing.numeroInterventi = existing.interventoIds.size;
+      if (detail.dataOraPianificata < existing.primaScadenza)
+        existing.primaScadenza = detail.dataOraPianificata;
+      if (
+        (PRIORITA_RANK[row.priorita] ?? 99) <
+        (PRIORITA_RANK[existing.prioritaPiuAlta] ?? 99)
+      )
+        existing.prioritaPiuAlta = row.priorita;
+      const warningRank = { scaduto: 1, oggi: 2, imminente: 3, prossimo: 4 };
+      if (
+        warning &&
+        (!existing.avviso ||
+          warningRank[warning] < warningRank[existing.avviso])
+      )
+        existing.avviso = warning;
+      existing.interventi.push(detail);
+    }
+    const groups = [...grouped.values()]
+      .map(({ interventoIds: _interventoIds, ...group }) => group)
+      .sort(
+        (left, right) =>
+          left.primaScadenza.localeCompare(right.primaScadenza) ||
+          (PRIORITA_RANK[left.prioritaPiuAlta] ?? 99) -
+            (PRIORITA_RANK[right.prioritaPiuAlta] ?? 99) ||
+          left.descrizione.localeCompare(right.descrizione, "it"),
+      );
+    res.json({
+      da: range.da,
+      a: range.a,
+      fusoOrario: "Europe/Rome",
+      gruppi: groups,
+    });
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
+});
+
 router.get("/interventi/:id", async (req, res) => {
   const id = parsePositiveInteger(req.params.id);
   if (id == null) {
@@ -1818,6 +2454,557 @@ router.get("/interventi/:id", async (req, res) => {
   }
 });
 
+router.get("/interventi/:id/operativita", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  try {
+    const row = await requireAccessibleIntervento(id, req, "sociale");
+    res.json(await operativitaFor(row));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
+});
+
+router.patch("/interventi/:id/materiali/:materialeId", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  const materialeId = parsePositiveInteger(req.params.materialeId);
+  if (id == null || materialeId == null) {
+    res.status(400).json({ error: "Identificativo non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  if (
+    body.statoPreparazione !== "pronto" &&
+    body.statoPreparazione !== "da_preparare"
+  ) {
+    res.status(400).json({
+      error: "statoPreparazione deve essere pronto o da_preparare",
+    });
+    return;
+  }
+  try {
+    const expected = parseIsoTimestamp(body.versione, "versione");
+    if (expected == null)
+      throw new RouteError(400, "La versione del materiale è obbligatoria");
+    await requireAccessibleIntervento(id, req, "sociale");
+    const now = new Date();
+    const updated = await db.transaction(async (tx) => {
+      const [intervento] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (!intervento) throw new RouteError(404, "Intervento non trovato");
+      if (!["pianificato", "in_corso"].includes(intervento.stato))
+        throw new RouteError(
+          409,
+          "Lo stato di preparazione non è modificabile per questo intervento",
+        );
+      const [materiale] = await tx
+        .select()
+        .from(interventiMaterialiTable)
+        .where(
+          and(
+            eq(interventiMaterialiTable.id, materialeId),
+            eq(interventiMaterialiTable.interventoId, id),
+          ),
+        )
+        .for("update");
+      if (!materiale)
+        throw new RouteError(404, "Materiale non appartenente all'intervento");
+      if (
+        materiale.statoPreparazione === "annullato" ||
+        materiale.statoPreparazione === "consegnato"
+      )
+        throw new RouteError(409, "Il materiale non è più preparabile");
+      if (materiale.dataAggiornamento.getTime() !== expected.getTime())
+        throw new RouteError(
+          409,
+          "Il materiale è stato modificato da un altro operatore",
+        );
+      const [row] = await tx
+        .update(interventiMaterialiTable)
+        .set({
+          statoPreparazione: body.statoPreparazione as MaterialeStato,
+          dataAggiornamento: now,
+        })
+        .where(
+          and(
+            eq(interventiMaterialiTable.id, materialeId),
+            eq(interventiMaterialiTable.interventoId, id),
+            eq(interventiMaterialiTable.dataAggiornamento, expected),
+          ),
+        )
+        .returning();
+      if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
+      await tx
+        .update(interventiTable)
+        .set({ dataAggiornamento: now })
+        .where(eq(interventiTable.id, id));
+      return row;
+    });
+    res.json(formatMateriale(updated));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    res.status(400).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "Aggiornamento materiale non valido",
+    });
+  }
+});
+
+router.post("/interventi/:id/avvia", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  let now: Date;
+  try {
+    now = parseIsoTimestamp(body.dataOraAvvio, "dataOraAvvio") ?? new Date();
+    await requireAccessibleIntervento(id, req, "sociale");
+    const updated = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (!current) throw new RouteError(404, "Intervento non trovato");
+      assertExpectedVersion(body, current);
+      if (!isInterventoStato(current.stato))
+        throw new RouteError(409, "Stato corrente non riconosciuto");
+      if (!["da_pianificare", "pianificato"].includes(current.stato)) {
+        throw new RouteError(
+          409,
+          "L'intervento è già stato avviato o non è avviabile",
+        );
+      }
+      const [row] = await tx
+        .update(interventiTable)
+        .set({
+          stato: "in_corso",
+          dataOraAvvio: now,
+          dataIntervento: current.dataIntervento ?? dataCivileEuropeRome(now),
+          dataAggiornamento: now,
+        })
+        .where(
+          and(
+            eq(interventiTable.id, id),
+            eq(interventiTable.stato, current.stato),
+          ),
+        )
+        .returning();
+      if (!row) throw new RouteError(409, "Avvio concorrente rilevato");
+      await tx.insert(interventiStoricoStatiTable).values({
+        interventoId: id,
+        statoPrecedente: current.stato,
+        statoNuovo: "in_corso",
+        operatoreId: req.user!.id,
+        dataTransizione: now,
+        motivo: null,
+      });
+      return row;
+    });
+    res.json(await formattedInterventoFor(updated));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Avvio non valido",
+    });
+  }
+});
+
+router.post("/interventi/:id/salva-operativita", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  try {
+    await requireAccessibleIntervento(id, req, "sociale");
+    const now = new Date();
+    const updated = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (!current) throw new RouteError(404, "Intervento non trovato");
+      assertExpectedVersion(body, current);
+      if (
+        !["da_pianificare", "pianificato", "in_corso"].includes(current.stato)
+      ) {
+        throw new RouteError(
+          409,
+          "Un intervento terminale è consultabile in sola lettura",
+        );
+      }
+      await replaceOperativita(tx, id, body, req.user!.id, now);
+      const updates: Partial<typeof interventiTable.$inferInsert> = {
+        dataAggiornamento: now,
+      };
+      if (hasOwn(body, "risultato"))
+        updates.risultato = nullableText(body.risultato, "Il risultato", 4000);
+      if (hasOwn(body, "esito"))
+        updates.esito = nullableText(body.esito, "L'esito", 4000);
+      if (hasOwn(body, "note"))
+        updates.note = nullableText(body.note, "Le note", 4000);
+      const [row] = await tx
+        .update(interventiTable)
+        .set(updates)
+        .where(
+          and(
+            eq(interventiTable.id, id),
+            eq(interventiTable.stato, current.stato),
+          ),
+        )
+        .returning();
+      if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
+      return row;
+    });
+    res.json(await operativitaFor(updated));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
+});
+
+router.post("/interventi/:id/concludi", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  if (body.conferma !== true) {
+    res
+      .status(400)
+      .json({ error: "La conclusione richiede conferma esplicita" });
+    return;
+  }
+  const successivoInput =
+    body.successivo &&
+    typeof body.successivo === "object" &&
+    !Array.isArray(body.successivo)
+      ? (body.successivo as Record<string, unknown>)
+      : null;
+  if (
+    hasOwn(body, "successivo") &&
+    body.successivo != null &&
+    successivoInput == null
+  ) {
+    res.status(400).json({ error: "Intervento successivo non valido" });
+    return;
+  }
+  let successivoWorkflow: WorkflowCreateResult | null = null;
+  let successivoOperatoreId: number | null = null;
+  let conclusionDate: Date;
+  try {
+    conclusionDate =
+      parseIsoTimestamp(body.dataOraConclusione, "dataOraConclusione") ??
+      new Date();
+    await requireAccessibleIntervento(id, req, "sociale");
+    if (successivoInput) {
+      successivoWorkflow = workflowCreateValues(
+        successivoInput,
+        conclusionDate,
+      );
+      const successivoStato = successivoWorkflow.values.stato;
+      if (
+        successivoWorkflow.values.ambito !== "sociale" ||
+        (successivoStato !== "da_pianificare" &&
+          successivoStato !== "pianificato")
+      ) {
+        throw new RouteError(
+          400,
+          "Il successivo deve essere Sociale e da pianificare o pianificato",
+        );
+      }
+      const tipo = requiredText(
+        successivoInput.tipoIntervento,
+        "La tipologia del successivo",
+        120,
+      );
+      successivoInput.tipoIntervento = tipo;
+      successivoOperatoreId = hasOwn(successivoInput, "operatoreId")
+        ? optionalPositiveInteger(successivoInput.operatoreId, "operatoreId")
+        : req.user!.id;
+    }
+    const result = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (!current) throw new RouteError(404, "Intervento non trovato");
+      assertExpectedVersion(body, current);
+      if (current.stato !== "in_corso") {
+        throw new RouteError(
+          409,
+          "L'intervento non è in corso o è già concluso",
+        );
+      }
+      if (current.dataOraAvvio == null)
+        throw new RouteError(409, "L'intervento non risulta avviato");
+      if (conclusionDate < current.dataOraAvvio)
+        throw new RouteError(400, "La conclusione non può precedere l'avvio");
+
+      const risultato = hasOwn(body, "risultato")
+        ? nullableText(body.risultato, "Il risultato", 4000)
+        : current.risultato;
+      const esito = hasOwn(body, "esito")
+        ? nullableText(body.esito, "L'esito", 4000)
+        : current.esito;
+      if (risultato == null && esito == null) {
+        throw new RouteError(
+          400,
+          "Inserire almeno un risultato o un esito finale",
+        );
+      }
+      await replaceOperativita(tx, id, body, req.user!.id, conclusionDate);
+      const [concluso] = await tx
+        .update(interventiTable)
+        .set({
+          stato: "concluso",
+          risultato,
+          esito,
+          note: hasOwn(body, "note")
+            ? nullableText(body.note, "Le note", 4000)
+            : current.note,
+          dataOraConclusione: conclusionDate,
+          dataAggiornamento: conclusionDate,
+        })
+        .where(
+          and(
+            eq(interventiTable.id, id),
+            eq(interventiTable.stato, "in_corso"),
+          ),
+        )
+        .returning();
+      if (!concluso)
+        throw new RouteError(409, "Conclusione concorrente rilevata");
+      await tx.insert(interventiStoricoStatiTable).values({
+        interventoId: id,
+        statoPrecedente: "in_corso",
+        statoNuovo: "concluso",
+        operatoreId: req.user!.id,
+        dataTransizione: conclusionDate,
+        motivo: null,
+      });
+
+      let successivo: InterventoRow | null = null;
+      if (successivoInput && successivoWorkflow && successivoOperatoreId) {
+        if (
+          !(await canAssignSocialOperator(
+            successivoOperatoreId,
+            current.beneficiarioId,
+            req,
+          ))
+        ) {
+          throw new RouteError(403, "Operatore del successivo non accessibile");
+        }
+        const [duplicate] = await tx
+          .select({ id: interventiTable.id })
+          .from(interventiTable)
+          .where(
+            and(
+              eq(interventiTable.interventoPrecedenteId, id),
+              inArray(interventiTable.stato, [
+                "da_pianificare",
+                "pianificato",
+                "in_corso",
+              ]),
+            ),
+          )
+          .limit(1);
+        if (duplicate)
+          throw new RouteError(
+            409,
+            "Esiste già un intervento successivo attivo",
+          );
+        [successivo] = await tx
+          .insert(interventiTable)
+          .values({
+            ...cleanInterventoBody(successivoInput),
+            ...successivoWorkflow.values,
+            beneficiarioId: current.beneficiarioId,
+            interventoPrecedenteId: id,
+            operatoreId: successivoOperatoreId,
+            risultato: null,
+            esito: null,
+          } as never)
+          .returning();
+        await tx.insert(interventiStoricoStatiTable).values({
+          interventoId: successivo.id,
+          statoPrecedente: null,
+          statoNuovo: successivo.stato,
+          operatoreId: req.user!.id,
+          dataTransizione: conclusionDate,
+          motivo: "Creato contestualmente alla conclusione del precedente",
+        });
+        await replaceOperativita(
+          tx,
+          successivo.id,
+          {
+            materiali: successivoInput.materiali ?? [],
+            documenti: successivoInput.documenti ?? [],
+          },
+          req.user!.id,
+          conclusionDate,
+        );
+      }
+      return { concluso, successivo };
+    });
+    res.json({
+      intervento: await formattedInterventoFor(result.concluso),
+      operativita: await operativitaFor(result.concluso),
+      successivo: result.successivo
+        ? await formattedInterventoFor(result.successivo)
+        : null,
+    });
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Conclusione non valida",
+    });
+  }
+});
+
+router.post("/interventi/:id/annulla", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  try {
+    const motivo = requiredText(
+      body.motivo,
+      "Il motivo dell'annullamento",
+      2000,
+    );
+    const now =
+      parseIsoTimestamp(body.dataOraAnnullamento, "dataOraAnnullamento") ??
+      new Date();
+    await requireAccessibleIntervento(id, req, "sociale");
+    const updated = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (!current) throw new RouteError(404, "Intervento non trovato");
+      assertExpectedVersion(body, current);
+      if (
+        !["da_pianificare", "pianificato", "in_corso"].includes(current.stato)
+      )
+        throw new RouteError(409, "L'intervento è già in uno stato terminale");
+      const [row] = await tx
+        .update(interventiTable)
+        .set({
+          stato: "annullato",
+          motivoAnnullamento: motivo,
+          dataAggiornamento: now,
+        })
+        .where(
+          and(
+            eq(interventiTable.id, id),
+            eq(interventiTable.stato, current.stato),
+          ),
+        )
+        .returning();
+      if (!row) throw new RouteError(409, "Annullamento concorrente rilevato");
+      await tx.insert(interventiStoricoStatiTable).values({
+        interventoId: id,
+        statoPrecedente: current.stato,
+        statoNuovo: "annullato",
+        operatoreId: req.user!.id,
+        dataTransizione: now,
+        motivo,
+      });
+      return row;
+    });
+    res.json(await formattedInterventoFor(updated));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Annullamento non valido",
+    });
+  }
+});
+
+router.post("/interventi/:id/mancata-presentazione", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  try {
+    const nota = nullableText(body.nota, "La nota", 2000);
+    const now =
+      parseIsoTimestamp(body.dataOraRegistrazione, "dataOraRegistrazione") ??
+      new Date();
+    await requireAccessibleIntervento(id, req, "sociale");
+    const updated = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (!current) throw new RouteError(404, "Intervento non trovato");
+      assertExpectedVersion(body, current);
+      if (current.stato !== "pianificato")
+        throw new RouteError(
+          409,
+          "La mancata presentazione richiede un intervento pianificato",
+        );
+      const [row] = await tx
+        .update(interventiTable)
+        .set({
+          stato: "mancata_presentazione",
+          dataOraAvvio: null,
+          note: nota ?? current.note,
+          dataAggiornamento: now,
+        })
+        .where(
+          and(
+            eq(interventiTable.id, id),
+            eq(interventiTable.stato, "pianificato"),
+          ),
+        )
+        .returning();
+      if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
+      await tx.insert(interventiStoricoStatiTable).values({
+        interventoId: id,
+        statoPrecedente: "pianificato",
+        statoNuovo: "mancata_presentazione",
+        operatoreId: req.user!.id,
+        dataTransizione: now,
+        motivo: nota,
+      });
+      return row;
+    });
+    res.json(await formattedInterventoFor(updated));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    res.status(400).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "Mancata presentazione non valida",
+    });
+  }
+});
+
 router.patch("/interventi/:id", async (req, res) => {
   const id = parsePositiveInteger(req.params.id);
   if (id == null) {
@@ -1831,7 +3018,6 @@ router.patch("/interventi/:id", async (req, res) => {
     "dataOraAvvio",
     "dataOraConclusione",
     "motivoAnnullamento",
-    "operatoreId",
   ];
   const forbiddenField = forbiddenWorkflowFields.find((field) =>
     hasOwn(body, field),
@@ -1891,6 +3077,26 @@ router.patch("/interventi/:id", async (req, res) => {
   const workflowUpdates: Partial<typeof interventiTable.$inferInsert> = {
     dataAggiornamento: new Date(),
   };
+  if (hasOwn(body, "operatoreId")) {
+    const operatoreId = parsePositiveInteger(body.operatoreId);
+    if (operatoreId == null) {
+      res.status(400).json({ error: "operatoreId non valido" });
+      return;
+    }
+    if (
+      existing.ambito !== "sociale" ||
+      !["da_pianificare", "pianificato"].includes(existing.stato) ||
+      !(await canAssignSocialOperator(
+        operatoreId,
+        existing.beneficiarioId,
+        req,
+      ))
+    ) {
+      res.status(403).json({ error: "Operatore assegnato non accessibile" });
+      return;
+    }
+    workflowUpdates.operatoreId = operatoreId;
+  }
   if (hasOwn(body, "priorita")) {
     if (!isInterventoPriorita(body.priorita)) {
       res.status(400).json({ error: "priorita non valida" });
