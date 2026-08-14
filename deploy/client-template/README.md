@@ -30,10 +30,11 @@ configurazione ambiente, moduli, loghi e backup separati.
    docker compose --env-file .env.docker -f docker-compose.prod.yml up -d db
    ```
 
-5. Applicare lo schema:
+5. Creare lo schema del nuovo database e applicare gli aggiornamenti incrementali:
 
    ```bash
-   docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run push-force
+   docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run push
+   docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run update
    ```
 
 6. Avviare lo stack:
@@ -48,6 +49,22 @@ configurazione ambiente, moduli, loghi e backup separati.
    docker compose --env-file .env.docker -f docker-compose.prod.yml ps
    curl -I https://cliente-x.magazzinosolidale.it
    ```
+
+## Aggiornamenti successivi
+
+Su un database esistente non usare `push` o `push-force`. Creare prima il backup
+e applicare soltanto gli aggiornamenti incrementali:
+
+```bash
+scripts/client-env/backup-client.sh --slug cliente-x
+docker compose --env-file .env.docker -f docker-compose.prod.yml build api
+docker compose --env-file .env.docker -f docker-compose.prod.yml up -d db
+docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run update
+docker compose --env-file .env.docker -f docker-compose.prod.yml up -d --remove-orphans
+```
+
+Il comando `update` e' idempotente ed esegue solo gli script SQL incrementali
+versionati nel repository.
 
 ## Sicurezza
 

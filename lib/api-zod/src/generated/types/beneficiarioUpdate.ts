@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BeneficiarioUpdateCreditoSolidaleStato } from './beneficiarioUpdateCreditoSolidaleStato';
+import type { BeneficiarioUpdateFasciaEtaPresunta } from './beneficiarioUpdateFasciaEtaPresunta';
 import type { BeneficiarioUpdateSesso } from './beneficiarioUpdateSesso';
 
 export interface BeneficiarioUpdate {
@@ -13,7 +14,13 @@ export interface BeneficiarioUpdate {
   codiceFiscale?: string | null;
   cognome?: string;
   nome?: string;
-  dataNascita?: string;
+  /** @nullable */
+  dataNascita?: Date | null;
+  /**
+     * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+     * @nullable
+     */
+  fasciaEtaPresunta?: BeneficiarioUpdateFasciaEtaPresunta;
   cittadinanza?: string;
   residenza?: string;
   domicilio?: string;

@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BeneficiarioCreditoSolidaleStato } from './beneficiarioCreditoSolidaleStato';
+import type { BeneficiarioFasciaEtaCorrente } from './beneficiarioFasciaEtaCorrente';
+import type { BeneficiarioFasciaEtaOrigine } from './beneficiarioFasciaEtaOrigine';
+import type { BeneficiarioFasciaEtaPresunta } from './beneficiarioFasciaEtaPresunta';
 
 export interface Beneficiario {
   id: number;
@@ -16,6 +19,14 @@ export interface Beneficiario {
   nome: string;
   /** @nullable */
   dataNascita?: string | null;
+  /**
+     * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+     * @nullable
+     */
+  fasciaEtaPresunta: BeneficiarioFasciaEtaPresunta;
+  /** Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta. */
+  fasciaEtaCorrente: BeneficiarioFasciaEtaCorrente;
+  fasciaEtaOrigine: BeneficiarioFasciaEtaOrigine;
   /** @nullable */
   sesso?: string | null;
   /** @nullable */

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BeneficiarioInputCreditoSolidaleStato } from './beneficiarioInputCreditoSolidaleStato';
+import type { BeneficiarioInputFasciaEtaPresunta } from './beneficiarioInputFasciaEtaPresunta';
 import type { BeneficiarioInputSesso } from './beneficiarioInputSesso';
 
 export interface BeneficiarioInput {
@@ -14,7 +15,13 @@ export interface BeneficiarioInput {
   codiceFiscale?: string | null;
   cognome: string;
   nome: string;
-  dataNascita?: string;
+  /** @nullable */
+  dataNascita?: Date | null;
+  /**
+     * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+     * @nullable
+     */
+  fasciaEtaPresunta?: BeneficiarioInputFasciaEtaPresunta;
   cittadinanza?: string;
   residenza?: string;
   domicilio?: string;

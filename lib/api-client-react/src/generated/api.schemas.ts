@@ -208,6 +208,20 @@ export interface ProdottiBulkInput {
   righe: ProdottoInput[];
 }
 
+/**
+ * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+ * @nullable
+ */
+export type BeneficiarioInputFasciaEtaPresunta = typeof BeneficiarioInputFasciaEtaPresunta[keyof typeof BeneficiarioInputFasciaEtaPresunta] | null;
+
+
+export const BeneficiarioInputFasciaEtaPresunta = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+} as const;
+
 export type BeneficiarioInputCreditoSolidaleStato = typeof BeneficiarioInputCreditoSolidaleStato[keyof typeof BeneficiarioInputCreditoSolidaleStato];
 
 
@@ -233,7 +247,13 @@ export interface BeneficiarioInput {
   codiceFiscale?: string | null;
   cognome: string;
   nome: string;
-  dataNascita?: string;
+  /** @nullable */
+  dataNascita?: string | null;
+  /**
+     * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+     * @nullable
+     */
+  fasciaEtaPresunta?: BeneficiarioInputFasciaEtaPresunta;
   cittadinanza?: string;
   residenza?: string;
   domicilio?: string;
@@ -927,6 +947,43 @@ export interface BeneficiarioSimile {
   score: number;
 }
 
+/**
+ * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+ * @nullable
+ */
+export type BeneficiarioFasciaEtaPresunta = typeof BeneficiarioFasciaEtaPresunta[keyof typeof BeneficiarioFasciaEtaPresunta] | null;
+
+
+export const BeneficiarioFasciaEtaPresunta = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+} as const;
+
+/**
+ * Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta.
+ */
+export type BeneficiarioFasciaEtaCorrente = typeof BeneficiarioFasciaEtaCorrente[keyof typeof BeneficiarioFasciaEtaCorrente];
+
+
+export const BeneficiarioFasciaEtaCorrente = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+export type BeneficiarioFasciaEtaOrigine = typeof BeneficiarioFasciaEtaOrigine[keyof typeof BeneficiarioFasciaEtaOrigine];
+
+
+export const BeneficiarioFasciaEtaOrigine = {
+  calcolata: 'calcolata',
+  presunta: 'presunta',
+  non_determinata: 'non_determinata',
+} as const;
+
 export type BeneficiarioCreditoSolidaleStato = typeof BeneficiarioCreditoSolidaleStato[keyof typeof BeneficiarioCreditoSolidaleStato];
 
 
@@ -946,6 +1003,14 @@ export interface Beneficiario {
   nome: string;
   /** @nullable */
   dataNascita?: string | null;
+  /**
+     * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+     * @nullable
+     */
+  fasciaEtaPresunta: BeneficiarioFasciaEtaPresunta;
+  /** Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta. */
+  fasciaEtaCorrente: BeneficiarioFasciaEtaCorrente;
+  fasciaEtaOrigine: BeneficiarioFasciaEtaOrigine;
   /** @nullable */
   sesso?: string | null;
   /** @nullable */
@@ -1007,6 +1072,43 @@ export interface Beneficiario {
   dataPresaInCarico?: string | null;
   dataCreazione: string;
 }
+
+/**
+ * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+ * @nullable
+ */
+export type BeneficiarioDettaglioFasciaEtaPresunta = typeof BeneficiarioDettaglioFasciaEtaPresunta[keyof typeof BeneficiarioDettaglioFasciaEtaPresunta] | null;
+
+
+export const BeneficiarioDettaglioFasciaEtaPresunta = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+} as const;
+
+/**
+ * Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta.
+ */
+export type BeneficiarioDettaglioFasciaEtaCorrente = typeof BeneficiarioDettaglioFasciaEtaCorrente[keyof typeof BeneficiarioDettaglioFasciaEtaCorrente];
+
+
+export const BeneficiarioDettaglioFasciaEtaCorrente = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+export type BeneficiarioDettaglioFasciaEtaOrigine = typeof BeneficiarioDettaglioFasciaEtaOrigine[keyof typeof BeneficiarioDettaglioFasciaEtaOrigine];
+
+
+export const BeneficiarioDettaglioFasciaEtaOrigine = {
+  calcolata: 'calcolata',
+  presunta: 'presunta',
+  non_determinata: 'non_determinata',
+} as const;
 
 export type BeneficiarioDettaglioCreditoSolidaleStato = typeof BeneficiarioDettaglioCreditoSolidaleStato[keyof typeof BeneficiarioDettaglioCreditoSolidaleStato];
 
@@ -1139,6 +1241,14 @@ export interface BeneficiarioDettaglio {
   nome: string;
   /** @nullable */
   dataNascita?: string | null;
+  /**
+     * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+     * @nullable
+     */
+  fasciaEtaPresunta: BeneficiarioDettaglioFasciaEtaPresunta;
+  /** Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta. */
+  fasciaEtaCorrente: BeneficiarioDettaglioFasciaEtaCorrente;
+  fasciaEtaOrigine: BeneficiarioDettaglioFasciaEtaOrigine;
   /** @nullable */
   sesso?: string | null;
   /** @nullable */
@@ -1221,6 +1331,20 @@ export interface BeneficiarioDettaglio {
   dataCreazione: string;
 }
 
+/**
+ * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+ * @nullable
+ */
+export type BeneficiarioUpdateFasciaEtaPresunta = typeof BeneficiarioUpdateFasciaEtaPresunta[keyof typeof BeneficiarioUpdateFasciaEtaPresunta] | null;
+
+
+export const BeneficiarioUpdateFasciaEtaPresunta = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+} as const;
+
 export type BeneficiarioUpdateCreditoSolidaleStato = typeof BeneficiarioUpdateCreditoSolidaleStato[keyof typeof BeneficiarioUpdateCreditoSolidaleStato];
 
 
@@ -1245,7 +1369,13 @@ export interface BeneficiarioUpdate {
   codiceFiscale?: string | null;
   cognome?: string;
   nome?: string;
-  dataNascita?: string;
+  /** @nullable */
+  dataNascita?: string | null;
+  /**
+     * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+     * @nullable
+     */
+  fasciaEtaPresunta?: BeneficiarioUpdateFasciaEtaPresunta;
   cittadinanza?: string;
   residenza?: string;
   domicilio?: string;

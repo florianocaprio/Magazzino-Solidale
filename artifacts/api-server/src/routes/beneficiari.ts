@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { beneficiariTable, nucleoFamiliareTable, interventiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable } from "@workspace/db";
+import { calcolaEta, isFasciaEtaPresunta, risolviFasciaEta } from "@workspace/api-zod";
 import { runBulk } from "../lib/bulk";
 import { eq, and, or, ilike, sql, desc, ne, type SQL } from "drizzle-orm";
 import {
@@ -31,6 +32,8 @@ import { DATA_NASCITA_FUTURA_MSG, hasFutureBirthDate } from "../lib/bug5Validati
 
 const CODICE_BENEFICIARIO_DUPLICATO_MSG = "Il codice beneficiario indicato è già associato a un altro beneficiario.";
 const SESSO_OBBLIGATORIO_MSG = "Il campo Sesso è obbligatorio.";
+const DATA_NASCITA_NON_VALIDA_MSG = "La data di nascita non è valida. Usa il formato AAAA-MM-GG.";
+const FASCIA_ETA_PRESUNTA_NON_VALIDA_MSG = "La fascia d'età presunta selezionata non è valida.";
 const CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG =
   "ATTENZIONE: il beneficiario non ha un Centro di Ascolto assegnato. Non è possibile assegnare Credito Solidale.";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -103,6 +106,7 @@ const ANAGRAFICA_BENEFICIARIO_PATCH_KEYS = new Set([
   "nome",
   "soprannome",
   "dataNascita",
+  "fasciaEtaPresunta",
   "sesso",
   "cittadinanza",
   "areaProvenienza",
@@ -129,6 +133,37 @@ const ANAGRAFICA_BENEFICIARIO_PATCH_KEYS = new Set([
 
 const isAnagraficaBeneficiarioPatch = (updates: Record<string, unknown>): boolean =>
   Object.keys(updates).some((key) => ANAGRAFICA_BENEFICIARIO_PATCH_KEYS.has(key));
+
+function normalizeEtaFields(
+  values: Record<string, unknown>,
+  source: Record<string, unknown>,
+): { error?: string } {
+  delete values.fasciaEtaCorrente;
+  delete values.fasciaEtaOrigine;
+
+  if ("dataNascita" in source) {
+    const raw = source.dataNascita;
+    if (raw == null || raw === "") {
+      values.dataNascita = null;
+    } else if (typeof raw !== "string" || calcolaEta(raw) == null) {
+      return { error: hasFutureBirthDate(raw) ? DATA_NASCITA_FUTURA_MSG : DATA_NASCITA_NON_VALIDA_MSG };
+    } else {
+      values.dataNascita = raw;
+    }
+  }
+
+  if ("fasciaEtaPresunta" in source) {
+    const raw = source.fasciaEtaPresunta;
+    if (raw == null || raw === "") {
+      values.fasciaEtaPresunta = null;
+    } else if (!isFasciaEtaPresunta(raw)) {
+      return { error: FASCIA_ETA_PRESUNTA_NON_VALIDA_MSG };
+    } else {
+      values.fasciaEtaPresunta = raw;
+    }
+  }
+  return {};
+}
 
 async function codiceBeneficiarioEsiste(codice: string, excludeId?: number): Promise<boolean> {
   const where = excludeId != null
@@ -279,6 +314,7 @@ function fmtBenef(
   cittaNome?: string | null,
   magazzinoEmporioPreferitoNome?: string | null,
 ) {
+  const fasciaEta = risolviFasciaEta(r.dataNascita, r.fasciaEtaPresunta);
   return {
     id: r.id,
     codice: r.codice,
@@ -287,6 +323,9 @@ function fmtBenef(
     cognome: r.cognome,
     nome: r.nome,
     dataNascita: r.dataNascita ?? null,
+    fasciaEtaPresunta: r.fasciaEtaPresunta ?? null,
+    fasciaEtaCorrente: fasciaEta.fascia,
+    fasciaEtaOrigine: fasciaEta.origine,
     sesso: r.sesso ?? null,
     cittadinanza: r.cittadinanza ?? null,
     areaProvenienza: r.areaProvenienza ?? null,
@@ -389,9 +428,6 @@ async function createBeneficiarioOne(
   req: Request,
 ): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string; status?: number }> {
   const b = body as Record<string, any>;
-  if (hasFutureBirthDate(b.dataNascita)) {
-    return { error: DATA_NASCITA_FUTURA_MSG, status: 400 };
-  }
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
@@ -400,6 +436,8 @@ async function createBeneficiarioOne(
   const sesso = normalizzaSesso(b.sesso);
   if (!sesso) return { error: SESSO_OBBLIGATORIO_MSG, status: 400 };
   const values: Record<string, any> = { ...b, codice, sesso };
+  const eta = normalizeEtaFields(values, b);
+  if (eta.error) return { error: eta.error, status: 400 };
   delete values.creditoSolidaleSaldo;
   delete values.creditoSolidaleDataUltimoMovimento;
   if ("uds" in values) values.uds = toBool(values.uds);
@@ -669,7 +707,7 @@ router.patch("/beneficiari/:id", async (req, res) => {
   const isInitialUdsLink = !existing.uds
     && toBool(req.body?.uds) === true
     && patchKeys.length > 0
-    && patchKeys.every((key) => key === "uds" || key === "zonaUdsId");
+    && patchKeys.every((key) => key === "uds" || key === "zonaUdsId" || key === "fasciaEtaPresunta");
   const canLinkWithinCallerCitta = isInitialUdsLink
     && cid != null
     && existing.cittaId === cid;
@@ -692,8 +730,9 @@ router.patch("/beneficiari/:id", async (req, res) => {
     }
   }
   const updates = { ...req.body, dataAggiornamento: new Date() };
-  if (hasFutureBirthDate(updates.dataNascita)) {
-    res.status(400).json({ error: DATA_NASCITA_FUTURA_MSG });
+  const eta = normalizeEtaFields(updates, req.body as Record<string, unknown>);
+  if (eta.error) {
+    res.status(400).json({ error: eta.error });
     return;
   }
   delete updates.creditoSolidaleSaldo;

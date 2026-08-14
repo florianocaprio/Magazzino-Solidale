@@ -185,10 +185,11 @@ Avviare il database:
 docker compose --env-file .env.docker -f docker-compose.prod.yml up -d db
 ```
 
-Applicare lo schema DB:
+Creare lo schema del nuovo database e applicare gli aggiornamenti incrementali:
 
 ```bash
-docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run push-force
+docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run push
+docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run update
 ```
 
 Avviare lo stack:
@@ -198,9 +199,38 @@ docker compose --env-file .env.docker -f docker-compose.prod.yml up -d --remove-
 docker compose --env-file .env.docker -f docker-compose.prod.yml ps
 ```
 
-Il container API applica comunque lo schema all'avvio tramite
-`docker-entrypoint-api.sh`; il comando esplicito sopra rende visibile il passaggio
-operativo.
+Il container API applica comunque gli aggiornamenti incrementali all'avvio
+tramite `docker-entrypoint-api.sh`. Il bootstrap completo con `push` e' riservato
+esclusivamente a un database nuovo e vuoto.
+
+## Aggiornare un database cliente esistente
+
+Non usare `push` o `push-force` per aggiornare un database con dati. Il piano
+Drizzle puo' includere modifiche estranee all'aggiornamento richiesto quando i
+nomi dei vincoli legacy differiscono da quelli generati dalla versione corrente.
+
+Il percorso raccomandato e':
+
+1. creare e verificare il backup con `backup-client.sh`;
+2. costruire l'immagine aggiornata;
+3. avviare il solo database;
+4. eseguire `pnpm --filter @workspace/db run update` dal container API;
+5. verificare schema e conteggi applicativi;
+6. avviare il resto dello stack.
+
+Il comando `deploy-client.sh` esegue questi passaggi, incluso il backup salvo
+uso esplicito di `--skip-backup`. Per eseguire manualmente il solo aggiornamento:
+
+```bash
+scripts/client-env/backup-client.sh --slug cliente-x
+docker compose --env-file .env.docker -f docker-compose.prod.yml build api
+docker compose --env-file .env.docker -f docker-compose.prod.yml up -d db
+docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run update
+```
+
+Gli aggiornamenti sono SQL versionati in `lib/db/updates`, eseguiti in ordine,
+in transazione e sotto lock advisory. Devono essere idempotenti: una seconda
+esecuzione deve terminare senza modificare dati o oggetti non previsti.
 
 ## Super Admin, ambiente e moduli
 
@@ -251,7 +281,7 @@ Lo script:
 - aggiorna il repository indicato da `SOURCE_REPO_DIR`, se disponibile;
 - ricostruisce le immagini;
 - avvia `db`;
-- applica `db push`;
+- applica gli aggiornamenti DB incrementali;
 - riavvia lo stack con `--remove-orphans`;
 - mostra `docker compose ps` e controlli post-deploy.
 

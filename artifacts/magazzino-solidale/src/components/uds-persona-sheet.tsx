@@ -11,6 +11,11 @@ import {
   useListZoneUds,
   useUpdateBeneficiario,
 } from "@workspace/api-client-react";
+import {
+  FASCE_ETA_PRESUNTE,
+  isFasciaEtaPresunta,
+  risolviFasciaEta,
+} from "@workspace/api-zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, Search } from "lucide-react";
@@ -45,10 +50,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
+import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
 
 const NO_ZONE = "__none__";
 const NO_CENTRO = "__nocentro__";
+const NO_FASCIA_ETA = "__non_determinata__";
 
 function makeSchema(t: (key: string) => string, isGlobal: boolean) {
   return z
@@ -61,6 +68,7 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
         .string()
         .optional()
         .refine(isNotFutureDateOnly, "La data di nascita non può essere successiva alla data odierna."),
+      fasciaEtaPresunta: z.string().optional(),
       sesso: z.string().min(1, t("beneficiari.sessoRequired")),
       cittadinanza: z.string().optional(),
       areaProvenienza: z.string().min(1, t("common.requiredField")),
@@ -130,6 +138,7 @@ function emptyFormValues(initialCittaId?: number | null, initialZonaUdsId?: numb
     soprannome: "",
     codiceFiscale: "",
     dataNascita: "",
+    fasciaEtaPresunta: NO_FASCIA_ETA,
     sesso: "",
     cittadinanza: "",
     areaProvenienza: "",
@@ -219,6 +228,12 @@ export function UdsPersonaSheet({
   const wSoprannome = form.watch("soprannome");
   const wTelefono = form.watch("telefono");
   const wDataNascita = form.watch("dataNascita");
+  const wFasciaEtaPresunta = form.watch("fasciaEtaPresunta");
+  const fasciaEtaCorrente = risolviFasciaEta(
+    wDataNascita,
+    isFasciaEtaPresunta(wFasciaEtaPresunta) ? wFasciaEtaPresunta : null,
+  );
+  const fasciaEtaPresuntaDirty = form.formState.dirtyFields.fasciaEtaPresunta;
   useEffect(() => {
     if (!open) return;
     const rawIdentityLength = [wNome, wCognome, wSoprannome, wTelefono]
@@ -302,6 +317,13 @@ export function UdsPersonaSheet({
         data: {
           uds: true,
           ...(targetZona != null ? { zonaUdsId: targetZona } : {}),
+          ...(fasciaEtaPresuntaDirty
+            ? {
+                fasciaEtaPresunta: isFasciaEtaPresunta(wFasciaEtaPresunta)
+                  ? wFasciaEtaPresunta
+                  : null,
+              }
+            : {}),
         } as never,
       },
       {
@@ -342,6 +364,9 @@ export function UdsPersonaSheet({
     if (data.soprannome) payload.soprannome = data.soprannome;
     if (data.codiceFiscale) payload.codiceFiscale = data.codiceFiscale;
     if (data.dataNascita) payload.dataNascita = data.dataNascita;
+    payload.fasciaEtaPresunta = isFasciaEtaPresunta(data.fasciaEtaPresunta)
+      ? data.fasciaEtaPresunta
+      : null;
     payload.sesso = data.sesso;
     if (data.cittadinanza) payload.cittadinanza = data.cittadinanza;
     if (data.areaProvenienza) payload.areaProvenienza = data.areaProvenienza;
@@ -596,6 +621,52 @@ export function UdsPersonaSheet({
                       </FormItem>
                     )}
                   />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="fasciaEtaPresunta"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("udsAnagrafica.fasciaEtaPresuntaLabel")}</FormLabel>
+                      <Select value={field.value || NO_FASCIA_ETA} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {FASCE_ETA_PRESUNTE.map((fascia) => (
+                            <SelectItem key={fascia} value={fascia}>
+                              {fasciaEtaLabel(t, fascia)}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value={NO_FASCIA_ETA}>
+                            {fasciaEtaLabel(t, "non_determinata")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {t("udsAnagrafica.fasciaEtaPresuntaHint")}
+                      </p>
+                    </FormItem>
+                  )}
+                />
+                <div
+                  className="rounded-md border bg-muted/30 p-3 text-sm"
+                  data-testid="fascia-eta-corrente"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">{t("udsAnagrafica.fasciaEtaCorrenteLabel")}</span>
+                    <Badge variant="outline">
+                      {fasciaEtaOrigineLabel(t, fasciaEtaCorrente.origine)}
+                    </Badge>
+                  </div>
+                  <div className="mt-1">{fasciaEtaLabel(t, fasciaEtaCorrente.fascia)}</div>
+                  {fasciaEtaCorrente.origine === "calcolata" && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("udsAnagrafica.fasciaEtaCalcolataHint")}
+                    </p>
+                  )}
                 </div>
                 <FormField
                   control={form.control}

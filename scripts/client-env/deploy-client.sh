@@ -156,7 +156,7 @@ fi
 
 run_client docker compose --env-file .env.docker -f docker-compose.prod.yml build
 run_client docker compose --env-file .env.docker -f docker-compose.prod.yml up -d db
-run_client docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run push-force
+run_client docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run update
 run_client docker compose --env-file .env.docker -f docker-compose.prod.yml up -d --remove-orphans
 run_client docker compose --env-file .env.docker -f docker-compose.prod.yml ps
 

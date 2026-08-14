@@ -81,6 +81,29 @@ describe("UdsPersonaSheet", () => {
     ).toBeGreaterThan(0);
     expect(onOpenChange).not.toHaveBeenCalled();
 
+    const fasciaPreview = document.querySelector('[data-testid="fascia-eta-corrente"]');
+    expect(fasciaPreview?.textContent).toContain("udsAnagrafica.fasciaEta.non_determinata");
+    expect(fasciaPreview?.textContent).toContain(
+      "udsAnagrafica.fasciaEtaOrigine.non_determinata",
+    );
+
+    const dataNascitaInput = document.querySelector<HTMLInputElement>(
+      'input[name="dataNascita"]',
+    );
+    expect(dataNascitaInput).not.toBeNull();
+    const birthDateAge20 = `${new Date().getFullYear() - 20}-01-01`;
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(dataNascitaInput, birthDateAge20);
+      dataNascitaInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(fasciaPreview?.textContent).toContain("udsAnagrafica.fasciaEta.18_29");
+    expect(fasciaPreview?.textContent).toContain("udsAnagrafica.fasciaEtaOrigine.calcolata");
+    expect(fasciaPreview?.textContent).toContain("udsAnagrafica.fasciaEtaCalcolataHint");
+
     const nomeInput =
       document.querySelector<HTMLInputElement>('input[name="nome"]');
     expect(nomeInput).not.toBeNull();
@@ -105,6 +128,9 @@ describe("UdsPersonaSheet", () => {
     expect(
       document.querySelector<HTMLInputElement>('input[name="nome"]')?.value,
     ).toBe("");
+    expect(
+      document.querySelector('[data-testid="fascia-eta-corrente"]')?.textContent,
+    ).toContain("udsAnagrafica.fasciaEta.non_determinata");
     expect(onOpenChange).not.toHaveBeenCalled();
 
     const cancelButtons = Array.from(
