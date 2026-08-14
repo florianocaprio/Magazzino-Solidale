@@ -5,24 +5,40 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { MensaInputStato } from './mensaInputStato';
 
+/**
+ * Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L'Area è l'entità configurata nel menu Aree; `cittaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
+ */
 export interface MensaInput {
   /**
+     * Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.
      * @minLength 1
      * @maxLength 30
      */
-  codice: string;
+  codice?: string;
   /**
      * @minLength 1
      * @maxLength 160
      */
   nome: string;
+  /** Identificativo dell'Area; per utenti territoriali prevale sempre l'Area del profilo. */
   cittaId: number;
-  /** Deve riferirsi a un magazzino attivo già configurato esplicitamente con tipo `mensa`; l'API non converte magazzini logistici esistenti. */
-  magazzinoId: number;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   /** @nullable */
   indirizzo?: string | null;
-  attiva?: boolean;
+  /** @nullable */
+  comune?: string | null;
+  /** @nullable */
+  zona?: string | null;
+  /** @nullable */
+  responsabile?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  email?: string | null;
+  stato?: MensaInputStato;
   /** @nullable */
   note?: string | null;
 }

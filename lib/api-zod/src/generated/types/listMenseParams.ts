@@ -7,6 +7,9 @@
  */
 
 export type ListMenseParams = {
+/**
+ * Identificativo dell'Area configurata nel menu Aree (nome storico interno del campo).
+ */
 cittaId?: number;
 attiva?: boolean;
 };

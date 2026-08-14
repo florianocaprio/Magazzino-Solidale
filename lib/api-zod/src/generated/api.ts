@@ -6858,7 +6858,7 @@ export const ChangePasswordBody = zod.object({
 
 
 export const ListMenseQueryParams = zod.object({
-  "cittaId": zod.coerce.number().optional(),
+  "cittaId": zod.coerce.number().optional().describe('Identificativo dell\'Area configurata nel menu Aree (nome storico interno del campo).'),
   "attiva": zod.coerce.boolean().optional()
 })
 
@@ -6866,11 +6866,19 @@ export const ListMenseResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "nome": zod.string(),
-  "cittaId": zod.number(),
+  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
   "cittaNome": zod.string().nullish(),
-  "magazzinoId": zod.number().describe('Magazzino attivo già configurato esplicitamente con tipo `mensa`; non viene effettuata alcuna conversione automatica.'),
+  "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
   "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "stato": zod.enum(['attivo', 'inattivo']).optional(),
   "attiva": zod.boolean(),
   "note": zod.string().nullish(),
   "createdBy": zod.number().nullish(),
@@ -6884,17 +6892,22 @@ export const createMensaBodyCodiceMax = 30;
 
 export const createMensaBodyNomeMax = 160;
 
-
+export const createMensaBodyStatoDefault = `attivo`;
 
 export const CreateMensaBody = zod.object({
-  "codice": zod.string().min(1).max(createMensaBodyCodiceMax),
+  "codice": zod.string().min(1).max(createMensaBodyCodiceMax).optional().describe('Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.'),
   "nome": zod.string().min(1).max(createMensaBodyNomeMax),
-  "cittaId": zod.number(),
-  "magazzinoId": zod.number().describe('Deve riferirsi a un magazzino attivo già configurato esplicitamente con tipo `mensa`; l\'API non converte magazzini logistici esistenti.'),
+  "cittaId": zod.number().describe('Identificativo dell\'Area; per utenti territoriali prevale sempre l\'Area del profilo.'),
+  "centroAscoltoId": zod.number().nullish(),
   "indirizzo": zod.string().nullish(),
-  "attiva": zod.boolean().optional(),
+  "comune": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "stato": zod.enum(['attivo', 'inattivo']).default(createMensaBodyStatoDefault),
   "note": zod.string().nullish()
-})
+}).describe('Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L\'Area è l\'entità configurata nel menu Aree; `cittaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.')
 
 
 export const GetMensaParams = zod.object({
@@ -6905,11 +6918,19 @@ export const GetMensaResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "nome": zod.string(),
-  "cittaId": zod.number(),
+  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
   "cittaNome": zod.string().nullish(),
-  "magazzinoId": zod.number().describe('Magazzino attivo già configurato esplicitamente con tipo `mensa`; non viene effettuata alcuna conversione automatica.'),
+  "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
   "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "stato": zod.enum(['attivo', 'inattivo']).optional(),
   "attiva": zod.boolean(),
   "note": zod.string().nullish(),
   "createdBy": zod.number().nullish(),
@@ -6938,11 +6959,19 @@ export const UpdateMensaResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "nome": zod.string(),
-  "cittaId": zod.number(),
+  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
   "cittaNome": zod.string().nullish(),
-  "magazzinoId": zod.number().describe('Magazzino attivo già configurato esplicitamente con tipo `mensa`; non viene effettuata alcuna conversione automatica.'),
+  "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
   "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "stato": zod.enum(['attivo', 'inattivo']).optional(),
   "attiva": zod.boolean(),
   "note": zod.string().nullish(),
   "createdBy": zod.number().nullish(),

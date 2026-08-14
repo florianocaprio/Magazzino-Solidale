@@ -15,6 +15,8 @@ import {
   useCreateTesseraBeneficiario,
   useCreateTrasferimentoMensa,
   useGetMensaReport,
+  useListCentriAscolto,
+  useListCitta,
   useListEccezioniMensa,
   useListGiacenzeMensa,
   useListMagazziniMensa,
@@ -63,6 +65,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
+import {
+  MensaMagazzinoForm,
+  type MensaMagazzinoValues,
+} from "@/components/mensa-magazzino-form";
 
 export type MensaView =
   | "postazione"
@@ -700,7 +706,7 @@ export function MensaPostazione() {
             {temporaryDuplicates.length > 0 && (
               <div className="space-y-2 rounded-md border border-amber-500 p-3">
                 <p className="font-medium">
-                  Possibili persone già presenti nella stessa città
+                  Possibili persone già presenti nella stessa area
                 </p>
                 {temporaryDuplicates.map((duplicate) => (
                   <Button
@@ -827,37 +833,34 @@ function MenseView() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: mense = [] } = useListMense();
-  const { data: warehouses = [] } = useListMagazziniMensa();
+  const { data: areas = [] } = useListCitta();
+  const { data: centri = [] } = useListCentriAscolto();
   const create = useCreateMensa();
-  const [form, setForm] = useState({
-    codice: "",
-    nome: "",
-    cittaId: user?.cittaId?.toString() ?? "",
-    magazzinoId: "",
-    indirizzo: "",
-  });
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const submit = (form: MensaMagazzinoValues) => {
     create.mutate(
       {
         data: {
-          codice: form.codice,
+          codice: form.codice || undefined,
           nome: form.nome,
-          cittaId: Number(form.cittaId),
-          magazzinoId: Number(form.magazzinoId),
+          cittaId: form.cittaId,
+          centroAscoltoId: form.centroAscoltoId,
           indirizzo: form.indirizzo || null,
+          comune: form.comune || null,
+          zona: form.zona || null,
+          responsabile: form.responsabile || null,
+          telefono: form.telefono || null,
+          email: form.email || null,
+          stato: form.stato,
+          note: form.note || null,
         },
       },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["/api/mensa/mense"] });
-          setForm({
-            ...form,
-            codice: "",
-            nome: "",
-            magazzinoId: "",
-            indirizzo: "",
-          });
+          queryClient.invalidateQueries({ queryKey: ["/api/magazzini"] });
+          setIsFormOpen(false);
+          toast({ title: "Mensa creata" });
         },
         onError: (error) =>
           toast({
@@ -870,69 +873,20 @@ function MenseView() {
   };
   return (
     <div className="space-y-6 p-6">
-      <PageTitle view="mense" />
-      <Card>
-        <CardHeader>
-          <CardTitle>Nuova Mensa</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="grid gap-3 md:grid-cols-2">
-            <Input
-              required
-              placeholder="Codice"
-              value={form.codice}
-              onChange={(e) => setForm({ ...form, codice: e.target.value })}
-            />
-            <Input
-              required
-              placeholder="Nome"
-              value={form.nome}
-              onChange={(e) => setForm({ ...form, nome: e.target.value })}
-            />
-            {user?.cittaId == null && (
-              <Input
-                required
-                type="number"
-                min="1"
-                placeholder="ID città"
-                value={form.cittaId}
-                onChange={(e) => setForm({ ...form, cittaId: e.target.value })}
-              />
-            )}
-            <Select
-              value={form.magazzinoId}
-              onValueChange={(value) =>
-                setForm({ ...form, magazzinoId: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Ubicazione logistica" />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses
-                  .filter(
-                    (warehouse) =>
-                      warehouse.tipoMagazzino === "mensa" &&
-                      !mense.some(
-                        (mensa) => mensa.magazzinoId === warehouse.id,
-                      ),
-                  )
-                  .map((warehouse) => (
-                    <SelectItem key={warehouse.id} value={String(warehouse.id)}>
-                      {warehouse.nome}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <Input
-              placeholder="Indirizzo"
-              value={form.indirizzo}
-              onChange={(e) => setForm({ ...form, indirizzo: e.target.value })}
-            />
-            <Button disabled={create.isPending}>Crea Mensa</Button>
-          </form>
-        </CardContent>
-      </Card>
+      <div className="flex items-start justify-between gap-4">
+        <PageTitle view="mense" />
+        <Button onClick={() => setIsFormOpen(true)}>Nuova Mensa</Button>
+      </div>
+      <MensaMagazzinoForm
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        onSubmit={submit}
+        areas={areas}
+        centri={centri}
+        lockedAreaId={user?.cittaId}
+        lockedCentroId={user?.centroAscoltoId}
+        pending={create.isPending}
+      />
       <div className="grid gap-4 md:grid-cols-2">
         {mense.map((mensa) => (
           <Card key={mensa.id}>
@@ -947,8 +901,14 @@ function MenseView() {
             <CardContent>
               <p>{mensa.codice}</p>
               <p className="text-sm text-muted-foreground">
-                {mensa.cittaNome} · {mensa.magazzinoNome}
+                Area: {mensa.cittaNome ?? mensa.cittaId}
               </p>
+              <p className="text-sm text-muted-foreground">
+                Centro di Ascolto: {mensa.centroAscoltoNome ?? "Tutti i centri"}
+              </p>
+              {mensa.indirizzo && (
+                <p className="text-sm text-muted-foreground">{mensa.indirizzo}</p>
+              )}
             </CardContent>
           </Card>
         ))}

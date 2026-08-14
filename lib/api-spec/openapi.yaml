@@ -4815,7 +4815,10 @@ paths:
       operationId: listMense
       tags: [mensa]
       parameters:
-        - { name: cittaId, in: query, schema: { type: integer } }
+        - name: cittaId
+          in: query
+          description: Identificativo dell'Area configurata nel menu Aree (nome storico interno del campo).
+          schema: { type: integer }
         - { name: attiva, in: query, schema: { type: boolean } }
       responses:
         "200":
@@ -4838,6 +4841,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Mensa" }
+        "400":
+          description: Area, Centro di Ascolto o dati della sede non validi
+        "409":
+          description: Codice già utilizzato o entità associata non attiva
 
   /mensa/mense/{id}:
     parameters:
@@ -11090,13 +11097,23 @@ components:
         id: { type: integer }
         codice: { type: string }
         nome: { type: string }
-        cittaId: { type: integer }
+        cittaId:
+          type: integer
+          description: Identificativo dell'Area configurata nel menu Aree; `cittaId` è il nome storico interno.
         cittaNome: { type: ["string", "null"] }
         magazzinoId:
           type: integer
-          description: Magazzino attivo già configurato esplicitamente con tipo `mensa`; non viene effettuata alcuna conversione automatica.
+          description: Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.
         magazzinoNome: { type: ["string", "null"] }
+        centroAscoltoId: { type: ["integer", "null"] }
+        centroAscoltoNome: { type: ["string", "null"] }
         indirizzo: { type: ["string", "null"] }
+        comune: { type: ["string", "null"] }
+        zona: { type: ["string", "null"] }
+        responsabile: { type: ["string", "null"] }
+        telefono: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        stato: { type: string, enum: [attivo, inattivo] }
         attiva: { type: boolean }
         note: { type: ["string", "null"] }
         createdBy: { type: ["integer", "null"] }
@@ -11105,16 +11122,29 @@ components:
 
     MensaInput:
       type: object
-      required: [codice, nome, cittaId, magazzinoId]
+      description: >-
+        Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`.
+        L'Area è l'entità configurata nel menu Aree; `cittaId` è il nome storico
+        interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
+      required: [nome, cittaId]
       properties:
-        codice: { type: string, minLength: 1, maxLength: 30 }
+        codice:
+          type: string
+          minLength: 1
+          maxLength: 30
+          description: Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.
         nome: { type: string, minLength: 1, maxLength: 160 }
-        cittaId: { type: integer }
-        magazzinoId:
+        cittaId:
           type: integer
-          description: Deve riferirsi a un magazzino attivo già configurato esplicitamente con tipo `mensa`; l'API non converte magazzini logistici esistenti.
+          description: Identificativo dell'Area; per utenti territoriali prevale sempre l'Area del profilo.
+        centroAscoltoId: { type: ["integer", "null"] }
         indirizzo: { type: ["string", "null"] }
-        attiva: { type: boolean }
+        comune: { type: ["string", "null"] }
+        zona: { type: ["string", "null"] }
+        responsabile: { type: ["string", "null"] }
+        telefono: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        stato: { type: string, enum: [attivo, inattivo], default: attivo }
         note: { type: ["string", "null"] }
 
     MensaUpdate:

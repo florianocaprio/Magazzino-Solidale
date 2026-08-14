@@ -3944,19 +3944,43 @@ export interface UdsPersonePerZonaReport {
   udsConCentro: number;
 }
 
+export type MensaStato = typeof MensaStato[keyof typeof MensaStato];
+
+
+export const MensaStato = {
+  attivo: 'attivo',
+  inattivo: 'inattivo',
+} as const;
+
 export interface Mensa {
   id: number;
   codice: string;
   nome: string;
+  /** Identificativo dell'Area configurata nel menu Aree; `cittaId` è il nome storico interno. */
   cittaId: number;
   /** @nullable */
   cittaNome?: string | null;
-  /** Magazzino attivo già configurato esplicitamente con tipo `mensa`; non viene effettuata alcuna conversione automatica. */
+  /** Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa. */
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
   /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
   indirizzo?: string | null;
+  /** @nullable */
+  comune?: string | null;
+  /** @nullable */
+  zona?: string | null;
+  /** @nullable */
+  responsabile?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  email?: string | null;
+  stato?: MensaStato;
   attiva: boolean;
   /** @nullable */
   note?: string | null;
@@ -3966,23 +3990,46 @@ export interface Mensa {
   versione: string;
 }
 
+export type MensaInputStato = typeof MensaInputStato[keyof typeof MensaInputStato];
+
+
+export const MensaInputStato = {
+  attivo: 'attivo',
+  inattivo: 'inattivo',
+} as const;
+
+/**
+ * Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L'Area è l'entità configurata nel menu Aree; `cittaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
+ */
 export interface MensaInput {
   /**
+     * Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.
      * @minLength 1
      * @maxLength 30
      */
-  codice: string;
+  codice?: string;
   /**
      * @minLength 1
      * @maxLength 160
      */
   nome: string;
+  /** Identificativo dell'Area; per utenti territoriali prevale sempre l'Area del profilo. */
   cittaId: number;
-  /** Deve riferirsi a un magazzino attivo già configurato esplicitamente con tipo `mensa`; l'API non converte magazzini logistici esistenti. */
-  magazzinoId: number;
+  /** @nullable */
+  centroAscoltoId?: number | null;
   /** @nullable */
   indirizzo?: string | null;
-  attiva?: boolean;
+  /** @nullable */
+  comune?: string | null;
+  /** @nullable */
+  zona?: string | null;
+  /** @nullable */
+  responsabile?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  email?: string | null;
+  stato?: MensaInputStato;
   /** @nullable */
   note?: string | null;
 }
@@ -5039,6 +5086,9 @@ zonaUdsId?: number;
 };
 
 export type ListMenseParams = {
+/**
+ * Identificativo dell'Area configurata nel menu Aree (nome storico interno del campo).
+ */
 cittaId?: number;
 attiva?: boolean;
 };

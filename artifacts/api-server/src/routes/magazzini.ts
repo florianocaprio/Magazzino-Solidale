@@ -13,6 +13,7 @@ import {
 } from "../lib/centroScope";
 import { requireAdmin } from "../middlewares/auth";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
+import { nextMagazzinoCodice } from "../lib/magazzinoCodice";
 
 const router: IRouter = Router();
 
@@ -43,17 +44,6 @@ function isUniqueViolation(e: unknown): boolean {
     cur = typeof cur === "object" ? (cur as { cause?: unknown }).cause : undefined;
   }
   return false;
-}
-
-/** Computes the next sequential MAG-NNN codice from the current max in the table. */
-async function nextMagCodice(): Promise<string> {
-  const rows = await db.select({ codice: magazziniTable.codice }).from(magazziniTable);
-  let max = 0;
-  for (const r of rows) {
-    const m = /^MAG-(\d+)$/.exec(r.codice);
-    if (m) max = Math.max(max, parseInt(m[1], 10));
-  }
-  return `MAG-${String(max + 1).padStart(3, "0")}`;
 }
 
 const fmt = (r: typeof magazziniTable.$inferSelect, centroNome?: string | null) => ({
@@ -154,7 +144,7 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
   // Auto-generated codice: retry on collision so a concurrent create can't crash it.
   const MAX_ATTEMPTS = 5;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const codice = await nextMagCodice();
+    const codice = await nextMagazzinoCodice();
     try {
       const [row] = await db.insert(magazziniTable).values({ ...values, codice }).returning();
       res.status(201).json(fmt(row, await centroNomeOf(row.centroAscoltoId)));

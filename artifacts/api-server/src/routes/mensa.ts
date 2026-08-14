@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
+  centriAscoltoTable,
   cittaTable,
   db,
   lottiTable,
@@ -53,6 +54,7 @@ import {
   issueTesseraBeneficiario,
   TesseraBeneficiarioError,
 } from "../lib/tesseraBeneficiarioService";
+import { nextMagazzinoCodice } from "../lib/magazzinoCodice";
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
@@ -139,6 +141,24 @@ function optionalText(
   return text(value, field, max);
 }
 
+function magazzinoStato(value: unknown): "attivo" | "inattivo" {
+  if (value == null || value === "") return "attivo";
+  if (value !== "attivo" && value !== "inattivo") {
+    throw new MensaError(400, "Lo stato non è valido");
+  }
+  return value;
+}
+
+async function nextMensaCodice(): Promise<string> {
+  const rows = await db.select({ codice: menseTable.codice }).from(menseTable);
+  let max = 0;
+  for (const row of rows) {
+    const match = /^MEN-(\d+)$/.exec(row.codice);
+    if (match) max = Math.max(max, parseInt(match[1], 10));
+  }
+  return `MEN-${String(max + 1).padStart(3, "0")}`;
+}
+
 function dateOnly(
   value: unknown,
   field: string,
@@ -215,7 +235,8 @@ function auditValues(
 function formatMensa(
   row: typeof menseTable.$inferSelect,
   cittaNome?: string | null,
-  magazzinoNome?: string | null,
+  magazzino?: typeof magazziniTable.$inferSelect | null,
+  centroAscoltoNome?: string | null,
 ) {
   return {
     id: row.id,
@@ -224,8 +245,16 @@ function formatMensa(
     cittaId: row.cittaId,
     cittaNome: cittaNome ?? null,
     magazzinoId: row.magazzinoId,
-    magazzinoNome: magazzinoNome ?? null,
+    magazzinoNome: magazzino?.nome ?? null,
+    centroAscoltoId: magazzino?.centroAscoltoId ?? null,
+    centroAscoltoNome: centroAscoltoNome ?? null,
     indirizzo: row.indirizzo ?? null,
+    comune: magazzino?.comune ?? null,
+    zona: magazzino?.zona ?? null,
+    responsabile: magazzino?.responsabile ?? null,
+    telefono: magazzino?.telefono ?? null,
+    email: magazzino?.email ?? null,
+    stato: magazzino?.stato ?? (row.attiva ? "attivo" : "inattivo"),
     attiva: row.attiva,
     note: row.note ?? null,
     createdBy: row.createdBy ?? null,
@@ -239,13 +268,18 @@ async function loadMensa(id: number) {
     .select({
       mensa: menseTable,
       cittaNome: cittaTable.nome,
-      magazzinoNome: magazziniTable.nome,
+      magazzino: magazziniTable,
+      centroAscoltoNome: centriAscoltoTable.nome,
       magazzinoStato: magazziniTable.stato,
       magazzinoTipo: magazziniTable.tipoMagazzino,
     })
     .from(menseTable)
     .leftJoin(cittaTable, eq(menseTable.cittaId, cittaTable.id))
     .leftJoin(magazziniTable, eq(menseTable.magazzinoId, magazziniTable.id))
+    .leftJoin(
+      centriAscoltoTable,
+      eq(magazziniTable.centroAscoltoId, centriAscoltoTable.id),
+    )
     .where(eq(menseTable.id, id));
   return row ?? null;
 }
@@ -254,7 +288,7 @@ async function requireMensa(id: number, req: Request, active = false) {
   const row = await loadMensa(id);
   if (!row) throw new MensaError(404, "Mensa non trovata");
   if (!canAccessCitta(row.mensa.cittaId, callerCittaId(req))) {
-    throw new MensaError(403, "Mensa non accessibile per la tua città");
+    throw new MensaError(403, "Mensa non accessibile per la tua area");
   }
   if (
     active &&
@@ -283,7 +317,7 @@ async function requireMensaLogisticsWarehouse(id: number, req: Request) {
     (ownCity != null && warehouse.cittaId !== ownCity) ||
     !(await canAccessMagazzino(id, callerCentroId(req), ownCity))
   ) {
-    throw new MensaError(403, "Magazzino non accessibile per la tua città");
+    throw new MensaError(403, "Magazzino non accessibile per la tua area");
   }
   if (warehouse.stato !== "attivo") {
     throw new MensaError(409, "Il magazzino non è attivo");
@@ -529,16 +563,26 @@ router.get(
         .select({
           mensa: menseTable,
           cittaNome: cittaTable.nome,
-          magazzinoNome: magazziniTable.nome,
+          magazzino: magazziniTable,
+          centroAscoltoNome: centriAscoltoTable.nome,
         })
         .from(menseTable)
         .leftJoin(cittaTable, eq(menseTable.cittaId, cittaTable.id))
         .leftJoin(magazziniTable, eq(menseTable.magazzinoId, magazziniTable.id))
+        .leftJoin(
+          centriAscoltoTable,
+          eq(magazziniTable.centroAscoltoId, centriAscoltoTable.id),
+        )
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(menseTable.createdAt), desc(menseTable.id));
       res.json(
         rows.map((row) =>
-          formatMensa(row.mensa, row.cittaNome, row.magazzinoNome),
+          formatMensa(
+            row.mensa,
+            row.cittaNome,
+            row.magazzino,
+            row.centroAscoltoNome,
+          ),
         ),
       );
     } catch (error) {
@@ -554,7 +598,14 @@ router.get(
   async (req, res) => {
     try {
       const row = await requireMensa(positiveInt(req.params.id, "id"), req);
-      res.json(formatMensa(row.mensa, row.cittaNome, row.magazzinoNome));
+      res.json(
+        formatMensa(
+          row.mensa,
+          row.cittaNome,
+          row.magazzino,
+          row.centroAscoltoNome,
+        ),
+      );
     } catch (error) {
       if (sendMensaError(error, res)) return;
       throw error;
@@ -567,9 +618,8 @@ router.post(
   requirePermission("mensa.manage"),
   async (req, res) => {
     try {
-      const codice = text(req.body?.codice, "Il codice", 30);
+      const providedCodice = optionalText(req.body?.codice, "Il codice", 30);
       const nome = text(req.body?.nome, "Il nome", 160);
-      const magazzinoId = positiveInt(req.body?.magazzinoId, "magazzinoId");
       const ownCity = callerCittaId(req);
       const cittaId = ownCity ?? positiveInt(req.body?.cittaId, "cittaId");
       if (
@@ -577,77 +627,140 @@ router.post(
         req.body?.cittaId != null &&
         Number(req.body.cittaId) !== ownCity
       ) {
-        throw new MensaError(403, "La Mensa deve appartenere alla tua città");
+        throw new MensaError(403, "La Mensa deve appartenere alla tua area");
       }
-      const [warehouse] = await db
-        .select()
-        .from(magazziniTable)
-        .where(eq(magazziniTable.id, magazzinoId));
-      if (!warehouse) throw new MensaError(400, "Magazzino non trovato");
+      const [area] = await db
+        .select({ id: cittaTable.id })
+        .from(cittaTable)
+        .where(eq(cittaTable.id, cittaId));
+      if (!area) throw new MensaError(400, "Area non trovata");
+
+      const ownCenter = callerCentroId(req);
+      const centroAscoltoId =
+        ownCenter ??
+        optionalPositiveInt(req.body?.centroAscoltoId, "centroAscoltoId");
       if (
-        !(await canAccessMagazzino(magazzinoId, callerCentroId(req), ownCity))
+        ownCenter != null &&
+        req.body?.centroAscoltoId != null &&
+        Number(req.body.centroAscoltoId) !== ownCenter
       ) {
-        throw new MensaError(403, "Magazzino non accessibile");
+        throw new MensaError(
+          403,
+          "La Mensa deve appartenere al tuo Centro di Ascolto",
+        );
       }
-      if (warehouse.cittaId !== cittaId) {
+      if (centroAscoltoId != null) {
+        const [centro] = await db
+          .select({
+            cittaId: centriAscoltoTable.cittaId,
+            attivo: centriAscoltoTable.attivo,
+          })
+          .from(centriAscoltoTable)
+          .where(eq(centriAscoltoTable.id, centroAscoltoId));
+        if (!centro) throw new MensaError(400, "Centro di Ascolto non trovato");
+        if (!centro.attivo) {
+          throw new MensaError(409, "Il Centro di Ascolto non è attivo");
+        }
+        if (centro.cittaId !== cittaId) {
+          throw new MensaError(
+            400,
+            "Il Centro di Ascolto deve appartenere alla stessa area della Mensa",
+          );
+        }
+      }
+      if (req.body?.magazzinoId != null) {
         throw new MensaError(
           400,
-          "Mensa e magazzino devono appartenere alla stessa città",
+          "Non selezionare un'ubicazione logistica: il magazzino Mensa viene creato automaticamente",
         );
       }
-      if (warehouse.stato !== "attivo") {
-        throw new MensaError(
-          409,
-          "Un magazzino non attivo non può essere associato a una Mensa",
-        );
+
+      const stato = magazzinoStato(req.body?.stato);
+      const indirizzo = optionalText(req.body?.indirizzo, "L'indirizzo", 200);
+      const comune = optionalText(req.body?.comune, "Il comune", 80);
+      const zona = optionalText(req.body?.zona, "La zona", 80);
+      const responsabile = optionalText(
+        req.body?.responsabile,
+        "Il responsabile",
+        120,
+      );
+      const telefono = optionalText(req.body?.telefono, "Il telefono", 20);
+      const email = optionalText(req.body?.email, "L'email", 120);
+      const note = optionalText(req.body?.note, "Le note", 4000);
+
+      const MAX_ATTEMPTS = 5;
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+        const codice = providedCodice ?? (await nextMensaCodice());
+        const codiceMagazzino = await nextMagazzinoCodice();
+        try {
+          const created = await db.transaction(async (tx) => {
+            const [warehouse] = await tx
+              .insert(magazziniTable)
+              .values({
+                codice: codiceMagazzino,
+                nome,
+                cittaId,
+                centroAscoltoId,
+                indirizzo,
+                comune,
+                zona,
+                responsabile,
+                telefono,
+                email,
+                tipoMagazzino: "mensa",
+                stato,
+                note,
+              })
+              .returning();
+            const [row] = await tx
+              .insert(menseTable)
+              .values({
+                codice,
+                nome,
+                cittaId,
+                magazzinoId: warehouse.id,
+                indirizzo,
+                attiva: stato === "attivo",
+                note,
+                createdBy: req.user!.id,
+              })
+              .returning();
+            await tx.insert(auditConfigurazioniTable).values(
+              auditValues(req, `mensa:${row.id}`, "creazione", null, {
+                codice,
+                nome,
+                cittaId,
+                centroAscoltoId,
+                magazzinoId: warehouse.id,
+                codiceMagazzino,
+              }),
+            );
+            return row;
+          });
+          const loaded = await loadMensa(created.id);
+          res.status(201).json(
+            formatMensa(
+              created,
+              loaded?.cittaNome ?? null,
+              loaded?.magazzino ?? null,
+              loaded?.centroAscoltoNome ?? null,
+            ),
+          );
+          return;
+        } catch (error) {
+          if (!isUniqueViolation(error)) throw error;
+          if (providedCodice) {
+            throw new MensaError(409, `Codice "${providedCodice}" già in uso`);
+          }
+          if (attempt === MAX_ATTEMPTS - 1) {
+            throw new MensaError(
+              409,
+              "Impossibile generare codici univoci per la Mensa, riprova",
+            );
+          }
+        }
       }
-      if (warehouse.tipoMagazzino !== "mensa") {
-        throw new MensaError(
-          409,
-          "Il magazzino deve essere esplicitamente configurato come Mensa",
-        );
-      }
-      const created = await db.transaction(async (tx) => {
-        const [row] = await tx
-          .insert(menseTable)
-          .values({
-            codice,
-            nome,
-            cittaId,
-            magazzinoId,
-            indirizzo: optionalText(req.body?.indirizzo, "L'indirizzo", 255),
-            attiva: req.body?.attiva !== false,
-            note: optionalText(req.body?.note, "Le note", 4000),
-            createdBy: req.user!.id,
-          })
-          .returning();
-        await tx.insert(auditConfigurazioniTable).values(
-          auditValues(req, `mensa:${row.id}`, "creazione", null, {
-            codice,
-            nome,
-            cittaId,
-            magazzinoId,
-          }),
-        );
-        return row;
-      });
-      const loaded = await loadMensa(created.id);
-      res
-        .status(201)
-        .json(
-          formatMensa(
-            created,
-            loaded?.cittaNome ?? null,
-            loaded?.magazzinoNome ?? null,
-          ),
-        );
     } catch (error) {
-      if (isUniqueViolation(error)) {
-        res
-          .status(409)
-          .json({ error: "Codice o magazzino già associato a una Mensa" });
-        return;
-      }
       if (sendMensaError(error, res)) return;
       throw error;
     }
@@ -1931,7 +2044,8 @@ router.patch(
         formatMensa(
           updated,
           loaded?.cittaNome ?? null,
-          loaded?.magazzinoNome ?? null,
+          loaded?.magazzino ?? null,
+          loaded?.centroAscoltoNome ?? null,
         ),
       );
     } catch (error) {
@@ -2072,7 +2186,7 @@ router.post(
       if (beneficiario.cittaId !== mensa.mensa.cittaId)
         throw new MensaError(
           400,
-          "Beneficiario e Mensa devono appartenere alla stessa città",
+          "Beneficiario e Mensa devono appartenere alla stessa area",
         );
       const created = await db.transaction(async (tx) => {
         if (mensaPrincipale) {

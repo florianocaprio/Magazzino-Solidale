@@ -15699,7 +15699,7 @@ export const createMensa = async (mensaInput: MensaInput, options?: RequestInit)
 
 
 
-export const getCreateMensaMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateMensaMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMensa>>, TError,{data: BodyType<MensaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createMensa>>, TError,{data: BodyType<MensaInput>}, TContext> => {
 
@@ -15728,9 +15728,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateMensaMutationResult = NonNullable<Awaited<ReturnType<typeof createMensa>>>
     export type CreateMensaMutationBody = BodyType<MensaInput>
-    export type CreateMensaMutationError = ErrorType<unknown>
+    export type CreateMensaMutationError = ErrorType<void>
 
-    export const useCreateMensa = <TError = ErrorType<unknown>,
+    export const useCreateMensa = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMensa>>, TError,{data: BodyType<MensaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createMensa>>,

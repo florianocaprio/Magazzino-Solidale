@@ -52,14 +52,17 @@ type Fixture = Awaited<ReturnType<typeof createFixture>>;
 function makeApp(
   fixture: Fixture,
   permissions: string[] = MENSA_PERMISSIONS.map((item) => item.key),
+  scope: { cittaId?: number | null; centroAscoltoId?: number | null } = {},
 ): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = {
       id: fixture.userId,
-      cittaId: fixture.romeId,
-      centroAscoltoId: null,
+      cittaId:
+        "cittaId" in scope ? (scope.cittaId ?? null) : fixture.romeId,
+      centroAscoltoId:
+        "centroAscoltoId" in scope ? (scope.centroAscoltoId ?? null) : null,
       isAdmin: false,
       isSuperAdmin: false,
       aree: ["mensa"],
@@ -460,7 +463,7 @@ describe("Modulo Mensa", () => {
     );
   });
 
-  it("associa solo magazzini Mensa attivi e non riconverte magazzini logistici", async () => {
+  it("crea atomicamente Mensa e magazzino dedicato con Area, Centro e codice automatico", async () => {
     const fixture = await createFixture();
     const withoutManage = MENSA_PERMISSIONS.map((item) => item.key).filter(
       (key) => key !== "mensa.manage",
@@ -473,30 +476,62 @@ describe("Modulo Mensa", () => {
       ).status,
     ).toBe(403);
 
-    const [emporioWarehouse] = await db
-      .insert(magazziniTable)
+    const [centro] = await db
+      .insert(centriAscoltoTable)
       .values({
-        codice: `EMP-${rnd()}`,
-        nome: "Emporio esistente",
+        nome: `Centro Mensa ${rnd()}`,
         cittaId: fixture.romeId,
-        tipoMagazzino: "emporio",
       })
-      .returning({ id: magazziniTable.id });
-    ids.warehouses.push(emporioWarehouse.id);
+      .returning({ id: centriAscoltoTable.id });
+    ids.centers.push(centro.id);
+
     const response = await request(makeApp(fixture))
       .post("/mensa/mense")
       .send({
-        codice: `MENSA-${rnd()}`,
-        nome: "Mensa non valida",
-        magazzinoId: emporioWarehouse.id,
+        nome: "Mensa Area Roma",
+        centroAscoltoId: centro.id,
+        indirizzo: "Via del Pane 10",
+        comune: "Roma",
+        zona: "Nord",
+        responsabile: "Ada Rossi",
+        telefono: "0612345678",
+        email: "mensa@example.test",
+        note: "Sede dedicata",
       });
-    expect(response.status).toBe(409);
-    const [unchanged] = await db
-      .select({ tipoMagazzino: magazziniTable.tipoMagazzino })
-      .from(magazziniTable)
-      .where(eq(magazziniTable.id, emporioWarehouse.id));
-    expect(unchanged.tipoMagazzino).toBe("emporio");
+    expect(response.status).toBe(201);
+    ids.canteens.push(response.body.id);
+    ids.warehouses.push(response.body.magazzinoId);
+    expect(response.body).toMatchObject({
+      nome: "Mensa Area Roma",
+      cittaId: fixture.romeId,
+      centroAscoltoId: centro.id,
+      comune: "Roma",
+      zona: "Nord",
+      responsabile: "Ada Rossi",
+      stato: "attivo",
+      attiva: true,
+    });
+    expect(response.body.codice).toMatch(/^MEN-\d+$/);
 
+    const [warehouse] = await db
+      .select()
+      .from(magazziniTable)
+      .where(eq(magazziniTable.id, response.body.magazzinoId));
+    expect(warehouse).toMatchObject({
+      nome: "Mensa Area Roma",
+      cittaId: fixture.romeId,
+      centroAscoltoId: centro.id,
+      tipoMagazzino: "mensa",
+      stato: "attivo",
+      comune: "Roma",
+      zona: "Nord",
+      responsabile: "Ada Rossi",
+    });
+    expect(warehouse.codice).toMatch(/^MAG-\d+$/);
+  });
+
+  it("non converte né associa un magazzino logistico esistente", async () => {
+    const fixture = await createFixture();
     const [logisticsWarehouse] = await db
       .insert(magazziniTable)
       .values({
@@ -514,32 +549,54 @@ describe("Modulo Mensa", () => {
         nome: "Mensa su magazzino logistico",
         magazzinoId: logisticsWarehouse.id,
       });
-    expect(logisticsResponse.status).toBe(409);
+    expect(logisticsResponse.status).toBe(400);
     const [logisticsUnchanged] = await db
       .select({ tipoMagazzino: magazziniTable.tipoMagazzino })
       .from(magazziniTable)
       .where(eq(magazziniTable.id, logisticsWarehouse.id));
     expect(logisticsUnchanged.tipoMagazzino).toBe("logistico");
+  });
 
-    const [inactiveWarehouse] = await db
-      .insert(magazziniTable)
-      .values({
-        codice: `MEN-INACTIVE-${rnd()}`,
-        nome: "Magazzino Mensa inattivo",
-        cittaId: fixture.romeId,
-        tipoMagazzino: "mensa",
-        stato: "inattivo",
-      })
-      .returning({ id: magazziniTable.id });
-    ids.warehouses.push(inactiveWarehouse.id);
-    const inactiveResponse = await request(makeApp(fixture))
+  it("vincola Centro di Ascolto e Area e non crea record parziali", async () => {
+    const fixture = await createFixture();
+    const [centroMilano] = await db
+      .insert(centriAscoltoTable)
+      .values({ nome: `Centro Milano ${rnd()}`, cittaId: fixture.milanId })
+      .returning({ id: centriAscoltoTable.id });
+    ids.centers.push(centroMilano.id);
+    const before = await db.select({ id: magazziniTable.id }).from(magazziniTable);
+    const response = await request(makeApp(fixture))
       .post("/mensa/mense")
       .send({
-        codice: `MENSA-INACTIVE-${rnd()}`,
-        nome: "Mensa inattiva",
-        magazzinoId: inactiveWarehouse.id,
+        nome: "Mensa non coerente",
+        centroAscoltoId: centroMilano.id,
       });
-    expect(inactiveResponse.status).toBe(409);
+    expect(response.status).toBe(400);
+    const after = await db.select({ id: magazziniTable.id }).from(magazziniTable);
+    expect(after).toHaveLength(before.length);
+  });
+
+  it("richiede l'Area agli utenti globali e impedisce override territoriali", async () => {
+    const fixture = await createFixture();
+    const globalApp = makeApp(fixture, undefined, { cittaId: null });
+    expect(
+      (await request(globalApp).post("/mensa/mense").send({ nome: "Senza area" }))
+        .status,
+    ).toBe(400);
+
+    const created = await request(globalApp).post("/mensa/mense").send({
+      nome: "Mensa Milano globale",
+      cittaId: fixture.milanId,
+    });
+    expect(created.status).toBe(201);
+    ids.canteens.push(created.body.id);
+    ids.warehouses.push(created.body.magazzinoId);
+    expect(created.body.cittaId).toBe(fixture.milanId);
+
+    const override = await request(makeApp(fixture))
+      .post("/mensa/mense")
+      .send({ nome: "Override non ammesso", cittaId: fixture.milanId });
+    expect(override.status).toBe(403);
   });
 
   it("impedisce operazioni Mensa quando il magazzino associato è inattivo", async () => {
