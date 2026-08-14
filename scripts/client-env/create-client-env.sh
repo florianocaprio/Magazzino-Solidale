@@ -155,9 +155,10 @@ Porta locale web: 127.0.0.1:${WEB_HOST_PORT}
 
    docker compose --env-file .env.docker -f docker-compose.prod.yml up -d db
 
-4. Applicare lo schema:
+4. Creare lo schema del nuovo database e applicare gli aggiornamenti incrementali:
 
-   docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run push-force
+   docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run push
+   docker compose --env-file .env.docker -f docker-compose.prod.yml run --rm api pnpm --filter @workspace/db run update
 
 5. Avviare lo stack:
 

@@ -36,11 +36,42 @@ multilingua (it/es/en/fr/de/ar).
    - `SESSION_SECRET` — segreto per la firma delle sessioni (usa una stringa
      lunga e casuale, es. `openssl rand -hex 32`)
 
-3. Applica lo schema al database:
+3. Per un database nuovo, crea lo schema e applica gli aggiornamenti incrementali:
 
    ```bash
    pnpm --filter @workspace/db run push
+   pnpm --filter @workspace/db run update
    ```
+
+   Su un database esistente non usare `push` per un aggiornamento applicativo:
+   crea prima un backup e usa soltanto `pnpm --filter @workspace/db run update`.
+
+## Aggiornare un database Docker esistente
+
+1. Creare un dump prima dell'aggiornamento:
+
+   ```bash
+   docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > /tmp/magazzino_backup_pre_aggiornamento.dump
+   ```
+
+2. Applicare gli aggiornamenti idempotenti dall'immagine API aggiornata:
+
+   ```bash
+   docker compose build api
+   docker compose up -d db
+   docker compose run --rm api pnpm --filter @workspace/db run update
+   ```
+
+3. Verificare lo schema e avviare lo stack:
+
+   ```bash
+   docker compose exec -T db psql -U magazzino -d magazzino -c '\d+ public.beneficiari'
+   docker compose up -d --remove-orphans
+   ```
+
+Il comando `update` esegue in ordine gli script SQL in `lib/db/updates`, ognuno
+in una transazione e sotto lock advisory. Gli script devono essere idempotenti e
+non devono riconciliare automaticamente altre differenze dello schema.
 
 ## Avvio (sviluppo)
 

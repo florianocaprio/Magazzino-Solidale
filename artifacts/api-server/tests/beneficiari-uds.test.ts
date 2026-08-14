@@ -177,7 +177,7 @@ describe("POST /beneficiari (uds)", () => {
 });
 
 describe("fascia d'età UDS", () => {
-  const referenceDate = new Date(2025, 5, 15);
+  const referenceDate = new Date("2025-06-15T10:00:00.000Z");
   const currentYear = new Date().getFullYear();
   const birthDateAge26 = `${currentYear - 26}-01-01`;
   const birthDateAge16 = `${currentYear - 16}-01-01`;
@@ -194,6 +194,35 @@ describe("fascia d'età UDS", () => {
     expect(calcolaEta(birthDate, referenceDate)).toBe(age);
     expect(risolviFasciaEta(birthDate, "0_17", referenceDate)).toEqual({
       fascia,
+      origine: "calcolata",
+    });
+  });
+
+  it.each(["UTC", "America/New_York", "Asia/Tokyo"])(
+    "usa sempre la data civile Europe/Rome anche con TZ del processo %s",
+    (processTimeZone) => {
+      const originalTimeZone = process.env.TZ;
+      process.env.TZ = processTimeZone;
+      try {
+        const beforeMidnightInRome = new Date("2026-08-13T21:59:59.999Z");
+        const midnightInRome = new Date("2026-08-13T22:00:00.000Z");
+
+        expect(calcolaEta("2008-08-14", beforeMidnightInRome)).toBe(17);
+        expect(calcolaEta("2008-08-14", midnightInRome)).toBe(18);
+      } finally {
+        if (originalTimeZone === undefined) delete process.env.TZ;
+        else process.env.TZ = originalTimeZone;
+      }
+    },
+  );
+
+  it("cambia fascia esattamente al compleanno secondo la mezzanotte italiana", () => {
+    expect(risolviFasciaEta("2008-08-14", null, new Date("2026-08-13T21:59:59.999Z"))).toEqual({
+      fascia: "0_17",
+      origine: "calcolata",
+    });
+    expect(risolviFasciaEta("2008-08-14", null, new Date("2026-08-13T22:00:00.000Z"))).toEqual({
+      fascia: "18_29",
       origine: "calcolata",
     });
   });

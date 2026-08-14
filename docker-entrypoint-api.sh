@@ -8,8 +8,8 @@ done
 
 echo "PostgreSQL pronto."
 
-echo "Applico schema DB con Drizzle..."
-pnpm --filter @workspace/db run push-force
+echo "Applico gli aggiornamenti DB incrementali..."
+pnpm --filter @workspace/db run update
 
 echo "Avvio API..."
 exec pnpm --filter @workspace/api-server run start

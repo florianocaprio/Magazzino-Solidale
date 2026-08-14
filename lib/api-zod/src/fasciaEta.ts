@@ -15,6 +15,13 @@ interface DateOnlyParts {
   day: number;
 }
 
+const EUROPE_ROME_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Rome",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 function parseDateOnly(value: string): DateOnlyParts | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
@@ -35,10 +42,13 @@ function parseDateOnly(value: string): DateOnlyParts | null {
 
 function referenceDateParts(referenceDate: Date): DateOnlyParts | null {
   if (Number.isNaN(referenceDate.getTime())) return null;
+  const parts = Object.fromEntries(
+    EUROPE_ROME_DATE_FORMATTER.formatToParts(referenceDate).map(({ type, value }) => [type, value]),
+  );
   return {
-    year: referenceDate.getFullYear(),
-    month: referenceDate.getMonth() + 1,
-    day: referenceDate.getDate(),
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
   };
 }
 
