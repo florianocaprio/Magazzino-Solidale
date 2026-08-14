@@ -19,10 +19,11 @@ function makeApp(): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as unknown as { user: { id: number; centroAscoltoId: number | null; cittaId: number | null } }).user = {
+    (req as unknown as { user: { id: number; centroAscoltoId: number | null; cittaId: number | null; aree: string[] } }).user = {
       id: operatorUserId,
       centroAscoltoId: null,
       cittaId: null,
+      aree: ["sociale", "uds"],
     };
     next();
   });

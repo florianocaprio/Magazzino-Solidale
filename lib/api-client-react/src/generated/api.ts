@@ -111,6 +111,9 @@ import type {
   ImpostazioniStampaUpdate,
   Intervento,
   InterventoInput,
+  InterventoStoricoStato,
+  InterventoSuccessivoInput,
+  InterventoTransizioneInput,
   InterventoUpdate,
   ListAccessiEmporioParams,
   ListApprovvigionamentiParams,
@@ -4680,6 +4683,215 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateInterventoMutationOptions(options));
+    }
+
+export const getTransitionInterventoUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/transizioni`
+}
+
+/**
+ * Esegue atomicamente una transizione di stato consentita e la registra nello storico append-only.
+ */
+export const transitionIntervento = async (id: number,
+    interventoTransizioneInput: InterventoTransizioneInput, options?: RequestInit): Promise<Intervento> => {
+
+  return customFetch<Intervento>(getTransitionInterventoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      interventoTransizioneInput,)
+  }
+);}
+
+
+
+
+export const getTransitionInterventoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionIntervento>>, TError,{id: number;data: BodyType<InterventoTransizioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transitionIntervento>>, TError,{id: number;data: BodyType<InterventoTransizioneInput>}, TContext> => {
+
+const mutationKey = ['transitionIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transitionIntervento>>, {id: number;data: BodyType<InterventoTransizioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  transitionIntervento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransitionInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof transitionIntervento>>>
+    export type TransitionInterventoMutationBody = BodyType<InterventoTransizioneInput>
+    export type TransitionInterventoMutationError = ErrorType<void>
+
+    export const useTransitionIntervento = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionIntervento>>, TError,{id: number;data: BodyType<InterventoTransizioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transitionIntervento>>,
+        TError,
+        {id: number;data: BodyType<InterventoTransizioneInput>},
+        TContext
+      > => {
+      return useMutation(getTransitionInterventoMutationOptions(options));
+    }
+
+export const getListInterventoStoricoStatiUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/storico-stati`
+}
+
+export const listInterventoStoricoStati = async (id: number, options?: RequestInit): Promise<InterventoStoricoStato[]> => {
+
+  return customFetch<InterventoStoricoStato[]>(getListInterventoStoricoStatiUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInterventoStoricoStatiQueryKey = (id: number,) => {
+    return [
+    `/api/interventi/${id}/storico-stati`
+    ] as const;
+    }
+
+
+export const getListInterventoStoricoStatiQueryOptions = <TData = Awaited<ReturnType<typeof listInterventoStoricoStati>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInterventoStoricoStati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInterventoStoricoStatiQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInterventoStoricoStati>>> = ({ signal }) => listInterventoStoricoStati(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInterventoStoricoStati>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInterventoStoricoStatiQueryResult = NonNullable<Awaited<ReturnType<typeof listInterventoStoricoStati>>>
+export type ListInterventoStoricoStatiQueryError = ErrorType<void>
+
+
+
+export function useListInterventoStoricoStati<TData = Awaited<ReturnType<typeof listInterventoStoricoStati>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInterventoStoricoStati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInterventoStoricoStatiQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateInterventoSuccessivoUrl = (id: number,) => {
+
+
+
+
+  return `/api/interventi/${id}/successivi`
+}
+
+/**
+ * Crea un nuovo intervento per lo stesso beneficiario lasciando immutato il precedente.
+ */
+export const createInterventoSuccessivo = async (id: number,
+    interventoSuccessivoInput: InterventoSuccessivoInput, options?: RequestInit): Promise<Intervento> => {
+
+  return customFetch<Intervento>(getCreateInterventoSuccessivoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      interventoSuccessivoInput,)
+  }
+);}
+
+
+
+
+export const getCreateInterventoSuccessivoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInterventoSuccessivo>>, TError,{id: number;data: BodyType<InterventoSuccessivoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createInterventoSuccessivo>>, TError,{id: number;data: BodyType<InterventoSuccessivoInput>}, TContext> => {
+
+const mutationKey = ['createInterventoSuccessivo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInterventoSuccessivo>>, {id: number;data: BodyType<InterventoSuccessivoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createInterventoSuccessivo(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateInterventoSuccessivoMutationResult = NonNullable<Awaited<ReturnType<typeof createInterventoSuccessivo>>>
+    export type CreateInterventoSuccessivoMutationBody = BodyType<InterventoSuccessivoInput>
+    export type CreateInterventoSuccessivoMutationError = ErrorType<void>
+
+    export const useCreateInterventoSuccessivo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInterventoSuccessivo>>, TError,{id: number;data: BodyType<InterventoSuccessivoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createInterventoSuccessivo>>,
+        TError,
+        {id: number;data: BodyType<InterventoSuccessivoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateInterventoSuccessivoMutationOptions(options));
     }
 
 export const getListBisogniPianificatiUrl = (interventoId: number,) => {

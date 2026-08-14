@@ -44,9 +44,16 @@ function makeApp(
           cittaId: number | null;
           centroAscoltoId: number | null;
           zonaUdsId: number | null;
+          aree: string[];
         };
       }
-    ).user = { id: operatorUserId, cittaId, centroAscoltoId, zonaUdsId };
+    ).user = {
+      id: operatorUserId,
+      cittaId,
+      centroAscoltoId,
+      zonaUdsId,
+      aree: ["uds"],
+    };
     next();
   });
   app.use(interventiRouter);

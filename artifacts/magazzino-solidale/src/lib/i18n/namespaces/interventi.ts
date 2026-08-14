@@ -1,6 +1,8 @@
 export const interventi = {
   it: {
     title: "Interventi Sociali",
+    workflowState: "Stato",
+    workflowStati: { da_pianificare: "Da pianificare", pianificato: "Pianificato", in_corso: "In corso", concluso: "Concluso", annullato: "Annullato", mancata_presentazione: "Mancata presentazione" },
     subtitle: "Registro dei colloqui e delle azioni di supporto.",
     registerIntervention: "Registra Intervento",
     exportTitle: "Registro Interventi",
@@ -50,6 +52,8 @@ export const interventi = {
   },
   es: {
     title: "Intervenciones Sociales",
+    workflowState: "Estado",
+    workflowStati: { da_pianificare: "Por planificar", pianificato: "Planificada", in_corso: "En curso", concluso: "Finalizada", annullato: "Cancelada", mancata_presentazione: "No se presentó" },
     subtitle: "Registro de las entrevistas y las acciones de apoyo.",
     registerIntervention: "Registrar Intervención",
     exportTitle: "Registro de Intervenciones",
@@ -99,6 +103,8 @@ export const interventi = {
   },
   en: {
     title: "Social Interventions",
+    workflowState: "Status",
+    workflowStati: { da_pianificare: "To be planned", pianificato: "Planned", in_corso: "In progress", concluso: "Completed", annullato: "Cancelled", mancata_presentazione: "No-show" },
     subtitle: "Log of interviews and support actions.",
     registerIntervention: "Record Intervention",
     exportTitle: "Interventions Log",
@@ -148,6 +154,8 @@ export const interventi = {
   },
   fr: {
     title: "Interventions Sociales",
+    workflowState: "Statut",
+    workflowStati: { da_pianificare: "À planifier", pianificato: "Planifiée", in_corso: "En cours", concluso: "Terminée", annullato: "Annulée", mancata_presentazione: "Absence" },
     subtitle: "Registre des entretiens et des actions de soutien.",
     registerIntervention: "Enregistrer une Intervention",
     exportTitle: "Registre des Interventions",
@@ -197,6 +205,8 @@ export const interventi = {
   },
   de: {
     title: "Soziale Maßnahmen",
+    workflowState: "Status",
+    workflowStati: { da_pianificare: "Zu planen", pianificato: "Geplant", in_corso: "In Bearbeitung", concluso: "Abgeschlossen", annullato: "Abgesagt", mancata_presentazione: "Nicht erschienen" },
     subtitle: "Protokoll der Gespräche und Unterstützungsmaßnahmen.",
     registerIntervention: "Maßnahme erfassen",
     exportTitle: "Maßnahmenprotokoll",
@@ -246,6 +256,8 @@ export const interventi = {
   },
   ar: {
     title: "التدخلات الاجتماعية",
+    workflowState: "الحالة",
+    workflowStati: { da_pianificare: "بحاجة إلى تخطيط", pianificato: "مخطط", in_corso: "قيد التنفيذ", concluso: "مكتمل", annullato: "ملغى", mancata_presentazione: "عدم الحضور" },
     subtitle: "سجل المقابلات وإجراءات الدعم.",
     registerIntervention: "تسجيل تدخل",
     exportTitle: "سجل التدخلات",

@@ -6,10 +6,22 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BisognoPianificatoUpsert } from './bisognoPianificatoUpsert';
+import type { InterventoPriorita } from './interventoPriorita';
 
 export interface InterventoUpdate {
-  dataIntervento?: string;
+  /** @nullable */
+  dataIntervento?: Date | null;
   tipoIntervento?: string;
+  priorita?: InterventoPriorita;
+  /** @nullable */
+  dataOraPianificata?: Date | null;
+  /** @nullable */
+  interventoPrecedenteId?: number | null;
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  sede?: string | null;
   descrizione?: string;
   esito?: string;
   prossimAzione?: string;

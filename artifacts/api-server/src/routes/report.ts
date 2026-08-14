@@ -435,6 +435,7 @@ router.get("/report/uds/interventi-per-mese", async (req, res) => {
   }
   const { da, a } = range;
   const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 
@@ -477,6 +478,7 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
   const from = da <= aRaw ? da : aRaw;
   const to = da <= aRaw ? aRaw : da;
   const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
   const where = sql.join(conds, sql` AND `);
 
   const result = await db.execute(sql`
@@ -540,6 +542,7 @@ router.get("/report/uds/interventi-per-tipo", async (req, res) => {
   }
   const { da, a } = range;
   const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 
@@ -567,6 +570,7 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
   }
   const { da, a } = range;
   const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 

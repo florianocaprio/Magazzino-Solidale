@@ -3,11 +3,26 @@ import {
   beneficiariTable,
   bisogniPianificatiTable,
   db,
+  interventiStoricoStatiTable,
   interventiTable,
   utentiTable,
   type BisognoPianificato,
 } from "@workspace/db";
-import { and, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -18,11 +33,18 @@ import {
   canAccessCentro,
   canAccessCitta,
   canAccessZonaUds,
-  beneficiarioCentroId,
-  beneficiarioCittaId,
-  beneficiarioZonaUdsId,
-  canUseBeneficiario,
 } from "../lib/centroScope";
+import {
+  canTransitionIntervento,
+  dataCivileEuropeRome,
+  isDateOnly,
+  isInterventoAmbito,
+  isInterventoPriorita,
+  isInterventoStato,
+  parseIsoTimestamp,
+  type InterventoAmbito,
+  type InterventoStato,
+} from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
 
@@ -58,6 +80,23 @@ interface BisogniSummary {
   prossimaScadenza: string | null;
 }
 
+interface WorkflowCreateResult {
+  legacy: boolean;
+  values: Pick<
+    typeof interventiTable.$inferInsert,
+    | "stato"
+    | "ambito"
+    | "priorita"
+    | "dataIntervento"
+    | "dataOraPianificata"
+    | "dataOraAvvio"
+    | "dataOraConclusione"
+    | "sede"
+    | "motivoAnnullamento"
+    | "dataAggiornamento"
+  >;
+}
+
 class RouteError extends Error {
   constructor(
     readonly status: number,
@@ -79,32 +118,8 @@ function parsePositiveInteger(value: unknown): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function isDateOnly(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
-}
-
 function oggiEuropeRome(referenceDate = new Date()): string {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Europe/Rome",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-      .formatToParts(referenceDate)
-      .map(({ type, value }) => [type, value]),
-  );
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return dataCivileEuropeRome(referenceDate);
 }
 
 function enumValue<T extends string>(
@@ -116,6 +131,163 @@ function enumValue<T extends string>(
     throw new RouteError(400, `Valore non valido per ${field}`);
   }
   return value as T;
+}
+
+function nullableText(
+  value: unknown,
+  field: string,
+  maxLength: number,
+): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new RouteError(400, `${field} non valido`);
+  }
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (normalized.length > maxLength) {
+    throw new RouteError(
+      400,
+      `${field} non può superare ${maxLength} caratteri`,
+    );
+  }
+  return normalized;
+}
+
+function workflowCreateValues(
+  body: Record<string, unknown>,
+  now = new Date(),
+): WorkflowCreateResult {
+  const legacy = !hasOwn(body, "stato");
+  const stato: InterventoStato = legacy
+    ? "concluso"
+    : isInterventoStato(body.stato)
+      ? body.stato
+      : (() => {
+          throw new RouteError(400, "Stato dell'intervento non valido");
+        })();
+
+  let ambito: InterventoAmbito | null = null;
+  if (hasOwn(body, "ambito")) {
+    if (!isInterventoAmbito(body.ambito)) {
+      throw new RouteError(400, "Ambito dell'intervento non valido");
+    }
+    ambito = body.ambito;
+  } else if (!legacy) {
+    throw new RouteError(
+      400,
+      "L'ambito è obbligatorio per i nuovi interventi di workflow",
+    );
+  }
+
+  const priorita = hasOwn(body, "priorita")
+    ? isInterventoPriorita(body.priorita)
+      ? body.priorita
+      : (() => {
+          throw new RouteError(400, "Priorità dell'intervento non valida");
+        })()
+    : "normale";
+
+  let dataIntervento: string | null = null;
+  if (body.dataIntervento != null && body.dataIntervento !== "") {
+    if (
+      typeof body.dataIntervento !== "string" ||
+      !isDateOnly(body.dataIntervento)
+    ) {
+      throw new RouteError(400, "dataIntervento non valida");
+    }
+    dataIntervento = body.dataIntervento;
+  } else if (legacy) {
+    throw new RouteError(
+      400,
+      "dataIntervento è obbligatoria per il payload legacy",
+    );
+  }
+
+  let dataOraPianificata: Date | null;
+  let dataOraAvvio: Date | null;
+  let dataOraConclusione: Date | null;
+  try {
+    dataOraPianificata = parseIsoTimestamp(
+      body.dataOraPianificata,
+      "dataOraPianificata",
+    );
+    dataOraAvvio = parseIsoTimestamp(body.dataOraAvvio, "dataOraAvvio");
+    dataOraConclusione = parseIsoTimestamp(
+      body.dataOraConclusione,
+      "dataOraConclusione",
+    );
+  } catch (error) {
+    throw new RouteError(
+      400,
+      error instanceof Error ? error.message : "Timestamp non valido",
+    );
+  }
+
+  const motivoAnnullamento = nullableText(
+    body.motivoAnnullamento,
+    "Il motivo dell'annullamento",
+    2000,
+  );
+  const sede = nullableText(body.sede, "La sede", 255);
+
+  if (!legacy) {
+    if (stato === "pianificato" && dataOraPianificata == null) {
+      throw new RouteError(
+        400,
+        "Un intervento pianificato richiede data e ora pianificate",
+      );
+    }
+    if (stato === "in_corso") {
+      dataOraAvvio ??= now;
+    }
+    if (stato === "concluso") {
+      if (dataOraAvvio == null || dataOraConclusione == null) {
+        throw new RouteError(
+          400,
+          "Un nuovo intervento concluso richiede avvio e conclusione effettivi",
+        );
+      }
+      if (dataOraConclusione < dataOraAvvio) {
+        throw new RouteError(400, "La conclusione non può precedere l'avvio");
+      }
+    }
+    if (stato === "annullato" && motivoAnnullamento == null) {
+      throw new RouteError(400, "Il motivo dell'annullamento è obbligatorio");
+    }
+    if (stato === "mancata_presentazione" && dataOraPianificata == null) {
+      throw new RouteError(
+        400,
+        "La mancata presentazione richiede una pianificazione",
+      );
+    }
+    if (
+      dataIntervento == null &&
+      (stato === "in_corso" || stato === "concluso") &&
+      dataOraAvvio != null
+    ) {
+      dataIntervento = dataCivileEuropeRome(dataOraAvvio);
+    }
+  } else {
+    dataOraPianificata = null;
+    dataOraAvvio = null;
+    dataOraConclusione = null;
+  }
+
+  return {
+    legacy,
+    values: {
+      stato,
+      ambito,
+      priorita,
+      dataIntervento,
+      dataOraPianificata,
+      dataOraAvvio,
+      dataOraConclusione,
+      sede,
+      motivoAnnullamento,
+      dataAggiornamento: now,
+    },
+  };
 }
 
 function normalizeBisogno(
@@ -272,6 +444,7 @@ function formatIntervento(
   summary: BisogniSummary,
   beneficiarioNome: string | null = null,
   operatoreCodice: string | null = null,
+  successoriIds: number[] = [],
 ) {
   return {
     id: row.id,
@@ -280,7 +453,7 @@ function formatIntervento(
     bollaId: row.bollaId ?? null,
     operatoreId: row.operatoreId ?? null,
     operatoreCodice,
-    dataIntervento: row.dataIntervento,
+    dataIntervento: row.dataIntervento ?? null,
     tipoIntervento: row.tipoIntervento,
     descrizione: row.descrizione ?? null,
     esito: row.esito ?? null,
@@ -292,7 +465,19 @@ function formatIntervento(
     scadenzaRinnovo: row.scadenzaRinnovo ?? null,
     scadenzaAutodichiarazioneIndigenza:
       row.scadenzaAutodichiarazioneIndigenza ?? null,
+    stato: row.stato,
+    ambito: row.ambito ?? null,
+    priorita: row.priorita,
+    dataOraPianificata: row.dataOraPianificata?.toISOString() ?? null,
+    dataOraAvvio: row.dataOraAvvio?.toISOString() ?? null,
+    dataOraConclusione: row.dataOraConclusione?.toISOString() ?? null,
+    interventoPrecedenteId: row.interventoPrecedenteId ?? null,
+    successoriIds,
+    numeroSuccessori: successoriIds.length,
+    sede: row.sede ?? null,
+    motivoAnnullamento: row.motivoAnnullamento ?? null,
     dataCreazione: row.dataCreazione.toISOString(),
+    dataAggiornamento: row.dataAggiornamento?.toISOString() ?? null,
     bisogniPianificatiTotale: summary.totale,
     bisogniPianificatiAperti: summary.aperti,
     bisogniPianificatiScaduti: summary.scaduti,
@@ -332,24 +517,143 @@ async function summariesFor(
   return summaries;
 }
 
-async function canUseUdsBeneficiarioInCallerCitta(
+async function successoriFor(
+  interventoIds: number[],
+): Promise<Map<number, number[]>> {
+  const result = new Map<number, number[]>();
+  if (interventoIds.length === 0) return result;
+  const rows = await db
+    .select({
+      id: interventiTable.id,
+      precedenteId: interventiTable.interventoPrecedenteId,
+    })
+    .from(interventiTable)
+    .where(inArray(interventiTable.interventoPrecedenteId, interventoIds))
+    .orderBy(interventiTable.id);
+  for (const row of rows) {
+    if (row.precedenteId == null) continue;
+    const current = result.get(row.precedenteId) ?? [];
+    current.push(row.id);
+    result.set(row.precedenteId, current);
+  }
+  return result;
+}
+
+type BeneficiarioAccess = Pick<
+  typeof beneficiariTable.$inferSelect,
+  "id" | "uds" | "cittaId" | "centroAscoltoId" | "zonaUdsId"
+>;
+
+async function beneficiarioAccess(
   beneficiarioId: number,
-  req: Request,
-): Promise<boolean> {
-  const cittaId = callerCittaId(req);
-  if (cittaId == null || !Number.isInteger(beneficiarioId)) return false;
-  const [beneficiario] = await db
-    .select({ uds: beneficiariTable.uds, cittaId: beneficiariTable.cittaId })
+): Promise<BeneficiarioAccess | null> {
+  const [row] = await db
+    .select({
+      id: beneficiariTable.id,
+      uds: beneficiariTable.uds,
+      cittaId: beneficiariTable.cittaId,
+      centroAscoltoId: beneficiariTable.centroAscoltoId,
+      zonaUdsId: beneficiariTable.zonaUdsId,
+    })
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId))
     .limit(1);
-  return beneficiario?.uds === true && beneficiario.cittaId === cittaId;
+  return row ?? null;
+}
+
+function canAccessInterventoAmbito(
+  ambito: string | null,
+  beneficiario: BeneficiarioAccess,
+  req: Request,
+): boolean {
+  const callerCitta = callerCittaId(req);
+  if (ambito === "uds") {
+    return (
+      canUseInterventoArea(req, "uds") &&
+      beneficiario.uds === true &&
+      beneficiario.cittaId != null &&
+      (callerCitta == null || beneficiario.cittaId === callerCitta)
+    );
+  }
+  if (
+    ambito == null &&
+    canUseInterventoArea(req, "uds") &&
+    beneficiario.uds === true &&
+    beneficiario.cittaId != null &&
+    (callerCitta == null || beneficiario.cittaId === callerCitta)
+  ) {
+    return true;
+  }
+  return (
+    canUseInterventoArea(req, "sociale") &&
+    canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req)) &&
+    canAccessCitta(beneficiario.cittaId, callerCitta) &&
+    canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req))
+  );
+}
+
+function canUseInterventoArea(
+  req: Request,
+  area: InterventoAmbito,
+): boolean {
+  return (
+    req.user?.isAdmin === true ||
+    req.user?.isSuperAdmin === true ||
+    req.user?.aree.includes(area) === true
+  );
+}
+
+async function canCreateForAmbito(
+  beneficiarioId: number,
+  ambito: InterventoAmbito | null,
+  req: Request,
+): Promise<boolean> {
+  const beneficiario = await beneficiarioAccess(beneficiarioId);
+  return (
+    beneficiario != null && canAccessInterventoAmbito(ambito, beneficiario, req)
+  );
+}
+
+async function requireAccessibleIntervento(
+  interventoId: number,
+  req: Request,
+): Promise<InterventoRow> {
+  const [result] = await db
+    .select({
+      intervento: interventiTable,
+      beneficiario: {
+        id: beneficiariTable.id,
+        uds: beneficiariTable.uds,
+        cittaId: beneficiariTable.cittaId,
+        centroAscoltoId: beneficiariTable.centroAscoltoId,
+        zonaUdsId: beneficiariTable.zonaUdsId,
+      },
+    })
+    .from(interventiTable)
+    .innerJoin(
+      beneficiariTable,
+      eq(interventiTable.beneficiarioId, beneficiariTable.id),
+    )
+    .where(eq(interventiTable.id, interventoId))
+    .limit(1);
+  if (!result) throw new RouteError(404, "Intervento non trovato");
+  if (
+    !canAccessInterventoAmbito(
+      result.intervento.ambito,
+      result.beneficiario,
+      req,
+    )
+  ) {
+    throw new RouteError(403, "Intervento non accessibile");
+  }
+  return result.intervento;
 }
 
 async function canManageBisogniForBeneficiario(
   beneficiarioId: number,
   req: Request,
 ): Promise<boolean> {
+  if (!canUseInterventoArea(req, "uds")) return false;
   const [beneficiario] = await db
     .select({ uds: beneficiariTable.uds, cittaId: beneficiariTable.cittaId })
     .from(beneficiariTable)
@@ -369,6 +673,9 @@ async function requireManageableUdsIntervento(
   interventoId: number,
   req: Request,
 ): Promise<InterventoRow> {
+  if (!canUseInterventoArea(req, "uds")) {
+    throw new RouteError(403, "Intervento UDS non accessibile");
+  }
   const [result] = await db
     .select({
       intervento: interventiTable,
@@ -383,7 +690,11 @@ async function requireManageableUdsIntervento(
     .where(eq(interventiTable.id, interventoId))
     .limit(1);
   if (!result) throw new RouteError(404, "Intervento non trovato");
-  if (result.uds !== true || result.cittaId == null) {
+  if (
+    result.uds !== true ||
+    result.cittaId == null ||
+    result.intervento.ambito === "sociale"
+  ) {
     throw new RouteError(
       403,
       "Intervento UDS non accessibile per la tua città",
@@ -399,6 +710,57 @@ async function requireManageableUdsIntervento(
   return result.intervento;
 }
 
+async function validateInterventoPrecedente(
+  precedenteId: number | null,
+  beneficiarioId: number,
+  currentId: number | null = null,
+): Promise<void> {
+  if (precedenteId == null) return;
+  if (currentId != null && precedenteId === currentId) {
+    throw new RouteError(400, "Un intervento non può riferirsi a sé stesso");
+  }
+  let cursor: number | null = precedenteId;
+  const visited = new Set<number>();
+  while (cursor != null) {
+    if (visited.has(cursor) || (currentId != null && cursor === currentId)) {
+      throw new RouteError(400, "Il collegamento creerebbe una catena ciclica");
+    }
+    visited.add(cursor);
+    const [row] = await db
+      .select({
+        beneficiarioId: interventiTable.beneficiarioId,
+        precedenteId: interventiTable.interventoPrecedenteId,
+      })
+      .from(interventiTable)
+      .where(eq(interventiTable.id, cursor))
+      .limit(1);
+    if (!row) {
+      throw new RouteError(404, "Intervento precedente non trovato");
+    }
+    if (row.beneficiarioId !== beneficiarioId) {
+      throw new RouteError(
+        400,
+        "Intervento precedente e successivo devono appartenere allo stesso beneficiario",
+      );
+    }
+    cursor = row.precedenteId;
+  }
+}
+
+function formatStoricoStato(
+  row: typeof interventiStoricoStatiTable.$inferSelect,
+) {
+  return {
+    id: row.id,
+    interventoId: row.interventoId,
+    statoPrecedente: row.statoPrecedente ?? null,
+    statoNuovo: row.statoNuovo,
+    operatoreId: row.operatoreId ?? null,
+    dataTransizione: row.dataTransizione.toISOString(),
+    motivo: row.motivo ?? null,
+  };
+}
+
 function sendRouteError(
   error: unknown,
   res: { status: (status: number) => { json: (body: unknown) => void } },
@@ -411,8 +773,21 @@ function sendRouteError(
 }
 
 router.get("/interventi", async (req, res) => {
-  const { beneficiarioId, tipo, centroAscoltoId, cittaId, bisogni } =
-    req.query as Record<string, string>;
+  const {
+    beneficiarioId,
+    tipo,
+    centroAscoltoId,
+    cittaId,
+    bisogni,
+    stato,
+    ambito,
+    includiStorici,
+    operatoreId,
+    priorita,
+    pianificataDa,
+    pianificataA,
+    interventoPrecedenteId,
+  } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   const requestedBeneficiarioId = beneficiarioId
     ? parsePositiveInteger(beneficiarioId)
@@ -422,16 +797,92 @@ router.get("/interventi", async (req, res) => {
     return;
   }
   if (requestedBeneficiarioId != null) {
-    conditions.push(eq(interventiTable.beneficiarioId, requestedBeneficiarioId));
+    conditions.push(
+      eq(interventiTable.beneficiarioId, requestedBeneficiarioId),
+    );
   }
-  const udsBeneficiarioInCallerCitta =
-    requestedBeneficiarioId != null &&
-    (await canUseUdsBeneficiarioInCallerCitta(requestedBeneficiarioId, req));
+  if (stato && !isInterventoStato(stato)) {
+    res.status(400).json({ error: "stato non valido" });
+    return;
+  }
+  if (stato) conditions.push(eq(interventiTable.stato, stato));
+  if (ambito && !isInterventoAmbito(ambito)) {
+    res.status(400).json({ error: "ambito non valido" });
+    return;
+  }
+  if (
+    ambito &&
+    !canUseInterventoArea(req, ambito as InterventoAmbito)
+  ) {
+    res.status(403).json({ error: `Ambito ${ambito} non consentito` });
+    return;
+  }
+  if (includiStorici && !["true", "false"].includes(includiStorici)) {
+    res.status(400).json({ error: "includiStorici non valido" });
+    return;
+  }
+  const includeStorici = includiStorici === "true";
+  if (includeStorici && !ambito) {
+    res.status(400).json({
+      error: "ambito è obbligatorio quando includiStorici è true",
+    });
+    return;
+  }
+  if (ambito) {
+    conditions.push(
+      includeStorici
+        ? or(eq(interventiTable.ambito, ambito), isNull(interventiTable.ambito))!
+        : eq(interventiTable.ambito, ambito),
+    );
+  }
+  if (priorita && !isInterventoPriorita(priorita)) {
+    res.status(400).json({ error: "priorita non valida" });
+    return;
+  }
+  if (priorita) conditions.push(eq(interventiTable.priorita, priorita));
+  for (const [raw, column, field] of [
+    [operatoreId, interventiTable.operatoreId, "operatoreId"],
+    [
+      interventoPrecedenteId,
+      interventiTable.interventoPrecedenteId,
+      "interventoPrecedenteId",
+    ],
+  ] as const) {
+    if (!raw) continue;
+    const parsed = parsePositiveInteger(raw);
+    if (parsed == null) {
+      res.status(400).json({ error: `${field} non valido` });
+      return;
+    }
+    conditions.push(eq(column, parsed));
+  }
+  let plannedFrom: Date | null = null;
+  let plannedTo: Date | null = null;
+  try {
+    plannedFrom = parseIsoTimestamp(pianificataDa, "pianificataDa");
+    plannedTo = parseIsoTimestamp(pianificataA, "pianificataA");
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Intervallo non valido",
+    });
+    return;
+  }
+  if (plannedFrom)
+    conditions.push(gte(interventiTable.dataOraPianificata, plannedFrom));
+  if (plannedTo)
+    conditions.push(lte(interventiTable.dataOraPianificata, plannedTo));
+
   const caller = callerCentroId(req);
-  if (!udsBeneficiarioInCallerCitta && caller != null) {
-    const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
-    if (f) conditions.push(f);
-  } else if (!udsBeneficiarioInCallerCitta && centroAscoltoId) {
+  const callerCitta = callerCittaId(req);
+  const callerZona = callerZonaUdsId(req);
+  if (callerCitta == null && ambito === "uds" && !cittaId && !beneficiarioId) {
+    res.status(400).json({
+      error: "cittaId è obbligatorio per elencare gli interventi UDS",
+    });
+    return;
+  }
+
+  if (caller == null && centroAscoltoId) {
     const parsedCentro = parsePositiveInteger(centroAscoltoId);
     if (parsedCentro == null) {
       res.status(400).json({ error: "centroAscoltoId non valido" });
@@ -439,7 +890,6 @@ router.get("/interventi", async (req, res) => {
     }
     conditions.push(eq(beneficiariTable.centroAscoltoId, parsedCentro));
   }
-  const callerCitta = callerCittaId(req);
   if (callerCitta == null && cittaId) {
     const parsedCitta = parsePositiveInteger(cittaId);
     if (parsedCitta == null) {
@@ -448,11 +898,53 @@ router.get("/interventi", async (req, res) => {
     }
     conditions.push(eq(beneficiariTable.cittaId, parsedCitta));
   }
-  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCitta);
-  if (cittaFilter) conditions.push(cittaFilter);
-  if (!udsBeneficiarioInCallerCitta) {
-    const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
-    if (zonaFilter) conditions.push(zonaFilter);
+  if (caller != null || callerCitta != null || callerZona != null) {
+    const scopeAlternatives: SQL[] = [];
+    if (canUseInterventoArea(req, "sociale")) {
+      const socialConditions = [
+        or(ne(interventiTable.ambito, "uds"), isNull(interventiTable.ambito)),
+        cittaScopeFilter(beneficiariTable.cittaId, callerCitta),
+        centroScopeFilter(beneficiariTable.centroAscoltoId, caller),
+        zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZona),
+      ].filter((condition): condition is SQL => condition != null);
+      scopeAlternatives.push(and(...socialConditions)!);
+    }
+    if (canUseInterventoArea(req, "uds") && callerCitta != null) {
+      scopeAlternatives.push(
+        and(
+          eq(interventiTable.ambito, "uds"),
+          eq(beneficiariTable.uds, true),
+          eq(beneficiariTable.cittaId, callerCitta),
+        )!,
+      );
+    }
+    if (
+      canUseInterventoArea(req, "uds") &&
+      callerCitta != null &&
+      requestedBeneficiarioId != null
+    ) {
+      scopeAlternatives.push(
+        and(
+          isNull(interventiTable.ambito),
+          eq(beneficiariTable.id, requestedBeneficiarioId),
+          eq(beneficiariTable.uds, true),
+          eq(beneficiariTable.cittaId, callerCitta),
+        )!,
+      );
+    }
+    conditions.push(
+      scopeAlternatives.length > 0 ? or(...scopeAlternatives)! : sql`false`,
+    );
+  } else if (!ambito) {
+    const canUseSociale = canUseInterventoArea(req, "sociale");
+    const canUseUds = canUseInterventoArea(req, "uds");
+    if (canUseSociale && !canUseUds) {
+      conditions.push(
+        or(ne(interventiTable.ambito, "uds"), isNull(interventiTable.ambito))!,
+      );
+    } else if (canUseUds && !canUseSociale) {
+      conditions.push(eq(interventiTable.ambito, "uds"));
+    }
   }
   if (tipo) {
     const tokenMatch = or(
@@ -496,13 +988,20 @@ router.get("/interventi", async (req, res) => {
       operatoreUsername: utentiTable.username,
     })
     .from(interventiTable)
-    .leftJoin(beneficiariTable, eq(interventiTable.beneficiarioId, beneficiariTable.id))
+    .leftJoin(
+      beneficiariTable,
+      eq(interventiTable.beneficiarioId, beneficiariTable.id),
+    )
     .leftJoin(utentiTable, eq(interventiTable.operatoreId, utentiTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(interventiTable.dataIntervento))
+    .orderBy(
+      sql`coalesce(${interventiTable.dataOraPianificata}, ${interventiTable.dataIntervento}::timestamp) desc nulls last`,
+      desc(interventiTable.id),
+    )
     .limit(200);
 
   const summaries = await summariesFor(rows.map((row) => row.i.id));
+  const successori = await successoriFor(rows.map((row) => row.i.id));
   res.json(
     rows.map((row) =>
       formatIntervento(
@@ -510,6 +1009,7 @@ router.get("/interventi", async (req, res) => {
         summaries.get(row.i.id) ?? emptySummary(),
         row.cognome && row.nome ? `${row.cognome} ${row.nome}` : null,
         row.operatoreMatricola ?? row.operatoreUsername ?? null,
+        successori.get(row.i.id) ?? [],
       ),
     ),
   );
@@ -517,6 +1017,13 @@ router.get("/interventi", async (req, res) => {
 
 router.post("/interventi", async (req, res) => {
   const body = req.body as Record<string, unknown>;
+  let workflow: WorkflowCreateResult;
+  try {
+    workflow = workflowCreateValues(body);
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
   const bisogniInput = body.bisogniPianificati;
   if (bisogniInput != null && !Array.isArray(bisogniInput)) {
     res.status(400).json({ error: "Bisogni Pianificati non validi" });
@@ -538,32 +1045,44 @@ router.post("/interventi", async (req, res) => {
     res.status(400).json({ error: "beneficiarioId non valido" });
     return;
   }
-  const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
-  const zid = callerZonaUdsId(req);
-  const canUseUdsInCitta = await canUseUdsBeneficiarioInCallerCitta(
-    beneficiarioId,
-    req,
-  );
   if (
-    (caller != null || cid != null || zid != null) &&
-    !canUseUdsInCitta &&
-    !(await canUseBeneficiario(beneficiarioId, caller, cid, zid))
+    !(await canCreateForAmbito(
+      beneficiarioId,
+      workflow.values.ambito as InterventoAmbito | null,
+      req,
+    ))
   ) {
-    res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    res.status(403).json({ error: "Beneficiario non accessibile" });
     return;
   }
   if (
     normalizedBisogni.length > 0 &&
-    !(await canManageBisogniForBeneficiario(beneficiarioId, req))
+    (workflow.values.ambito === "sociale" ||
+      !(await canManageBisogniForBeneficiario(beneficiarioId, req)))
   ) {
-    res
-      .status(403)
-      .json({
-        error:
-          "I Bisogni Pianificati richiedono una persona UDS con città accessibile",
-      });
+    res.status(403).json({
+      error:
+        "I Bisogni Pianificati richiedono una persona UDS con città accessibile",
+    });
     return;
+  }
+
+  let interventoPrecedenteId: number | null = null;
+  if (hasOwn(body, "interventoPrecedenteId")) {
+    interventoPrecedenteId =
+      body.interventoPrecedenteId == null
+        ? null
+        : parsePositiveInteger(body.interventoPrecedenteId);
+    if (body.interventoPrecedenteId != null && interventoPrecedenteId == null) {
+      res.status(400).json({ error: "interventoPrecedenteId non valido" });
+      return;
+    }
+  }
+  try {
+    await validateInterventoPrecedente(interventoPrecedenteId, beneficiarioId);
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
   }
 
   const { intervento, bisogniCreati } = await db.transaction(async (tx) => {
@@ -571,10 +1090,20 @@ router.post("/interventi", async (req, res) => {
       .insert(interventiTable)
       .values({
         ...cleanInterventoBody(body),
+        ...workflow.values,
         beneficiarioId,
+        interventoPrecedenteId,
         operatoreId: req.user!.id,
       } as never)
       .returning();
+    await tx.insert(interventiStoricoStatiTable).values({
+      interventoId: created.id,
+      statoPrecedente: null,
+      statoNuovo: created.stato,
+      operatoreId: req.user!.id,
+      dataTransizione: workflow.values.dataAggiornamento!,
+      motivo: workflow.legacy ? "Creazione da payload legacy" : null,
+    });
     const createdNeeds =
       normalizedBisogni.length > 0
         ? await tx
@@ -600,40 +1129,23 @@ router.get("/interventi/:id", async (req, res) => {
     res.status(400).json({ error: "id non valido" });
     return;
   }
-  const [row] = await db
-    .select()
-    .from(interventiTable)
-    .where(eq(interventiTable.id, id));
-  if (!row) {
-    res.status(404).json({ error: "Not found" });
-    return;
+  try {
+    const row = await requireAccessibleIntervento(id, req);
+    const needs = await orderedBisogni([row.id]);
+    const successori = await successoriFor([row.id]);
+    res.json(
+      formatIntervento(
+        row,
+        summarizeBisogni(needs),
+        null,
+        null,
+        successori.get(row.id) ?? [],
+      ),
+    );
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
   }
-  const canUseUdsInCitta = await canUseUdsBeneficiarioInCallerCitta(
-    row.beneficiarioId,
-    req,
-  );
-  if (
-    !canUseUdsInCitta &&
-    (!canAccessCentro(
-      await beneficiarioCentroId(row.beneficiarioId),
-      callerCentroId(req),
-    ) ||
-      !canAccessCitta(
-        await beneficiarioCittaId(row.beneficiarioId),
-        callerCittaId(req),
-      ) ||
-      !canAccessZonaUds(
-        await beneficiarioZonaUdsId(row.beneficiarioId),
-        callerZonaUdsId(req),
-      ))
-  ) {
-    res
-      .status(403)
-      .json({ error: "Risorsa non accessibile per il tuo centro" });
-    return;
-  }
-  const needs = await orderedBisogni([row.id]);
-  res.json(formatIntervento(row, summarizeBisogni(needs)));
 });
 
 router.patch("/interventi/:id", async (req, res) => {
@@ -642,28 +1154,34 @@ router.patch("/interventi/:id", async (req, res) => {
     res.status(400).json({ error: "id non valido" });
     return;
   }
-  const [existing] = await db
-    .select()
-    .from(interventiTable)
-    .where(eq(interventiTable.id, id));
-  if (!existing) {
-    res.status(404).json({ error: "Not found" });
+  const body = req.body as Record<string, unknown>;
+  const forbiddenWorkflowFields = [
+    "stato",
+    "ambito",
+    "dataOraAvvio",
+    "dataOraConclusione",
+    "motivoAnnullamento",
+    "operatoreId",
+  ];
+  const forbiddenField = forbiddenWorkflowFields.find((field) =>
+    hasOwn(body, field),
+  );
+  if (forbiddenField) {
+    res.status(400).json({
+      error: `${forbiddenField} può essere modificato soltanto tramite un'operazione di dominio`,
+    });
     return;
   }
-  const body = req.body as Record<string, unknown>;
+  let existing: InterventoRow;
+  try {
+    existing = await requireAccessibleIntervento(id, req);
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
   const bisogniInput = body.bisogniPianificati;
   if (bisogniInput != null && !Array.isArray(bisogniInput)) {
     res.status(400).json({ error: "Bisogni Pianificati non validi" });
-    return;
-  }
-  const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
-  const zid = callerZonaUdsId(req);
-  const canUseExistingUdsInCitta = await canUseUdsBeneficiarioInCallerCitta(existing.beneficiarioId, req);
-  if (!canUseExistingUdsInCitta && (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)
-      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), cid)
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), zid))) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
   const targetBeneficiarioId =
@@ -674,23 +1192,85 @@ router.patch("/interventi/:id", async (req, res) => {
     res.status(400).json({ error: "beneficiarioId non valido" });
     return;
   }
-  const canUseTargetUdsInCitta =
-    body.beneficiarioId != null &&
-    (await canUseUdsBeneficiarioInCallerCitta(targetBeneficiarioId, req));
-  if (
-    (caller != null || cid != null || zid != null) &&
-    targetBeneficiarioId !== existing.beneficiarioId &&
-    !canUseTargetUdsInCitta &&
-    !(await canUseBeneficiario(targetBeneficiarioId, caller, cid, zid))
-  ) {
-    res
-      .status(403)
-      .json({ error: "Beneficiario non accessibile per il tuo centro" });
+  if (targetBeneficiarioId !== existing.beneficiarioId) {
+    if (
+      !(await canCreateForAmbito(
+        targetBeneficiarioId,
+        existing.ambito as InterventoAmbito | null,
+        req,
+      ))
+    ) {
+      res.status(403).json({ error: "Beneficiario non accessibile" });
+      return;
+    }
+    res.status(400).json({
+      error:
+        "Il beneficiario di un intervento esistente non può essere modificato",
+    });
     return;
   }
   if (bisogniInput != null) {
     try {
       await requireManageableUdsIntervento(id, req);
+    } catch (error) {
+      if (sendRouteError(error, res)) return;
+      throw error;
+    }
+  }
+
+  const workflowUpdates: Partial<typeof interventiTable.$inferInsert> = {
+    dataAggiornamento: new Date(),
+  };
+  if (hasOwn(body, "priorita")) {
+    if (!isInterventoPriorita(body.priorita)) {
+      res.status(400).json({ error: "priorita non valida" });
+      return;
+    }
+    workflowUpdates.priorita = body.priorita;
+  }
+  if (hasOwn(body, "sede")) {
+    try {
+      workflowUpdates.sede = nullableText(body.sede, "La sede", 255);
+    } catch (error) {
+      if (sendRouteError(error, res)) return;
+      throw error;
+    }
+  }
+  if (hasOwn(body, "dataOraPianificata")) {
+    try {
+      workflowUpdates.dataOraPianificata = parseIsoTimestamp(
+        body.dataOraPianificata,
+        "dataOraPianificata",
+      );
+    } catch (error) {
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "Timestamp non valido",
+      });
+      return;
+    }
+    if (
+      existing.stato === "pianificato" &&
+      workflowUpdates.dataOraPianificata == null
+    ) {
+      res.status(400).json({
+        error: "Un intervento pianificato richiede data e ora pianificate",
+      });
+      return;
+    }
+  }
+
+  if (hasOwn(body, "interventoPrecedenteId")) {
+    const parsed =
+      body.interventoPrecedenteId == null
+        ? null
+        : parsePositiveInteger(body.interventoPrecedenteId);
+    if (body.interventoPrecedenteId != null && parsed == null) {
+      res.status(400).json({ error: "interventoPrecedenteId non valido" });
+      return;
+    }
+    try {
+      await validateInterventoPrecedente(parsed, existing.beneficiarioId, id);
+      workflowUpdates.interventoPrecedenteId = parsed;
     } catch (error) {
       if (sendRouteError(error, res)) return;
       throw error;
@@ -703,8 +1283,8 @@ router.patch("/interventi/:id", async (req, res) => {
         .update(interventiTable)
         .set({
           ...cleanInterventoBody(body),
+          ...workflowUpdates,
           beneficiarioId: targetBeneficiarioId,
-          operatoreId: req.user!.id,
         } as never)
         .where(eq(interventiTable.id, id))
         .returning();
@@ -746,6 +1326,249 @@ router.patch("/interventi/:id", async (req, res) => {
     });
     const needs = await orderedBisogni([id]);
     res.json(formatIntervento(row, summarizeBisogni(needs)));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
+});
+
+router.post("/interventi/:id/transizioni", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  if (!isInterventoStato(body.stato)) {
+    res.status(400).json({ error: "Stato di destinazione non valido" });
+    return;
+  }
+  let transitionDate: Date;
+  let plannedDate: Date | null = null;
+  let motivo: string | null;
+  try {
+    transitionDate =
+      parseIsoTimestamp(body.dataOraTransizione, "dataOraTransizione") ??
+      new Date();
+    plannedDate = parseIsoTimestamp(
+      body.dataOraPianificata,
+      "dataOraPianificata",
+    );
+    motivo = nullableText(body.motivo, "Il motivo", 2000);
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Transizione non valida",
+    });
+    return;
+  }
+
+  try {
+    await requireAccessibleIntervento(id, req);
+    const updated = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (!current) throw new RouteError(404, "Intervento non trovato");
+      if (!isInterventoStato(current.stato)) {
+        throw new RouteError(409, "Stato corrente non riconosciuto");
+      }
+      const target = body.stato as InterventoStato;
+      if (!canTransitionIntervento(current.stato, target)) {
+        throw new RouteError(
+          409,
+          `Transizione da ${current.stato} a ${target} non consentita`,
+        );
+      }
+
+      const updates: Partial<typeof interventiTable.$inferInsert> = {
+        stato: target,
+        dataAggiornamento: transitionDate,
+      };
+      if (target === "pianificato") {
+        updates.dataOraPianificata = plannedDate ?? current.dataOraPianificata;
+        if (updates.dataOraPianificata == null) {
+          throw new RouteError(
+            400,
+            "La transizione a pianificato richiede data e ora pianificate",
+          );
+        }
+      }
+      if (target === "da_pianificare") {
+        updates.dataOraPianificata = null;
+      }
+      if (target === "in_corso") {
+        updates.dataOraAvvio = transitionDate;
+        if (current.dataIntervento == null) {
+          updates.dataIntervento = dataCivileEuropeRome(transitionDate);
+        }
+      }
+      if (target === "concluso") {
+        if (current.dataOraAvvio == null) {
+          throw new RouteError(
+            409,
+            "Un intervento deve essere avviato prima della conclusione",
+          );
+        }
+        if (transitionDate < current.dataOraAvvio) {
+          throw new RouteError(400, "La conclusione non può precedere l'avvio");
+        }
+        updates.dataOraConclusione = transitionDate;
+      }
+      if (target === "annullato") {
+        if (motivo == null) {
+          throw new RouteError(
+            400,
+            "Il motivo dell'annullamento è obbligatorio",
+          );
+        }
+        updates.motivoAnnullamento = motivo;
+      }
+      if (target === "mancata_presentazione") {
+        updates.dataOraAvvio = null;
+      }
+
+      const [row] = await tx
+        .update(interventiTable)
+        .set(updates)
+        .where(eq(interventiTable.id, id))
+        .returning();
+      await tx.insert(interventiStoricoStatiTable).values({
+        interventoId: id,
+        statoPrecedente: current.stato,
+        statoNuovo: target,
+        operatoreId: req.user!.id,
+        dataTransizione: transitionDate,
+        motivo,
+      });
+      return row;
+    });
+    const needs = await orderedBisogni([id]);
+    const successori = await successoriFor([id]);
+    res.json(
+      formatIntervento(
+        updated,
+        summarizeBisogni(needs),
+        null,
+        null,
+        successori.get(id) ?? [],
+      ),
+    );
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
+});
+
+router.get("/interventi/:id/storico-stati", async (req, res) => {
+  const id = parsePositiveInteger(req.params.id);
+  if (id == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  try {
+    await requireAccessibleIntervento(id, req);
+    const rows = await db
+      .select()
+      .from(interventiStoricoStatiTable)
+      .where(eq(interventiStoricoStatiTable.interventoId, id))
+      .orderBy(
+        asc(interventiStoricoStatiTable.dataTransizione),
+        asc(interventiStoricoStatiTable.id),
+      );
+    res.json(rows.map(formatStoricoStato));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
+});
+
+router.post("/interventi/:id/successivi", async (req, res) => {
+  const precedenteId = parsePositiveInteger(req.params.id);
+  if (precedenteId == null) {
+    res.status(400).json({ error: "id non valido" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  if (!hasOwn(body, "stato")) {
+    res.status(400).json({
+      error: "Lo stato iniziale è obbligatorio per un intervento successivo",
+    });
+    return;
+  }
+  try {
+    const precedente = await requireAccessibleIntervento(precedenteId, req);
+    const workflow = workflowCreateValues(body);
+    if (
+      !(await canCreateForAmbito(
+        precedente.beneficiarioId,
+        workflow.values.ambito as InterventoAmbito | null,
+        req,
+      ))
+    ) {
+      throw new RouteError(403, "Beneficiario non accessibile");
+    }
+    await validateInterventoPrecedente(precedenteId, precedente.beneficiarioId);
+
+    const tipoIntervento = body.tipoIntervento;
+    if (typeof tipoIntervento !== "string" || !tipoIntervento.trim()) {
+      throw new RouteError(400, "tipoIntervento è obbligatorio");
+    }
+    const duplicateConditions: SQL[] = [
+      eq(interventiTable.interventoPrecedenteId, precedenteId),
+      eq(interventiTable.tipoIntervento, tipoIntervento),
+      inArray(interventiTable.stato, [
+        "da_pianificare",
+        "pianificato",
+        "in_corso",
+      ]),
+    ];
+    if (workflow.values.dataOraPianificata == null) {
+      duplicateConditions.push(isNull(interventiTable.dataOraPianificata));
+    } else {
+      duplicateConditions.push(
+        eq(
+          interventiTable.dataOraPianificata,
+          workflow.values.dataOraPianificata,
+        ),
+      );
+    }
+    const [duplicate] = await db
+      .select({ id: interventiTable.id })
+      .from(interventiTable)
+      .where(and(...duplicateConditions))
+      .limit(1);
+    if (duplicate) {
+      throw new RouteError(
+        409,
+        "Esiste già un intervento successivo con la stessa pianificazione",
+      );
+    }
+
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(interventiTable)
+        .values({
+          ...cleanInterventoBody(body),
+          ...workflow.values,
+          beneficiarioId: precedente.beneficiarioId,
+          interventoPrecedenteId: precedenteId,
+          operatoreId: req.user!.id,
+        } as never)
+        .returning();
+      await tx.insert(interventiStoricoStatiTable).values({
+        interventoId: row.id,
+        statoPrecedente: null,
+        statoNuovo: row.stato,
+        operatoreId: req.user!.id,
+        dataTransizione: workflow.values.dataAggiornamento!,
+        motivo: "Creazione come intervento successivo",
+      });
+      return row;
+    });
+    res.status(201).json(formatIntervento(created, emptySummary()));
   } catch (error) {
     if (sendRouteError(error, res)) return;
     throw error;

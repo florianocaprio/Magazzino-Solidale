@@ -36,12 +36,14 @@ function makeApp(): Express {
         centroAscoltoId: number;
         cittaId: number;
         zonaUdsId: number;
+        aree: string[];
       };
     }).user = {
       id: operatorUserId,
       centroAscoltoId: centroOperatore,
       cittaId: cittaOperatore,
       zonaUdsId: zonaOperatore,
+      aree: ["uds"],
     };
     next();
   });

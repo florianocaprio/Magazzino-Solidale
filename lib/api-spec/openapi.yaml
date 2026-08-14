@@ -1267,6 +1267,44 @@ paths:
           schema:
             type: string
             enum: [aperti, scaduti, nessuno]
+        - name: stato
+          in: query
+          schema:
+            $ref: "#/components/schemas/InterventoStato"
+        - name: ambito
+          in: query
+          schema:
+            $ref: "#/components/schemas/InterventoAmbito"
+        - name: includiStorici
+          in: query
+          description: Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
+          schema:
+            type: boolean
+            default: false
+        - name: operatoreId
+          in: query
+          schema:
+            type: integer
+        - name: priorita
+          in: query
+          schema:
+            $ref: "#/components/schemas/InterventoPriorita"
+        - name: pianificataDa
+          in: query
+          description: Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
+          schema:
+            type: string
+            format: date-time
+        - name: pianificataA
+          in: query
+          description: Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
+          schema:
+            type: string
+            format: date-time
+        - name: interventoPrecedenteId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of interventions
@@ -1332,6 +1370,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Intervento"
+
+  /interventi/{id}/transizioni:
+    post:
+      operationId: transitionIntervento
+      tags: [interventi]
+      description: Esegue atomicamente una transizione di stato consentita e la registra nello storico append-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterventoTransizioneInput"
+      responses:
+        "200":
+          description: Intervento aggiornato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intervento"
+        "400":
+          description: Dati o timestamp non validi
+        "403":
+          description: Intervento non accessibile
+        "409":
+          description: Transizione non consentita
+
+  /interventi/{id}/storico-stati:
+    get:
+      operationId: listInterventoStoricoStati
+      tags: [interventi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Storico cronologico e append-only degli stati
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterventoStoricoStato"
+        "403":
+          description: Intervento non accessibile
+        "404":
+          description: Intervento non trovato
+
+  /interventi/{id}/successivi:
+    post:
+      operationId: createInterventoSuccessivo
+      tags: [interventi]
+      description: Crea un nuovo intervento per lo stesso beneficiario lasciando immutato il precedente.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterventoSuccessivoInput"
+      responses:
+        "201":
+          description: Intervento successivo creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intervento"
+        "400":
+          description: Dati o collegamento non validi
+        "403":
+          description: Intervento non accessibile
+        "409":
+          description: Pianificazione successiva duplicata
 
   /interventi/{interventoId}/bisogni-pianificati:
     get:
@@ -7364,6 +7488,28 @@ components:
           type: string
 
     # ── Interventi ────────────────────────────────────────────────────────
+    InterventoStato:
+      type: string
+      description: Stato canonico del ciclo di vita dell'intervento.
+      enum:
+        [
+          da_pianificare,
+          pianificato,
+          in_corso,
+          concluso,
+          annullato,
+          mancata_presentazione,
+        ]
+
+    InterventoAmbito:
+      type: string
+      description: Ambito esplicito; i record storici non classificabili mantengono null.
+      enum: [sociale, uds]
+
+    InterventoPriorita:
+      type: string
+      enum: [bassa, normale, alta, urgente]
+
     Intervento:
       type: object
       properties:
@@ -7380,7 +7526,8 @@ components:
         operatoreCodice:
           type: ["string", "null"]
         dataIntervento:
-          type: string
+          type: ["string", "null"]
+          format: date
         tipoIntervento:
           type: string
         descrizione:
@@ -7401,8 +7548,41 @@ components:
           type: ["string", "null"]
         scadenzaAutodichiarazioneIndigenza:
           type: ["string", "null"]
+        stato:
+          $ref: "#/components/schemas/InterventoStato"
+        ambito:
+          anyOf:
+            - $ref: "#/components/schemas/InterventoAmbito"
+            - type: "null"
+        priorita:
+          $ref: "#/components/schemas/InterventoPriorita"
+        dataOraPianificata:
+          type: ["string", "null"]
+          format: date-time
+        dataOraAvvio:
+          type: ["string", "null"]
+          format: date-time
+        dataOraConclusione:
+          type: ["string", "null"]
+          format: date-time
+        interventoPrecedenteId:
+          type: ["integer", "null"]
+        successoriIds:
+          type: array
+          items:
+            type: integer
+        numeroSuccessori:
+          type: integer
+        sede:
+          type: ["string", "null"]
+        motivoAnnullamento:
+          type: ["string", "null"]
         dataCreazione:
           type: string
+          format: date-time
+        dataAggiornamento:
+          type: ["string", "null"]
+          format: date-time
         bisogniPianificatiTotale:
           type: integer
         bisogniPianificatiAperti:
@@ -7417,7 +7597,19 @@ components:
           beneficiarioId,
           dataIntervento,
           tipoIntervento,
+          stato,
+          ambito,
+          priorita,
+          dataOraPianificata,
+          dataOraAvvio,
+          dataOraConclusione,
+          interventoPrecedenteId,
+          successoriIds,
+          numeroSuccessori,
+          sede,
+          motivoAnnullamento,
           dataCreazione,
+          dataAggiornamento,
           bisogniPianificatiTotale,
           bisogniPianificatiAperti,
           bisogniPianificatiScaduti,
@@ -7430,9 +7622,35 @@ components:
         beneficiarioId:
           type: integer
         dataIntervento:
-          type: string
+          type: ["string", "null"]
+          format: date
         tipoIntervento:
           type: string
+        stato:
+          allOf:
+            - $ref: "#/components/schemas/InterventoStato"
+          description: Se omesso, il payload è trattato esplicitamente come legacy e l'intervento come già concluso.
+        ambito:
+          $ref: "#/components/schemas/InterventoAmbito"
+        priorita:
+          $ref: "#/components/schemas/InterventoPriorita"
+        dataOraPianificata:
+          type: ["string", "null"]
+          format: date-time
+        dataOraAvvio:
+          type: ["string", "null"]
+          format: date-time
+        dataOraConclusione:
+          type: ["string", "null"]
+          format: date-time
+        interventoPrecedenteId:
+          type: ["integer", "null"]
+        sede:
+          type: ["string", "null"]
+          maxLength: 255
+        motivoAnnullamento:
+          type: ["string", "null"]
+          maxLength: 2000
         descrizione:
           type: string
         esito:
@@ -7455,15 +7673,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BisognoPianificatoUpsert"
-      required: [beneficiarioId, dataIntervento, tipoIntervento]
+      required: [beneficiarioId, tipoIntervento]
 
     InterventoUpdate:
       type: object
       properties:
         dataIntervento:
-          type: string
+          type: ["string", "null"]
+          format: date
         tipoIntervento:
           type: string
+        priorita:
+          $ref: "#/components/schemas/InterventoPriorita"
+        dataOraPianificata:
+          type: ["string", "null"]
+          format: date-time
+        interventoPrecedenteId:
+          type: ["integer", "null"]
+        sede:
+          type: ["string", "null"]
+          maxLength: 255
         descrizione:
           type: string
         esito:
@@ -7486,6 +7715,93 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BisognoPianificatoUpsert"
+
+    InterventoTransizioneInput:
+      type: object
+      properties:
+        stato:
+          $ref: "#/components/schemas/InterventoStato"
+        motivo:
+          type: ["string", "null"]
+          maxLength: 2000
+        dataOraTransizione:
+          type: string
+          format: date-time
+          description: Timestamp effettivo con offset; se omesso viene usato l'istante corrente del server.
+        dataOraPianificata:
+          type: string
+          format: date-time
+          description: Obbligatorio quando la destinazione è pianificato e non esiste già una pianificazione.
+      required: [stato]
+
+    InterventoStoricoStato:
+      type: object
+      properties:
+        id:
+          type: integer
+        interventoId:
+          type: integer
+        statoPrecedente:
+          anyOf:
+            - $ref: "#/components/schemas/InterventoStato"
+            - type: "null"
+        statoNuovo:
+          $ref: "#/components/schemas/InterventoStato"
+        operatoreId:
+          type: ["integer", "null"]
+        dataTransizione:
+          type: string
+          format: date-time
+        motivo:
+          type: ["string", "null"]
+      required:
+        [
+          id,
+          interventoId,
+          statoPrecedente,
+          statoNuovo,
+          operatoreId,
+          dataTransizione,
+          motivo,
+        ]
+
+    InterventoSuccessivoInput:
+      type: object
+      properties:
+        tipoIntervento:
+          type: string
+        stato:
+          $ref: "#/components/schemas/InterventoStato"
+        ambito:
+          $ref: "#/components/schemas/InterventoAmbito"
+        priorita:
+          $ref: "#/components/schemas/InterventoPriorita"
+        dataIntervento:
+          type: ["string", "null"]
+          format: date
+        dataOraPianificata:
+          type: ["string", "null"]
+          format: date-time
+        dataOraAvvio:
+          type: ["string", "null"]
+          format: date-time
+        dataOraConclusione:
+          type: ["string", "null"]
+          format: date-time
+        sede:
+          type: ["string", "null"]
+          maxLength: 255
+        descrizione:
+          type: string
+        esito:
+          type: string
+        prossimAzione:
+          type: string
+        note:
+          type: string
+        noteUds:
+          type: string
+      required: [tipoIntervento, stato, ambito]
 
     BisognoPianificato:
       type: object

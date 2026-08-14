@@ -1596,7 +1596,7 @@ export const GetBeneficiarioResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
-  "dataIntervento": zod.string(),
+  "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
   "esito": zod.string().nullish(),
@@ -1607,7 +1607,19 @@ export const GetBeneficiarioResponse = zod.object({
   "scadenzaIsee": zod.string().nullish(),
   "scadenzaRinnovo": zod.string().nullish(),
   "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
-  "dataCreazione": zod.string(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
   "bisogniPianificatiTotale": zod.number(),
   "bisogniPianificatiAperti": zod.number(),
   "bisogniPianificatiScaduti": zod.number(),
@@ -1795,12 +1807,22 @@ export const DeleteNucleoFamiliareParams = zod.object({
 })
 
 
+export const listInterventiQueryIncludiStoriciDefault = false;
+
 export const ListInterventiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
   "tipo": zod.coerce.string().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
   "cittaId": zod.coerce.number().optional(),
-  "bisogni": zod.enum(['aperti', 'scaduti', 'nessuno']).optional().describe('Filtra gli interventi in base ai Bisogni Pianificati collegati.')
+  "bisogni": zod.enum(['aperti', 'scaduti', 'nessuno']).optional().describe('Filtra gli interventi in base ai Bisogni Pianificati collegati.'),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).optional(),
+  "ambito": zod.enum(['sociale', 'uds']).optional(),
+  "includiStorici": zod.coerce.boolean().default(listInterventiQueryIncludiStoriciDefault).describe('Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.'),
+  "operatoreId": zod.coerce.number().optional(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "pianificataDa": zod.date().optional().describe('Estremo iniziale ISO 8601 con fuso dell\'intervallo pianificato.'),
+  "pianificataA": zod.date().optional().describe('Estremo finale ISO 8601 con fuso dell\'intervallo pianificato.'),
+  "interventoPrecedenteId": zod.coerce.number().optional()
 })
 
 export const ListInterventiResponseItem = zod.object({
@@ -1810,7 +1832,7 @@ export const ListInterventiResponseItem = zod.object({
   "bollaId": zod.number().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
-  "dataIntervento": zod.string(),
+  "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
   "esito": zod.string().nullish(),
@@ -1821,7 +1843,19 @@ export const ListInterventiResponseItem = zod.object({
   "scadenzaIsee": zod.string().nullish(),
   "scadenzaRinnovo": zod.string().nullish(),
   "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
-  "dataCreazione": zod.string(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
   "bisogniPianificatiTotale": zod.number(),
   "bisogniPianificatiAperti": zod.number(),
   "bisogniPianificatiScaduti": zod.number(),
@@ -1829,6 +1863,10 @@ export const ListInterventiResponseItem = zod.object({
 })
 export const ListInterventiResponse = zod.array(ListInterventiResponseItem)
 
+
+export const createInterventoBodySedeMax = 255;
+
+export const createInterventoBodyMotivoAnnullamentoMax = 2000;
 
 export const createInterventoBodyBisogniPianificatiItemDescrizioneMax = 500;
 
@@ -1838,8 +1876,17 @@ export const createInterventoBodyBisogniPianificatiItemNoteMax = 2000;
 
 export const CreateInterventoBody = zod.object({
   "beneficiarioId": zod.number(),
-  "dataIntervento": zod.string(),
+  "dataIntervento": zod.coerce.date().nullish(),
   "tipoIntervento": zod.string(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.').optional().describe('Se omesso, il payload è trattato esplicitamente come legacy e l\'intervento come già concluso.'),
+  "ambito": zod.enum(['sociale', 'uds']).optional().describe('Ambito esplicito; i record storici non classificabili mantengono null.'),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "dataOraPianificata": zod.coerce.date().nullish(),
+  "dataOraAvvio": zod.coerce.date().nullish(),
+  "dataOraConclusione": zod.coerce.date().nullish(),
+  "interventoPrecedenteId": zod.number().nullish(),
+  "sede": zod.string().max(createInterventoBodySedeMax).nullish(),
+  "motivoAnnullamento": zod.string().max(createInterventoBodyMotivoAnnullamentoMax).nullish(),
   "descrizione": zod.string().optional(),
   "esito": zod.string().optional(),
   "prossimAzione": zod.string().optional(),
@@ -1872,7 +1919,7 @@ export const GetInterventoResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
-  "dataIntervento": zod.string(),
+  "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
   "esito": zod.string().nullish(),
@@ -1883,7 +1930,19 @@ export const GetInterventoResponse = zod.object({
   "scadenzaIsee": zod.string().nullish(),
   "scadenzaRinnovo": zod.string().nullish(),
   "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
-  "dataCreazione": zod.string(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
   "bisogniPianificatiTotale": zod.number(),
   "bisogniPianificatiAperti": zod.number(),
   "bisogniPianificatiScaduti": zod.number(),
@@ -1895,6 +1954,8 @@ export const UpdateInterventoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateInterventoBodySedeMax = 255;
+
 export const updateInterventoBodyBisogniPianificatiItemDescrizioneMax = 500;
 
 export const updateInterventoBodyBisogniPianificatiItemNoteMax = 2000;
@@ -1902,8 +1963,12 @@ export const updateInterventoBodyBisogniPianificatiItemNoteMax = 2000;
 
 
 export const UpdateInterventoBody = zod.object({
-  "dataIntervento": zod.string().optional(),
+  "dataIntervento": zod.coerce.date().nullish(),
   "tipoIntervento": zod.string().optional(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "dataOraPianificata": zod.coerce.date().nullish(),
+  "interventoPrecedenteId": zod.number().nullish(),
+  "sede": zod.string().max(updateInterventoBodySedeMax).nullish(),
   "descrizione": zod.string().optional(),
   "esito": zod.string().optional(),
   "prossimAzione": zod.string().optional(),
@@ -1931,7 +1996,7 @@ export const UpdateInterventoResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
-  "dataIntervento": zod.string(),
+  "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
   "esito": zod.string().nullish(),
@@ -1942,11 +2007,124 @@ export const UpdateInterventoResponse = zod.object({
   "scadenzaIsee": zod.string().nullish(),
   "scadenzaRinnovo": zod.string().nullish(),
   "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
-  "dataCreazione": zod.string(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
   "bisogniPianificatiTotale": zod.number(),
   "bisogniPianificatiAperti": zod.number(),
   "bisogniPianificatiScaduti": zod.number(),
   "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+})
+
+
+/**
+ * Esegue atomicamente una transizione di stato consentita e la registra nello storico append-only.
+ */
+export const TransitionInterventoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const transitionInterventoBodyMotivoMax = 2000;
+
+
+
+export const TransitionInterventoBody = zod.object({
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "motivo": zod.string().max(transitionInterventoBodyMotivoMax).nullish(),
+  "dataOraTransizione": zod.coerce.date().optional().describe('Timestamp effettivo con offset; se omesso viene usato l\'istante corrente del server.'),
+  "dataOraPianificata": zod.coerce.date().optional().describe('Obbligatorio quando la destinazione è pianificato e non esiste già una pianificazione.')
+})
+
+export const TransitionInterventoResponse = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "bollaId": zod.number().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "dataIntervento": zod.coerce.date().nullable(),
+  "tipoIntervento": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "esito": zod.string().nullish(),
+  "prossimAzione": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "noteUds": zod.string().nullish(),
+  "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+})
+
+
+export const ListInterventoStoricoStatiParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListInterventoStoricoStatiResponseItem = zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "statoPrecedente": zod.union([zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),zod.null()]),
+  "statoNuovo": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "operatoreId": zod.number().nullable(),
+  "dataTransizione": zod.coerce.date(),
+  "motivo": zod.string().nullable()
+})
+export const ListInterventoStoricoStatiResponse = zod.array(ListInterventoStoricoStatiResponseItem)
+
+
+/**
+ * Crea un nuovo intervento per lo stesso beneficiario lasciando immutato il precedente.
+ */
+export const CreateInterventoSuccessivoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const createInterventoSuccessivoBodySedeMax = 255;
+
+
+
+export const CreateInterventoSuccessivoBody = zod.object({
+  "tipoIntervento": zod.string(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "dataIntervento": zod.coerce.date().nullish(),
+  "dataOraPianificata": zod.coerce.date().nullish(),
+  "dataOraAvvio": zod.coerce.date().nullish(),
+  "dataOraConclusione": zod.coerce.date().nullish(),
+  "sede": zod.string().max(createInterventoSuccessivoBodySedeMax).nullish(),
+  "descrizione": zod.string().optional(),
+  "esito": zod.string().optional(),
+  "prossimAzione": zod.string().optional(),
+  "note": zod.string().optional(),
+  "noteUds": zod.string().optional()
 })
 
 
