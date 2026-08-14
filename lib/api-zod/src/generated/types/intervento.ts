@@ -38,4 +38,9 @@ export interface Intervento {
   /** @nullable */
   scadenzaAutodichiarazioneIndigenza?: string | null;
   dataCreazione: string;
+  bisogniPianificatiTotale: number;
+  bisogniPianificatiAperti: number;
+  bisogniPianificatiScaduti: number;
+  /** @nullable */
+  bisogniPianificatiProssimaScadenza: string | null;
 }

@@ -1261,6 +1261,12 @@ paths:
           in: query
           schema:
             type: integer
+        - name: bisogni
+          in: query
+          description: Filtra gli interventi in base ai Bisogni Pianificati collegati.
+          schema:
+            type: string
+            enum: [aperti, scaduti, nessuno]
       responses:
         "200":
           description: List of interventions
@@ -1326,6 +1332,93 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Intervento"
+
+  /interventi/{interventoId}/bisogni-pianificati:
+    get:
+      operationId: listBisogniPianificati
+      tags: [interventi]
+      parameters:
+        - name: interventoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Storico completo dei Bisogni Pianificati dell'intervento
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BisognoPianificato"
+        "403":
+          description: Intervento non accessibile per la città dell'operatore
+        "404":
+          description: Intervento non trovato
+    post:
+      operationId: createBisognoPianificato
+      tags: [interventi]
+      parameters:
+        - name: interventoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BisognoPianificatoInput"
+      responses:
+        "201":
+          description: Bisogno Pianificato creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BisognoPianificato"
+        "400":
+          description: Dati non validi
+        "403":
+          description: Intervento non accessibile per la città dell'operatore
+        "404":
+          description: Intervento non trovato
+
+  /interventi/{interventoId}/bisogni-pianificati/{bisognoId}:
+    patch:
+      operationId: updateBisognoPianificato
+      tags: [interventi]
+      parameters:
+        - name: interventoId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: bisognoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BisognoPianificatoUpdate"
+      responses:
+        "200":
+          description: Bisogno Pianificato aggiornato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BisognoPianificato"
+        "400":
+          description: Dati non validi
+        "403":
+          description: Intervento non accessibile per la città dell'operatore
+        "404":
+          description: Intervento o Bisogno Pianificato non trovato
 
   # ─── CONSEGNE ────────────────────────────────────────────────────────────────
   /consegne:
@@ -7310,7 +7403,26 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, beneficiarioId, dataIntervento, tipoIntervento, dataCreazione]
+        bisogniPianificatiTotale:
+          type: integer
+        bisogniPianificatiAperti:
+          type: integer
+        bisogniPianificatiScaduti:
+          type: integer
+        bisogniPianificatiProssimaScadenza:
+          type: ["string", "null"]
+      required:
+        [
+          id,
+          beneficiarioId,
+          dataIntervento,
+          tipoIntervento,
+          dataCreazione,
+          bisogniPianificatiTotale,
+          bisogniPianificatiAperti,
+          bisogniPianificatiScaduti,
+          bisogniPianificatiProssimaScadenza,
+        ]
 
     InterventoInput:
       type: object
@@ -7339,6 +7451,10 @@ components:
           type: string
         scadenzaAutodichiarazioneIndigenza:
           type: string
+        bisogniPianificati:
+          type: array
+          items:
+            $ref: "#/components/schemas/BisognoPianificatoUpsert"
       required: [beneficiarioId, dataIntervento, tipoIntervento]
 
     InterventoUpdate:
@@ -7366,7 +7482,127 @@ components:
           type: string
         scadenzaAutodichiarazioneIndigenza:
           type: string
+        bisogniPianificati:
+          type: array
+          items:
+            $ref: "#/components/schemas/BisognoPianificatoUpsert"
 
+    BisognoPianificato:
+      type: object
+      properties:
+        id:
+          type: integer
+        interventoId:
+          type: integer
+        tipo:
+          type: string
+          enum: [richiesta, azione]
+        descrizione:
+          type: string
+          maxLength: 500
+        stato:
+          type: string
+          enum: [da_pianificare, pianificato, completato, annullato]
+        dataPrevista:
+          type: ["string", "null"]
+        priorita:
+          type: string
+          enum: [bassa, normale, alta, urgente]
+        note:
+          type: ["string", "null"]
+          maxLength: 2000
+        dataCompletamento:
+          type: ["string", "null"]
+        dataCreazione:
+          type: string
+        dataAggiornamento:
+          type: string
+      required:
+        [
+          id,
+          interventoId,
+          tipo,
+          descrizione,
+          stato,
+          dataPrevista,
+          priorita,
+          note,
+          dataCompletamento,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    BisognoPianificatoInput:
+      type: object
+      properties:
+        tipo:
+          type: string
+          enum: [richiesta, azione]
+        descrizione:
+          type: string
+          minLength: 1
+          maxLength: 500
+        stato:
+          type: string
+          enum: [da_pianificare, pianificato, completato, annullato]
+          default: da_pianificare
+        dataPrevista:
+          type: ["string", "null"]
+        priorita:
+          type: string
+          enum: [bassa, normale, alta, urgente]
+          default: normale
+        note:
+          type: ["string", "null"]
+          maxLength: 2000
+      required: [tipo, descrizione]
+
+    BisognoPianificatoUpdate:
+      type: object
+      properties:
+        tipo:
+          type: string
+          enum: [richiesta, azione]
+        descrizione:
+          type: string
+          minLength: 1
+          maxLength: 500
+        stato:
+          type: string
+          enum: [da_pianificare, pianificato, completato, annullato]
+        dataPrevista:
+          type: ["string", "null"]
+        priorita:
+          type: string
+          enum: [bassa, normale, alta, urgente]
+        note:
+          type: ["string", "null"]
+          maxLength: 2000
+
+    BisognoPianificatoUpsert:
+      type: object
+      properties:
+        id:
+          type: integer
+        tipo:
+          type: string
+          enum: [richiesta, azione]
+        descrizione:
+          type: string
+          minLength: 1
+          maxLength: 500
+        stato:
+          type: string
+          enum: [da_pianificare, pianificato, completato, annullato]
+        dataPrevista:
+          type: ["string", "null"]
+        priorita:
+          type: string
+          enum: [bassa, normale, alta, urgente]
+        note:
+          type: ["string", "null"]
+          maxLength: 2000
+      required: [tipo, descrizione, stato, priorita]
     # ── Consegne ──────────────────────────────────────────────────────────
     Consegna:
       type: object

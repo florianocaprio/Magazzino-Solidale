@@ -5,10 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListInterventiBisogni } from './listInterventiBisogni';
 
 export type ListInterventiParams = {
 beneficiarioId?: number;
 tipo?: string;
 centroAscoltoId?: number;
 cittaId?: number;
+/**
+ * Filtra gli interventi in base ai Bisogni Pianificati collegati.
+ */
+bisogni?: ListInterventiBisogni;
 };
