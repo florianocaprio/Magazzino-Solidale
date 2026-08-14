@@ -2723,8 +2723,7 @@ export interface InterventoOperativita {
 }
 
 export interface InterventoOperativitaInput {
-  /** @nullable */
-  versione?: string | null;
+  versione: string;
   /**
      * @maxLength 4000
      * @nullable
@@ -2746,14 +2745,12 @@ export interface InterventoOperativitaInput {
 }
 
 export interface InterventoAvvioInput {
-  /** @nullable */
-  versione?: string | null;
+  versione: string;
   dataOraAvvio?: string;
 }
 
 export interface InterventoAnnullamentoInput {
-  /** @nullable */
-  versione?: string | null;
+  versione: string;
   /**
      * @minLength 1
      * @maxLength 2000
@@ -2763,8 +2760,7 @@ export interface InterventoAnnullamentoInput {
 }
 
 export interface InterventoMancataPresentazioneInput {
-  /** @nullable */
-  versione?: string | null;
+  versione: string;
   /**
      * @maxLength 2000
      * @nullable

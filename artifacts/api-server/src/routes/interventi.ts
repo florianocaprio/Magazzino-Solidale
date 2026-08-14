@@ -703,10 +703,22 @@ function assertExpectedVersion(
   body: Record<string, unknown>,
   current: InterventoRow,
 ): void {
-  if (!hasOwn(body, "versione") || body.versione == null) return;
-  const expected = parseIsoTimestamp(body.versione, "versione");
+  if (!hasOwn(body, "versione") || body.versione == null) {
+    throw new RouteError(400, "La versione è obbligatoria");
+  }
+  let expected: Date | null;
+  try {
+    expected = parseIsoTimestamp(body.versione, "versione");
+  } catch (error) {
+    throw new RouteError(
+      400,
+      error instanceof Error ? error.message : "Versione non valida",
+    );
+  }
+  if (expected == null) {
+    throw new RouteError(400, "La versione è obbligatoria");
+  }
   if (
-    expected == null ||
     current.dataAggiornamento == null ||
     expected.getTime() !== current.dataAggiornamento.getTime()
   ) {

@@ -5100,7 +5100,7 @@ export const getAvviaInterventoUrl = (id: number,) => {
  * Avvia atomicamente un intervento Sociale da pianificare o pianificato, senza modificare l'operatore assegnato.
  */
 export const avviaIntervento = async (id: number,
-    interventoAvvioInput?: InterventoAvvioInput, options?: RequestInit): Promise<Intervento> => {
+    interventoAvvioInput: InterventoAvvioInput, options?: RequestInit): Promise<Intervento> => {
 
   return customFetch<Intervento>(getAvviaInterventoUrl(id),
   {
@@ -5116,8 +5116,8 @@ export const avviaIntervento = async (id: number,
 
 
 export const getAvviaInterventoMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data?: BodyType<InterventoAvvioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data?: BodyType<InterventoAvvioInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data: BodyType<InterventoAvvioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data: BodyType<InterventoAvvioInput>}, TContext> => {
 
 const mutationKey = ['avviaIntervento'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -5129,7 +5129,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof avviaIntervento>>, {id: number;data?: BodyType<InterventoAvvioInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof avviaIntervento>>, {id: number;data: BodyType<InterventoAvvioInput>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  avviaIntervento(id,data,requestOptions)
@@ -5143,15 +5143,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type AvviaInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof avviaIntervento>>>
-    export type AvviaInterventoMutationBody = BodyType<InterventoAvvioInput> | undefined
+    export type AvviaInterventoMutationBody = BodyType<InterventoAvvioInput>
     export type AvviaInterventoMutationError = ErrorType<void>
 
     export const useAvviaIntervento = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data?: BodyType<InterventoAvvioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaIntervento>>, TError,{id: number;data: BodyType<InterventoAvvioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof avviaIntervento>>,
         TError,
-        {id: number;data?: BodyType<InterventoAvvioInput>},
+        {id: number;data: BodyType<InterventoAvvioInput>},
         TContext
       > => {
       return useMutation(getAvviaInterventoMutationOptions(options));

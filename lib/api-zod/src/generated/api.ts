@@ -2295,7 +2295,7 @@ export const AvviaInterventoParams = zod.object({
 })
 
 export const AvviaInterventoBody = zod.object({
-  "versione": zod.coerce.date().nullish(),
+  "versione": zod.coerce.date(),
   "dataOraAvvio": zod.coerce.date().optional()
 })
 
@@ -2384,7 +2384,7 @@ export const salvaInterventoOperativitaBodyDocumentiItemNoteMax = 2000;
 
 
 export const SalvaInterventoOperativitaBody = zod.object({
-  "versione": zod.coerce.date().nullish(),
+  "versione": zod.coerce.date(),
   "risultato": zod.string().max(salvaInterventoOperativitaBodyRisultatoMax).nullish(),
   "esito": zod.string().max(salvaInterventoOperativitaBodyEsitoMax).nullish(),
   "note": zod.string().max(salvaInterventoOperativitaBodyNoteMax).nullish(),
@@ -2519,7 +2519,7 @@ export const concludiInterventoBodyTwoSuccessivoOneTwoDocumentiItemNoteMax = 200
 
 
 export const ConcludiInterventoBody = zod.object({
-  "versione": zod.coerce.date().nullish(),
+  "versione": zod.coerce.date(),
   "risultato": zod.string().max(concludiInterventoBodyOneRisultatoMax).nullish(),
   "esito": zod.string().max(concludiInterventoBodyOneEsitoMax).nullish(),
   "note": zod.string().max(concludiInterventoBodyOneNoteMax).nullish(),
@@ -2740,7 +2740,7 @@ export const annullaInterventoBodyMotivoMax = 2000;
 
 
 export const AnnullaInterventoBody = zod.object({
-  "versione": zod.coerce.date().nullish(),
+  "versione": zod.coerce.date(),
   "motivo": zod.string().min(1).max(annullaInterventoBodyMotivoMax),
   "dataOraAnnullamento": zod.coerce.date().optional()
 })
@@ -2804,7 +2804,7 @@ export const registraMancataPresentazioneBodyNotaMax = 2000;
 
 
 export const RegistraMancataPresentazioneBody = zod.object({
-  "versione": zod.coerce.date().nullish(),
+  "versione": zod.coerce.date(),
   "nota": zod.string().max(registraMancataPresentazioneBodyNotaMax).nullish(),
   "dataOraRegistrazione": zod.coerce.date().optional()
 })

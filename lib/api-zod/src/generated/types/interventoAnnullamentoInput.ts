@@ -7,8 +7,7 @@
  */
 
 export interface InterventoAnnullamentoInput {
-  /** @nullable */
-  versione?: Date | null;
+  versione: Date;
   /**
      * @minLength 1
      * @maxLength 2000

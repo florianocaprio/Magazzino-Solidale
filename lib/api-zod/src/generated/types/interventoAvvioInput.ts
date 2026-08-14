@@ -7,7 +7,6 @@
  */
 
 export interface InterventoAvvioInput {
-  /** @nullable */
-  versione?: Date | null;
+  versione: Date;
   dataOraAvvio?: Date;
 }

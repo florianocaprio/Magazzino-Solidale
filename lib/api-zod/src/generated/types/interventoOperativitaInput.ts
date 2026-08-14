@@ -10,8 +10,7 @@ import type { InterventoDocumentoInput } from './interventoDocumentoInput';
 import type { InterventoMaterialeInput } from './interventoMaterialeInput';
 
 export interface InterventoOperativitaInput {
-  /** @nullable */
-  versione?: Date | null;
+  versione: Date;
   /**
      * @maxLength 4000
      * @nullable

@@ -7,8 +7,7 @@
  */
 
 export interface InterventoMancataPresentazioneInput {
-  /** @nullable */
-  versione?: Date | null;
+  versione: Date;
   /**
      * @maxLength 2000
      * @nullable

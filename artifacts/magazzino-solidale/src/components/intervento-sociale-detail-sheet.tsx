@@ -76,11 +76,11 @@ interface Props {
   isPending?: boolean;
   onOpenChange: (open: boolean) => void;
   onPianifica: (input: PianificazioneInterventoInput) => void;
-  onAvvia: (versione: string | null) => void;
+  onAvvia: (versione: string) => void;
   onSalva: (input: InterventoConclusioneInput) => void;
   onConcludi: (input: InterventoConclusioneInput) => void;
-  onAnnulla: (versione: string | null, motivo: string) => void;
-  onMancataPresentazione: (versione: string | null, nota: string) => void;
+  onAnnulla: (versione: string, motivo: string) => void;
+  onMancataPresentazione: (versione: string, nota: string) => void;
 }
 
 function timestampLabel(value: string | null | undefined): string {
@@ -235,19 +235,23 @@ export function InterventoSocialeDetailSheet({
     intervento?.stato === "concluso" ||
     intervento?.stato === "annullato" ||
     intervento?.stato === "mancata_presentazione";
-  const operationalPayload = (): InterventoConclusioneInput => ({
-    versione: operativita?.versione ?? null,
-    risultato: risultato || null,
-    esito: esito || null,
-    note: note || null,
-    attivita,
-    materiali,
-    documenti,
-    conferma: true,
-  });
+  const operationalPayload = (): InterventoConclusioneInput | null => {
+    if (!operativita?.versione) return null;
+    return {
+      versione: operativita.versione,
+      risultato: risultato || null,
+      esito: esito || null,
+      note: note || null,
+      attivita,
+      materiali,
+      documenti,
+      conferma: true,
+    };
+  };
 
   const conclude = () => {
     const payload = operationalPayload();
+    if (!payload) return;
     if (creaSuccessivo) {
       payload.successivo = {
         tipoIntervento: successivoTipo,
@@ -673,8 +677,10 @@ export function InterventoSocialeDetailSheet({
                     intervento.stato === "pianificato") && (
                     <Button
                       type="button"
-                      disabled={isPending}
-                      onClick={() => onAvvia(operativita.versione)}
+                      disabled={isPending || !operativita.versione}
+                      onClick={() => {
+                        if (operativita.versione) onAvvia(operativita.versione);
+                      }}
                     >
                       {t("interventi.operational.start")}
                     </Button>
@@ -682,8 +688,11 @@ export function InterventoSocialeDetailSheet({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={isPending}
-                    onClick={() => onSalva(operationalPayload())}
+                    disabled={isPending || !operativita.versione}
+                    onClick={() => {
+                      const payload = operationalPayload();
+                      if (payload) onSalva(payload);
+                    }}
                   >
                     {t("interventi.operational.saveWithoutClosing")}
                   </Button>
@@ -692,6 +701,7 @@ export function InterventoSocialeDetailSheet({
                       type="button"
                       disabled={
                         isPending ||
+                        !operativita.versione ||
                         !confermaConclusione ||
                         (!risultato.trim() && !esito.trim()) ||
                         (creaSuccessivo &&
@@ -714,14 +724,20 @@ export function InterventoSocialeDetailSheet({
                 <Button
                   type="button"
                   variant="destructive"
-                  disabled={isPending || !motivoAnnullamento.trim()}
+                  disabled={
+                    isPending ||
+                    !operativita.versione ||
+                    !motivoAnnullamento.trim()
+                  }
                   onClick={() => {
                     if (
+                      operativita.versione &&
                       window.confirm(
                         t("interventi.operational.confirmCancellation"),
                       )
-                    )
+                    ) {
                       onAnnulla(operativita.versione, motivoAnnullamento);
+                    }
                   }}
                 >
                   {t("interventi.operational.cancel")}
@@ -738,13 +754,14 @@ export function InterventoSocialeDetailSheet({
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={isPending}
-                      onClick={() =>
-                        onMancataPresentazione(
-                          operativita.versione,
-                          notaMancataPresentazione,
-                        )
-                      }
+                      disabled={isPending || !operativita.versione}
+                      onClick={() => {
+                        if (operativita.versione)
+                          onMancataPresentazione(
+                            operativita.versione,
+                            notaMancataPresentazione,
+                          );
+                      }}
                     >
                       {t("interventi.operational.noShow")}
                     </Button>

@@ -1589,7 +1589,7 @@ paths:
           required: true
           schema: { type: integer }
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
@@ -1600,6 +1600,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Intervento" }
+        "400": { description: Versione obbligatoria o richiesta non valida }
         "409": { description: Stato o versione concorrente }
 
   /interventi/{id}/salva-operativita:
@@ -1624,6 +1625,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/InterventoOperativita" }
+        "400": { description: Versione obbligatoria o richiesta non valida }
         "409": { description: Stato terminale o versione concorrente }
 
   /interventi/{id}/concludi:
@@ -1648,7 +1650,10 @@ paths:
             application/json:
               schema:
                 { $ref: "#/components/schemas/InterventoConclusioneResult" }
-        "400": { description: "Risultato, esito o successivo non validi" }
+        "400":
+          {
+            description: "Versione obbligatoria, risultato, esito o successivo non validi",
+          }
         "409": { description: Conclusione concorrente o stato non consentito }
 
   /interventi/{id}/annulla:
@@ -1672,6 +1677,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Intervento" }
+        "400": { description: Versione obbligatoria o richiesta non valida }
         "409": { description: Stato terminale o versione concorrente }
 
   /interventi/{id}/mancata-presentazione:
@@ -1698,6 +1704,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Intervento" }
+        "400": { description: Versione obbligatoria o richiesta non valida }
         "409": { description: Stato o versione concorrente }
 
   /interventi/{id}/transizioni:
@@ -8682,7 +8689,7 @@ components:
     InterventoOperativitaInput:
       type: object
       properties:
-        versione: { type: ["string", "null"], format: date-time }
+        versione: { type: string, format: date-time }
         risultato: { type: ["string", "null"], maxLength: 4000 }
         esito: { type: ["string", "null"], maxLength: 4000 }
         note: { type: ["string", "null"], maxLength: 4000 }
@@ -8695,27 +8702,30 @@ components:
         documenti:
           type: array
           items: { $ref: "#/components/schemas/InterventoDocumentoInput" }
+      required: [versione]
 
     InterventoAvvioInput:
       type: object
       properties:
-        versione: { type: ["string", "null"], format: date-time }
+        versione: { type: string, format: date-time }
         dataOraAvvio: { type: string, format: date-time }
+      required: [versione]
 
     InterventoAnnullamentoInput:
       type: object
       properties:
-        versione: { type: ["string", "null"], format: date-time }
+        versione: { type: string, format: date-time }
         motivo: { type: string, minLength: 1, maxLength: 2000 }
         dataOraAnnullamento: { type: string, format: date-time }
-      required: [motivo]
+      required: [versione, motivo]
 
     InterventoMancataPresentazioneInput:
       type: object
       properties:
-        versione: { type: ["string", "null"], format: date-time }
+        versione: { type: string, format: date-time }
         nota: { type: ["string", "null"], maxLength: 2000 }
         dataOraRegistrazione: { type: string, format: date-time }
+      required: [versione]
 
     InterventoSuccessivoOperativoInput:
       allOf:

@@ -109,6 +109,15 @@ async function createIntervento(input: {
   return row.id;
 }
 
+async function versioneIntervento(id: number): Promise<string> {
+  const [row] = await db
+    .select({ versione: interventiTable.dataAggiornamento })
+    .from(interventiTable)
+    .where(eq(interventiTable.id, id));
+  if (!row?.versione) throw new Error("Versione intervento non disponibile");
+  return row.versione.toISOString();
+}
+
 beforeAll(async () => {
   const cities = await db
     .insert(cittaTable)
@@ -238,15 +247,85 @@ afterAll(async () => {
 });
 
 describe("gestione operativa degli interventi Sociali", () => {
+  describe.each([
+    {
+      nome: "avvia",
+      percorso: "avvia",
+      stato: "pianificato",
+      body: {},
+    },
+    {
+      nome: "salva operatività",
+      percorso: "salva-operativita",
+      stato: "in_corso",
+      body: {},
+    },
+    {
+      nome: "concludi",
+      percorso: "concludi",
+      stato: "in_corso",
+      body: { conferma: true, risultato: "Concluso" },
+    },
+    {
+      nome: "annulla",
+      percorso: "annulla",
+      stato: "da_pianificare",
+      body: { motivo: "Richiesta del beneficiario" },
+    },
+    {
+      nome: "mancata presentazione",
+      percorso: "mancata-presentazione",
+      stato: "pianificato",
+      body: { nota: "Non presente" },
+    },
+  ])("versione obbligatoria per $nome", ({ percorso, stato, body }) => {
+    async function interventoPerEndpoint(): Promise<number> {
+      return createIntervento({
+        stato,
+        pianificata:
+          stato === "pianificato" ? new Date("2026-08-20T08:00:00Z") : null,
+        avvio: stato === "in_corso" ? new Date("2026-08-20T08:00:00Z") : null,
+      });
+    }
+
+    it.each([
+      { caso: "mancante", versione: undefined },
+      { caso: "null", versione: null },
+      { caso: "malformata", versione: "non-un-timestamp" },
+    ])("restituisce 400 con versione $caso", async ({ versione }) => {
+      const id = await interventoPerEndpoint();
+      const payload = versione === undefined ? body : { ...body, versione };
+      const response = await request(makeApp())
+        .post(`/interventi/${id}/${percorso}`)
+        .send(payload);
+      expect(response.status).toBe(400);
+      expect(response.body.error.toLowerCase()).toContain("versione");
+    });
+
+    it("restituisce 409 con una versione valida ma superata", async () => {
+      const id = await interventoPerEndpoint();
+      const corrente = await versioneIntervento(id);
+      const superata = new Date(
+        new Date(corrente).getTime() - 1_000,
+      ).toISOString();
+      const response = await request(makeApp())
+        .post(`/interventi/${id}/${percorso}`)
+        .send({ ...body, versione: superata });
+      expect(response.status).toBe(409);
+      expect(response.body.error).toContain("modificato da un altro operatore");
+    });
+  });
+
   it("avvia una sola volta da pianificato e distingue operatore assegnato ed effettivo", async () => {
     const id = await createIntervento({
       stato: "pianificato",
       pianificata: new Date("2026-08-20T08:00:00Z"),
     });
     const app = makeApp();
+    const versione = await versioneIntervento(id);
     const [first, second] = await Promise.all([
-      request(app).post(`/interventi/${id}/avvia`).send({}),
-      request(app).post(`/interventi/${id}/avvia`).send({}),
+      request(app).post(`/interventi/${id}/avvia`).send({ versione }),
+      request(app).post(`/interventi/${id}/avvia`).send({ versione }),
     ]);
     expect([first.status, second.status].sort()).toEqual([200, 409]);
     const [row] = await db
@@ -268,7 +347,10 @@ describe("gestione operativa degli interventi Sociali", () => {
     const id = await createIntervento({ stato: "da_pianificare" });
     const response = await request(makeApp())
       .post(`/interventi/${id}/avvia`)
-      .send({ dataOraAvvio: "2026-08-20T08:05:00Z" });
+      .send({
+        versione: await versioneIntervento(id),
+        dataOraAvvio: "2026-08-20T08:05:00Z",
+      });
     expect(response.status).toBe(200);
     expect(response.body.stato).toBe("in_corso");
     expect(response.body.dataOraPianificata).toBeNull();
@@ -283,6 +365,7 @@ describe("gestione operativa degli interventi Sociali", () => {
     const response = await request(makeApp())
       .post(`/interventi/${id}/salva-operativita`)
       .send({
+        versione: await versioneIntervento(id),
         risultato: "In lavorazione",
         esito: "Parziale",
         note: "Nota salvata",
@@ -338,6 +421,7 @@ describe("gestione operativa degli interventi Sociali", () => {
     const invalid = await request(makeApp())
       .post(`/interventi/${id}/salva-operativita`)
       .send({
+        versione: response.body.versione,
         materiali: [
           {
             descrizioneSnapshot: "Errore",
@@ -361,12 +445,13 @@ describe("gestione operativa degli interventi Sociali", () => {
     });
     const invalid = await request(makeApp())
       .post(`/interventi/${id}/concludi`)
-      .send({ conferma: true });
+      .send({ conferma: true, versione: await versioneIntervento(id) });
     expect(invalid.status).toBe(400);
 
     const response = await request(makeApp())
       .post(`/interventi/${id}/concludi`)
       .send({
+        versione: await versioneIntervento(id),
         conferma: true,
         dataOraConclusione: "2026-08-20T09:00:00Z",
         risultato: "Obiettivo raggiunto",
@@ -405,11 +490,18 @@ describe("gestione operativa degli interventi Sociali", () => {
     ids.interventi.push(response.body.successivo.id);
     const second = await request(makeApp())
       .post(`/interventi/${id}/concludi`)
-      .send({ conferma: true, risultato: "Duplicato" });
+      .send({
+        conferma: true,
+        risultato: "Duplicato",
+        versione: response.body.operativita.versione,
+      });
     expect(second.status).toBe(409);
     const immutable = await request(makeApp())
       .post(`/interventi/${id}/salva-operativita`)
-      .send({ risultato: "Alterazione" });
+      .send({
+        risultato: "Alterazione",
+        versione: response.body.operativita.versione,
+      });
     expect(immutable.status).toBe(409);
   });
 
@@ -417,11 +509,14 @@ describe("gestione operativa degli interventi Sociali", () => {
     const cancellabile = await createIntervento({ stato: "da_pianificare" });
     const missingReason = await request(makeApp())
       .post(`/interventi/${cancellabile}/annulla`)
-      .send({});
+      .send({ versione: await versioneIntervento(cancellabile) });
     expect(missingReason.status).toBe(400);
     const cancelled = await request(makeApp())
       .post(`/interventi/${cancellabile}/annulla`)
-      .send({ motivo: "Richiesta del beneficiario" });
+      .send({
+        versione: await versioneIntervento(cancellabile),
+        motivo: "Richiesta del beneficiario",
+      });
     expect(cancelled.status).toBe(200);
     expect(cancelled.body.motivoAnnullamento).toBe(
       "Richiesta del beneficiario",
@@ -433,7 +528,10 @@ describe("gestione operativa degli interventi Sociali", () => {
     });
     const noShow = await request(makeApp())
       .post(`/interventi/${planned}/mancata-presentazione`)
-      .send({ nota: "Non si è presentato" });
+      .send({
+        versione: await versioneIntervento(planned),
+        nota: "Non si è presentato",
+      });
     expect(noShow.status).toBe(200);
     expect(noShow.body.stato).toBe("mancata_presentazione");
     expect(noShow.body.dataOraAvvio).toBeNull();
@@ -447,6 +545,7 @@ describe("gestione operativa degli interventi Sociali", () => {
     const earlier = await request(makeApp())
       .post(`/interventi/${id}/concludi`)
       .send({
+        versione: await versioneIntervento(id),
         conferma: true,
         risultato: "Non valido",
         dataOraConclusione: "2026-08-20T09:00:00Z",
@@ -455,6 +554,7 @@ describe("gestione operativa degli interventi Sociali", () => {
     const invalidNext = await request(makeApp())
       .post(`/interventi/${id}/concludi`)
       .send({
+        versione: await versioneIntervento(id),
         conferma: true,
         risultato: "Non deve restare concluso",
         successivo: {
