@@ -348,7 +348,8 @@ export function InterventoSocialeDetailSheet({
                 value={
                   intervento.dataOraConclusione
                     ? timestampLabel(intervento.dataOraConclusione)
-                    : intervento.dataIntervento
+                    : intervento.stato === "concluso" &&
+                        intervento.dataIntervento
                       ? interventoDataLabel(intervento)
                       : "–"
                 }

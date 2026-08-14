@@ -180,6 +180,11 @@ describe("InterventoSocialeDetailSheet", () => {
     await act(async () => root.render(render(false)));
     await act(async () => root.render(render(true)));
     expect(onOpenChange).not.toHaveBeenCalled();
+    const concludedAt = Array.from(document.body.querySelectorAll("dt")).find(
+      (element) =>
+        element.textContent === "interventi.detail.concludedAt",
+    )?.nextElementSibling;
+    expect(concludedAt?.textContent).toBe("–");
     const description = Array.from(
       document.body.querySelectorAll("textarea"),
     ).find(
