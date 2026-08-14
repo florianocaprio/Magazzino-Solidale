@@ -44,7 +44,7 @@ import {
 } from "../lib/centroScope";
 import { isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
-import { canUseMensaException, dataServizioMensa } from "../lib/mensaWorkflow";
+import { canUseMensaException, dataServizioMensa, stessoGiornoServizioMensa } from "../lib/mensaWorkflow";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
@@ -700,6 +700,8 @@ router.post(
       if (!beneficiario) throw new MensaError(404, "Beneficiario non trovato");
       if (!beneficiario.attivo)
         throw new MensaError(409, "Il beneficiario non è attivo");
+      if (beneficiario.statoAnagrafica !== "completa" || beneficiario.centroAscoltoId == null)
+        throw new MensaError(409, "Completa l'anagrafica e associa un Centro di Ascolto prima di emettere la tessera");
       const ownCity = callerCittaId(req);
       if (ownCity != null && beneficiario.cittaId !== ownCity)
         throw new MensaError(403, "Beneficiario non accessibile");
@@ -1123,6 +1125,10 @@ router.post(
               "Il beneficiario dispone già di un'abilitazione Mensa valida",
             );
           }
+          const latest = await latestEligibility(existing.id);
+          if (latest?.abilitazione.stato === "sospesa" || latest?.abilitazione.stato === "revocata") {
+            throw new MensaError(409, `Accesso temporaneo non consentito: abilitazione Mensa ${latest.abilitazione.stato}`);
+          }
           beneficiario = existing;
         }
         const [authorization] = await tx
@@ -1367,9 +1373,10 @@ router.post(
         return;
       }
       const [access] = await db
-        .select({ accesso: mensaAccessiTable, mensa: menseTable })
+        .select({ accesso: mensaAccessiTable, mensa: menseTable, autorizzazioneTemporanea: mensaAutorizzazioniTemporaneeTable })
         .from(mensaAccessiTable)
         .innerJoin(menseTable, eq(mensaAccessiTable.mensaId, menseTable.id))
+        .leftJoin(mensaAutorizzazioniTemporaneeTable, eq(mensaAccessiTable.autorizzazioneTemporaneaId, mensaAutorizzazioniTemporaneeTable.id))
         .where(eq(mensaAccessiTable.id, accessoId));
       if (!access) throw new MensaError(404, "Accesso non trovato");
       if (!canAccessCitta(access.mensa.cittaId, callerCittaId(req)))
@@ -1385,6 +1392,13 @@ router.post(
       const beneficiarioId = access.accesso.beneficiarioId;
       const now = new Date();
       const serviceDate = dataServizioMensa(now);
+      if (!stessoGiornoServizioMensa(access.accesso.dataOra, now)) {
+        throw new MensaError(409, "L'accesso Mensa non è valido per la data di servizio corrente");
+      }
+      if (access.accesso.modalitaAccesso === "temporaneo"
+        && (!access.autorizzazioneTemporanea || access.autorizzazioneTemporanea.dataServizio !== serviceDate)) {
+        throw new MensaError(409, "L'autorizzazione temporanea non è valida per la data di servizio corrente");
+      }
       const [sameService] = await db
         .select({ id: mensaPastiTable.id })
         .from(mensaPastiTable)

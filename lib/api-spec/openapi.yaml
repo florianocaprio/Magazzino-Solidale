@@ -1040,6 +1040,12 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: statoAnagrafica
+          in: query
+          description: Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
+          schema:
+            type: string
+            enum: [provvisoria, completa]
       responses:
         "200":
           description: List of beneficiaries
@@ -1260,6 +1266,24 @@ paths:
           description: Deleted
 
   /beneficiari/{id}/tessere:
+    get:
+      operationId: listTessereBeneficiarioDaAnagrafica
+      tags: [beneficiari]
+      summary: Elenca le tessere trasversali del beneficiario, inclusa l'eventuale tessera legacy attiva
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Tessere del beneficiario dalla più recente
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TesseraBeneficiario" }
+        "403": { description: Permesso o scope territoriale non consentito }
     post:
       operationId: createTesseraBeneficiarioDaAnagrafica
       tags: [beneficiari]
@@ -7266,6 +7290,7 @@ components:
         statoAnagrafica:
           type: string
           enum: [provvisoria, completa]
+          description: È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server.
         cognome:
           type: string
         nome:

@@ -4530,6 +4530,83 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getDeleteNucleoFamiliareMutationOptions(options));
     }
 
+export const getListTessereBeneficiarioDaAnagraficaUrl = (id: number,) => {
+
+
+
+
+  return `/api/beneficiari/${id}/tessere`
+}
+
+/**
+ * @summary Elenca le tessere trasversali del beneficiario, inclusa l'eventuale tessera legacy attiva
+ */
+export const listTessereBeneficiarioDaAnagrafica = async (id: number, options?: RequestInit): Promise<TesseraBeneficiario[]> => {
+
+  return customFetch<TesseraBeneficiario[]>(getListTessereBeneficiarioDaAnagraficaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTessereBeneficiarioDaAnagraficaQueryKey = (id: number,) => {
+    return [
+    `/api/beneficiari/${id}/tessere`
+    ] as const;
+    }
+
+
+export const getListTessereBeneficiarioDaAnagraficaQueryOptions = <TData = Awaited<ReturnType<typeof listTessereBeneficiarioDaAnagrafica>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTessereBeneficiarioDaAnagrafica>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTessereBeneficiarioDaAnagraficaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTessereBeneficiarioDaAnagrafica>>> = ({ signal }) => listTessereBeneficiarioDaAnagrafica(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTessereBeneficiarioDaAnagrafica>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTessereBeneficiarioDaAnagraficaQueryResult = NonNullable<Awaited<ReturnType<typeof listTessereBeneficiarioDaAnagrafica>>>
+export type ListTessereBeneficiarioDaAnagraficaQueryError = ErrorType<void>
+
+
+/**
+ * @summary Elenca le tessere trasversali del beneficiario, inclusa l'eventuale tessera legacy attiva
+ */
+
+export function useListTessereBeneficiarioDaAnagrafica<TData = Awaited<ReturnType<typeof listTessereBeneficiarioDaAnagrafica>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTessereBeneficiarioDaAnagrafica>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTessereBeneficiarioDaAnagraficaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getCreateTesseraBeneficiarioDaAnagraficaUrl = (id: number,) => {
 
 

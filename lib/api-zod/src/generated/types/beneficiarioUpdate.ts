@@ -13,6 +13,7 @@ import type { BeneficiarioUpdateStatoAnagrafica } from './beneficiarioUpdateStat
 export interface BeneficiarioUpdate {
   /** @nullable */
   codiceFiscale?: string | null;
+  /** È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server. */
   statoAnagrafica?: BeneficiarioUpdateStatoAnagrafica;
   cognome?: string;
   nome?: string;

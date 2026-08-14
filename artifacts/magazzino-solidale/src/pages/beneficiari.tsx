@@ -65,6 +65,7 @@ type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 const CENTRO_ALL = "__all__";
 const PRIORITA_ALL = "__all__";
 const CITTA_ALL = "__all__";
+const STATO_ANAGRAFICA_ALL = "__all__";
 const NO_ZONE = "__none__";
 const NO_EMPORIO = "__none__";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -105,6 +106,7 @@ export default function Beneficiari() {
   const [centroFilter, setCentroFilter] = useState<string>(CENTRO_ALL);
   const [prioritaFilter, setPrioritaFilter] = useState<string>(PRIORITA_ALL);
   const [cittaFilter, setCittaFilter] = useState<string>(CITTA_ALL);
+  const [statoAnagraficaFilter, setStatoAnagraficaFilter] = useState<string>(STATO_ANAGRAFICA_ALL);
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setCentroFilter(String(lockedCentroId));
@@ -116,6 +118,7 @@ export default function Beneficiari() {
     centroAscoltoId: centroFilter !== CENTRO_ALL ? parseInt(centroFilter) : undefined,
     priorita: prioritaFilter !== PRIORITA_ALL ? prioritaFilter : undefined,
     cittaId: isCittaGlobal && cittaFilter !== CITTA_ALL ? parseInt(cittaFilter) : undefined,
+    statoAnagrafica: statoAnagraficaFilter !== STATO_ANAGRAFICA_ALL ? statoAnagraficaFilter as "provvisoria" | "completa" : undefined,
   });
   const { data: centri } = useListCentriAscolto();
   const { data: magazzini } = useListMagazzini();
@@ -443,6 +446,14 @@ export default function Beneficiari() {
                 <SelectItem value="bassa">{t("beneficiari.prioBassa")}</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={statoAnagraficaFilter} onValueChange={setStatoAnagraficaFilter}>
+              <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Stato anagrafica" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={STATO_ANAGRAFICA_ALL}>Tutte le anagrafiche</SelectItem>
+                <SelectItem value="provvisoria">Anagrafiche da completare</SelectItem>
+                <SelectItem value="completa">Anagrafiche complete</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -494,6 +505,7 @@ export default function Beneficiari() {
                         {b.cittaNome && <span className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{b.cittaNome}</span>}
                       </div>
                     )}
+                    {b.statoAnagrafica === "provvisoria" && <Badge variant="secondary" className="mt-1">Provvisoria</Badge>}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{b.codice}</TableCell>
                   <TableCell className="text-sm">

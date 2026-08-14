@@ -1444,6 +1444,9 @@ export interface BeneficiarioDettaglio {
   dataCreazione: string;
 }
 
+/**
+ * È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server.
+ */
 export type BeneficiarioUpdateStatoAnagrafica = typeof BeneficiarioUpdateStatoAnagrafica[keyof typeof BeneficiarioUpdateStatoAnagrafica];
 
 
@@ -1488,6 +1491,7 @@ export const BeneficiarioUpdateSesso = {
 export interface BeneficiarioUpdate {
   /** @nullable */
   codiceFiscale?: string | null;
+  /** È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server. */
   statoAnagrafica?: BeneficiarioUpdateStatoAnagrafica;
   cognome?: string;
   nome?: string;
@@ -4623,7 +4627,19 @@ cittaId?: number;
 zonaUdsId?: number;
 uds?: boolean;
 attivo?: boolean;
+/**
+ * Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
+ */
+statoAnagrafica?: ListBeneficiariStatoAnagrafica;
 };
+
+export type ListBeneficiariStatoAnagrafica = typeof ListBeneficiariStatoAnagrafica[keyof typeof ListBeneficiariStatoAnagrafica];
+
+
+export const ListBeneficiariStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
 
 export type CercaBeneficiariSimiliParams = {
 /**

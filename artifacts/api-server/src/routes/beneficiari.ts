@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable } from "@workspace/db";
+import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable, tessereBeneficiariTable } from "@workspace/db";
 import { calcolaEta, isFasciaEtaPresunta, risolviFasciaEta } from "@workspace/api-zod";
 import { runBulk } from "../lib/bulk";
 import { eq, and, or, ilike, inArray, sql, desc, ne, type SQL } from "drizzle-orm";
@@ -379,7 +379,7 @@ function fmtBenef(
 }
 
 router.get("/beneficiari", async (req, res) => {
-  const { search, priorita, domicilio, centroAscoltoId, cittaId, zonaUdsId, uds, attivo } = req.query as Record<string, string>;
+  const { search, priorita, domicilio, centroAscoltoId, cittaId, zonaUdsId, uds, attivo, statoAnagrafica } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (search) {
     const q = `%${search}%`;
@@ -392,6 +392,13 @@ router.get("/beneficiari", async (req, res) => {
     if (searchFilter) conditions.push(searchFilter);
   }
   if (priorita) conditions.push(eq(beneficiariTable.priorita, priorita));
+  if (statoAnagrafica) {
+    if (!["provvisoria", "completa"].includes(statoAnagrafica)) {
+      res.status(400).json({ error: "Stato anagrafica non valido" });
+      return;
+    }
+    conditions.push(eq(beneficiariTable.statoAnagrafica, statoAnagrafica));
+  }
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
   // Città and zona are HARD boundaries when present on the caller; explicit
   // query params let a global caller narrow the result.
@@ -585,6 +592,20 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
   }));
 });
 
+router.get("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.manage"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
+  const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
+  if (!beneficiario) { res.status(404).json({ error: "Beneficiario non trovato" }); return; }
+  if (!canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req)) || !canAccessCitta(beneficiario.cittaId, callerCittaId(req))) {
+    res.status(403).json({ error: "Beneficiario non accessibile" }); return;
+  }
+  const rows = await db.select().from(tessereBeneficiariTable)
+    .where(eq(tessereBeneficiariTable.beneficiarioId, id))
+    .orderBy(desc(tessereBeneficiariTable.createdAt));
+  res.json(rows.map(formatTesseraBeneficiario));
+});
+
 router.post("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.manage"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
@@ -594,7 +615,7 @@ router.post("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.man
     res.status(403).json({ error: "Beneficiario non accessibile" }); return;
   }
   if (!beneficiario.attivo) { res.status(409).json({ error: "Il beneficiario non è attivo" }); return; }
-  if (beneficiario.statoAnagrafica !== "completa") {
+  if (beneficiario.statoAnagrafica !== "completa" || beneficiario.centroAscoltoId == null) {
     res.status(409).json({ error: "Completa l'anagrafica prima di emettere la tessera" }); return;
   }
   const dataScadenza = req.body?.dataScadenza;
@@ -772,7 +793,9 @@ router.patch("/beneficiari/:id", async (req, res) => {
     ? updates.creditoSolidaleAbilitato === true
     : existing.creditoSolidaleAbilitato === true;
   if (caller != null) {
-    if (creditoSolidaleAbilitatoFinale && existing.centroAscoltoId == null) {
+    if (existing.statoAnagrafica === "provvisoria" && updates.statoAnagrafica === "completa") {
+      updates.centroAscoltoId = caller;
+    } else if (creditoSolidaleAbilitatoFinale && existing.centroAscoltoId == null) {
       updates.centroAscoltoId = caller;
     } else {
       delete updates.centroAscoltoId;
@@ -780,6 +803,38 @@ router.patch("/beneficiari/:id", async (req, res) => {
   }
   if (cid != null) delete updates.cittaId;
   if (zid != null) updates.zonaUdsId = zid;
+
+  if ("statoAnagrafica" in updates) {
+    const isCompletion = existing.statoAnagrafica === "provvisoria" && updates.statoAnagrafica === "completa";
+    if (!isCompletion) {
+      res.status(400).json({ error: "È consentito solo il completamento esplicito di un'anagrafica provvisoria" }); return;
+    }
+    const centroId = Number(updates.centroAscoltoId ?? existing.centroAscoltoId);
+    if (!Number.isSafeInteger(centroId) || centroId <= 0) {
+      res.status(400).json({ error: "Associa un Centro di Ascolto prima di completare l'anagrafica" }); return;
+    }
+    const [centro] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, centroId));
+    const finalCittaId = "cittaId" in updates ? Number(updates.cittaId) : existing.cittaId;
+    if (!centro || !centro.attivo) {
+      res.status(400).json({ error: "Il Centro di Ascolto selezionato non è disponibile" }); return;
+    }
+    if (!canAccessCentro(centro.id, caller) || !canAccessCitta(centro.cittaId, cid)
+      || (finalCittaId != null && centro.cittaId != null && centro.cittaId !== finalCittaId)) {
+      res.status(403).json({ error: "Il Centro di Ascolto selezionato non appartiene al perimetro territoriale consentito" }); return;
+    }
+    const nome = String(updates.nome ?? existing.nome).trim();
+    const cognome = String(updates.cognome ?? existing.cognome).trim();
+    const sesso = normalizzaSesso(updates.sesso ?? existing.sesso);
+    const dataNascita = (updates.dataNascita ?? existing.dataNascita) as string | null | undefined;
+    const fasciaEtaPresunta = updates.fasciaEtaPresunta ?? existing.fasciaEtaPresunta;
+    if (!nome || !cognome || !sesso || (calcolaEta(dataNascita ?? "") == null && !isFasciaEtaPresunta(fasciaEtaPresunta))) {
+      res.status(400).json({ error: "Completa nome, cognome, sesso e data di nascita o fascia d'età presunta" }); return;
+    }
+    updates.nome = nome;
+    updates.cognome = cognome;
+    updates.sesso = sesso;
+    updates.centroAscoltoId = centroId;
+  }
 
   const centroAscoltoIdFinale = "centroAscoltoId" in updates ? updates.centroAscoltoId : existing.centroAscoltoId;
   if (creditoSolidaleAbilitatoFinale && (centroAscoltoIdFinale == null || centroAscoltoIdFinale === "")) {

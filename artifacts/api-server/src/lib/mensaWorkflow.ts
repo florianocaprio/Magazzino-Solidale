@@ -8,6 +8,10 @@ export function dataServizioMensa(referenceDate = new Date()): string {
   return dataCivileEuropeRome(referenceDate);
 }
 
+export function stessoGiornoServizioMensa(accesso: Date, pasto: Date): boolean {
+  return dataServizioMensa(accesso) === dataServizioMensa(pasto);
+}
+
 /**
  * Territorial policy for exceptions between Mense.
  *

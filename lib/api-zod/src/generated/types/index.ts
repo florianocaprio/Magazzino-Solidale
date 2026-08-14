@@ -190,6 +190,7 @@ export * from './listAccessiEmporioParams';
 export * from './listAccessiMensaParams';
 export * from './listApprovvigionamentiParams';
 export * from './listBeneficiariParams';
+export * from './listBeneficiariStatoAnagrafica';
 export * from './listBolleParams';
 export * from './listConsegneParams';
 export * from './listCreditoSolidaleMovimentiParams';

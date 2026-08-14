@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server.
+ */
 export type BeneficiarioUpdateStatoAnagrafica = typeof BeneficiarioUpdateStatoAnagrafica[keyof typeof BeneficiarioUpdateStatoAnagrafica];
 
 

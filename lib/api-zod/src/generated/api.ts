@@ -1372,7 +1372,8 @@ export const ListBeneficiariQueryParams = zod.object({
   "cittaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional(),
   "uds": zod.coerce.boolean().optional(),
-  "attivo": zod.coerce.boolean().optional()
+  "attivo": zod.coerce.boolean().optional(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional().describe('Filtra le anagrafiche complete o quelle provvisorie ancora da completare.')
 })
 
 export const ListBeneficiariResponseItem = zod.object({
@@ -1732,7 +1733,7 @@ export const UpdateBeneficiarioParams = zod.object({
 
 export const UpdateBeneficiarioBody = zod.object({
   "codiceFiscale": zod.string().nullish(),
-  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional().describe('È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server.'),
   "cognome": zod.string().optional(),
   "nome": zod.string().optional(),
   "dataNascita": zod.coerce.date().nullish(),
@@ -1876,6 +1877,29 @@ export const DeleteNucleoFamiliareParams = zod.object({
   "id": zod.coerce.number(),
   "membroId": zod.coerce.number()
 })
+
+
+/**
+ * @summary Elenca le tessere trasversali del beneficiario, inclusa l'eventuale tessera legacy attiva
+ */
+export const ListTessereBeneficiarioDaAnagraficaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListTessereBeneficiarioDaAnagraficaResponseItem = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "codice": zod.string(),
+  "stato": zod.enum(['attiva', 'sospesa', 'revocata', 'scaduta']),
+  "dataEmissione": zod.coerce.date(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "dataRevoca": zod.coerce.date().nullish(),
+  "motivoRevoca": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+export const ListTessereBeneficiarioDaAnagraficaResponse = zod.array(ListTessereBeneficiarioDaAnagraficaResponseItem)
 
 
 /**

@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
+  centriAscoltoTable,
   cittaTable,
   db,
   magazziniTable,
@@ -27,11 +28,12 @@ import {
   updateModuloAmbiente,
 } from "../src/lib/configurazioneAmbiente";
 import { MENSA_PERMISSIONS } from "../src/lib/permissions";
-import { dataServizioMensa } from "../src/lib/mensaWorkflow";
+import { dataServizioMensa, stessoGiornoServizioMensa } from "../src/lib/mensaWorkflow";
 
 const ids = {
   users: [] as number[],
   cities: [] as number[],
+  centers: [] as number[],
   warehouses: [] as number[],
   beneficiaries: [] as number[],
   canteens: [] as number[],
@@ -287,6 +289,10 @@ afterEach(async () => {
     await db
       .delete(magazziniTable)
       .where(inArray(magazziniTable.id, ids.warehouses.splice(0)));
+  if (ids.centers.length)
+    await db
+      .delete(centriAscoltoTable)
+      .where(inArray(centriAscoltoTable.id, ids.centers.splice(0)));
   if (ids.users.length)
     await db
       .delete(utentiTable)
@@ -313,6 +319,13 @@ describe("Modulo Mensa", () => {
       expect(dataServizioMensa(new Date(instant))).toBe(expected);
     },
   );
+
+  it("considera non valido per il pasto un accesso di un istante prima della mezzanotte Europe/Rome", () => {
+    expect(stessoGiornoServizioMensa(
+      new Date("2026-01-14T22:59:59Z"),
+      new Date("2026-01-14T23:00:00Z"),
+    )).toBe(false);
+  });
 
   it("scade la principale terminata ieri e consente una nuova abilitazione oggi", async () => {
     const fixture = await createFixture();
@@ -711,6 +724,10 @@ describe("Modulo Mensa", () => {
 
   it("crea e conserva lo storico di abilitazione e tessera", async () => {
     const fixture = await createFixture();
+    const [center] = await db.insert(centriAscoltoTable)
+      .values({ nome: `Centro tessere ${rnd()}`, cittaId: fixture.romeId })
+      .returning({ id: centriAscoltoTable.id });
+    ids.centers.push(center.id);
     const [beneficiary] = await db
       .insert(beneficiariTable)
       .values({
@@ -718,6 +735,9 @@ describe("Modulo Mensa", () => {
         nome: "Storico",
         cognome: "Mensa",
         cittaId: fixture.romeId,
+        centroAscoltoId: center.id,
+        sesso: "M",
+        fasciaEtaPresunta: "30_64",
         attivo: true,
       })
       .returning({
@@ -979,6 +999,47 @@ describe("Modulo Mensa", () => {
     );
   });
 
+  it("consente l'accesso temporaneo dopo un'abilitazione temporalmente scaduta", async () => {
+    const fixture = await createFixture();
+    const today = dataServizioMensa();
+    await db.update(mensaAbilitazioniTable)
+      .set({ dataFine: shiftDate(today, -1), stato: "attiva" })
+      .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+    const response = await request(makeApp(fixture)).post("/mensa/accessi/temporaneo").send({
+      mensaId: fixture.mensaA,
+      beneficiarioId: fixture.beneficiaryId,
+      motivo: "Abilitazione precedente scaduta",
+      idempotencyKey: `expired-${rnd()}`,
+    });
+    expect(response.status).toBe(201);
+    expect(response.body.temporaneo).toBe(true);
+  });
+
+  it.each(["sospesa", "revocata"] as const)("nega l'accesso temporaneo con abilitazione %s", async (stato) => {
+    const fixture = await createFixture();
+    await db.update(mensaAbilitazioniTable).set({ stato }).where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+    const response = await request(makeApp(fixture)).post("/mensa/accessi/temporaneo").send({
+      mensaId: fixture.mensaA,
+      beneficiarioId: fixture.beneficiaryId,
+      motivo: "Tentativo non autorizzato",
+      idempotencyKey: `${stato}-${rnd()}`,
+    });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain(stato);
+  });
+
+  it("indirizza al flusso ordinario una persona con abilitazione valida", async () => {
+    const fixture = await createFixture();
+    const response = await request(makeApp(fixture)).post("/mensa/accessi/temporaneo").send({
+      mensaId: fixture.mensaA,
+      beneficiarioId: fixture.beneficiaryId,
+      motivo: "Tentativo temporaneo",
+      idempotencyKey: `valid-${rnd()}`,
+    });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain("abilitazione Mensa valida");
+  });
+
   it("protegge accessi temporanei con permesso dedicato e scope città", async () => {
     const fixture = await createFixture();
     const noTemporary = MENSA_PERMISSIONS.map((item) => item.key).filter(
@@ -1020,12 +1081,39 @@ describe("Modulo Mensa", () => {
       .post(`/beneficiari/${fixture.beneficiaryId}/tessere`)
       .send({ motivoSostituzione: "Test anagrafica provvisoria" });
     expect(provisional.status).toBe(409);
+    expect((await request(app).post("/mensa/tessere").send({
+      beneficiarioId: fixture.beneficiaryId,
+      motivoSostituzione: "Test emissione Mensa",
+    })).status).toBe(409);
+    const toComplete = await request(app).get("/beneficiari?statoAnagrafica=provvisoria");
+    expect(toComplete.status).toBe(200);
+    expect(toComplete.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: fixture.beneficiaryId })]));
 
-    const completed = await request(app)
+    const incomplete = await request(app)
       .patch(`/beneficiari/${fixture.beneficiaryId}`)
       .send({ statoAnagrafica: "completa" });
+    expect(incomplete.status).toBe(400);
+    const [center] = await db.insert(centriAscoltoTable)
+      .values({ nome: `Centro ${rnd()}`, cittaId: fixture.romeId })
+      .returning({ id: centriAscoltoTable.id });
+    ids.centers.push(center.id);
+    const completed = await request(app).patch(`/beneficiari/${fixture.beneficiaryId}`).send({
+      statoAnagrafica: "completa",
+      centroAscoltoId: center.id,
+      sesso: "M",
+      fasciaEtaPresunta: "30_64",
+    });
     expect(completed.status).toBe(200);
     expect(completed.body.statoAnagrafica).toBe("completa");
+    expect(completed.body.centroAscoltoId).toBe(center.id);
+    const noLongerToComplete = await request(app).get("/beneficiari?statoAnagrafica=provvisoria");
+    expect(noLongerToComplete.body).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: fixture.beneficiaryId })]));
+    const completionAudit = await db.select().from(auditConfigurazioniTable)
+      .where(eq(auditConfigurazioniTable.chiave, `beneficiario:${fixture.beneficiaryId}`));
+    expect(completionAudit).toEqual(expect.arrayContaining([expect.objectContaining({ azione: "completamento-anagrafica" })]));
+    const cards = await request(app).get(`/beneficiari/${fixture.beneficiaryId}/tessere`);
+    expect(cards.status).toBe(200);
+    expect(cards.body).toEqual(expect.arrayContaining([expect.objectContaining({ stato: "attiva" })]));
     const issued = await request(app)
       .post(`/beneficiari/${fixture.beneficiaryId}/tessere`)
       .send({ motivoSostituzione: "Sostituzione tessera legacy" });
@@ -1033,6 +1121,58 @@ describe("Modulo Mensa", () => {
     expect(issued.body.codice).toMatch(/^MS-[A-Za-z0-9_-]+$/);
     expect(issued.body.codice).not.toContain("BEN-");
     expect(issued.body.codice).not.toContain("Mario");
+    const cardHistory = await request(app).get(`/beneficiari/${fixture.beneficiaryId}/tessere`);
+    expect(cardHistory.status).toBe(200);
+    expect(cardHistory.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: issued.body.id, stato: "attiva" }),
+      expect.objectContaining({ id: fixture.cardId, stato: "revocata", motivoRevoca: "Sostituzione tessera legacy" }),
+    ]));
+  });
+
+  it("rifiuta un pasto con accesso del giorno precedente e un'autorizzazione temporanea di altra data", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const access = await verify(app, fixture);
+    const today = dataServizioMensa();
+    const yesterday = shiftDate(today, -1);
+    await db.update(mensaAccessiTable).set({ dataOra: new Date(`${yesterday}T12:00:00Z`) })
+      .where(eq(mensaAccessiTable.id, access.body.id));
+    const oldAccessMeal = await request(app).post("/mensa/pasti").send({
+      accessoMensaId: access.body.id,
+      tipoServizio: "cena",
+      idempotencyKey: `old-access-${rnd()}`,
+    });
+    expect(oldAccessMeal.status).toBe(409);
+    expect(oldAccessMeal.body.error).toContain("data di servizio corrente");
+
+    const [existing] = await db.insert(beneficiariTable).values({
+      codice: `BTD-${rnd()}`,
+      nome: "Data",
+      cognome: "Temporanea",
+      sesso: "F",
+      fasciaEtaPresunta: "30_64",
+      cittaId: fixture.romeId,
+    }).returning({ id: beneficiariTable.id });
+    ids.beneficiaries.push(existing.id);
+    const temporary = await request(app).post("/mensa/accessi/temporaneo").send({
+      mensaId: fixture.mensaA,
+      beneficiarioId: existing.id,
+      motivo: "Controllo data autorizzazione",
+      idempotencyKey: `temp-date-${rnd()}`,
+    });
+    expect(temporary.status).toBe(201);
+    const [temporaryAccess] = await db.select({ autorizzazioneTemporaneaId: mensaAccessiTable.autorizzazioneTemporaneaId })
+      .from(mensaAccessiTable).where(eq(mensaAccessiTable.id, temporary.body.id));
+    expect(temporaryAccess.autorizzazioneTemporaneaId).not.toBeNull();
+    await db.update(mensaAutorizzazioniTemporaneeTable).set({ dataServizio: yesterday })
+      .where(eq(mensaAutorizzazioniTemporaneeTable.id, temporaryAccess.autorizzazioneTemporaneaId!));
+    const mismatchedAuthorization = await request(app).post("/mensa/pasti").send({
+      accessoMensaId: temporary.body.id,
+      tipoServizio: "cena",
+      idempotencyKey: `temp-auth-date-${rnd()}`,
+    });
+    expect(mismatchedAuthorization.status).toBe(409);
+    expect(mismatchedAuthorization.body.error).toContain("autorizzazione temporanea");
   });
 
   it("conta un beneficiario una sola volta nel report anche se servito in più Mense", async () => {
