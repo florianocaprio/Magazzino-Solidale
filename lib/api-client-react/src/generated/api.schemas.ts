@@ -1210,6 +1210,8 @@ export interface Intervento {
   /** @nullable */
   descrizione?: string | null;
   /** @nullable */
+  risultato?: string | null;
+  /** @nullable */
   esito?: string | null;
   /** @nullable */
   prossimAzione?: string | null;
@@ -2476,6 +2478,7 @@ export interface InterventoInput {
      */
   motivoAnnullamento?: string | null;
   descrizione?: string;
+  risultato?: string;
   esito?: string;
   prossimAzione?: string;
   note?: string;
@@ -2488,6 +2491,8 @@ export interface InterventoInput {
 }
 
 export interface InterventoUpdate {
+  /** Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato. */
+  operatoreId?: number;
   /** @nullable */
   dataIntervento?: string | null;
   tipoIntervento?: string;
@@ -2502,6 +2507,7 @@ export interface InterventoUpdate {
      */
   sede?: string | null;
   descrizione?: string;
+  risultato?: string;
   esito?: string;
   prossimAzione?: string;
   note?: string;
@@ -2557,10 +2563,229 @@ export interface InterventoSuccessivoInput {
      */
   sede?: string | null;
   descrizione?: string;
+  risultato?: string;
   esito?: string;
   prossimAzione?: string;
   note?: string;
   noteUds?: string;
+}
+
+export interface InterventoAttivita {
+  id: number;
+  interventoId: number;
+  /** @nullable */
+  tipologiaId: number | null;
+  tipologiaSnapshot: string;
+  descrizione: string;
+  /** @nullable */
+  risultato: string | null;
+  /** @nullable */
+  operatoreId: number | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export interface InterventoAttivitaInput {
+  /** @nullable */
+  tipologiaId?: number | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  tipologiaSnapshot?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  descrizione: string;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  risultato?: string | null;
+}
+
+export type InterventoMaterialeStato = typeof InterventoMaterialeStato[keyof typeof InterventoMaterialeStato];
+
+
+export const InterventoMaterialeStato = {
+  da_preparare: 'da_preparare',
+  pronto: 'pronto',
+  consegnato: 'consegnato',
+  annullato: 'annullato',
+} as const;
+
+export interface InterventoMateriale {
+  id: number;
+  interventoId: number;
+  /** @nullable */
+  prodottoId: number | null;
+  descrizioneSnapshot: string;
+  unitaMisuraSnapshot: string;
+  /** @minimum 0 */
+  quantitaPrevista: number;
+  /** @minimum 0 */
+  quantitaConsegnata: number;
+  statoPreparazione: InterventoMaterialeStato;
+  /** @nullable */
+  magazzinoId: number | null;
+  /** @nullable */
+  note: string | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export interface InterventoMaterialeInput {
+  /** @nullable */
+  prodottoId?: number | null;
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  descrizioneSnapshot?: string | null;
+  /**
+     * @maxLength 40
+     * @nullable
+     */
+  unitaMisuraSnapshot?: string | null;
+  /** @minimum 0 */
+  quantitaPrevista?: number;
+  /** @minimum 0 */
+  quantitaConsegnata?: number;
+  statoPreparazione?: InterventoMaterialeStato;
+  /** @nullable */
+  magazzinoId?: number | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
+}
+
+export type InterventoDocumentoStato = typeof InterventoDocumentoStato[keyof typeof InterventoDocumentoStato];
+
+
+export const InterventoDocumentoStato = {
+  da_acquisire: 'da_acquisire',
+  da_verificare: 'da_verificare',
+  acquisito: 'acquisito',
+  verificato: 'verificato',
+  non_disponibile: 'non_disponibile',
+  annullato: 'annullato',
+} as const;
+
+export interface InterventoDocumento {
+  id: number;
+  interventoId: number;
+  tipoDescrizione: string;
+  stato: InterventoDocumentoStato;
+  /** @nullable */
+  dataScadenza: string | null;
+  /** @nullable */
+  note: string | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export interface InterventoDocumentoInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  tipoDescrizione: string;
+  stato: InterventoDocumentoStato;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
+}
+
+export interface InterventoOperativita {
+  interventoId: number;
+  stato: InterventoStato;
+  /** @nullable */
+  versione: string | null;
+  /** @nullable */
+  risultato: string | null;
+  /** @nullable */
+  esito: string | null;
+  /** @nullable */
+  note: string | null;
+  attivita: InterventoAttivita[];
+  materiali: InterventoMateriale[];
+  documenti: InterventoDocumento[];
+}
+
+export interface InterventoOperativitaInput {
+  /** @nullable */
+  versione?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  risultato?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  esito?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  note?: string | null;
+  attivita?: InterventoAttivitaInput[];
+  materiali?: InterventoMaterialeInput[];
+  documenti?: InterventoDocumentoInput[];
+}
+
+export interface InterventoAvvioInput {
+  /** @nullable */
+  versione?: string | null;
+  dataOraAvvio?: string;
+}
+
+export interface InterventoAnnullamentoInput {
+  /** @nullable */
+  versione?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+  dataOraAnnullamento?: string;
+}
+
+export interface InterventoMancataPresentazioneInput {
+  /** @nullable */
+  versione?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  nota?: string | null;
+  dataOraRegistrazione?: string;
+}
+
+export type InterventoSuccessivoOperativoInput = InterventoSuccessivoInput & {
+  operatoreId?: number;
+  materiali?: InterventoMaterialeInput[];
+  documenti?: InterventoDocumentoInput[];
+};
+
+export type InterventoConclusioneInput = InterventoOperativitaInput & ({
+  conferma: true;
+  dataOraConclusione?: string;
+  successivo?: InterventoSuccessivoOperativoInput | null;
+});
+
+export interface InterventoConclusioneResult {
+  intervento: Intervento;
+  operativita: InterventoOperativita;
+  successivo: Intervento | null;
 }
 
 export type BisognoPianificatoTipo = typeof BisognoPianificatoTipo[keyof typeof BisognoPianificatoTipo];

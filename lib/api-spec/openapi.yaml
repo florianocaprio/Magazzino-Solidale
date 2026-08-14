@@ -1494,6 +1494,148 @@ paths:
               schema:
                 $ref: "#/components/schemas/Intervento"
 
+  /interventi/{id}/operativita:
+    get:
+      operationId: getInterventoOperativita
+      tags: [interventi]
+      description: Restituisce attività, materiali e documenti dell'intervento Sociale applicando lo stesso scope territoriale dell'intervento.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Dati operativi strutturati
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterventoOperativita"
+        "403": { description: Intervento Sociale non accessibile }
+        "404": { description: Intervento non trovato }
+
+  /interventi/{id}/avvia:
+    post:
+      operationId: avviaIntervento
+      tags: [interventi]
+      description: Avvia atomicamente un intervento Sociale da pianificare o pianificato, senza modificare l'operatore assegnato.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterventoAvvioInput"
+      responses:
+        "200":
+          description: Intervento avviato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Intervento" }
+        "409": { description: Stato o versione concorrente }
+
+  /interventi/{id}/salva-operativita:
+    post:
+      operationId: salvaInterventoOperativita
+      tags: [interventi]
+      description: Salva in una transazione i dati operativi senza chiudere l'intervento. È utilizzabile prima dell'avvio per materiali e documenti previsti.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterventoOperativitaInput"
+      responses:
+        "200":
+          description: Dati salvati; lo stato non cambia
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InterventoOperativita" }
+        "409": { description: Stato terminale o versione concorrente }
+
+  /interventi/{id}/concludi:
+    post:
+      operationId: concludiIntervento
+      tags: [interventi]
+      description: Salva i dati operativi, conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InterventoConclusioneInput" }
+      responses:
+        "200":
+          description: Intervento concluso
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/InterventoConclusioneResult" }
+        "400": { description: "Risultato, esito o successivo non validi" }
+        "409": { description: Conclusione concorrente o stato non consentito }
+
+  /interventi/{id}/annulla:
+    post:
+      operationId: annullaIntervento
+      tags: [interventi]
+      description: Annulla l'intervento con motivazione obbligatoria e storico.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InterventoAnnullamentoInput" }
+      responses:
+        "200":
+          description: Intervento annullato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Intervento" }
+        "409": { description: Stato terminale o versione concorrente }
+
+  /interventi/{id}/mancata-presentazione:
+    post:
+      operationId: registraMancataPresentazione
+      tags: [interventi]
+      description: Registra la mancata presentazione di un intervento pianificato senza creare un falso avvio.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                $ref: "#/components/schemas/InterventoMancataPresentazioneInput",
+              }
+      responses:
+        "200":
+          description: Mancata presentazione registrata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Intervento" }
+        "409": { description: Stato o versione concorrente }
+
   /interventi/{id}/transizioni:
     post:
       operationId: transitionIntervento
@@ -8015,6 +8157,8 @@ components:
           type: string
         descrizione:
           type: ["string", "null"]
+        risultato:
+          type: ["string", "null"]
         esito:
           type: ["string", "null"]
         prossimAzione:
@@ -8151,6 +8295,8 @@ components:
           maxLength: 2000
         descrizione:
           type: string
+        risultato:
+          type: string
         esito:
           type: string
         prossimAzione:
@@ -8176,6 +8322,9 @@ components:
     InterventoUpdate:
       type: object
       properties:
+        operatoreId:
+          type: integer
+          description: Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato.
         dataIntervento:
           type: ["string", "null"]
           format: date
@@ -8192,6 +8341,8 @@ components:
           type: ["string", "null"]
           maxLength: 255
         descrizione:
+          type: string
+        risultato:
           type: string
         esito:
           type: string
@@ -8291,6 +8442,8 @@ components:
           maxLength: 255
         descrizione:
           type: string
+        risultato:
+          type: string
         esito:
           type: string
         prossimAzione:
@@ -8300,6 +8453,239 @@ components:
         noteUds:
           type: string
       required: [tipoIntervento, stato, ambito]
+
+    InterventoAttivita:
+      type: object
+      properties:
+        id: { type: integer }
+        interventoId: { type: integer }
+        tipologiaId: { type: ["integer", "null"] }
+        tipologiaSnapshot: { type: string }
+        descrizione: { type: string }
+        risultato: { type: ["string", "null"] }
+        operatoreId: { type: ["integer", "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [
+          id,
+          interventoId,
+          tipologiaId,
+          tipologiaSnapshot,
+          descrizione,
+          risultato,
+          operatoreId,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    InterventoAttivitaInput:
+      type: object
+      properties:
+        tipologiaId: { type: ["integer", "null"] }
+        tipologiaSnapshot: { type: ["string", "null"], maxLength: 120 }
+        descrizione: { type: string, minLength: 1, maxLength: 4000 }
+        risultato: { type: ["string", "null"], maxLength: 4000 }
+      required: [descrizione]
+
+    InterventoMaterialeStato:
+      type: string
+      enum: [da_preparare, pronto, consegnato, annullato]
+
+    InterventoMateriale:
+      type: object
+      properties:
+        id: { type: integer }
+        interventoId: { type: integer }
+        prodottoId: { type: ["integer", "null"] }
+        descrizioneSnapshot: { type: string }
+        unitaMisuraSnapshot: { type: string }
+        quantitaPrevista: { type: number, minimum: 0 }
+        quantitaConsegnata: { type: number, minimum: 0 }
+        statoPreparazione:
+          { $ref: "#/components/schemas/InterventoMaterialeStato" }
+        magazzinoId: { type: ["integer", "null"] }
+        note: { type: ["string", "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [
+          id,
+          interventoId,
+          prodottoId,
+          descrizioneSnapshot,
+          unitaMisuraSnapshot,
+          quantitaPrevista,
+          quantitaConsegnata,
+          statoPreparazione,
+          magazzinoId,
+          note,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    InterventoMaterialeInput:
+      type: object
+      properties:
+        prodottoId: { type: ["integer", "null"] }
+        descrizioneSnapshot: { type: ["string", "null"], maxLength: 255 }
+        unitaMisuraSnapshot: { type: ["string", "null"], maxLength: 40 }
+        quantitaPrevista: { type: number, minimum: 0, default: 0 }
+        quantitaConsegnata: { type: number, minimum: 0, default: 0 }
+        statoPreparazione:
+          { $ref: "#/components/schemas/InterventoMaterialeStato" }
+        magazzinoId: { type: ["integer", "null"] }
+        note: { type: ["string", "null"], maxLength: 2000 }
+
+    InterventoDocumentoStato:
+      type: string
+      enum:
+        [
+          da_acquisire,
+          da_verificare,
+          acquisito,
+          verificato,
+          non_disponibile,
+          annullato,
+        ]
+
+    InterventoDocumento:
+      type: object
+      properties:
+        id: { type: integer }
+        interventoId: { type: integer }
+        tipoDescrizione: { type: string }
+        stato: { $ref: "#/components/schemas/InterventoDocumentoStato" }
+        dataScadenza: { type: ["string", "null"], format: date }
+        note: { type: ["string", "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [
+          id,
+          interventoId,
+          tipoDescrizione,
+          stato,
+          dataScadenza,
+          note,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    InterventoDocumentoInput:
+      type: object
+      properties:
+        tipoDescrizione: { type: string, minLength: 1, maxLength: 200 }
+        stato: { $ref: "#/components/schemas/InterventoDocumentoStato" }
+        dataScadenza: { type: ["string", "null"], format: date }
+        note: { type: ["string", "null"], maxLength: 2000 }
+      required: [tipoDescrizione, stato]
+
+    InterventoOperativita:
+      type: object
+      properties:
+        interventoId: { type: integer }
+        stato: { $ref: "#/components/schemas/InterventoStato" }
+        versione: { type: ["string", "null"], format: date-time }
+        risultato: { type: ["string", "null"] }
+        esito: { type: ["string", "null"] }
+        note: { type: ["string", "null"] }
+        attivita:
+          type: array
+          items: { $ref: "#/components/schemas/InterventoAttivita" }
+        materiali:
+          type: array
+          items: { $ref: "#/components/schemas/InterventoMateriale" }
+        documenti:
+          type: array
+          items: { $ref: "#/components/schemas/InterventoDocumento" }
+      required:
+        [
+          interventoId,
+          stato,
+          versione,
+          risultato,
+          esito,
+          note,
+          attivita,
+          materiali,
+          documenti,
+        ]
+
+    InterventoOperativitaInput:
+      type: object
+      properties:
+        versione: { type: ["string", "null"], format: date-time }
+        risultato: { type: ["string", "null"], maxLength: 4000 }
+        esito: { type: ["string", "null"], maxLength: 4000 }
+        note: { type: ["string", "null"], maxLength: 4000 }
+        attivita:
+          type: array
+          items: { $ref: "#/components/schemas/InterventoAttivitaInput" }
+        materiali:
+          type: array
+          items: { $ref: "#/components/schemas/InterventoMaterialeInput" }
+        documenti:
+          type: array
+          items: { $ref: "#/components/schemas/InterventoDocumentoInput" }
+
+    InterventoAvvioInput:
+      type: object
+      properties:
+        versione: { type: ["string", "null"], format: date-time }
+        dataOraAvvio: { type: string, format: date-time }
+
+    InterventoAnnullamentoInput:
+      type: object
+      properties:
+        versione: { type: ["string", "null"], format: date-time }
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
+        dataOraAnnullamento: { type: string, format: date-time }
+      required: [motivo]
+
+    InterventoMancataPresentazioneInput:
+      type: object
+      properties:
+        versione: { type: ["string", "null"], format: date-time }
+        nota: { type: ["string", "null"], maxLength: 2000 }
+        dataOraRegistrazione: { type: string, format: date-time }
+
+    InterventoSuccessivoOperativoInput:
+      allOf:
+        - $ref: "#/components/schemas/InterventoSuccessivoInput"
+        - type: object
+          properties:
+            operatoreId: { type: integer }
+            materiali:
+              type: array
+              items: { $ref: "#/components/schemas/InterventoMaterialeInput" }
+            documenti:
+              type: array
+              items: { $ref: "#/components/schemas/InterventoDocumentoInput" }
+
+    InterventoConclusioneInput:
+      allOf:
+        - $ref: "#/components/schemas/InterventoOperativitaInput"
+        - type: object
+          properties:
+            conferma: { type: boolean, enum: [true] }
+            dataOraConclusione: { type: string, format: date-time }
+            successivo:
+              anyOf:
+                - $ref: "#/components/schemas/InterventoSuccessivoOperativoInput"
+                - type: "null"
+          required: [conferma]
+
+    InterventoConclusioneResult:
+      type: object
+      properties:
+        intervento: { $ref: "#/components/schemas/Intervento" }
+        operativita: { $ref: "#/components/schemas/InterventoOperativita" }
+        successivo:
+          anyOf:
+            - $ref: "#/components/schemas/Intervento"
+            - type: "null"
+      required: [intervento, operativita, successivo]
 
     BisognoPianificato:
       type: object

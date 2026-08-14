@@ -38,6 +38,8 @@ export interface Intervento {
   /** @nullable */
   descrizione?: string | null;
   /** @nullable */
+  risultato?: string | null;
+  /** @nullable */
   esito?: string | null;
   /** @nullable */
   prossimAzione?: string | null;

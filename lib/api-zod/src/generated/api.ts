@@ -1605,6 +1605,7 @@ export const GetBeneficiarioResponse = zod.object({
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -1865,6 +1866,7 @@ export const ListInterventiResponseItem = zod.object({
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -1921,6 +1923,7 @@ export const CreateInterventoBody = zod.object({
   "sede": zod.string().max(createInterventoBodySedeMax).nullish(),
   "motivoAnnullamento": zod.string().max(createInterventoBodyMotivoAnnullamentoMax).nullish(),
   "descrizione": zod.string().optional(),
+  "risultato": zod.string().optional(),
   "esito": zod.string().optional(),
   "prossimAzione": zod.string().optional(),
   "note": zod.string().optional(),
@@ -2010,6 +2013,7 @@ export const GetInterventoResponse = zod.object({
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -2052,6 +2056,7 @@ export const updateInterventoBodyBisogniPianificatiItemNoteMax = 2000;
 
 
 export const UpdateInterventoBody = zod.object({
+  "operatoreId": zod.number().optional().describe('Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato.'),
   "dataIntervento": zod.coerce.date().nullish(),
   "tipoIntervento": zod.string().optional(),
   "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
@@ -2059,6 +2064,7 @@ export const UpdateInterventoBody = zod.object({
   "interventoPrecedenteId": zod.number().nullish(),
   "sede": zod.string().max(updateInterventoBodySedeMax).nullish(),
   "descrizione": zod.string().optional(),
+  "risultato": zod.string().optional(),
   "esito": zod.string().optional(),
   "prossimAzione": zod.string().optional(),
   "note": zod.string().optional(),
@@ -2094,6 +2100,629 @@ export const UpdateInterventoResponse = zod.object({
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
+  "esito": zod.string().nullish(),
+  "prossimAzione": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "noteUds": zod.string().nullish(),
+  "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "ambitoLegacy": zod.boolean(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+})
+
+
+/**
+ * Restituisce attività, materiali e documenti dell'intervento Sociale applicando lo stesso scope territoriale dell'intervento.
+ */
+export const GetInterventoOperativitaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getInterventoOperativitaResponseMaterialiItemQuantitaPrevistaMin = 0;
+
+export const getInterventoOperativitaResponseMaterialiItemQuantitaConsegnataMin = 0;
+
+
+
+export const GetInterventoOperativitaResponse = zod.object({
+  "interventoId": zod.number(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "versione": zod.coerce.date().nullable(),
+  "risultato": zod.string().nullable(),
+  "esito": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "attivita": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "tipologiaId": zod.number().nullable(),
+  "tipologiaSnapshot": zod.string(),
+  "descrizione": zod.string(),
+  "risultato": zod.string().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})),
+  "materiali": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "prodottoId": zod.number().nullable(),
+  "descrizioneSnapshot": zod.string(),
+  "unitaMisuraSnapshot": zod.string(),
+  "quantitaPrevista": zod.number().min(getInterventoOperativitaResponseMaterialiItemQuantitaPrevistaMin),
+  "quantitaConsegnata": zod.number().min(getInterventoOperativitaResponseMaterialiItemQuantitaConsegnataMin),
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto', 'consegnato', 'annullato']),
+  "magazzinoId": zod.number().nullable(),
+  "note": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})),
+  "documenti": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "tipoDescrizione": zod.string(),
+  "stato": zod.enum(['da_acquisire', 'da_verificare', 'acquisito', 'verificato', 'non_disponibile', 'annullato']),
+  "dataScadenza": zod.coerce.date().nullable(),
+  "note": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}))
+})
+
+
+/**
+ * Avvia atomicamente un intervento Sociale da pianificare o pianificato, senza modificare l'operatore assegnato.
+ */
+export const AvviaInterventoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AvviaInterventoBody = zod.object({
+  "versione": zod.coerce.date().nullish(),
+  "dataOraAvvio": zod.coerce.date().optional()
+})
+
+export const AvviaInterventoResponse = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullable(),
+  "nucleoFamiliareSintesi": zod.string().nullable(),
+  "bollaId": zod.number().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "operatoreNome": zod.string().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "dataIntervento": zod.coerce.date().nullable(),
+  "tipoIntervento": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
+  "esito": zod.string().nullish(),
+  "prossimAzione": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "noteUds": zod.string().nullish(),
+  "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "ambitoLegacy": zod.boolean(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+})
+
+
+/**
+ * Salva in una transazione i dati operativi senza chiudere l'intervento. È utilizzabile prima dell'avvio per materiali e documenti previsti.
+ */
+export const SalvaInterventoOperativitaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const salvaInterventoOperativitaBodyRisultatoMax = 4000;
+
+export const salvaInterventoOperativitaBodyEsitoMax = 4000;
+
+export const salvaInterventoOperativitaBodyNoteMax = 4000;
+
+export const salvaInterventoOperativitaBodyAttivitaItemTipologiaSnapshotMax = 120;
+
+export const salvaInterventoOperativitaBodyAttivitaItemDescrizioneMax = 4000;
+
+export const salvaInterventoOperativitaBodyAttivitaItemRisultatoMax = 4000;
+
+export const salvaInterventoOperativitaBodyMaterialiItemDescrizioneSnapshotMax = 255;
+
+export const salvaInterventoOperativitaBodyMaterialiItemUnitaMisuraSnapshotMax = 40;
+
+export const salvaInterventoOperativitaBodyMaterialiItemQuantitaPrevistaDefault = 0;
+export const salvaInterventoOperativitaBodyMaterialiItemQuantitaPrevistaMin = 0;
+
+export const salvaInterventoOperativitaBodyMaterialiItemQuantitaConsegnataDefault = 0;
+export const salvaInterventoOperativitaBodyMaterialiItemQuantitaConsegnataMin = 0;
+
+export const salvaInterventoOperativitaBodyMaterialiItemNoteMax = 2000;
+
+export const salvaInterventoOperativitaBodyDocumentiItemTipoDescrizioneMax = 200;
+
+export const salvaInterventoOperativitaBodyDocumentiItemNoteMax = 2000;
+
+
+
+export const SalvaInterventoOperativitaBody = zod.object({
+  "versione": zod.coerce.date().nullish(),
+  "risultato": zod.string().max(salvaInterventoOperativitaBodyRisultatoMax).nullish(),
+  "esito": zod.string().max(salvaInterventoOperativitaBodyEsitoMax).nullish(),
+  "note": zod.string().max(salvaInterventoOperativitaBodyNoteMax).nullish(),
+  "attivita": zod.array(zod.object({
+  "tipologiaId": zod.number().nullish(),
+  "tipologiaSnapshot": zod.string().max(salvaInterventoOperativitaBodyAttivitaItemTipologiaSnapshotMax).nullish(),
+  "descrizione": zod.string().min(1).max(salvaInterventoOperativitaBodyAttivitaItemDescrizioneMax),
+  "risultato": zod.string().max(salvaInterventoOperativitaBodyAttivitaItemRisultatoMax).nullish()
+})).optional(),
+  "materiali": zod.array(zod.object({
+  "prodottoId": zod.number().nullish(),
+  "descrizioneSnapshot": zod.string().max(salvaInterventoOperativitaBodyMaterialiItemDescrizioneSnapshotMax).nullish(),
+  "unitaMisuraSnapshot": zod.string().max(salvaInterventoOperativitaBodyMaterialiItemUnitaMisuraSnapshotMax).nullish(),
+  "quantitaPrevista": zod.number().min(salvaInterventoOperativitaBodyMaterialiItemQuantitaPrevistaMin).default(salvaInterventoOperativitaBodyMaterialiItemQuantitaPrevistaDefault),
+  "quantitaConsegnata": zod.number().min(salvaInterventoOperativitaBodyMaterialiItemQuantitaConsegnataMin).default(salvaInterventoOperativitaBodyMaterialiItemQuantitaConsegnataDefault),
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto', 'consegnato', 'annullato']).optional(),
+  "magazzinoId": zod.number().nullish(),
+  "note": zod.string().max(salvaInterventoOperativitaBodyMaterialiItemNoteMax).nullish()
+})).optional(),
+  "documenti": zod.array(zod.object({
+  "tipoDescrizione": zod.string().min(1).max(salvaInterventoOperativitaBodyDocumentiItemTipoDescrizioneMax),
+  "stato": zod.enum(['da_acquisire', 'da_verificare', 'acquisito', 'verificato', 'non_disponibile', 'annullato']),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "note": zod.string().max(salvaInterventoOperativitaBodyDocumentiItemNoteMax).nullish()
+})).optional()
+})
+
+export const salvaInterventoOperativitaResponseMaterialiItemQuantitaPrevistaMin = 0;
+
+export const salvaInterventoOperativitaResponseMaterialiItemQuantitaConsegnataMin = 0;
+
+
+
+export const SalvaInterventoOperativitaResponse = zod.object({
+  "interventoId": zod.number(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "versione": zod.coerce.date().nullable(),
+  "risultato": zod.string().nullable(),
+  "esito": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "attivita": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "tipologiaId": zod.number().nullable(),
+  "tipologiaSnapshot": zod.string(),
+  "descrizione": zod.string(),
+  "risultato": zod.string().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})),
+  "materiali": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "prodottoId": zod.number().nullable(),
+  "descrizioneSnapshot": zod.string(),
+  "unitaMisuraSnapshot": zod.string(),
+  "quantitaPrevista": zod.number().min(salvaInterventoOperativitaResponseMaterialiItemQuantitaPrevistaMin),
+  "quantitaConsegnata": zod.number().min(salvaInterventoOperativitaResponseMaterialiItemQuantitaConsegnataMin),
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto', 'consegnato', 'annullato']),
+  "magazzinoId": zod.number().nullable(),
+  "note": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})),
+  "documenti": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "tipoDescrizione": zod.string(),
+  "stato": zod.enum(['da_acquisire', 'da_verificare', 'acquisito', 'verificato', 'non_disponibile', 'annullato']),
+  "dataScadenza": zod.coerce.date().nullable(),
+  "note": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}))
+})
+
+
+/**
+ * Salva i dati operativi, conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato.
+ */
+export const ConcludiInterventoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const concludiInterventoBodyOneRisultatoMax = 4000;
+
+export const concludiInterventoBodyOneEsitoMax = 4000;
+
+export const concludiInterventoBodyOneNoteMax = 4000;
+
+export const concludiInterventoBodyOneAttivitaItemTipologiaSnapshotMax = 120;
+
+export const concludiInterventoBodyOneAttivitaItemDescrizioneMax = 4000;
+
+export const concludiInterventoBodyOneAttivitaItemRisultatoMax = 4000;
+
+export const concludiInterventoBodyOneMaterialiItemDescrizioneSnapshotMax = 255;
+
+export const concludiInterventoBodyOneMaterialiItemUnitaMisuraSnapshotMax = 40;
+
+export const concludiInterventoBodyOneMaterialiItemQuantitaPrevistaDefault = 0;
+export const concludiInterventoBodyOneMaterialiItemQuantitaPrevistaMin = 0;
+
+export const concludiInterventoBodyOneMaterialiItemQuantitaConsegnataDefault = 0;
+export const concludiInterventoBodyOneMaterialiItemQuantitaConsegnataMin = 0;
+
+export const concludiInterventoBodyOneMaterialiItemNoteMax = 2000;
+
+export const concludiInterventoBodyOneDocumentiItemTipoDescrizioneMax = 200;
+
+export const concludiInterventoBodyOneDocumentiItemNoteMax = 2000;
+
+export const concludiInterventoBodyTwoSuccessivoOneOneSedeMax = 255;
+
+export const concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemDescrizioneSnapshotMax = 255;
+
+export const concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemUnitaMisuraSnapshotMax = 40;
+
+export const concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemQuantitaPrevistaDefault = 0;
+export const concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemQuantitaPrevistaMin = 0;
+
+export const concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemQuantitaConsegnataDefault = 0;
+export const concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemQuantitaConsegnataMin = 0;
+
+export const concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemNoteMax = 2000;
+
+export const concludiInterventoBodyTwoSuccessivoOneTwoDocumentiItemTipoDescrizioneMax = 200;
+
+export const concludiInterventoBodyTwoSuccessivoOneTwoDocumentiItemNoteMax = 2000;
+
+
+
+export const ConcludiInterventoBody = zod.object({
+  "versione": zod.coerce.date().nullish(),
+  "risultato": zod.string().max(concludiInterventoBodyOneRisultatoMax).nullish(),
+  "esito": zod.string().max(concludiInterventoBodyOneEsitoMax).nullish(),
+  "note": zod.string().max(concludiInterventoBodyOneNoteMax).nullish(),
+  "attivita": zod.array(zod.object({
+  "tipologiaId": zod.number().nullish(),
+  "tipologiaSnapshot": zod.string().max(concludiInterventoBodyOneAttivitaItemTipologiaSnapshotMax).nullish(),
+  "descrizione": zod.string().min(1).max(concludiInterventoBodyOneAttivitaItemDescrizioneMax),
+  "risultato": zod.string().max(concludiInterventoBodyOneAttivitaItemRisultatoMax).nullish()
+})).optional(),
+  "materiali": zod.array(zod.object({
+  "prodottoId": zod.number().nullish(),
+  "descrizioneSnapshot": zod.string().max(concludiInterventoBodyOneMaterialiItemDescrizioneSnapshotMax).nullish(),
+  "unitaMisuraSnapshot": zod.string().max(concludiInterventoBodyOneMaterialiItemUnitaMisuraSnapshotMax).nullish(),
+  "quantitaPrevista": zod.number().min(concludiInterventoBodyOneMaterialiItemQuantitaPrevistaMin).default(concludiInterventoBodyOneMaterialiItemQuantitaPrevistaDefault),
+  "quantitaConsegnata": zod.number().min(concludiInterventoBodyOneMaterialiItemQuantitaConsegnataMin).default(concludiInterventoBodyOneMaterialiItemQuantitaConsegnataDefault),
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto', 'consegnato', 'annullato']).optional(),
+  "magazzinoId": zod.number().nullish(),
+  "note": zod.string().max(concludiInterventoBodyOneMaterialiItemNoteMax).nullish()
+})).optional(),
+  "documenti": zod.array(zod.object({
+  "tipoDescrizione": zod.string().min(1).max(concludiInterventoBodyOneDocumentiItemTipoDescrizioneMax),
+  "stato": zod.enum(['da_acquisire', 'da_verificare', 'acquisito', 'verificato', 'non_disponibile', 'annullato']),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "note": zod.string().max(concludiInterventoBodyOneDocumentiItemNoteMax).nullish()
+})).optional()
+}).and(zod.object({
+  "conferma": zod.literal(true),
+  "dataOraConclusione": zod.coerce.date().optional(),
+  "successivo": zod.union([zod.object({
+  "tipoIntervento": zod.string(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "dataIntervento": zod.coerce.date().nullish(),
+  "dataOraPianificata": zod.coerce.date().nullish(),
+  "dataOraAvvio": zod.coerce.date().nullish(),
+  "dataOraConclusione": zod.coerce.date().nullish(),
+  "sede": zod.string().max(concludiInterventoBodyTwoSuccessivoOneOneSedeMax).nullish(),
+  "descrizione": zod.string().optional(),
+  "risultato": zod.string().optional(),
+  "esito": zod.string().optional(),
+  "prossimAzione": zod.string().optional(),
+  "note": zod.string().optional(),
+  "noteUds": zod.string().optional()
+}).and(zod.object({
+  "operatoreId": zod.number().optional(),
+  "materiali": zod.array(zod.object({
+  "prodottoId": zod.number().nullish(),
+  "descrizioneSnapshot": zod.string().max(concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemDescrizioneSnapshotMax).nullish(),
+  "unitaMisuraSnapshot": zod.string().max(concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemUnitaMisuraSnapshotMax).nullish(),
+  "quantitaPrevista": zod.number().min(concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemQuantitaPrevistaMin).default(concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemQuantitaPrevistaDefault),
+  "quantitaConsegnata": zod.number().min(concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemQuantitaConsegnataMin).default(concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemQuantitaConsegnataDefault),
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto', 'consegnato', 'annullato']).optional(),
+  "magazzinoId": zod.number().nullish(),
+  "note": zod.string().max(concludiInterventoBodyTwoSuccessivoOneTwoMaterialiItemNoteMax).nullish()
+})).optional(),
+  "documenti": zod.array(zod.object({
+  "tipoDescrizione": zod.string().min(1).max(concludiInterventoBodyTwoSuccessivoOneTwoDocumentiItemTipoDescrizioneMax),
+  "stato": zod.enum(['da_acquisire', 'da_verificare', 'acquisito', 'verificato', 'non_disponibile', 'annullato']),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "note": zod.string().max(concludiInterventoBodyTwoSuccessivoOneTwoDocumentiItemNoteMax).nullish()
+})).optional()
+})),zod.null()]).optional()
+}))
+
+export const concludiInterventoResponseOperativitaMaterialiItemQuantitaPrevistaMin = 0;
+
+export const concludiInterventoResponseOperativitaMaterialiItemQuantitaConsegnataMin = 0;
+
+
+
+export const ConcludiInterventoResponse = zod.object({
+  "intervento": zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullable(),
+  "nucleoFamiliareSintesi": zod.string().nullable(),
+  "bollaId": zod.number().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "operatoreNome": zod.string().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "dataIntervento": zod.coerce.date().nullable(),
+  "tipoIntervento": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
+  "esito": zod.string().nullish(),
+  "prossimAzione": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "noteUds": zod.string().nullish(),
+  "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "ambitoLegacy": zod.boolean(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+}),
+  "operativita": zod.object({
+  "interventoId": zod.number(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "versione": zod.coerce.date().nullable(),
+  "risultato": zod.string().nullable(),
+  "esito": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "attivita": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "tipologiaId": zod.number().nullable(),
+  "tipologiaSnapshot": zod.string(),
+  "descrizione": zod.string(),
+  "risultato": zod.string().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})),
+  "materiali": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "prodottoId": zod.number().nullable(),
+  "descrizioneSnapshot": zod.string(),
+  "unitaMisuraSnapshot": zod.string(),
+  "quantitaPrevista": zod.number().min(concludiInterventoResponseOperativitaMaterialiItemQuantitaPrevistaMin),
+  "quantitaConsegnata": zod.number().min(concludiInterventoResponseOperativitaMaterialiItemQuantitaConsegnataMin),
+  "statoPreparazione": zod.enum(['da_preparare', 'pronto', 'consegnato', 'annullato']),
+  "magazzinoId": zod.number().nullable(),
+  "note": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})),
+  "documenti": zod.array(zod.object({
+  "id": zod.number(),
+  "interventoId": zod.number(),
+  "tipoDescrizione": zod.string(),
+  "stato": zod.enum(['da_acquisire', 'da_verificare', 'acquisito', 'verificato', 'non_disponibile', 'annullato']),
+  "dataScadenza": zod.coerce.date().nullable(),
+  "note": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}))
+}),
+  "successivo": zod.union([zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullable(),
+  "nucleoFamiliareSintesi": zod.string().nullable(),
+  "bollaId": zod.number().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "operatoreNome": zod.string().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "dataIntervento": zod.coerce.date().nullable(),
+  "tipoIntervento": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
+  "esito": zod.string().nullish(),
+  "prossimAzione": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "noteUds": zod.string().nullish(),
+  "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "ambitoLegacy": zod.boolean(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+}),zod.null()])
+})
+
+
+/**
+ * Annulla l'intervento con motivazione obbligatoria e storico.
+ */
+export const AnnullaInterventoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const annullaInterventoBodyMotivoMax = 2000;
+
+
+
+export const AnnullaInterventoBody = zod.object({
+  "versione": zod.coerce.date().nullish(),
+  "motivo": zod.string().min(1).max(annullaInterventoBodyMotivoMax),
+  "dataOraAnnullamento": zod.coerce.date().optional()
+})
+
+export const AnnullaInterventoResponse = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullable(),
+  "nucleoFamiliareSintesi": zod.string().nullable(),
+  "bollaId": zod.number().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "operatoreNome": zod.string().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "dataIntervento": zod.coerce.date().nullable(),
+  "tipoIntervento": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
+  "esito": zod.string().nullish(),
+  "prossimAzione": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "noteUds": zod.string().nullish(),
+  "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "ambitoLegacy": zod.boolean(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullable(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+})
+
+
+/**
+ * Registra la mancata presentazione di un intervento pianificato senza creare un falso avvio.
+ */
+export const RegistraMancataPresentazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const registraMancataPresentazioneBodyNotaMax = 2000;
+
+
+
+export const RegistraMancataPresentazioneBody = zod.object({
+  "versione": zod.coerce.date().nullish(),
+  "nota": zod.string().max(registraMancataPresentazioneBodyNotaMax).nullish(),
+  "dataOraRegistrazione": zod.coerce.date().optional()
+})
+
+export const RegistraMancataPresentazioneResponse = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullable(),
+  "nucleoFamiliareSintesi": zod.string().nullable(),
+  "bollaId": zod.number().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "operatoreNome": zod.string().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "cittaId": zod.number().nullable(),
+  "dataIntervento": zod.coerce.date().nullable(),
+  "tipoIntervento": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -2157,6 +2786,7 @@ export const TransitionInterventoResponse = zod.object({
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
   "esito": zod.string().nullish(),
   "prossimAzione": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -2224,6 +2854,7 @@ export const CreateInterventoSuccessivoBody = zod.object({
   "dataOraConclusione": zod.coerce.date().nullish(),
   "sede": zod.string().max(createInterventoSuccessivoBodySedeMax).nullish(),
   "descrizione": zod.string().optional(),
+  "risultato": zod.string().optional(),
   "esito": zod.string().optional(),
   "prossimAzione": zod.string().optional(),
   "note": zod.string().optional(),

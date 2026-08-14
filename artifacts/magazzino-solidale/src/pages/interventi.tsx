@@ -1,5 +1,6 @@
 import {
   getGetInterventiRiepilogoVisteQueryKey,
+  getGetInterventoOperativitaQueryKey,
   getGetInterventoQueryKey,
   getListBeneficiariQueryKey,
   getListBisogniPianificatiQueryKey,
@@ -8,7 +9,11 @@ import {
   getListInterventoStoricoStatiQueryKey,
   getListCittaQueryKey,
   useCreateIntervento,
+  useAnnullaIntervento,
+  useAvviaIntervento,
+  useConcludiIntervento,
   useGetIntervento,
+  useGetInterventoOperativita,
   useGetInterventiRiepilogoViste,
   useListBeneficiari,
   useListBisogniPianificati,
@@ -17,9 +22,16 @@ import {
   useListInterventi,
   useListInterventiOperatori,
   useListInterventoStoricoStati,
+  useListMagazzini,
+  useListProdotti,
   useListTipiIntervento,
+  useRegistraMancataPresentazione,
+  useSalvaInterventoOperativita,
+  transitionIntervento,
+  updateIntervento,
   type GetInterventiRiepilogoVisteParams,
   type Intervento,
+  type InterventoConclusioneInput,
   type InterventoInput,
   type ListInterventiParams,
 } from "@workspace/api-client-react";
@@ -28,7 +40,10 @@ import { ChevronDown, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ExportButtons } from "@/components/export-buttons";
-import { InterventoSocialeDetailSheet } from "@/components/intervento-sociale-detail-sheet";
+import {
+  InterventoSocialeDetailSheet,
+  type PianificazioneInterventoInput,
+} from "@/components/intervento-sociale-detail-sheet";
 import {
   InterventoSocialeFormSheet,
   type InterventoSocialeCreateMode,
@@ -100,6 +115,7 @@ export default function Interventi() {
   const [selectedInterventoId, setSelectedInterventoId] = useState<
     number | null
   >(null);
+  const [planningPending, setPlanningPending] = useState(false);
   const debouncedSearch = useDebouncedValue(filters.ricerca, 300);
   const debouncedBeneficiarySearch = useDebouncedValue(beneficiarySearch, 250);
 
@@ -229,6 +245,12 @@ export default function Interventi() {
       enabled: selectedInterventoId != null,
     },
   });
+  const operationalQuery = useGetInterventoOperativita(detailId, {
+    query: {
+      queryKey: getGetInterventoOperativitaQueryKey(detailId),
+      enabled: selectedInterventoId != null,
+    },
+  });
   const historyQuery = useListInterventoStoricoStati(detailId, {
     query: {
       queryKey: getListInterventoStoricoStatiQueryKey(detailId),
@@ -242,6 +264,13 @@ export default function Interventi() {
     },
   });
   const createIntervento = useCreateIntervento();
+  const avviaIntervento = useAvviaIntervento();
+  const salvaOperativita = useSalvaInterventoOperativita();
+  const concludiIntervento = useConcludiIntervento();
+  const annullaIntervento = useAnnullaIntervento();
+  const mancataPresentazione = useRegistraMancataPresentazione();
+  const prodottiQuery = useListProdotti();
+  const magazziniQuery = useListMagazzini();
 
   const openForm = (mode: InterventoSocialeCreateMode) => {
     setFormMode(mode);
@@ -271,6 +300,51 @@ export default function Interventi() {
         },
       },
     );
+  };
+
+  const mutationError = (error: unknown) => {
+    const candidate = error as {
+      data?: { error?: string };
+      message?: string;
+    };
+    toast({
+      title: t("interventi.operational.operationError"),
+      description: candidate.data?.error ?? candidate.message,
+      variant: "destructive",
+    });
+  };
+
+  const refreshOperational = async (title: string) => {
+    if (selectedInterventoId != null) {
+      await invalidateInterventiSociali(queryClient, selectedInterventoId);
+    } else {
+      await invalidateInterventiSociali(queryClient);
+    }
+    toast({ title });
+  };
+
+  const pianifica = async (input: PianificazioneInterventoInput) => {
+    if (!detailQuery.data || selectedInterventoId == null) return;
+    setPlanningPending(true);
+    try {
+      await updateIntervento(selectedInterventoId, {
+        dataOraPianificata: input.dataOraPianificata,
+        priorita: input.priorita,
+        sede: input.sede,
+        operatoreId: input.operatoreId,
+      });
+      if (detailQuery.data.stato === "da_pianificare") {
+        await transitionIntervento(selectedInterventoId, {
+          stato: "pianificato",
+          dataOraPianificata: input.dataOraPianificata,
+        });
+      }
+      await refreshOperational(t("interventi.operational.appointmentSaved"));
+    } catch (error) {
+      mutationError(error);
+    } finally {
+      setPlanningPending(false);
+    }
   };
 
   const interventi = interventiQuery.data ?? [];
@@ -381,15 +455,85 @@ export default function Interventi() {
       <InterventoSocialeDetailSheet
         open={selectedInterventoId != null}
         intervento={detailQuery.data}
+        operativita={operationalQuery.data}
         storico={historyQuery.data}
         bisogni={needsQuery.data}
+        tipi={typesQuery.data ?? []}
+        operatori={operatorsQuery.data ?? []}
+        prodotti={prodottiQuery.data ?? []}
+        magazzini={magazziniQuery.data ?? []}
         isLoading={
           detailQuery.isLoading ||
+          operationalQuery.isLoading ||
           historyQuery.isLoading ||
           needsQuery.isLoading
         }
+        isPending={
+          planningPending ||
+          avviaIntervento.isPending ||
+          salvaOperativita.isPending ||
+          concludiIntervento.isPending ||
+          annullaIntervento.isPending ||
+          mancataPresentazione.isPending
+        }
         onOpenChange={(open) => {
           if (!open) setSelectedInterventoId(null);
+        }}
+        onPianifica={pianifica}
+        onAvvia={(versione) => {
+          if (selectedInterventoId == null) return;
+          avviaIntervento.mutate(
+            { id: selectedInterventoId, data: { versione } },
+            {
+              onSuccess: () =>
+                refreshOperational(t("interventi.operational.started")),
+              onError: mutationError,
+            },
+          );
+        }}
+        onSalva={(data: InterventoConclusioneInput) => {
+          if (selectedInterventoId == null) return;
+          salvaOperativita.mutate(
+            { id: selectedInterventoId, data },
+            {
+              onSuccess: () =>
+                refreshOperational(t("interventi.operational.saved")),
+              onError: mutationError,
+            },
+          );
+        }}
+        onConcludi={(data) => {
+          if (selectedInterventoId == null) return;
+          concludiIntervento.mutate(
+            { id: selectedInterventoId, data },
+            {
+              onSuccess: () =>
+                refreshOperational(t("interventi.operational.concluded")),
+              onError: mutationError,
+            },
+          );
+        }}
+        onAnnulla={(versione, motivo) => {
+          if (selectedInterventoId == null) return;
+          annullaIntervento.mutate(
+            { id: selectedInterventoId, data: { versione, motivo } },
+            {
+              onSuccess: () =>
+                refreshOperational(t("interventi.operational.cancelled")),
+              onError: mutationError,
+            },
+          );
+        }}
+        onMancataPresentazione={(versione, nota) => {
+          if (selectedInterventoId == null) return;
+          mancataPresentazione.mutate(
+            { id: selectedInterventoId, data: { versione, nota } },
+            {
+              onSuccess: () =>
+                refreshOperational(t("interventi.operational.noShowSaved")),
+              onError: mutationError,
+            },
+          );
         }}
       />
     </div>

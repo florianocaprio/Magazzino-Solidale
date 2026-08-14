@@ -25,6 +25,7 @@ export const interventiTable = pgTable(
     dataIntervento: date("data_intervento"),
     tipoIntervento: varchar("tipo_intervento", { length: 120 }).notNull(),
     descrizione: text("descrizione"),
+    risultato: text("risultato"),
     esito: text("esito"),
     prossimAzione: text("prossim_azione"),
     note: text("note"),
