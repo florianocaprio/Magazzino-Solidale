@@ -373,7 +373,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
     groupKey: "analisi",
     area: "analisi",
-    moduloCodice: "REPORT",
+    moduloCodiciAll: ["CENTRO_ASCOLTO", "REPORT"],
   },
   {
     key: "reportUds",

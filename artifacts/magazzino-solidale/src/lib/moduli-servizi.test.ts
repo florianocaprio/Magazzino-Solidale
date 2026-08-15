@@ -97,6 +97,16 @@ describe("moduli-servizio e navigazione", () => {
     expect(enabledKeys(activeWithoutScarichi)).not.toContain("scarichi");
   });
 
+  it("richiede Centro di Ascolto per Report Centro senza vincolare Report UDS", () => {
+    const reportCentro = NAV_ITEMS.find((item) => item.key === "report");
+    const reportUds = NAV_ITEMS.find((item) => item.key === "reportUds");
+
+    expect(reportCentro?.moduloCodiciAll).toEqual(["CENTRO_ASCOLTO", "REPORT"]);
+    expect(reportUds?.moduloCodiciAll).toEqual(["REPORT", "UDS"]);
+    expect(enabledKeys(["REPORT", "UDS"])).not.toContain("report");
+    expect(enabledKeys(["REPORT", "UDS"])).toContain("reportUds");
+  });
+
   it("mappa le route dirette ai moduli corretti", () => {
     expect(MODULO_BY_ROUTE["/beneficiari"]).toBe("CENTRO_ASCOLTO");
     expect(MODULO_BY_ROUTE["/interventi"]).toBe("CENTRO_ASCOLTO");

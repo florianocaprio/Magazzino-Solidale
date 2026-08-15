@@ -75,3 +75,22 @@ export function requireAnyModulo(
     });
   };
 }
+
+export function requireAllModuli(
+  codici: readonly string[],
+  errorMessage?: string,
+): RequestHandler {
+  const normalized = codici.map(normalizeModuloCodice).filter(Boolean);
+  return async (_req, res, next) => {
+    const states = await Promise.all(normalized.map(isModuloAttivo));
+    if (states.every(Boolean)) {
+      next();
+      return;
+    }
+    res.status(403).json({
+      error:
+        errorMessage ??
+        `I moduli ${normalized.join(", ")} devono essere abilitati per questo ambiente`,
+    });
+  };
+}

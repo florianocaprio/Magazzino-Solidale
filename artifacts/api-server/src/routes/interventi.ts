@@ -47,7 +47,11 @@ import {
   canAccessCitta,
   canAccessZonaUds,
 } from "../lib/centroScope";
-import { requireAnyModulo } from "../lib/featureFlags";
+import {
+  isModuloAttivo,
+  requireAnyModulo,
+  requireModulo,
+} from "../lib/featureFlags";
 import {
   avvisoInterventoEuropeRome,
   canTransitionIntervento,
@@ -183,6 +187,30 @@ class RouteError extends Error {
     message: string,
   ) {
     super(message);
+  }
+}
+
+function moduloServizioIntervento(
+  ambito: InterventoAmbito | null,
+): "CENTRO_ASCOLTO" | "UDS" {
+  return ambito === "uds" ? "UDS" : "CENTRO_ASCOLTO";
+}
+
+async function isServizioInterventoAttivo(
+  ambito: InterventoAmbito | null,
+): Promise<boolean> {
+  return isModuloAttivo(moduloServizioIntervento(ambito));
+}
+
+async function requireServizioInterventoAttivo(
+  ambito: InterventoAmbito | null,
+): Promise<void> {
+  const modulo = moduloServizioIntervento(ambito);
+  if (!(await isModuloAttivo(modulo))) {
+    throw new RouteError(
+      403,
+      `Il servizio ${modulo} non è abilitato per questo intervento`,
+    );
   }
 }
 
@@ -1041,6 +1069,7 @@ async function canCreateForAmbito(
   ambito: InterventoAmbito | null,
   req: Request,
 ): Promise<boolean> {
+  if (!(await isServizioInterventoAttivo(ambito))) return false;
   const beneficiario = await beneficiarioAccess(beneficiarioId);
   return (
     beneficiario != null && canAccessInterventoAmbito(ambito, beneficiario, req)
@@ -1110,6 +1139,9 @@ async function requireAccessibleIntervento(
     .where(eq(interventiTable.id, interventoId))
     .limit(1);
   if (!result) throw new RouteError(404, "Intervento non trovato");
+  await requireServizioInterventoAttivo(
+    result.intervento.ambito === "uds" ? "uds" : "sociale",
+  );
   if (expectedAmbito === "sociale") {
     const socialAccessible =
       result.intervento.ambito !== "uds" &&
@@ -1281,6 +1313,7 @@ async function requireManageableUdsIntervento(
   interventoId: number,
   req: Request,
 ): Promise<InterventoRow> {
+  await requireServizioInterventoAttivo("uds");
   if (!canUseInterventoArea(req, "uds")) {
     throw new RouteError(403, "Intervento UDS non accessibile");
   }
@@ -1685,6 +1718,15 @@ router.get("/interventi", async (req, res) => {
     res.status(400).json({ error: "ambito non valido" });
     return;
   }
+  const socialServiceActive = await isServizioInterventoAttivo("sociale");
+  const udsServiceActive = await isServizioInterventoAttivo("uds");
+  if (
+    (ambito === "sociale" && !socialServiceActive) ||
+    (ambito === "uds" && !udsServiceActive)
+  ) {
+    res.status(403).json({ error: `Servizio ${ambito} non abilitato` });
+    return;
+  }
   if (ambito && !canUseInterventoArea(req, ambito as InterventoAmbito)) {
     res.status(403).json({ error: `Ambito ${ambito} non consentito` });
     return;
@@ -1709,7 +1751,7 @@ router.get("/interventi", async (req, res) => {
       conditions.push(
         ambito === "sociale" && (includeStorici || ambitoLegacy)
           ? socialAmbitoCondition(ambitoLegacy)
-          : includeStorici
+          : includeStorici && socialServiceActive
             ? or(
                 eq(interventiTable.ambito, ambito),
                 isNull(interventiTable.ambito),
@@ -1720,6 +1762,26 @@ router.get("/interventi", async (req, res) => {
       if (sendRouteError(error, res)) return;
       throw error;
     }
+  } else {
+    const featureScopes: SQL[] = [];
+    if (socialServiceActive && canUseInterventoArea(req, "sociale")) {
+      featureScopes.push(socialAmbitoCondition(undefined));
+    }
+    if (udsServiceActive && canUseInterventoArea(req, "uds")) {
+      featureScopes.push(
+        socialServiceActive
+          ? or(
+              eq(interventiTable.ambito, "uds"),
+              isNull(interventiTable.ambito),
+            )!
+          : eq(interventiTable.ambito, "uds"),
+      );
+    }
+    if (featureScopes.length === 0) {
+      res.status(403).json({ error: "Nessun servizio interventi abilitato" });
+      return;
+    }
+    if (featureScopes.length === 1) conditions.push(featureScopes[0]);
   }
   if (priorita && !isInterventoPriorita(priorita)) {
     res.status(400).json({ error: "priorita non valida" });
@@ -1988,7 +2050,10 @@ router.get("/interventi", async (req, res) => {
   );
 });
 
-router.get("/interventi/riepilogo-viste", async (req, res) => {
+router.get(
+  "/interventi/riepilogo-viste",
+  requireModulo("CENTRO_ASCOLTO"),
+  async (req, res) => {
   const query = req.query as Record<string, string | undefined>;
   const referenceDate = new Date();
   let conditions: SQL[];
@@ -2040,9 +2105,13 @@ router.get("/interventi/riepilogo-viste", async (req, res) => {
     dataRiferimento: intervalloOggiEuropeRome(referenceDate).date,
     fusoOrario: "Europe/Rome",
   });
-});
+  },
+);
 
-router.get("/interventi/operatori", async (req, res) => {
+router.get(
+  "/interventi/operatori",
+  requireModulo("CENTRO_ASCOLTO"),
+  async (req, res) => {
   const query = req.query as Record<string, string | undefined>;
   if (!canUseInterventoArea(req, "sociale")) {
     res.status(403).json({ error: "Ambito sociale non consentito" });
@@ -2115,7 +2184,8 @@ router.get("/interventi/operatori", async (req, res) => {
         codice: row.codice ?? row.username,
       })),
   );
-});
+  },
+);
 
 router.post("/interventi", async (req, res) => {
   const body = req.body as Record<string, unknown>;
@@ -2238,7 +2308,10 @@ router.post("/interventi", async (req, res) => {
     .json(formatIntervento(intervento, summarizeBisogni(bisogniCreati)));
 });
 
-router.get("/interventi/materiale-da-preparare", async (req, res) => {
+router.get(
+  "/interventi/materiale-da-preparare",
+  requireModulo("CENTRO_ASCOLTO"),
+  async (req, res) => {
   const query = req.query as Record<string, string | undefined>;
   try {
     const range = preparazioneRange(query);
@@ -2428,7 +2501,8 @@ router.get("/interventi/materiale-da-preparare", async (req, res) => {
     if (sendRouteError(error, res)) return;
     throw error;
   }
-});
+  },
+);
 
 router.get("/interventi/:id", async (req, res) => {
   const id = parsePositiveInteger(req.params.id);

@@ -462,8 +462,10 @@ function AppRoutes() {
         <Route path="/report">
           {() => (
             <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <Report />
+              <RequireModulo codice="CENTRO_ASCOLTO">
+                <RequireModulo codice="REPORT">
+                  <Report />
+                </RequireModulo>
               </RequireModulo>
             </Guard>
           )}

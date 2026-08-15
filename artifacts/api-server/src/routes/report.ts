@@ -2,11 +2,19 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
 import { callerCentroId, callerCittaId, callerZonaUdsId } from "../lib/centroScope";
-import { requireModulo } from "../lib/featureFlags";
+import { requireAllModuli } from "../lib/featureFlags";
 
 const router: IRouter = Router();
 
-router.use("/report", requireModulo("REPORT"));
+const requireReportCentro = requireAllModuli(["CENTRO_ASCOLTO", "REPORT"]);
+const requireReportUds = requireAllModuli(["UDS", "REPORT"]);
+
+router.use("/report", (req, res, next) => {
+  const guard = req.path.startsWith("/uds/")
+    ? requireReportUds
+    : requireReportCentro;
+  guard(req, res, next);
+});
 
 /**
  * Generic "own value OR shared/null" SQL fragment for a scoping column. Used for
