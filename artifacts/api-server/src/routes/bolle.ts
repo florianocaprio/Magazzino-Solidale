@@ -35,8 +35,11 @@ import {
   stornoRigaTx,
   syncInterventoBolla,
 } from "../lib/bollaDelivery";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use("/bolle", requireModulo("BOLLE"));
 
 // stati che consentono ancora modifiche
 const STATI_MODIFICABILI = ["bozza"];

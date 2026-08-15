@@ -3,6 +3,11 @@ import request from "supertest";
 import type { Express } from "express";
 import { pool } from "@workspace/db";
 import {
+  ensureAmbienteModuli,
+  listModuliFunzionali,
+  updateModuloAmbiente,
+} from "../src/lib/configurazioneAmbiente";
+import {
   makeScarichiApp,
   newScope,
   cleanup,
@@ -20,6 +25,7 @@ let scope: SeedScope;
 let bootScope: SeedScope;
 let operatoreId: number;
 let magazzinoId: number;
+let originalScarichiAttivo = true;
 
 /** Creates a scarico with one riga via the API and records its id for cleanup. */
 async function creaScarico(opts: {
@@ -49,6 +55,12 @@ async function creaScarico(opts: {
 }
 
 beforeAll(async () => {
+  await ensureAmbienteModuli();
+  originalScarichiAttivo =
+    (await listModuliFunzionali()).find(
+      (modulo) => modulo.codice === "SCARICHI",
+    )?.attivo ?? true;
+  await updateModuloAmbiente("SCARICHI", true, null);
   // The operator user is reused across the whole suite (scarichi stamp its id);
   // it is cleaned up once in afterAll.
   bootScope = newScope();
@@ -56,6 +68,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  await updateModuloAmbiente("SCARICHI", true, null);
   scope = newScope();
   app = makeScarichiApp(operatoreId);
   magazzinoId = await createMagazzino(scope, "Magazzino Scarico Test");
@@ -66,11 +79,38 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await updateModuloAmbiente("SCARICHI", originalScarichiAttivo, null);
   await cleanup(bootScope);
   await pool.end();
 });
 
 describe("POST /scarichi — scarico FEFO", () => {
+  it("blocca le API quando il modulo è disabilitato e conserva lo storico alla riabilitazione", async () => {
+    const prodottoId = await createProdotto(scope);
+    await createLotto({ prodottoId, magazzinoId, quantita: 5 });
+    const created = await creaScarico({ prodottoId, quantita: 2 });
+    expect(created.status).toBe(201);
+    scope.scaricoIds.push(created.body.id);
+
+    try {
+      await updateModuloAmbiente("SCARICHI", false, null);
+
+      const blockedRead = await request(app).get(
+        `/scarichi/${created.body.id}`,
+      );
+      expect(blockedRead.status).toBe(403);
+
+      const blockedCreate = await creaScarico({ prodottoId, quantita: 1 });
+      expect(blockedCreate.status).toBe(403);
+    } finally {
+      await updateModuloAmbiente("SCARICHI", true, null);
+    }
+
+    const restored = await request(app).get(`/scarichi/${created.body.id}`);
+    expect(restored.status).toBe(200);
+    expect(restored.body.id).toBe(created.body.id);
+  });
+
   it("scala le quantità dai lotti in ordine FEFO (scadenza crescente)", async () => {
     const prodottoId = await createProdotto(scope);
     // Lotto A scade prima → deve essere svuotato per primo.

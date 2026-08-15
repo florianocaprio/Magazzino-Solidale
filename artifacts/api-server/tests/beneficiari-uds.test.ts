@@ -74,12 +74,17 @@ async function setEmporioEnabled(enabled: boolean): Promise<void> {
   await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
+async function setCentroAscoltoEnabled(enabled: boolean): Promise<void> {
+  await updateModuloAmbiente("CENTRO_ASCOLTO", enabled, null);
+}
+
 beforeAll(async () => {
   cittaA = await createCitta();
 });
 
 beforeEach(async () => {
   await setEmporioEnabled(true);
+  await setCentroAscoltoEnabled(true);
   beneficiarioIds.length = 0;
   magazzinoIds.length = 0;
 });
@@ -93,6 +98,7 @@ afterEach(async () => {
     await db.delete(magazziniTable).where(inArray(magazziniTable.id, magazzinoIds));
   }
   await setEmporioEnabled(false);
+  await setCentroAscoltoEnabled(true);
 });
 
 afterAll(async () => {
@@ -117,6 +123,22 @@ describe("POST /beneficiari (uds)", () => {
     expect(res.status).toBe(201);
     expect(res.body.uds).toBe(true);
     expect(res.body.cittaId).toBe(cittaA);
+    beneficiarioIds.push(res.body.id);
+  });
+
+  it("continua a creare persone UDS quando il servizio Centro di Ascolto è disabilitato", async () => {
+    await setCentroAscoltoEnabled(false);
+    const res = await request(appAs(null))
+      .post("/beneficiari")
+      .send({
+        nome: "Persona",
+        cognome: "Solo UDS",
+        sesso: "F",
+        uds: true,
+        cittaId: cittaA,
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.uds).toBe(true);
     beneficiarioIds.push(res.body.id);
   });
 

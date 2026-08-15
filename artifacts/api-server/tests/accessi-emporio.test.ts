@@ -50,6 +50,14 @@ async function setEmporioEnabled(enabled: boolean): Promise<void> {
   await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
+async function setCentroAscoltoEnabled(enabled: boolean): Promise<void> {
+  await updateModuloAmbiente("CENTRO_ASCOLTO", enabled, null);
+}
+
+async function setMagazzinoSolidaleEnabled(enabled: boolean): Promise<void> {
+  await updateModuloAmbiente("MAGAZZINO_SOLIDALE", enabled, null);
+}
+
 async function createCitta(): Promise<number> {
   const [citta] = await db.insert(cittaTable).values({ nome: `Citta ${rnd()}` }).returning({ id: cittaTable.id });
   cittaIds.push(citta.id);
@@ -124,6 +132,8 @@ async function createAccesso(payload: Record<string, unknown> = {}) {
 
 beforeEach(async () => {
   await setEmporioEnabled(true);
+  await setCentroAscoltoEnabled(true);
+  await setMagazzinoSolidaleEnabled(true);
 });
 
 afterEach(async () => {
@@ -133,6 +143,8 @@ afterEach(async () => {
   if (centroIds.length > 0) await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds.splice(0)));
   if (cittaIds.length > 0) await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds.splice(0)));
   await setEmporioEnabled(false);
+  await setCentroAscoltoEnabled(true);
+  await setMagazzinoSolidaleEnabled(true);
 });
 
 afterAll(async () => {
@@ -147,6 +159,20 @@ describe("Accessi Emporio", () => {
     expect(res.body.tipoPianificazione).toBe("accesso_emporio");
     expect(res.body.statoAccessoEmporio).toBe("pianificato");
     expect(res.body.saldoCreditoSolidale).toBe(0);
+  });
+
+  it("continua a creare accessi quando il servizio Centro di Ascolto è disabilitato", async () => {
+    await setCentroAscoltoEnabled(false);
+    const { res } = await createAccesso();
+    expect(res.status).toBe(201);
+    expect(res.body.tipoPianificazione).toBe("accesso_emporio");
+  });
+
+  it("continua a creare accessi quando il servizio Magazzino Solidale è disabilitato", async () => {
+    await setMagazzinoSolidaleEnabled(false);
+    const { res } = await createAccesso();
+    expect(res.status).toBe(201);
+    expect(res.body.tipoPianificazione).toBe("accesso_emporio");
   });
 
   it("blocca la creazione se Emporio è disabilitato", async () => {

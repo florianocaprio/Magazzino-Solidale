@@ -22,8 +22,11 @@ import {
   matricolaVolontarioDuplicataPayload,
   matricolaVolontarioGiaUsata,
 } from "../lib/volontariMatricola";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use("/turni", requireModulo("CENTRO_ASCOLTO"));
 
 type VolInput = { volontarioId: number; ruolo?: string | null };
 

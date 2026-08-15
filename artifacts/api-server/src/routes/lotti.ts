@@ -10,8 +10,11 @@ import {
   magazzinoScopeFilter,
   canAccessMagazzino,
 } from "../lib/centroScope";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use("/lotti", requireModulo("LOTTI"));
 
 router.get("/lotti", async (req, res) => {
   const { prodottoId, magazzinoId, inScadenza } = req.query as Record<string, string>;

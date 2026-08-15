@@ -47,6 +47,7 @@ import {
   canAccessCitta,
   canAccessZonaUds,
 } from "../lib/centroScope";
+import { requireAnyModulo } from "../lib/featureFlags";
 import {
   avvisoInterventoEuropeRome,
   canTransitionIntervento,
@@ -71,6 +72,8 @@ import {
 } from "../lib/interventiViste";
 
 const router: IRouter = Router();
+
+router.use("/interventi", requireAnyModulo(["CENTRO_ASCOLTO", "UDS"]));
 
 const BISOGNO_TIPI = ["richiesta", "azione"] as const;
 const BISOGNO_STATI = [

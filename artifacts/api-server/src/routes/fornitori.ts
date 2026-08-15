@@ -8,8 +8,11 @@ import {
   cittaScopeFilter,
   canAccessCitta,
 } from "../lib/centroScope";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use("/fornitori", requireModulo("FORNITORI"));
 
 const fmt = (
   r: typeof fornitoriTable.$inferSelect,

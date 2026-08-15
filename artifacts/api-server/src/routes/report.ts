@@ -2,8 +2,11 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
 import { callerCentroId, callerCittaId, callerZonaUdsId } from "../lib/centroScope";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use("/report", requireModulo("REPORT"));
 
 /**
  * Generic "own value OR shared/null" SQL fragment for a scoping column. Used for

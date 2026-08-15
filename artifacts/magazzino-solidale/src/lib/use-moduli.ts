@@ -7,6 +7,12 @@ export const EMPORIO_DISABLED_MESSAGE = "Il modulo Emporio Solidale è disabilit
 export const UNITA_STRADA_DISABLED_MESSAGE = "La gestione Unità di Strada è disabilitata.";
 
 export const MODULO_BY_ROUTE: Record<string, string> = {
+  "/beneficiari": "CENTRO_ASCOLTO",
+  "/interventi": "CENTRO_ASCOLTO",
+  "/turni": "CENTRO_ASCOLTO",
+  "/centri-ascolto": "CENTRO_ASCOLTO",
+  "/preparazione-consegne": "MAGAZZINO_SOLIDALE",
+  "/scarichi": "SCARICHI",
   "/lotti": "LOTTI",
   "/trasferimenti": "TRASFERIMENTI",
   "/approvvigionamenti": "APPROVVIGIONAMENTI",
@@ -14,6 +20,8 @@ export const MODULO_BY_ROUTE: Record<string, string> = {
   "/mezzi": "MEZZI",
   "/consegne": "CONSEGNE",
   "/bolle": "BOLLE",
+  "/fornitori": "FORNITORI",
+  "/report": "REPORT",
   "/uds/anagrafica": "UDS",
   "/uds/interventi": "UDS",
   "/uds/report-giornaliero": "UDS",
@@ -25,6 +33,20 @@ export const MODULO_BY_ROUTE: Record<string, string> = {
   "/emporio/crediti-saldo": "CREDITO_SOLIDALE",
   "/politiche-credito-solidale": "CREDITO_SOLIDALE",
 };
+
+export function areAllModuliAttivi(
+  codici: readonly string[],
+  isAttivo: (codice: string) => boolean,
+): boolean {
+  return codici.every(isAttivo);
+}
+
+export function isAnyModuloAttivo(
+  codici: readonly string[],
+  isAttivo: (codice: string) => boolean,
+): boolean {
+  return codici.some(isAttivo);
+}
 
 export function useModuloFlags() {
   const query = useGetConfigurazioneAmbientePubblica({
@@ -58,6 +80,10 @@ export function useConfigurazioneAmbienteFlags() {
     if (!hasConfig) return true;
     return activeCodes.has(codice);
   };
+  const areAllModuliAttiviForEnvironment = (codici: readonly string[]) =>
+    areAllModuliAttivi(codici, (codice) => isModuloAttivo(codice));
+  const isAnyModuloAttivoForEnvironment = (codici: readonly string[]) =>
+    isAnyModuloAttivo(codici, (codice) => isModuloAttivo(codice));
 
   return {
     ...query,
@@ -65,5 +91,7 @@ export function useConfigurazioneAmbienteFlags() {
     moduli: query.data?.moduli ?? [],
     moduliAttivi: query.data?.moduliAttivi ?? [],
     isModuloAttivo,
+    areAllModuliAttivi: areAllModuliAttiviForEnvironment,
+    isAnyModuloAttivo: isAnyModuloAttivoForEnvironment,
   };
 }
