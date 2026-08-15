@@ -20,11 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, CreditCard, FileDown, AlertTriangle, Upload } from "lucide-react";
+import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, FileDown, AlertTriangle, Upload } from "lucide-react";
 import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
-import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
-import { loadTesseraBrandingForPdf } from "@/lib/branding-ambiente";
 import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { useTranslation } from "react-i18next";
@@ -67,6 +65,7 @@ type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 const CENTRO_ALL = "__all__";
 const PRIORITA_ALL = "__all__";
 const CITTA_ALL = "__all__";
+const STATO_ANAGRAFICA_ALL = "__all__";
 const NO_ZONE = "__none__";
 const NO_EMPORIO = "__none__";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -107,6 +106,7 @@ export default function Beneficiari() {
   const [centroFilter, setCentroFilter] = useState<string>(CENTRO_ALL);
   const [prioritaFilter, setPrioritaFilter] = useState<string>(PRIORITA_ALL);
   const [cittaFilter, setCittaFilter] = useState<string>(CITTA_ALL);
+  const [statoAnagraficaFilter, setStatoAnagraficaFilter] = useState<string>(STATO_ANAGRAFICA_ALL);
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setCentroFilter(String(lockedCentroId));
@@ -118,6 +118,7 @@ export default function Beneficiari() {
     centroAscoltoId: centroFilter !== CENTRO_ALL ? parseInt(centroFilter) : undefined,
     priorita: prioritaFilter !== PRIORITA_ALL ? prioritaFilter : undefined,
     cittaId: isCittaGlobal && cittaFilter !== CITTA_ALL ? parseInt(cittaFilter) : undefined,
+    statoAnagrafica: statoAnagraficaFilter !== STATO_ANAGRAFICA_ALL ? statoAnagraficaFilter as "provvisoria" | "completa" : undefined,
   });
   const { data: centri } = useListCentriAscolto();
   const { data: magazzini } = useListMagazzini();
@@ -445,6 +446,14 @@ export default function Beneficiari() {
                 <SelectItem value="bassa">{t("beneficiari.prioBassa")}</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={statoAnagraficaFilter} onValueChange={setStatoAnagraficaFilter}>
+              <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Stato anagrafica" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={STATO_ANAGRAFICA_ALL}>Tutte le anagrafiche</SelectItem>
+                <SelectItem value="provvisoria">Anagrafiche da completare</SelectItem>
+                <SelectItem value="completa">Anagrafiche complete</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -496,6 +505,7 @@ export default function Beneficiari() {
                         {b.cittaNome && <span className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{b.cittaNome}</span>}
                       </div>
                     )}
+                    {b.statoAnagrafica === "provvisoria" && <Badge variant="secondary" className="mt-1">Provvisoria</Badge>}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{b.codice}</TableCell>
                   <TableCell className="text-sm">
@@ -538,18 +548,6 @@ export default function Beneficiari() {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={async () => {
-                            const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
-                            await generateTesseraPdf({
-                              beneficiario: { codice: b.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
-                              labels: buildTesseraLabels(t),
-                              associationLogoDataUrl: logoDataUrl,
-                              branding,
-                            });
-                          }}
-                        ><CreditCard className="mr-2 h-4 w-4" /> {t("beneficiari.stampaTessera")}</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}</DropdownMenuItem>
                       </DropdownMenuContent>

@@ -83,13 +83,13 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       prodottoId,
       magazzinoId: origineId,
       quantita: 10,
-      dataScadenza: "2026-07-01",
+      dataScadenza: "2027-07-01",
     });
     const lottoB = await createLotto({
       prodottoId,
       magazzinoId: origineId,
       quantita: 10,
-      dataScadenza: "2026-09-01",
+      dataScadenza: "2027-09-01",
     });
 
     const t = await creaTrasferimento({ prodottoId, quantita: 15 });
@@ -142,6 +142,39 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
     // Secondo avvio: ora è "in_transito" → 400.
     const second = await request(app).post(`/trasferimenti/${t.id}/avvia`);
     expect(second.status).toBe(400);
+  });
+
+  it("non distribuisce lotti scaduti e mantiene il rollback completo", async () => {
+    const prodottoId = await createProdotto(scope);
+    const expired = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 10,
+      dataScadenza: "2020-01-01",
+    });
+    const t = await creaTrasferimento({ prodottoId, quantita: 5 });
+
+    const response = await request(app).post(`/trasferimenti/${t.id}/avvia`);
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/scaduti|FEFO/i);
+    expect(parseFloat((await getLotto(expired)).quantitaResidua)).toBe(10);
+    expect(await getMovimentiForTrasferimento(t.id)).toHaveLength(0);
+  });
+
+  it("due avvii concorrenti producono un solo scarico", async () => {
+    const prodottoId = await createProdotto(scope);
+    const lottoId = await createLotto({ prodottoId, magazzinoId: origineId, quantita: 10 });
+    const t = await creaTrasferimento({ prodottoId, quantita: 6 });
+
+    const responses = await Promise.all([
+      request(app).post(`/trasferimenti/${t.id}/avvia`),
+      request(app).post(`/trasferimenti/${t.id}/avvia`),
+    ]);
+    expect(responses.filter((response) => response.status === 200)).toHaveLength(1);
+    expect(parseFloat((await getLotto(lottoId)).quantitaResidua)).toBe(4);
+    const outputs = (await getMovimentiForTrasferimento(t.id)).filter((row) => row.tipoDettaglio === "uscita");
+    expect(outputs).toHaveLength(1);
+    expect(parseFloat(outputs[0].quantita)).toBe(6);
   });
 });
 
@@ -224,6 +257,22 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     // Ancora in "richiesto" → conferma non consentita.
     const res = await request(app).post(`/trasferimenti/${t.id}/conferma`);
     expect(res.status).toBe(400);
+  });
+
+  it("due conferme concorrenti producono un solo carico a destinazione", async () => {
+    const prodottoId = await createProdotto(scope);
+    await createLotto({ prodottoId, magazzinoId: origineId, quantita: 6 });
+    const t = await creaTrasferimento({ prodottoId, quantita: 6 });
+    expect((await request(app).post(`/trasferimenti/${t.id}/avvia`)).status).toBe(200);
+
+    const responses = await Promise.all([
+      request(app).post(`/trasferimenti/${t.id}/conferma`),
+      request(app).post(`/trasferimenti/${t.id}/conferma`),
+    ]);
+    expect(responses.filter((response) => response.status === 200)).toHaveLength(1);
+    const destinationLots = await getLottiInMagazzino(destinoId);
+    expect(destinationLots).toHaveLength(1);
+    expect(parseFloat(destinationLots[0].quantitaResidua)).toBe(6);
   });
 });
 

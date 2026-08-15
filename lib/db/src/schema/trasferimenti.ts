@@ -1,23 +1,44 @@
-import { pgTable, serial, varchar, text, timestamp, integer, date, decimal } from "drizzle-orm/pg-core";
+import {
+  date,
+  decimal,
+  index,
+  integer,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { utentiTable } from "./auth";
+import { menseTable } from "./mensa";
 
-export const trasferimentiTable = pgTable("trasferimenti", {
-  id: serial("id").primaryKey(),
-  codice: varchar("codice", { length: 30 }).notNull().unique(),
-  magazzinoOrigineId: integer("magazzino_origine_id").notNull(),
-  magazzinoDestinoId: integer("magazzino_destino_id").notNull(),
-  dataRichiesta: date("data_richiesta").notNull(),
-  dataEsecuzione: date("data_esecuzione"),
-  dataConfermaRicezione: date("data_conferma_ricezione"),
-  stato: varchar("stato", { length: 20 }).notNull().default("richiesto"),
-  trasportatoreVolontarioId: integer("trasportatore_volontario_id"),
-  trasportatoreNome: varchar("trasportatore_nome", { length: 120 }),
-  note: text("note"),
-  operatoreId: integer("operatore_id").references(() => utentiTable.id),
-  dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
-});
+export const trasferimentiTable = pgTable(
+  "trasferimenti",
+  {
+    id: serial("id").primaryKey(),
+    codice: varchar("codice", { length: 30 }).notNull().unique(),
+    magazzinoOrigineId: integer("magazzino_origine_id").notNull(),
+    magazzinoDestinoId: integer("magazzino_destino_id").notNull(),
+    dataRichiesta: date("data_richiesta").notNull(),
+    dataEsecuzione: date("data_esecuzione"),
+    dataConfermaRicezione: date("data_conferma_ricezione"),
+    stato: varchar("stato", { length: 20 }).notNull().default("richiesto"),
+    trasportatoreVolontarioId: integer("trasportatore_volontario_id"),
+    trasportatoreNome: varchar("trasportatore_nome", { length: 120 }),
+    note: text("note"),
+    operatoreId: integer("operatore_id").references(() => utentiTable.id),
+    mensaId: integer("mensa_id").references(() => menseTable.id),
+    idempotencyKey: varchar("idempotency_key", { length: 80 }),
+    dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("trasferimenti_idempotency_unique").on(table.idempotencyKey),
+    index("trasferimenti_mensa_idx").on(table.mensaId),
+  ],
+);
 
 export const trasferimentoRigheTable = pgTable("trasferimento_righe", {
   id: serial("id").primaryKey(),

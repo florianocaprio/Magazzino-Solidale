@@ -8,10 +8,13 @@
 import type { BeneficiarioUpdateCreditoSolidaleStato } from './beneficiarioUpdateCreditoSolidaleStato';
 import type { BeneficiarioUpdateFasciaEtaPresunta } from './beneficiarioUpdateFasciaEtaPresunta';
 import type { BeneficiarioUpdateSesso } from './beneficiarioUpdateSesso';
+import type { BeneficiarioUpdateStatoAnagrafica } from './beneficiarioUpdateStatoAnagrafica';
 
 export interface BeneficiarioUpdate {
   /** @nullable */
   codiceFiscale?: string | null;
+  /** È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server. */
+  statoAnagrafica?: BeneficiarioUpdateStatoAnagrafica;
   cognome?: string;
   nome?: string;
   /** @nullable */

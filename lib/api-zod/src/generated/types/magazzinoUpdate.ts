@@ -8,6 +8,7 @@
 import type { MagazzinoUpdateTipoMagazzino } from './magazzinoUpdateTipoMagazzino';
 
 export interface MagazzinoUpdate {
+  codice?: string;
   nome?: string;
   indirizzo?: string;
   comune?: string;
@@ -17,6 +18,11 @@ export interface MagazzinoUpdate {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /**
+     * Area identifier; required when the resulting type is mensa
+     * @nullable
+     */
+  cittaId?: number | null;
   tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
   note?: string;

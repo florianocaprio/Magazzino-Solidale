@@ -11,5 +11,6 @@ export interface RuoloUpdate {
   nome?: string;
   descrizione?: string;
   aree?: string[];
+  permessi?: string[];
   isAdmin?: boolean;
 }

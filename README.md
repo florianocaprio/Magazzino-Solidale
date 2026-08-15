@@ -73,6 +73,28 @@ Il comando `update` esegue in ordine gli script SQL in `lib/db/updates`, ognuno
 in una transazione e sotto lock advisory. Gli script devono essere idempotenti e
 non devono riconciliare automaticamente altre differenze dello schema.
 
+### Aggiornamento Fase 5-4 — Mensa
+
+L'update `20260814_fase5_4_modulo_mensa.sql` è additivo e idempotente: aggiunge
+Mense, abilitazioni, tessere beneficiario trasversali, accessi, eccezioni e
+pasti; estende inoltre ruoli e trasferimenti senza creare un secondo sistema di
+giacenze. Prima della produzione creare sempre un dump, eseguire `update` in una
+finestra controllata e verificare:
+
+```bash
+pnpm --filter @workspace/db run update
+psql "$DATABASE_URL" -c "select count(*) from beneficiari"
+psql "$DATABASE_URL" -c "select table_name from information_schema.tables where table_schema='public' and table_name like 'mensa%'"
+```
+
+Per sola compatibilità legacy, i codici beneficiario già stampati vengono
+registrati una volta come prima tessera trasversale attiva. Ogni nuova emissione
+usa invece un token casuale opaco `MS-...`, mai `beneficiari.codice`, e il
+QR/barcode non contiene nome, codice fiscale o altri dati personali. Per
+collaudare la migrazione su dati reali, ripristinare il dump in un database
+separato e lanciare due volte `update`: entrambe le esecuzioni devono concludersi
+senza variazioni nelle cardinalità delle entità preesistenti.
+
 ## Avvio (sviluppo)
 
 Avvia i due servizi (in due terminali, oppure tramite i workflow di Replit):

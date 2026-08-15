@@ -65,6 +65,7 @@ import SuperAdminModuli from "@/pages/super-admin-moduli";
 import SuperAdminAuditConfigurazioni from "@/pages/super-admin-audit-configurazioni";
 import SuperAdminLogSistema from "@/pages/super-admin-log-sistema";
 import SostieniProgetto from "@/pages/sostieni-progetto";
+import MensaPage, { type MensaView } from "@/pages/mensa";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -118,6 +119,30 @@ function RequireModulo({
     );
   }
   return <>{children}</>;
+}
+
+function RequirePermission({
+  permission,
+  children,
+}: {
+  permission: string;
+  children: React.ReactNode;
+}) {
+  const { hasPermission } = useAuth();
+  if (!hasPermission(permission)) return <NotAuthorized />;
+  return <>{children}</>;
+}
+
+function MensaRoute({ view, permission }: { view: MensaView; permission: string }) {
+  return (
+    <Guard area="mensa">
+      <RequireModulo codice="MENSA">
+        <RequirePermission permission={permission}>
+          <MensaPage view={view} />
+        </RequirePermission>
+      </RequireModulo>
+    </Guard>
+  );
 }
 
 function AppRoutes() {
@@ -293,6 +318,13 @@ function AppRoutes() {
             </Guard>
           )}
         </Route>
+
+        <Route path="/mensa/postazione">{() => <MensaRoute view="postazione" permission="mensa.access.scan" />}</Route>
+        <Route path="/mensa/pasti">{() => <MensaRoute view="pasti" permission="mensa.view" />}</Route>
+        <Route path="/mensa/abilitazioni">{() => <MensaRoute view="abilitazioni" permission="mensa.eligibility.manage" />}</Route>
+        <Route path="/mensa/trasferimenti">{() => <MensaRoute view="trasferimenti" permission="mensa.transfers.manage" />}</Route>
+        <Route path="/mensa/eccezioni">{() => <MensaRoute view="eccezioni" permission="mensa.view" />}</Route>
+        <Route path="/mensa/report">{() => <MensaRoute view="report" permission="mensa.reports.view" />}</Route>
         <Route path="/uds/interventi">
           {() => (
             <Guard area="uds">

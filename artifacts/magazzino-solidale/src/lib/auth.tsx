@@ -16,6 +16,7 @@ interface AuthContextValue {
   bootstrapLoading: boolean;
   refreshBootstrap: () => void;
   hasArea: (area: string) => boolean;
+  hasPermission: (permission: string) => boolean;
   setUser: (user: AuthUser) => void;
   refresh: () => void;
   logout: () => void;
@@ -55,6 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user.aree.includes(area);
   };
 
+  const hasPermission = (permission: string): boolean => {
+    if (!user) return false;
+    return user.isAdmin || user.permessi.includes(permission);
+  };
+
   const setUser = (next: AuthUser) => {
     queryClient.setQueryData(CURRENT_USER_KEY, next);
   };
@@ -84,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         bootstrapLoading,
         refreshBootstrap,
         hasArea,
+        hasPermission,
         setUser,
         refresh,
         logout,

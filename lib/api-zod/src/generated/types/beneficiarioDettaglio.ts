@@ -9,6 +9,7 @@ import type { BeneficiarioDettaglioCreditoSolidaleStato } from './beneficiarioDe
 import type { BeneficiarioDettaglioFasciaEtaCorrente } from './beneficiarioDettaglioFasciaEtaCorrente';
 import type { BeneficiarioDettaglioFasciaEtaOrigine } from './beneficiarioDettaglioFasciaEtaOrigine';
 import type { BeneficiarioDettaglioFasciaEtaPresunta } from './beneficiarioDettaglioFasciaEtaPresunta';
+import type { BeneficiarioDettaglioStatoAnagrafica } from './beneficiarioDettaglioStatoAnagrafica';
 import type { Consegna } from './consegna';
 import type { Intervento } from './intervento';
 import type { NucleoFamiliare } from './nucleoFamiliare';
@@ -18,6 +19,7 @@ export interface BeneficiarioDettaglio {
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica: BeneficiarioDettaglioStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */

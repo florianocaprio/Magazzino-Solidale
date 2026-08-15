@@ -13,4 +13,5 @@ export const MagazzinoInputTipoMagazzino = {
   logistico: 'logistico',
   emporio: 'emporio',
   misto: 'misto',
+  mensa: 'mensa',
 } as const;

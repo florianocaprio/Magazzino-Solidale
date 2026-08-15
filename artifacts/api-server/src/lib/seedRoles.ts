@@ -1,11 +1,13 @@
 import { eq } from "drizzle-orm";
 import { db, ruoliTable } from "@workspace/db";
-import { ALL_AREA_KEYS, EMPORIO_AREA_KEY } from "./areas";
+import { ALL_AREA_KEYS, EMPORIO_AREA_KEY, MENSA_AREA_KEY } from "./areas";
+import { ALL_PERMISSION_KEYS, MENSA_PERMISSIONS } from "./permissions";
 import { logger } from "./logger";
 
 export const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
 export const ADMIN_ROLE_NAME = "Amministratore";
 export const EMPORIO_ROLE_NAME = "Emporio";
+export const MENSA_ROLE_NAME = "Operatore Mensa";
 const OPERATOR_ROLE_NAME = "Operatore";
 const VOLUNTEER_ROLE_NAME = "Volontario";
 const UDS_ROLE_NAME = "Operatore UDS";
@@ -23,6 +25,7 @@ export async function ensureSuperAdminRole(): Promise<number> {
         descrizione:
           "Accesso completo a tutte le aree e alla configurazione ambiente",
         aree: ALL_AREA_KEYS,
+        permessi: ALL_PERMISSION_KEYS,
         isAdmin: true,
       })
       .where(eq(ruoliTable.id, existing.id));
@@ -36,6 +39,7 @@ export async function ensureSuperAdminRole(): Promise<number> {
       descrizione:
         "Accesso completo a tutte le aree e alla configurazione ambiente",
       aree: ALL_AREA_KEYS,
+      permessi: ALL_PERMISSION_KEYS,
       isAdmin: true,
     })
     .returning({ id: ruoliTable.id });
@@ -60,6 +64,7 @@ export async function seedRoles(): Promise<void> {
       nome: ADMIN_ROLE_NAME,
       descrizione: "Accesso completo a tutte le aree e alla gestione utenti",
       aree: ALL_AREA_KEYS,
+      permessi: ALL_PERMISSION_KEYS,
       isAdmin: true,
     });
     logger.info("Seeded admin role");
@@ -130,5 +135,33 @@ export async function seedRoles(): Promise<void> {
       .set({ aree: [...emporioRole.aree, EMPORIO_AREA_KEY] })
       .where(eq(ruoliTable.id, emporioRole.id));
     logger.info("Added Emporio access area to existing Emporio role");
+  }
+
+  const defaultMensaPermissions = MENSA_PERMISSIONS.map(
+    (item) => item.key,
+  ).filter((key) => key !== "mensa.meals.override");
+  const [mensaRole] = await db
+    .select({
+      id: ruoliTable.id,
+      aree: ruoliTable.aree,
+      permessi: ruoliTable.permessi,
+    })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.nome, MENSA_ROLE_NAME));
+  if (!mensaRole) {
+    await db.insert(ruoliTable).values({
+      nome: MENSA_ROLE_NAME,
+      descrizione: "Operatore del servizio Mensa",
+      aree: [MENSA_AREA_KEY],
+      permessi: defaultMensaPermissions,
+      isAdmin: false,
+    });
+    logger.info("Seeded Mensa operator role");
+  } else if (!mensaRole.aree.includes(MENSA_AREA_KEY)) {
+    await db
+      .update(ruoliTable)
+      .set({ aree: [...mensaRole.aree, MENSA_AREA_KEY] })
+      .where(eq(ruoliTable.id, mensaRole.id));
+    logger.info("Added Mensa access area to existing Mensa role");
   }
 }

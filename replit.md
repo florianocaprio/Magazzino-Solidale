@@ -120,6 +120,16 @@ Le app girano tramite **workflow** Replit (porte assegnate via `PORT`, non fisse
 
 ---
 
+### Mensa
+- Modulo `MENSA`, area RBAC `mensa` e permission granulari `mensa.*`. Le permission sono archiviate in `ruoli.permessi` e verificate lato API oltre che su menu, route e azioni.
+- Ogni `mense` appartiene a una `citta` e collega in modo univoco un `magazzini` attivo già configurato esplicitamente come tipo `mensa`; la creazione non converte magazzini logistici esistenti. Prodotti, lotti, scadenze, FEFO, movimenti, trasferimenti e PDF restano quelli logistici esistenti.
+- `tessere_beneficiari` è trasversale ai servizi e conserva solo un token opaco. Il backfill di `beneficiari.codice` è esclusivamente compatibilità per tessere legacy già stampate; ogni nuova emissione usa un token casuale `MS-...` privo di dati personali. Gli accessi risolvono l'identità lato server e restituiscono alla postazione esclusivamente identità operativa, Mensa assegnata e informazioni alimentari necessarie.
+- `mensa_abilitazioni` conserva lo storico. Le principali `attiva` con `data_fine` precedente alla data di servizio vengono riconciliate in `scaduta`, con audit, prima di crearne una nuova. Un operatore territoriale opera nello scope territoriale corrente, oggi implementato tramite `cittaId`: una Mensa diversa è autorizzabile con motivazione solo nello stesso territorio. La policy è centralizzata in `canUseMensaException` per poter adottare in futuro un eventuale `areaId` senza distribuire il confronto nelle route. Un altro territorio è sempre negato e i dati personali vengono oscurati.
+- Accesso e pasto sono entità separate (`mensa_accessi`, `mensa_pasti`). Chiavi di idempotenza e indici univoci impediscono doppi click/scansioni; il secondo servizio della stessa giornata richiede `mensa.meals.override` e una motivazione auditata.
+- I rifornimenti creati da `/mensa/trasferimenti` sono righe delle tabelle `trasferimenti`/`trasferimento_righe`; avvio e conferma usano transazioni, lock sui lotti, FEFO non scaduto e claim atomico dello stato. `/trasferimenti/:id/documento` alimenta il PDF condiviso e audita l'emissione.
+- La data operativa è sempre la data civile `Europe/Rome`, indipendente dal fuso del processo/container.
+- Update produzione/Docker: backup, quindi `pnpm --filter @workspace/db run update`; non usare `push-force`. Lo script `lib/db/updates/20260814_fase5_4_modulo_mensa.sql` è idempotente e applicabile a database popolati.
+
 ## Sicurezza, Accessi & Scoping
 
 ### Autenticazione & RBAC per area

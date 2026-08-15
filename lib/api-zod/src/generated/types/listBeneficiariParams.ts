@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListBeneficiariStatoAnagrafica } from './listBeneficiariStatoAnagrafica';
 
 export type ListBeneficiariParams = {
 search?: string;
@@ -15,4 +16,8 @@ cittaId?: number;
 zonaUdsId?: number;
 uds?: boolean;
 attivo?: boolean;
+/**
+ * Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
+ */
+statoAnagrafica?: ListBeneficiariStatoAnagrafica;
 };

@@ -82,6 +82,7 @@ export const MagazzinoTipoMagazzino = {
   logistico: 'logistico',
   emporio: 'emporio',
   misto: 'misto',
+  mensa: 'mensa',
 } as const;
 
 export interface Magazzino {
@@ -208,6 +209,14 @@ export interface ProdottiBulkInput {
   righe: ProdottoInput[];
 }
 
+export type BeneficiarioInputStatoAnagrafica = typeof BeneficiarioInputStatoAnagrafica[keyof typeof BeneficiarioInputStatoAnagrafica];
+
+
+export const BeneficiarioInputStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
+
 /**
  * Fascia d'età stimata dall'operatore; null indica che non è determinata.
  * @nullable
@@ -245,6 +254,7 @@ export interface BeneficiarioInput {
   codice?: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica?: BeneficiarioInputStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */
@@ -326,6 +336,7 @@ export const MagazzinoInputTipoMagazzino = {
   logistico: 'logistico',
   emporio: 'emporio',
   misto: 'misto',
+  mensa: 'mensa',
 } as const;
 
 export interface MagazzinoInput {
@@ -339,6 +350,11 @@ export interface MagazzinoInput {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /**
+     * Area identifier; required when tipoMagazzino is mensa
+     * @nullable
+     */
+  cittaId?: number | null;
   tipoMagazzino?: MagazzinoInputTipoMagazzino;
   stato?: string;
   note?: string;
@@ -351,9 +367,11 @@ export const MagazzinoUpdateTipoMagazzino = {
   logistico: 'logistico',
   emporio: 'emporio',
   misto: 'misto',
+  mensa: 'mensa',
 } as const;
 
 export interface MagazzinoUpdate {
+  codice?: string;
   nome?: string;
   indirizzo?: string;
   comune?: string;
@@ -363,6 +381,11 @@ export interface MagazzinoUpdate {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /**
+     * Area identifier; required when the resulting type is mensa
+     * @nullable
+     */
+  cittaId?: number | null;
   tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
   note?: string;
@@ -626,6 +649,10 @@ export interface Trasferimento {
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
+  /** @nullable */
+  mensaId?: number | null;
+  /** @nullable */
+  idempotencyKey?: string | null;
   righe?: TrasferimentoRiga[];
   dataCreazione: string;
 }
@@ -947,6 +974,14 @@ export interface BeneficiarioSimile {
   score: number;
 }
 
+export type BeneficiarioStatoAnagrafica = typeof BeneficiarioStatoAnagrafica[keyof typeof BeneficiarioStatoAnagrafica];
+
+
+export const BeneficiarioStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
+
 /**
  * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
  * @nullable
@@ -999,6 +1034,7 @@ export interface Beneficiario {
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica: BeneficiarioStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */
@@ -1072,6 +1108,14 @@ export interface Beneficiario {
   dataPresaInCarico?: string | null;
   dataCreazione: string;
 }
+
+export type BeneficiarioDettaglioStatoAnagrafica = typeof BeneficiarioDettaglioStatoAnagrafica[keyof typeof BeneficiarioDettaglioStatoAnagrafica];
+
+
+export const BeneficiarioDettaglioStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
 
 /**
  * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
@@ -1316,6 +1360,7 @@ export interface BeneficiarioDettaglio {
   codice: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica: BeneficiarioDettaglioStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */
@@ -1411,6 +1456,17 @@ export interface BeneficiarioDettaglio {
 }
 
 /**
+ * È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server.
+ */
+export type BeneficiarioUpdateStatoAnagrafica = typeof BeneficiarioUpdateStatoAnagrafica[keyof typeof BeneficiarioUpdateStatoAnagrafica];
+
+
+export const BeneficiarioUpdateStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
+
+/**
  * Fascia d'età stimata dall'operatore; null indica che non è determinata.
  * @nullable
  */
@@ -1446,6 +1502,8 @@ export const BeneficiarioUpdateSesso = {
 export interface BeneficiarioUpdate {
   /** @nullable */
   codiceFiscale?: string | null;
+  /** È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server. */
+  statoAnagrafica?: BeneficiarioUpdateStatoAnagrafica;
   cognome?: string;
   nome?: string;
   /** @nullable */
@@ -3897,7 +3955,491 @@ export interface UdsPersonePerZonaReport {
   udsConCentro: number;
 }
 
+export type MensaStato = typeof MensaStato[keyof typeof MensaStato];
+
+
+export const MensaStato = {
+  attivo: 'attivo',
+  inattivo: 'inattivo',
+} as const;
+
+export interface Mensa {
+  id: number;
+  codice: string;
+  nome: string;
+  /** Identificativo dell'Area configurata nel menu Aree; `cittaId` è il nome storico interno. */
+  cittaId: number;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa. */
+  magazzinoId: number;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
+  indirizzo?: string | null;
+  /** @nullable */
+  comune?: string | null;
+  /** @nullable */
+  zona?: string | null;
+  /** @nullable */
+  responsabile?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  email?: string | null;
+  stato?: MensaStato;
+  attiva: boolean;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+  versione: string;
+}
+
+export type MensaInputStato = typeof MensaInputStato[keyof typeof MensaInputStato];
+
+
+export const MensaInputStato = {
+  attivo: 'attivo',
+  inattivo: 'inattivo',
+} as const;
+
+/**
+ * Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L'Area è l'entità configurata nel menu Aree; `cittaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
+ */
+export interface MensaInput {
+  /**
+     * Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.
+     * @minLength 1
+     * @maxLength 30
+     */
+  codice?: string;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  nome: string;
+  /** Identificativo dell'Area; per utenti territoriali prevale sempre l'Area del profilo. */
+  cittaId: number;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  indirizzo?: string | null;
+  /** @nullable */
+  comune?: string | null;
+  /** @nullable */
+  zona?: string | null;
+  /** @nullable */
+  responsabile?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  email?: string | null;
+  stato?: MensaInputStato;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface MensaUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  nome?: string;
+  /** @nullable */
+  indirizzo?: string | null;
+  attiva?: boolean;
+  /** @nullable */
+  note?: string | null;
+  versione: string;
+}
+
+export interface MensaBeneficiarioSummary {
+  id: number;
+  nome: string;
+  cognome: string;
+  codice: string;
+  attivo: boolean;
+  /** @nullable */
+  cittaId?: number | null;
+}
+
+export type MensaAbilitazioneStato = typeof MensaAbilitazioneStato[keyof typeof MensaAbilitazioneStato];
+
+
+export const MensaAbilitazioneStato = {
+  attiva: 'attiva',
+  sospesa: 'sospesa',
+  revocata: 'revocata',
+  scaduta: 'scaduta',
+} as const;
+
+export interface MensaAbilitazione {
+  id: number;
+  beneficiarioId: number;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  beneficiarioCodice?: string | null;
+  mensaId: number;
+  /** @nullable */
+  mensaNome?: string | null;
+  dataInizio: string;
+  /** @nullable */
+  dataFine?: string | null;
+  stato: MensaAbilitazioneStato;
+  mensaPrincipale: boolean;
+  /** @nullable */
+  motivo?: string | null;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+  versione: string;
+}
+
+export interface MensaAbilitazioneInput {
+  beneficiarioId: number;
+  mensaId: number;
+  dataInizio: string;
+  /** @nullable */
+  dataFine?: string | null;
+  mensaPrincipale?: boolean;
+  /** @nullable */
+  motivo?: string | null;
+}
+
+export type MensaStatoInputStato = typeof MensaStatoInputStato[keyof typeof MensaStatoInputStato];
+
+
+export const MensaStatoInputStato = {
+  attiva: 'attiva',
+  sospesa: 'sospesa',
+  revocata: 'revocata',
+  scaduta: 'scaduta',
+} as const;
+
+export interface MensaStatoInput {
+  stato: MensaStatoInputStato;
+  /** @nullable */
+  motivo?: string | null;
+  versione: string;
+}
+
+export type TesseraBeneficiarioStato = typeof TesseraBeneficiarioStato[keyof typeof TesseraBeneficiarioStato];
+
+
+export const TesseraBeneficiarioStato = {
+  attiva: 'attiva',
+  sospesa: 'sospesa',
+  revocata: 'revocata',
+  scaduta: 'scaduta',
+} as const;
+
+export interface TesseraBeneficiario {
+  id: number;
+  beneficiarioId: number;
+  codice: string;
+  stato: TesseraBeneficiarioStato;
+  dataEmissione: string;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  dataRevoca?: string | null;
+  /** @nullable */
+  motivoRevoca?: string | null;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+  versione: string;
+}
+
+export interface TesseraBeneficiarioInput {
+  beneficiarioId: number;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  motivoSostituzione?: string | null;
+}
+
+export interface TesseraBeneficiarioAnagraficaInput {
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  motivoSostituzione?: string | null;
+}
+
+export type MensaNuovaPersonaTemporaneaInputSesso = typeof MensaNuovaPersonaTemporaneaInputSesso[keyof typeof MensaNuovaPersonaTemporaneaInputSesso];
+
+
+export const MensaNuovaPersonaTemporaneaInputSesso = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta = typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta[keyof typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta] | null;
+
+
+export const MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+} as const;
+
+export interface MensaNuovaPersonaTemporaneaInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  nome: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  cognome: string;
+  sesso: MensaNuovaPersonaTemporaneaInputSesso;
+  /** @nullable */
+  dataNascita?: string | null;
+  /** @nullable */
+  fasciaEtaPresunta?: MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta;
+  /**
+     * @maxLength 20
+     * @nullable
+     */
+  telefono?: string | null;
+  /**
+     * @maxLength 60
+     * @nullable
+     */
+  cittadinanza?: string | null;
+  /** @nullable */
+  allergie?: string | null;
+  /** @nullable */
+  restrizioniAlimentari?: string | null;
+}
+
+/**
+ * Indicare esattamente uno tra beneficiarioId e nuovaPersona. L'autorizzazione vale solo per la data civile corrente Europe/Rome.
+ */
+export interface MensaAccessoTemporaneoInput {
+  mensaId: number;
+  beneficiarioId?: number;
+  nuovaPersona?: MensaNuovaPersonaTemporaneaInput;
+  /** @nullable */
+  motivo?: string | null;
+  confermaDuplicato?: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+}
+
+export type MensaAccessoInputModalitaAccesso = typeof MensaAccessoInputModalitaAccesso[keyof typeof MensaAccessoInputModalitaAccesso];
+
+
+export const MensaAccessoInputModalitaAccesso = {
+  tessera: 'tessera',
+  manuale: 'manuale',
+} as const;
+
+export interface MensaAccessoInput {
+  mensaId: number;
+  modalitaAccesso: MensaAccessoInputModalitaAccesso;
+  codiceTessera?: string;
+  beneficiarioId?: number;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+}
+
+export type MensaAccessoEsito = typeof MensaAccessoEsito[keyof typeof MensaAccessoEsito];
+
+
+export const MensaAccessoEsito = {
+  consentito: 'consentito',
+  negato: 'negato',
+  consentito_eccezione: 'consentito_eccezione',
+} as const;
+
+export type MensaAccessoModalitaAccesso = typeof MensaAccessoModalitaAccesso[keyof typeof MensaAccessoModalitaAccesso];
+
+
+export const MensaAccessoModalitaAccesso = {
+  tessera: 'tessera',
+  manuale: 'manuale',
+  temporaneo: 'temporaneo',
+} as const;
+
+export interface MensaAccesso {
+  id: number;
+  mensaId: number;
+  mensaNome: string;
+  /** @nullable */
+  beneficiarioId?: number | null;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  beneficiarioCodice?: string | null;
+  /** @nullable */
+  mensaPrincipaleId?: number | null;
+  /** @nullable */
+  mensaPrincipaleNome?: string | null;
+  /** @nullable */
+  statoAbilitazione?: string | null;
+  /** @nullable */
+  restrizioniAlimentari?: string | null;
+  /** @nullable */
+  allergie?: string | null;
+  esito: MensaAccessoEsito;
+  motivoEsito: string;
+  modalitaAccesso: MensaAccessoModalitaAccesso;
+  temporaneo: boolean;
+  dataOra: string;
+  /** @nullable */
+  eccezioneId?: number | null;
+  eccezionePossibile: boolean;
+  idempotentReplay?: boolean;
+}
+
+export interface MensaPastoInput {
+  accessoMensaId: number;
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  tipoServizio: string;
+  /** @nullable */
+  note?: string | null;
+  override?: boolean;
+  /** @nullable */
+  motivoOverride?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+}
+
+export interface MensaPasto {
+  id: number;
+  mensaId: number;
+  mensaNome?: string;
+  beneficiarioId: number;
+  beneficiarioNome?: string;
+  beneficiarioCodice?: string;
+  accessoMensaId: number;
+  dataOra: string;
+  dataServizio: string;
+  tipoServizio: string;
+  eccezione?: boolean;
+  override?: boolean;
+  operatore?: string;
+  idempotentReplay?: boolean;
+  [key: string]: unknown;
+ }
+
+export interface MensaEccezione {
+  id: number;
+  beneficiarioId: number;
+  beneficiarioNome?: string;
+  mensaPrincipaleId: number;
+  mensaDestinazioneId: number;
+  cittaId: number;
+  motivo: string;
+  dataOra: string;
+  [key: string]: unknown;
+ }
+
+export interface MensaEccezioneInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+}
+
+export interface MensaMagazzinoSummary {
+  id: number;
+  codice: string;
+  nome: string;
+  /** @nullable */
+  cittaId?: number | null;
+  tipoMagazzino: string;
+}
+
+export interface MensaGiacenza {
+  prodottoId: number;
+  codice: string;
+  nome: string;
+  unitaMisura: string;
+  quantita: number;
+}
+
+export type MensaTrasferimentoInputRigheItem = {
+  prodottoId: number;
+  /** @exclusiveMinimum 0 */
+  quantita: number;
+  unitaMisura: string;
+  /** @nullable */
+  note?: string | null;
+};
+
+export interface MensaTrasferimentoInput {
+  mensaId: number;
+  magazzinoOrigineId: number;
+  dataRichiesta: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+  /** @nullable */
+  trasportatoreNome?: string | null;
+  /** @nullable */
+  note?: string | null;
+  /** @minItems 1 */
+  righe: MensaTrasferimentoInputRigheItem[];
+}
+
+export type MensaReportDistribuzioneItem = {
+  mensaId: number;
+  mensaNome: string;
+  totalePasti: number;
+  beneficiariDistinti: number;
+  pastiEccezione: number;
+};
+
+export interface MensaReport {
+  dal: string;
+  al: string;
+  totalePasti: number;
+  beneficiariDistinti: number;
+  accessiOrdinari: number;
+  accessiEccezione: number;
+  accessiNegati: number;
+  mediaPastiGiorno: number;
+  distribuzione: MensaReportDistribuzioneItem[];
+  [key: string]: unknown;
+ }
+
 export interface Area {
+  key: string;
+  label: string;
+}
+
+export interface Permission {
   key: string;
   label: string;
 }
@@ -3939,6 +4481,7 @@ export interface AuthUser {
   isSuperAdmin: boolean;
   isAdmin: boolean;
   aree: string[];
+  permessi: string[];
   mustChangePassword: boolean;
   emailDaAggiornare: boolean;
 }
@@ -4058,6 +4601,7 @@ export interface Ruolo {
   /** @nullable */
   descrizione?: string | null;
   aree: string[];
+  permessi: string[];
   isAdmin: boolean;
   dataCreazione: string;
 }
@@ -4067,6 +4611,7 @@ export interface RuoloInput {
   nome: string;
   descrizione?: string;
   aree: string[];
+  permessi?: string[];
   isAdmin?: boolean;
 }
 
@@ -4075,6 +4620,7 @@ export interface RuoloUpdate {
   nome?: string;
   descrizione?: string;
   aree?: string[];
+  permessi?: string[];
   isAdmin?: boolean;
 }
 
@@ -4139,7 +4685,19 @@ cittaId?: number;
 zonaUdsId?: number;
 uds?: boolean;
 attivo?: boolean;
+/**
+ * Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
+ */
+statoAnagrafica?: ListBeneficiariStatoAnagrafica;
 };
+
+export type ListBeneficiariStatoAnagrafica = typeof ListBeneficiariStatoAnagrafica[keyof typeof ListBeneficiariStatoAnagrafica];
+
+
+export const ListBeneficiariStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
 
 export type CercaBeneficiariSimiliParams = {
 /**
@@ -4536,6 +5094,57 @@ zonaUdsId?: number;
 export type ReportUdsPersonePerZonaParams = {
 cittaId?: number;
 zonaUdsId?: number;
+};
+
+export type ListMenseParams = {
+/**
+ * Identificativo dell'Area configurata nel menu Aree (nome storico interno del campo).
+ */
+cittaId?: number;
+attiva?: boolean;
+};
+
+export type SearchMensaBeneficiariParams = {
+/**
+ * @minLength 2
+ */
+search: string;
+};
+
+export type ListMensaAbilitazioniParams = {
+beneficiarioId?: number;
+mensaId?: number;
+};
+
+export type ListTessereBeneficiarioParams = {
+beneficiarioId: number;
+};
+
+export type ListAccessiMensaParams = {
+mensaId?: number;
+};
+
+export type ListPastiMensaParams = {
+mensaId?: number;
+data?: string;
+tipoServizio?: string;
+};
+
+export type ListGiacenzeMensaParams = {
+magazzinoId: number;
+};
+
+export type ListTrasferimentiMensa200Item = { [key: string]: unknown };
+
+export type CreateTrasferimentoMensa200 = { [key: string]: unknown };
+
+export type CreateTrasferimentoMensa201 = { [key: string]: unknown };
+
+export type GetMensaReportParams = {
+dal: string;
+al: string;
+mensaId?: number;
+tipoServizio?: string;
 };
 
 export type ListUtentiParams = {

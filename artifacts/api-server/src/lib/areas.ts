@@ -1,10 +1,12 @@
 export const EMPORIO_AREA_KEY = "emporio";
+export const MENSA_AREA_KEY = "mensa";
 
 export const ALL_AREAS = [
   { key: "generale", label: "Generale" },
   { key: "magazzino", label: "Magazzino" },
   { key: "sociale", label: "Sociale" },
   { key: EMPORIO_AREA_KEY, label: "Emporio" },
+  { key: MENSA_AREA_KEY, label: "Mensa" },
   { key: "uds", label: "Unità di Strada" },
   { key: "logistica", label: "Logistica" },
   { key: "analisi", label: "Analisi" },
@@ -27,7 +29,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   lotti: "magazzino",
   movimenti: "magazzino",
   giacenze: "magazzino",
-  trasferimenti: "magazzino",
+  trasferimenti: ["magazzino", MENSA_AREA_KEY],
   "preparazione-consegne": "magazzino",
 
   // Read by several operational areas to populate filters/forms; mutations are
@@ -78,6 +80,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   "accessi-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
   "cassa-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
   "spese-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
+  mensa: MENSA_AREA_KEY,
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",

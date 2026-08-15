@@ -8,11 +8,13 @@
 import type { BeneficiarioInputCreditoSolidaleStato } from './beneficiarioInputCreditoSolidaleStato';
 import type { BeneficiarioInputFasciaEtaPresunta } from './beneficiarioInputFasciaEtaPresunta';
 import type { BeneficiarioInputSesso } from './beneficiarioInputSesso';
+import type { BeneficiarioInputStatoAnagrafica } from './beneficiarioInputStatoAnagrafica';
 
 export interface BeneficiarioInput {
   codice?: string;
   /** @nullable */
   codiceFiscale?: string | null;
+  statoAnagrafica?: BeneficiarioInputStatoAnagrafica;
   cognome: string;
   nome: string;
   /** @nullable */

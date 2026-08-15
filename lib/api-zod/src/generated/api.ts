@@ -79,7 +79,7 @@ export const ListMagazziniResponseItem = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "cittaId": zod.number().nullish(),
-  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto']),
+  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']),
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -88,6 +88,7 @@ export const ListMagazziniResponse = zod.array(ListMagazziniResponseItem)
 
 
 /**
+ * Creates a warehouse. When tipoMagazzino is mensa, cittaId (the Area) is required and the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
 export const CreateMagazzinoBody = zod.object({
@@ -100,7 +101,8 @@ export const CreateMagazzinoBody = zod.object({
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
-  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto']).optional(),
+  "cittaId": zod.number().nullish().describe('Area identifier; required when tipoMagazzino is mensa'),
+  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']).optional(),
   "stato": zod.string().optional(),
   "note": zod.string().optional()
 })
@@ -123,18 +125,22 @@ export const GetMagazzinoResponse = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "cittaId": zod.number().nullish(),
-  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto']),
+  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']),
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 
 
+/**
+ * Updates a warehouse. Mensa warehouse changes are propagated to the operational Mensa detail; an existing Mensa cannot be changed to a different warehouse type.
+ */
 export const UpdateMagazzinoParams = zod.object({
   "id": zod.coerce.number()
 })
 
 export const UpdateMagazzinoBody = zod.object({
+  "codice": zod.string().optional(),
   "nome": zod.string().optional(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
@@ -143,7 +149,8 @@ export const UpdateMagazzinoBody = zod.object({
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
-  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto']).optional(),
+  "cittaId": zod.number().nullish().describe('Area identifier; required when the resulting type is mensa'),
+  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']).optional(),
   "stato": zod.string().optional(),
   "note": zod.string().optional()
 })
@@ -161,7 +168,7 @@ export const UpdateMagazzinoResponse = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "cittaId": zod.number().nullish(),
-  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto']),
+  "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']),
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -599,6 +606,8 @@ export const ListTrasferimentiResponseItem = zod.object({
   "note": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -658,6 +667,8 @@ export const GetTrasferimentoResponse = zod.object({
   "note": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -714,6 +725,8 @@ export const UpdateTrasferimentoResponse = zod.object({
   "note": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -758,6 +771,54 @@ export const AvviaTrasferimentoResponse = zod.object({
   "note": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "fsePlus": zod.boolean(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Recupera e audita i dati della bolla di trasferimento
+ */
+export const GetDocumentoTrasferimentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDocumentoTrasferimentoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "magazzinoOrigineId": zod.number(),
+  "magazzinoOrigineNome": zod.string().nullish(),
+  "magazzinoOrigineIndirizzo": zod.string().nullish(),
+  "magazzinoOrigineComune": zod.string().nullish(),
+  "magazzinoOrigineZona": zod.string().nullish(),
+  "magazzinoDestinoId": zod.number(),
+  "magazzinoDestinoNome": zod.string().nullish(),
+  "magazzinoDestinoIndirizzo": zod.string().nullish(),
+  "magazzinoDestinoComune": zod.string().nullish(),
+  "magazzinoDestinoZona": zod.string().nullish(),
+  "trasportatoreVolontarioId": zod.number().nullish(),
+  "trasportatoreVolontarioNome": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "dataRichiesta": zod.string(),
+  "dataEsecuzione": zod.string().nullish(),
+  "dataConfermaRicezione": zod.string().nullish(),
+  "stato": zod.string(),
+  "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -807,6 +868,8 @@ export const ConfermaTrasferimentoResponse = zod.object({
   "note": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -1316,13 +1379,15 @@ export const ListBeneficiariQueryParams = zod.object({
   "cittaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional(),
   "uds": zod.coerce.boolean().optional(),
-  "attivo": zod.coerce.boolean().optional()
+  "attivo": zod.coerce.boolean().optional(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional().describe('Filtra le anagrafiche complete o quelle provvisorie ancora da completare.')
 })
 
 export const ListBeneficiariResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
@@ -1372,6 +1437,7 @@ export const ListBeneficiariResponse = zod.array(ListBeneficiariResponseItem)
 export const CreateBeneficiarioBody = zod.object({
   "codice": zod.string().optional(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional(),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.coerce.date().nullish(),
@@ -1461,6 +1527,7 @@ export const BulkBeneficiariBody = zod.object({
   "righe": zod.array(zod.object({
   "codice": zod.string().optional(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional(),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.coerce.date().nullish(),
@@ -1524,6 +1591,7 @@ export const GetBeneficiarioResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
@@ -1672,6 +1740,7 @@ export const UpdateBeneficiarioParams = zod.object({
 
 export const UpdateBeneficiarioBody = zod.object({
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']).optional().describe('È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server.'),
   "cognome": zod.string().optional(),
   "nome": zod.string().optional(),
   "dataNascita": zod.coerce.date().nullish(),
@@ -1721,6 +1790,7 @@ export const UpdateBeneficiarioResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "codiceFiscale": zod.string().nullish(),
+  "statoAnagrafica": zod.enum(['provvisoria', 'completa']),
   "cognome": zod.string(),
   "nome": zod.string(),
   "dataNascita": zod.string().nullish(),
@@ -1813,6 +1883,42 @@ export const AddNucleoFamiliareBody = zod.object({
 export const DeleteNucleoFamiliareParams = zod.object({
   "id": zod.coerce.number(),
   "membroId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Elenca le tessere trasversali del beneficiario, inclusa l'eventuale tessera legacy attiva
+ */
+export const ListTessereBeneficiarioDaAnagraficaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListTessereBeneficiarioDaAnagraficaResponseItem = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "codice": zod.string(),
+  "stato": zod.enum(['attiva', 'sospesa', 'revocata', 'scaduta']),
+  "dataEmissione": zod.coerce.date(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "dataRevoca": zod.coerce.date().nullish(),
+  "motivoRevoca": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+export const ListTessereBeneficiarioDaAnagraficaResponse = zod.array(ListTessereBeneficiarioDaAnagraficaResponseItem)
+
+
+/**
+ * @summary Emette una tessera trasversale opaca da un'anagrafica autorizzata
+ */
+export const CreateTesseraBeneficiarioDaAnagraficaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateTesseraBeneficiarioDaAnagraficaBody = zod.object({
+  "dataScadenza": zod.coerce.date().nullish(),
+  "motivoSostituzione": zod.string().nullish()
 })
 
 
@@ -6685,6 +6791,7 @@ export const LoginUserResponse = zod.object({
   "isSuperAdmin": zod.boolean(),
   "isAdmin": zod.boolean(),
   "aree": zod.array(zod.string()),
+  "permessi": zod.array(zod.string()),
   "mustChangePassword": zod.boolean(),
   "emailDaAggiornare": zod.boolean()
 })
@@ -6708,6 +6815,7 @@ export const GetCurrentUserResponse = zod.object({
   "isSuperAdmin": zod.boolean(),
   "isAdmin": zod.boolean(),
   "aree": zod.array(zod.string()),
+  "permessi": zod.array(zod.string()),
   "mustChangePassword": zod.boolean(),
   "emailDaAggiornare": zod.boolean()
 })
@@ -6756,6 +6864,568 @@ export const ChangePasswordBody = zod.object({
 })
 
 
+export const ListMenseQueryParams = zod.object({
+  "cittaId": zod.coerce.number().optional().describe('Identificativo dell\'Area configurata nel menu Aree (nome storico interno del campo).'),
+  "attiva": zod.coerce.boolean().optional()
+})
+
+export const ListMenseResponseItem = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "stato": zod.enum(['attivo', 'inattivo']).optional(),
+  "attiva": zod.boolean(),
+  "note": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+export const ListMenseResponse = zod.array(ListMenseResponseItem)
+
+
+export const createMensaBodyCodiceMax = 30;
+
+export const createMensaBodyNomeMax = 160;
+
+export const createMensaBodyStatoDefault = `attivo`;
+
+export const CreateMensaBody = zod.object({
+  "codice": zod.string().min(1).max(createMensaBodyCodiceMax).optional().describe('Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.'),
+  "nome": zod.string().min(1).max(createMensaBodyNomeMax),
+  "cittaId": zod.number().describe('Identificativo dell\'Area; per utenti territoriali prevale sempre l\'Area del profilo.'),
+  "centroAscoltoId": zod.number().nullish(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "stato": zod.enum(['attivo', 'inattivo']).default(createMensaBodyStatoDefault),
+  "note": zod.string().nullish()
+}).describe('Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L\'Area è l\'entità configurata nel menu Aree; `cittaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.')
+
+
+export const GetMensaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMensaResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "stato": zod.enum(['attivo', 'inattivo']).optional(),
+  "attiva": zod.boolean(),
+  "note": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+
+
+export const UpdateMensaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateMensaBodyNomeMax = 160;
+
+
+
+export const UpdateMensaBody = zod.object({
+  "nome": zod.string().min(1).max(updateMensaBodyNomeMax).optional(),
+  "indirizzo": zod.string().nullish(),
+  "attiva": zod.boolean().optional(),
+  "note": zod.string().nullish(),
+  "versione": zod.coerce.date()
+})
+
+export const UpdateMensaResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
+  "cittaNome": zod.string().nullish(),
+  "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "responsabile": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "stato": zod.enum(['attivo', 'inattivo']).optional(),
+  "attiva": zod.boolean(),
+  "note": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+
+
+export const searchMensaBeneficiariQuerySearchMin = 2;
+
+
+
+export const SearchMensaBeneficiariQueryParams = zod.object({
+  "search": zod.coerce.string().min(searchMensaBeneficiariQuerySearchMin)
+})
+
+export const SearchMensaBeneficiariResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "codice": zod.string(),
+  "attivo": zod.boolean(),
+  "cittaId": zod.number().nullish()
+})
+export const SearchMensaBeneficiariResponse = zod.array(SearchMensaBeneficiariResponseItem)
+
+
+export const ListMensaAbilitazioniQueryParams = zod.object({
+  "beneficiarioId": zod.coerce.number().optional(),
+  "mensaId": zod.coerce.number().optional()
+})
+
+export const ListMensaAbilitazioniResponseItem = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string().nullish(),
+  "dataInizio": zod.coerce.date(),
+  "dataFine": zod.coerce.date().nullish(),
+  "stato": zod.enum(['attiva', 'sospesa', 'revocata', 'scaduta']),
+  "mensaPrincipale": zod.boolean(),
+  "motivo": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+export const ListMensaAbilitazioniResponse = zod.array(ListMensaAbilitazioniResponseItem)
+
+
+export const CreateMensaAbilitazioneBody = zod.object({
+  "beneficiarioId": zod.number(),
+  "mensaId": zod.number(),
+  "dataInizio": zod.coerce.date(),
+  "dataFine": zod.coerce.date().nullish(),
+  "mensaPrincipale": zod.boolean().optional(),
+  "motivo": zod.string().nullish()
+})
+
+
+export const UpdateMensaAbilitazioneStatoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateMensaAbilitazioneStatoBody = zod.object({
+  "stato": zod.enum(['attiva', 'sospesa', 'revocata', 'scaduta']),
+  "motivo": zod.string().nullish(),
+  "versione": zod.coerce.date()
+})
+
+export const UpdateMensaAbilitazioneStatoResponse = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string().nullish(),
+  "dataInizio": zod.coerce.date(),
+  "dataFine": zod.coerce.date().nullish(),
+  "stato": zod.enum(['attiva', 'sospesa', 'revocata', 'scaduta']),
+  "mensaPrincipale": zod.boolean(),
+  "motivo": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+
+
+export const ListTessereBeneficiarioQueryParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const ListTessereBeneficiarioResponseItem = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "codice": zod.string(),
+  "stato": zod.enum(['attiva', 'sospesa', 'revocata', 'scaduta']),
+  "dataEmissione": zod.coerce.date(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "dataRevoca": zod.coerce.date().nullish(),
+  "motivoRevoca": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+export const ListTessereBeneficiarioResponse = zod.array(ListTessereBeneficiarioResponseItem)
+
+
+export const CreateTesseraBeneficiarioBody = zod.object({
+  "beneficiarioId": zod.number(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "motivoSostituzione": zod.string().nullish()
+})
+
+
+export const UpdateTesseraBeneficiarioStatoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateTesseraBeneficiarioStatoBody = zod.object({
+  "stato": zod.enum(['attiva', 'sospesa', 'revocata', 'scaduta']),
+  "motivo": zod.string().nullish(),
+  "versione": zod.coerce.date()
+})
+
+export const UpdateTesseraBeneficiarioStatoResponse = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "codice": zod.string(),
+  "stato": zod.enum(['attiva', 'sospesa', 'revocata', 'scaduta']),
+  "dataEmissione": zod.coerce.date(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "dataRevoca": zod.coerce.date().nullish(),
+  "motivoRevoca": zod.string().nullish(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.coerce.date(),
+  "versione": zod.coerce.date()
+})
+
+
+export const verificaAccessoMensaBodyIdempotencyKeyMax = 80;
+
+
+
+export const VerificaAccessoMensaBody = zod.object({
+  "mensaId": zod.number(),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale']),
+  "codiceTessera": zod.string().optional(),
+  "beneficiarioId": zod.number().optional(),
+  "idempotencyKey": zod.string().min(1).max(verificaAccessoMensaBodyIdempotencyKeyMax)
+})
+
+export const VerificaAccessoMensaResponse = zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string(),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "mensaPrincipaleId": zod.number().nullish(),
+  "mensaPrincipaleNome": zod.string().nullish(),
+  "statoAbilitazione": zod.string().nullish(),
+  "restrizioniAlimentari": zod.string().nullish(),
+  "allergie": zod.string().nullish(),
+  "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
+  "motivoEsito": zod.string(),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "temporaneo": zod.boolean(),
+  "dataOra": zod.coerce.date(),
+  "eccezioneId": zod.number().nullish(),
+  "eccezionePossibile": zod.boolean(),
+  "idempotentReplay": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Crea un accesso giornaliero motivato per una persona esistente o una nuova anagrafica provvisoria
+ */
+export const createAccessoTemporaneoMensaBodyNuovaPersonaNomeMax = 80;
+
+export const createAccessoTemporaneoMensaBodyNuovaPersonaCognomeMax = 80;
+
+export const createAccessoTemporaneoMensaBodyNuovaPersonaTelefonoMax = 20;
+
+export const createAccessoTemporaneoMensaBodyNuovaPersonaCittadinanzaMax = 60;
+
+export const createAccessoTemporaneoMensaBodyConfermaDuplicatoDefault = false;
+export const createAccessoTemporaneoMensaBodyIdempotencyKeyMax = 80;
+
+
+
+export const CreateAccessoTemporaneoMensaBody = zod.object({
+  "mensaId": zod.number(),
+  "beneficiarioId": zod.number().optional(),
+  "nuovaPersona": zod.object({
+  "nome": zod.string().min(1).max(createAccessoTemporaneoMensaBodyNuovaPersonaNomeMax),
+  "cognome": zod.string().min(1).max(createAccessoTemporaneoMensaBodyNuovaPersonaCognomeMax),
+  "sesso": zod.enum(['M', 'F', 'ALTRO']),
+  "dataNascita": zod.coerce.date().nullish(),
+  "fasciaEtaPresunta": zod.union([zod.literal('0_17'),zod.literal('18_29'),zod.literal('30_64'),zod.literal('65_plus'),zod.literal(null)]).nullish(),
+  "telefono": zod.string().max(createAccessoTemporaneoMensaBodyNuovaPersonaTelefonoMax).nullish(),
+  "cittadinanza": zod.string().max(createAccessoTemporaneoMensaBodyNuovaPersonaCittadinanzaMax).nullish(),
+  "allergie": zod.string().nullish(),
+  "restrizioniAlimentari": zod.string().nullish()
+}).optional(),
+  "motivo": zod.string().nullish(),
+  "confermaDuplicato": zod.boolean().default(createAccessoTemporaneoMensaBodyConfermaDuplicatoDefault),
+  "idempotencyKey": zod.string().min(1).max(createAccessoTemporaneoMensaBodyIdempotencyKeyMax)
+}).describe('Indicare esattamente uno tra beneficiarioId e nuovaPersona. L\'autorizzazione vale solo per la data civile corrente Europe\/Rome.')
+
+export const CreateAccessoTemporaneoMensaResponse = zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string(),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "mensaPrincipaleId": zod.number().nullish(),
+  "mensaPrincipaleNome": zod.string().nullish(),
+  "statoAbilitazione": zod.string().nullish(),
+  "restrizioniAlimentari": zod.string().nullish(),
+  "allergie": zod.string().nullish(),
+  "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
+  "motivoEsito": zod.string(),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "temporaneo": zod.boolean(),
+  "dataOra": zod.coerce.date(),
+  "eccezioneId": zod.number().nullish(),
+  "eccezionePossibile": zod.boolean(),
+  "idempotentReplay": zod.boolean().optional()
+})
+
+
+export const ListAccessiMensaQueryParams = zod.object({
+  "mensaId": zod.coerce.number().optional()
+})
+
+export const ListAccessiMensaResponseItem = zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string(),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "mensaPrincipaleId": zod.number().nullish(),
+  "mensaPrincipaleNome": zod.string().nullish(),
+  "statoAbilitazione": zod.string().nullish(),
+  "restrizioniAlimentari": zod.string().nullish(),
+  "allergie": zod.string().nullish(),
+  "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
+  "motivoEsito": zod.string(),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "temporaneo": zod.boolean(),
+  "dataOra": zod.coerce.date(),
+  "eccezioneId": zod.number().nullish(),
+  "eccezionePossibile": zod.boolean(),
+  "idempotentReplay": zod.boolean().optional()
+})
+export const ListAccessiMensaResponse = zod.array(ListAccessiMensaResponseItem)
+
+
+export const AutorizzaEccezioneMensaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const autorizzaEccezioneMensaBodyMotivoMax = 2000;
+
+
+
+export const AutorizzaEccezioneMensaBody = zod.object({
+  "motivo": zod.string().min(1).max(autorizzaEccezioneMensaBodyMotivoMax)
+})
+
+export const AutorizzaEccezioneMensaResponse = zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string(),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "mensaPrincipaleId": zod.number().nullish(),
+  "mensaPrincipaleNome": zod.string().nullish(),
+  "statoAbilitazione": zod.string().nullish(),
+  "restrizioniAlimentari": zod.string().nullish(),
+  "allergie": zod.string().nullish(),
+  "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
+  "motivoEsito": zod.string(),
+  "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "temporaneo": zod.boolean(),
+  "dataOra": zod.coerce.date(),
+  "eccezioneId": zod.number().nullish(),
+  "eccezionePossibile": zod.boolean(),
+  "idempotentReplay": zod.boolean().optional()
+})
+
+
+export const ListPastiMensaQueryParams = zod.object({
+  "mensaId": zod.coerce.number().optional(),
+  "data": zod.date().optional(),
+  "tipoServizio": zod.coerce.string().optional()
+})
+
+export const ListPastiMensaResponseItem = zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string().optional(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().optional(),
+  "beneficiarioCodice": zod.string().optional(),
+  "accessoMensaId": zod.number(),
+  "dataOra": zod.coerce.date(),
+  "dataServizio": zod.coerce.date(),
+  "tipoServizio": zod.string(),
+  "eccezione": zod.boolean().optional(),
+  "override": zod.boolean().optional(),
+  "operatore": zod.string().optional(),
+  "idempotentReplay": zod.boolean().optional()
+})
+export const ListPastiMensaResponse = zod.array(ListPastiMensaResponseItem)
+
+
+export const createPastoMensaBodyTipoServizioMax = 40;
+
+export const createPastoMensaBodyIdempotencyKeyMax = 80;
+
+
+
+export const CreatePastoMensaBody = zod.object({
+  "accessoMensaId": zod.number(),
+  "tipoServizio": zod.string().min(1).max(createPastoMensaBodyTipoServizioMax),
+  "note": zod.string().nullish(),
+  "override": zod.boolean().optional(),
+  "motivoOverride": zod.string().nullish(),
+  "idempotencyKey": zod.string().min(1).max(createPastoMensaBodyIdempotencyKeyMax)
+})
+
+export const CreatePastoMensaResponse = zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string().optional(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().optional(),
+  "beneficiarioCodice": zod.string().optional(),
+  "accessoMensaId": zod.number(),
+  "dataOra": zod.coerce.date(),
+  "dataServizio": zod.coerce.date(),
+  "tipoServizio": zod.string(),
+  "eccezione": zod.boolean().optional(),
+  "override": zod.boolean().optional(),
+  "operatore": zod.string().optional(),
+  "idempotentReplay": zod.boolean().optional()
+})
+
+
+export const ListEccezioniMensaResponseItem = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().optional(),
+  "mensaPrincipaleId": zod.number(),
+  "mensaDestinazioneId": zod.number(),
+  "cittaId": zod.number(),
+  "motivo": zod.string(),
+  "dataOra": zod.coerce.date()
+})
+export const ListEccezioniMensaResponse = zod.array(ListEccezioniMensaResponseItem)
+
+
+export const ListMagazziniMensaResponseItem = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullish(),
+  "tipoMagazzino": zod.string()
+})
+export const ListMagazziniMensaResponse = zod.array(ListMagazziniMensaResponseItem)
+
+
+export const ListGiacenzeMensaQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number()
+})
+
+export const ListGiacenzeMensaResponseItem = zod.object({
+  "prodottoId": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "unitaMisura": zod.string(),
+  "quantita": zod.number()
+})
+export const ListGiacenzeMensaResponse = zod.array(ListGiacenzeMensaResponseItem)
+
+
+export const ListTrasferimentiMensaResponseItem = zod.record(zod.string(), zod.unknown())
+export const ListTrasferimentiMensaResponse = zod.array(ListTrasferimentiMensaResponseItem)
+
+
+export const createTrasferimentoMensaBodyIdempotencyKeyMax = 80;
+
+export const createTrasferimentoMensaBodyRigheItemQuantitaExclusiveMin = 0;
+
+
+
+
+export const CreateTrasferimentoMensaBody = zod.object({
+  "mensaId": zod.number(),
+  "magazzinoOrigineId": zod.number(),
+  "dataRichiesta": zod.coerce.date(),
+  "idempotencyKey": zod.string().min(1).max(createTrasferimentoMensaBodyIdempotencyKeyMax),
+  "trasportatoreNome": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "prodottoId": zod.number(),
+  "quantita": zod.number().gt(createTrasferimentoMensaBodyRigheItemQuantitaExclusiveMin),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).min(1)
+})
+
+export const CreateTrasferimentoMensaResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const GetMensaReportQueryParams = zod.object({
+  "dal": zod.date(),
+  "al": zod.date(),
+  "mensaId": zod.coerce.number().optional(),
+  "tipoServizio": zod.coerce.string().optional()
+})
+
+export const GetMensaReportResponse = zod.object({
+  "dal": zod.coerce.date(),
+  "al": zod.coerce.date(),
+  "totalePasti": zod.number(),
+  "beneficiariDistinti": zod.number(),
+  "accessiOrdinari": zod.number(),
+  "accessiEccezione": zod.number(),
+  "accessiNegati": zod.number(),
+  "mediaPastiGiorno": zod.number(),
+  "distribuzione": zod.array(zod.object({
+  "mensaId": zod.number(),
+  "mensaNome": zod.string(),
+  "totalePasti": zod.number(),
+  "beneficiariDistinti": zod.number(),
+  "pastiEccezione": zod.number()
+}))
+})
+
+
 export const ListAreeResponseItem = zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -6763,11 +7433,22 @@ export const ListAreeResponseItem = zod.object({
 export const ListAreeResponse = zod.array(ListAreeResponseItem)
 
 
+/**
+ * @summary Elenco centralizzato dei permessi assegnabili ai ruoli
+ */
+export const ListPermessiResponseItem = zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})
+export const ListPermessiResponse = zod.array(ListPermessiResponseItem)
+
+
 export const ListRuoliResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "descrizione": zod.string().nullish(),
   "aree": zod.array(zod.string()),
+  "permessi": zod.array(zod.string()),
   "isAdmin": zod.boolean(),
   "dataCreazione": zod.string()
 })
@@ -6781,6 +7462,7 @@ export const CreateRuoloBody = zod.object({
   "nome": zod.string().min(1),
   "descrizione": zod.string().optional(),
   "aree": zod.array(zod.string()),
+  "permessi": zod.array(zod.string()).optional(),
   "isAdmin": zod.boolean().optional()
 })
 
@@ -6794,6 +7476,7 @@ export const GetRuoloResponse = zod.object({
   "nome": zod.string(),
   "descrizione": zod.string().nullish(),
   "aree": zod.array(zod.string()),
+  "permessi": zod.array(zod.string()),
   "isAdmin": zod.boolean(),
   "dataCreazione": zod.string()
 })
@@ -6810,6 +7493,7 @@ export const UpdateRuoloBody = zod.object({
   "nome": zod.string().min(1).optional(),
   "descrizione": zod.string().optional(),
   "aree": zod.array(zod.string()).optional(),
+  "permessi": zod.array(zod.string()).optional(),
   "isAdmin": zod.boolean().optional()
 })
 
@@ -6818,6 +7502,7 @@ export const UpdateRuoloResponse = zod.object({
   "nome": zod.string(),
   "descrizione": zod.string().nullish(),
   "aree": zod.array(zod.string()),
+  "permessi": zod.array(zod.string()),
   "isAdmin": zod.boolean(),
   "dataCreazione": zod.string()
 })

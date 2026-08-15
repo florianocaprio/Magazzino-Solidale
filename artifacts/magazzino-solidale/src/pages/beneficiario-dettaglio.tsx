@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, useCreateTesseraBeneficiarioDaAnagrafica, useListTessereBeneficiarioDaAnagrafica, getListTessereBeneficiarioDaAnagraficaQueryKey, type TesseraBeneficiario, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ExportButtons } from "@/components/export-buttons";
 import { useToast } from "@/hooks/use-toast";
@@ -66,9 +66,21 @@ export default function BeneficiarioDettaglio() {
   const updateBeneficiario = useUpdateBeneficiario();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const createTessera = useCreateTesseraBeneficiarioDaAnagrafica();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const [editing, setEditing] = useState(false);
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [completionCentroId, setCompletionCentroId] = useState("");
+  const [replaceCardOpen, setReplaceCardOpen] = useState(false);
+  const [replacementReason, setReplacementReason] = useState("");
+  const { data: tessereBeneficiario, isLoading: tessereLoading } = useListTessereBeneficiarioDaAnagrafica(numId, {
+    query: {
+      queryKey: getListTessereBeneficiarioDaAnagraficaQueryKey(numId),
+      enabled: Number.isInteger(numId) && numId > 0 && hasPermission("beneficiari.cards.manage"),
+    },
+  });
+  const activeTessera = useMemo(() => (tessereBeneficiario ?? []).find((tessera) => tessera.stato === "attiva") ?? null, [tessereBeneficiario]);
   const { data: accessiEmporio } = useListAccessiEmporio(
     { beneficiarioId: numId },
     { query: { queryKey: getListAccessiEmporioQueryKey({ beneficiarioId: numId }), enabled: Number.isInteger(numId) && numId > 0 } },
@@ -129,6 +141,27 @@ export default function BeneficiarioDettaglio() {
     );
   };
 
+  const printTessera = async (card: TesseraBeneficiario) => {
+    if (!b) return;
+    const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
+    await generateTesseraPdf({
+      beneficiario: { codice: card.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
+      labels: buildTesseraLabels(t), associationLogoDataUrl: logoDataUrl, branding,
+    });
+  };
+
+  const emitTessera = (motivoSostituzione?: string) => {
+    createTessera.mutate({ id: numId, data: { motivoSostituzione: motivoSostituzione || null } }, {
+      onSuccess: async (card) => {
+        await queryClient.invalidateQueries({ queryKey: getListTessereBeneficiarioDaAnagraficaQueryKey(numId) });
+        setReplaceCardOpen(false); setReplacementReason("");
+        await printTessera(card);
+        toast({ title: motivoSostituzione ? "Tessera sostituita e pronta per la stampa" : "Tessera emessa e pronta per la stampa" });
+      },
+      onError: (error) => toast({ title: "Tessera non emessa", description: apiErrorMessage(error, "Operazione non riuscita"), variant: "destructive" }),
+    });
+  };
+
   if (isLoading) return <div className="p-6 space-y-6 max-w-7xl mx-auto"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
   if (!b) return <div className="p-6">{t("beneficiarioDettaglio.notFound")}</div>;
 
@@ -139,6 +172,8 @@ export default function BeneficiarioDettaglio() {
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold tracking-tight">{b.cognome} {b.nome}</h1>
             <Badge variant="outline" className="font-mono text-muted-foreground">{b.codice}</Badge>
+            {b.statoAnagrafica === "provvisoria" && <Badge variant="secondary">Anagrafica provvisoria</Badge>}
+            {activeTessera && <Badge variant="outline">Tessera attiva {activeTessera.codice.startsWith("MS-") ? "MS" : "legacy"}</Badge>}
             {!b.attivo && <Badge variant="destructive">{t("common.inactive")}</Badge>}
           </div>
           <p className="text-muted-foreground flex items-center gap-2">
@@ -147,27 +182,73 @@ export default function BeneficiarioDettaglio() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={async () => {
-              const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
-              await generateTesseraPdf({
-                beneficiario: { codice: b.codice, nome: b.nome, cognome: b.cognome, codiceFiscale: b.codiceFiscale },
-                labels: buildTesseraLabels(t),
-                associationLogoDataUrl: logoDataUrl,
-                branding,
-              });
-            }}
-          >
-            <CreditCard className="w-4 h-4" /> {t("tessera.generate")}
-          </Button>
+          {b.statoAnagrafica === "provvisoria" && (
+            <Button variant="outline" onClick={() => {
+              setCompletionCentroId(String(b.centroAscoltoId ?? user?.centroAscoltoId ?? ""));
+              setCompletionOpen(true);
+            }}>Completa anagrafica</Button>
+          )}
+          {hasPermission("beneficiari.cards.manage") && b.statoAnagrafica === "completa" && (
+            tessereLoading ? <Button variant="outline" disabled>Verifica tessera…</Button>
+              : activeTessera ? <>
+                <Button variant="outline" className="gap-2" onClick={() => void printTessera(activeTessera)}><CreditCard className="w-4 h-4" /> Stampa tessera attiva</Button>
+                <Button variant="outline" className="gap-2" onClick={() => setReplaceCardOpen(true)}><RefreshCw className="w-4 h-4" /> Sostituisci tessera</Button>
+              </> : <Button variant="outline" className="gap-2" disabled={createTessera.isPending} onClick={() => emitTessera()}>
+                <CreditCard className="w-4 h-4" /> {t("tessera.generate")}
+              </Button>
+          )}
           <SchedaExportButtons b={b} size="default" />
           <Button variant="outline" className="gap-2" onClick={() => setEditing(true)}>
             <Pencil className="w-4 h-4" /> {t("beneficiarioDettaglio.editAnagrafica")}
           </Button>
         </div>
       </div>
+
+      <Dialog open={completionOpen} onOpenChange={setCompletionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Completa anagrafica provvisoria</DialogTitle>
+            <DialogDescription>Associa la persona a un Centro di Ascolto e conferma i dati anagrafici minimi.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">La conferma associa la persona a un Centro di Ascolto ed è registrata nell’audit.</p>
+            <Select value={completionCentroId} onValueChange={setCompletionCentroId}>
+              <SelectTrigger><SelectValue placeholder="Seleziona il Centro di Ascolto" /></SelectTrigger>
+              <SelectContent>{centri?.filter((centro) => centro.attivo).map((centro) => <SelectItem key={centro.id} value={String(centro.id)}>{centro.nome}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompletionOpen(false)}>Annulla</Button>
+            <Button disabled={!completionCentroId || updateBeneficiario.isPending} onClick={() => updateBeneficiario.mutate(
+              { id: numId, data: { statoAnagrafica: "completa", centroAscoltoId: Number(completionCentroId) } }, {
+                onSuccess: () => {
+                  queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) });
+                  queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+                  setCompletionOpen(false); toast({ title: "Anagrafica completata" });
+                },
+                onError: (error) => toast({ title: "Anagrafica non aggiornata", description: apiErrorMessage(error, "Controlla i dati obbligatori"), variant: "destructive" }),
+              },
+            )}>Conferma completamento</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={replaceCardOpen} onOpenChange={setReplaceCardOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sostituisci tessera attiva</DialogTitle>
+            <DialogDescription>Revoca la tessera corrente e genera una nuova tessera trasversale.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">La tessera attuale verrà revocata e ne verrà generata una nuova con token opaco MS-*.</p>
+            <Textarea value={replacementReason} onChange={(event) => setReplacementReason(event.target.value)} placeholder="Motivo obbligatorio della sostituzione" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReplaceCardOpen(false)}>Annulla</Button>
+            <Button disabled={!replacementReason.trim() || createTessera.isPending} onClick={() => emitTessera(replacementReason.trim())}>Revoca e genera nuova tessera</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {editing && (
         <EditBeneficiarioSheet
