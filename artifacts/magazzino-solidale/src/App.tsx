@@ -147,6 +147,26 @@ function RequireAnyModulo({
   return <>{children}</>;
 }
 
+export function RequireAreaModulo({
+  requisiti,
+  children,
+}: {
+  requisiti: readonly { area: string; moduloCodice: string }[];
+  children: React.ReactNode;
+}) {
+  const { hasArea } = useAuth();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  if (
+    !requisiti.some(
+      ({ area, moduloCodice }) =>
+        hasArea(area) && isModuloAttivo(moduloCodice),
+    )
+  ) {
+    return <NotAuthorized />;
+  }
+  return <>{children}</>;
+}
+
 function RequirePermission({
   permission,
   children,
@@ -308,7 +328,14 @@ function AppRoutes() {
         <Route path="/beneficiari/:id">
           {() => (
             <Guard area={["sociale", "uds"]}>
-              <BeneficiarioDettaglio />
+              <RequireAreaModulo
+                requisiti={[
+                  { area: "sociale", moduloCodice: "CENTRO_ASCOLTO" },
+                  { area: "uds", moduloCodice: "UDS" },
+                ]}
+              >
+                <BeneficiarioDettaglio />
+              </RequireAreaModulo>
             </Guard>
           )}
         </Route>
