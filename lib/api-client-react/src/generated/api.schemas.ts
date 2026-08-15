@@ -5,6 +5,142 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export type ReportingDashboardSection = typeof ReportingDashboardSection[keyof typeof ReportingDashboardSection];
+
+
+export const ReportingDashboardSection = {
+  generale: 'generale',
+  pacchi: 'pacchi',
+  'centro-ascolto': 'centro-ascolto',
+  emporio: 'emporio',
+  mensa: 'mensa',
+  uds: 'uds',
+  'magazzino-logistica': 'magazzino-logistica',
+  'fse-plus': 'fse-plus',
+} as const;
+
+export type ReportingDashboardTimezone = typeof ReportingDashboardTimezone[keyof typeof ReportingDashboardTimezone];
+
+
+export const ReportingDashboardTimezone = {
+  'Europe/Rome': 'Europe/Rome',
+} as const;
+
+export interface ReportAppliedFilters {
+  da: string;
+  a: string;
+  anno: number;
+  /** @nullable */
+  cittaId: number | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  magazzinoId: number | null;
+  /** @nullable */
+  mensaId: number | null;
+  /** @nullable */
+  zonaUdsId: number | null;
+  /** @nullable */
+  operatoreId: number | null;
+  /** @nullable */
+  tipoIntervento: string | null;
+  /** @nullable */
+  tipoServizio: string | null;
+}
+
+export type ReportKpiUnit = typeof ReportKpiUnit[keyof typeof ReportKpiUnit];
+
+
+export const ReportKpiUnit = {
+  count: 'count',
+  quantity: 'quantity',
+  kg: 'kg',
+  credit: 'credit',
+  days: 'days',
+  average: 'average',
+} as const;
+
+export type ReportKpiAvailability = typeof ReportKpiAvailability[keyof typeof ReportKpiAvailability];
+
+
+export const ReportKpiAvailability = {
+  ok: 'ok',
+  derivable: 'derivable',
+  missing: 'missing',
+} as const;
+
+export interface ReportKpi {
+  key: string;
+  /** @nullable */
+  value: number | null;
+  unit: ReportKpiUnit;
+  availability: ReportKpiAvailability;
+  /** @nullable */
+  drilldownMetric: string | null;
+}
+
+export type ReportSeriesPointsItem = {
+  label: string;
+  value: number;
+  /** @nullable */
+  secondaryValue?: number | null;
+};
+
+export interface ReportSeries {
+  key: string;
+  points: ReportSeriesPointsItem[];
+}
+
+export type ReportTableRowsItem = { [key: string]: unknown };
+
+export interface ReportTable {
+  key: string;
+  columns: string[];
+  rows: ReportTableRowsItem[];
+}
+
+export type ReportQualityItemAvailability = typeof ReportQualityItemAvailability[keyof typeof ReportQualityItemAvailability];
+
+
+export const ReportQualityItemAvailability = {
+  ok: 'ok',
+  derivable: 'derivable',
+  missing: 'missing',
+} as const;
+
+export interface ReportQualityItem {
+  key: string;
+  /** @nullable */
+  count: number | null;
+  availability: ReportQualityItemAvailability;
+  /** @nullable */
+  note: string | null;
+}
+
+export interface ReportingDashboard {
+  section: ReportingDashboardSection;
+  filters: ReportAppliedFilters;
+  kpi: ReportKpi[];
+  series: ReportSeries[];
+  tables: ReportTable[];
+  quality: ReportQualityItem[];
+  definitions: string[];
+  generatedAt: string;
+  timezone: ReportingDashboardTimezone;
+}
+
+export type ReportDrilldownRowsItem = { [key: string]: unknown };
+
+export interface ReportDrilldown {
+  section: string;
+  metric: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  columns: string[];
+  rows: ReportDrilldownRowsItem[];
+}
+
 export type ReportFsePlusProdottiItem = {
   prodottoId: number;
   prodottoNome: string;
@@ -4624,6 +4760,40 @@ export interface RuoloUpdate {
   isAdmin?: boolean;
 }
 
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+export type ReportDaParameter = string;
+
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+export type ReportAParameter = string;
+
+export type ReportAnnoParameter = number;
+
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+export type ReportCittaIdParameter = number;
+
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+export type ReportCentroIdParameter = number;
+
+export type ReportMagazzinoIdParameter = number;
+
+export type ReportMensaIdParameter = number;
+
+export type ReportZonaUdsIdParameter = number;
+
+export type ReportOperatoreIdParameter = number;
+
+export type ReportTipoInterventoParameter = string;
+
+export type ReportTipoServizioParameter = string;
+
 export type ListProdottiParams = {
 categoria?: string;
 tipo?: string;
@@ -5056,6 +5226,238 @@ export type ReportFsePlusParams = {
 anno?: number;
 cittaId?: number;
 };
+
+export type GetReportDashboardGeneraleParams = {
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * @minimum 2000
+ * @maximum 2100
+ */
+anno?: ReportAnnoParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+magazzinoId?: ReportMagazzinoIdParameter;
+};
+
+export type GetReportPacchiParams = {
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+magazzinoId?: ReportMagazzinoIdParameter;
+};
+
+export type GetReportCentroAscoltoParams = {
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+zonaUdsId?: ReportZonaUdsIdParameter;
+operatoreId?: ReportOperatoreIdParameter;
+tipoIntervento?: ReportTipoInterventoParameter;
+};
+
+export type GetReportEmporioParams = {
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+magazzinoId?: ReportMagazzinoIdParameter;
+};
+
+export type GetReportMensaIntegratoParams = {
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+magazzinoId?: ReportMagazzinoIdParameter;
+mensaId?: ReportMensaIdParameter;
+operatoreId?: ReportOperatoreIdParameter;
+tipoServizio?: ReportTipoServizioParameter;
+};
+
+export type GetReportUdsIntegratoParams = {
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+zonaUdsId?: ReportZonaUdsIdParameter;
+operatoreId?: ReportOperatoreIdParameter;
+tipoIntervento?: ReportTipoInterventoParameter;
+};
+
+export type GetReportMagazzinoLogisticaParams = {
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+magazzinoId?: ReportMagazzinoIdParameter;
+};
+
+export type GetReportFsePlusIntegratoParams = {
+/**
+ * @minimum 2000
+ * @maximum 2100
+ */
+anno?: ReportAnnoParameter;
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+magazzinoId?: ReportMagazzinoIdParameter;
+};
+
+export type GetReportDrilldownParams = {
+section: GetReportDrilldownSection;
+metric: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
+/**
+ * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+ */
+da?: ReportDaParameter;
+/**
+ * Data civile finale Europe/Rome (YYYY-MM-DD)
+ */
+a?: ReportAParameter;
+/**
+ * @minimum 2000
+ * @maximum 2100
+ */
+anno?: ReportAnnoParameter;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+/**
+ * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+ */
+centroAscoltoId?: ReportCentroIdParameter;
+magazzinoId?: ReportMagazzinoIdParameter;
+mensaId?: ReportMensaIdParameter;
+zonaUdsId?: ReportZonaUdsIdParameter;
+operatoreId?: ReportOperatoreIdParameter;
+tipoIntervento?: ReportTipoInterventoParameter;
+tipoServizio?: ReportTipoServizioParameter;
+};
+
+export type GetReportDrilldownSection = typeof GetReportDrilldownSection[keyof typeof GetReportDrilldownSection];
+
+
+export const GetReportDrilldownSection = {
+  generale: 'generale',
+  pacchi: 'pacchi',
+  'centro-ascolto': 'centro-ascolto',
+  emporio: 'emporio',
+  mensa: 'mensa',
+  uds: 'uds',
+  'magazzino-logistica': 'magazzino-logistica',
+  'fse-plus': 'fse-plus',
+} as const;
 
 export type ReportUdsInterventiPerMeseParams = {
 da?: string;

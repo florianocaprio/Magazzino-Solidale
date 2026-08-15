@@ -103,6 +103,15 @@ import type {
   GetMaterialeDaPreparareParams,
   GetMensaReportParams,
   GetPreparazioneConsegneParams,
+  GetReportCentroAscoltoParams,
+  GetReportDashboardGeneraleParams,
+  GetReportDrilldownParams,
+  GetReportEmporioParams,
+  GetReportFsePlusIntegratoParams,
+  GetReportMagazzinoLogisticaParams,
+  GetReportMensaIntegratoParams,
+  GetReportPacchiParams,
+  GetReportUdsIntegratoParams,
   GetVolontariCarico200Item,
   GetVolontariCaricoParams,
   Giacenza,
@@ -209,6 +218,7 @@ import type {
   ReportAllocazioneMezziParams,
   ReportConsegnePerCentroParams,
   ReportConsegnePerMeseParams,
+  ReportDrilldown,
   ReportFsePlus,
   ReportFsePlusParams,
   ReportGiacenzePerMagazzinoParams,
@@ -217,6 +227,7 @@ import type {
   ReportUdsInterventiPerTipoParams,
   ReportUdsInterventiPerZonaParams,
   ReportUdsPersonePerZonaParams,
+  ReportingDashboard,
   ResetPasswordInput,
   Ruolo,
   RuoloInput,
@@ -14704,6 +14715,762 @@ export function useReportFsePlus<TData = Awaited<ReturnType<typeof reportFsePlus
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getReportFsePlusQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportDashboardGeneraleUrl = (params?: GetReportDashboardGeneraleParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/dashboard?${stringifiedParams}` : `/api/report/dashboard`
+}
+
+/**
+ * @summary Dashboard generale integrata dei moduli attivi
+ */
+export const getReportDashboardGenerale = async (params?: GetReportDashboardGeneraleParams, options?: RequestInit): Promise<ReportingDashboard> => {
+
+  return customFetch<ReportingDashboard>(getGetReportDashboardGeneraleUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportDashboardGeneraleQueryKey = (params?: GetReportDashboardGeneraleParams,) => {
+    return [
+    `/api/report/dashboard`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportDashboardGeneraleQueryOptions = <TData = Awaited<ReturnType<typeof getReportDashboardGenerale>>, TError = ErrorType<unknown>>(params?: GetReportDashboardGeneraleParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportDashboardGenerale>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportDashboardGeneraleQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportDashboardGenerale>>> = ({ signal }) => getReportDashboardGenerale(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportDashboardGenerale>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportDashboardGeneraleQueryResult = NonNullable<Awaited<ReturnType<typeof getReportDashboardGenerale>>>
+export type GetReportDashboardGeneraleQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Dashboard generale integrata dei moduli attivi
+ */
+
+export function useGetReportDashboardGenerale<TData = Awaited<ReturnType<typeof getReportDashboardGenerale>>, TError = ErrorType<unknown>>(
+ params?: GetReportDashboardGeneraleParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportDashboardGenerale>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportDashboardGeneraleQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportPacchiUrl = (params?: GetReportPacchiParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/pacchi?${stringifiedParams}` : `/api/report/pacchi`
+}
+
+/**
+ * @summary Report Pacchi Alimentari
+ */
+export const getReportPacchi = async (params?: GetReportPacchiParams, options?: RequestInit): Promise<ReportingDashboard> => {
+
+  return customFetch<ReportingDashboard>(getGetReportPacchiUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportPacchiQueryKey = (params?: GetReportPacchiParams,) => {
+    return [
+    `/api/report/pacchi`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportPacchiQueryOptions = <TData = Awaited<ReturnType<typeof getReportPacchi>>, TError = ErrorType<unknown>>(params?: GetReportPacchiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportPacchi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportPacchiQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportPacchi>>> = ({ signal }) => getReportPacchi(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportPacchi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportPacchiQueryResult = NonNullable<Awaited<ReturnType<typeof getReportPacchi>>>
+export type GetReportPacchiQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report Pacchi Alimentari
+ */
+
+export function useGetReportPacchi<TData = Awaited<ReturnType<typeof getReportPacchi>>, TError = ErrorType<unknown>>(
+ params?: GetReportPacchiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportPacchi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportPacchiQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportCentroAscoltoUrl = (params?: GetReportCentroAscoltoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/centro-ascolto?${stringifiedParams}` : `/api/report/centro-ascolto`
+}
+
+/**
+ * @summary Report Centro di Ascolto
+ */
+export const getReportCentroAscolto = async (params?: GetReportCentroAscoltoParams, options?: RequestInit): Promise<ReportingDashboard> => {
+
+  return customFetch<ReportingDashboard>(getGetReportCentroAscoltoUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportCentroAscoltoQueryKey = (params?: GetReportCentroAscoltoParams,) => {
+    return [
+    `/api/report/centro-ascolto`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportCentroAscoltoQueryOptions = <TData = Awaited<ReturnType<typeof getReportCentroAscolto>>, TError = ErrorType<unknown>>(params?: GetReportCentroAscoltoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportCentroAscolto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportCentroAscoltoQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportCentroAscolto>>> = ({ signal }) => getReportCentroAscolto(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportCentroAscolto>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportCentroAscoltoQueryResult = NonNullable<Awaited<ReturnType<typeof getReportCentroAscolto>>>
+export type GetReportCentroAscoltoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report Centro di Ascolto
+ */
+
+export function useGetReportCentroAscolto<TData = Awaited<ReturnType<typeof getReportCentroAscolto>>, TError = ErrorType<unknown>>(
+ params?: GetReportCentroAscoltoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportCentroAscolto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportCentroAscoltoQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportEmporioUrl = (params?: GetReportEmporioParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/emporio?${stringifiedParams}` : `/api/report/emporio`
+}
+
+/**
+ * @summary Report Emporio Solidale
+ */
+export const getReportEmporio = async (params?: GetReportEmporioParams, options?: RequestInit): Promise<ReportingDashboard> => {
+
+  return customFetch<ReportingDashboard>(getGetReportEmporioUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportEmporioQueryKey = (params?: GetReportEmporioParams,) => {
+    return [
+    `/api/report/emporio`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportEmporioQueryOptions = <TData = Awaited<ReturnType<typeof getReportEmporio>>, TError = ErrorType<unknown>>(params?: GetReportEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportEmporioQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportEmporio>>> = ({ signal }) => getReportEmporio(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportEmporio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportEmporioQueryResult = NonNullable<Awaited<ReturnType<typeof getReportEmporio>>>
+export type GetReportEmporioQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report Emporio Solidale
+ */
+
+export function useGetReportEmporio<TData = Awaited<ReturnType<typeof getReportEmporio>>, TError = ErrorType<unknown>>(
+ params?: GetReportEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportEmporioQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportMensaIntegratoUrl = (params?: GetReportMensaIntegratoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/mensa?${stringifiedParams}` : `/api/report/mensa`
+}
+
+/**
+ * @summary Report Mensa integrato; mantiene il permesso mensa.reports.view
+ */
+export const getReportMensaIntegrato = async (params?: GetReportMensaIntegratoParams, options?: RequestInit): Promise<ReportingDashboard> => {
+
+  return customFetch<ReportingDashboard>(getGetReportMensaIntegratoUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportMensaIntegratoQueryKey = (params?: GetReportMensaIntegratoParams,) => {
+    return [
+    `/api/report/mensa`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportMensaIntegratoQueryOptions = <TData = Awaited<ReturnType<typeof getReportMensaIntegrato>>, TError = ErrorType<unknown>>(params?: GetReportMensaIntegratoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportMensaIntegrato>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportMensaIntegratoQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportMensaIntegrato>>> = ({ signal }) => getReportMensaIntegrato(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportMensaIntegrato>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportMensaIntegratoQueryResult = NonNullable<Awaited<ReturnType<typeof getReportMensaIntegrato>>>
+export type GetReportMensaIntegratoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report Mensa integrato; mantiene il permesso mensa.reports.view
+ */
+
+export function useGetReportMensaIntegrato<TData = Awaited<ReturnType<typeof getReportMensaIntegrato>>, TError = ErrorType<unknown>>(
+ params?: GetReportMensaIntegratoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportMensaIntegrato>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportMensaIntegratoQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportUdsIntegratoUrl = (params?: GetReportUdsIntegratoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/uds?${stringifiedParams}` : `/api/report/uds`
+}
+
+/**
+ * @summary Report Unità di Strada integrato
+ */
+export const getReportUdsIntegrato = async (params?: GetReportUdsIntegratoParams, options?: RequestInit): Promise<ReportingDashboard> => {
+
+  return customFetch<ReportingDashboard>(getGetReportUdsIntegratoUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportUdsIntegratoQueryKey = (params?: GetReportUdsIntegratoParams,) => {
+    return [
+    `/api/report/uds`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportUdsIntegratoQueryOptions = <TData = Awaited<ReturnType<typeof getReportUdsIntegrato>>, TError = ErrorType<unknown>>(params?: GetReportUdsIntegratoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportUdsIntegrato>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportUdsIntegratoQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportUdsIntegrato>>> = ({ signal }) => getReportUdsIntegrato(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportUdsIntegrato>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportUdsIntegratoQueryResult = NonNullable<Awaited<ReturnType<typeof getReportUdsIntegrato>>>
+export type GetReportUdsIntegratoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report Unità di Strada integrato
+ */
+
+export function useGetReportUdsIntegrato<TData = Awaited<ReturnType<typeof getReportUdsIntegrato>>, TError = ErrorType<unknown>>(
+ params?: GetReportUdsIntegratoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportUdsIntegrato>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportUdsIntegratoQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportMagazzinoLogisticaUrl = (params?: GetReportMagazzinoLogisticaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/magazzino-logistica?${stringifiedParams}` : `/api/report/magazzino-logistica`
+}
+
+/**
+ * @summary Report Magazzino e Logistica
+ */
+export const getReportMagazzinoLogistica = async (params?: GetReportMagazzinoLogisticaParams, options?: RequestInit): Promise<ReportingDashboard> => {
+
+  return customFetch<ReportingDashboard>(getGetReportMagazzinoLogisticaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportMagazzinoLogisticaQueryKey = (params?: GetReportMagazzinoLogisticaParams,) => {
+    return [
+    `/api/report/magazzino-logistica`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportMagazzinoLogisticaQueryOptions = <TData = Awaited<ReturnType<typeof getReportMagazzinoLogistica>>, TError = ErrorType<unknown>>(params?: GetReportMagazzinoLogisticaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportMagazzinoLogistica>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportMagazzinoLogisticaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportMagazzinoLogistica>>> = ({ signal }) => getReportMagazzinoLogistica(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportMagazzinoLogistica>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportMagazzinoLogisticaQueryResult = NonNullable<Awaited<ReturnType<typeof getReportMagazzinoLogistica>>>
+export type GetReportMagazzinoLogisticaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Report Magazzino e Logistica
+ */
+
+export function useGetReportMagazzinoLogistica<TData = Awaited<ReturnType<typeof getReportMagazzinoLogistica>>, TError = ErrorType<unknown>>(
+ params?: GetReportMagazzinoLogisticaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportMagazzinoLogistica>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportMagazzinoLogisticaQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportFsePlusIntegratoUrl = (params?: GetReportFsePlusIntegratoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/fse-plus/integrato?${stringifiedParams}` : `/api/report/fse-plus/integrato`
+}
+
+/**
+ * @summary Rendicontazione FSE+ integrata e data-gap SIFEAD
+ */
+export const getReportFsePlusIntegrato = async (params?: GetReportFsePlusIntegratoParams, options?: RequestInit): Promise<ReportingDashboard> => {
+
+  return customFetch<ReportingDashboard>(getGetReportFsePlusIntegratoUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportFsePlusIntegratoQueryKey = (params?: GetReportFsePlusIntegratoParams,) => {
+    return [
+    `/api/report/fse-plus/integrato`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportFsePlusIntegratoQueryOptions = <TData = Awaited<ReturnType<typeof getReportFsePlusIntegrato>>, TError = ErrorType<unknown>>(params?: GetReportFsePlusIntegratoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportFsePlusIntegrato>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportFsePlusIntegratoQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportFsePlusIntegrato>>> = ({ signal }) => getReportFsePlusIntegrato(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportFsePlusIntegrato>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportFsePlusIntegratoQueryResult = NonNullable<Awaited<ReturnType<typeof getReportFsePlusIntegrato>>>
+export type GetReportFsePlusIntegratoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Rendicontazione FSE+ integrata e data-gap SIFEAD
+ */
+
+export function useGetReportFsePlusIntegrato<TData = Awaited<ReturnType<typeof getReportFsePlusIntegrato>>, TError = ErrorType<unknown>>(
+ params?: GetReportFsePlusIntegratoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportFsePlusIntegrato>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportFsePlusIntegratoQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportDrilldownUrl = (params: GetReportDrilldownParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/drilldown?${stringifiedParams}` : `/api/report/drilldown`
+}
+
+/**
+ * @summary Dettaglio paginato e auditabile di un indicatore
+ */
+export const getReportDrilldown = async (params: GetReportDrilldownParams, options?: RequestInit): Promise<ReportDrilldown> => {
+
+  return customFetch<ReportDrilldown>(getGetReportDrilldownUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportDrilldownQueryKey = (params?: GetReportDrilldownParams,) => {
+    return [
+    `/api/report/drilldown`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportDrilldownQueryOptions = <TData = Awaited<ReturnType<typeof getReportDrilldown>>, TError = ErrorType<unknown>>(params: GetReportDrilldownParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportDrilldown>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportDrilldownQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportDrilldown>>> = ({ signal }) => getReportDrilldown(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportDrilldown>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportDrilldownQueryResult = NonNullable<Awaited<ReturnType<typeof getReportDrilldown>>>
+export type GetReportDrilldownQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Dettaglio paginato e auditabile di un indicatore
+ */
+
+export function useGetReportDrilldown<TData = Awaited<ReturnType<typeof getReportDrilldown>>, TError = ErrorType<unknown>>(
+ params: GetReportDrilldownParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportDrilldown>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportDrilldownQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

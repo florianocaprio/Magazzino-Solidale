@@ -95,6 +95,10 @@ Le app girano tramite **workflow** Replit (porte assegnate via `PORT`, non fisse
   - Porta `magazzinoId`+`centroAscoltoId`; filtrabile per entrambi + stato. La nota (Textarea) è inclusa nell'email.
 
 ### Report (Analisi)
+- **Reportistica integrata**: `/report` è la landing “Report e Statistiche”; le viste `/report/dashboard`, `/report/pacchi`, `/report/centro-ascolto`, `/report/emporio`, `/report/mensa`, `/report/uds`, `/report/magazzino-logistica` e `/report/fse-plus` consumano DTO comuni prodotti da `api-server/src/lib/reporting`. KPI, serie, tabelle, qualità dati, drill-down ed export derivano dallo stesso calcolo server-side.
+- Gate e sicurezza: `REPORT` + area `analisi`, modulo sorgente e area sorgente; Mensa mantiene `mensa.reports.view`. I filtri scoped del caller sono bloccati in UI e nuovamente imposti dal backend. La dashboard generale include solo moduli attivi e sorgenti autorizzate al ruolo.
+- Export: workbook multi-foglio e riepilogo PDF; FSE+ mantiene sempre i fogli SIFEAD previsti e scrive “dato non disponibile” quando il dominio non rappresenta una dimensione. Provenienza FSE+ sempre dal lotto movimentato.
+- Compatibilità: `/report-uds` apre la nuova vista UDS; `/mensa/report` e gli endpoint legacy restano attivi finché la parità semantica non è certificata.
 - Stock per magazzino, consegne per mese, consegne per centro, FSE+ — Recharts; ogni lista/entità esportabile in XLSX + PDF (lato client: `xlsx` + `jspdf`/`jspdf-autotable`).
 - Barra filtri globale: **Periodo** (da/a), **Magazzino**, **Centro**. Gli endpoint accettano `da`/`a` (ISO; fallback su `anno` poi anno corrente), `magazzinoId`, `centroAscoltoId` (tutti opzionali). I report consegne fanno join `beneficiari` per il filtro centro (le consegne non hanno colonna centro diretta). FSE+ mantiene il proprio selettore d'anno statutario.
 - **Consegne per Centro** (`GET /report/consegne-per-centro`, prima di FSE+): raggruppa le consegne `stato='effettuata'` per centro (via beneficiario), separando dirette dal centro (`volontario_id IS NULL`) vs con volontari + totale; senza centro → "Senza centro di ascolto".

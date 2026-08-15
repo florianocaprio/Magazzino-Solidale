@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import type { ReportingDashboard } from "@workspace/api-client-react";
 
 export type ExportColumn<T> = {
   header: string;
@@ -175,6 +176,155 @@ export async function exportToPdf<T>(opts: {
 
   drawBrandingFooters(doc, branding, marginX);
   doc.save(`${filename}_${timestamp()}.pdf`);
+}
+
+function reportSheetName(value: string): string {
+  return value.replace(/[\\/?*\[\]:]/g, "_").slice(0, 31) || "Dati";
+}
+
+export function buildReportingWorkbook(
+  report: ReportingDashboard,
+  labels: {
+    title: string;
+    kpi: (key: string) => string;
+    table: (key: string) => string;
+    quality: (key: string) => string;
+    unavailable: string;
+  },
+): XLSX.WorkBook {
+  const workbook = XLSX.utils.book_new();
+  const summary = [
+    [labels.title],
+    ["Da", report.filters.da],
+    ["A", report.filters.a],
+    ["Città ID", report.filters.cittaId ?? "Tutte"],
+    ["Centro di Ascolto ID", report.filters.centroAscoltoId ?? "Tutti"],
+    ["Magazzino ID", report.filters.magazzinoId ?? "Tutti"],
+    ["Mensa ID", report.filters.mensaId ?? "Tutte"],
+    ["Zona UDS ID", report.filters.zonaUdsId ?? "Tutte"],
+    ["Generato il", report.generatedAt],
+    ["Applicazione", "Magazzino Solidale"],
+    ["Europe/Rome"],
+    [],
+    ["Indicatore", "Valore", "Unità", "Disponibilità"],
+    ...report.kpi.map((item) => [
+      labels.kpi(item.key),
+      item.value ?? labels.unavailable,
+      item.unit,
+      item.availability,
+    ]),
+    [],
+    ["Definizioni"],
+    ...report.definitions.map((definition) => [definition]),
+  ];
+  const summarySheet = XLSX.utils.aoa_to_sheet(summary);
+  summarySheet["!cols"] = [{ wch: 42 }, { wch: 24 }, { wch: 18 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(workbook, summarySheet, "00_Riepilogo");
+
+  for (const table of report.tables) {
+    const sheet = XLSX.utils.json_to_sheet(table.rows, {
+      header: table.columns,
+    });
+    sheet["!cols"] = table.columns.map((column) => ({
+      wch: Math.min(
+        50,
+        Math.max(
+          12,
+          column.length + 2,
+          ...table.rows.map((row) => String(row[column] ?? "").length + 2),
+        ),
+      ),
+    }));
+    XLSX.utils.book_append_sheet(
+      workbook,
+      sheet,
+      reportSheetName(table.key || labels.table(table.key)),
+    );
+  }
+
+  const qualityRows = report.quality.map((item) => ({
+    controllo: labels.quality(item.key),
+    conteggio: item.count ?? labels.unavailable,
+    disponibilita: item.availability,
+    note: item.note ?? "",
+  }));
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(qualityRows),
+    report.section === "fse-plus" ? "08_Qualita_Dati" : "Qualita_Dati",
+  );
+
+  if (report.section === "fse-plus") {
+    const existing = new Set(workbook.SheetNames);
+    const required = [
+      "01_Prodotti_FSE",
+      "02_Continuativi",
+      "03_Saltuari_Mensa",
+      "04_Saltuari_Pacchi",
+      "05_Saltuari_Strada",
+      "06_Pacchi_Pasti",
+      "07_Misure_Accompagnamento",
+      "08_Qualita_Dati",
+      "09_Dettaglio_Controllo",
+    ];
+    for (const name of required) {
+      if (existing.has(name)) continue;
+      const sheet = XLSX.utils.aoa_to_sheet([
+        ["Stato", labels.unavailable],
+        ["Nota", "Il modello operativo non rende disponibile questo dettaglio senza inferenze."],
+      ]);
+      XLSX.utils.book_append_sheet(workbook, sheet, name);
+    }
+  }
+
+  return workbook;
+}
+
+export function exportReportingWorkbook(
+  filename: string,
+  report: ReportingDashboard,
+  labels: Parameters<typeof buildReportingWorkbook>[1],
+): void {
+  XLSX.writeFile(buildReportingWorkbook(report, labels), `${filename}_${timestamp()}.xlsx`);
+}
+
+export async function exportReportingPdf(opts: {
+  filename: string;
+  title: string;
+  report: ReportingDashboard;
+  kpiLabel: (key: string) => string;
+  unavailable: string;
+  generatedBy?: string;
+  branding?: PdfExportBranding | null;
+}): Promise<void> {
+  const rows = opts.report.kpi.map((item) => ({
+    indicatore: opts.kpiLabel(item.key),
+    valore: item.value ?? opts.unavailable,
+    unita: item.unit,
+    disponibilita: item.availability,
+  }));
+  const scope = [
+    opts.report.filters.cittaId != null ? `Città ${opts.report.filters.cittaId}` : null,
+    opts.report.filters.centroAscoltoId != null ? `Centro ${opts.report.filters.centroAscoltoId}` : null,
+    opts.report.filters.magazzinoId != null ? `Magazzino ${opts.report.filters.magazzinoId}` : null,
+    opts.report.filters.mensaId != null ? `Mensa ${opts.report.filters.mensaId}` : null,
+    opts.report.filters.zonaUdsId != null ? `Zona UDS ${opts.report.filters.zonaUdsId}` : null,
+  ].filter(Boolean).join(" · ");
+  await exportToPdf({
+    filename: opts.filename,
+    title: opts.title,
+    subtitle: `${opts.report.filters.da} – ${opts.report.filters.a} · Europe/Rome${scope ? ` · ${scope}` : ""}`,
+    rows,
+    columns: [
+      { header: "Indicatore", accessor: (row) => row.indicatore },
+      { header: "Valore", accessor: (row) => row.valore },
+      { header: "Unità", accessor: (row) => row.unita },
+      { header: "Disponibilità", accessor: (row) => row.disponibilita },
+    ],
+    orientation: "landscape",
+    generatedBy: opts.generatedBy,
+    branding: opts.branding,
+  });
 }
 
 export type SchedaLabelValue = { label: string; value: string | number | null | undefined };

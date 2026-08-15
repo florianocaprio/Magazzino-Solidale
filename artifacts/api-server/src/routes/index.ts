@@ -35,6 +35,7 @@ import creditoSolidaleRouter from "./credito-solidale";
 import accessiEmporioRouter from "./accessi-emporio";
 import cassaEmporioRouter from "./cassa-emporio";
 import speseEmporioRouter from "./spese-emporio";
+import reportIntegratoRouter from "./report-integrato";
 import reportRouter from "./report";
 import mensaRouter from "./mensa";
 import authRouter from "./auth";
@@ -94,6 +95,7 @@ router.use(creditoSolidaleRouter);
 router.use(accessiEmporioRouter);
 router.use(cassaEmporioRouter);
 router.use(speseEmporioRouter);
+router.use(reportIntegratoRouter);
 router.use(reportRouter);
 router.use(mensaRouter);
 
