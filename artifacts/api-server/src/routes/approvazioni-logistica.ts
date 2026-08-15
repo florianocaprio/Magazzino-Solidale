@@ -19,8 +19,18 @@ import {
   matricolaVolontarioGiaUsata,
   normalizeVolontarioMatricola,
 } from "../lib/volontariMatricola";
+import {
+  isModuloAttivo,
+  requireAnyModulo,
+  requireModulo,
+} from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use(
+  "/approvazioni-logistica",
+  requireAnyModulo(["VOLONTARI", "MEZZI"]),
+);
 
 const PENDING = "in_attesa";
 
@@ -90,12 +100,16 @@ async function ensureVisibleCentro(rowCentroId: number | null, req: Request) {
 }
 
 router.get("/approvazioni-logistica", async (req, res) => {
+  const [volontariAttivi, mezziAttivi] = await Promise.all([
+    isModuloAttivo("VOLONTARI"),
+    isModuloAttivo("MEZZI"),
+  ]);
   const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
   const scope = andScoped(
     centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)),
     idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds),
   );
-  const volontari = await db
+  const volontari = volontariAttivi ? await db
     .select({
       id: volontariTable.id,
       nome: volontariTable.nome,
@@ -114,13 +128,13 @@ router.get("/approvazioni-logistica", async (req, res) => {
     .from(volontariTable)
     .leftJoin(centriAscoltoTable, eq(volontariTable.centroAscoltoId, centriAscoltoTable.id))
     .where(andScoped(eq(volontariTable.statoApprovazione, PENDING), scope))
-    .orderBy(desc(volontariTable.dataCreazione));
+    .orderBy(desc(volontariTable.dataCreazione)) : [];
 
   const mezzoScope = andScoped(
     centroScopeFilter(mezziTable.centroAscoltoId, callerCentroId(req)),
     idSetScopeFilter(mezziTable.centroAscoltoId, cittaCentroIds),
   );
-  const mezzi = await db
+  const mezzi = mezziAttivi ? await db
     .select({
       id: mezziTable.id,
       codice: mezziTable.codice,
@@ -139,13 +153,13 @@ router.get("/approvazioni-logistica", async (req, res) => {
     .from(mezziTable)
     .leftJoin(centriAscoltoTable, eq(mezziTable.centroAscoltoId, centriAscoltoTable.id))
     .where(andScoped(eq(mezziTable.statoApprovazione, PENDING), mezzoScope))
-    .orderBy(desc(mezziTable.dataCreazione));
+    .orderBy(desc(mezziTable.dataCreazione)) : [];
 
   res.json({ volontari: volontari.map(fmtVolontario), mezzi: mezzi.map(fmtMezzo) });
 });
 
-router.post("/approvazioni-logistica/volontari/:id/approva", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLONTARI"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!(await ensureVisibleCentro(existing.centroAscoltoId ?? null, req))) {
@@ -176,8 +190,8 @@ router.post("/approvazioni-logistica/volontari/:id/approva", async (req, res) =>
   res.json({ ok: true });
 });
 
-router.post("/approvazioni-logistica/volontari/:id/respingi", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.post("/approvazioni-logistica/volontari/:id/respingi", requireModulo("VOLONTARI"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!(await ensureVisibleCentro(existing.centroAscoltoId ?? null, req))) {
@@ -191,8 +205,8 @@ router.post("/approvazioni-logistica/volontari/:id/respingi", async (req, res) =
   res.json({ ok: true });
 });
 
-router.post("/approvazioni-logistica/mezzi/:id/approva", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.post("/approvazioni-logistica/mezzi/:id/approva", requireModulo("MEZZI"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(mezziTable).where(eq(mezziTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!(await ensureVisibleCentro(existing.centroAscoltoId ?? null, req))) {
@@ -206,8 +220,8 @@ router.post("/approvazioni-logistica/mezzi/:id/approva", async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post("/approvazioni-logistica/mezzi/:id/respingi", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.post("/approvazioni-logistica/mezzi/:id/respingi", requireModulo("MEZZI"), async (req, res) => {
+  const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(mezziTable).where(eq(mezziTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!(await ensureVisibleCentro(existing.centroAscoltoId ?? null, req))) {

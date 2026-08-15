@@ -6,8 +6,11 @@ import {
   UpdateTipologiaFornitoreBody,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/auth";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use("/tipologie-fornitore", requireModulo("FORNITORI"));
 
 function fmt(r: typeof tipologieFornitoreTable.$inferSelect) {
   return {

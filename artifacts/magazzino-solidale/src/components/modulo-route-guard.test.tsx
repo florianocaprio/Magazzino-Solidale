@@ -10,6 +10,8 @@ vi.mock("@/lib/use-moduli", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/use-moduli")>()),
   useConfigurazioneAmbienteFlags: () => ({
     isModuloAttivo: (codice: string) => moduleState.activeCodes.has(codice),
+    isAnyModuloAttivo: (codici: readonly string[]) =>
+      codici.some((codice) => moduleState.activeCodes.has(codice)),
   }),
 }));
 
@@ -25,7 +27,7 @@ vi.mock("react-i18next", async (importOriginal) => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-import { RequireAreaModulo, RequireModulo } from "@/App";
+import { RequireAnyModulo, RequireAreaModulo, RequireModulo } from "@/App";
 
 describe("RequireModulo", () => {
   it("blocca il contenuto della route quando il modulo è disabilitato", () => {
@@ -52,6 +54,24 @@ describe("RequireModulo", () => {
 
     expect(html).toContain("pagina scarichi");
     expect(html).not.toContain("superAdmin.moduleDisabled.title");
+  });
+
+  it("applica il prerequisito OR alle route condivise", () => {
+    moduleState.activeCodes.clear();
+    const blocked = renderToStaticMarkup(
+      <RequireAnyModulo codici={["VOLONTARI", "MEZZI"]}>
+        <span>approvazioni logistica</span>
+      </RequireAnyModulo>,
+    );
+    expect(blocked).not.toContain("approvazioni logistica");
+
+    moduleState.activeCodes.add("MEZZI");
+    const allowed = renderToStaticMarkup(
+      <RequireAnyModulo codici={["VOLONTARI", "MEZZI"]}>
+        <span>approvazioni logistica</span>
+      </RequireAnyModulo>,
+    );
+    expect(allowed).toContain("approvazioni logistica");
   });
 
   it("blocca la scheda condivisa al Sociale spento ma la mantiene disponibile a UDS", () => {

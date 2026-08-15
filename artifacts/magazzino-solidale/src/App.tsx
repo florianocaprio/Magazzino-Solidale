@@ -121,7 +121,7 @@ export function RequireModulo({
   return <>{children}</>;
 }
 
-function RequireAnyModulo({
+export function RequireAnyModulo({
   codici,
   children,
 }: {
@@ -310,9 +310,16 @@ function AppRoutes() {
         <Route path="/centri-ascolto">
           {() => (
             <Guard area="amministrazione">
-              <RequireModulo codice="CENTRO_ASCOLTO">
+              <RequireAnyModulo
+                codici={[
+                  "CENTRO_ASCOLTO",
+                  "EMPORIO_SOLIDALE",
+                  "MENSA",
+                  "CREDITO_SOLIDALE",
+                ]}
+              >
                 <CentriAscolto />
-              </RequireModulo>
+              </RequireAnyModulo>
             </Guard>
           )}
         </Route>
@@ -436,7 +443,9 @@ function AppRoutes() {
         <Route path="/approvazioni-logistica">
           {() => (
             <Guard area="logistica">
-              <ApprovazioniLogistica />
+              <RequireAnyModulo codici={["VOLONTARI", "MEZZI"]}>
+                <ApprovazioniLogistica />
+              </RequireAnyModulo>
             </Guard>
           )}
         </Route>
@@ -500,7 +509,9 @@ function AppRoutes() {
         <Route path="/ruoli-volontari">
           {() => (
             <Guard area="amministrazione">
-              <RuoliVolontari />
+              <RequireModulo codice="VOLONTARI">
+                <RuoliVolontari />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -516,7 +527,9 @@ function AppRoutes() {
         <Route path="/tipologie-fornitore">
           {() => (
             <Guard area="amministrazione">
-              <TipologieFornitore />
+              <RequireModulo codice="FORNITORI">
+                <TipologieFornitore />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
