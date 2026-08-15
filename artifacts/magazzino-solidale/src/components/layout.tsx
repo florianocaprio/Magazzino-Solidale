@@ -37,7 +37,6 @@ import {
   Languages,
   ChevronDown,
   LogOut,
-  Utensils,
   ScanLine,
   Soup,
   FileWarning,
@@ -257,15 +256,6 @@ const NAV_ITEMS: NavItem[] = [
     area: "mensa",
     moduloCodice: "MENSA",
     permission: "mensa.view",
-  },
-  {
-    key: "mensaMense",
-    url: "/mensa/mense",
-    icon: Utensils,
-    groupKey: "mensa",
-    area: "mensa",
-    moduloCodice: "MENSA",
-    permission: "mensa.manage",
   },
   {
     key: "mensaAbilitazioni",

@@ -321,7 +321,6 @@ function AppRoutes() {
 
         <Route path="/mensa/postazione">{() => <MensaRoute view="postazione" permission="mensa.access.scan" />}</Route>
         <Route path="/mensa/pasti">{() => <MensaRoute view="pasti" permission="mensa.view" />}</Route>
-        <Route path="/mensa/mense">{() => <MensaRoute view="mense" permission="mensa.manage" />}</Route>
         <Route path="/mensa/abilitazioni">{() => <MensaRoute view="abilitazioni" permission="mensa.eligibility.manage" />}</Route>
         <Route path="/mensa/trasferimenti">{() => <MensaRoute view="trasferimenti" permission="mensa.transfers.manage" />}</Route>
         <Route path="/mensa/eccezioni">{() => <MensaRoute view="eccezioni" permission="mensa.view" />}</Route>

@@ -18,6 +18,11 @@ export interface MagazzinoInput {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /**
+     * Area identifier; required when tipoMagazzino is mensa
+     * @nullable
+     */
+  cittaId?: number | null;
   tipoMagazzino?: MagazzinoInputTipoMagazzino;
   stato?: string;
   note?: string;

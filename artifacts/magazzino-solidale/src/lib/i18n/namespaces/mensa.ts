@@ -3,7 +3,6 @@ const it = {
     group: "Mensa",
     mensaPostazione: "Postazione Mensa",
     mensaPasti: "Pasti di oggi",
-    mensaMense: "Mense",
     mensaAbilitazioni: "Abilitazioni",
     mensaTrasferimenti: "Trasferimenti",
     mensaEccezioni: "Eccezioni",
@@ -12,7 +11,6 @@ const it = {
   title: {
     postazione: "Postazione Mensa",
     pasti: "Pasti di oggi",
-    mense: "Mense",
     abilitazioni: "Abilitazioni",
     trasferimenti: "Rifornimenti Mensa",
     eccezioni: "Eccezioni di accesso",
@@ -35,7 +33,6 @@ const en = {
     group: "Canteen",
     mensaPostazione: "Canteen station",
     mensaPasti: "Today's meals",
-    mensaMense: "Canteens",
     mensaAbilitazioni: "Eligibility",
     mensaTrasferimenti: "Transfers",
     mensaEccezioni: "Exceptions",

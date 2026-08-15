@@ -681,6 +681,7 @@ export const getCreateMagazzinoUrl = () => {
 }
 
 /**
+ * Creates a warehouse. When tipoMagazzino is mensa, cittaId (the Area) is required and the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
 export const createMagazzino = async (magazzinoInput: MagazzinoInput, options?: RequestInit): Promise<Magazzino> => {
@@ -822,6 +823,9 @@ export const getUpdateMagazzinoUrl = (id: number,) => {
   return `/api/magazzini/${id}`
 }
 
+/**
+ * Updates a warehouse. Mensa warehouse changes are propagated to the operational Mensa detail; an existing Mensa cannot be changed to a different warehouse type.
+ */
 export const updateMagazzino = async (id: number,
     magazzinoUpdate: MagazzinoUpdate, options?: RequestInit): Promise<Magazzino> => {
 
@@ -838,7 +842,7 @@ export const updateMagazzino = async (id: number,
 
 
 
-export const getUpdateMagazzinoMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateMagazzinoMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMagazzino>>, TError,{id: number;data: BodyType<MagazzinoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateMagazzino>>, TError,{id: number;data: BodyType<MagazzinoUpdate>}, TContext> => {
 
@@ -867,9 +871,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateMagazzinoMutationResult = NonNullable<Awaited<ReturnType<typeof updateMagazzino>>>
     export type UpdateMagazzinoMutationBody = BodyType<MagazzinoUpdate>
-    export type UpdateMagazzinoMutationError = ErrorType<unknown>
+    export type UpdateMagazzinoMutationError = ErrorType<void>
 
-    export const useUpdateMagazzino = <TError = ErrorType<unknown>,
+    export const useUpdateMagazzino = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMagazzino>>, TError,{id: number;data: BodyType<MagazzinoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateMagazzino>>,
@@ -902,7 +906,7 @@ export const deleteMagazzino = async (id: number, options?: RequestInit): Promis
 
 
 
-export const getDeleteMagazzinoMutationOptions = <TError = ErrorType<unknown>,
+export const getDeleteMagazzinoMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMagazzino>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteMagazzino>>, TError,{id: number}, TContext> => {
 
@@ -931,9 +935,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteMagazzinoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMagazzino>>>
 
-    export type DeleteMagazzinoMutationError = ErrorType<unknown>
+    export type DeleteMagazzinoMutationError = ErrorType<void>
 
-    export const useDeleteMagazzino = <TError = ErrorType<unknown>,
+    export const useDeleteMagazzino = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMagazzino>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteMagazzino>>,

@@ -88,6 +88,7 @@ export const ListMagazziniResponse = zod.array(ListMagazziniResponseItem)
 
 
 /**
+ * Creates a warehouse. When tipoMagazzino is mensa, cittaId (the Area) is required and the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
 export const CreateMagazzinoBody = zod.object({
@@ -100,6 +101,7 @@ export const CreateMagazzinoBody = zod.object({
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish().describe('Area identifier; required when tipoMagazzino is mensa'),
   "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']).optional(),
   "stato": zod.string().optional(),
   "note": zod.string().optional()
@@ -130,11 +132,15 @@ export const GetMagazzinoResponse = zod.object({
 })
 
 
+/**
+ * Updates a warehouse. Mensa warehouse changes are propagated to the operational Mensa detail; an existing Mensa cannot be changed to a different warehouse type.
+ */
 export const UpdateMagazzinoParams = zod.object({
   "id": zod.coerce.number()
 })
 
 export const UpdateMagazzinoBody = zod.object({
+  "codice": zod.string().optional(),
   "nome": zod.string().optional(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
@@ -143,6 +149,7 @@ export const UpdateMagazzinoBody = zod.object({
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
+  "cittaId": zod.number().nullish().describe('Area identifier; required when the resulting type is mensa'),
   "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']).optional(),
   "stato": zod.string().optional(),
   "note": zod.string().optional()

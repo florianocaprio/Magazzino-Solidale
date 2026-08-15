@@ -350,6 +350,11 @@ export interface MagazzinoInput {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /**
+     * Area identifier; required when tipoMagazzino is mensa
+     * @nullable
+     */
+  cittaId?: number | null;
   tipoMagazzino?: MagazzinoInputTipoMagazzino;
   stato?: string;
   note?: string;
@@ -366,6 +371,7 @@ export const MagazzinoUpdateTipoMagazzino = {
 } as const;
 
 export interface MagazzinoUpdate {
+  codice?: string;
   nome?: string;
   indirizzo?: string;
   comune?: string;
@@ -375,6 +381,11 @@ export interface MagazzinoUpdate {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /**
+     * Area identifier; required when the resulting type is mensa
+     * @nullable
+     */
+  cittaId?: number | null;
   tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
   note?: string;

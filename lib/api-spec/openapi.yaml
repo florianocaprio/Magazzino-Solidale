@@ -118,6 +118,9 @@ paths:
       operationId: createMagazzino
       tags: [magazzini]
       summary: Create a warehouse
+      description: >-
+        Creates a warehouse. When tipoMagazzino is mensa, cittaId (the Area)
+        is required and the operational Mensa detail is created atomically.
       requestBody:
         required: true
         content:
@@ -152,6 +155,10 @@ paths:
     patch:
       operationId: updateMagazzino
       tags: [magazzini]
+      description: >-
+        Updates a warehouse. Mensa warehouse changes are propagated to the
+        operational Mensa detail; an existing Mensa cannot be changed to a
+        different warehouse type.
       parameters:
         - name: id
           in: path
@@ -171,6 +178,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Magazzino"
+        "409":
+          description: The requested type change is incompatible with an existing Mensa
     delete:
       operationId: deleteMagazzino
       tags: [magazzini]
@@ -183,6 +192,10 @@ paths:
       responses:
         "204":
           description: Deleted
+        "409":
+          description: >-
+            The warehouse is referenced by an issued delivery note or by
+            operational history and must be deactivated instead
 
   # ─── PRODOTTI ────────────────────────────────────────────────────────────────
   /prodotti:
@@ -5766,6 +5779,9 @@ components:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+          description: Area identifier; required when tipoMagazzino is mensa
         tipoMagazzino:
           type: string
           enum: [logistico, emporio, misto, mensa]
@@ -5778,6 +5794,8 @@ components:
     MagazzinoUpdate:
       type: object
       properties:
+        codice:
+          type: string
         nome:
           type: string
         indirizzo:
@@ -5794,6 +5812,9 @@ components:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
+        cittaId:
+          type: ["integer", "null"]
+          description: Area identifier; required when the resulting type is mensa
         tipoMagazzino:
           type: string
           enum: [logistico, emporio, misto, mensa]

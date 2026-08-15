@@ -48,6 +48,10 @@ const tipoMagazzinoBadgeClasses: Record<string, string> = {
   mensa: "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20",
 };
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Operazione non riuscita";
+}
+
 export default function Magazzini() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -126,6 +130,10 @@ export default function Magazzini() {
       : !cittaStr || cittaStr === NO_CITTA
         ? null
         : parseInt(cittaStr, 10);
+    if (rest.tipoMagazzino === "mensa" && cittaId == null) {
+      form.setError("cittaId", { message: t("magazzini.mensaAreaRequired") });
+      return;
+    }
     const payload = { ...rest, centroAscoltoId, cittaId };
     if (editingId) {
       updateMagazzino.mutate({ id: editingId, data: payload }, {
@@ -133,7 +141,12 @@ export default function Magazzini() {
           queryClient.invalidateQueries({ queryKey: getListMagazziniQueryKey() });
           toast({ title: t("magazzini.toastUpdated") });
           setIsFormOpen(false);
-        }
+        },
+        onError: (error) => toast({
+          title: t("magazzini.toastUpdateFailed"),
+          description: errorMessage(error),
+          variant: "destructive",
+        }),
       });
     } else {
       createMagazzino.mutate({ data: payload }, {
@@ -141,7 +154,12 @@ export default function Magazzini() {
           queryClient.invalidateQueries({ queryKey: getListMagazziniQueryKey() });
           toast({ title: t("magazzini.toastCreated") });
           setIsFormOpen(false);
-        }
+        },
+        onError: (error) => toast({
+          title: t("magazzini.toastCreateFailed"),
+          description: errorMessage(error),
+          variant: "destructive",
+        }),
       });
     }
   };
@@ -153,7 +171,15 @@ export default function Magazzini() {
         queryClient.invalidateQueries({ queryKey: getListMagazziniQueryKey() });
         toast({ title: t("magazzini.toastDeleted") });
         setDeletingId(null);
-      }
+      },
+      onError: (error) => {
+        toast({
+          title: t("magazzini.toastDeleteFailed"),
+          description: errorMessage(error),
+          variant: "destructive",
+        });
+        setDeletingId(null);
+      },
     });
   };
 
@@ -219,6 +245,7 @@ export default function Magazzini() {
                   <SelectItem value="logistico">{t("magazzini.tipo_logistico")}</SelectItem>
                   <SelectItem value="emporio">{t("magazzini.tipo_emporio")}</SelectItem>
                   <SelectItem value="misto">{t("magazzini.tipo_misto")}</SelectItem>
+                  <SelectItem value="mensa">{t("magazzini.tipo_mensa")}</SelectItem>
                 </SelectContent>
               </Select>
               {!isCittaLocked && (

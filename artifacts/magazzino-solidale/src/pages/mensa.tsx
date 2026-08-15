@@ -8,15 +8,12 @@ import {
   useAutorizzaEccezioneMensa,
   useAvviaTrasferimento,
   useConfermaTrasferimento,
-  useCreateMensa,
   useCreateAccessoTemporaneoMensa,
   useCreateMensaAbilitazione,
   useCreatePastoMensa,
   useCreateTesseraBeneficiario,
   useCreateTrasferimentoMensa,
   useGetMensaReport,
-  useListCentriAscolto,
-  useListCitta,
   useListEccezioniMensa,
   useListGiacenzeMensa,
   useListMagazziniMensa,
@@ -65,15 +62,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
-import {
-  MensaMagazzinoForm,
-  type MensaMagazzinoValues,
-} from "@/components/mensa-magazzino-form";
 
 export type MensaView =
   | "postazione"
   | "pasti"
-  | "mense"
   | "abilitazioni"
   | "trasferimenti"
   | "eccezioni"
@@ -828,95 +820,6 @@ function PastiView() {
   );
 }
 
-function MenseView() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const { data: mense = [] } = useListMense();
-  const { data: areas = [] } = useListCitta();
-  const { data: centri = [] } = useListCentriAscolto();
-  const create = useCreateMensa();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const submit = (form: MensaMagazzinoValues) => {
-    create.mutate(
-      {
-        data: {
-          codice: form.codice || undefined,
-          nome: form.nome,
-          cittaId: form.cittaId,
-          centroAscoltoId: form.centroAscoltoId,
-          indirizzo: form.indirizzo || null,
-          comune: form.comune || null,
-          zona: form.zona || null,
-          responsabile: form.responsabile || null,
-          telefono: form.telefono || null,
-          email: form.email || null,
-          stato: form.stato,
-          note: form.note || null,
-        },
-      },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["/api/mensa/mense"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/magazzini"] });
-          setIsFormOpen(false);
-          toast({ title: "Mensa creata" });
-        },
-        onError: (error) =>
-          toast({
-            title: "Mensa non creata",
-            description: errorMessage(error),
-            variant: "destructive",
-          }),
-      },
-    );
-  };
-  return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-start justify-between gap-4">
-        <PageTitle view="mense" />
-        <Button onClick={() => setIsFormOpen(true)}>Nuova Mensa</Button>
-      </div>
-      <MensaMagazzinoForm
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        onSubmit={submit}
-        areas={areas}
-        centri={centri}
-        lockedAreaId={user?.cittaId}
-        lockedCentroId={user?.centroAscoltoId}
-        pending={create.isPending}
-      />
-      <div className="grid gap-4 md:grid-cols-2">
-        {mense.map((mensa) => (
-          <Card key={mensa.id}>
-            <CardHeader>
-              <CardTitle className="flex justify-between">
-                {mensa.nome}
-                <Badge variant={mensa.attiva ? "default" : "secondary"}>
-                  {mensa.attiva ? "Attiva" : "Disattivata"}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>{mensa.codice}</p>
-              <p className="text-sm text-muted-foreground">
-                Area: {mensa.cittaNome ?? mensa.cittaId}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Centro di Ascolto: {mensa.centroAscoltoNome ?? "Tutti i centri"}
-              </p>
-              {mensa.indirizzo && (
-                <p className="text-sm text-muted-foreground">{mensa.indirizzo}</p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function AbilitazioniView() {
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
@@ -1394,8 +1297,6 @@ export default function MensaPage({ view }: { view: MensaView }) {
         return <MensaPostazione />;
       case "pasti":
         return <PastiView />;
-      case "mense":
-        return <MenseView />;
       case "abilitazioni":
         return <AbilitazioniView />;
       case "trasferimenti":
