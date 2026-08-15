@@ -19,8 +19,14 @@ import {
   andScoped,
 } from "../lib/centroScope";
 import { PRENOTAZIONE_MAGAZZINO_ATTIVA, parseDbNumber } from "../lib/disponibilitaMagazzino";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use(
+  "/preparazione-consegne",
+  requireModulo("MAGAZZINO_SOLIDALE"),
+);
 
 /**
  * Goods to prepare for the PLANNED deliveries of a warehouse.

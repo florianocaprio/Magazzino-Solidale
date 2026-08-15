@@ -996,6 +996,53 @@ describe("Modulo Mensa", () => {
     expect(replay.body.idempotentReplay).toBe(true);
   });
 
+  it("crea una persona provvisoria anche con il servizio Centro di Ascolto disabilitato", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    await updateModuloAmbiente("CENTRO_ASCOLTO", false, null);
+
+    try {
+      const response = await request(app)
+        .post("/mensa/accessi/temporaneo")
+        .send({
+          mensaId: fixture.mensaA,
+          idempotencyKey: `temporary-no-centro-${rnd()}`,
+          motivo: "Persona senza presa in carico del Centro di Ascolto",
+          nuovaPersona: {
+            nome: `Nuovo${rnd()}`,
+            cognome: `Mensa${rnd()}`,
+            sesso: "F",
+            fasciaEtaPresunta: "30_64",
+          },
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.temporaneo).toBe(true);
+      ids.beneficiaries.push(Number(response.body.beneficiarioId));
+      const [created] = await db
+        .select()
+        .from(beneficiariTable)
+        .where(eq(beneficiariTable.id, Number(response.body.beneficiarioId)));
+      expect(created.statoAnagrafica).toBe("provvisoria");
+      expect(created.centroAscoltoId).toBeNull();
+    } finally {
+      await updateModuloAmbiente("CENTRO_ASCOLTO", true, null);
+    }
+  });
+
+  it("continua a verificare accessi quando il servizio Magazzino Solidale è disabilitato", async () => {
+    const fixture = await createFixture();
+    await updateModuloAmbiente("MAGAZZINO_SOLIDALE", false, null);
+
+    try {
+      const response = await verify(makeApp(fixture), fixture);
+      expect(response.status).toBe(201);
+      expect(response.body.esito).toBe("consentito");
+    } finally {
+      await updateModuloAmbiente("MAGAZZINO_SOLIDALE", true, null);
+    }
+  });
+
   it("impone la conferma dei duplicati e permette di scegliere un esistente senza abilitazione", async () => {
     const fixture = await createFixture();
     const app = makeApp(fixture);

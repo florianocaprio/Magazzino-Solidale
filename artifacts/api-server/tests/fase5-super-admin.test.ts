@@ -8,7 +8,7 @@ import configurazioneAmbienteRouter from "../src/routes/configurazione-ambiente"
 import impostazioniModuliRouter from "../src/routes/impostazioni-moduli";
 import superAdminRouter from "../src/routes/super-admin";
 import utentiRouter from "../src/routes/utenti";
-import { requireModulo } from "../src/lib/featureFlags";
+import { requireAnyModulo, requireModulo } from "../src/lib/featureFlags";
 import { ensureFase5Bootstrap, getConfigurazioneAmbiente, listModuliFunzionali, updateConfigurazioneAmbiente, updateModuloAmbiente, type ConfigurazioneAmbienteDto } from "../src/lib/configurazioneAmbiente";
 import type { SessionUser } from "../src/middlewares/auth";
 import { loadSessionUser } from "../src/middlewares/auth";
@@ -26,6 +26,8 @@ let originalConfig: ConfigurazioneAmbienteDto;
 let originalPredittivoAttivo = true;
 let originalEmporioAttivo = true;
 let originalUdsAttivo = true;
+let originalCentroAscoltoAttivo = true;
+let originalMagazzinoSolidaleAttivo = true;
 
 function appAs(user: SessionUser): Express {
   const app = express();
@@ -44,6 +46,14 @@ function appAs(user: SessionUser): Express {
   app.get("/test-modulo-inesistente", requireModulo("NON_ESISTE"), (_req, res) => {
     res.status(204).send();
   });
+  app.get("/test-centro-ascolto", requireModulo("CENTRO_ASCOLTO"), (_req, res) => {
+    res.status(204).send();
+  });
+  app.get(
+    "/test-interventi-condivisi",
+    requireAnyModulo(["CENTRO_ASCOLTO", "UDS"]),
+    (_req, res) => res.status(204).send(),
+  );
   return app;
 }
 
@@ -161,6 +171,8 @@ beforeEach(async () => {
   originalPredittivoAttivo = predittivo?.attivo ?? true;
   originalEmporioAttivo = (await listModuliFunzionali()).find((m) => m.codice === "EMPORIO_SOLIDALE")?.attivo ?? true;
   originalUdsAttivo = (await listModuliFunzionali()).find((m) => m.codice === "UDS")?.attivo ?? true;
+  originalCentroAscoltoAttivo = (await listModuliFunzionali()).find((m) => m.codice === "CENTRO_ASCOLTO")?.attivo ?? true;
+  originalMagazzinoSolidaleAttivo = (await listModuliFunzionali()).find((m) => m.codice === "MAGAZZINO_SOLIDALE")?.attivo ?? true;
   superUser = await createAdminUser(true);
   adminUser = await createAdminUser(false);
 });
@@ -170,6 +182,8 @@ afterEach(async () => {
   await updateModuloAmbiente("PREDITTIVO", originalPredittivoAttivo, null);
   await updateModuloAmbiente("EMPORIO_SOLIDALE", originalEmporioAttivo, null);
   await updateModuloAmbiente("UDS", originalUdsAttivo, null);
+  await updateModuloAmbiente("CENTRO_ASCOLTO", originalCentroAscoltoAttivo, null);
+  await updateModuloAmbiente("MAGAZZINO_SOLIDALE", originalMagazzinoSolidaleAttivo, null);
   if (createdSystemLogIds.length > 0) {
     await db
       .delete(systemLogsTable)
@@ -290,6 +304,34 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     expect(list.status).toBe(200);
     expect(list.body.some((m: { codice: string }) => m.codice === "DASHBOARD")).toBe(true);
     expect(list.body.some((m: { codice: string }) => m.codice === "PREDITTIVO")).toBe(true);
+    for (const expected of [
+      ["MAGAZZINO_SOLIDALE", "Magazzino Solidale"],
+      ["CENTRO_ASCOLTO", "Centro di Ascolto"],
+    ]) {
+      const modulo = list.body.find((m: { codice: string }) => m.codice === expected[0]);
+      expect(modulo).toMatchObject({
+        nome: expected[1],
+        categoria: "servizi",
+        core: false,
+        attivoDefault: true,
+      });
+    }
+    const servizi = list.body
+      .filter((m: { categoria: string }) => m.categoria === "servizi")
+      .map((m: { codice: string }) => m.codice);
+    expect(servizi).toEqual(
+      expect.arrayContaining([
+        "MAGAZZINO_SOLIDALE",
+        "CENTRO_ASCOLTO",
+        "EMPORIO_SOLIDALE",
+        "MENSA",
+        "UDS",
+      ]),
+    );
+    expect(list.body.find((m: { codice: string }) => m.codice === "BENEFICIARI")).toMatchObject({
+      core: true,
+      categoria: "tecnica",
+    });
 
     const disabled = await request(appAs(superUser)).patch("/super-admin/moduli/PREDITTIVO").send({ attivo: false });
     expect(disabled.status).toBe(200);
@@ -341,6 +383,17 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
 
     expect(denied.status).toBe(403);
     expect(denied.body.error).toBe("Modulo NON_ESISTE non abilitato per questo ambiente");
+  });
+
+  it("disabilita il workflow Centro senza bloccare il motore condiviso con UDS", async () => {
+    await updateModuloAmbiente("CENTRO_ASCOLTO", false, superUser.id);
+    await updateModuloAmbiente("UDS", true, superUser.id);
+
+    const center = await request(appAs(superUser)).get("/test-centro-ascolto");
+    const shared = await request(appAs(superUser)).get("/test-interventi-condivisi");
+
+    expect(center.status).toBe(403);
+    expect(shared.status).toBe(204);
   });
 
   it("consente al Super Admin di consultare i log di sistema", async () => {

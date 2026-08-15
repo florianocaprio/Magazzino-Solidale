@@ -27,8 +27,11 @@ import {
   calcolaDisponibilitaMagazzino,
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use("/scarichi", requireModulo("SCARICHI"));
 
 const VALID_CAUSALI = ["deteriorata", "rubata", "scaduta", "altro"] as const;
 

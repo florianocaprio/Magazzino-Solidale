@@ -74,19 +74,21 @@ import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "@/lib/i18n";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 
-type NavItem = {
+export type NavItem = {
   key: string;
   url: string;
   icon: LucideIcon;
   groupKey: string;
   area?: string;
   moduloCodice?: string;
+  moduloCodiciAll?: readonly string[];
+  moduloCodiciAny?: readonly string[];
   superAdmin?: boolean;
   public?: boolean;
   permission?: string;
 };
 
-const NAV_ITEMS: NavItem[] = [
+export const NAV_ITEMS: NavItem[] = [
   {
     key: "dashboard",
     url: "/",
@@ -144,6 +146,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: PackageCheck,
     groupKey: "magazzino",
     area: "magazzino",
+    moduloCodice: "MAGAZZINO_SOLIDALE",
   },
 
   {
@@ -152,6 +155,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Building2,
     groupKey: "amministrazione",
     area: "amministrazione",
+    moduloCodice: "CENTRO_ASCOLTO",
   },
   {
     key: "beneficiari",
@@ -159,6 +163,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Users,
     groupKey: "sociale",
     area: "sociale",
+    moduloCodice: "CENTRO_ASCOLTO",
   },
   {
     key: "interventi",
@@ -166,6 +171,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: ClipboardList,
     groupKey: "sociale",
     area: "sociale",
+    moduloCodice: "CENTRO_ASCOLTO",
   },
   {
     key: "consegne",
@@ -173,7 +179,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Truck,
     groupKey: "sociale",
     area: "sociale",
-    moduloCodice: "CONSEGNE",
+    moduloCodiciAll: ["CENTRO_ASCOLTO", "CONSEGNE"],
   },
   {
     key: "bolle",
@@ -181,7 +187,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: FileText,
     groupKey: "magazzino",
     area: "sociale",
-    moduloCodice: "BOLLE",
+    moduloCodiciAll: ["MAGAZZINO_SOLIDALE", "BOLLE"],
   },
   {
     key: "turni",
@@ -189,13 +195,15 @@ const NAV_ITEMS: NavItem[] = [
     icon: CalendarDays,
     groupKey: "sociale",
     area: "sociale",
+    moduloCodice: "CENTRO_ASCOLTO",
   },
   {
     key: "scarichi",
     url: "/scarichi",
     icon: PackageMinus,
-    groupKey: "sociale",
-    area: "sociale",
+    groupKey: "magazzino",
+    area: "magazzino",
+    moduloCodice: "SCARICHI",
   },
 
   {
@@ -212,7 +220,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: CreditCard,
     groupKey: "emporio",
     area: "emporio",
-    moduloCodice: "CREDITO_SOLIDALE",
+    moduloCodiciAll: ["EMPORIO_SOLIDALE", "CREDITO_SOLIDALE"],
   },
   {
     key: "politicheCreditoSolidale",
@@ -220,7 +228,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: SlidersHorizontal,
     groupKey: "emporio",
     area: "amministrazione",
-    moduloCodice: "CREDITO_SOLIDALE",
+    moduloCodiciAll: ["EMPORIO_SOLIDALE", "CREDITO_SOLIDALE"],
   },
   {
     key: "emporioAccessi",
@@ -348,6 +356,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Store,
     groupKey: "logistica",
     area: "logistica",
+    moduloCodice: "FORNITORI",
   },
   {
     key: "approvvigionamenti",
@@ -364,6 +373,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
     groupKey: "analisi",
     area: "analisi",
+    moduloCodiciAll: ["CENTRO_ASCOLTO", "REPORT"],
   },
   {
     key: "reportUds",
@@ -371,7 +381,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Footprints,
     groupKey: "analisi",
     area: "analisi",
-    moduloCodice: "UDS",
+    moduloCodiciAll: ["REPORT", "UDS"],
   },
 
   {
@@ -416,6 +426,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: ListChecks,
     groupKey: "amministrazione",
     area: "amministrazione",
+    moduloCodiciAny: ["CENTRO_ASCOLTO", "UDS"],
   },
   {
     key: "tipologieFornitore",
@@ -515,6 +526,26 @@ function NavMenuLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   );
 }
 
+export function isNavItemEnabledByModules(
+  item: NavItem,
+  isModuloAttivo: (codice?: string | null) => boolean,
+): boolean {
+  if (item.moduloCodice && !isModuloAttivo(item.moduloCodice)) return false;
+  if (
+    item.moduloCodiciAll &&
+    !item.moduloCodiciAll.every((codice) => isModuloAttivo(codice))
+  ) {
+    return false;
+  }
+  if (
+    item.moduloCodiciAny &&
+    !item.moduloCodiciAny.some((codice) => isModuloAttivo(codice))
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, hasPermission, logout } = useAuth();
@@ -525,7 +556,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     if (item.superAdmin) return user?.isSuperAdmin === true;
     if (item.public) return true;
     return !!item.area && hasArea(item.area) && (!item.permission || hasPermission(item.permission));
-  }).filter((item) => isModuloAttivo(item.moduloCodice));
+  }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo));
 
   const groupedNav = visibleItems.reduce(
     (acc, item) => {

@@ -6,8 +6,14 @@ import {
   UpdateTipoInterventoBody,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/auth";
+import { requireAnyModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use(
+  "/tipi-intervento",
+  requireAnyModulo(["CENTRO_ASCOLTO", "UDS"]),
+);
 
 function fmt(r: typeof tipiInterventoTable.$inferSelect) {
   return {

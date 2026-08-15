@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetConfigurazioneAmbientePubblicaQueryKey,
@@ -58,6 +58,8 @@ export default function SuperAdminModuli() {
 
   const moduli = useMemo(
     () => [...(query.data ?? [])].sort((a, b) => {
+      if (a.categoria === "servizi" && b.categoria !== "servizi") return -1;
+      if (b.categoria === "servizi" && a.categoria !== "servizi") return 1;
       const byCategory = a.categoria.localeCompare(b.categoria);
       if (byCategory !== 0) return byCategory;
       return a.ordine - b.ordine;
@@ -146,49 +148,65 @@ export default function SuperAdminModuli() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {moduli.map((modulo) => {
+              {moduli.map((modulo, index) => {
                 const isPending = pendingCodice === modulo.codice;
+                const startsServices =
+                  modulo.categoria === "servizi" && index === 0;
+                const startsCapabilities =
+                  modulo.categoria !== "servizi" &&
+                  (index === 0 || moduli[index - 1]?.categoria === "servizi");
                 const actionLabel = modulo.attivo
                   ? t("superAdmin.modules.disableAction")
                   : t("superAdmin.modules.enableAction");
                 return (
-                  <TableRow key={modulo.codice}>
-                    <TableCell className="font-mono text-xs">{modulo.codice}</TableCell>
-                    <TableCell className="font-medium">{modulo.nome}</TableCell>
-                    <TableCell className="max-w-md text-muted-foreground">{modulo.descrizione}</TableCell>
-                    <TableCell>{modulo.categoria}</TableCell>
-                    <TableCell>
-                      <Badge variant={modulo.core ? "default" : "secondary"}>
-                        {modulo.core ? t("superAdmin.modules.core") : t("superAdmin.modules.optional")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{statusBadge(modulo.attivo, t)}</TableCell>
-                    <TableCell>{modulo.ordine}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex flex-col items-end gap-1">
-                        <div className="inline-flex min-w-36 items-center justify-end gap-2">
-                          {isPending && (
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <Fragment key={modulo.codice}>
+                    {(startsServices || startsCapabilities) && (
+                      <TableRow className="bg-muted/60 hover:bg-muted/60">
+                        <TableCell colSpan={8} className="font-semibold uppercase tracking-wide">
+                          {startsServices
+                            ? t("superAdmin.modules.servicesGroup")
+                            : t("superAdmin.modules.capabilitiesGroup")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    <TableRow>
+                      <TableCell className="font-mono text-xs">{modulo.codice}</TableCell>
+                      <TableCell className="font-medium">{modulo.nome}</TableCell>
+                      <TableCell className="max-w-md text-muted-foreground">{modulo.descrizione}</TableCell>
+                      <TableCell>{modulo.categoria}</TableCell>
+                      <TableCell>
+                        <Badge variant={modulo.core ? "default" : "secondary"}>
+                          {modulo.core ? t("superAdmin.modules.core") : t("superAdmin.modules.optional")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{statusBadge(modulo.attivo, t)}</TableCell>
+                      <TableCell>{modulo.ordine}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex flex-col items-end gap-1">
+                          <div className="inline-flex min-w-36 items-center justify-end gap-2">
+                            {isPending && (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                            <Switch
+                              checked={modulo.attivo}
+                              disabled={modulo.core || isPending}
+                              onCheckedChange={(checked) => setModulo(modulo, checked)}
+                              aria-label={modulo.core ? t("superAdmin.modules.cannotDisableCore") : actionLabel}
+                              title={modulo.core ? t("superAdmin.modules.cannotDisableCore") : actionLabel}
+                            />
+                            <span className="w-24 text-left text-xs text-muted-foreground">
+                              {isPending ? t("superAdmin.modules.updating") : actionLabel}
+                            </span>
+                          </div>
+                          {modulo.core && (
+                            <span className="text-xs text-muted-foreground">
+                              {t("superAdmin.modules.cannotDisableCore")}
+                            </span>
                           )}
-                          <Switch
-                            checked={modulo.attivo}
-                            disabled={modulo.core || isPending}
-                            onCheckedChange={(checked) => setModulo(modulo, checked)}
-                            aria-label={modulo.core ? t("superAdmin.modules.cannotDisableCore") : actionLabel}
-                            title={modulo.core ? t("superAdmin.modules.cannotDisableCore") : actionLabel}
-                          />
-                          <span className="w-24 text-left text-xs text-muted-foreground">
-                            {isPending ? t("superAdmin.modules.updating") : actionLabel}
-                          </span>
                         </div>
-                        {modulo.core && (
-                          <span className="text-xs text-muted-foreground">
-                            {t("superAdmin.modules.cannotDisableCore")}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </TableCell>
+                    </TableRow>
+                  </Fragment>
                 );
               })}
             </TableBody>

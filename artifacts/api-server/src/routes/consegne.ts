@@ -31,11 +31,14 @@ import { volontarioOverLimit } from "../lib/volontarioCarico";
 import { sendEmail } from "../lib/emailService";
 import { buildIcs } from "../lib/ics";
 import { completeBollaDelivery, handleBollaActionError } from "../lib/bollaDelivery";
+import { requireAllModuli } from "../lib/featureFlags";
 
 const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
 
 const router: IRouter = Router();
+
+router.use("/consegne", requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]));
 
 // priorità con cui scegliere la bolla "rappresentativa" di una consegna quando
 // ce ne fosse più d'una collegata (le annullate sono ignorate del tutto)

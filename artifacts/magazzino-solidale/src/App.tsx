@@ -95,7 +95,7 @@ function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function RequireModulo({
+export function RequireModulo({
   codice,
   children,
 }: {
@@ -117,6 +117,52 @@ function RequireModulo({
         </div>
       </div>
     );
+  }
+  return <>{children}</>;
+}
+
+function RequireAnyModulo({
+  codici,
+  children,
+}: {
+  codici: readonly string[];
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  const { isAnyModuloAttivo } = useConfigurazioneAmbienteFlags();
+  if (!isAnyModuloAttivo(codici)) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-6 text-center">
+        <div className="max-w-md space-y-2">
+          <h1 className="text-2xl font-semibold">
+            {t("superAdmin.moduleDisabled.title")}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {t("superAdmin.moduleDisabled.description")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
+export function RequireAreaModulo({
+  requisiti,
+  children,
+}: {
+  requisiti: readonly { area: string; moduloCodice: string }[];
+  children: React.ReactNode;
+}) {
+  const { hasArea } = useAuth();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  if (
+    !requisiti.some(
+      ({ area, moduloCodice }) =>
+        hasArea(area) && isModuloAttivo(moduloCodice),
+    )
+  ) {
+    return <NotAuthorized />;
   }
   return <>{children}</>;
 }
@@ -206,14 +252,18 @@ function AppRoutes() {
         <Route path="/preparazione-consegne">
           {() => (
             <Guard area="magazzino">
-              <PreparazioneConsegne />
+              <RequireModulo codice="MAGAZZINO_SOLIDALE">
+                <PreparazioneConsegne />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/scarichi">
           {() => (
             <Guard area="magazzino">
-              <Scarichi />
+              <RequireModulo codice="SCARICHI">
+                <Scarichi />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -230,8 +280,10 @@ function AppRoutes() {
         <Route path="/emporio/crediti-saldo">
           {() => (
             <Guard area="emporio">
-              <RequireModulo codice="CREDITO_SOLIDALE">
-                <EmporioCreditiSaldo />
+              <RequireModulo codice="EMPORIO_SOLIDALE">
+                <RequireModulo codice="CREDITO_SOLIDALE">
+                  <EmporioCreditiSaldo />
+                </RequireModulo>
               </RequireModulo>
             </Guard>
           )}
@@ -258,36 +310,51 @@ function AppRoutes() {
         <Route path="/centri-ascolto">
           {() => (
             <Guard area="amministrazione">
-              <CentriAscolto />
+              <RequireModulo codice="CENTRO_ASCOLTO">
+                <CentriAscolto />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/beneficiari">
           {() => (
             <Guard area="sociale">
-              <Beneficiari />
+              <RequireModulo codice="CENTRO_ASCOLTO">
+                <Beneficiari />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/beneficiari/:id">
           {() => (
             <Guard area={["sociale", "uds"]}>
-              <BeneficiarioDettaglio />
+              <RequireAreaModulo
+                requisiti={[
+                  { area: "sociale", moduloCodice: "CENTRO_ASCOLTO" },
+                  { area: "uds", moduloCodice: "UDS" },
+                ]}
+              >
+                <BeneficiarioDettaglio />
+              </RequireAreaModulo>
             </Guard>
           )}
         </Route>
         <Route path="/interventi">
           {() => (
             <Guard area="sociale">
-              <Interventi />
+              <RequireModulo codice="CENTRO_ASCOLTO">
+                <Interventi />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/consegne">
           {() => (
             <Guard area="sociale">
-              <RequireModulo codice="CONSEGNE">
-                <Consegne />
+              <RequireModulo codice="CENTRO_ASCOLTO">
+                <RequireModulo codice="CONSEGNE">
+                  <Consegne />
+                </RequireModulo>
               </RequireModulo>
             </Guard>
           )}
@@ -295,8 +362,10 @@ function AppRoutes() {
         <Route path="/bolle">
           {() => (
             <Guard area="sociale">
-              <RequireModulo codice="BOLLE">
-                <Bolle />
+              <RequireModulo codice="MAGAZZINO_SOLIDALE">
+                <RequireModulo codice="BOLLE">
+                  <Bolle />
+                </RequireModulo>
               </RequireModulo>
             </Guard>
           )}
@@ -304,7 +373,9 @@ function AppRoutes() {
         <Route path="/turni">
           {() => (
             <Guard area="sociale">
-              <Turni />
+              <RequireModulo codice="CENTRO_ASCOLTO">
+                <Turni />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -372,7 +443,9 @@ function AppRoutes() {
         <Route path="/fornitori">
           {() => (
             <Guard area="logistica">
-              <Fornitori />
+              <RequireModulo codice="FORNITORI">
+                <Fornitori />
+              </RequireModulo>
             </Guard>
           )}
         </Route>
@@ -389,15 +462,21 @@ function AppRoutes() {
         <Route path="/report">
           {() => (
             <Guard area="analisi">
-              <Report />
+              <RequireModulo codice="CENTRO_ASCOLTO">
+                <RequireModulo codice="REPORT">
+                  <Report />
+                </RequireModulo>
+              </RequireModulo>
             </Guard>
           )}
         </Route>
         <Route path="/report-uds">
           {() => (
             <Guard area="analisi">
-              <RequireModulo codice="UDS">
-                <ReportUds />
+              <RequireModulo codice="REPORT">
+                <RequireModulo codice="UDS">
+                  <ReportUds />
+                </RequireModulo>
               </RequireModulo>
             </Guard>
           )}
@@ -428,7 +507,9 @@ function AppRoutes() {
         <Route path="/tipi-intervento">
           {() => (
             <Guard area="amministrazione">
-              <TipiIntervento />
+              <RequireAnyModulo codici={["CENTRO_ASCOLTO", "UDS"]}>
+                <TipiIntervento />
+              </RequireAnyModulo>
             </Guard>
           )}
         </Route>
@@ -442,8 +523,10 @@ function AppRoutes() {
         <Route path="/politiche-credito-solidale">
           {() => (
             <Guard area="amministrazione">
-              <RequireModulo codice="CREDITO_SOLIDALE">
-                <PoliticheCreditoSolidale />
+              <RequireModulo codice="EMPORIO_SOLIDALE">
+                <RequireModulo codice="CREDITO_SOLIDALE">
+                  <PoliticheCreditoSolidale />
+                </RequireModulo>
               </RequireModulo>
             </Guard>
           )}
