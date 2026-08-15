@@ -107,6 +107,43 @@ describe("moduli-servizio e navigazione", () => {
     expect(enabledKeys(["REPORT", "UDS"])).toContain("reportUds");
   });
 
+  it("allinea le configurazioni secondarie a Volontari e Fornitori", () => {
+    expect(enabledKeys([])).not.toContain("ruoliVolontari");
+    expect(enabledKeys([])).not.toContain("tipologieFornitore");
+    expect(enabledKeys(["VOLONTARI"])).toContain("ruoliVolontari");
+    expect(enabledKeys(["FORNITORI"])).toContain("tipologieFornitore");
+  });
+
+  it("mostra Approvazioni Logistica con almeno uno tra Volontari e Mezzi", () => {
+    expect(enabledKeys([])).not.toContain("approvazioniLogistica");
+    expect(enabledKeys(["VOLONTARI"])).toContain("approvazioniLogistica");
+    expect(enabledKeys(["MEZZI"])).toContain("approvazioniLogistica");
+  });
+
+  it("mantiene Impostazioni Stampa indipendente dai moduli Bolle e Magazzino", () => {
+    expect(enabledKeys([])).toContain("impostazioniStampa");
+    expect(enabledKeys(["BOLLE"])).toContain("impostazioniStampa");
+    expect(enabledKeys(["MAGAZZINO_SOLIDALE"])).toContain(
+      "impostazioniStampa",
+    );
+  });
+
+  it.each([
+    "CENTRO_ASCOLTO",
+    "EMPORIO_SOLIDALE",
+    "MENSA",
+    "CREDITO_SOLIDALE",
+  ])("mantiene configurabili i Centri quando è attivo %s", (modulo) => {
+    expect(enabledKeys([modulo])).toContain("centriAscolto");
+  });
+
+  it("non altera le altre voci amministrative senza feature flag", () => {
+    const keys = enabledKeys([]);
+    expect(keys).toEqual(
+      expect.arrayContaining(["citta", "utenti", "ruoli", "impostazioniStampa"]),
+    );
+  });
+
   it("mappa le route dirette ai moduli corretti", () => {
     expect(MODULO_BY_ROUTE["/beneficiari"]).toBe("CENTRO_ASCOLTO");
     expect(MODULO_BY_ROUTE["/interventi"]).toBe("CENTRO_ASCOLTO");

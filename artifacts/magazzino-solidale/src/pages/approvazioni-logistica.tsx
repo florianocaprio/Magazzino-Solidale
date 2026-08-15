@@ -21,11 +21,15 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { volontarioLabel } from "@/lib/volontari-label";
+import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { Check, X } from "lucide-react";
 
 export default function ApprovazioniLogistica() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  const volontariAttivi = isModuloAttivo("VOLONTARI");
+  const mezziAttivi = isModuloAttivo("MEZZI");
   const queryClient = useQueryClient();
   const { data, isLoading } = useListApprovazioniLogistica();
   const approvaVolontario = useApprovaVolontarioLogistica();
@@ -61,7 +65,8 @@ export default function ApprovazioniLogistica() {
         </p>
       </div>
 
-      <Card>
+      {volontariAttivi && (
+        <Card>
         <CardHeader>
           <CardTitle>{t("approvazioniLogistica.volontariTitle", { defaultValue: "Volontari da approvare" })}</CardTitle>
         </CardHeader>
@@ -121,9 +126,11 @@ export default function ApprovazioniLogistica() {
             </Table>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
-      <Card>
+      {mezziAttivi && (
+        <Card>
         <CardHeader>
           <CardTitle>{t("approvazioniLogistica.mezziTitle", { defaultValue: "Mezzi da approvare" })}</CardTitle>
         </CardHeader>
@@ -183,7 +190,8 @@ export default function ApprovazioniLogistica() {
             </Table>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }

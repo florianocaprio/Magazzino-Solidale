@@ -6,8 +6,11 @@ import {
   UpdateRuoloVolontarioBody,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/auth";
+import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
+
+router.use("/ruoli-volontari", requireModulo("VOLONTARI"));
 
 function fmt(r: typeof ruoliVolontariTable.$inferSelect) {
   return {

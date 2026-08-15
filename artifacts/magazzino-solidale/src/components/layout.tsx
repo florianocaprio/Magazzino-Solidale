@@ -155,7 +155,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Building2,
     groupKey: "amministrazione",
     area: "amministrazione",
-    moduloCodice: "CENTRO_ASCOLTO",
+    moduloCodiciAny: [
+      "CENTRO_ASCOLTO",
+      "EMPORIO_SOLIDALE",
+      "MENSA",
+      "CREDITO_SOLIDALE",
+    ],
   },
   {
     key: "beneficiari",
@@ -349,6 +354,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ClipboardCheck,
     groupKey: "logistica",
     area: "logistica",
+    moduloCodiciAny: ["VOLONTARI", "MEZZI"],
   },
   {
     key: "fornitori",
@@ -419,6 +425,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Contact,
     groupKey: "amministrazione",
     area: "amministrazione",
+    moduloCodice: "VOLONTARI",
   },
   {
     key: "tipiIntervento",
@@ -434,6 +441,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Truck,
     groupKey: "amministrazione",
     area: "amministrazione",
+    moduloCodice: "FORNITORI",
   },
   {
     key: "impostazioniStampa",
