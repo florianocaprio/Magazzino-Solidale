@@ -59,7 +59,7 @@ export const base = {
       groups: {
         generale: "Generale",
         magazzino: "Magazzino",
-        sociale: "Sociale",
+        sociale: "Centro di Ascolto",
         emporio: "EMPORIO",
         uds: "Unità di Strada",
         logistica: "Logistica",
