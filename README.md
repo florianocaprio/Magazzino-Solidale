@@ -1,8 +1,6 @@
 # Magazzino Solidale AIM
 
-Gestionale per un magazzino solidale: tracciamento prodotti/lotti (FEFO), CRM
-beneficiari, consegne, trasferimenti, volontari e report — più il modulo **Unità
-di Strada (UDS)** e lo scoping per **Città / Zona**.
+Il progetto consente di gestire Emporio Solidale, Centro di Ascolto, Distribuzione Pacchi alimentari, Mensa, Unità di strada.
 
 Stack: pnpm workspaces · Node.js 24 · TypeScript · React + Vite · Express 5 ·
 PostgreSQL + Drizzle ORM · contratti API in OpenAPI (codegen Orval). Interfaccia
