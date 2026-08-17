@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   NAV_ITEMS,
   isNavItemEnabledByModules,
+  isNavItemEnabledByCapabilities,
 } from "@/components/layout";
 import {
   MODULO_BY_ROUTE,
@@ -163,5 +164,12 @@ describe("moduli-servizio e navigazione", () => {
     expect(areAllModuliAttivi(["CENTRO_ASCOLTO", "UDS"], check)).toBe(true);
     expect(areAllModuliAttivi(["CENTRO_ASCOLTO", "MENSA"], check)).toBe(false);
     expect(isAnyModuloAttivo(["CENTRO_ASCOLTO", "MENSA"], check)).toBe(true);
+  });
+
+  it("mostra MAPS solo quando le capabilities contengono almeno un layer", () => {
+    const maps = NAV_ITEMS.find((item) => item.key === "maps");
+    expect(maps).toMatchObject({ permission: "maps.operational", requiresMapsLayer: true });
+    expect(isNavItemEnabledByCapabilities(maps!, 0)).toBe(false);
+    expect(isNavItemEnabledByCapabilities(maps!, 1)).toBe(true);
   });
 });

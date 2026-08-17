@@ -73,13 +73,14 @@ import { useAuth } from "@/lib/auth";
 import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "@/lib/i18n";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
+import { getGetMapsCapabilitiesQueryKey, useGetMapsCapabilities } from "@workspace/api-client-react";
 
 export type NavItem = {
   key: string;
   url: string;
   icon: LucideIcon;
   groupKey: string;
-  area?: string;
+  area?: string | readonly string[];
   moduloCodice?: string;
   moduloCodiciAll?: readonly string[];
   moduloCodiciAny?: readonly string[];
@@ -87,6 +88,7 @@ export type NavItem = {
   public?: boolean;
   permission?: string;
   sourceAreas?: readonly string[];
+  requiresMapsLayer?: boolean;
 };
 
 export const NAV_ITEMS: NavItem[] = [
@@ -96,6 +98,15 @@ export const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     groupKey: "generale",
     area: "generale",
+  },
+  {
+    key: "maps",
+    url: "/maps",
+    icon: Map,
+    groupKey: "generale",
+    area: ["sociale", "magazzino"],
+    permission: "maps.operational",
+    requiresMapsLayer: true,
   },
   {
     key: "magazzini",
@@ -619,18 +630,31 @@ export function isNavItemEnabledByModules(
   return true;
 }
 
+export function isNavItemEnabledByCapabilities(
+  item: NavItem,
+  mapsLayerCount: number,
+): boolean {
+  return !item.requiresMapsLayer || mapsLayerCount > 0;
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, hasPermission, logout } = useAuth();
   const { t } = useTranslation();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  const canAskMaps = hasPermission("maps.operational") && (hasArea("sociale") || hasArea("magazzino"));
+  const { data: mapsCapabilities } = useGetMapsCapabilities({
+    query: { queryKey: getGetMapsCapabilitiesQueryKey(), enabled: canAskMaps, staleTime: 5 * 60 * 1000 },
+  });
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.superAdmin) return user?.isSuperAdmin === true;
     if (item.public) return true;
-    return !!item.area && hasArea(item.area) &&
+    const itemAreas = Array.isArray(item.area) ? item.area : item.area ? [item.area] : [];
+    return itemAreas.some(hasArea) &&
       (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
-      (!item.permission || hasPermission(item.permission));
+      (!item.permission || hasPermission(item.permission)) &&
+      isNavItemEnabledByCapabilities(item, mapsCapabilities?.layers.length ?? 0);
   }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo));
 
   const groupedNav = visibleItems.reduce(

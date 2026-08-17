@@ -45,7 +45,10 @@ export function makeScopedApp(
     id: number;
     centroAscoltoId: number | null;
     cittaId?: number | null;
+    zonaUdsId?: number | null;
     aree?: string[];
+    permessi?: string[];
+    isAdmin?: boolean;
   },
 ): Express {
   const app = express();
@@ -57,14 +60,20 @@ export function makeScopedApp(
           id: number;
           centroAscoltoId: number | null;
           cittaId: number | null;
+          zonaUdsId: number | null;
           aree: string[];
+          permessi: string[];
+          isAdmin: boolean;
         };
       }
     ).user = {
       id: user.id,
       centroAscoltoId: user.centroAscoltoId,
       cittaId: user.cittaId ?? null,
+      zonaUdsId: user.zonaUdsId ?? null,
       aree: user.aree ?? ["sociale", "uds"],
+      permessi: user.permessi ?? [],
+      isAdmin: user.isAdmin ?? false,
     };
     next();
   });

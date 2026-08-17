@@ -57,6 +57,7 @@ import { bulkImport } from "./namespaces/bulkImport";
 import { sostieniProgetto } from "./namespaces/sostieniProgetto";
 import { mensa } from "./namespaces/mensa";
 import { reporting } from "./namespaces/reporting";
+import { maps } from "./namespaces/maps";
 
 export { LANGUAGES, isRtl, applyDirection } from "./languages";
 export type { LanguageCode } from "./languages";
@@ -117,6 +118,7 @@ const PAGE_NAMESPACES = {
   sostieniProgetto,
   mensa,
   reporting,
+  maps,
 } as const;
 
 function buildResources() {

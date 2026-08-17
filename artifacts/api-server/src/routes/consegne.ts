@@ -7,8 +7,6 @@ import {
   volontariTable,
   bolleTable,
   centriAscoltoTable,
-  turniTable,
-  turniVolontariTable,
 } from "@workspace/db";
 import { eq, and, gte, lte, desc, inArray, type SQL } from "drizzle-orm";
 import {
@@ -32,6 +30,7 @@ import { sendEmail } from "../lib/emailService";
 import { buildIcs } from "../lib/ics";
 import { completeBollaDelivery, handleBollaActionError } from "../lib/bollaDelivery";
 import { requireAllModuli } from "../lib/featureFlags";
+import { syncTurnoDaConsegna } from "../lib/consegneTurni";
 
 const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
@@ -63,68 +62,6 @@ function normalizeConsegnaPayload(raw: Record<string, any>) {
     if (body.volontarioAltro) body.volontarioId = null;
   }
   return body;
-}
-
-function fasciaTurnoFromConsegna(fascia: string | null | undefined): string | null {
-  const normalized = (fascia ?? "").toLowerCase();
-  if (normalized.includes("matt")) return "09-13";
-  if (normalized.includes("pom")) return "14-18";
-  if (normalized.includes("sera") || normalized.includes("18")) return "18-20";
-  return null;
-}
-
-async function syncTurnoDaConsegna(consegna: typeof consegneTable.$inferSelect) {
-  if (consegna.volontarioId == null && consegna.mezzoId == null) return;
-  const centroAscoltoId = await beneficiarioCentroId(consegna.beneficiarioId);
-  const fascia = fasciaTurnoFromConsegna(consegna.fasciaOraria);
-  if (centroAscoltoId == null || fascia == null) return;
-
-  await db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select()
-      .from(turniTable)
-      .where(and(
-        eq(turniTable.centroAscoltoId, centroAscoltoId),
-        eq(turniTable.data, consegna.dataPrevista),
-        eq(turniTable.fascia, fascia),
-      ));
-
-    let turnoId: number;
-    if (existing) {
-      turnoId = existing.id;
-      if (consegna.mezzoId != null && existing.mezzoId !== consegna.mezzoId) {
-        await tx.update(turniTable).set({ mezzoId: consegna.mezzoId }).where(eq(turniTable.id, turnoId));
-      }
-    } else {
-      const [created] = await tx
-        .insert(turniTable)
-        .values({
-          centroAscoltoId,
-          data: consegna.dataPrevista,
-          fascia,
-          mezzoId: consegna.mezzoId ?? null,
-        })
-        .returning();
-      turnoId = created.id;
-    }
-
-    if (consegna.volontarioId != null) {
-      const [already] = await tx
-        .select({ id: turniVolontariTable.id })
-        .from(turniVolontariTable)
-        .where(and(
-          eq(turniVolontariTable.turnoId, turnoId),
-          eq(turniVolontariTable.volontarioId, consegna.volontarioId),
-        ));
-      if (!already) {
-        await tx.insert(turniVolontariTable).values({
-          turnoId,
-          volontarioId: consegna.volontarioId,
-          ruolo: "Consegna",
-        });
-      }
-    }
-  });
 }
 
 /** Ritorna, per ogni consegnaId, la bolla collegata più rilevante (non annullata). */
@@ -368,6 +305,12 @@ router.post("/consegne/:id/associa-bolla", async (req, res) => {
   }
   if (bolla.consegnaId != null && bolla.consegnaId !== consegnaId) {
     res.status(400).json({ error: "La bolla è già associata a un'altra consegna" });
+    return;
+  }
+  if (bolla.ritiroNonEffettuatoAt != null && bolla.consegnaId == null) {
+    res.status(409).json({
+      error: "Per un ritiro non effettuato usa la conversione in consegna domiciliare dalla bolla",
+    });
     return;
   }
 

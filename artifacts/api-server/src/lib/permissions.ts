@@ -23,9 +23,21 @@ export const BENEFICIARI_PERMISSIONS = [
   },
 ] as const;
 
+export const MAPS_PERMISSIONS = [
+  {
+    key: "maps.route",
+    label: "MAPS: apertura percorsi su attività autorizzate",
+  },
+  {
+    key: "maps.operational",
+    label: "MAPS: accesso alla mappa operativa",
+  },
+] as const;
+
 export const ALL_PERMISSIONS = [
   ...MENSA_PERMISSIONS,
   ...BENEFICIARI_PERMISSIONS,
+  ...MAPS_PERMISSIONS,
 ] as const;
 export const ALL_PERMISSION_KEYS = ALL_PERMISSIONS.map((item) => item.key);
 

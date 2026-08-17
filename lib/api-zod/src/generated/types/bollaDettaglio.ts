@@ -46,6 +46,12 @@ export interface BollaDettaglio {
   /** @nullable */
   noteRicezione?: string | null;
   /** @nullable */
+  ritiroNonEffettuatoAt?: Date | null;
+  /** @nullable */
+  ritiroNonEffettuatoOperatoreId?: number | null;
+  /** @nullable */
+  ritiroNonEffettuatoMotivo?: string | null;
+  /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;

@@ -81,6 +81,9 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   "cassa-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
   "spese-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
   mensa: MENSA_AREA_KEY,
+  // MAPS è un adapter tecnico: l'accesso al segmento richiede almeno un'area
+  // sorgente; i singoli provider applicano poi area, moduli, permission e scope.
+  maps: ["sociale", "magazzino", "uds"],
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",

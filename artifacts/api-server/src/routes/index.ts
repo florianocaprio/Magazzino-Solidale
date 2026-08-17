@@ -38,6 +38,7 @@ import speseEmporioRouter from "./spese-emporio";
 import reportIntegratoRouter from "./report-integrato";
 import reportRouter from "./report";
 import mensaRouter from "./mensa";
+import mapsRouter from "./maps";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
 import ruoliRouter from "./ruoli";
@@ -98,6 +99,7 @@ router.use(speseEmporioRouter);
 router.use(reportIntegratoRouter);
 router.use(reportRouter);
 router.use(mensaRouter);
+router.use(mapsRouter);
 
 // Admin-only management endpoints.
 router.use(areeRouter);

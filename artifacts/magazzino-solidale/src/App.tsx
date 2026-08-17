@@ -66,6 +66,7 @@ import SuperAdminAuditConfigurazioni from "@/pages/super-admin-audit-configurazi
 import SuperAdminLogSistema from "@/pages/super-admin-log-sistema";
 import SostieniProgetto from "@/pages/sostieni-progetto";
 import MensaPage, { type MensaView } from "@/pages/mensa";
+import MapsOperativa from "@/pages/maps";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -230,6 +231,15 @@ function AppRoutes() {
           {() => (
             <Guard area="amministrazione">
               <Magazzini />
+            </Guard>
+          )}
+        </Route>
+        <Route path="/maps">
+          {() => (
+            <Guard area={["sociale", "magazzino"]}>
+              <RequirePermission permission="maps.operational">
+                <MapsOperativa />
+              </RequirePermission>
             </Guard>
           )}
         </Route>

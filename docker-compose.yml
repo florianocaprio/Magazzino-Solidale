@@ -49,6 +49,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      args:
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     platform: linux/amd64
     container_name: magazzino-web
     depends_on:

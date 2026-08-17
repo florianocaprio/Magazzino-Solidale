@@ -78,6 +78,8 @@ import type {
   ConsegnaUpdate,
   ConsegneMeseReport,
   ConsegnePerCentroReport,
+  ConversioneConsegnaInput,
+  ConversioneConsegnaResult,
   CreateTrasferimentoMensa200,
   CreateTrasferimentoMensa201,
   CreditoSolidaleCalcolo,
@@ -100,6 +102,9 @@ import type {
   FornitoreUpdate,
   FornitoriBulkInput,
   GetInterventiRiepilogoVisteParams,
+  GetMapsConsegneParams,
+  GetMapsInterventiSocialiParams,
+  GetMapsRitiriNonEffettuatiParams,
   GetMaterialeDaPreparareParams,
   GetMensaReportParams,
   GetPreparazioneConsegneParams,
@@ -176,6 +181,9 @@ import type {
   Magazzino,
   MagazzinoInput,
   MagazzinoUpdate,
+  MapsCapabilities,
+  MapsMarker,
+  MapsRoute,
   MaterialeDaPreparare,
   MaterialePreparazioneUpdateInput,
   Mensa,
@@ -231,6 +239,7 @@ import type {
   ReportUdsPersonePerZonaParams,
   ReportingDashboard,
   ResetPasswordInput,
+  RitiroNonEffettuatoInput,
   Ruolo,
   RuoloInput,
   RuoloUpdate,
@@ -9274,6 +9283,609 @@ export const useConsegnaBolla = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getConsegnaBollaMutationOptions(options));
     }
+
+export const getSegnalaRitiroNonEffettuatoUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/ritiro-non-effettuato`
+}
+
+/**
+ * @summary Registra l'esito di mancato ritiro senza cambiare lo stato logistico della bolla
+ */
+export const segnalaRitiroNonEffettuato = async (id: number,
+    ritiroNonEffettuatoInput?: RitiroNonEffettuatoInput, options?: RequestInit): Promise<BollaDettaglio> => {
+
+  return customFetch<BollaDettaglio>(getSegnalaRitiroNonEffettuatoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ritiroNonEffettuatoInput,)
+  }
+);}
+
+
+
+
+export const getSegnalaRitiroNonEffettuatoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof segnalaRitiroNonEffettuato>>, TError,{id: number;data?: BodyType<RitiroNonEffettuatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof segnalaRitiroNonEffettuato>>, TError,{id: number;data?: BodyType<RitiroNonEffettuatoInput>}, TContext> => {
+
+const mutationKey = ['segnalaRitiroNonEffettuato'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof segnalaRitiroNonEffettuato>>, {id: number;data?: BodyType<RitiroNonEffettuatoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  segnalaRitiroNonEffettuato(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SegnalaRitiroNonEffettuatoMutationResult = NonNullable<Awaited<ReturnType<typeof segnalaRitiroNonEffettuato>>>
+    export type SegnalaRitiroNonEffettuatoMutationBody = BodyType<RitiroNonEffettuatoInput> | undefined
+    export type SegnalaRitiroNonEffettuatoMutationError = ErrorType<void>
+
+    /**
+ * @summary Registra l'esito di mancato ritiro senza cambiare lo stato logistico della bolla
+ */
+export const useSegnalaRitiroNonEffettuato = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof segnalaRitiroNonEffettuato>>, TError,{id: number;data?: BodyType<RitiroNonEffettuatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof segnalaRitiroNonEffettuato>>,
+        TError,
+        {id: number;data?: BodyType<RitiroNonEffettuatoInput>},
+        TContext
+      > => {
+      return useMutation(getSegnalaRitiroNonEffettuatoMutationOptions(options));
+    }
+
+export const getConvertiBollaInConsegnaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/converti-consegna`
+}
+
+/**
+ * @summary Converte in modo transazionale e idempotente un mancato ritiro in consegna domiciliare
+ */
+export const convertiBollaInConsegna = async (id: number,
+    conversioneConsegnaInput: ConversioneConsegnaInput, options?: RequestInit): Promise<ConversioneConsegnaResult> => {
+
+  return customFetch<ConversioneConsegnaResult>(getConvertiBollaInConsegnaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      conversioneConsegnaInput,)
+  }
+);}
+
+
+
+
+export const getConvertiBollaInConsegnaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof convertiBollaInConsegna>>, TError,{id: number;data: BodyType<ConversioneConsegnaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof convertiBollaInConsegna>>, TError,{id: number;data: BodyType<ConversioneConsegnaInput>}, TContext> => {
+
+const mutationKey = ['convertiBollaInConsegna'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof convertiBollaInConsegna>>, {id: number;data: BodyType<ConversioneConsegnaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  convertiBollaInConsegna(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConvertiBollaInConsegnaMutationResult = NonNullable<Awaited<ReturnType<typeof convertiBollaInConsegna>>>
+    export type ConvertiBollaInConsegnaMutationBody = BodyType<ConversioneConsegnaInput>
+    export type ConvertiBollaInConsegnaMutationError = ErrorType<void>
+
+    /**
+ * @summary Converte in modo transazionale e idempotente un mancato ritiro in consegna domiciliare
+ */
+export const useConvertiBollaInConsegna = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof convertiBollaInConsegna>>, TError,{id: number;data: BodyType<ConversioneConsegnaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof convertiBollaInConsegna>>,
+        TError,
+        {id: number;data: BodyType<ConversioneConsegnaInput>},
+        TContext
+      > => {
+      return useMutation(getConvertiBollaInConsegnaMutationOptions(options));
+    }
+
+export const getGetMapsCapabilitiesUrl = () => {
+
+
+
+
+  return `/api/maps/capabilities`
+}
+
+/**
+ * @summary Restituisce esclusivamente i layer MAPS autorizzati per il caller
+ */
+export const getMapsCapabilities = async ( options?: RequestInit): Promise<MapsCapabilities> => {
+
+  return customFetch<MapsCapabilities>(getGetMapsCapabilitiesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMapsCapabilitiesQueryKey = () => {
+    return [
+    `/api/maps/capabilities`
+    ] as const;
+    }
+
+
+export const getGetMapsCapabilitiesQueryOptions = <TData = Awaited<ReturnType<typeof getMapsCapabilities>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsCapabilities>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMapsCapabilitiesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMapsCapabilities>>> = ({ signal }) => getMapsCapabilities({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMapsCapabilities>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMapsCapabilitiesQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsCapabilities>>>
+export type GetMapsCapabilitiesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Restituisce esclusivamente i layer MAPS autorizzati per il caller
+ */
+
+export function useGetMapsCapabilities<TData = Awaited<ReturnType<typeof getMapsCapabilities>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsCapabilities>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMapsCapabilitiesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMapsInterventiSocialiUrl = (params?: GetMapsInterventiSocialiParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/maps/layers/sociale/interventi?${stringifiedParams}` : `/api/maps/layers/sociale/interventi`
+}
+
+export const getMapsInterventiSociali = async (params?: GetMapsInterventiSocialiParams, options?: RequestInit): Promise<MapsMarker[]> => {
+
+  return customFetch<MapsMarker[]>(getGetMapsInterventiSocialiUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMapsInterventiSocialiQueryKey = (params?: GetMapsInterventiSocialiParams,) => {
+    return [
+    `/api/maps/layers/sociale/interventi`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMapsInterventiSocialiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError = ErrorType<unknown>>(params?: GetMapsInterventiSocialiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMapsInterventiSocialiQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMapsInterventiSociali>>> = ({ signal }) => getMapsInterventiSociali(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMapsInterventiSocialiQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsInterventiSociali>>>
+export type GetMapsInterventiSocialiQueryError = ErrorType<unknown>
+
+
+
+export function useGetMapsInterventiSociali<TData = Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError = ErrorType<unknown>>(
+ params?: GetMapsInterventiSocialiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMapsInterventiSocialiQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMapsConsegneUrl = (params?: GetMapsConsegneParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/maps/layers/pacchi/consegne?${stringifiedParams}` : `/api/maps/layers/pacchi/consegne`
+}
+
+export const getMapsConsegne = async (params?: GetMapsConsegneParams, options?: RequestInit): Promise<MapsMarker[]> => {
+
+  return customFetch<MapsMarker[]>(getGetMapsConsegneUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMapsConsegneQueryKey = (params?: GetMapsConsegneParams,) => {
+    return [
+    `/api/maps/layers/pacchi/consegne`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMapsConsegneQueryOptions = <TData = Awaited<ReturnType<typeof getMapsConsegne>>, TError = ErrorType<unknown>>(params?: GetMapsConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMapsConsegneQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMapsConsegne>>> = ({ signal }) => getMapsConsegne(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMapsConsegne>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMapsConsegneQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsConsegne>>>
+export type GetMapsConsegneQueryError = ErrorType<unknown>
+
+
+
+export function useGetMapsConsegne<TData = Awaited<ReturnType<typeof getMapsConsegne>>, TError = ErrorType<unknown>>(
+ params?: GetMapsConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMapsConsegneQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMapsRitiriNonEffettuatiUrl = (params?: GetMapsRitiriNonEffettuatiParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/maps/layers/pacchi/ritiri-non-effettuati?${stringifiedParams}` : `/api/maps/layers/pacchi/ritiri-non-effettuati`
+}
+
+export const getMapsRitiriNonEffettuati = async (params?: GetMapsRitiriNonEffettuatiParams, options?: RequestInit): Promise<MapsMarker[]> => {
+
+  return customFetch<MapsMarker[]>(getGetMapsRitiriNonEffettuatiUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMapsRitiriNonEffettuatiQueryKey = (params?: GetMapsRitiriNonEffettuatiParams,) => {
+    return [
+    `/api/maps/layers/pacchi/ritiri-non-effettuati`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMapsRitiriNonEffettuatiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError = ErrorType<unknown>>(params?: GetMapsRitiriNonEffettuatiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMapsRitiriNonEffettuatiQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>> = ({ signal }) => getMapsRitiriNonEffettuati(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMapsRitiriNonEffettuatiQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>>
+export type GetMapsRitiriNonEffettuatiQueryError = ErrorType<unknown>
+
+
+
+export function useGetMapsRitiriNonEffettuati<TData = Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError = ErrorType<unknown>>(
+ params?: GetMapsRitiriNonEffettuatiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMapsRitiriNonEffettuatiQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMapsPuntiOperativiUrl = () => {
+
+
+
+
+  return `/api/maps/layers/centro/punti-operativi`
+}
+
+export const getMapsPuntiOperativi = async ( options?: RequestInit): Promise<MapsMarker[]> => {
+
+  return customFetch<MapsMarker[]>(getGetMapsPuntiOperativiUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMapsPuntiOperativiQueryKey = () => {
+    return [
+    `/api/maps/layers/centro/punti-operativi`
+    ] as const;
+    }
+
+
+export const getGetMapsPuntiOperativiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMapsPuntiOperativiQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMapsPuntiOperativi>>> = ({ signal }) => getMapsPuntiOperativi({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMapsPuntiOperativiQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsPuntiOperativi>>>
+export type GetMapsPuntiOperativiQueryError = ErrorType<unknown>
+
+
+
+export function useGetMapsPuntiOperativi<TData = Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMapsPuntiOperativiQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMapsRouteConsegnaUrl = (id: number,) => {
+
+
+
+
+  return `/api/maps/routes/consegne/${id}`
+}
+
+/**
+ * @summary Costruisce un Google Maps URL per una consegna domiciliare già autorizzata
+ */
+export const getMapsRouteConsegna = async (id: number, options?: RequestInit): Promise<MapsRoute> => {
+
+  return customFetch<MapsRoute>(getGetMapsRouteConsegnaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMapsRouteConsegnaQueryKey = (id: number,) => {
+    return [
+    `/api/maps/routes/consegne/${id}`
+    ] as const;
+    }
+
+
+export const getGetMapsRouteConsegnaQueryOptions = <TData = Awaited<ReturnType<typeof getMapsRouteConsegna>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsRouteConsegna>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMapsRouteConsegnaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMapsRouteConsegna>>> = ({ signal }) => getMapsRouteConsegna(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMapsRouteConsegna>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMapsRouteConsegnaQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsRouteConsegna>>>
+export type GetMapsRouteConsegnaQueryError = ErrorType<void>
+
+
+/**
+ * @summary Costruisce un Google Maps URL per una consegna domiciliare già autorizzata
+ */
+
+export function useGetMapsRouteConsegna<TData = Awaited<ReturnType<typeof getMapsRouteConsegna>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsRouteConsegna>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMapsRouteConsegnaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListRuoliVolontariUrl = () => {
 

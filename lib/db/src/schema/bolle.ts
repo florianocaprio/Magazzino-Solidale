@@ -21,6 +21,9 @@ export const bolleTable = pgTable("bolle", {
   confermaRicezione: boolean("conferma_ricezione").notNull().default(false),
   noteRicezione: text("note_ricezione"),
   firmaNota: text("firma_nota"),
+  ritiroNonEffettuatoAt: timestamp("ritiro_non_effettuato_at", { withTimezone: true }),
+  ritiroNonEffettuatoOperatoreId: integer("ritiro_non_effettuato_operatore_id").references(() => utentiTable.id),
+  ritiroNonEffettuatoMotivo: varchar("ritiro_non_effettuato_motivo", { length: 500 }),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 

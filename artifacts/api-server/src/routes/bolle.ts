@@ -36,6 +36,10 @@ import {
   syncInterventoBolla,
 } from "../lib/bollaDelivery";
 import { requireAllModuli } from "../lib/featureFlags";
+import { isDateOnly } from "../lib/interventiWorkflow";
+import { volontarioOverLimit } from "../lib/volontarioCarico";
+import { syncTurnoDaConsegna } from "../lib/consegneTurni";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -146,6 +150,9 @@ async function buildDettaglio(id: number) {
     noteConsegna: row.b.noteConsegna ?? null,
     confermaRicezione: row.b.confermaRicezione,
     noteRicezione: row.b.noteRicezione ?? null,
+    ritiroNonEffettuatoAt: row.b.ritiroNonEffettuatoAt?.toISOString() ?? null,
+    ritiroNonEffettuatoOperatoreId: row.b.ritiroNonEffettuatoOperatoreId ?? null,
+    ritiroNonEffettuatoMotivo: row.b.ritiroNonEffettuatoMotivo ?? null,
     operatoreId: row.b.operatoreId ?? null,
     operatoreCodice: row.operatoreMatricola ?? row.operatoreUsername ?? null,
     dataCreazione: row.b.dataCreazione.toISOString(),
@@ -416,6 +423,9 @@ router.get("/bolle", async (req, res) => {
     noteConsegna: r.b.noteConsegna ?? null,
     confermaRicezione: r.b.confermaRicezione,
     noteRicezione: r.b.noteRicezione ?? null,
+    ritiroNonEffettuatoAt: r.b.ritiroNonEffettuatoAt?.toISOString() ?? null,
+    ritiroNonEffettuatoOperatoreId: r.b.ritiroNonEffettuatoOperatoreId ?? null,
+    ritiroNonEffettuatoMotivo: r.b.ritiroNonEffettuatoMotivo ?? null,
     operatoreId: r.b.operatoreId ?? null,
     operatoreCodice: r.operatoreMatricola ?? r.operatoreUsername ?? null,
     dataCreazione: r.b.dataCreazione.toISOString(),
@@ -764,6 +774,130 @@ router.post("/bolle/:id/consegna", async (req, res) => {
   const det = await buildDettaglio(bollaId);
   res.json(det);
 });
+
+// ─── ESITO RITIRO (separato dallo stato logistico) ──────────────────────────
+
+router.post("/bolle/:id/ritiro-non-effettuato", async (req, res) => {
+  const bollaId = Number(req.params.id);
+  if (!Number.isInteger(bollaId) || bollaId <= 0) {
+    res.status(400).json({ error: "ID bolla non valido" }); return;
+  }
+  const motivoRaw = req.body?.motivo;
+  if (motivoRaw != null && typeof motivoRaw !== "string") {
+    res.status(400).json({ error: "Il motivo deve essere testuale" }); return;
+  }
+  const motivo = typeof motivoRaw === "string" ? motivoRaw.trim() || null : null;
+  if (motivo && motivo.length > 500) {
+    res.status(400).json({ error: "Il motivo non può superare 500 caratteri" }); return;
+  }
+  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
+  if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" }); return;
+  }
+  try {
+    const recorded = await db.transaction(async (tx) => {
+      const current = await lockBolla(tx, bollaId);
+      if (current.consegnaId != null) throw new BollaActionError(409, "La bolla è già associata a una consegna");
+      if (current.stato !== "confermato") throw new BollaActionError(409, "Il ritiro non effettuato è registrabile solo su una bolla confermata per il ritiro in sede");
+      if (current.ritiroNonEffettuatoAt != null) return false;
+      await tx.update(bolleTable).set({
+        ritiroNonEffettuatoAt: new Date(),
+        ritiroNonEffettuatoOperatoreId: req.user!.id,
+        ritiroNonEffettuatoMotivo: motivo,
+        operatoreId: req.user!.id,
+      }).where(eq(bolleTable.id, bollaId));
+      return true;
+    });
+    if (recorded) logger.info({ bollaId, operatoreId: req.user!.id }, "Ritiro bolla segnato come non effettuato");
+  } catch (error) {
+    if (handleBollaActionError(error, res)) return;
+    throw error;
+  }
+  res.json(await buildDettaglio(bollaId));
+});
+
+router.post(
+  "/bolle/:id/converti-consegna",
+  requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]),
+  async (req, res) => {
+  const bollaId = Number(req.params.id);
+  if (!Number.isInteger(bollaId) || bollaId <= 0) {
+    res.status(400).json({ error: "ID bolla non valido" }); return;
+  }
+  const body = req.body ?? {};
+  const indirizzoConsegna = typeof body.indirizzoConsegna === "string" ? body.indirizzoConsegna.trim() : "";
+  if (!indirizzoConsegna || indirizzoConsegna.length > 200) {
+    res.status(400).json({ error: "Indirizzo di consegna obbligatorio (massimo 200 caratteri)" }); return;
+  }
+  if (!isDateOnly(body.dataPrevista)) {
+    res.status(400).json({ error: "dataPrevista deve essere una data YYYY-MM-DD" }); return;
+  }
+  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
+  if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" }); return;
+  }
+  const volontarioId = body.volontarioId === undefined ? bolla.volontarioConsegnaId : body.volontarioId;
+  const volontarioAltro = body.volontarioAltro === undefined ? bolla.trasportatoreNome : (typeof body.volontarioAltro === "string" ? body.volontarioAltro.trim() || null : null);
+  if (volontarioId != null && (!Number.isInteger(volontarioId) || volontarioId <= 0)) {
+    res.status(400).json({ error: "volontarioId non valido" }); return;
+  }
+  if (volontarioId != null && volontarioAltro) {
+    res.status(400).json({ error: "Indicare un volontario censito oppure Altro, non entrambi" }); return;
+  }
+  if (volontarioId != null && !(await canUseVolontarioConsegna(volontarioId, bolla.beneficiarioId))) {
+    res.status(403).json({ error: "Volontario non accessibile per il centro della bolla" }); return;
+  }
+  if (volontarioId != null && await volontarioOverLimit(volontarioId, body.dataPrevista)) {
+    res.status(400).json({ error: "Il volontario ha già raggiunto il numero massimo di consegne per questo turno" }); return;
+  }
+
+  let result: { consegna: typeof consegneTable.$inferSelect; existing: boolean };
+  try {
+    result = await db.transaction(async (tx) => {
+      const current = await lockBolla(tx, bollaId);
+      if (current.ritiroNonEffettuatoAt == null) throw new BollaActionError(409, "La bolla non è marcata come ritiro non effettuato");
+      if (current.stato !== "confermato") throw new BollaActionError(409, "La bolla non è più convertibile");
+      if (current.consegnaId != null) {
+        const [linked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, current.consegnaId));
+        if (!linked) throw new BollaActionError(409, "La bolla risulta già convertita ma la consegna collegata non è disponibile");
+        return { consegna: linked, existing: true };
+      }
+      const codice = `CON-${Date.now()}-${bollaId}`.slice(0, 30);
+      const [created] = await tx.insert(consegneTable).values({
+        codice,
+        beneficiarioId: current.beneficiarioId,
+        tipoPianificazione: "consegna_pacco",
+        tipoConsegna: "domicilio",
+        dataPrevista: body.dataPrevista,
+        fasciaOraria: typeof body.fasciaOraria === "string" ? body.fasciaOraria.trim() || null : null,
+        indirizzoConsegna,
+        zona: null,
+        magazzinoId: current.magazzinoId,
+        volontarioId,
+        volontarioAltro,
+        mezzoId: Number.isInteger(body.mezzoId) ? body.mezzoId : current.mezzoId,
+        mezzoAltro: typeof body.mezzoAltro === "boolean" ? body.mezzoAltro : current.mezzoAltro,
+        stato: "pianificata",
+        noteOperative: typeof body.noteOperative === "string" ? body.noteOperative.trim() || null : null,
+      }).returning();
+      await tx.update(bolleTable).set({
+        consegnaId: created.id,
+        indirizzoConsegna,
+        operatoreId: req.user!.id,
+      }).where(eq(bolleTable.id, bollaId));
+      return { consegna: created, existing: false };
+    });
+  } catch (error) {
+    if (handleBollaActionError(error, res)) return;
+    throw error;
+  }
+  if (!result.existing) await syncTurnoDaConsegna(result.consegna);
+  if (!result.existing) logger.info({ bollaId, consegnaId: result.consegna.id, operatoreId: req.user!.id }, "Bolla convertita in consegna domiciliare");
+  res.status(result.existing ? 200 : 201).json({ created: !result.existing, consegnaId: result.consegna.id, codice: result.consegna.codice });
+  },
+);
 
 // ─── ANNULLA ──────────────────────────────────────────────────────────────────
 
