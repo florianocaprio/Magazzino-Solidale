@@ -4,7 +4,7 @@ import type { ReportFilters, ReportKpi } from "./types";
 import { andSql, number, rows } from "./sql";
 import { dashboard, kpi } from "./shared";
 import { pacchiConditions, pacchiMetrics } from "./pacchi";
-import { socialConditions, socialMetrics, socialEventDate } from "./centroAscolto";
+import { socialCompletedConditions, socialMetrics, socialEventDate } from "./centroAscolto";
 import { emporioMetrics, speseConditions } from "./emporio";
 import { mealConditions, mensaMetrics } from "./mensa";
 import { udsBaseConditions, udsEventDate, udsMetrics } from "./uds";
@@ -49,7 +49,7 @@ function eventUnions(filters: ReportFilters, active: ActiveSources): SQL[] {
     unions.push(sql`SELECT i.beneficiario_id, ${socialEventDate} AS giorno, 'centro-ascolto'::text AS area,
       be.citta_id, be.centro_ascolto_id
       FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
-      WHERE ${andSql(socialConditions(filters))}`);
+      WHERE ${andSql(socialCompletedConditions(filters))}`);
   }
   if (active.emporio) {
     unions.push(sql`SELECT se.beneficiario_id, se.data_chiusura::date AS giorno, 'emporio'::text AS area,
@@ -115,13 +115,13 @@ export async function buildGeneralReport(filters: ReportFilters) {
     kpi("personeUnicheComplessive", number(uniqueRows[0]?.persone)),
   ];
   if (pacchi) {
-    allKpi.push(kpi("pacchiDistribuiti", pacchi.pacchi), kpi("personeNucleiPacchi", pacchi.persone));
+    allKpi.push(kpi("pacchiDistribuiti", pacchi.pacchi), kpi("nucleiPacchi", pacchi.nuclei));
   }
   if (sociale) {
     allKpi.push(kpi("interventiCentroAscolto", sociale.interventi), kpi("personeCentroAscolto", sociale.persone));
   }
   if (emporio) {
-    allKpi.push(kpi("accessiEmporio", emporio.accessi), kpi("speseEmporio", emporio.spese), kpi("prodottiEmporio", emporio.prodotti, "quantity"), kpi("creditoUtilizzato", emporio.credito, "credit"));
+    allKpi.push(kpi("accessiEmporio", emporio.accessi), kpi("speseEmporio", emporio.spese), kpi("prodottiEmporio", emporio.prodottiDistinti), kpi("creditoUtilizzato", emporio.credito, "credit"));
   }
   if (mensa) {
     allKpi.push(kpi("pastiErogati", mensa.pasti), kpi("utentiMensa", mensa.persone));

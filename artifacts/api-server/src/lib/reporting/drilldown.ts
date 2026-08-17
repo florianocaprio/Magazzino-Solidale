@@ -3,7 +3,7 @@ import type { ReportDrilldown, ReportFilters, ReportSection } from "./types";
 import { ReportingError } from "./filters";
 import { andSql, number, reportScope, rows } from "./sql";
 import { pacchiConditions } from "./pacchi";
-import { socialConditions, socialEventDate } from "./centroAscolto";
+import { socialCompletedConditions, socialEventDate } from "./centroAscolto";
 import { accessConditions, speseConditions } from "./emporio";
 import { mealConditions, mensaAccessConditions } from "./mensa";
 import { udsBaseConditions, udsIdentityConditions, udsEventDate } from "./uds";
@@ -104,7 +104,7 @@ function detailDefinition(
           SELECT be.id, be.codice AS beneficiario_codice, COUNT(*) AS interventi,
                  MAX(${socialEventDate})::text AS data, COUNT(*) OVER() AS full_count
           FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
-          WHERE ${andSql(socialConditions(filters))}
+          WHERE ${andSql(socialCompletedConditions(filters))}
           GROUP BY be.id, be.codice ORDER BY data DESC, be.id DESC ${pagination}
         `,
       };
@@ -131,7 +131,7 @@ function detailDefinition(
                COUNT(*) OVER() AS full_count
         FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
         LEFT JOIN utenti u ON u.id = i.operatore_id
-        WHERE ${andSql(socialConditions(filters))}
+        WHERE ${andSql(socialCompletedConditions(filters))}
         ORDER BY ${socialEventDate} DESC, i.id DESC ${pagination}
       `,
     };
@@ -337,15 +337,21 @@ function detailDefinition(
       };
     }
     return {
-      columns: ["id", "data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita"],
+      columns: ["id", "data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita", "canale"],
       query: sql`
         SELECT mv.id, b.data_bolla::text AS data, b.numero_bolla AS documento,
                be.codice AS beneficiario_codice, p.nome AS prodotto,
                l.codice_lotto AS lotto, abs(mv.quantita::numeric) AS quantita,
-               mv.unita_misura AS unita, COUNT(*) OVER() AS full_count
+               mv.unita_misura AS unita,
+               CASE WHEN se.id IS NOT NULL THEN 'emporio'
+                    WHEN c.tipo_consegna = 'domicilio' THEN 'domiciliare'
+                    ELSE 'pacchi' END AS canale,
+               COUNT(*) OVER() AS full_count
         FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id AND l.fse_plus = true
         JOIN bolla_righe br ON br.id = mv.bolla_riga_id JOIN bolle b ON b.id = br.bolla_id
         JOIN beneficiari be ON be.id = b.beneficiario_id JOIN prodotti p ON p.id = br.prodotto_id
+        LEFT JOIN spese_emporio se ON se.bolla_id = b.id AND se.stato_spesa = 'chiusa'
+        LEFT JOIN consegne c ON c.id = b.consegna_id
         WHERE mv.tipo_movimento = 'scarico' AND b.stato = 'consegnato'
           AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
           AND ${andSql(reportScope(filters, { citta: sql`be.citta_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}

@@ -6,6 +6,10 @@ import { dashboard, kpi, quality } from "./shared";
 function pacchiConditions(filters: ReportFilters): SQL[] {
   return [
     sql`b.stato = 'consegnato'`,
+    sql`NOT EXISTS (
+      SELECT 1 FROM spese_emporio pacchi_se
+      WHERE pacchi_se.bolla_id = b.id AND pacchi_se.stato_spesa = 'chiusa'
+    )`,
     sql`b.data_bolla::date BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
       citta: sql`be.citta_id`,
@@ -71,17 +75,18 @@ export async function buildPacchiReport(filters: ReportFilters) {
         WHERE mv.bolla_riga_id IS NOT NULL AND mv.tipo_movimento = 'scarico'
         GROUP BY mv.bolla_riga_id
       )
-      SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, p.unita_misura,
+      SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, br.unita_misura,
              SUM(br.quantita::numeric) AS quantita,
              SUM(COALESCE(cl.quantita_fse, 0)) AS quantita_fse,
-             SUM(br.quantita::numeric - COALESCE(cl.quantita_fse, 0)) AS quantita_non_fse
+             SUM(br.quantita::numeric - COALESCE(cl.quantita_fse, 0)) AS quantita_non_fse,
+             COUNT(*) AS righe
       FROM bolle b
       JOIN beneficiari be ON be.id = b.beneficiario_id
       JOIN bolla_righe br ON br.bolla_id = b.id
       JOIN prodotti p ON p.id = br.prodotto_id
       LEFT JOIN consumo_lotti cl ON cl.bolla_riga_id = br.id
       WHERE ${where}
-      GROUP BY p.id, p.nome, p.unita_misura
+      GROUP BY p.id, p.nome, br.unita_misura
       ORDER BY quantita DESC, p.nome
     `),
     rows<Record<string, unknown>>(sql`
@@ -109,9 +114,11 @@ export async function buildPacchiReport(filters: ReportFilters) {
     `),
   ]);
 
-  const quantityTotal = products.reduce((sum, row) => sum + number(row.quantita), 0);
-  const fseTotal = products.reduce((sum, row) => sum + number(row.quantita_fse), 0);
-  const nonFseTotal = products.reduce((sum, row) => sum + number(row.quantita_non_fse), 0);
+  const rowsTotal = products.reduce((sum, row) => sum + number(row.righe), 0);
+  const distinctProducts = new Set(products.map((row) => number(row.prodotto_id))).size;
+  const calculableKg = products
+    .filter((row) => String(row.unita_misura).toLowerCase() === "kg")
+    .reduce((sum, row) => sum + number(row.quantita), 0);
   const dq = dataQuality[0] ?? {};
 
   return dashboard({
@@ -123,19 +130,20 @@ export async function buildPacchiReport(filters: ReportFilters) {
       kpi("personeRaggiunte", metrics.persone, "count", "personeRaggiunte"),
       kpi("distribuzioniSede", metrics.sede),
       kpi("distribuzioniDomiciliari", metrics.domiciliari),
-      kpi("quantitaProdotti", quantityTotal, "quantity"),
-      kpi("quantitaFse", fseTotal, "quantity", "prodottiFse"),
-      kpi("quantitaNonFse", nonFseTotal, "quantity"),
+      kpi("prodottiDistinti", distinctProducts),
+      kpi("righeProdotto", rowsTotal),
+      kpi("kgCalcolabili", calculableKg, "kg"),
     ],
     series: [{ key: "pacchiPerMese", points: monthSeries(monthly, "totale", "nuclei") }],
     tables: [
       {
         key: "prodotti",
-        columns: ["prodottoId", "prodottoNome", "unitaMisura", "quantita", "quantitaFse", "quantitaNonFse"],
+        columns: ["prodottoId", "prodottoNome", "unitaMisura", "righe", "quantita", "quantitaFse", "quantitaNonFse"],
         rows: products.map((row) => ({
           prodottoId: number(row.prodotto_id),
           prodottoNome: String(row.prodotto_nome),
           unitaMisura: String(row.unita_misura),
+          righe: number(row.righe),
           quantita: number(row.quantita),
           quantitaFse: number(row.quantita_fse),
           quantitaNonFse: number(row.quantita_non_fse),
@@ -157,10 +165,11 @@ export async function buildPacchiReport(filters: ReportFilters) {
       quality("nucleoIncompleto", number(dq.nucleo_incompleto), number(dq.nucleo_incompleto) ? "derivable" : "ok"),
     ],
     definitions: [
-      "Pacco distribuito = bolla nello stato consegnato nel periodo.",
+      "Pacco distribuito = bolla nello stato consegnato nel periodo non associata a una spesa Emporio chiusa.",
       "Nucleo servito = beneficiario distinto associato a una bolla consegnata.",
       "Persone raggiunte = titolare più membri del nucleo registrati per i nuclei serviti.",
       "La quantità FSE+ deriva esclusivamente dai lotti effettivamente scaricati.",
+      "Le quantità sono mostrate per prodotto e unità; soltanto i kg vengono aggregati nel KPI dedicato.",
     ],
   });
 }

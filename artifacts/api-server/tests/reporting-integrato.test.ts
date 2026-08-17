@@ -3,12 +3,14 @@ import type { Request } from "express";
 import {
   db, pool, beneficiariTable, bolleTable, bollaRigheTable, cittaTable,
   centriAscoltoTable, lottiTable, magazziniTable, movimentiTable, prodottiTable,
+  consegneTable, sessioniCassaEmporioTable, speseEmporioTable,
+  speseEmporioRigheTable, interventiTable,
 } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import { parseReportFilters, ReportingError } from "../src/lib/reporting/filters";
 import { reportingAgeBand } from "../src/lib/reporting/ageBands";
 import { buildPacchiReport } from "../src/lib/reporting/pacchi";
-import { buildCentroAscoltoReport } from "../src/lib/reporting/centroAscolto";
+import { buildCentroAscoltoReport, isSocialPlannedExpired } from "../src/lib/reporting/centroAscolto";
 import { buildEmporioReport } from "../src/lib/reporting/emporio";
 import { buildMensaReport } from "../src/lib/reporting/mensa";
 import { buildUdsReport } from "../src/lib/reporting/uds";
@@ -18,6 +20,7 @@ import { buildGeneralReport } from "../src/lib/reporting/generale";
 import type { ReportFilters } from "../src/lib/reporting/types";
 import { requireSourceArea } from "../src/routes/report-integrato";
 import { buildDrilldown } from "../src/lib/reporting/drilldown";
+import { dateTimeEuropeRomeToUtc } from "../src/lib/interventiViste";
 
 function requestFor(
   query: Record<string, unknown>,
@@ -111,69 +114,199 @@ describe("fasce di età centralizzate", () => {
   });
 });
 
+describe("semantica dei servizi Centro di Ascolto", () => {
+  it("conta come servite solo le persone con interventi conclusi e applica il cutoff temporale", async () => {
+    const suffix = Math.random().toString(36).slice(2, 9);
+    const interventionIds: number[] = [];
+    const [city] = await db.insert(cittaTable).values({ nome: `Social report city ${suffix}` }).returning({ id: cittaTable.id });
+    const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Social report centre ${suffix}`, cittaId: city.id }).returning({ id: centriAscoltoTable.id });
+    const beneficiaries = await db.insert(beneficiariTable).values([
+      { codice: `SRV-${suffix}`, nome: "Servita", cognome: "Report", cittaId: city.id, centroAscoltoId: centre.id },
+      { codice: `PLN-${suffix}`, nome: "Pianificata", cognome: "Report", cittaId: city.id, centroAscoltoId: centre.id },
+    ]).returning({ id: beneficiariTable.id, codice: beneficiariTable.codice });
+    const served = beneficiaries.find((row) => row.codice.startsWith("SRV"))!;
+    const plannedOnly = beneficiaries.find((row) => row.codice.startsWith("PLN"))!;
+    const now = new Date();
+    const past = new Date(now.getTime() - 60 * 60 * 1000);
+    const future = new Date(now.getTime() + 60 * 60 * 1000);
+    try {
+      const created = await db.insert(interventiTable).values([
+        { beneficiarioId: served.id, tipoIntervento: `Concluso ${suffix}`, ambito: "sociale", stato: "concluso", dataOraConclusione: now },
+        { beneficiarioId: served.id, tipoIntervento: `Annullato ${suffix}`, ambito: "sociale", stato: "annullato", dataIntervento: "2026-08-17" },
+        { beneficiarioId: served.id, tipoIntervento: `Mancata ${suffix}`, ambito: "sociale", stato: "mancata_presentazione", dataIntervento: "2026-08-17" },
+        { beneficiarioId: served.id, tipoIntervento: `Scaduto ${suffix}`, ambito: "sociale", stato: "pianificato", dataOraPianificata: past },
+        { beneficiarioId: served.id, tipoIntervento: `Futuro ${suffix}`, ambito: "sociale", stato: "pianificato", dataOraPianificata: future },
+        { beneficiarioId: plannedOnly.id, tipoIntervento: `Solo pianificato ${suffix}`, ambito: "sociale", stato: "pianificato", dataOraPianificata: future },
+      ]).returning({ id: interventiTable.id });
+      interventionIds.push(...created.map((row) => row.id));
+      const filters = {
+        ...fullFilters(), da: "2020-01-01", a: "2100-12-31", anno: 2026,
+        cittaId: city.id, centroAscoltoId: centre.id,
+        cittaMode: "query" as const, centroMode: "query" as const,
+      };
+      const report = await buildCentroAscoltoReport(filters);
+      expect(report.kpi.find((item) => item.key === "personeServite")?.value).toBe(1);
+      expect(report.kpi.find((item) => item.key === "interventiEffettuati")?.value).toBe(1);
+      expect(report.kpi.find((item) => item.key === "annullati")?.value).toBe(1);
+      expect(report.kpi.find((item) => item.key === "mancatePresentazioni")?.value).toBe(1);
+      expect(report.kpi.find((item) => item.key === "scaduti")?.value).toBe(1);
+      expect(report.kpi.find((item) => item.key === "pianificati")?.value).toBe(2);
+      const peopleDetails = await buildDrilldown({ section: "centro-ascolto", metric: "personeServite", filters, page: 1, pageSize: 25 });
+      const interventionDetails = await buildDrilldown({ section: "centro-ascolto", metric: "interventi", filters, page: 1, pageSize: 25 });
+      expect(peopleDetails.total).toBe(1);
+      expect(interventionDetails.total).toBe(1);
+    } finally {
+      if (interventionIds.length) await db.delete(interventiTable).where(inArray(interventiTable.id, interventionIds));
+      await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiaries.map((row) => row.id)));
+      await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centre.id]));
+      await db.delete(cittaTable).where(inArray(cittaTable.id, [city.id]));
+    }
+  });
+
+  it("non considera scaduto un appuntamento futuro nella stessa data civile Europe/Rome", () => {
+    const now = dateTimeEuropeRomeToUtc("2026-08-17", 12, 0);
+    const pastToday = dateTimeEuropeRomeToUtc("2026-08-17", 10, 0);
+    const futureToday = dateTimeEuropeRomeToUtc("2026-08-17", 15, 0);
+    expect(isSocialPlannedExpired(pastToday, "2026-08-17", now)).toBe(true);
+    expect(isSocialPlannedExpired(futureToday, "2026-08-17", now)).toBe(false);
+  });
+});
+
 describe("regole di conteggio Pacchi e FSE+", () => {
   it("conta solo bolle consegnate, non duplica il pacco per riga e usa il lotto per FSE+", async () => {
     const suffix = Math.random().toString(36).slice(2, 9);
-    const ids = { bolle: [] as number[], righe: [] as number[], movimenti: [] as number[], lotti: [] as number[] };
+    const ids = {
+      bolle: [] as number[], righe: [] as number[], movimenti: [] as number[], lotti: [] as number[],
+      accessi: [] as number[], sessioni: [] as number[], spese: [] as number[], spesaRighe: [] as number[],
+    };
     const [city] = await db.insert(cittaTable).values({ nome: `Report city ${suffix}` }).returning({ id: cittaTable.id });
     const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Report centre ${suffix}`, cittaId: city.id }).returning({ id: centriAscoltoTable.id });
     const [warehouse] = await db.insert(magazziniTable).values({ codice: `R-${suffix}`, nome: `Report warehouse ${suffix}`, cittaId: city.id, centroAscoltoId: centre.id }).returning({ id: magazziniTable.id });
     const [beneficiary] = await db.insert(beneficiariTable).values({ codice: `RB-${suffix}`, nome: "Report", cognome: "Test", sesso: "F", cittaId: city.id, centroAscoltoId: centre.id }).returning({ id: beneficiariTable.id });
-    const [product] = await db.insert(prodottiTable).values({ codice: `RP-${suffix}`, nome: `Report product ${suffix}`, tipoProdotto: "alimentare", unitaMisura: "kg", fsePlus: false }).returning({ id: prodottiTable.id });
+    const products = await db.insert(prodottiTable).values([
+      { codice: `RP-KG-${suffix}`, nome: `Report kg ${suffix}`, tipoProdotto: "alimentare", unitaMisura: "kg", fsePlus: false },
+      { codice: `RP-PZ-${suffix}`, nome: `Report pezzi ${suffix}`, tipoProdotto: "alimentare", unitaMisura: "pz", fsePlus: false },
+    ]).returning({ id: prodottiTable.id, unitaMisura: prodottiTable.unitaMisura });
+    const productKg = products.find((row) => row.unitaMisura === "kg")!;
+    const productPz = products.find((row) => row.unitaMisura === "pz")!;
     try {
       const createdBolle = await db.insert(bolleTable).values([
         { numeroBolla: `RBO-${suffix}-1`, dataBolla: "2026-06-01", beneficiarioId: beneficiary.id, magazzinoId: warehouse.id, stato: "bozza" },
         { numeroBolla: `RBO-${suffix}-2`, dataBolla: "2026-06-01", beneficiarioId: beneficiary.id, magazzinoId: warehouse.id, stato: "annullato" },
         { numeroBolla: `RBO-${suffix}-3`, dataBolla: "2026-06-01", beneficiarioId: beneficiary.id, magazzinoId: warehouse.id, stato: "consegnato" },
-      ]).returning({ id: bolleTable.id, stato: bolleTable.stato });
+        { numeroBolla: `RBO-${suffix}-4`, dataBolla: "2026-06-01", beneficiarioId: beneficiary.id, magazzinoId: warehouse.id, stato: "consegnato" },
+      ]).returning({ id: bolleTable.id, numeroBolla: bolleTable.numeroBolla });
       ids.bolle.push(...createdBolle.map((row) => row.id));
-      const finalBolla = createdBolle.find((row) => row.stato === "consegnato")!;
+      const finalBolla = createdBolle.find((row) => row.numeroBolla.endsWith("-3"))!;
+      const emporioBolla = createdBolle.find((row) => row.numeroBolla.endsWith("-4"))!;
       const createdRows = await db.insert(bollaRigheTable).values([
-        { bollaId: finalBolla.id, prodottoId: product.id, quantita: "2.00", unitaMisura: "kg" },
-        { bollaId: finalBolla.id, prodottoId: product.id, quantita: "3.00", unitaMisura: "kg" },
+        { bollaId: finalBolla.id, prodottoId: productKg.id, quantita: "2.00", unitaMisura: "kg" },
+        { bollaId: finalBolla.id, prodottoId: productKg.id, quantita: "3.00", unitaMisura: "kg" },
+        { bollaId: finalBolla.id, prodottoId: productPz.id, quantita: "7.00", unitaMisura: "pz" },
+        { bollaId: emporioBolla.id, prodottoId: productPz.id, quantita: "4.00", unitaMisura: "pz" },
       ]).returning({ id: bollaRigheTable.id });
       ids.righe.push(...createdRows.map((row) => row.id));
       const lots = await db.insert(lottiTable).values([
-        { prodottoId: product.id, codiceLotto: `FSE-${suffix}`, dataCarico: "2026-01-01", quantitaCaricata: "10", quantitaResidua: "8", magazzinoId: warehouse.id, fsePlus: true },
-        { prodottoId: product.id, codiceLotto: `NO-${suffix}`, dataCarico: "2026-01-01", quantitaCaricata: "10", quantitaResidua: "7", magazzinoId: warehouse.id, fsePlus: false },
-      ]).returning({ id: lottiTable.id, fsePlus: lottiTable.fsePlus });
+        { prodottoId: productKg.id, codiceLotto: `FSE-${suffix}`, dataCarico: "2026-01-01", quantitaCaricata: "10", quantitaResidua: "8", magazzinoId: warehouse.id, fsePlus: true },
+        { prodottoId: productKg.id, codiceLotto: `NO-${suffix}`, dataCarico: "2026-01-01", quantitaCaricata: "10", quantitaResidua: "7", magazzinoId: warehouse.id, fsePlus: false },
+        { prodottoId: productPz.id, codiceLotto: `PZ-${suffix}`, dataCarico: "2026-01-01", quantitaCaricata: "20", quantitaResidua: "16", magazzinoId: warehouse.id, fsePlus: false },
+      ]).returning({ id: lottiTable.id, prodottoId: lottiTable.prodottoId, fsePlus: lottiTable.fsePlus });
       ids.lotti.push(...lots.map((row) => row.id));
       const createdMovements = await db.insert(movimentiTable).values([
-        { tipoMovimento: "scarico", tipoDettaglio: "bolla", dataMovimento: "2026-06-01", magazzinoId: warehouse.id, prodottoId: product.id, lottoId: lots.find((row) => row.fsePlus)!.id, quantita: "-2", unitaMisura: "kg", beneficiarioId: beneficiary.id, bollaId: finalBolla.id, bollaRigaId: createdRows[0].id },
-        { tipoMovimento: "scarico", tipoDettaglio: "bolla", dataMovimento: "2026-06-01", magazzinoId: warehouse.id, prodottoId: product.id, lottoId: lots.find((row) => !row.fsePlus)!.id, quantita: "-3", unitaMisura: "kg", beneficiarioId: beneficiary.id, bollaId: finalBolla.id, bollaRigaId: createdRows[1].id },
+        { tipoMovimento: "scarico", tipoDettaglio: "bolla", dataMovimento: "2026-06-01", magazzinoId: warehouse.id, prodottoId: productKg.id, lottoId: lots.find((row) => row.fsePlus)!.id, quantita: "-2", unitaMisura: "kg", beneficiarioId: beneficiary.id, bollaId: finalBolla.id, bollaRigaId: createdRows[0].id },
+        { tipoMovimento: "scarico", tipoDettaglio: "bolla", dataMovimento: "2026-06-01", magazzinoId: warehouse.id, prodottoId: productKg.id, lottoId: lots.find((row) => !row.fsePlus && row.prodottoId === productKg.id)!.id, quantita: "-3", unitaMisura: "kg", beneficiarioId: beneficiary.id, bollaId: finalBolla.id, bollaRigaId: createdRows[1].id },
       ]).returning({ id: movimentiTable.id });
       ids.movimenti.push(...createdMovements.map((row) => row.id));
+
+      const [access] = await db.insert(consegneTable).values({
+        codice: `RA-${suffix}`, beneficiarioId: beneficiary.id,
+        tipoPianificazione: "accesso_emporio", tipoConsegna: "ritiro",
+        dataPrevista: "2026-06-01", magazzinoId: warehouse.id,
+        magazzinoEmporioId: warehouse.id, stato: "effettuata",
+        statoAccessoEmporio: "effettuato", dataOraEffettivaAccesso: new Date("2026-06-01T10:00:00Z"),
+      }).returning({ id: consegneTable.id });
+      ids.accessi.push(access.id);
+      const [session] = await db.insert(sessioniCassaEmporioTable).values({
+        accessoEmporioId: access.id, beneficiarioId: beneficiary.id,
+        magazzinoEmporioId: warehouse.id, centroAscoltoId: centre.id, cittaId: city.id,
+        statoSessione: "chiusa", dataChiusura: new Date("2026-06-01T10:15:00Z"),
+      }).returning({ id: sessioniCassaEmporioTable.id });
+      ids.sessioni.push(session.id);
+      const [expense] = await db.insert(speseEmporioTable).values({
+        sessioneCassaId: session.id, accessoEmporioId: access.id,
+        beneficiarioId: beneficiary.id, centroAscoltoId: centre.id, cittaId: city.id,
+        magazzinoEmporioId: warehouse.id, bollaId: emporioBolla.id,
+        numeroSpesa: `RS-${suffix}`, dataChiusura: new Date("2026-06-01T10:15:00Z"),
+        totaleCreditoConsumati: "4", saldoPrima: "10", saldoDopo: "6", statoSpesa: "chiusa",
+      }).returning({ id: speseEmporioTable.id });
+      ids.spese.push(expense.id);
+      const expenseRows = await db.insert(speseEmporioRigheTable).values({
+        spesaEmporioId: expense.id, prodottoId: productPz.id,
+        descrizioneProdotto: `Report pezzi ${suffix}`, quantita: "4",
+        creditoUnitario: "1", creditoTotale: "4", bollaRigaId: createdRows[3].id,
+      }).returning({ id: speseEmporioRigheTable.id });
+      ids.spesaRighe.push(...expenseRows.map((row) => row.id));
 
       const filters = { ...fullFilters(), cittaId: city.id, centroAscoltoId: centre.id, magazzinoId: warehouse.id, cittaMode: "query" as const, centroMode: "query" as const };
       const parcelReport = await buildPacchiReport(filters);
       expect(parcelReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(1);
       expect(parcelReport.kpi.find((item) => item.key === "nucleiServiti")?.value).toBe(1);
-      expect(parcelReport.kpi.find((item) => item.key === "quantitaProdotti")?.value).toBe(5);
-      expect(parcelReport.kpi.find((item) => item.key === "quantitaFse")?.value).toBe(2);
-      expect(parcelReport.kpi.find((item) => item.key === "quantitaNonFse")?.value).toBe(3);
+      expect(parcelReport.kpi.find((item) => item.key === "prodottiDistinti")?.value).toBe(2);
+      expect(parcelReport.kpi.find((item) => item.key === "righeProdotto")?.value).toBe(3);
+      expect(parcelReport.kpi.find((item) => item.key === "kgCalcolabili")?.value).toBe(5);
+      expect(parcelReport.kpi.some((item) => item.key === "quantitaProdotti")).toBe(false);
+      const parcelProducts = parcelReport.tables.find((table) => table.key === "prodotti")?.rows ?? [];
+      expect(parcelProducts).toEqual(expect.arrayContaining([
+        expect.objectContaining({ unitaMisura: "kg", quantita: 5 }),
+        expect.objectContaining({ unitaMisura: "pz", quantita: 7 }),
+      ]));
+
+      const emporioReport = await buildEmporioReport(filters);
+      expect(emporioReport.kpi.find((item) => item.key === "speseConcluse")?.value).toBe(1);
+      expect(emporioReport.kpi.find((item) => item.key === "prodottiDistintiDistribuiti")?.value).toBe(1);
+
+      const generalReport = await buildGeneralReport(filters);
+      expect(generalReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(1);
+      expect(generalReport.kpi.find((item) => item.key === "speseEmporio")?.value).toBe(1);
+      expect(generalReport.kpi.find((item) => item.key === "nucleiPacchi")?.value).toBe(1);
 
       const fseReport = await buildFsePlusReport(filters);
-      expect(fseReport.kpi.find((item) => item.key === "prodottiFseDistribuiti")?.value).toBe(2);
+      expect(fseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value).toBe(1);
       expect(fseReport.tables.find((table) => table.key === "01_Prodotti_FSE")?.rows[0]).toMatchObject({ quantitaFse: 2, quantitaTotale: 5, percentualeFse: 40 });
+      const fseDetails = await buildDrilldown({ section: "fse-plus", metric: "prodottiFse", filters, page: 1, pageSize: 25 });
+      expect(fseDetails.columns).toEqual(["id", "data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita", "canale"]);
+      expect(fseDetails.rows[0]).toMatchObject({ beneficiarioCodice: `RB-${suffix}`, canale: "pacchi", unita: "kg" });
+      expect(fseDetails.rows[0]).not.toHaveProperty("nome");
+      expect(fseDetails.rows[0]).not.toHaveProperty("cognome");
       const mensaOnlyFseReport = await buildFsePlusReport({
         ...filters,
         callerIsAdmin: false,
         callerAreas: ["mensa"],
         callerPermissions: ["mensa.reports.view"],
       });
-      expect(mensaOnlyFseReport.kpi.find((item) => item.key === "prodottiFseDistribuiti")?.value).toBe(0);
+      expect(mensaOnlyFseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value).toBe(0);
       expect(mensaOnlyFseReport.tables.find((table) => table.key === "01_Prodotti_FSE")?.rows).toHaveLength(0);
       await expect(buildDrilldown({ section: "pacchi", metric: "nonEsiste", filters, page: 1, pageSize: 25 })).rejects.toThrow(/non disponibile/);
       const parcelDetails = await buildDrilldown({ section: "pacchi", metric: "pacchiDistribuiti", filters, page: 1, pageSize: 25 });
       const householdDetails = await buildDrilldown({ section: "pacchi", metric: "nucleiServiti", filters, page: 1, pageSize: 25 });
       expect(parcelDetails.total).toBe(1);
       expect(householdDetails.total).toBe(1);
+      const logisticsReport = await buildLogisticaReport(filters);
+      const stockRows = logisticsReport.tables.find((table) => table.key === "giacenze")?.rows ?? [];
+      expect(stockRows).toEqual(expect.arrayContaining([
+        expect.objectContaining({ unitaMisura: "kg", quantita: 15 }),
+        expect.objectContaining({ unitaMisura: "pz", quantita: 16 }),
+      ]));
     } finally {
+      if (ids.spesaRighe.length) await db.delete(speseEmporioRigheTable).where(inArray(speseEmporioRigheTable.id, ids.spesaRighe));
+      if (ids.spese.length) await db.delete(speseEmporioTable).where(inArray(speseEmporioTable.id, ids.spese));
+      if (ids.sessioni.length) await db.delete(sessioniCassaEmporioTable).where(inArray(sessioniCassaEmporioTable.id, ids.sessioni));
+      if (ids.accessi.length) await db.delete(consegneTable).where(inArray(consegneTable.id, ids.accessi));
       if (ids.movimenti.length) await db.delete(movimentiTable).where(inArray(movimentiTable.id, ids.movimenti));
       if (ids.righe.length) await db.delete(bollaRigheTable).where(inArray(bollaRigheTable.id, ids.righe));
       if (ids.bolle.length) await db.delete(bolleTable).where(inArray(bolleTable.id, ids.bolle));
       if (ids.lotti.length) await db.delete(lottiTable).where(inArray(lottiTable.id, ids.lotti));
-      await db.delete(prodottiTable).where(inArray(prodottiTable.id, [product.id]));
+      await db.delete(prodottiTable).where(inArray(prodottiTable.id, products.map((row) => row.id)));
       await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, [beneficiary.id]));
       await db.delete(magazziniTable).where(inArray(magazziniTable.id, [warehouse.id]));
       await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centre.id]));

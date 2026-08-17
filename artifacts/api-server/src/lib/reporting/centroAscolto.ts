@@ -2,6 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
 import { dashboard, kpi, quality } from "./shared";
+import { intervalloGiornoEuropeRome } from "../interventiViste";
 
 const eventDate = sql`(
   COALESCE(
@@ -30,20 +31,47 @@ function socialConditions(filters: ReportFilters): SQL[] {
   return conditions;
 }
 
+function socialCompletedConditions(filters: ReportFilters): SQL[] {
+  return [...socialConditions(filters), sql`i.stato = 'concluso'`];
+}
+
+function plannedCutoff(filters: ReportFilters): SQL {
+  return sql`LEAST(
+    (${filters.a}::date + interval '1 day') AT TIME ZONE 'Europe/Rome',
+    CURRENT_TIMESTAMP
+  )`;
+}
+
+export function isSocialPlannedExpired(
+  plannedAt: Date,
+  reportEnd: string,
+  now = new Date(),
+): boolean {
+  const reportEndExclusive = intervalloGiornoEuropeRome(reportEnd).end;
+  const cutoff = Math.min(reportEndExclusive.getTime(), now.getTime());
+  return plannedAt.getTime() < cutoff;
+}
+
 export async function socialMetrics(filters: ReportFilters) {
   const where = andSql(socialConditions(filters));
+  const cutoff = plannedCutoff(filters);
   const [row] = await rows<Record<string, unknown>>(sql`
-    SELECT COUNT(*) AS interventi,
-           COUNT(DISTINCT i.beneficiario_id) AS persone,
+    SELECT COUNT(*) FILTER (WHERE i.stato = 'concluso') AS interventi,
+           COUNT(DISTINCT i.beneficiario_id) FILTER (WHERE i.stato = 'concluso') AS persone,
            COUNT(*) FILTER (WHERE i.stato = 'da_pianificare') AS da_pianificare,
-           COUNT(*) FILTER (WHERE i.stato = 'pianificato') AS pianificati,
+           COUNT(*) FILTER (
+             WHERE i.stato = 'pianificato' AND i.data_ora_pianificata >= ${cutoff}
+           ) AS pianificati,
            COUNT(*) FILTER (WHERE i.stato = 'concluso') AS conclusi,
            COUNT(*) FILTER (WHERE i.stato = 'mancata_presentazione') AS mancati,
+           COUNT(*) FILTER (WHERE i.stato = 'annullato') AS annullati,
            COUNT(*) FILTER (
              WHERE i.stato = 'pianificato'
-               AND i.data_ora_pianificata < (${filters.a}::date + interval '1 day') AT TIME ZONE 'Europe/Rome'
+               AND i.data_ora_pianificata < ${cutoff}
            ) AS scaduti,
-           COUNT(DISTINCT i.operatore_id) FILTER (WHERE i.operatore_id IS NOT NULL) AS operatori
+           COUNT(DISTINCT i.operatore_id) FILTER (
+             WHERE i.operatore_id IS NOT NULL AND i.stato = 'concluso'
+           ) AS operatori
     FROM interventi i
     JOIN beneficiari be ON be.id = i.beneficiario_id
     WHERE ${where}
@@ -65,21 +93,24 @@ export async function socialMetrics(filters: ReportFilters) {
     daPianificare: number(row?.da_pianificare),
     pianificati: number(row?.pianificati),
     conclusi: number(row?.conclusi),
-    nonEffettuati: number(row?.mancati) + number(row?.scaduti),
+    mancatePresentazioni: number(row?.mancati),
+    annullati: number(row?.annullati),
+    scaduti: number(row?.scaduti),
     operatori: number(row?.operatori),
   };
 }
 
 export async function buildCentroAscoltoReport(filters: ReportFilters) {
   const where = andSql(socialConditions(filters));
+  const completedWhere = andSql(socialCompletedConditions(filters));
   const metrics = await socialMetrics(filters);
   const [monthly, types, operators, centres, dqRows] = await Promise.all([
     rows<Record<string, unknown>>(sql`
       SELECT to_char(${eventDate}, 'YYYY-MM') AS mese,
              COUNT(*) AS totale,
-             COUNT(*) FILTER (WHERE i.stato = 'concluso') AS conclusi
+             COUNT(DISTINCT i.beneficiario_id) AS persone
       FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
-      WHERE ${where} GROUP BY 1 ORDER BY 1
+      WHERE ${completedWhere} GROUP BY 1 ORDER BY 1
     `),
     rows<Record<string, unknown>>(sql`
       SELECT tipo, COUNT(*) AS totale
@@ -88,7 +119,7 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
         FROM interventi i
         JOIN beneficiari be ON be.id = i.beneficiario_id,
         LATERAL unnest(regexp_split_to_array(i.tipo_intervento, '\s*,\s*')) tipo
-        WHERE ${where}
+        WHERE ${completedWhere}
       ) classificati
       WHERE tipo <> '' GROUP BY tipo ORDER BY totale DESC, tipo
     `),
@@ -98,16 +129,16 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
       FROM interventi i
       JOIN beneficiari be ON be.id = i.beneficiario_id
       LEFT JOIN utenti u ON u.id = i.operatore_id
-      WHERE ${where}
+      WHERE ${completedWhere}
       GROUP BY u.id, u.matricola, u.username ORDER BY totale DESC, operatore
     `),
     rows<Record<string, unknown>>(sql`
       SELECT COALESCE(ca.nome, 'Senza centro') AS centro, COUNT(*) AS totale,
-             COUNT(*) FILTER (WHERE i.stato = 'concluso') AS conclusi
+             COUNT(DISTINCT i.beneficiario_id) AS persone
       FROM interventi i
       JOIN beneficiari be ON be.id = i.beneficiario_id
       LEFT JOIN centri_di_ascolto ca ON ca.id = be.centro_ascolto_id
-      WHERE ${where}
+      WHERE ${completedWhere}
       GROUP BY ca.id, ca.nome ORDER BY totale DESC, centro
     `),
     rows<Record<string, unknown>>(sql`
@@ -126,20 +157,21 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
     kpi: [
       kpi("personePreseInCarico", metrics.preseInCarico, "count", "personePreseInCarico"),
       kpi("personeServite", metrics.persone, "count", "personeServite"),
-      kpi("interventi", metrics.interventi, "count", "interventi"),
+      kpi("interventiEffettuati", metrics.interventi, "count", "interventi"),
       kpi("colloquiAccoglienza", null, "count", null, "missing"),
       kpi("colloquiFollowup", null, "count", null, "missing"),
       kpi("daPianificare", metrics.daPianificare),
       kpi("pianificati", metrics.pianificati),
-      kpi("conclusi", metrics.conclusi),
-      kpi("scadutiNonEffettuati", metrics.nonEffettuati),
+      kpi("mancatePresentazioni", metrics.mancatePresentazioni),
+      kpi("annullati", metrics.annullati),
+      kpi("scaduti", metrics.scaduti),
       kpi("operatoriCoinvolti", metrics.operatori),
     ],
-    series: [{ key: "interventiPerMese", points: monthSeries(monthly, "totale", "conclusi") }],
+    series: [{ key: "interventiPerMese", points: monthSeries(monthly, "totale", "persone") }],
     tables: [
       { key: "tipologie", columns: ["tipo", "totale"], rows: types.map((r) => ({ tipo: String(r.tipo), totale: number(r.totale) })) },
       { key: "operatori", columns: ["operatore", "totale"], rows: operators.map((r) => ({ operatore: String(r.operatore), totale: number(r.totale) })) },
-      { key: "centri", columns: ["centro", "totale", "conclusi"], rows: centres.map((r) => ({ centro: String(r.centro), totale: number(r.totale), conclusi: number(r.conclusi) })) },
+      { key: "centri", columns: ["centro", "totale", "persone"], rows: centres.map((r) => ({ centro: String(r.centro), totale: number(r.totale), persone: number(r.persone) })) },
     ],
     quality: [
       quality("ambitoLegacy", number(dq.ambito_legacy), number(dq.ambito_legacy) ? "derivable" : "ok", "I record legacy con ambito NULL seguono la vista Sociale corrente."),
@@ -148,11 +180,12 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
     ],
     definitions: [
       "Intervento Sociale = ambito sociale oppure ambito NULL legacy, coerentemente con la vista operativa corrente.",
-      "Persona servita = beneficiario distinto con almeno un intervento nel periodo.",
+      "Intervento effettuato = intervento Sociale nello stato concluso.",
+      "Persona servita = beneficiario distinto con almeno un intervento concluso nel periodo.",
+      "Scaduto = intervento ancora pianificato con data/ora precedente al minore tra fine periodo e ora corrente Europe/Rome.",
       "Le note riservate non sono dimensioni analitiche e non vengono esportate.",
     ],
   });
 }
 
-export { socialConditions, eventDate as socialEventDate };
-
+export { socialConditions, socialCompletedConditions, plannedCutoff, eventDate as socialEventDate };

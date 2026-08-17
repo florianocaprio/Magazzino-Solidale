@@ -104,19 +104,22 @@ export async function buildLogisticaReport(filters: ReportFilters) {
       WHERE ${movementWhere} GROUP BY 1 ORDER BY 1
     `),
     rows<Record<string, unknown>>(sql`
-      SELECT mg.id AS magazzino_id, mg.nome AS magazzino_nome,
+      SELECT mg.id AS magazzino_id, mg.nome AS magazzino_nome, p.unita_misura,
              COUNT(DISTINCT l.prodotto_id) FILTER (WHERE l.quantita_residua::numeric > 0) AS prodotti,
              COALESCE(SUM(l.quantita_residua::numeric), 0) AS quantita,
              COUNT(*) FILTER (WHERE l.quantita_residua::numeric > 0 AND l.data_scadenza < ${filters.a}::date) AS scaduti
       FROM magazzini mg LEFT JOIN lotti l ON l.magazzino_id = mg.id
-      WHERE ${warehouseWhere} GROUP BY mg.id, mg.nome ORDER BY mg.nome
+      LEFT JOIN prodotti p ON p.id = l.prodotto_id
+      WHERE ${warehouseWhere} GROUP BY mg.id, mg.nome, p.unita_misura ORDER BY mg.nome, p.unita_misura
     `),
     rows<Record<string, unknown>>(sql`
       SELECT mv.tipo_movimento AS tipo, mv.tipo_dettaglio AS causale,
-             COUNT(*) AS movimenti, COALESCE(SUM(abs(mv.quantita::numeric)), 0) AS quantita
+             mv.unita_misura, COUNT(*) AS movimenti,
+             COALESCE(SUM(abs(mv.quantita::numeric)), 0) AS quantita
       FROM movimenti mv JOIN magazzini mg ON mg.id = mv.magazzino_id
       WHERE ${movementWhere}
-      GROUP BY mv.tipo_movimento, mv.tipo_dettaglio ORDER BY movimenti DESC, causale
+      GROUP BY mv.tipo_movimento, mv.tipo_dettaglio, mv.unita_misura
+      ORDER BY movimenti DESC, causale, mv.unita_misura
     `),
     rows<Record<string, unknown>>(sql`
       SELECT tr.stato, COUNT(*) AS totale
@@ -173,8 +176,8 @@ export async function buildLogisticaReport(filters: ReportFilters) {
     series: magazzinoEnabled || lottiEnabled ? [{ key: "movimentiPerMese", points: monthSeries(monthly, "carichi", "scarichi") }] : [],
     tables: [
       ...(magazzinoEnabled || lottiEnabled ? [
-        { key: "giacenze", columns: ["magazzinoId", "magazzinoNome", "prodotti", "quantita", "scaduti"], rows: warehouses.map((r) => ({ magazzinoId: number(r.magazzino_id), magazzinoNome: String(r.magazzino_nome), prodotti: number(r.prodotti), quantita: number(r.quantita), scaduti: number(r.scaduti) })) },
-        { key: "causali", columns: ["tipo", "causale", "movimenti", "quantita"], rows: movementTypes.map((r) => ({ tipo: String(r.tipo), causale: String(r.causale), movimenti: number(r.movimenti), quantita: number(r.quantita) })) },
+        { key: "giacenze", columns: ["magazzinoId", "magazzinoNome", "unitaMisura", "prodotti", "quantita", "scaduti"], rows: warehouses.map((r) => ({ magazzinoId: number(r.magazzino_id), magazzinoNome: String(r.magazzino_nome), unitaMisura: r.unita_misura == null ? null : String(r.unita_misura), prodotti: number(r.prodotti), quantita: number(r.quantita), scaduti: number(r.scaduti) })) },
+        { key: "causali", columns: ["tipo", "causale", "unitaMisura", "movimenti", "quantita"], rows: movementTypes.map((r) => ({ tipo: String(r.tipo), causale: String(r.causale), unitaMisura: String(r.unita_misura), movimenti: number(r.movimenti), quantita: number(r.quantita) })) },
       ] : []),
       ...(trasferimentiEnabled ? [{ key: "trasferimenti", columns: ["stato", "totale"], rows: transferStates.map((r) => ({ stato: String(r.stato), totale: number(r.totale) })) }] : []),
     ],
@@ -186,6 +189,7 @@ export async function buildLogisticaReport(filters: ReportFilters) {
       "La giacenza reale è la somma delle quantità residue dei lotti.",
       `Scadenze e merce scaduta sono valutate sulla data civile finale ${filters.a}.`,
       "I movimenti sono eventi di audit; non costituiscono una seconda giacenza.",
+      "Giacenze e quantità movimentate sono aggregate separatamente per unità di misura.",
     ],
   });
 }

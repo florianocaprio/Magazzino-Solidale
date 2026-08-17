@@ -74,7 +74,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
     sql`persone.fascia_eta_presunta`,
     filters.a,
   );
-  const [products, channels, people, ageRows, sexRows, qualityRows, packageMeals] = await Promise.all([
+  const [products, channels, channelQuantities, people, ageRows, sexRows, qualityRows, packageMeals] = await Promise.all([
     rows<Record<string, unknown>>(sql`
       WITH fse_movimenti AS (
         SELECT mv.bolla_riga_id, SUM(abs(mv.quantita::numeric)) AS quantita
@@ -82,7 +82,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         WHERE mv.tipo_movimento = 'scarico' AND l.fse_plus = true
         GROUP BY mv.bolla_riga_id
       ), distribuzioni AS (
-        SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, p.unita_misura,
+        SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, br.unita_misura,
                COALESCE(fm.quantita, 0) AS quantita_fse,
                br.quantita::numeric AS quantita_totale_riga
         FROM bolla_righe br
@@ -118,7 +118,6 @@ export async function buildFsePlusReport(filters: ReportFilters) {
                WHEN c.tipo_consegna = 'domicilio' THEN 'domiciliare'
                ELSE 'pacchi'
              END AS canale,
-             SUM(fm.quantita) AS quantita,
              COUNT(DISTINCT b.id) AS documenti,
              COUNT(DISTINCT b.beneficiario_id) AS nuclei
       FROM fse_movimenti fm
@@ -129,7 +128,31 @@ export async function buildFsePlusReport(filters: ReportFilters) {
       LEFT JOIN consegne c ON c.id = b.consegna_id
       WHERE b.stato = 'consegnato' AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
         AND ${scope} AND ${sourceCondition}
-      GROUP BY 1 ORDER BY quantita DESC, canale
+      GROUP BY 1 ORDER BY documenti DESC, canale
+    `),
+    rows<Record<string, unknown>>(sql`
+      WITH fse_movimenti AS (
+        SELECT mv.bolla_riga_id, SUM(abs(mv.quantita::numeric)) AS quantita
+        FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id
+        WHERE mv.tipo_movimento = 'scarico' AND l.fse_plus = true
+        GROUP BY mv.bolla_riga_id
+      )
+      SELECT CASE
+               WHEN se.id IS NOT NULL THEN 'emporio'
+               WHEN c.tipo_consegna = 'domicilio' THEN 'domiciliare'
+               ELSE 'pacchi'
+             END AS canale,
+             br.unita_misura,
+             SUM(fm.quantita) AS quantita
+      FROM fse_movimenti fm
+      JOIN bolla_righe br ON br.id = fm.bolla_riga_id
+      JOIN bolle b ON b.id = br.bolla_id
+      JOIN beneficiari be ON be.id = b.beneficiario_id
+      LEFT JOIN spese_emporio se ON se.bolla_id = b.id AND se.stato_spesa = 'chiusa'
+      LEFT JOIN consegne c ON c.id = b.consegna_id
+      WHERE b.stato = 'consegnato' AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
+        AND ${scope} AND ${sourceCondition}
+      GROUP BY 1, br.unita_misura ORDER BY canale, br.unita_misura
     `),
     rows<Record<string, unknown>>(sql`
       WITH famiglie AS (
@@ -234,7 +257,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
   const persons = people[0] ?? {};
   const dq = qualityRows[0] ?? {};
   const pp = packageMeals[0] ?? {};
-  const quantity = products.reduce((sum, row) => sum + number(row.quantita_fse), 0);
+  const distinctProducts = new Set(products.map((row) => number(row.prodotto_id))).size;
   const kg = products.reduce((sum, row) => sum + (row.kg == null ? 0 : number(row.kg)), 0);
   const unconvertible = products.filter((row) => row.kg == null).length;
 
@@ -256,14 +279,14 @@ export async function buildFsePlusReport(filters: ReportFilters) {
     section: "fse-plus",
     filters,
     kpi: [
-      kpi("prodottiFseDistribuiti", quantity, "quantity", "prodottiFse"),
+      kpi("prodottiFseDistinti", distinctProducts, "count", "prodottiFse"),
       kpi("kgCalcolabili", kg, "kg"),
       kpi("nucleiRaggiunti", number(persons.nuclei), "count", "nucleiRaggiunti"),
       kpi("personeRaggiunte", number(persons.persone), "count", "personeRaggiunte"),
       ...(sources.pacchi ? [kpi("pacchiDistribuiti", number(pp.pacchi))] : []),
       ...(sources.mensa ? [kpi("pastiDistribuiti", number(pp.pasti))] : []),
     ],
-    series: [{ key: "canali", points: channels.map((r) => ({ label: String(r.canale), value: number(r.quantita), secondaryValue: number(r.nuclei) })) }],
+    series: [{ key: "canali", points: channels.map((r) => ({ label: String(r.canale), value: number(r.documenti), secondaryValue: number(r.nuclei) })) }],
     tables: [
       { key: "01_Prodotti_FSE", columns: ["prodottoId", "prodottoNome", "unitaMisura", "quantitaFse", "quantitaTotale", "percentualeFse", "kg"], rows: products.map((r) => ({ prodottoId: number(r.prodotto_id), prodottoNome: String(r.prodotto_nome), unitaMisura: String(r.unita_misura), quantitaFse: number(r.quantita_fse), quantitaTotale: number(r.quantita_totale), percentualeFse: r.percentuale_fse == null ? null : number(r.percentuale_fse), kg: r.kg == null ? null : number(r.kg) })) },
       { key: "02_Continuativi", columns: ["stato", "nota"], rows: [{ stato: "MANCANTE", nota: "Classificazione continuativo non presente nel modello" }] },
@@ -274,7 +297,8 @@ export async function buildFsePlusReport(filters: ReportFilters) {
       { key: "07_Misure_Accompagnamento", columns: ["stato", "nota"], rows: [{ stato: "MANCANTE", nota: "Tipologie intervento non mappate a misure FSE+" }] },
       { key: "fasceEta", columns: ["fascia", "persone"], rows: ageRows.map((r) => ({ fascia: String(r.fascia), persone: number(r.persone) })) },
       { key: "sesso", columns: ["sesso", "persone"], rows: sexRows.map((r) => ({ sesso: String(r.sesso), persone: number(r.persone) })) },
-      { key: "canali", columns: ["canale", "quantita", "documenti", "nuclei"], rows: channels.map((r) => ({ canale: String(r.canale), quantita: number(r.quantita), documenti: number(r.documenti), nuclei: number(r.nuclei) })) },
+      { key: "canali", columns: ["canale", "documenti", "nuclei"], rows: channels.map((r) => ({ canale: String(r.canale), documenti: number(r.documenti), nuclei: number(r.nuclei) })) },
+      { key: "quantitaPerCanaleUnita", columns: ["canale", "unitaMisura", "quantita"], rows: channelQuantities.map((r) => ({ canale: String(r.canale), unitaMisura: String(r.unita_misura), quantita: number(r.quantita) })) },
       { key: "disponibilitaSifead", columns: ["campo", "disponibilita", "fonte", "note"], rows: availabilityRows.map(([campo, disponibilita, fonte, note]) => ({ campo, disponibilita, fonte, note })) },
     ],
     quality: [
@@ -290,6 +314,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
       `Le fasce d'età sono valutate alla data finale ${filters.a}.`,
       "Le celle SIFEAD non supportate dal modello restano MANCANTI e non assumono valore zero.",
       "Le sorgenti FSE+ sono incluse solo quando modulo, area e permessi del chiamante lo consentono.",
+      "I canali sono confrontati per documenti e nuclei; le quantità restano separate per unità di misura.",
     ],
   });
 }

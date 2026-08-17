@@ -48,10 +48,15 @@ il controllo autorevole è server-side.
 - Evento = operazione valida; persona = `COUNT(DISTINCT beneficiario_id)`;
   nucleo = titolare/famiglia servita; persone del nucleo = titolare più membri
   registrati soltanto nei report che lo richiedono.
-- Pacco distribuito = bolla `consegnato`; bozze e annullati non contano. Le righe
-  non moltiplicano il numero di pacchi.
+- Pacco distribuito = bolla `consegnato` non associata a una
+  `spese_emporio` chiusa; bozze, annullati e distribuzioni Emporio non contano.
+  La condizione è condivisa da KPI, serie, tabelle, dashboard generale e
+  drill-down. Le righe non moltiplicano il numero di pacchi.
 - Sociale = intervento `ambito='sociale'` oppure `NULL` legacy, come la vista
-  corrente; `ambito='uds'` è escluso.
+  corrente; `ambito='uds'` è escluso. Persone servite, interventi, serie,
+  tabelle e drill-down includono soltanto lo stato `concluso`; pianificati,
+  annullati, mancate presentazioni e scaduti restano KPI separati. Il cutoff
+  degli scaduti è il minore tra fine periodo e ora corrente Europe/Rome.
 - Emporio = `spese_emporio.stato_spesa='chiusa'`; sessioni/carrelli non chiusi
   non sono erogazioni.
 - Mensa = righe `mensa_pasti`; accesso negato non è persona servita. Le date di
@@ -59,9 +64,11 @@ il controllo autorevole è server-side.
 - UDS = beneficiario `uds=true` e intervento `ambito='uds'` oppure `NULL`
   legacy. Il numero cronologico è calcolato sull'intera storia territoriale
   prima di data, tipo e operatore del report.
-- Giacenza = somma `lotti.quantita_residua`; i movimenti sono audit, non una
-  seconda giacenza. Le sezioni Logistica vengono restituite soltanto per i
-  moduli attivi.
+- Giacenza per prodotto = somma `lotti.quantita_residua` omogenei; i movimenti
+  sono audit, non una seconda giacenza. Quantità di unità differenti non sono
+  mai sommate: Pacchi, Emporio, FSE+ e Logistica espongono quantità per prodotto
+  e/o unità, conteggi confrontabili e un KPI kg soltanto per valori già in kg.
+  Le sezioni Logistica vengono restituite soltanto per i moduli attivi.
 - Persona unica generale = beneficiario distinto sull'unione degli eventi
   effettivamente erogati nelle sorgenti autorizzate; non si sommano KPI di aree
   e non si espandono i nuclei.
@@ -78,7 +85,12 @@ sempre esplicita ed è la data finale del report. La data di nascita prevale;
 La provenienza è determinata esclusivamente dal lotto realmente movimentato
 (`lotti.fse_plus`), mai dal flag prodotto quando esiste un lotto specifico. I kg
 sono sommati soltanto per unità già espressa in kg; non si inventano conversioni.
-Il workbook contiene sempre i fogli `00`–`09` previsti.
+Il workbook contiene sempre i fogli `00`–`09` previsti. Il foglio
+`09_Dettaglio_Controllo` viene popolato dal drill-down paginato FSE+ con data,
+documento, codice beneficiario, prodotto, lotto, quantità, unità e canale;
+nominativi e dati sociali sensibili non vengono esportati. Le etichette export
+seguono la lingua UI e gli scope usano il nome leggibile quando disponibile,
+con fallback all'ID.
 
 Disponibili: prodotti/quantità da movimenti e lotti, documenti/nuclei, persone
 registrate nel nucleo, sesso e fascia età con warning di completezza.

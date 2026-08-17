@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { ReportingDashboard } from "@workspace/api-client-react";
+import type { ReportDrilldown, ReportingDashboard } from "@workspace/api-client-react";
 
 export type ExportColumn<T> = {
   header: string;
@@ -142,8 +142,14 @@ export async function exportToPdf<T>(opts: {
   orientation?: "portrait" | "landscape";
   generatedBy?: string;
   branding?: PdfExportBranding | null;
+  metadataLabels?: {
+    generatedAt: string;
+    rows: string;
+    reportGeneratedBy: string;
+    locale: string;
+  };
 }): Promise<void> {
-  const { filename, title, subtitle, rows, columns, orientation = "portrait", generatedBy, branding } = opts;
+  const { filename, title, subtitle, rows, columns, orientation = "portrait", generatedBy, branding, metadataLabels } = opts;
   const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
   const marginX = 40;
   const headerBottomY = await drawBrandingHeader(doc, branding, marginX);
@@ -156,10 +162,13 @@ export async function exportToPdf<T>(opts: {
   doc.setFontSize(9);
   doc.setTextColor(120);
   const meta = subtitle ? `${subtitle}  •  ` : "";
-  const by = generatedBy ? `  •  Report generato da: ${generatedBy}` : "";
+  const generatedAtLabel = metadataLabels?.generatedAt ?? "Generato il";
+  const rowsLabel = metadataLabels?.rows ?? "righe";
+  const generatedByLabel = metadataLabels?.reportGeneratedBy ?? "Report generato da";
+  const by = generatedBy ? `  •  ${generatedByLabel}: ${generatedBy}` : "";
   const metaY = titleY + 16;
   doc.text(
-    `${meta}Generato il ${new Date().toLocaleString("it-IT")}  •  ${rows.length} righe${by}`,
+    `${meta}${generatedAtLabel} ${new Date().toLocaleString(metadataLabels?.locale)}  •  ${rows.length} ${rowsLabel}${by}`,
     marginX,
     metaY,
   );
@@ -184,37 +193,38 @@ function reportSheetName(value: string): string {
 
 export function buildReportingWorkbook(
   report: ReportingDashboard,
-  labels: {
-    title: string;
-    kpi: (key: string) => string;
-    table: (key: string) => string;
-    quality: (key: string) => string;
-    unavailable: string;
-  },
+  labels: ReportingExportLabels,
+  scopeNames: ReportingScopeNames = {},
+  fseControl?: ReportDrilldown | null,
 ): XLSX.WorkBook {
+  const scopeValue = (
+    id: number | null | undefined,
+    name: string | null | undefined,
+    all: string,
+  ) => name ?? (id == null ? all : String(id));
   const workbook = XLSX.utils.book_new();
   const summary = [
     [labels.title],
-    ["Da", report.filters.da],
-    ["A", report.filters.a],
-    ["Città ID", report.filters.cittaId ?? "Tutte"],
-    ["Centro di Ascolto ID", report.filters.centroAscoltoId ?? "Tutti"],
-    ["Magazzino ID", report.filters.magazzinoId ?? "Tutti"],
-    ["Mensa ID", report.filters.mensaId ?? "Tutte"],
-    ["Zona UDS ID", report.filters.zonaUdsId ?? "Tutte"],
-    ["Generato il", report.generatedAt],
-    ["Applicazione", "Magazzino Solidale"],
+    [labels.metadata.from, report.filters.da],
+    [labels.metadata.to, report.filters.a],
+    [labels.metadata.city, scopeValue(report.filters.cittaId, scopeNames.city, labels.metadata.allCities)],
+    [labels.metadata.centre, scopeValue(report.filters.centroAscoltoId, scopeNames.centre, labels.metadata.allCentres)],
+    [labels.metadata.warehouse, scopeValue(report.filters.magazzinoId, scopeNames.warehouse, labels.metadata.allWarehouses)],
+    [labels.metadata.mensa, scopeValue(report.filters.mensaId, scopeNames.mensa, labels.metadata.allMense)],
+    [labels.metadata.zone, scopeValue(report.filters.zonaUdsId, scopeNames.zone, labels.metadata.allZones)],
+    [labels.metadata.generatedAt, report.generatedAt],
+    [labels.metadata.application, "Magazzino Solidale"],
     ["Europe/Rome"],
     [],
-    ["Indicatore", "Valore", "Unità", "Disponibilità"],
+    [labels.metadata.indicator, labels.metadata.value, labels.metadata.unit, labels.metadata.availability],
     ...report.kpi.map((item) => [
       labels.kpi(item.key),
       item.value ?? labels.unavailable,
-      item.unit,
-      item.availability,
+      labels.unit(item.unit),
+      labels.availability(item.availability),
     ]),
     [],
-    ["Definizioni"],
+    [labels.metadata.definitions],
     ...report.definitions.map((definition) => [definition]),
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summary);
@@ -222,9 +232,10 @@ export function buildReportingWorkbook(
   XLSX.utils.book_append_sheet(workbook, summarySheet, "00_Riepilogo");
 
   for (const table of report.tables) {
-    const sheet = XLSX.utils.json_to_sheet(table.rows, {
-      header: table.columns,
-    });
+    const sheet = XLSX.utils.aoa_to_sheet([
+      table.columns.map(labels.column),
+      ...table.rows.map((row) => table.columns.map((column) => row[column] ?? "")),
+    ]);
     sheet["!cols"] = table.columns.map((column) => ({
       wch: Math.min(
         50,
@@ -242,19 +253,29 @@ export function buildReportingWorkbook(
     );
   }
 
-  const qualityRows = report.quality.map((item) => ({
-    controllo: labels.quality(item.key),
-    conteggio: item.count ?? labels.unavailable,
-    disponibilita: item.availability,
-    note: item.note ?? "",
-  }));
+  const qualityRows = [
+    [labels.metadata.indicator, labels.metadata.value, labels.metadata.availability, labels.metadata.notes],
+    ...report.quality.map((item) => [
+      labels.quality(item.key),
+      item.count ?? labels.unavailable,
+      labels.availability(item.availability),
+      item.note ?? "",
+    ]),
+  ];
   XLSX.utils.book_append_sheet(
     workbook,
-    XLSX.utils.json_to_sheet(qualityRows),
+    XLSX.utils.aoa_to_sheet(qualityRows),
     report.section === "fse-plus" ? "08_Qualita_Dati" : "Qualita_Dati",
   );
 
   if (report.section === "fse-plus") {
+    if (fseControl) {
+      const controlSheet = XLSX.utils.aoa_to_sheet([
+        fseControl.columns.map(labels.column),
+        ...fseControl.rows.map((row) => fseControl.columns.map((column) => row[column] ?? "")),
+      ]);
+      XLSX.utils.book_append_sheet(workbook, controlSheet, "09_Dettaglio_Controllo");
+    }
     const existing = new Set(workbook.SheetNames);
     const required = [
       "01_Prodotti_FSE",
@@ -284,8 +305,10 @@ export function exportReportingWorkbook(
   filename: string,
   report: ReportingDashboard,
   labels: Parameters<typeof buildReportingWorkbook>[1],
+  scopeNames?: ReportingScopeNames,
+  fseControl?: ReportDrilldown | null,
 ): void {
-  XLSX.writeFile(buildReportingWorkbook(report, labels), `${filename}_${timestamp()}.xlsx`);
+  XLSX.writeFile(buildReportingWorkbook(report, labels, scopeNames, fseControl), `${filename}_${timestamp()}.xlsx`);
 }
 
 export async function exportReportingPdf(opts: {
@@ -294,6 +317,8 @@ export async function exportReportingPdf(opts: {
   report: ReportingDashboard;
   kpiLabel: (key: string) => string;
   unavailable: string;
+  labels: ReportingExportLabels;
+  scopeNames?: ReportingScopeNames;
   generatedBy?: string;
   branding?: PdfExportBranding | null;
 }): Promise<void> {
@@ -304,11 +329,11 @@ export async function exportReportingPdf(opts: {
     disponibilita: item.availability,
   }));
   const scope = [
-    opts.report.filters.cittaId != null ? `Città ${opts.report.filters.cittaId}` : null,
-    opts.report.filters.centroAscoltoId != null ? `Centro ${opts.report.filters.centroAscoltoId}` : null,
-    opts.report.filters.magazzinoId != null ? `Magazzino ${opts.report.filters.magazzinoId}` : null,
-    opts.report.filters.mensaId != null ? `Mensa ${opts.report.filters.mensaId}` : null,
-    opts.report.filters.zonaUdsId != null ? `Zona UDS ${opts.report.filters.zonaUdsId}` : null,
+    opts.report.filters.cittaId != null ? `${opts.labels.metadata.city}: ${opts.scopeNames?.city ?? opts.report.filters.cittaId}` : null,
+    opts.report.filters.centroAscoltoId != null ? `${opts.labels.metadata.centre}: ${opts.scopeNames?.centre ?? opts.report.filters.centroAscoltoId}` : null,
+    opts.report.filters.magazzinoId != null ? `${opts.labels.metadata.warehouse}: ${opts.scopeNames?.warehouse ?? opts.report.filters.magazzinoId}` : null,
+    opts.report.filters.mensaId != null ? `${opts.labels.metadata.mensa}: ${opts.scopeNames?.mensa ?? opts.report.filters.mensaId}` : null,
+    opts.report.filters.zonaUdsId != null ? `${opts.labels.metadata.zone}: ${opts.scopeNames?.zone ?? opts.report.filters.zonaUdsId}` : null,
   ].filter(Boolean).join(" · ");
   await exportToPdf({
     filename: opts.filename,
@@ -316,16 +341,66 @@ export async function exportReportingPdf(opts: {
     subtitle: `${opts.report.filters.da} – ${opts.report.filters.a} · Europe/Rome${scope ? ` · ${scope}` : ""}`,
     rows,
     columns: [
-      { header: "Indicatore", accessor: (row) => row.indicatore },
-      { header: "Valore", accessor: (row) => row.valore },
-      { header: "Unità", accessor: (row) => row.unita },
-      { header: "Disponibilità", accessor: (row) => row.disponibilita },
+      { header: opts.labels.metadata.indicator, accessor: (row) => row.indicatore },
+      { header: opts.labels.metadata.value, accessor: (row) => row.valore },
+      { header: opts.labels.metadata.unit, accessor: (row) => opts.labels.unit(row.unita) },
+      { header: opts.labels.metadata.availability, accessor: (row) => opts.labels.availability(row.disponibilita) },
     ],
     orientation: "landscape",
     generatedBy: opts.generatedBy,
     branding: opts.branding,
+    metadataLabels: {
+      generatedAt: opts.labels.metadata.generatedAt,
+      rows: opts.labels.metadata.rows,
+      reportGeneratedBy: opts.labels.metadata.reportGeneratedBy,
+      locale: opts.labels.locale,
+    },
   });
 }
+
+export type ReportingScopeNames = {
+  city?: string | null;
+  centre?: string | null;
+  warehouse?: string | null;
+  mensa?: string | null;
+  zone?: string | null;
+};
+
+export type ReportingExportLabels = {
+  title: string;
+  kpi: (key: string) => string;
+  table: (key: string) => string;
+  quality: (key: string) => string;
+  column: (key: string) => string;
+  unit: (key: string) => string;
+  availability: (key: string) => string;
+  unavailable: string;
+  locale: string;
+  metadata: {
+    from: string;
+    to: string;
+    city: string;
+    centre: string;
+    warehouse: string;
+    mensa: string;
+    zone: string;
+    allCities: string;
+    allCentres: string;
+    allWarehouses: string;
+    allMense: string;
+    allZones: string;
+    generatedAt: string;
+    application: string;
+    indicator: string;
+    value: string;
+    unit: string;
+    availability: string;
+    definitions: string;
+    notes: string;
+    rows: string;
+    reportGeneratedBy: string;
+  };
+};
 
 export type SchedaLabelValue = { label: string; value: string | number | null | undefined };
 

@@ -41,14 +41,14 @@ export async function emporioMetrics(filters: ReportFilters) {
              COUNT(DISTINCT se.beneficiario_id) AS utenti,
              COALESCE(SUM(se.totale_credito_consumati::numeric), 0) AS credito,
              COALESCE(AVG(se.totale_credito_consumati::numeric), 0) AS credito_medio,
-             COALESCE((SELECT SUM(ser.quantita::numeric)
+             COALESCE((SELECT COUNT(DISTINCT ser.prodotto_id)
                FROM spese_emporio_righe ser
                JOIN spese_emporio se2 ON se2.id = ser.spesa_emporio_id
                WHERE se2.id IN (SELECT se3.id FROM spese_emporio se3 WHERE se3.stato_spesa = 'chiusa'
                  AND se3.data_chiusura::date BETWEEN ${filters.da} AND ${filters.a}
                  AND ${andSql(reportScope(filters, {
                    citta: sql`se3.citta_id`, centro: sql`se3.centro_ascolto_id`, magazzino: sql`se3.magazzino_emporio_id`,
-                 }))})) , 0) AS prodotti
+                 }))})) , 0) AS prodotti_distinti
       FROM spese_emporio se WHERE ${speseWhere}
     `),
     rows<Record<string, unknown>>(sql`
@@ -76,7 +76,7 @@ export async function emporioMetrics(filters: ReportFilters) {
           }))}
         GROUP BY l.magazzino_id, l.prodotto_id
       )
-      SELECT COALESCE(SUM(stock.quantita), 0) AS giacenza,
+      SELECT COUNT(*) FILTER (WHERE stock.quantita > 0) AS prodotti_giacenza,
              COUNT(*) FILTER (WHERE stock.quantita <= p.scorta_minima::numeric) AS sotto_scorta
       FROM stock JOIN prodotti p ON p.id = stock.prodotto_id
     `),
@@ -90,11 +90,11 @@ export async function emporioMetrics(filters: ReportFilters) {
     utenti: number(s.utenti),
     accessi: number(a.accessi),
     spese: number(s.spese),
-    prodotti: number(s.prodotti),
+    prodottiDistinti: number(s.prodotti_distinti),
     credito: number(s.credito),
     creditoMedio: number(s.credito_medio),
     saldo: number(e.saldo),
-    giacenza: number(st.giacenza),
+    prodottiGiacenza: number(st.prodotti_giacenza),
     sottoScorta: number(st.sotto_scorta),
   };
 }
@@ -111,7 +111,7 @@ export async function buildEmporioReport(filters: ReportFilters) {
       GROUP BY 1 ORDER BY 1
     `),
     rows<Record<string, unknown>>(sql`
-      SELECT p.id AS prodotto_id, p.nome AS prodotto_nome,
+      SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, p.unita_misura,
              COALESCE(SUM(ser.quantita::numeric), 0) AS quantita,
              COALESCE(SUM(ser.quantita::numeric) FILTER (WHERE l.fse_plus = true), 0) AS quantita_fse
       FROM spese_emporio se
@@ -119,7 +119,7 @@ export async function buildEmporioReport(filters: ReportFilters) {
       JOIN prodotti p ON p.id = ser.prodotto_id
       LEFT JOIN lotti l ON l.id = ser.lotto_id
       WHERE ${where}
-      GROUP BY p.id, p.nome ORDER BY quantita DESC, p.nome
+      GROUP BY p.id, p.nome, p.unita_misura ORDER BY quantita DESC, p.nome
     `),
     rows<Record<string, unknown>>(sql`
       SELECT COALESCE(ca.nome, 'Senza centro') AS centro,
@@ -155,16 +155,16 @@ export async function buildEmporioReport(filters: ReportFilters) {
       kpi("utentiServiti", metrics.utenti, "count", "utentiServiti"),
       kpi("accessi", metrics.accessi, "count", "accessi"),
       kpi("speseConcluse", metrics.spese, "count", "speseConcluse"),
-      kpi("prodottiDistribuiti", metrics.prodotti, "quantity", "prodottiDistribuiti"),
+      kpi("prodottiDistintiDistribuiti", metrics.prodottiDistinti, "count", "prodottiDistribuiti"),
       kpi("creditoUtilizzato", metrics.credito, "credit"),
       kpi("creditoMedioSpesa", metrics.creditoMedio, "credit"),
       kpi("saldoResiduo", metrics.saldo, "credit"),
-      kpi("giacenzaEmporio", metrics.giacenza, "quantity"),
+      kpi("prodottiInGiacenza", metrics.prodottiGiacenza),
       kpi("prodottiSottoScorta", metrics.sottoScorta),
     ],
     series: [{ key: "spesePerMese", points: monthSeries(monthly, "totale", "credito") }],
     tables: [
-      { key: "prodotti", columns: ["prodottoId", "prodottoNome", "quantita", "quantitaFse"], rows: products.map((r) => ({ prodottoId: number(r.prodotto_id), prodottoNome: String(r.prodotto_nome), quantita: number(r.quantita), quantitaFse: number(r.quantita_fse) })) },
+      { key: "prodotti", columns: ["prodottoId", "prodottoNome", "unitaMisura", "quantita", "quantitaFse"], rows: products.map((r) => ({ prodottoId: number(r.prodotto_id), prodottoNome: String(r.prodotto_nome), unitaMisura: String(r.unita_misura), quantita: number(r.quantita), quantitaFse: number(r.quantita_fse) })) },
       { key: "centri", columns: ["centro", "spese", "utenti", "credito"], rows: centres.map((r) => ({ centro: String(r.centro), spese: number(r.spese), utenti: number(r.utenti), credito: number(r.credito) })) },
       { key: "frequenza", columns: ["beneficiarioCodice", "spese"], rows: frequency.map((r) => ({ beneficiarioCodice: String(r.beneficiario_codice), spese: number(r.spese) })) },
     ],
@@ -174,12 +174,12 @@ export async function buildEmporioReport(filters: ReportFilters) {
     ],
     definitions: [
       "Spesa Emporio = record spese_emporio nello stato chiusa.",
-      "Prodotti distribuiti = somma delle righe delle sole spese chiuse.",
+      "Prodotti distinti distribuiti = prodotti diversi presenti nelle sole spese chiuse.",
       "Utente servito = beneficiario distinto con almeno una spesa chiusa nel periodo.",
       "La provenienza FSE+ deriva dal lotto della riga di spesa.",
+      "Le quantità restano separate per prodotto e unità di misura e non vengono sommate tra unità eterogenee.",
     ],
   });
 }
 
 export { speseConditions, accessConditions };
-
