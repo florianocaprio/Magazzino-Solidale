@@ -1,9 +1,6 @@
 import {
-  useListCentriAscolto,
-  useListCitta,
-  useListMagazzini,
-  useListMense,
-  useListZoneUds,
+  useGetReportFilterOptions,
+  type GetReportFilterOptionsSection,
 } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,23 +39,25 @@ export function ReportFilters({
   value,
   onChange,
 }: {
-  section: string;
+  section: GetReportFilterOptionsSection;
   value: ReportingFilterState;
   onChange: (value: ReportingFilterState) => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { data: cities = [] } = useListCitta();
-  const { data: centres = [] } = useListCentriAscolto();
-  const { data: warehouses = [] } = useListMagazzini();
-  const { data: mense = [] } = useListMense({ attiva: true });
-  const { data: zones = [] } = useListZoneUds({ cittaId: value.cittaId ?? undefined });
+  const { data: options } = useGetReportFilterOptions({
+    section,
+    cittaId: value.cittaId ?? undefined,
+  });
+  const cities = options?.cities ?? [];
+  const centres = options?.centres ?? [];
+  const warehouses = options?.warehouses ?? [];
+  const mense = options?.mense ?? [];
+  const zones = options?.zones ?? [];
   const { cityLocked, centreLocked, zoneLocked } = getReportingFilterLocks(user);
   const showWarehouse = ["generale", "pacchi", "emporio", "magazzino-logistica", "fse-plus"].includes(section);
   const showMensa = section === "mensa";
   const showZone = section === "uds";
-  const visibleCentres = centres.filter((centre) => value.cittaId == null || centre.cittaId == null || centre.cittaId === value.cittaId);
-  const visibleWarehouses = warehouses.filter((warehouse) => value.cittaId == null || warehouse.cittaId == null || warehouse.cittaId === value.cittaId);
 
   const update = (patch: Partial<ReportingFilterState>) => onChange({ ...value, ...patch });
   return (
@@ -113,7 +112,7 @@ export function ReportFilters({
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>{t("reporting.filters.allCentres")}</SelectItem>
-              {visibleCentres.map((centre) => <SelectItem key={centre.id} value={String(centre.id)}>{centre.nome}</SelectItem>)}
+              {centres.map((centre) => <SelectItem key={centre.id} value={String(centre.id)}>{centre.nome}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -124,7 +123,7 @@ export function ReportFilters({
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t("reporting.filters.allWarehouses")}</SelectItem>
-                {visibleWarehouses.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.nome}</SelectItem>)}
+                {warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

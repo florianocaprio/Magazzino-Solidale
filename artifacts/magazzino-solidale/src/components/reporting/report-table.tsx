@@ -10,12 +10,13 @@ import {
 } from "@/components/ui/table";
 import { ReportEmptyState } from "./report-empty-state";
 import { useTranslation } from "react-i18next";
+import { localizeReportingText } from "@/lib/reporting-text";
 
-function cell(value: unknown): string {
+function cell(value: unknown, t: (key: string, options?: Record<string, unknown>) => string): string {
   if (value == null) return "—";
   if (typeof value === "number") return new Intl.NumberFormat().format(value);
   if (typeof value === "boolean") return value ? "✓" : "—";
-  return String(value);
+  return localizeReportingText(t, String(value));
 }
 
 export function ReportTable({ table }: { table: ReportTableData }) {
@@ -42,7 +43,7 @@ export function ReportTable({ table }: { table: ReportTableData }) {
                 {table.rows.slice(0, 100).map((row, index) => (
                   <TableRow key={String(row.id ?? row.prodottoId ?? row.mensaId ?? index)}>
                     {table.columns.map((column) => (
-                      <TableCell key={column}>{cell(row[column])}</TableCell>
+                      <TableCell key={column}>{cell(row[column], t)}</TableCell>
                     ))}
                   </TableRow>
                 ))}
@@ -54,4 +55,3 @@ export function ReportTable({ table }: { table: ReportTableData }) {
     </Card>
   );
 }
-

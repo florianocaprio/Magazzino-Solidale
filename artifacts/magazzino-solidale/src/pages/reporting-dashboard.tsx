@@ -25,6 +25,7 @@ import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { localizeReportingText } from "@/lib/reporting-text";
 
 type Section = ReportingDashboardSection;
 
@@ -128,7 +129,7 @@ function QueryContent({
       {report.definitions.length > 0 && (
         <section className="rounded-lg border bg-muted/30 p-4">
           <h2 className="font-semibold">{t("reporting.definitions.title")}</h2>
-          <ul className="mt-2 list-disc space-y-1 ps-5 text-sm text-muted-foreground">{report.definitions.map((definition) => <li key={definition}>{definition}</li>)}</ul>
+          <ul className="mt-2 list-disc space-y-1 ps-5 text-sm text-muted-foreground">{report.definitions.map((definition) => <li key={definition}>{localizeReportingText(t, definition)}</li>)}</ul>
         </section>
       )}
       <ReportDrilldown open={metric != null} onOpenChange={(open) => { if (!open) setMetric(null); }} params={drilldownParams} />

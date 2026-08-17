@@ -1,10 +1,6 @@
 import {
   getReportDrilldown,
-  useListCentriAscolto,
-  useListCitta,
-  useListMagazzini,
-  useListMense,
-  useListZoneUds,
+  useGetReportFilterOptions,
   type ReportDrilldown,
   type ReportingDashboard,
 } from "@workspace/api-client-react";
@@ -15,27 +11,27 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { exportReportingPdf, exportReportingWorkbook } from "@/lib/export";
+import { localizeReportingText } from "@/lib/reporting-text";
 
 export function ReportExportActions({ report }: { report: ReportingDashboard }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [pdfLoading, setPdfLoading] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
-  const { data: cities = [] } = useListCitta();
-  const { data: centres = [] } = useListCentriAscolto();
-  const { data: warehouses = [] } = useListMagazzini();
-  const { data: mense = [] } = useListMense();
-  const { data: zones = [] } = useListZoneUds({ cittaId: report.filters.cittaId ?? undefined });
+  const { data: options } = useGetReportFilterOptions({
+    section: report.section,
+    cittaId: report.filters.cittaId ?? undefined,
+  });
   const title = t(`reporting.sections.${report.section}.title`);
   const filename = `report_${report.section}_${report.filters.da}_${report.filters.a}`;
   const kpiLabel = (key: string) => t(`reporting.kpi.${key}`);
   const unavailable = t("reporting.unavailable");
   const scopeNames = {
-    city: cities.find((item) => item.id === report.filters.cittaId)?.nome,
-    centre: centres.find((item) => item.id === report.filters.centroAscoltoId)?.nome,
-    warehouse: warehouses.find((item) => item.id === report.filters.magazzinoId)?.nome,
-    mensa: mense.find((item) => item.id === report.filters.mensaId)?.nome,
-    zone: zones.find((item) => item.id === report.filters.zonaUdsId)?.nome,
+    city: options?.cities.find((item) => item.id === report.filters.cittaId)?.nome,
+    centre: options?.centres.find((item) => item.id === report.filters.centroAscoltoId)?.nome,
+    warehouse: options?.warehouses.find((item) => item.id === report.filters.magazzinoId)?.nome,
+    mensa: options?.mense.find((item) => item.id === report.filters.mensaId)?.nome,
+    zone: options?.zones.find((item) => item.id === report.filters.zonaUdsId)?.nome,
   };
   const exportLabels = {
     title,
@@ -45,6 +41,7 @@ export function ReportExportActions({ report }: { report: ReportingDashboard }) 
     column: (key: string) => t(`reporting.columns.${key}`),
     unit: (key: string) => t(`reporting.units.${key}`),
     availability: (key: string) => t(`reporting.availability.${key}`),
+    text: (value: string) => localizeReportingText(t, value),
     unavailable,
     locale: i18n.resolvedLanguage ?? i18n.language,
     metadata: {

@@ -16,11 +16,11 @@ const ALLOWED_METRICS: Record<ReportSection, Set<string>> = {
   generale: new Set(),
   pacchi: new Set(["pacchiDistribuiti", "nucleiServiti", "personeRaggiunte", "prodottiFse"]),
   "centro-ascolto": new Set(["personePreseInCarico", "personeServite", "interventi"]),
-  emporio: new Set(["utentiServiti", "accessi", "speseConcluse", "prodottiDistribuiti"]),
+  emporio: new Set(["utentiServiti", "accessi", "speseConcluse", "prodottiDistribuiti", "prodottiDistintiDistribuiti"]),
   mensa: new Set(["pastiErogati", "personeUniche", "accessiNegati"]),
   uds: new Set(["interventi", "personeUniche", "primiContatti"]),
   "magazzino-logistica": new Set(["movimentiCarico", "movimentiScarico", "trasferimenti"]),
-  "fse-plus": new Set(["prodottiFse", "nucleiRaggiunti", "personeRaggiunte"]),
+  "fse-plus": new Set(["prodottiFse", "prodottiFseDistinti", "nucleiRaggiunti", "personeRaggiunte"]),
 };
 
 function detailDefinition(
@@ -175,6 +175,22 @@ function detailDefinition(
         JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se.id
         WHERE ${andSql(speseConditions(filters))}
         ORDER BY se.data_chiusura DESC, ser.id DESC ${pagination}
+      `,
+    };
+  }
+  if (section === "emporio" && metric === "prodottiDistintiDistribuiti") {
+    return {
+      columns: ["prodottoId", "codice", "prodotto", "unita", "righe", "spese"],
+      query: sql`
+        SELECT p.id AS prodotto_id, p.codice, p.nome AS prodotto,
+               p.unita_misura AS unita, COUNT(ser.id) AS righe,
+               COUNT(DISTINCT se.id) AS spese, COUNT(*) OVER() AS full_count
+        FROM spese_emporio se
+        JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se.id
+        JOIN prodotti p ON p.id = ser.prodotto_id
+        WHERE ${andSql(speseConditions(filters))}
+        GROUP BY p.id, p.codice, p.nome, p.unita_misura
+        ORDER BY p.nome, p.id ${pagination}
       `,
     };
   }
@@ -334,6 +350,31 @@ function detailDefinition(
           )
           SELECT id, beneficiario_codice, tipo, COUNT(*) OVER() AS full_count
           FROM persone ORDER BY beneficiario_codice, id ${pagination}`,
+      };
+    }
+    if (metric === "prodottiFseDistinti") {
+      return {
+        columns: ["prodottoId", "codice", "prodotto", "unita", "documenti", "lotti", "movimenti"],
+        query: sql`
+          SELECT p.id AS prodotto_id, p.codice, p.nome AS prodotto,
+                 string_agg(DISTINCT mv.unita_misura, ', ' ORDER BY mv.unita_misura) AS unita,
+                 COUNT(DISTINCT b.id) AS documenti,
+                 COUNT(DISTINCT l.id) AS lotti,
+                 COUNT(DISTINCT mv.id) AS movimenti,
+                 COUNT(*) OVER() AS full_count
+          FROM movimenti mv
+          JOIN lotti l ON l.id = mv.lotto_id AND l.fse_plus = true
+          JOIN bolla_righe br ON br.id = mv.bolla_riga_id
+          JOIN bolle b ON b.id = br.bolla_id
+          JOIN beneficiari be ON be.id = b.beneficiario_id
+          JOIN prodotti p ON p.id = br.prodotto_id
+          WHERE mv.tipo_movimento = 'scarico' AND b.stato = 'consegnato'
+            AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
+            AND ${andSql(reportScope(filters, { citta: sql`be.citta_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
+            AND ${fseBollaSourceCondition(filters)}
+          GROUP BY p.id, p.codice, p.nome
+          ORDER BY p.nome, p.id ${pagination}
+        `,
       };
     }
     return {

@@ -28,11 +28,15 @@ async function activeSources(filters: ReportFilters): Promise<ActiveSources> {
   ]);
   const canRead = (area: string) =>
     filters.callerIsAdmin || filters.callerAreas.includes(area);
+  const canReadMensa =
+    filters.callerIsAdmin ||
+    (filters.callerAreas.includes("mensa") &&
+      filters.callerPermissions.includes("mensa.reports.view"));
   return {
     pacchi: magazzino && bolle && canRead("sociale"),
     sociale: sociale && canRead("sociale"),
     emporio: emporio && canRead("emporio"),
-    mensa: mensa && canRead("mensa"),
+    mensa: mensa && canReadMensa,
     uds: uds && canRead("uds"),
   };
 }

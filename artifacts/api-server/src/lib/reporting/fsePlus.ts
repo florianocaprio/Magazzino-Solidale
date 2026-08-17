@@ -279,7 +279,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
     section: "fse-plus",
     filters,
     kpi: [
-      kpi("prodottiFseDistinti", distinctProducts, "count", "prodottiFse"),
+      kpi("prodottiFseDistinti", distinctProducts, "count", "prodottiFseDistinti"),
       kpi("kgCalcolabili", kg, "kg"),
       kpi("nucleiRaggiunti", number(persons.nuclei), "count", "nucleiRaggiunti"),
       kpi("personeRaggiunte", number(persons.persone), "count", "personeRaggiunte"),

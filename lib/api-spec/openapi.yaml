@@ -4747,6 +4747,26 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ReportDrilldown" }
 
+  /report/filter-options:
+    get:
+      operationId: getReportFilterOptions
+      tags: [report]
+      summary: Opzioni read-only autorizzate per i filtri della reportistica
+      parameters:
+        - name: section
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+        - $ref: "#/components/parameters/ReportCittaId"
+      responses:
+        "200":
+          description: Opzioni filtrate per scope, aree, moduli e permessi del chiamante
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportFilterOptions" }
+
   /report/uds/interventi-per-mese:
     get:
       operationId: reportUdsInterventiPerMese
@@ -5834,6 +5854,38 @@ components:
           items:
             type: object
             additionalProperties: true
+
+    ReportFilterOption:
+      type: object
+      required: [id, nome, cittaId]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        cittaId: { type: [integer, "null"] }
+        centroAscoltoId: { type: [integer, "null"] }
+
+    ReportFilterOptions:
+      type: object
+      required: [section, cities, centres, warehouses, mense, zones]
+      properties:
+        section:
+          type: string
+          enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+        cities:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+        centres:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+        warehouses:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+        mense:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+        zones:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
 
     ReportFsePlus:
       type: object

@@ -225,7 +225,7 @@ export function buildReportingWorkbook(
     ]),
     [],
     [labels.metadata.definitions],
-    ...report.definitions.map((definition) => [definition]),
+    ...report.definitions.map((definition) => [labels.text(definition)]),
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summary);
   summarySheet["!cols"] = [{ wch: 42 }, { wch: 24 }, { wch: 18 }, { wch: 18 }];
@@ -234,7 +234,10 @@ export function buildReportingWorkbook(
   for (const table of report.tables) {
     const sheet = XLSX.utils.aoa_to_sheet([
       table.columns.map(labels.column),
-      ...table.rows.map((row) => table.columns.map((column) => row[column] ?? "")),
+      ...table.rows.map((row) => table.columns.map((column) => {
+        const value = row[column];
+        return typeof value === "string" ? labels.text(value) : (value ?? "");
+      })),
     ]);
     sheet["!cols"] = table.columns.map((column) => ({
       wch: Math.min(
@@ -259,7 +262,7 @@ export function buildReportingWorkbook(
       labels.quality(item.key),
       item.count ?? labels.unavailable,
       labels.availability(item.availability),
-      item.note ?? "",
+      item.note ? labels.text(item.note) : "",
     ]),
   ];
   XLSX.utils.book_append_sheet(
@@ -272,7 +275,10 @@ export function buildReportingWorkbook(
     if (fseControl) {
       const controlSheet = XLSX.utils.aoa_to_sheet([
         fseControl.columns.map(labels.column),
-        ...fseControl.rows.map((row) => fseControl.columns.map((column) => row[column] ?? "")),
+        ...fseControl.rows.map((row) => fseControl.columns.map((column) => {
+          const value = row[column];
+          return typeof value === "string" ? labels.text(value) : (value ?? "");
+        })),
       ]);
       XLSX.utils.book_append_sheet(workbook, controlSheet, "09_Dettaglio_Controllo");
     }
@@ -291,8 +297,8 @@ export function buildReportingWorkbook(
     for (const name of required) {
       if (existing.has(name)) continue;
       const sheet = XLSX.utils.aoa_to_sheet([
-        ["Stato", labels.unavailable],
-        ["Nota", "Il modello operativo non rende disponibile questo dettaglio senza inferenze."],
+        [labels.column("stato"), labels.unavailable],
+        [labels.column("nota"), labels.text("Il modello operativo non rende disponibile questo dettaglio senza inferenze.")],
       ]);
       XLSX.utils.book_append_sheet(workbook, sheet, name);
     }
@@ -374,6 +380,7 @@ export type ReportingExportLabels = {
   column: (key: string) => string;
   unit: (key: string) => string;
   availability: (key: string) => string;
+  text: (value: string) => string;
   unavailable: string;
   locale: string;
   metadata: {

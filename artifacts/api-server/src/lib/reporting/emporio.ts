@@ -155,7 +155,7 @@ export async function buildEmporioReport(filters: ReportFilters) {
       kpi("utentiServiti", metrics.utenti, "count", "utentiServiti"),
       kpi("accessi", metrics.accessi, "count", "accessi"),
       kpi("speseConcluse", metrics.spese, "count", "speseConcluse"),
-      kpi("prodottiDistintiDistribuiti", metrics.prodottiDistinti, "count", "prodottiDistribuiti"),
+      kpi("prodottiDistintiDistribuiti", metrics.prodottiDistinti, "count", "prodottiDistintiDistribuiti"),
       kpi("creditoUtilizzato", metrics.credito, "credit"),
       kpi("creditoMedioSpesa", metrics.creditoMedio, "credit"),
       kpi("saldoResiduo", metrics.saldo, "credit"),

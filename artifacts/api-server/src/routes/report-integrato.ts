@@ -21,6 +21,7 @@ import {
 } from "../lib/reporting/filters";
 import { buildDrilldown } from "../lib/reporting/drilldown";
 import type { ReportSection } from "../lib/reporting/types";
+import { buildReportFilterOptions } from "../lib/reporting/filterOptions";
 
 const router: IRouter = Router();
 
@@ -78,6 +79,7 @@ router.use(
     "/report/uds",
     "/report/magazzino-logistica",
     "/report/fse-plus/integrato",
+    "/report/filter-options",
     "/report/drilldown",
   ],
   requireModulo("REPORT"),
@@ -134,6 +136,25 @@ router.get(
   requireAnyModulo(["MAGAZZINO_SOLIDALE", "BOLLE", "EMPORIO_SOLIDALE", "MENSA", "UDS"]),
   reportHandler(buildFsePlusReport),
 );
+
+router.get("/report/filter-options", async (req, res) => {
+  try {
+    const section = String(req.query.section ?? "") as ReportSection;
+    if (!sections.has(section)) throw new ReportingError(400, "section non valida");
+    const rawCityId = req.query.cittaId;
+    const requestedCityId = rawCityId == null || rawCityId === "" ? null : Number(rawCityId);
+    if (requestedCityId != null && (!Number.isInteger(requestedCityId) || requestedCityId <= 0)) {
+      throw new ReportingError(400, "cittaId non valido");
+    }
+    if (req.user?.cittaId != null && requestedCityId != null && req.user.cittaId !== requestedCityId) {
+      throw new ReportingError(403, "La città richiesta è fuori dal perimetro del ruolo");
+    }
+    res.json(await buildReportFilterOptions(req, section, requestedCityId));
+  } catch (error) {
+    if (sendError(error, res)) return;
+    throw error;
+  }
+});
 
 router.get("/report/drilldown", async (req, res) => {
   try {

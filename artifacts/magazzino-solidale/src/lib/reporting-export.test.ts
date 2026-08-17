@@ -6,6 +6,7 @@ const labels = {
   title: "FSE+", kpi: (key: string) => key, table: (key: string) => key,
   quality: (key: string) => key, column: (key: string) => key,
   unit: (key: string) => key, availability: (key: string) => key,
+  text: (value: string) => value,
   unavailable: "Dato non disponibile", locale: "it",
   metadata: {
     from: "Da", to: "A", city: "Città", centre: "Centro", warehouse: "Magazzino",
@@ -19,6 +20,14 @@ const labels = {
 
 describe("export reportistica", () => {
   it("genera un workbook FSE+ completo anche con dataset vuoto", () => {
+    const localizedLabels = {
+      ...labels,
+      column: (key: string) => ({ stato: "Status", nota: "Note" })[key] ?? key,
+      text: (value: string) =>
+        value === "Il modello operativo non rende disponibile questo dettaglio senza inferenze."
+          ? "The operational model does not provide this detail without inference."
+          : value,
+    };
     const workbook = buildReportingWorkbook(
       {
         section: "fse-plus",
@@ -27,13 +36,22 @@ describe("export reportistica", () => {
         generatedAt: "2026-08-15T00:00:00.000Z",
         timezone: "Europe/Rome",
       },
-      labels,
+      localizedLabels,
     );
     expect(workbook.SheetNames).toEqual(expect.arrayContaining([
       "00_Riepilogo", "01_Prodotti_FSE", "02_Continuativi", "03_Saltuari_Mensa",
       "04_Saltuari_Pacchi", "05_Saltuari_Strada", "06_Pacchi_Pasti",
       "07_Misure_Accompagnamento", "08_Qualita_Dati", "09_Dettaglio_Controllo",
     ]));
+    const fallbackRows = XLSX.utils.sheet_to_json<unknown[]>(
+      workbook.Sheets["02_Continuativi"],
+      { header: 1 },
+    );
+    expect(fallbackRows).toContainEqual(["Status", "Dato non disponibile"]);
+    expect(fallbackRows).toContainEqual([
+      "Note",
+      "The operational model does not provide this detail without inference.",
+    ]);
   });
 
   it("popola il dettaglio FSE+ con dati auditabili e senza nominativi", () => {

@@ -7191,6 +7191,49 @@ export const GetReportDrilldownResponse = zod.object({
 
 
 /**
+ * @summary Opzioni read-only autorizzate per i filtri della reportistica
+ */
+export const GetReportFilterOptionsQueryParams = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città')
+})
+
+export const GetReportFilterOptionsResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "cities": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+})),
+  "centres": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+})),
+  "warehouses": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+})),
+  "mense": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+})),
+  "zones": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+}))
+})
+
+
+/**
  * @summary UDS street interventions grouped by month
  */
 export const ReportUdsInterventiPerMeseQueryParams = zod.object({

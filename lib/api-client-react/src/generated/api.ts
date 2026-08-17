@@ -107,6 +107,7 @@ import type {
   GetReportDashboardGeneraleParams,
   GetReportDrilldownParams,
   GetReportEmporioParams,
+  GetReportFilterOptionsParams,
   GetReportFsePlusIntegratoParams,
   GetReportMagazzinoLogisticaParams,
   GetReportMensaIntegratoParams,
@@ -219,6 +220,7 @@ import type {
   ReportConsegnePerCentroParams,
   ReportConsegnePerMeseParams,
   ReportDrilldown,
+  ReportFilterOptions,
   ReportFsePlus,
   ReportFsePlusParams,
   ReportGiacenzePerMagazzinoParams,
@@ -15471,6 +15473,90 @@ export function useGetReportDrilldown<TData = Awaited<ReturnType<typeof getRepor
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetReportDrilldownQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetReportFilterOptionsUrl = (params: GetReportFilterOptionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/report/filter-options?${stringifiedParams}` : `/api/report/filter-options`
+}
+
+/**
+ * @summary Opzioni read-only autorizzate per i filtri della reportistica
+ */
+export const getReportFilterOptions = async (params: GetReportFilterOptionsParams, options?: RequestInit): Promise<ReportFilterOptions> => {
+
+  return customFetch<ReportFilterOptions>(getGetReportFilterOptionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportFilterOptionsQueryKey = (params?: GetReportFilterOptionsParams,) => {
+    return [
+    `/api/report/filter-options`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetReportFilterOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getReportFilterOptions>>, TError = ErrorType<unknown>>(params: GetReportFilterOptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportFilterOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportFilterOptionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportFilterOptions>>> = ({ signal }) => getReportFilterOptions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportFilterOptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportFilterOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof getReportFilterOptions>>>
+export type GetReportFilterOptionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Opzioni read-only autorizzate per i filtri della reportistica
+ */
+
+export function useGetReportFilterOptions<TData = Awaited<ReturnType<typeof getReportFilterOptions>>, TError = ErrorType<unknown>>(
+ params: GetReportFilterOptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportFilterOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportFilterOptionsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

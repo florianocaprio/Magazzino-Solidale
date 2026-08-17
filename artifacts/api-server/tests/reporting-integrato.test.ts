@@ -4,7 +4,7 @@ import {
   db, pool, beneficiariTable, bolleTable, bollaRigheTable, cittaTable,
   centriAscoltoTable, lottiTable, magazziniTable, movimentiTable, prodottiTable,
   consegneTable, sessioniCassaEmporioTable, speseEmporioTable,
-  speseEmporioRigheTable, interventiTable,
+  speseEmporioRigheTable, interventiTable, menseTable,
 } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import { parseReportFilters, ReportingError } from "../src/lib/reporting/filters";
@@ -21,6 +21,7 @@ import type { ReportFilters } from "../src/lib/reporting/types";
 import { requireSourceArea } from "../src/routes/report-integrato";
 import { buildDrilldown } from "../src/lib/reporting/drilldown";
 import { dateTimeEuropeRomeToUtc } from "../src/lib/interventiViste";
+import { buildReportFilterOptions } from "../src/lib/reporting/filterOptions";
 
 function requestFor(
   query: Record<string, unknown>,
@@ -93,6 +94,32 @@ describe("RBAC delle sorgenti report", () => {
     let allowed = false;
     middleware(requestFor({}, { aree: ["analisi", "mensa"] }), res, () => { allowed = true; });
     expect(allowed).toBe(true);
+  });
+
+  it("include Mensa nella dashboard generale solo con il permesso dedicato o per admin", async () => {
+    const withoutPermission = await buildGeneralReport({
+      ...fullFilters(),
+      callerIsAdmin: false,
+      callerAreas: ["analisi", "mensa"],
+      callerPermissions: [],
+    });
+    expect(withoutPermission.kpi.some((item) => item.key === "pastiErogati")).toBe(false);
+
+    const withPermission = await buildGeneralReport({
+      ...fullFilters(),
+      callerIsAdmin: false,
+      callerAreas: ["analisi", "mensa"],
+      callerPermissions: ["mensa.reports.view"],
+    });
+    expect(withPermission.kpi.some((item) => item.key === "pastiErogati")).toBe(true);
+
+    const admin = await buildGeneralReport({
+      ...fullFilters(),
+      callerAreas: ["analisi"],
+      callerPermissions: [],
+      callerIsAdmin: true,
+    });
+    expect(admin.kpi.some((item) => item.key === "pastiErogati")).toBe(true);
   });
 });
 
@@ -178,8 +205,10 @@ describe("regole di conteggio Pacchi e FSE+", () => {
     const ids = {
       bolle: [] as number[], righe: [] as number[], movimenti: [] as number[], lotti: [] as number[],
       accessi: [] as number[], sessioni: [] as number[], spese: [] as number[], spesaRighe: [] as number[],
+      mense: [] as number[],
     };
     const [city] = await db.insert(cittaTable).values({ nome: `Report city ${suffix}` }).returning({ id: cittaTable.id });
+    const [otherCity] = await db.insert(cittaTable).values({ nome: `Other report city ${suffix}` }).returning({ id: cittaTable.id });
     const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Report centre ${suffix}`, cittaId: city.id }).returning({ id: centriAscoltoTable.id });
     const [warehouse] = await db.insert(magazziniTable).values({ codice: `R-${suffix}`, nome: `Report warehouse ${suffix}`, cittaId: city.id, centroAscoltoId: centre.id }).returning({ id: magazziniTable.id });
     const [beneficiary] = await db.insert(beneficiariTable).values({ codice: `RB-${suffix}`, nome: "Report", cognome: "Test", sesso: "F", cittaId: city.id, centroAscoltoId: centre.id }).returning({ id: beneficiariTable.id });
@@ -246,6 +275,13 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         creditoUnitario: "1", creditoTotale: "4", bollaRigaId: createdRows[3].id,
       }).returning({ id: speseEmporioRigheTable.id });
       ids.spesaRighe.push(...expenseRows.map((row) => row.id));
+      const [canteen] = await db.insert(menseTable).values({
+        codice: `RM-${suffix}`,
+        nome: `Report mensa ${suffix}`,
+        cittaId: city.id,
+        magazzinoId: warehouse.id,
+      }).returning({ id: menseTable.id });
+      ids.mense.push(canteen.id);
 
       const filters = { ...fullFilters(), cittaId: city.id, centroAscoltoId: centre.id, magazzinoId: warehouse.id, cittaMode: "query" as const, centroMode: "query" as const };
       const parcelReport = await buildPacchiReport(filters);
@@ -264,6 +300,9 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       const emporioReport = await buildEmporioReport(filters);
       expect(emporioReport.kpi.find((item) => item.key === "speseConcluse")?.value).toBe(1);
       expect(emporioReport.kpi.find((item) => item.key === "prodottiDistintiDistribuiti")?.value).toBe(1);
+      const emporioDistinctDetails = await buildDrilldown({ section: "emporio", metric: "prodottiDistintiDistribuiti", filters, page: 1, pageSize: 25 });
+      expect(emporioDistinctDetails.total).toBe(emporioReport.kpi.find((item) => item.key === "prodottiDistintiDistribuiti")?.value);
+      expect(emporioDistinctDetails.rows[0]).toMatchObject({ prodottoId: productPz.id, unita: "pz" });
 
       const generalReport = await buildGeneralReport(filters);
       expect(generalReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(1);
@@ -278,6 +317,9 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       expect(fseDetails.rows[0]).toMatchObject({ beneficiarioCodice: `RB-${suffix}`, canale: "pacchi", unita: "kg" });
       expect(fseDetails.rows[0]).not.toHaveProperty("nome");
       expect(fseDetails.rows[0]).not.toHaveProperty("cognome");
+      const fseDistinctDetails = await buildDrilldown({ section: "fse-plus", metric: "prodottiFseDistinti", filters, page: 1, pageSize: 25 });
+      expect(fseDistinctDetails.total).toBe(fseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value);
+      expect(fseDistinctDetails.rows[0]).toMatchObject({ prodottoId: productKg.id, unita: "kg" });
       const mensaOnlyFseReport = await buildFsePlusReport({
         ...filters,
         callerIsAdmin: false,
@@ -297,7 +339,49 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         expect.objectContaining({ unitaMisura: "kg", quantita: 15 }),
         expect.objectContaining({ unitaMisura: "pz", quantita: 16 }),
       ]));
+
+      const pacchiOptions = await buildReportFilterOptions(
+        requestFor({}, { cittaId: city.id, aree: ["analisi", "sociale"] }),
+        "pacchi",
+        city.id,
+      );
+      expect(pacchiOptions.warehouses).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: warehouse.id, nome: `Report warehouse ${suffix}` }),
+      ]));
+      expect(pacchiOptions.cities.map((item) => item.id)).toEqual([city.id]);
+      expect(pacchiOptions.cities.map((item) => item.id)).not.toContain(otherCity.id);
+      expect(pacchiOptions.mense).toEqual([]);
+      expect(pacchiOptions.zones).toEqual([]);
+
+      const unauthorizedPacchiOptions = await buildReportFilterOptions(
+        requestFor({}, { cittaId: city.id, aree: ["analisi"] }),
+        "pacchi",
+        city.id,
+      );
+      expect(unauthorizedPacchiOptions).toMatchObject({
+        cities: [],
+        centres: [],
+        warehouses: [],
+        mense: [],
+        zones: [],
+      });
+
+      const mensaOptionsWithoutPermission = await buildReportFilterOptions(
+        requestFor({}, { cittaId: city.id, aree: ["analisi", "mensa"], permessi: [] }),
+        "mensa",
+        city.id,
+      );
+      expect(mensaOptionsWithoutPermission.mense).toEqual([]);
+      const mensaOptionsWithPermission = await buildReportFilterOptions(
+        requestFor({}, { cittaId: city.id, aree: ["analisi", "mensa"], permessi: ["mensa.reports.view"] }),
+        "mensa",
+        city.id,
+      );
+      expect(mensaOptionsWithPermission.mense).toEqual([
+        expect.objectContaining({ id: canteen.id, nome: `Report mensa ${suffix}` }),
+      ]);
     } finally {
+      if (ids.mense.length) await db.delete(menseTable).where(inArray(menseTable.id, ids.mense));
       if (ids.spesaRighe.length) await db.delete(speseEmporioRigheTable).where(inArray(speseEmporioRigheTable.id, ids.spesaRighe));
       if (ids.spese.length) await db.delete(speseEmporioTable).where(inArray(speseEmporioTable.id, ids.spese));
       if (ids.sessioni.length) await db.delete(sessioniCassaEmporioTable).where(inArray(sessioniCassaEmporioTable.id, ids.sessioni));
@@ -311,6 +395,7 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       await db.delete(magazziniTable).where(inArray(magazziniTable.id, [warehouse.id]));
       await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centre.id]));
       await db.delete(cittaTable).where(inArray(cittaTable.id, [city.id]));
+      await db.delete(cittaTable).where(inArray(cittaTable.id, [otherCity.id]));
     }
   });
 });
@@ -340,11 +425,11 @@ describe("query aggregate reali", () => {
     const metrics = {
       pacchi: ["pacchiDistribuiti", "nucleiServiti", "personeRaggiunte", "prodottiFse"],
       "centro-ascolto": ["personePreseInCarico", "personeServite", "interventi"],
-      emporio: ["utentiServiti", "accessi", "speseConcluse", "prodottiDistribuiti"],
+      emporio: ["utentiServiti", "accessi", "speseConcluse", "prodottiDistribuiti", "prodottiDistintiDistribuiti"],
       mensa: ["pastiErogati", "personeUniche", "accessiNegati"],
       uds: ["interventi", "personeUniche", "primiContatti"],
       "magazzino-logistica": ["movimentiCarico", "movimentiScarico", "trasferimenti"],
-      "fse-plus": ["prodottiFse", "nucleiRaggiunti", "personeRaggiunte"],
+      "fse-plus": ["prodottiFse", "prodottiFseDistinti", "nucleiRaggiunti", "personeRaggiunte"],
     } as const;
     for (const [section, sectionMetrics] of Object.entries(metrics)) {
       for (const metric of sectionMetrics) {

@@ -141,6 +141,38 @@ export interface ReportDrilldown {
   rows: ReportDrilldownRowsItem[];
 }
 
+export interface ReportFilterOption {
+  id: number;
+  nome: string;
+  /** @nullable */
+  cittaId: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+}
+
+export type ReportFilterOptionsSection = typeof ReportFilterOptionsSection[keyof typeof ReportFilterOptionsSection];
+
+
+export const ReportFilterOptionsSection = {
+  generale: 'generale',
+  pacchi: 'pacchi',
+  'centro-ascolto': 'centro-ascolto',
+  emporio: 'emporio',
+  mensa: 'mensa',
+  uds: 'uds',
+  'magazzino-logistica': 'magazzino-logistica',
+  'fse-plus': 'fse-plus',
+} as const;
+
+export interface ReportFilterOptions {
+  section: ReportFilterOptionsSection;
+  cities: ReportFilterOption[];
+  centres: ReportFilterOption[];
+  warehouses: ReportFilterOption[];
+  mense: ReportFilterOption[];
+  zones: ReportFilterOption[];
+}
+
 export type ReportFsePlusProdottiItem = {
   prodottoId: number;
   prodottoNome: string;
@@ -5449,6 +5481,28 @@ export type GetReportDrilldownSection = typeof GetReportDrilldownSection[keyof t
 
 
 export const GetReportDrilldownSection = {
+  generale: 'generale',
+  pacchi: 'pacchi',
+  'centro-ascolto': 'centro-ascolto',
+  emporio: 'emporio',
+  mensa: 'mensa',
+  uds: 'uds',
+  'magazzino-logistica': 'magazzino-logistica',
+  'fse-plus': 'fse-plus',
+} as const;
+
+export type GetReportFilterOptionsParams = {
+section: GetReportFilterOptionsSection;
+/**
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ */
+cittaId?: ReportCittaIdParameter;
+};
+
+export type GetReportFilterOptionsSection = typeof GetReportFilterOptionsSection[keyof typeof GetReportFilterOptionsSection];
+
+
+export const GetReportFilterOptionsSection = {
   generale: 'generale',
   pacchi: 'pacchi',
   'centro-ascolto': 'centro-ascolto',

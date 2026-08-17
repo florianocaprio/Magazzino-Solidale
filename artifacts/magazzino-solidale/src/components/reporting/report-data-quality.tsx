@@ -2,6 +2,7 @@ import type { ReportQualityItem } from "@workspace/api-client-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { localizeReportingText } from "@/lib/reporting-text";
 
 export function ReportDataQuality({ items }: { items: ReportQualityItem[] }) {
   const { t } = useTranslation();
@@ -20,7 +21,7 @@ export function ReportDataQuality({ items }: { items: ReportQualityItem[] }) {
               <AlertTitle>{t(`reporting.quality.${item.key}`)}</AlertTitle>
               <AlertDescription>
                 {item.count != null && <span className="font-medium">{item.count}. </span>}
-                {item.note ?? t(`reporting.availability.${item.availability}`)}
+                {item.note ? localizeReportingText(t, item.note) : t(`reporting.availability.${item.availability}`)}
               </AlertDescription>
             </Alert>
           );
@@ -29,4 +30,3 @@ export function ReportDataQuality({ items }: { items: ReportQualityItem[] }) {
     </section>
   );
 }
-
