@@ -6666,6 +6666,574 @@ export const ReportFsePlusResponse = zod.object({
 
 
 /**
+ * @summary Dashboard generale integrata dei moduli attivi
+ */
+export const getReportDashboardGeneraleQueryAnnoMin = 2000;
+export const getReportDashboardGeneraleQueryAnnoMax = 2100;
+
+
+
+export const GetReportDashboardGeneraleQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "anno": zod.coerce.number().min(getReportDashboardGeneraleQueryAnnoMin).max(getReportDashboardGeneraleQueryAnnoMax).optional(),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "magazzinoId": zod.coerce.number().optional()
+})
+
+export const GetReportDashboardGeneraleResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "filters": zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "anno": zod.number(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "magazzinoId": zod.number().nullable(),
+  "mensaId": zod.number().nullable(),
+  "zonaUdsId": zod.number().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "tipoIntervento": zod.string().nullable(),
+  "tipoServizio": zod.string().nullable()
+}),
+  "kpi": zod.array(zod.object({
+  "key": zod.string(),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "drilldownMetric": zod.string().nullable()
+})),
+  "series": zod.array(zod.object({
+  "key": zod.string(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "secondaryValue": zod.number().nullish()
+}))
+})),
+  "tables": zod.array(zod.object({
+  "key": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})),
+  "quality": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number().nullable(),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "note": zod.string().nullable()
+})),
+  "definitions": zod.array(zod.string()),
+  "generatedAt": zod.coerce.date(),
+  "timezone": zod.enum(['Europe/Rome'])
+})
+
+
+/**
+ * @summary Report Pacchi Alimentari
+ */
+export const GetReportPacchiQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "magazzinoId": zod.coerce.number().optional()
+})
+
+export const GetReportPacchiResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "filters": zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "anno": zod.number(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "magazzinoId": zod.number().nullable(),
+  "mensaId": zod.number().nullable(),
+  "zonaUdsId": zod.number().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "tipoIntervento": zod.string().nullable(),
+  "tipoServizio": zod.string().nullable()
+}),
+  "kpi": zod.array(zod.object({
+  "key": zod.string(),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "drilldownMetric": zod.string().nullable()
+})),
+  "series": zod.array(zod.object({
+  "key": zod.string(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "secondaryValue": zod.number().nullish()
+}))
+})),
+  "tables": zod.array(zod.object({
+  "key": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})),
+  "quality": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number().nullable(),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "note": zod.string().nullable()
+})),
+  "definitions": zod.array(zod.string()),
+  "generatedAt": zod.coerce.date(),
+  "timezone": zod.enum(['Europe/Rome'])
+})
+
+
+/**
+ * @summary Report Centro di Ascolto
+ */
+export const GetReportCentroAscoltoQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "zonaUdsId": zod.coerce.number().optional(),
+  "operatoreId": zod.coerce.number().optional(),
+  "tipoIntervento": zod.coerce.string().optional()
+})
+
+export const GetReportCentroAscoltoResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "filters": zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "anno": zod.number(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "magazzinoId": zod.number().nullable(),
+  "mensaId": zod.number().nullable(),
+  "zonaUdsId": zod.number().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "tipoIntervento": zod.string().nullable(),
+  "tipoServizio": zod.string().nullable()
+}),
+  "kpi": zod.array(zod.object({
+  "key": zod.string(),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "drilldownMetric": zod.string().nullable()
+})),
+  "series": zod.array(zod.object({
+  "key": zod.string(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "secondaryValue": zod.number().nullish()
+}))
+})),
+  "tables": zod.array(zod.object({
+  "key": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})),
+  "quality": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number().nullable(),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "note": zod.string().nullable()
+})),
+  "definitions": zod.array(zod.string()),
+  "generatedAt": zod.coerce.date(),
+  "timezone": zod.enum(['Europe/Rome'])
+})
+
+
+/**
+ * @summary Report Emporio Solidale
+ */
+export const GetReportEmporioQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "magazzinoId": zod.coerce.number().optional()
+})
+
+export const GetReportEmporioResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "filters": zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "anno": zod.number(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "magazzinoId": zod.number().nullable(),
+  "mensaId": zod.number().nullable(),
+  "zonaUdsId": zod.number().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "tipoIntervento": zod.string().nullable(),
+  "tipoServizio": zod.string().nullable()
+}),
+  "kpi": zod.array(zod.object({
+  "key": zod.string(),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "drilldownMetric": zod.string().nullable()
+})),
+  "series": zod.array(zod.object({
+  "key": zod.string(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "secondaryValue": zod.number().nullish()
+}))
+})),
+  "tables": zod.array(zod.object({
+  "key": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})),
+  "quality": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number().nullable(),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "note": zod.string().nullable()
+})),
+  "definitions": zod.array(zod.string()),
+  "generatedAt": zod.coerce.date(),
+  "timezone": zod.enum(['Europe/Rome'])
+})
+
+
+/**
+ * @summary Report Mensa integrato; mantiene il permesso mensa.reports.view
+ */
+export const GetReportMensaIntegratoQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "magazzinoId": zod.coerce.number().optional(),
+  "mensaId": zod.coerce.number().optional(),
+  "operatoreId": zod.coerce.number().optional(),
+  "tipoServizio": zod.coerce.string().optional()
+})
+
+export const GetReportMensaIntegratoResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "filters": zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "anno": zod.number(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "magazzinoId": zod.number().nullable(),
+  "mensaId": zod.number().nullable(),
+  "zonaUdsId": zod.number().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "tipoIntervento": zod.string().nullable(),
+  "tipoServizio": zod.string().nullable()
+}),
+  "kpi": zod.array(zod.object({
+  "key": zod.string(),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "drilldownMetric": zod.string().nullable()
+})),
+  "series": zod.array(zod.object({
+  "key": zod.string(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "secondaryValue": zod.number().nullish()
+}))
+})),
+  "tables": zod.array(zod.object({
+  "key": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})),
+  "quality": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number().nullable(),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "note": zod.string().nullable()
+})),
+  "definitions": zod.array(zod.string()),
+  "generatedAt": zod.coerce.date(),
+  "timezone": zod.enum(['Europe/Rome'])
+})
+
+
+/**
+ * @summary Report Unità di Strada integrato
+ */
+export const GetReportUdsIntegratoQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "zonaUdsId": zod.coerce.number().optional(),
+  "operatoreId": zod.coerce.number().optional(),
+  "tipoIntervento": zod.coerce.string().optional()
+})
+
+export const GetReportUdsIntegratoResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "filters": zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "anno": zod.number(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "magazzinoId": zod.number().nullable(),
+  "mensaId": zod.number().nullable(),
+  "zonaUdsId": zod.number().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "tipoIntervento": zod.string().nullable(),
+  "tipoServizio": zod.string().nullable()
+}),
+  "kpi": zod.array(zod.object({
+  "key": zod.string(),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "drilldownMetric": zod.string().nullable()
+})),
+  "series": zod.array(zod.object({
+  "key": zod.string(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "secondaryValue": zod.number().nullish()
+}))
+})),
+  "tables": zod.array(zod.object({
+  "key": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})),
+  "quality": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number().nullable(),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "note": zod.string().nullable()
+})),
+  "definitions": zod.array(zod.string()),
+  "generatedAt": zod.coerce.date(),
+  "timezone": zod.enum(['Europe/Rome'])
+})
+
+
+/**
+ * @summary Report Magazzino e Logistica
+ */
+export const GetReportMagazzinoLogisticaQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "magazzinoId": zod.coerce.number().optional()
+})
+
+export const GetReportMagazzinoLogisticaResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "filters": zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "anno": zod.number(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "magazzinoId": zod.number().nullable(),
+  "mensaId": zod.number().nullable(),
+  "zonaUdsId": zod.number().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "tipoIntervento": zod.string().nullable(),
+  "tipoServizio": zod.string().nullable()
+}),
+  "kpi": zod.array(zod.object({
+  "key": zod.string(),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "drilldownMetric": zod.string().nullable()
+})),
+  "series": zod.array(zod.object({
+  "key": zod.string(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "secondaryValue": zod.number().nullish()
+}))
+})),
+  "tables": zod.array(zod.object({
+  "key": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})),
+  "quality": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number().nullable(),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "note": zod.string().nullable()
+})),
+  "definitions": zod.array(zod.string()),
+  "generatedAt": zod.coerce.date(),
+  "timezone": zod.enum(['Europe/Rome'])
+})
+
+
+/**
+ * @summary Rendicontazione FSE+ integrata e data-gap SIFEAD
+ */
+export const getReportFsePlusIntegratoQueryAnnoMin = 2000;
+export const getReportFsePlusIntegratoQueryAnnoMax = 2100;
+
+
+
+export const GetReportFsePlusIntegratoQueryParams = zod.object({
+  "anno": zod.coerce.number().min(getReportFsePlusIntegratoQueryAnnoMin).max(getReportFsePlusIntegratoQueryAnnoMax).optional(),
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "magazzinoId": zod.coerce.number().optional()
+})
+
+export const GetReportFsePlusIntegratoResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "filters": zod.object({
+  "da": zod.coerce.date(),
+  "a": zod.coerce.date(),
+  "anno": zod.number(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "magazzinoId": zod.number().nullable(),
+  "mensaId": zod.number().nullable(),
+  "zonaUdsId": zod.number().nullable(),
+  "operatoreId": zod.number().nullable(),
+  "tipoIntervento": zod.string().nullable(),
+  "tipoServizio": zod.string().nullable()
+}),
+  "kpi": zod.array(zod.object({
+  "key": zod.string(),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "drilldownMetric": zod.string().nullable()
+})),
+  "series": zod.array(zod.object({
+  "key": zod.string(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "secondaryValue": zod.number().nullish()
+}))
+})),
+  "tables": zod.array(zod.object({
+  "key": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})),
+  "quality": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number().nullable(),
+  "availability": zod.enum(['ok', 'derivable', 'missing']),
+  "note": zod.string().nullable()
+})),
+  "definitions": zod.array(zod.string()),
+  "generatedAt": zod.coerce.date(),
+  "timezone": zod.enum(['Europe/Rome'])
+})
+
+
+/**
+ * @summary Dettaglio paginato e auditabile di un indicatore
+ */
+export const getReportDrilldownQueryPageDefault = 1;
+
+export const getReportDrilldownQueryPageSizeDefault = 25;
+export const getReportDrilldownQueryPageSizeMax = 100;
+
+export const getReportDrilldownQueryAnnoMin = 2000;
+export const getReportDrilldownQueryAnnoMax = 2100;
+
+
+
+export const GetReportDrilldownQueryParams = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "metric": zod.coerce.string(),
+  "page": zod.coerce.number().min(1).default(getReportDrilldownQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(getReportDrilldownQueryPageSizeMax).default(getReportDrilldownQueryPageSizeDefault),
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
+  "anno": zod.coerce.number().min(getReportDrilldownQueryAnnoMin).max(getReportDrilldownQueryAnnoMax).optional(),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
+  "magazzinoId": zod.coerce.number().optional(),
+  "mensaId": zod.coerce.number().optional(),
+  "zonaUdsId": zod.coerce.number().optional(),
+  "operatoreId": zod.coerce.number().optional(),
+  "tipoIntervento": zod.coerce.string().optional(),
+  "tipoServizio": zod.coerce.string().optional()
+})
+
+export const GetReportDrilldownResponse = zod.object({
+  "section": zod.string(),
+  "metric": zod.string(),
+  "page": zod.number(),
+  "pageSize": zod.number(),
+  "total": zod.number(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+})
+
+
+/**
+ * @summary Opzioni read-only autorizzate per i filtri della reportistica
+ */
+export const GetReportFilterOptionsQueryParams = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città')
+})
+
+export const GetReportFilterOptionsResponse = zod.object({
+  "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
+  "cities": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+})),
+  "centres": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+})),
+  "warehouses": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+})),
+  "mense": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+})),
+  "zones": zod.array(zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cittaId": zod.number().nullable(),
+  "centroAscoltoId": zod.number().nullish()
+}))
+})
+
+
+/**
  * @summary UDS street interventions grouped by month
  */
 export const ReportUdsInterventiPerMeseQueryParams = zod.object({

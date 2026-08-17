@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import type { ReportDrilldown, ReportingDashboard } from "@workspace/api-client-react";
 
 export type ExportColumn<T> = {
   header: string;
@@ -141,8 +142,14 @@ export async function exportToPdf<T>(opts: {
   orientation?: "portrait" | "landscape";
   generatedBy?: string;
   branding?: PdfExportBranding | null;
+  metadataLabels?: {
+    generatedAt: string;
+    rows: string;
+    reportGeneratedBy: string;
+    locale: string;
+  };
 }): Promise<void> {
-  const { filename, title, subtitle, rows, columns, orientation = "portrait", generatedBy, branding } = opts;
+  const { filename, title, subtitle, rows, columns, orientation = "portrait", generatedBy, branding, metadataLabels } = opts;
   const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
   const marginX = 40;
   const headerBottomY = await drawBrandingHeader(doc, branding, marginX);
@@ -155,10 +162,13 @@ export async function exportToPdf<T>(opts: {
   doc.setFontSize(9);
   doc.setTextColor(120);
   const meta = subtitle ? `${subtitle}  •  ` : "";
-  const by = generatedBy ? `  •  Report generato da: ${generatedBy}` : "";
+  const generatedAtLabel = metadataLabels?.generatedAt ?? "Generato il";
+  const rowsLabel = metadataLabels?.rows ?? "righe";
+  const generatedByLabel = metadataLabels?.reportGeneratedBy ?? "Report generato da";
+  const by = generatedBy ? `  •  ${generatedByLabel}: ${generatedBy}` : "";
   const metaY = titleY + 16;
   doc.text(
-    `${meta}Generato il ${new Date().toLocaleString("it-IT")}  •  ${rows.length} righe${by}`,
+    `${meta}${generatedAtLabel} ${new Date().toLocaleString(metadataLabels?.locale)}  •  ${rows.length} ${rowsLabel}${by}`,
     marginX,
     metaY,
   );
@@ -176,6 +186,228 @@ export async function exportToPdf<T>(opts: {
   drawBrandingFooters(doc, branding, marginX);
   doc.save(`${filename}_${timestamp()}.pdf`);
 }
+
+function reportSheetName(value: string): string {
+  return value.replace(/[\\/?*\[\]:]/g, "_").slice(0, 31) || "Dati";
+}
+
+export function buildReportingWorkbook(
+  report: ReportingDashboard,
+  labels: ReportingExportLabels,
+  scopeNames: ReportingScopeNames = {},
+  fseControl?: ReportDrilldown | null,
+): XLSX.WorkBook {
+  const scopeValue = (
+    id: number | null | undefined,
+    name: string | null | undefined,
+    all: string,
+  ) => name ?? (id == null ? all : String(id));
+  const workbook = XLSX.utils.book_new();
+  const summary = [
+    [labels.title],
+    [labels.metadata.from, report.filters.da],
+    [labels.metadata.to, report.filters.a],
+    [labels.metadata.city, scopeValue(report.filters.cittaId, scopeNames.city, labels.metadata.allCities)],
+    [labels.metadata.centre, scopeValue(report.filters.centroAscoltoId, scopeNames.centre, labels.metadata.allCentres)],
+    [labels.metadata.warehouse, scopeValue(report.filters.magazzinoId, scopeNames.warehouse, labels.metadata.allWarehouses)],
+    [labels.metadata.mensa, scopeValue(report.filters.mensaId, scopeNames.mensa, labels.metadata.allMense)],
+    [labels.metadata.zone, scopeValue(report.filters.zonaUdsId, scopeNames.zone, labels.metadata.allZones)],
+    [labels.metadata.generatedAt, report.generatedAt],
+    [labels.metadata.application, "Magazzino Solidale"],
+    ["Europe/Rome"],
+    [],
+    [labels.metadata.indicator, labels.metadata.value, labels.metadata.unit, labels.metadata.availability],
+    ...report.kpi.map((item) => [
+      labels.kpi(item.key),
+      item.value ?? labels.unavailable,
+      labels.unit(item.unit),
+      labels.availability(item.availability),
+    ]),
+    [],
+    [labels.metadata.definitions],
+    ...report.definitions.map((definition) => [labels.text(definition)]),
+  ];
+  const summarySheet = XLSX.utils.aoa_to_sheet(summary);
+  summarySheet["!cols"] = [{ wch: 42 }, { wch: 24 }, { wch: 18 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(workbook, summarySheet, "00_Riepilogo");
+
+  for (const table of report.tables) {
+    const sheet = XLSX.utils.aoa_to_sheet([
+      table.columns.map(labels.column),
+      ...table.rows.map((row) => table.columns.map((column) => {
+        const value = row[column];
+        return typeof value === "string" ? labels.text(value) : (value ?? "");
+      })),
+    ]);
+    sheet["!cols"] = table.columns.map((column) => ({
+      wch: Math.min(
+        50,
+        Math.max(
+          12,
+          column.length + 2,
+          ...table.rows.map((row) => String(row[column] ?? "").length + 2),
+        ),
+      ),
+    }));
+    XLSX.utils.book_append_sheet(
+      workbook,
+      sheet,
+      reportSheetName(table.key || labels.table(table.key)),
+    );
+  }
+
+  const qualityRows = [
+    [labels.metadata.indicator, labels.metadata.value, labels.metadata.availability, labels.metadata.notes],
+    ...report.quality.map((item) => [
+      labels.quality(item.key),
+      item.count ?? labels.unavailable,
+      labels.availability(item.availability),
+      item.note ? labels.text(item.note) : "",
+    ]),
+  ];
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(qualityRows),
+    report.section === "fse-plus" ? "08_Qualita_Dati" : "Qualita_Dati",
+  );
+
+  if (report.section === "fse-plus") {
+    if (fseControl) {
+      const controlSheet = XLSX.utils.aoa_to_sheet([
+        fseControl.columns.map(labels.column),
+        ...fseControl.rows.map((row) => fseControl.columns.map((column) => {
+          const value = row[column];
+          return typeof value === "string" ? labels.text(value) : (value ?? "");
+        })),
+      ]);
+      XLSX.utils.book_append_sheet(workbook, controlSheet, "09_Dettaglio_Controllo");
+    }
+    const existing = new Set(workbook.SheetNames);
+    const required = [
+      "01_Prodotti_FSE",
+      "02_Continuativi",
+      "03_Saltuari_Mensa",
+      "04_Saltuari_Pacchi",
+      "05_Saltuari_Strada",
+      "06_Pacchi_Pasti",
+      "07_Misure_Accompagnamento",
+      "08_Qualita_Dati",
+      "09_Dettaglio_Controllo",
+    ];
+    for (const name of required) {
+      if (existing.has(name)) continue;
+      const sheet = XLSX.utils.aoa_to_sheet([
+        [labels.column("stato"), labels.unavailable],
+        [labels.column("nota"), labels.text("Il modello operativo non rende disponibile questo dettaglio senza inferenze.")],
+      ]);
+      XLSX.utils.book_append_sheet(workbook, sheet, name);
+    }
+  }
+
+  return workbook;
+}
+
+export function exportReportingWorkbook(
+  filename: string,
+  report: ReportingDashboard,
+  labels: Parameters<typeof buildReportingWorkbook>[1],
+  scopeNames?: ReportingScopeNames,
+  fseControl?: ReportDrilldown | null,
+): void {
+  XLSX.writeFile(buildReportingWorkbook(report, labels, scopeNames, fseControl), `${filename}_${timestamp()}.xlsx`);
+}
+
+export async function exportReportingPdf(opts: {
+  filename: string;
+  title: string;
+  report: ReportingDashboard;
+  kpiLabel: (key: string) => string;
+  unavailable: string;
+  labels: ReportingExportLabels;
+  scopeNames?: ReportingScopeNames;
+  generatedBy?: string;
+  branding?: PdfExportBranding | null;
+}): Promise<void> {
+  const rows = opts.report.kpi.map((item) => ({
+    indicatore: opts.kpiLabel(item.key),
+    valore: item.value ?? opts.unavailable,
+    unita: item.unit,
+    disponibilita: item.availability,
+  }));
+  const scope = [
+    opts.report.filters.cittaId != null ? `${opts.labels.metadata.city}: ${opts.scopeNames?.city ?? opts.report.filters.cittaId}` : null,
+    opts.report.filters.centroAscoltoId != null ? `${opts.labels.metadata.centre}: ${opts.scopeNames?.centre ?? opts.report.filters.centroAscoltoId}` : null,
+    opts.report.filters.magazzinoId != null ? `${opts.labels.metadata.warehouse}: ${opts.scopeNames?.warehouse ?? opts.report.filters.magazzinoId}` : null,
+    opts.report.filters.mensaId != null ? `${opts.labels.metadata.mensa}: ${opts.scopeNames?.mensa ?? opts.report.filters.mensaId}` : null,
+    opts.report.filters.zonaUdsId != null ? `${opts.labels.metadata.zone}: ${opts.scopeNames?.zone ?? opts.report.filters.zonaUdsId}` : null,
+  ].filter(Boolean).join(" · ");
+  await exportToPdf({
+    filename: opts.filename,
+    title: opts.title,
+    subtitle: `${opts.report.filters.da} – ${opts.report.filters.a} · Europe/Rome${scope ? ` · ${scope}` : ""}`,
+    rows,
+    columns: [
+      { header: opts.labels.metadata.indicator, accessor: (row) => row.indicatore },
+      { header: opts.labels.metadata.value, accessor: (row) => row.valore },
+      { header: opts.labels.metadata.unit, accessor: (row) => opts.labels.unit(row.unita) },
+      { header: opts.labels.metadata.availability, accessor: (row) => opts.labels.availability(row.disponibilita) },
+    ],
+    orientation: "landscape",
+    generatedBy: opts.generatedBy,
+    branding: opts.branding,
+    metadataLabels: {
+      generatedAt: opts.labels.metadata.generatedAt,
+      rows: opts.labels.metadata.rows,
+      reportGeneratedBy: opts.labels.metadata.reportGeneratedBy,
+      locale: opts.labels.locale,
+    },
+  });
+}
+
+export type ReportingScopeNames = {
+  city?: string | null;
+  centre?: string | null;
+  warehouse?: string | null;
+  mensa?: string | null;
+  zone?: string | null;
+};
+
+export type ReportingExportLabels = {
+  title: string;
+  kpi: (key: string) => string;
+  table: (key: string) => string;
+  quality: (key: string) => string;
+  column: (key: string) => string;
+  unit: (key: string) => string;
+  availability: (key: string) => string;
+  text: (value: string) => string;
+  unavailable: string;
+  locale: string;
+  metadata: {
+    from: string;
+    to: string;
+    city: string;
+    centre: string;
+    warehouse: string;
+    mensa: string;
+    zone: string;
+    allCities: string;
+    allCentres: string;
+    allWarehouses: string;
+    allMense: string;
+    allZones: string;
+    generatedAt: string;
+    application: string;
+    indicator: string;
+    value: string;
+    unit: string;
+    availability: string;
+    definitions: string;
+    notes: string;
+    rows: string;
+    reportGeneratedBy: string;
+  };
+};
 
 export type SchedaLabelValue = { label: string; value: string | number | null | undefined };
 

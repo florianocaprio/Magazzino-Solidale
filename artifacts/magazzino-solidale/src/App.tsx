@@ -43,8 +43,8 @@ import Turni from "@/pages/turni";
 import ImpostazioniStampa from "@/pages/impostazioni-stampa";
 import ImpostazioniModuli from "@/pages/impostazioni-moduli";
 import Approvvigionamenti from "@/pages/approvvigionamenti";
-import Report from "@/pages/report";
-import ReportUds from "@/pages/report-uds";
+import ReportingLanding from "@/pages/reporting-landing";
+import ReportingDashboardPage from "@/pages/reporting-dashboard";
 import Utenti from "@/pages/utenti";
 import Ruoli from "@/pages/ruoli";
 import Citta from "@/pages/citta";
@@ -189,6 +189,29 @@ function MensaRoute({ view, permission }: { view: MensaView; permission: string 
       </RequireModulo>
     </Guard>
   );
+}
+
+function ReportingRoute({
+  section,
+  areas,
+  modules = [],
+  anyModules = [],
+  permission,
+}: {
+  section: React.ComponentProps<typeof ReportingDashboardPage>["section"];
+  areas?: string[];
+  modules?: string[];
+  anyModules?: string[];
+  permission?: string;
+}) {
+  const { hasArea, hasPermission } = useAuth();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  if (areas && !areas.some(hasArea)) return <NotAuthorized />;
+  if (permission && !hasPermission(permission)) return <NotAuthorized />;
+  const disabledModule = modules.find((code) => !isModuloAttivo(code)) ??
+    (anyModules.length > 0 && !anyModules.some(isModuloAttivo) ? anyModules[0] : undefined);
+  if (disabledModule) return <RequireModulo codice={disabledModule}><ReportingDashboardPage section={section} /></RequireModulo>;
+  return <ReportingDashboardPage section={section} />;
 }
 
 function AppRoutes() {
@@ -468,13 +491,55 @@ function AppRoutes() {
           )}
         </Route>
 
+        <Route path="/report/dashboard">
+          {() => (
+            <Guard area="analisi">
+              <RequireModulo codice="REPORT">
+                <ReportingRoute section="generale" />
+              </RequireModulo>
+            </Guard>
+          )}
+        </Route>
+        <Route path="/report/pacchi">
+          {() => (
+            <Guard area="analisi"><RequireModulo codice="REPORT"><ReportingRoute section="pacchi" areas={["sociale"]} modules={["MAGAZZINO_SOLIDALE", "BOLLE"]} /></RequireModulo></Guard>
+          )}
+        </Route>
+        <Route path="/report/centro-ascolto">
+          {() => (
+            <Guard area="analisi"><RequireModulo codice="REPORT"><ReportingRoute section="centro-ascolto" areas={["sociale"]} modules={["CENTRO_ASCOLTO"]} /></RequireModulo></Guard>
+          )}
+        </Route>
+        <Route path="/report/emporio">
+          {() => (
+            <Guard area="analisi"><RequireModulo codice="REPORT"><ReportingRoute section="emporio" areas={["emporio"]} modules={["EMPORIO_SOLIDALE"]} /></RequireModulo></Guard>
+          )}
+        </Route>
+        <Route path="/report/mensa">
+          {() => (
+            <Guard area="analisi"><RequireModulo codice="REPORT"><ReportingRoute section="mensa" areas={["mensa"]} modules={["MENSA"]} permission="mensa.reports.view" /></RequireModulo></Guard>
+          )}
+        </Route>
+        <Route path="/report/uds">
+          {() => (
+            <Guard area="analisi"><RequireModulo codice="REPORT"><ReportingRoute section="uds" areas={["uds"]} modules={["UDS"]} /></RequireModulo></Guard>
+          )}
+        </Route>
+        <Route path="/report/magazzino-logistica">
+          {() => (
+            <Guard area="analisi"><RequireModulo codice="REPORT"><ReportingRoute section="magazzino-logistica" areas={["magazzino", "logistica"]} anyModules={["MAGAZZINO_SOLIDALE", "LOTTI", "TRASFERIMENTI", "MEZZI", "FORNITORI", "APPROVVIGIONAMENTI"]} /></RequireModulo></Guard>
+          )}
+        </Route>
+        <Route path="/report/fse-plus">
+          {() => (
+            <Guard area="analisi"><RequireModulo codice="REPORT"><ReportingRoute section="fse-plus" /></RequireModulo></Guard>
+          )}
+        </Route>
         <Route path="/report">
           {() => (
             <Guard area="analisi">
-              <RequireModulo codice="CENTRO_ASCOLTO">
-                <RequireModulo codice="REPORT">
-                  <Report />
-                </RequireModulo>
+              <RequireModulo codice="REPORT">
+                <ReportingLanding />
               </RequireModulo>
             </Guard>
           )}
@@ -482,11 +547,7 @@ function AppRoutes() {
         <Route path="/report-uds">
           {() => (
             <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <RequireModulo codice="UDS">
-                  <ReportUds />
-                </RequireModulo>
-              </RequireModulo>
+              <RequireModulo codice="REPORT"><ReportingRoute section="uds" areas={["uds"]} modules={["UDS"]} /></RequireModulo>
             </Guard>
           )}
         </Route>

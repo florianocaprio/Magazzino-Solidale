@@ -128,6 +128,21 @@ momento la gestione delle utenze avviene solo dopo l'autenticazione.
 - `pnpm --filter @workspace/api-spec run codegen` — rigenera hook API + schemi
   Zod dall'OpenAPI
 
+## Report e Statistiche
+
+Il modulo `REPORT` espone in `/report` la landing della reportistica integrata:
+Dashboard generale, Pacchi Alimentari, Centro di Ascolto, Emporio, Mensa, UDS,
+Magazzino/Logistica e rendicontazione trasversale FSE+. I calcoli sono eseguiti
+dal reporting service server-side; grafici, tabelle, drill-down paginato ed
+export XLSX/PDF consumano lo stesso payload aggregato. Città, Centro e Zona UDS
+sono sempre riapplicati dal backend; per Mensa resta necessario anche il
+permesso `mensa.reports.view`.
+
+Le route storiche `/report-uds`, `/mensa/report` e gli endpoint legacy sotto
+`/report` restano disponibili per compatibilità. La nuova fase non introduce
+modifiche allo schema database. Le limitazioni del modello SIFEAD sono mostrate
+come dati mancanti, mai convertite in zeri o inferenze da note libere.
+
 ## Note
 
 - I segreti vanno **solo** nel file `.env`, che è escluso dal versionamento.

@@ -86,6 +86,7 @@ export type NavItem = {
   superAdmin?: boolean;
   public?: boolean;
   permission?: string;
+  sourceAreas?: readonly string[];
 };
 
 export const NAV_ITEMS: NavItem[] = [
@@ -379,15 +380,79 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
     groupKey: "analisi",
     area: "analisi",
+    moduloCodice: "REPORT",
+  },
+  {
+    key: "reportDashboard",
+    url: "/report/dashboard",
+    icon: BarChart3,
+    groupKey: "analisi",
+    area: "analisi",
+    moduloCodice: "REPORT",
+  },
+  {
+    key: "reportPacchi",
+    url: "/report/pacchi",
+    icon: PackageCheck,
+    groupKey: "analisi",
+    area: "analisi",
+    sourceAreas: ["sociale"],
+    moduloCodiciAll: ["REPORT", "MAGAZZINO_SOLIDALE", "BOLLE"],
+  },
+  {
+    key: "reportCentroAscolto",
+    url: "/report/centro-ascolto",
+    icon: Building2,
+    groupKey: "analisi",
+    area: "analisi",
+    sourceAreas: ["sociale"],
     moduloCodiciAll: ["CENTRO_ASCOLTO", "REPORT"],
   },
   {
+    key: "reportEmporio",
+    url: "/report/emporio",
+    icon: Store,
+    groupKey: "analisi",
+    area: "analisi",
+    sourceAreas: ["emporio"],
+    moduloCodiciAll: ["REPORT", "EMPORIO_SOLIDALE"],
+  },
+  {
+    key: "reportMensa",
+    url: "/report/mensa",
+    icon: Soup,
+    groupKey: "analisi",
+    area: "analisi",
+    sourceAreas: ["mensa"],
+    moduloCodiciAll: ["REPORT", "MENSA"],
+    permission: "mensa.reports.view",
+  },
+  {
     key: "reportUds",
-    url: "/report-uds",
+    url: "/report/uds",
     icon: Footprints,
     groupKey: "analisi",
     area: "analisi",
+    sourceAreas: ["uds"],
     moduloCodiciAll: ["REPORT", "UDS"],
+  },
+  {
+    key: "reportLogistica",
+    url: "/report/magazzino-logistica",
+    icon: Warehouse,
+    groupKey: "analisi",
+    area: "analisi",
+    sourceAreas: ["magazzino", "logistica"],
+    moduloCodice: "REPORT",
+    moduloCodiciAny: ["MAGAZZINO_SOLIDALE", "LOTTI", "TRASFERIMENTI", "MEZZI", "FORNITORI", "APPROVVIGIONAMENTI"],
+  },
+  {
+    key: "reportFsePlus",
+    url: "/report/fse-plus",
+    icon: Boxes,
+    groupKey: "analisi",
+    area: "analisi",
+    moduloCodice: "REPORT",
   },
 
   {
@@ -563,7 +628,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.superAdmin) return user?.isSuperAdmin === true;
     if (item.public) return true;
-    return !!item.area && hasArea(item.area) && (!item.permission || hasPermission(item.permission));
+    return !!item.area && hasArea(item.area) &&
+      (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
+      (!item.permission || hasPermission(item.permission));
   }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo));
 
   const groupedNav = visibleItems.reduce(
@@ -609,7 +676,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                               item={item}
                               isActive={
                                 location === item.url ||
-                                (item.url !== "/" &&
+                                (item.url !== "/" && item.url !== "/report" &&
                                   location.startsWith(item.url))
                               }
                             />

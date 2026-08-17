@@ -56,6 +56,7 @@ import { barcodeScanner } from "./namespaces/barcodeScanner";
 import { bulkImport } from "./namespaces/bulkImport";
 import { sostieniProgetto } from "./namespaces/sostieniProgetto";
 import { mensa } from "./namespaces/mensa";
+import { reporting } from "./namespaces/reporting";
 
 export { LANGUAGES, isRtl, applyDirection } from "./languages";
 export type { LanguageCode } from "./languages";
@@ -115,6 +116,7 @@ const PAGE_NAMESPACES = {
   bulkImport,
   sostieniProgetto,
   mensa,
+  reporting,
 } as const;
 
 function buildResources() {

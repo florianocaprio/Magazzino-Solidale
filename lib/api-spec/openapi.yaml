@@ -4554,6 +4554,219 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReportFsePlus"
 
+  /report/dashboard:
+    get:
+      operationId: getReportDashboardGenerale
+      tags: [report]
+      summary: Dashboard generale integrata dei moduli attivi
+      parameters:
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportAnno"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportMagazzinoId"
+      responses:
+        "200":
+          description: Dashboard integrata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportingDashboard" }
+
+  /report/pacchi:
+    get:
+      operationId: getReportPacchi
+      tags: [report]
+      summary: Report Pacchi Alimentari
+      parameters:
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportMagazzinoId"
+      responses:
+        "200":
+          description: Dashboard Pacchi Alimentari
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportingDashboard" }
+
+  /report/centro-ascolto:
+    get:
+      operationId: getReportCentroAscolto
+      tags: [report]
+      summary: Report Centro di Ascolto
+      parameters:
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportZonaUdsId"
+        - $ref: "#/components/parameters/ReportOperatoreId"
+        - $ref: "#/components/parameters/ReportTipoIntervento"
+      responses:
+        "200":
+          description: Dashboard Centro di Ascolto
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportingDashboard" }
+
+  /report/emporio:
+    get:
+      operationId: getReportEmporio
+      tags: [report]
+      summary: Report Emporio Solidale
+      parameters:
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportMagazzinoId"
+      responses:
+        "200":
+          description: Dashboard Emporio Solidale
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportingDashboard" }
+
+  /report/mensa:
+    get:
+      operationId: getReportMensaIntegrato
+      tags: [report]
+      summary: Report Mensa integrato; mantiene il permesso mensa.reports.view
+      parameters:
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportMagazzinoId"
+        - $ref: "#/components/parameters/ReportMensaId"
+        - $ref: "#/components/parameters/ReportOperatoreId"
+        - $ref: "#/components/parameters/ReportTipoServizio"
+      responses:
+        "200":
+          description: Dashboard Mensa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportingDashboard" }
+
+  /report/uds:
+    get:
+      operationId: getReportUdsIntegrato
+      tags: [report]
+      summary: Report Unità di Strada integrato
+      parameters:
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportZonaUdsId"
+        - $ref: "#/components/parameters/ReportOperatoreId"
+        - $ref: "#/components/parameters/ReportTipoIntervento"
+      responses:
+        "200":
+          description: Dashboard UDS
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportingDashboard" }
+
+  /report/magazzino-logistica:
+    get:
+      operationId: getReportMagazzinoLogistica
+      tags: [report]
+      summary: Report Magazzino e Logistica
+      parameters:
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportMagazzinoId"
+      responses:
+        "200":
+          description: Dashboard Magazzino e Logistica
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportingDashboard" }
+
+  /report/fse-plus/integrato:
+    get:
+      operationId: getReportFsePlusIntegrato
+      tags: [report]
+      summary: Rendicontazione FSE+ integrata e data-gap SIFEAD
+      parameters:
+        - $ref: "#/components/parameters/ReportAnno"
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportMagazzinoId"
+      responses:
+        "200":
+          description: Dashboard FSE+
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportingDashboard" }
+
+  /report/drilldown:
+    get:
+      operationId: getReportDrilldown
+      tags: [report]
+      summary: Dettaglio paginato e auditabile di un indicatore
+      parameters:
+        - name: section
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+        - name: metric
+          in: query
+          required: true
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportAnno"
+        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportMagazzinoId"
+        - $ref: "#/components/parameters/ReportMensaId"
+        - $ref: "#/components/parameters/ReportZonaUdsId"
+        - $ref: "#/components/parameters/ReportOperatoreId"
+        - $ref: "#/components/parameters/ReportTipoIntervento"
+        - $ref: "#/components/parameters/ReportTipoServizio"
+      responses:
+        "200":
+          description: Drill-down paginato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportDrilldown" }
+
+  /report/filter-options:
+    get:
+      operationId: getReportFilterOptions
+      tags: [report]
+      summary: Opzioni read-only autorizzate per i filtri della reportistica
+      parameters:
+        - name: section
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+        - $ref: "#/components/parameters/ReportCittaId"
+      responses:
+        "200":
+          description: Opzioni filtrate per scope, aree, moduli e permessi del chiamante
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportFilterOptions" }
+
   /report/uds/interventi-per-mese:
     get:
       operationId: reportUdsInterventiPerMese
@@ -5483,7 +5696,197 @@ paths:
 
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
+  parameters:
+    ReportDa:
+      name: da
+      in: query
+      description: Data civile iniziale Europe/Rome (YYYY-MM-DD)
+      schema: { type: string, format: date }
+    ReportA:
+      name: a
+      in: query
+      description: Data civile finale Europe/Rome (YYYY-MM-DD)
+      schema: { type: string, format: date }
+    ReportAnno:
+      name: anno
+      in: query
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+    ReportCittaId:
+      name: cittaId
+      in: query
+      description: Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+      schema: { type: integer }
+    ReportCentroId:
+      name: centroAscoltoId
+      in: query
+      description: Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+      schema: { type: integer }
+    ReportMagazzinoId:
+      name: magazzinoId
+      in: query
+      schema: { type: integer }
+    ReportMensaId:
+      name: mensaId
+      in: query
+      schema: { type: integer }
+    ReportZonaUdsId:
+      name: zonaUdsId
+      in: query
+      schema: { type: integer }
+    ReportOperatoreId:
+      name: operatoreId
+      in: query
+      schema: { type: integer }
+    ReportTipoIntervento:
+      name: tipoIntervento
+      in: query
+      schema: { type: string }
+    ReportTipoServizio:
+      name: tipoServizio
+      in: query
+      schema: { type: string }
   schemas:
+    ReportingDashboard:
+      type: object
+      required: [section, filters, kpi, series, tables, quality, definitions, generatedAt, timezone]
+      properties:
+        section:
+          type: string
+          enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+        filters:
+          $ref: "#/components/schemas/ReportAppliedFilters"
+        kpi:
+          type: array
+          items: { $ref: "#/components/schemas/ReportKpi" }
+        series:
+          type: array
+          items: { $ref: "#/components/schemas/ReportSeries" }
+        tables:
+          type: array
+          items: { $ref: "#/components/schemas/ReportTable" }
+        quality:
+          type: array
+          items: { $ref: "#/components/schemas/ReportQualityItem" }
+        definitions:
+          type: array
+          items: { type: string }
+        generatedAt: { type: string, format: date-time }
+        timezone: { type: string, enum: [Europe/Rome] }
+
+    ReportAppliedFilters:
+      type: object
+      required: [da, a, anno, cittaId, centroAscoltoId, magazzinoId, mensaId, zonaUdsId, operatoreId, tipoIntervento, tipoServizio]
+      properties:
+        da: { type: string, format: date }
+        a: { type: string, format: date }
+        anno: { type: integer }
+        cittaId: { type: [integer, "null"] }
+        centroAscoltoId: { type: [integer, "null"] }
+        magazzinoId: { type: [integer, "null"] }
+        mensaId: { type: [integer, "null"] }
+        zonaUdsId: { type: [integer, "null"] }
+        operatoreId: { type: [integer, "null"] }
+        tipoIntervento: { type: [string, "null"] }
+        tipoServizio: { type: [string, "null"] }
+
+    ReportKpi:
+      type: object
+      required: [key, value, unit, availability, drilldownMetric]
+      properties:
+        key: { type: string }
+        value: { type: [number, "null"] }
+        unit: { type: string, enum: [count, quantity, kg, credit, days, average] }
+        availability: { type: string, enum: [ok, derivable, missing] }
+        drilldownMetric: { type: [string, "null"] }
+
+    ReportSeries:
+      type: object
+      required: [key, points]
+      properties:
+        key: { type: string }
+        points:
+          type: array
+          items:
+            type: object
+            required: [label, value]
+            properties:
+              label: { type: string }
+              value: { type: number }
+              secondaryValue: { type: [number, "null"] }
+
+    ReportTable:
+      type: object
+      required: [key, columns, rows]
+      properties:
+        key: { type: string }
+        columns:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    ReportQualityItem:
+      type: object
+      required: [key, count, availability, note]
+      properties:
+        key: { type: string }
+        count: { type: [integer, "null"] }
+        availability: { type: string, enum: [ok, derivable, missing] }
+        note: { type: [string, "null"] }
+
+    ReportDrilldown:
+      type: object
+      required: [section, metric, page, pageSize, total, columns, rows]
+      properties:
+        section: { type: string }
+        metric: { type: string }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+        columns:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    ReportFilterOption:
+      type: object
+      required: [id, nome, cittaId]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        cittaId: { type: [integer, "null"] }
+        centroAscoltoId: { type: [integer, "null"] }
+
+    ReportFilterOptions:
+      type: object
+      required: [section, cities, centres, warehouses, mense, zones]
+      properties:
+        section:
+          type: string
+          enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+        cities:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+        centres:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+        warehouses:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+        mense:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+        zones:
+          type: array
+          items: { $ref: "#/components/schemas/ReportFilterOption" }
+
     ReportFsePlus:
       type: object
       properties:
