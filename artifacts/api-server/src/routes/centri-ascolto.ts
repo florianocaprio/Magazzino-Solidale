@@ -1,21 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import {
-  centriAscoltoTable,
-  beneficiariTable,
-  cittaTable,
-} from "@workspace/db";
+import { centriAscoltoTable, beneficiariTable, cittaTable } from "@workspace/db";
 import { eq, count } from "drizzle-orm";
-import {
-  CreateCentroAscoltoBody,
-  UpdateCentroAscoltoBody,
-} from "@workspace/api-zod";
-import {
-  callerCittaId,
-  cittaScopeFilter,
-  canAccessCitta,
-} from "../lib/centroScope";
+import { CreateCentroAscoltoBody, UpdateCentroAscoltoBody } from "@workspace/api-zod";
+import { callerCittaId, cittaScopeFilter, canAccessCitta } from "../lib/centroScope";
 import { requireAdmin } from "../middlewares/auth";
+import { canMutateScopedResource } from "../lib/adminScope";
 import express from "express";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -52,10 +42,7 @@ function fmt(r: typeof centriAscoltoTable.$inferSelect, beneficiariCount = 0) {
 }
 
 async function cittaExists(cittaId: number): Promise<boolean> {
-  const [row] = await db
-    .select({ id: cittaTable.id })
-    .from(cittaTable)
-    .where(eq(cittaTable.id, cittaId));
+  const [row] = await db.select({ id: cittaTable.id }).from(cittaTable).where(eq(cittaTable.id, cittaId));
   return Boolean(row);
 }
 
@@ -65,12 +52,9 @@ router.get("/centri-ascolto", async (req, res) => {
     .from(centriAscoltoTable)
     .where(cittaScopeFilter(centriAscoltoTable.cittaId, callerCittaId(req)))
     .orderBy(centriAscoltoTable.nome);
-  const counts = await db
-    .select({ centroId: beneficiariTable.centroAscoltoId, n: count() })
-    .from(beneficiariTable)
-    .groupBy(beneficiariTable.centroAscoltoId);
-  const countMap = new Map(counts.map(c => [c.centroId, c.n]));
-  res.json(rows.map(r => fmt(r, countMap.get(r.id) ?? 0)));
+  const counts = await db.select({ centroId: beneficiariTable.centroAscoltoId, n: count() }).from(beneficiariTable).groupBy(beneficiariTable.centroAscoltoId);
+  const countMap = new Map(counts.map((c) => [c.centroId, c.n]));
+  res.json(rows.map((r) => fmt(r, countMap.get(r.id) ?? 0)));
 });
 
 router.post("/centri-ascolto", requireAdmin, async (req, res) => {
@@ -81,6 +65,10 @@ router.post("/centri-ascolto", requireAdmin, async (req, res) => {
   }
   const cid = callerCittaId(req);
   const values = { ...parsed.data };
+  if (cid != null && values.cittaId != null && values.cittaId !== cid) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
+    return;
+  }
   if (cid != null) values.cittaId = cid;
   if (values.cittaId != null && !(await cittaExists(values.cittaId))) {
     res.status(400).json({ error: "L'area selezionata non esiste" });
@@ -93,7 +81,10 @@ router.post("/centri-ascolto", requireAdmin, async (req, res) => {
 router.get("/centri-ascolto/:id", async (req, res) => {
   const id = paramId(req.params.id);
   const [row] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (!row) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   if (!canAccessCitta(row.cittaId, callerCittaId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
@@ -106,9 +97,12 @@ router.patch("/centri-ascolto/:id", requireAdmin, async (req, res) => {
   const id = paramId(req.params.id);
   const cid = callerCittaId(req);
   const [existing] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCitta(existing.cittaId, cid)) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!existing) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!canMutateScopedResource(existing.cittaId, cid)) {
+    res.status(403).json({ error: "Centro non modificabile per il tuo profilo" });
     return;
   }
   const parsed = UpdateCentroAscoltoBody.safeParse(req.body);
@@ -117,38 +111,55 @@ router.patch("/centri-ascolto/:id", requireAdmin, async (req, res) => {
     return;
   }
   const updates = { ...parsed.data };
+  if (cid != null && updates.cittaId !== undefined && updates.cittaId !== cid) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
+    return;
+  }
   if (cid != null) delete updates.cittaId;
   if (updates.cittaId != null && !(await cittaExists(updates.cittaId))) {
     res.status(400).json({ error: "L'area selezionata non esiste" });
     return;
   }
   const [row] = await db.update(centriAscoltoTable).set(updates).where(eq(centriAscoltoTable.id, id)).returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (!row) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   res.json(fmt(row));
 });
 
 router.post(
   "/centri-ascolto/:id/logo",
   requireAdmin,
-  express.raw({ type: ["image/png", "image/jpeg", "image/webp"], limit: MAX_LOGO_BYTES }),
+  express.raw({
+    type: ["image/png", "image/jpeg", "image/webp"],
+    limit: MAX_LOGO_BYTES,
+  }),
   async (req, res) => {
     const id = paramId(req.params.id);
     const [existing] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Centro di ascolto non trovato" }); return; }
-    if (!canAccessCitta(existing.cittaId, callerCittaId(req))) {
-      res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    if (!existing) {
+      res.status(404).json({ error: "Centro di ascolto non trovato" });
+      return;
+    }
+    if (!canMutateScopedResource(existing.cittaId, callerCittaId(req))) {
+      res.status(403).json({ error: "Centro non modificabile per il tuo profilo" });
       return;
     }
     const extension = LOGO_TYPES.get(req.get("content-type")?.split(";")[0] ?? "");
     if (!extension || !Buffer.isBuffer(req.body) || req.body.length === 0) {
-      res.status(400).json({ error: "Il logo deve essere un'immagine PNG, JPEG o WebP valida" });
+      res.status(400).json({
+        error: "Il logo deve essere un'immagine PNG, JPEG o WebP valida",
+      });
       return;
     }
     const relativeDir = path.join("centri", String(id));
     const uploadRoot = process.env.UPLOAD_DIR ?? "/app/uploads";
     await mkdir(path.join(uploadRoot, relativeDir), { recursive: true });
     const fileName = `${randomUUID()}${extension}`;
-    await writeFile(path.join(uploadRoot, relativeDir, fileName), req.body, { flag: "wx" });
+    await writeFile(path.join(uploadRoot, relativeDir, fileName), req.body, {
+      flag: "wx",
+    });
     const logoUrl = `/uploads/${relativeDir.split(path.sep).join("/")}/${fileName}`;
     const [row] = await db.update(centriAscoltoTable).set({ logoUrl }).where(eq(centriAscoltoTable.id, id)).returning();
     res.json(fmt(row));
@@ -158,13 +169,15 @@ router.post(
 router.delete("/centri-ascolto/:id", requireAdmin, async (req, res) => {
   const id = paramId(req.params.id);
   const [existing] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
-  if (!existing) { res.status(204).send(); return; }
-  if (!canAccessCitta(existing.cittaId, callerCittaId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!existing) {
+    res.status(204).send();
     return;
   }
-  await db.update(beneficiariTable).set({ centroAscoltoId: null }).where(eq(beneficiariTable.centroAscoltoId, id));
-  await db.delete(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
+  if (!canMutateScopedResource(existing.cittaId, callerCittaId(req))) {
+    res.status(403).json({ error: "Centro non modificabile per il tuo profilo" });
+    return;
+  }
+  await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, id));
   res.status(204).send();
 });
 

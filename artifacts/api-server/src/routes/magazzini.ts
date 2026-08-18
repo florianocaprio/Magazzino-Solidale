@@ -1,22 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import {
-  cittaTable,
-  magazziniTable,
-  centriAscoltoTable,
-  menseTable,
-} from "@workspace/db";
+import { cittaTable, magazziniTable, centriAscoltoTable, menseTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import {
-  callerCentroId,
-  callerCittaId,
-  centroScopeFilter,
-  cittaScopeFilter,
-  canAccessCentro,
-  canAccessCitta,
-  andScoped,
-} from "../lib/centroScope";
+import { CreateMagazzinoBody, UpdateMagazzinoBody } from "@workspace/api-zod";
+import { callerCentroId, callerCittaId, centroScopeFilter, cittaScopeFilter, canAccessCentro, canAccessCitta, andScoped } from "../lib/centroScope";
 import { requireAdmin } from "../middlewares/auth";
+import { canMutateScopedResource } from "../lib/adminScope";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
 import { nextMagazzinoCodice } from "../lib/magazzinoCodice";
 import { magazzinoDeletionBlockReason } from "../lib/magazzinoDeletion";
@@ -34,9 +23,7 @@ function paramId(v: string | string[]): number {
 
 function parseTipoMagazzino(value: unknown, fallback?: TipoMagazzino): TipoMagazzino | null {
   if (value == null || value === "") return fallback ?? null;
-  return typeof value === "string" && TIPI_MAGAZZINO.includes(value as TipoMagazzino)
-    ? (value as TipoMagazzino)
-    : null;
+  return typeof value === "string" && TIPI_MAGAZZINO.includes(value as TipoMagazzino) ? (value as TipoMagazzino) : null;
 }
 
 function isTipoEmporio(tipo: TipoMagazzino): boolean {
@@ -75,17 +62,11 @@ const fmt = (r: typeof magazziniTable.$inferSelect, centroNome?: string | null) 
 
 async function centroNomeOf(id: number | null): Promise<string | null> {
   if (id == null) return null;
-  const [c] = await db
-    .select({ nome: centriAscoltoTable.nome })
-    .from(centriAscoltoTable)
-    .where(eq(centriAscoltoTable.id, id));
+  const [c] = await db.select({ nome: centriAscoltoTable.nome }).from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
   return c?.nome ?? null;
 }
 
-async function validateMensaScope(
-  cittaId: unknown,
-  centroAscoltoId: unknown,
-): Promise<string | null> {
+async function validateMensaScope(cittaId: unknown, centroAscoltoId: unknown): Promise<string | null> {
   if (!Number.isInteger(cittaId) || Number(cittaId) <= 0) {
     return "Seleziona un'Area valida per la Mensa.";
   }
@@ -100,7 +81,10 @@ async function validateMensaScope(
     return "Centro di Ascolto non valido.";
   }
   const [centro] = await db
-    .select({ cittaId: centriAscoltoTable.cittaId, attivo: centriAscoltoTable.attivo })
+    .select({
+      cittaId: centriAscoltoTable.cittaId,
+      attivo: centriAscoltoTable.attivo,
+    })
     .from(centriAscoltoTable)
     .where(eq(centriAscoltoTable.id, Number(centroAscoltoId)));
   if (!centro || !centro.attivo) return "Il Centro di Ascolto selezionato non è attivo.";
@@ -114,22 +98,19 @@ router.get("/magazzini", async (req, res) => {
   const rows = await db
     .select({ m: magazziniTable, centroNome: centriAscoltoTable.nome })
     .from(magazziniTable)
-    .leftJoin(
-      centriAscoltoTable,
-      eq(magazziniTable.centroAscoltoId, centriAscoltoTable.id),
-    )
-    .where(
-      andScoped(
-        centroScopeFilter(magazziniTable.centroAscoltoId, callerCentroId(req)),
-        cittaScopeFilter(magazziniTable.cittaId, callerCittaId(req)),
-      ),
-    )
+    .leftJoin(centriAscoltoTable, eq(magazziniTable.centroAscoltoId, centriAscoltoTable.id))
+    .where(andScoped(centroScopeFilter(magazziniTable.centroAscoltoId, callerCentroId(req)), cittaScopeFilter(magazziniTable.cittaId, callerCittaId(req))))
     .orderBy(magazziniTable.nome);
   res.json(rows.map((r) => fmt(r.m, r.centroNome)));
 });
 
 router.post("/magazzini", requireAdmin, async (req, res) => {
-  const body = req.body;
+  const parsed = CreateMagazzinoBody.safeParse(req.body);
+  if (!parsed.success || !parsed.data.nome.trim()) {
+    res.status(400).json({ error: "Inserimento magazzino non valido" });
+    return;
+  }
+  const body = parsed.data;
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
@@ -210,7 +191,9 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
     } catch (e) {
       if (isUniqueViolation(e) && attempt < MAX_ATTEMPTS - 1) continue;
       if (isUniqueViolation(e)) {
-        res.status(409).json({ error: "Impossibile generare un codice univoco per il magazzino, riprova" });
+        res.status(409).json({
+          error: "Impossibile generare un codice univoco per il magazzino, riprova",
+        });
         return;
       }
       throw e;
@@ -221,7 +204,10 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
 router.get("/magazzini/:id", async (req, res) => {
   const id = paramId(req.params.id);
   const [row] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (!row) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -238,16 +224,24 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const [existing] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+  if (!existing) {
+    res.status(404).json({ error: "Not found" });
     return;
   }
-  if (!canAccessCitta(existing.cittaId, cid)) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!canMutateScopedResource(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Magazzino non modificabile per il tuo centro" });
     return;
   }
-  const updates = { ...req.body };
+  if (!canMutateScopedResource(existing.cittaId, cid)) {
+    res.status(403).json({ error: "Magazzino non modificabile per la tua Area" });
+    return;
+  }
+  const parsed = UpdateMagazzinoBody.safeParse(req.body);
+  if (!parsed.success || (parsed.data.nome !== undefined && !parsed.data.nome.trim())) {
+    res.status(400).json({ error: "Modifica magazzino non valida" });
+    return;
+  }
+  const updates = { ...parsed.data };
   if ("tipoMagazzino" in updates) {
     const tipoMagazzino = parseTipoMagazzino(updates.tipoMagazzino);
     if (!tipoMagazzino) {
@@ -260,11 +254,7 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
     }
     updates.tipoMagazzino = tipoMagazzino;
   }
-  if (
-    existing.tipoMagazzino === "mensa" &&
-    updates.tipoMagazzino != null &&
-    updates.tipoMagazzino !== "mensa"
-  ) {
+  if (existing.tipoMagazzino === "mensa" && updates.tipoMagazzino != null && updates.tipoMagazzino !== "mensa") {
     res.status(409).json({
       error: "Un magazzino Mensa non può cambiare tipo. Puoi disattivarlo o eliminarlo se non possiede storico.",
     });
@@ -276,9 +266,7 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
   if (cid != null) delete updates.cittaId;
   const targetTipo = (updates.tipoMagazzino ?? existing.tipoMagazzino) as TipoMagazzino;
   const targetCittaId = updates.cittaId === undefined ? existing.cittaId : updates.cittaId;
-  const targetCentroId = updates.centroAscoltoId === undefined
-    ? existing.centroAscoltoId
-    : updates.centroAscoltoId;
+  const targetCentroId = updates.centroAscoltoId === undefined ? existing.centroAscoltoId : updates.centroAscoltoId;
   if (targetTipo === "mensa") {
     const scopeError = await validateMensaScope(targetCittaId, targetCentroId);
     if (scopeError) {
@@ -287,11 +275,7 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
     }
   }
   const row = await db.transaction(async (tx) => {
-    const [updated] = await tx
-      .update(magazziniTable)
-      .set(updates)
-      .where(eq(magazziniTable.id, id))
-      .returning();
+    const [updated] = await tx.update(magazziniTable).set(updates).where(eq(magazziniTable.id, id)).returning();
     if (updated.tipoMagazzino === "mensa") {
       await syncMensaFromMagazzino(tx, updated, req.user?.id ?? null);
     }
@@ -304,29 +288,26 @@ router.delete("/magazzini/:id", requireAdmin, async (req, res) => {
   const id = paramId(req.params.id);
   const caller = callerCentroId(req);
   const [existing] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
-  if (!existing) { res.status(204).send(); return; }
-  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+  if (!existing) {
+    res.status(204).send();
     return;
   }
-  if (!canAccessCitta(existing.cittaId, callerCittaId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!canMutateScopedResource(existing.centroAscoltoId, caller)) {
+    res.status(403).json({ error: "Magazzino non modificabile per il tuo centro" });
     return;
   }
-  const [linkedMensa] = await db
-    .select({ id: menseTable.id })
-    .from(menseTable)
-    .where(eq(menseTable.magazzinoId, id));
+  if (!canMutateScopedResource(existing.cittaId, callerCittaId(req))) {
+    res.status(403).json({ error: "Magazzino non modificabile per la tua Area" });
+    return;
+  }
+  const [linkedMensa] = await db.select({ id: menseTable.id }).from(menseTable).where(eq(menseTable.magazzinoId, id));
   if (linkedMensa && (await mensaHasOperationalHistory(linkedMensa.id))) {
     res.status(409).json({
       error: "La Mensa possiede storico operativo e non può essere eliminata. Puoi disattivarla.",
     });
     return;
   }
-  const blockReason = await magazzinoDeletionBlockReason(
-    id,
-    linkedMensa ? { ignoreMensaId: linkedMensa.id } : {},
-  );
+  const blockReason = await magazzinoDeletionBlockReason(id, linkedMensa ? { ignoreMensaId: linkedMensa.id } : {});
   if (blockReason) {
     res.status(409).json({ error: blockReason });
     return;

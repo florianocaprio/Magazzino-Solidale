@@ -1,17 +1,9 @@
 import { Router, type IRouter } from "express";
-import {
-  db,
-  cittaTable,
-  zoneUdsTable,
-  beneficiariTable,
-  utentiTable,
-  centriAscoltoTable,
-  magazziniTable,
-} from "@workspace/db";
+import { db, cittaTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { CreateCittaBody, UpdateCittaBody } from "@workspace/api-zod";
-import { requireAdmin } from "../middlewares/auth";
 import { callerCittaId } from "../lib/centroScope";
+import { requireGlobalAdmin } from "../lib/adminScope";
 
 const router: IRouter = Router();
 
@@ -27,7 +19,7 @@ function fmt(r: typeof cittaTable.$inferSelect) {
   };
 }
 
-// City is a HARD boundary: a città-scoped caller only ever sees their own città.
+// L'Area (tabella legacy `citta`) è un confine rigido: un caller scoped vede solo la propria.
 router.get("/citta", async (req, res) => {
   const cittaId = callerCittaId(req);
   const rows =
@@ -45,7 +37,7 @@ router.get("/citta/:id", async (req, res) => {
   const id = parseInt(req.params.id as string);
   const cittaId = callerCittaId(req);
   if (cittaId != null && cittaId !== id) {
-    res.status(403).json({ error: "Città non accessibile per il tuo profilo" });
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
   const [row] = await db.select().from(cittaTable).where(eq(cittaTable.id, id));
@@ -56,7 +48,7 @@ router.get("/citta/:id", async (req, res) => {
   res.json(fmt(row));
 });
 
-router.post("/citta", requireAdmin, async (req, res) => {
+router.post("/citta", requireGlobalAdmin, async (req, res) => {
   const result = CreateCittaBody.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Inserimento area non valido" });
@@ -68,7 +60,7 @@ router.post("/citta", requireAdmin, async (req, res) => {
   res.status(201).json(fmt(row));
 });
 
-router.patch("/citta/:id", requireAdmin, async (req, res) => {
+router.patch("/citta/:id", requireGlobalAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
   const result = UpdateCittaBody.safeParse(req.body);
   if (!result.success) {
@@ -89,27 +81,17 @@ router.patch("/citta/:id", requireAdmin, async (req, res) => {
   res.json(fmt(row));
 });
 
-router.delete("/citta/:id", requireAdmin, async (req, res) => {
+router.delete("/citta/:id", requireGlobalAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
-  // Clear all FK references before deleting (FKs are RESTRICT by default).
-  await db
-    .update(beneficiariTable)
-    .set({ cittaId: null, zonaUdsId: null })
-    .where(eq(beneficiariTable.cittaId, id));
-  await db
-    .update(utentiTable)
-    .set({ cittaId: null, zonaUdsId: null })
-    .where(eq(utentiTable.cittaId, id));
-  await db
-    .update(centriAscoltoTable)
-    .set({ cittaId: null })
-    .where(eq(centriAscoltoTable.cittaId, id));
-  await db
-    .update(magazziniTable)
-    .set({ cittaId: null })
-    .where(eq(magazziniTable.cittaId, id));
-  await db.delete(zoneUdsTable).where(eq(zoneUdsTable.cittaId, id));
-  await db.delete(cittaTable).where(eq(cittaTable.id, id));
+  const [row] = await db
+    .update(cittaTable)
+    .set({ attivo: false })
+    .where(eq(cittaTable.id, id))
+    .returning({ id: cittaTable.id });
+  if (!row) {
+    res.status(404).json({ error: "Area non trovata" });
+    return;
+  }
   res.status(204).send();
 });
 
