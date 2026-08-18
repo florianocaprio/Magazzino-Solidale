@@ -232,6 +232,13 @@ Gli aggiornamenti sono SQL versionati in `lib/db/updates`, eseguiti in ordine,
 in transazione e sotto lock advisory. Devono essere idempotenti: una seconda
 esecuzione deve terminare senza modificare dati o oggetti non previsti.
 
+Per l'hardening Beneficiari, `20260819_audit_beneficiari_hardening.sql` aggiunge
+esclusivamente `beneficiari.versione integer NOT NULL DEFAULT 1`. Confrontare i
+conteggi delle entità principali prima e dopo, verificare che tutte le versioni
+siano valorizzate e lanciare le query diagnostiche Area legacy/nucleo orfano
+documentate nel README. Non aggiungere la FK del nucleo finché gli eventuali
+orfani non sono stati classificati e bonificati esplicitamente.
+
 ## Super Admin, ambiente e moduli
 
 Per ogni piattaforma il primo utente operativo deve essere un Super Admin. La
