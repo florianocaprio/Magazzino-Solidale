@@ -104,15 +104,6 @@ export const NAV_ITEMS: NavItem[] = [
     area: "generale",
   },
   {
-    key: "maps",
-    url: "/maps",
-    icon: Map,
-    groupKey: "generale",
-    area: ["sociale", "magazzino"],
-    permission: "maps.operational",
-    requiresMapsLayer: true,
-  },
-  {
     key: "magazzini",
     url: "/magazzini",
     icon: Warehouse,
@@ -387,6 +378,15 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodice: "APPROVVIGIONAMENTI",
+  },
+  {
+    key: "maps",
+    url: "/maps",
+    icon: Map,
+    groupKey: "logistica",
+    area: ["sociale", "magazzino"],
+    permission: "maps.operational",
+    requiresMapsLayer: true,
   },
 
   {

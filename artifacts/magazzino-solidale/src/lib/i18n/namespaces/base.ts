@@ -70,7 +70,7 @@ export const base = {
       },
       items: {
         dashboard: "Dashboard",
-        maps: "MAPS operativo",
+        maps: "Mappa Operativa",
         magazzini: "Magazzini",
         prodotti: "Catalogo Prodotti",
         lotti: "Lotti",
@@ -195,7 +195,7 @@ export const base = {
       },
       items: {
         dashboard: "Panel",
-        maps: "MAPS operativo",
+        maps: "Mapa operativo",
         magazzini: "Almacenes",
         prodotti: "Catálogo de Productos",
         lotti: "Lotes",
@@ -320,7 +320,7 @@ export const base = {
       },
       items: {
         dashboard: "Dashboard",
-        maps: "Operational MAPS",
+        maps: "Operational Map",
         magazzini: "Warehouses",
         prodotti: "Product Catalogue",
         lotti: "Lots",
@@ -445,7 +445,7 @@ export const base = {
       },
       items: {
         dashboard: "Tableau de bord",
-        maps: "MAPS opérationnel",
+        maps: "Carte opérationnelle",
         magazzini: "Entrepôts",
         prodotti: "Catalogue de produits",
         lotti: "Lots",
@@ -570,7 +570,7 @@ export const base = {
       },
       items: {
         dashboard: "Übersicht",
-        maps: "Operative MAPS",
+        maps: "Einsatzkarte",
         magazzini: "Lager",
         prodotti: "Produktkatalog",
         lotti: "Chargen",
@@ -695,7 +695,7 @@ export const base = {
       },
       items: {
         dashboard: "لوحة التحكم",
-        maps: "الخرائط التشغيلية",
+        maps: "الخريطة التشغيلية",
         magazzini: "المستودعات",
         prodotti: "كتالوج المنتجات",
         lotti: "الدفعات",
