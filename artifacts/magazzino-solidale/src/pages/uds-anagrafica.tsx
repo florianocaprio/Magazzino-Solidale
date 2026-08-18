@@ -3,11 +3,12 @@ import {
   getGetBeneficiarioQueryKey,
   getListBeneficiariQueryKey,
   getListCittaQueryKey,
-  type Beneficiario,
+  type BeneficiarioDirectory,
   useListBeneficiari,
   useListCitta,
   useListZoneUds,
-  useUpdateBeneficiario,
+  useUpdateBeneficiarioStato,
+  useAuthorizeBeneficiariExport,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Footprints, Plus, Search } from "lucide-react";
@@ -44,7 +45,7 @@ const ALL_ZONE = "__all__";
 
 export default function UdsAnagrafica() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const isGlobal = user?.cittaId == null;
@@ -75,11 +76,12 @@ export default function UdsAnagrafica() {
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
   };
   const { data: beneficiari, isLoading } = useListBeneficiari(listParams);
-  const updateBenef = useUpdateBeneficiario();
+  const updateBenef = useUpdateBeneficiarioStato();
+  const authorizeExport = useAuthorizeBeneficiariExport();
 
-  const toggleStatus = (beneficiario: { id: number; attivo: boolean }) => {
+  const toggleStatus = (beneficiario: { id: number; attivo: boolean; versione: number }) => {
     updateBenef.mutate(
-      { id: beneficiario.id, data: { attivo: !beneficiario.attivo } as never },
+      { id: beneficiario.id, data: { attivo: !beneficiario.attivo, versione: beneficiario.versione } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
@@ -94,7 +96,7 @@ export default function UdsAnagrafica() {
     );
   };
 
-  const canale = (beneficiario: Beneficiario) => {
+  const canale = (beneficiario: BeneficiarioDirectory) => {
     const uds = beneficiario.uds;
     const centro = beneficiario.centroAscoltoId != null;
     if (uds && centro) {
@@ -115,20 +117,20 @@ export default function UdsAnagrafica() {
   const rows = beneficiari ?? [];
   const exportColumns = useMemo(
     () => [
-      { header: t("common.surname"), accessor: (b: Beneficiario) => b.cognome },
-      { header: t("common.name"), accessor: (b: Beneficiario) => b.nome },
+      { header: t("common.surname"), accessor: (b: BeneficiarioDirectory) => b.cognome },
+      { header: t("common.name"), accessor: (b: BeneficiarioDirectory) => b.nome },
       {
         header: t("udsAnagrafica.colSoprannome"),
-        accessor: (b: Beneficiario) => b.soprannome ?? "",
+        accessor: (b: BeneficiarioDirectory) => b.soprannome ?? "",
       },
-      { header: t("udsAnagrafica.colTelefono"), accessor: (b: Beneficiario) => b.telefono ?? "" },
+      { header: t("udsAnagrafica.colTelefono"), accessor: (b: BeneficiarioDirectory) => b.telefono ?? "" },
       {
         header: t("udsAnagrafica.colFasciaEta"),
-        accessor: (b: Beneficiario) =>
+        accessor: (b: BeneficiarioDirectory) =>
           `${fasciaEtaLabel(t, b.fasciaEtaCorrente)} (${fasciaEtaOrigineLabel(t, b.fasciaEtaOrigine)})`,
       },
-      { header: t("udsAnagrafica.colZona"), accessor: (b: Beneficiario) => b.zonaUdsNome ?? "" },
-      { header: t("udsAnagrafica.colCanale"), accessor: (b: Beneficiario) => canale(b).label },
+      { header: t("udsAnagrafica.colZona"), accessor: (b: BeneficiarioDirectory) => b.zonaUdsNome ?? "" },
+      { header: t("udsAnagrafica.colCanale"), accessor: (b: BeneficiarioDirectory) => canale(b).label },
     ],
     [t],
   );
@@ -148,15 +150,16 @@ export default function UdsAnagrafica() {
           <p className="text-muted-foreground">{t("udsAnagrafica.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons
+          {hasPermission("beneficiari.export") && <ExportButtons
             rows={rows}
             columns={exportColumns}
             filename="uds-anagrafica"
             title={t("udsAnagrafica.exportTitle")}
-          />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+            beforeExport={() => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: rows.length, beneficiarioId: null } }).then(() => undefined)}
+          />}
+          {hasPermission("beneficiari.manage") && <Button onClick={() => setIsFormOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> {t("udsAnagrafica.newPerson")}
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -286,6 +289,7 @@ export default function UdsAnagrafica() {
                           <Switch
                             checked={beneficiario.attivo}
                             onCheckedChange={() => toggleStatus(beneficiario)}
+                            disabled={!hasPermission("beneficiari.deactivate") || updateBenef.isPending}
                             aria-label={
                               beneficiario.attivo
                                 ? t("beneficiari.disattiva")

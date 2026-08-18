@@ -23,6 +23,7 @@ type ExportButtonsProps<T> = {
   disabled?: boolean;
   size?: "sm" | "default";
   variant?: "outline" | "default" | "secondary";
+  beforeExport?: (format: "xlsx" | "pdf") => Promise<void>;
 };
 
 export function ExportButtons<T>({
@@ -36,6 +37,7 @@ export function ExportButtons<T>({
   disabled,
   size = "sm",
   variant = "outline",
+  beforeExport,
 }: ExportButtonsProps<T>) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -45,6 +47,7 @@ export function ExportButtons<T>({
   const handlePdfExport = async () => {
     setPdfLoading(true);
     try {
+      await beforeExport?.("pdf");
       const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
       await exportToPdf({
         filename,
@@ -70,7 +73,10 @@ export function ExportButtons<T>({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
-          onClick={() => exportToXlsx(filename, sheetName ?? title, rows, columns)}
+          onClick={() => void (async () => {
+            await beforeExport?.("xlsx");
+            exportToXlsx(filename, sheetName ?? title, rows, columns);
+          })()}
         >
           <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" /> {t("common.exportExcel")}
         </DropdownMenuItem>

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type Beneficiario, type MensaAbilitazioneRiepilogoBeneficiario } from "@workspace/api-client-react";
-import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiarioStato, useAuthorizeBeneficiariExport, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type BeneficiarioDirectory, type MensaAbilitazioneRiepilogoBeneficiario } from "@workspace/api-client-react";
+import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -137,6 +137,9 @@ export default function Beneficiari() {
   const { emporioAbilitato, unitaStradaAbilitata, mensaAbilitato } = useModuloFlags();
   const canViewMensa = mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
   const canManageMensa = canViewMensa && hasPermission("mensa.eligibility.manage");
+  const canManage = hasPermission("beneficiari.manage");
+  const canDeactivate = hasPermission("beneficiari.deactivate");
+  const canExport = hasPermission("beneficiari.export");
   const beneficiarioIds = useMemo(() => (beneficiari ?? []).map((beneficiario) => beneficiario.id), [beneficiari]);
   const mensaSummaryParams = useMemo(() => beneficiarioIds.length > 0 ? { beneficiarioIds: beneficiarioIds.join(",") } : undefined, [beneficiarioIds]);
   const mensaSummary = useGetMensaAbilitazioniRiepilogoBeneficiari(mensaSummaryParams, {
@@ -159,12 +162,13 @@ export default function Beneficiari() {
   const createBeneficiario = useCreateBeneficiario();
   const createMensaAbilitazione = useCreateMensaAbilitazione();
   const deleteBeneficiario = useDeleteBeneficiario();
-  const updateBeneficiario = useUpdateBeneficiario();
+  const updateBeneficiarioStato = useUpdateBeneficiarioStato();
+  const authorizeExport = useAuthorizeBeneficiariExport();
   const bulkBeneficiari = useBulkBeneficiari();
   const [isImportOpen, setIsImportOpen] = useState(false);
 
-  const toggleStatus = (b: { id: number; attivo: boolean }) => {
-    updateBeneficiario.mutate({ id: b.id, data: { attivo: !b.attivo } }, {
+  const toggleStatus = (b: { id: number; attivo: boolean; versione: number }) => {
+    updateBeneficiarioStato.mutate({ id: b.id, data: { attivo: !b.attivo, versione: b.versione } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) });
@@ -230,7 +234,9 @@ export default function Beneficiari() {
       zonaUdsId,
       uds,
       magazzinoEmporioPreferitoId,
-      creditoSolidaleNote,
+      creditoSolidaleAbilitato: _creditoSolidaleAbilitato,
+      creditoSolidaleStato: _creditoSolidaleStato,
+      creditoSolidaleNote: _creditoSolidaleNote,
       abilitaMensa: shouldEnableMensa,
       mensaId,
       mensaDataInizio,
@@ -244,15 +250,6 @@ export default function Beneficiari() {
       return;
     }
     const centroId = centroAscoltoId ? parseInt(centroAscoltoId) : (isCentroLocked && lockedCentroId != null ? lockedCentroId : null);
-    if (rest.creditoSolidaleAbilitato && centroId == null) {
-      form.setError("centroAscoltoId", { type: "manual", message: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto") });
-      toast({
-        title: t("beneficiari.creditoSolidaleSection"),
-        description: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto"),
-        variant: "destructive",
-      });
-      return;
-    }
     if (shouldEnableMensa) {
       if (!formCitta) {
         form.setError("cittaId", { type: "manual", message: "Seleziona l'Area" });
@@ -277,9 +274,6 @@ export default function Beneficiari() {
       sesso: rest.sesso,
       centroAscoltoId: centroId,
       codiceFiscale: codiceFiscale?.trim() ? codiceFiscale.trim().toUpperCase() : null,
-      creditoSolidaleAbilitato: rest.creditoSolidaleAbilitato,
-      creditoSolidaleStato: rest.creditoSolidaleAbilitato ? rest.creditoSolidaleStato : "non_abilitato",
-      creditoSolidaleNote: creditoSolidaleNote?.trim() ? creditoSolidaleNote.trim() : null,
       magazzinoEmporioPreferitoId:
         magazzinoEmporioPreferitoId && magazzinoEmporioPreferitoId !== NO_EMPORIO
           ? parseInt(magazzinoEmporioPreferitoId)
@@ -350,43 +344,39 @@ export default function Beneficiari() {
           <p className="text-muted-foreground">{t("beneficiari.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons
+          {canExport && <ExportButtons
             rows={beneficiari ?? []}
             columns={[
               { header: t("common.code"), accessor: (b) => b.codice },
               { header: t("common.surname"), accessor: (b) => b.cognome },
               { header: t("common.name"), accessor: (b) => b.nome },
-              { header: t("common.email"), accessor: (b) => b.email },
               { header: t("common.phone"), accessor: (b) => b.telefono },
-              { header: t("beneficiari.comune"), accessor: (b) => b.comune },
-              { header: t("beneficiari.zonaMunicipio"), accessor: (b) => b.zonaMunicipio },
               { header: t("beneficiari.centroAscolto"), accessor: (b) => b.centroAscoltoNome },
-              { header: t("beneficiari.creditoSolidaleStato"), accessor: (b) => t(creditoSolidaleLabelKey(b.creditoSolidaleStato)) },
-              { header: t("beneficiari.magazzinoEmporioPreferito"), accessor: (b) => b.magazzinoEmporioPreferitoNome },
               ...(canViewMensa ? [{
                 header: "Mensa",
-                accessor: (b: Beneficiario) => mensaSummary.isLoading
+                accessor: (b: BeneficiarioDirectory) => mensaSummary.isLoading
                   ? "IN CARICAMENTO"
                   : mensaSummary.isError
                     ? "NON DISPONIBILE"
                     : (mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato").toUpperCase(),
               }] : []),
             ]}
+            beforeExport={() => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: beneficiari?.length ?? 0, beneficiarioId: null } }).then(() => undefined)}
             filename="beneficiari"
             title={t("beneficiari.exportTitle")}
             orientation="landscape"
-          />
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+          />}
+          {canManage && <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" /> {t("bulkImport.button")}
-          </Button>
-          <Button onClick={() => {
+          </Button>}
+          {canManage && <Button onClick={() => {
             form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "");
             form.setValue("abilitaMensa", false);
             form.setValue("mensaId", "");
             form.setValue("mensaDataInizio", todayEuropeRome());
             form.setValue("mensaDataFine", "");
             setDupDismissed(false); setDupParams({}); setIsFormOpen(true);
-          }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
+          }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>}
         </div>
       </div>
 
@@ -410,10 +400,7 @@ export default function Beneficiari() {
           { key: "priorita", header: t("beneficiari.colPriorita"), example: "media" },
           { key: "areaProvenienza", header: t("beneficiarioDettaglio.areaProvenienza"), example: "UE" },
           { key: "centro", header: t("beneficiari.centroAscolto"), example: "" },
-          { key: "creditoSolidaleAbilitato", header: t("beneficiari.creditoSolidaleAbilitato"), example: "No" },
-          { key: "creditoSolidaleStato", header: t("beneficiari.creditoSolidaleStato"), example: "non_abilitato" },
           { key: "magazzinoEmporioPreferito", header: t("beneficiari.magazzinoEmporioPreferito"), example: "" },
-          { key: "creditoSolidaleNote", header: t("beneficiari.creditoSolidaleNote"), example: "" },
           ...(isCittaGlobal ? [{ key: "citta", header: t("nav.citta"), example: "" }] : []),
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
@@ -440,11 +427,6 @@ export default function Beneficiari() {
             }
             magazzinoEmporioPreferitoId = emporio.id;
           }
-          const creditoSolidaleAbilitato = parseBoolCell(r.creditoSolidaleAbilitato);
-          const creditoSolidaleStato = r.creditoSolidaleStato?.trim() || (creditoSolidaleAbilitato ? "attivo" : "non_abilitato");
-          if (!STATI_CREDITO_SOLIDALE.includes(creditoSolidaleStato as CreditoSolidaleStato)) {
-            return { error: t("bulkImport.unknownRef", { field: t("beneficiari.creditoSolidaleStato"), value: creditoSolidaleStato }) };
-          }
           let numComponenti: number | undefined;
           if (r.numComponenti) {
             const n = Number(r.numComponenti);
@@ -468,9 +450,6 @@ export default function Beneficiari() {
               areaProvenienza: r.areaProvenienza || undefined,
               centroAscoltoId,
               cittaId,
-              creditoSolidaleAbilitato,
-              creditoSolidaleStato: creditoSolidaleAbilitato ? creditoSolidaleStato : "non_abilitato",
-              creditoSolidaleNote: r.creditoSolidaleNote || undefined,
               magazzinoEmporioPreferitoId,
             },
           };
@@ -548,13 +527,9 @@ export default function Beneficiari() {
               <TableRow>
                 <TableHead>{t("beneficiari.colNominativo")}</TableHead>
                 <TableHead>{t("common.code")}</TableHead>
-                <TableHead>{t("beneficiari.colZonaComune")}</TableHead>
                 {isGlobal && <TableHead>{t("beneficiari.centroAscolto")}</TableHead>}
-                <TableHead className="text-center">{t("beneficiari.colComponenti")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
-                <TableHead className="text-center">{t("beneficiari.creditoSolidaleSection")}</TableHead>
                 {canViewMensa && <TableHead className="text-center">Mensa</TableHead>}
-                <TableHead className="text-center">{t("beneficiari.colDomicilio")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -565,20 +540,16 @@ export default function Beneficiari() {
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
-                    <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
                     {canViewMensa && <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>}
-                    <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={(isGlobal ? 10 : 9) + (canViewMensa ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={(isGlobal ? 6 : 5) + (canViewMensa ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
                 <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
@@ -596,24 +567,12 @@ export default function Beneficiari() {
                     {b.statoAnagrafica === "provvisoria" && <Badge variant="secondary" className="mt-1">Provvisoria</Badge>}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{b.codice}</TableCell>
-                  <TableCell className="text-sm">
-                    {b.comune && <div className="flex items-center gap-1"><MapPin className="h-3 w-3 text-muted-foreground"/> {b.comune} {b.zonaMunicipio ? `(${b.zonaMunicipio})` : ''}</div>}
-                  </TableCell>
                   {isGlobal && (
                     <TableCell className="text-sm text-muted-foreground">
                       {b.centroAscoltoNome ?? <span className="italic">{t("common.none")}</span>}
                     </TableCell>
                   )}
-                  <TableCell className="text-center font-medium">{b.numComponenti}</TableCell>
                   <TableCell className="text-center">{getPriorityBadge(b.priorita)}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant="outline"
-                      className={creditoSolidaleBadgeClasses[(b.creditoSolidaleStato ?? "non_abilitato") as CreditoSolidaleStato] ?? creditoSolidaleBadgeClasses.non_abilitato}
-                    >
-                      {t(creditoSolidaleLabelKey(b.creditoSolidaleStato))}
-                    </Badge>
-                  </TableCell>
                   {canViewMensa && (
                     <TableCell className="text-center">
                       {mensaSummary.isLoading ? (
@@ -626,13 +585,11 @@ export default function Beneficiari() {
                     </TableCell>
                   )}
                   <TableCell className="text-center">
-                    {b.consegnaDomicilio && <Home className="h-4 w-4 text-blue-500 mx-auto" />}
-                  </TableCell>
-                  <TableCell className="text-center">
                     <div className="flex items-center justify-center">
                       <Switch
                         checked={b.attivo}
                         onCheckedChange={() => toggleStatus(b)}
+                        disabled={!canDeactivate || updateBeneficiarioStato.isPending}
                         aria-label={b.attivo ? t("beneficiari.disattiva") : t("beneficiari.attiva")}
                       />
                     </div>
@@ -646,9 +603,9 @@ export default function Beneficiari() {
                             {t("beneficiari.profileDetail")}
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}</DropdownMenuItem>
+                        {canManage && <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>}
+                        {canExport && <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>}
+                        {canDeactivate && <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> Disattiva</DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -849,77 +806,6 @@ export default function Beneficiari() {
                   />
                 )}
 
-                <div className="rounded-md border p-3 space-y-3">
-                  <div>
-                    <h4 className="text-sm font-medium">{t("beneficiari.creditoSolidaleSection")}</h4>
-                    <p className="text-xs text-muted-foreground">{t("beneficiari.creditoSolidaleHelp")}</p>
-                    {!emporioAbilitato && (
-                      <p className="text-xs text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>
-                    )}
-                  </div>
-                  <FormField control={form.control} name="creditoSolidaleAbilitato" render={({ field }) => (
-                    <FormItem className="flex items-center justify-between">
-                      <FormLabel className="!mt-0">{t("beneficiari.creditoSolidaleAbilitato")}</FormLabel>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          disabled={!emporioAbilitato}
-                          onCheckedChange={(checked) => {
-                            field.onChange(checked);
-                            form.setValue("creditoSolidaleStato", checked ? "attivo" : "non_abilitato");
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="creditoSolidaleStato" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("beneficiari.creditoSolidaleStato")}</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!emporioAbilitato || !creditoSolidaleAbilitato}
-                      >
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="non_abilitato">{t("beneficiari.creditoSolidaleStatoNonAbilitato")}</SelectItem>
-                          <SelectItem value="attivo">{t("beneficiari.creditoSolidaleStatoAttivo")}</SelectItem>
-                          <SelectItem value="sospeso">{t("beneficiari.creditoSolidaleStatoSospeso")}</SelectItem>
-                          <SelectItem value="revocato">{t("beneficiari.creditoSolidaleStatoRevocato")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="magazzinoEmporioPreferitoId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("beneficiari.magazzinoEmporioPreferito")}</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value || NO_EMPORIO}
-                        disabled={!emporioAbilitato || !creditoSolidaleAbilitato}
-                      >
-                        <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value={NO_EMPORIO}>{t("common.none")}</SelectItem>
-                          {emporiDisponibili.map((m) => (
-                            <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">{t("beneficiari.creditoSolidaleDataAbilitazione")}</label>
-                    <Input disabled placeholder={t("beneficiari.creditoSolidaleDataAutomatica")} />
-                  </div>
-                  <FormField control={form.control} name="creditoSolidaleNote" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("beneficiari.creditoSolidaleNote")}</FormLabel>
-                      <FormControl><Textarea rows={2} disabled={!emporioAbilitato} {...field} /></FormControl>
-                    </FormItem>
-                  )} />
-                </div>
-
                 <FormField control={form.control} name="consegnaDomicilio" render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">
                     <FormLabel className="mb-0">{t("beneficiarioDettaglio.consegnaDomicilio")}</FormLabel>
@@ -981,7 +867,10 @@ export default function Beneficiari() {
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>{t("beneficiari.deleteTitle")}</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disattiva Beneficiario</AlertDialogTitle>
+            <AlertDialogDescription>Il Beneficiario non potrà generare nuove attività operative. Lo storico resta preservato e potrà essere riattivato.</AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
@@ -993,7 +882,7 @@ export default function Beneficiari() {
                   }
                 });
               }
-            }} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
+            }} className="bg-destructive text-destructive-foreground">Disattiva</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,4 +1,4 @@
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListInterventi, getListInterventiQueryKey, type BeneficiarioDettaglio, type Intervento } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, useListInterventi, getListInterventiQueryKey, useAuthorizeBeneficiariExport, type BeneficiarioDettaglio, type Intervento } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -120,6 +120,7 @@ async function doExport(b: BeneficiarioDettaglio, interventi: Intervento[], kind
 export function SchedaExportButtons({ b, size = "sm" }: { b: BeneficiarioDettaglio; size?: "sm" | "default" }) {
   const { t } = useTranslation();
   const [exporting, setExporting] = useState(false);
+  const authorizeExport = useAuthorizeBeneficiariExport();
   const { data: interventi, isLoading } = useListInterventi(
     { beneficiarioId: b.id },
     { query: { queryKey: getListInterventiQueryKey({ beneficiarioId: b.id }) } },
@@ -128,6 +129,7 @@ export function SchedaExportButtons({ b, size = "sm" }: { b: BeneficiarioDettagl
   const handleExport = async (kind: "pdf" | "xlsx") => {
     setExporting(true);
     try {
+      await authorizeExport.mutateAsync({ data: { tipo: "dossier", beneficiarioId: b.id, numeroRecord: 1 } });
       await doExport(b, list, kind, t);
     } finally {
       setExporting(false);

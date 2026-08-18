@@ -14,6 +14,15 @@ function cellValue<T>(col: ExportColumn<T>, row: T): string | number {
   return v;
 }
 
+/** Neutralizza formule in valori testuali controllati dall'utente senza alterare i numeri reali. */
+export function sanitizeSpreadsheetCell(value: unknown): unknown {
+  return typeof value === "string" && /^[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
+function worksheetFromRows(rows: unknown[][]): XLSX.WorkSheet {
+  return XLSX.utils.aoa_to_sheet(rows.map((row) => row.map(sanitizeSpreadsheetCell)));
+}
+
 function timestamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -117,7 +126,7 @@ export function exportToXlsx<T>(
 ): void {
   const header = columns.map((c) => c.header);
   const body = rows.map((r) => columns.map((c) => cellValue(c, r)));
-  const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+  const ws = worksheetFromRows([header, ...body]);
 
   ws["!cols"] = columns.map((c) => {
     const maxLen = Math.max(
@@ -227,12 +236,12 @@ export function buildReportingWorkbook(
     [labels.metadata.definitions],
     ...report.definitions.map((definition) => [labels.text(definition)]),
   ];
-  const summarySheet = XLSX.utils.aoa_to_sheet(summary);
+  const summarySheet = worksheetFromRows(summary);
   summarySheet["!cols"] = [{ wch: 42 }, { wch: 24 }, { wch: 18 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(workbook, summarySheet, "00_Riepilogo");
 
   for (const table of report.tables) {
-    const sheet = XLSX.utils.aoa_to_sheet([
+    const sheet = worksheetFromRows([
       table.columns.map(labels.column),
       ...table.rows.map((row) => table.columns.map((column) => {
         const value = row[column];
@@ -267,13 +276,13 @@ export function buildReportingWorkbook(
   ];
   XLSX.utils.book_append_sheet(
     workbook,
-    XLSX.utils.aoa_to_sheet(qualityRows),
+    worksheetFromRows(qualityRows),
     report.section === "fse-plus" ? "08_Qualita_Dati" : "Qualita_Dati",
   );
 
   if (report.section === "fse-plus") {
     if (fseControl) {
-      const controlSheet = XLSX.utils.aoa_to_sheet([
+      const controlSheet = worksheetFromRows([
         fseControl.columns.map(labels.column),
         ...fseControl.rows.map((row) => fseControl.columns.map((column) => {
           const value = row[column];
@@ -296,7 +305,7 @@ export function buildReportingWorkbook(
     ];
     for (const name of required) {
       if (existing.has(name)) continue;
-      const sheet = XLSX.utils.aoa_to_sheet([
+      const sheet = worksheetFromRows([
         [labels.column("stato"), labels.unavailable],
         [labels.column("nota"), labels.text("Il modello operativo non rende disponibile questo dettaglio senza inferenze.")],
       ]);
@@ -439,7 +448,7 @@ export function exportSchedaXlsx(opts: {
     [campoHeader, valoreHeader],
     ...anagrafica.map((r) => [r.label, toCell(r.value)]),
   ];
-  const anagWs = XLSX.utils.aoa_to_sheet(anagAoa);
+  const anagWs = worksheetFromRows(anagAoa);
   anagWs["!cols"] = [{ wch: 28 }, { wch: 50 }];
   XLSX.utils.book_append_sheet(wb, anagWs, anagraficaSheetName.slice(0, 31));
 
@@ -449,7 +458,7 @@ export function exportSchedaXlsx(opts: {
       sec.headers,
       ...sec.rows.map((row) => row.map(toCell)),
     ];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const ws = worksheetFromRows(aoa);
     ws["!cols"] = sec.headers.map((h, i) => {
       const maxLen = Math.max(h.length, ...sec.rows.map((r) => toCell(r[i]).length));
       return { wch: Math.min(Math.max(maxLen + 2, 10), 50) };

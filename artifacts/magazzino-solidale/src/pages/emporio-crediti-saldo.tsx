@@ -6,14 +6,14 @@ import {
   useCreateCreditoSolidaleRettifica,
   useCreateCreditoSolidaleRicaricaManuale,
   useExecuteCreditoSolidaleRicaricaMensile,
-  useListBeneficiari,
+  useListCreditoSolidaleBeneficiari,
   useListCentriAscolto,
   useListCitta,
   useListCreditoSolidaleBeneficiarioMovimenti,
   useListCreditoSolidaleMovimenti,
   useListMagazzini,
   useStornaCreditoSolidaleMovimento,
-  type Beneficiario,
+  type CreditoSolidaleBeneficiario,
   type CreditoSolidaleMovimento,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -40,7 +40,7 @@ type StatoCreditoSolidale = (typeof STATI_CREDITO_SOLIDALE)[number];
 
 type ActionState = {
   tipo: "ricarica" | "rettifica";
-  beneficiario: Beneficiario;
+  beneficiario: CreditoSolidaleBeneficiario;
 } | null;
 
 const statusClasses: Record<StatoCreditoSolidale, string> = {
@@ -83,7 +83,7 @@ function statoKey(stato: string | null | undefined): StatoCreditoSolidale {
     : "non_abilitato";
 }
 
-function matchesTesseraCode(b: Beneficiario, normalized: string): boolean {
+function matchesTesseraCode(b: CreditoSolidaleBeneficiario, normalized: string): boolean {
   return b.codice.toLowerCase() === normalized || (b.codiceFiscale?.toLowerCase() ?? "") === normalized;
 }
 
@@ -120,7 +120,7 @@ export default function EmporioCreditiSaldo() {
     centroAscoltoId: optionalId(centroFilter),
     cittaId: optionalId(cittaFilter),
   };
-  const { data: beneficiari, isLoading } = useListBeneficiari(beneficiariParams);
+  const { data: beneficiari, isLoading } = useListCreditoSolidaleBeneficiari(beneficiariParams);
   const { data: centri } = useListCentriAscolto();
   const { data: citta } = useListCitta();
   const { data: magazzini } = useListMagazzini();
@@ -215,7 +215,7 @@ export default function EmporioCreditiSaldo() {
     });
   }, [emporioAbilitato]);
 
-  const openAction = (tipo: "ricarica" | "rettifica", beneficiario: Beneficiario) => {
+  const openAction = (tipo: "ricarica" | "rettifica", beneficiario: CreditoSolidaleBeneficiario) => {
     setAction({ tipo, beneficiario });
     setVariazione("");
     setMotivo("");
