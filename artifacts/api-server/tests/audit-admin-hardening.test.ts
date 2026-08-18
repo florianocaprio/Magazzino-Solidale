@@ -8,6 +8,7 @@ import {
   cittaTable,
   db,
   magazziniTable,
+  menseTable,
   politicheCreditoSolidaleTable,
   pool,
   ruoliTable,
@@ -33,6 +34,7 @@ import emailRouter from "../src/routes/impostazioni-email";
 type Actor = {
   id: number;
   cittaId: number | null;
+  centroAscoltoId?: number | null;
   isAdmin: boolean;
   isSuperAdmin?: boolean;
 };
@@ -42,6 +44,7 @@ const ids = {
   centri: [] as number[],
   zone: [] as number[],
   magazzini: [] as number[],
+  mense: [] as number[],
   politiche: [] as number[],
   ruoli: [] as number[],
   utenti: [] as number[],
@@ -81,7 +84,7 @@ function appAs(actor: Actor, ...routers: Router[]): Express {
       matricola: null,
       ruoloId: actor.isAdmin ? adminRoleId : operatorRoleId,
       ruoloNome: actor.isAdmin ? "Audit Admin" : "Audit Operator",
-      centroAscoltoId: null,
+      centroAscoltoId: actor.centroAscoltoId ?? null,
       centroAscoltoNome: null,
       cittaId: actor.cittaId,
       cittaNome: null,
@@ -116,6 +119,7 @@ async function createUser(
       matricola: `AUD-${token}`,
       ruoloId: roleId,
       cittaId: actor.cittaId,
+      centroAscoltoId: actor.centroAscoltoId ?? null,
       isSuperAdmin: actor.isSuperAdmin ?? false,
     })
     .returning({ id: utentiTable.id });
@@ -202,6 +206,10 @@ afterEach(async () => {
     await db
       .delete(beneficiariTable)
       .where(inArray(beneficiariTable.id, ids.beneficiari.splice(0)));
+  if (ids.mense.length)
+    await db
+      .delete(menseTable)
+      .where(inArray(menseTable.id, ids.mense.splice(0)));
   if (ids.utenti.length)
     await db
       .delete(utentiTable)
@@ -431,6 +439,200 @@ describe("audit hardening Amministrazione/Core", () => {
     expect((await request(app).delete(`/magazzini/${shared.id}`)).status).toBe(
       403,
     );
+  });
+
+  it("ADM-06 valida Area e Centro per ogni tipo di Magazzino e preserva la sincronizzazione Mensa", async () => {
+    const appA = appAs(adminA, magazziniRouter);
+    const globalApp = appAs(globalAdmin, magazziniRouter);
+    const rejectedCodes: string[] = [];
+
+    const crossAreaCode = `MC-${suffix()}`;
+    rejectedCodes.push(crossAreaCode);
+    expect(
+      (
+        await request(appA).post("/magazzini").send({
+          codice: crossAreaCode,
+          nome: "Magazzino incoerente Admin A",
+          cittaId: areaA,
+          centroAscoltoId: centroB,
+          tipoMagazzino: "logistico",
+        })
+      ).status,
+    ).toBe(400);
+
+    const globalMismatchCode = `MG-${suffix()}`;
+    rejectedCodes.push(globalMismatchCode);
+    expect(
+      (
+        await request(globalApp).post("/magazzini").send({
+          codice: globalMismatchCode,
+          nome: "Magazzino incoerente globale",
+          cittaId: areaA,
+          centroAscoltoId: centroB,
+          tipoMagazzino: "logistico",
+        })
+      ).status,
+    ).toBe(400);
+
+    const centerBoundApp = appAs({ ...adminA, centroAscoltoId: centroA }, magazziniRouter);
+    const centerBound = await request(centerBoundApp).post("/magazzini").send({
+      nome: "Centro vincolato",
+      cittaId: areaA,
+      centroAscoltoId: centroB,
+    });
+    expect(centerBound.status).toBe(201);
+    expect(centerBound.body.centroAscoltoId).toBe(centroA);
+    ids.magazzini.push(centerBound.body.id);
+
+    await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centroA));
+    const inactiveCenterCode = `MI-${suffix()}`;
+    rejectedCodes.push(inactiveCenterCode);
+    expect(
+      (
+        await request(globalApp).post("/magazzini").send({
+          codice: inactiveCenterCode,
+          nome: "Centro inattivo",
+          cittaId: areaA,
+          centroAscoltoId: centroA,
+        })
+      ).status,
+    ).toBe(400);
+    await db.update(centriAscoltoTable).set({ attivo: true }).where(eq(centriAscoltoTable.id, centroA));
+
+    await db.update(cittaTable).set({ attivo: false }).where(eq(cittaTable.id, areaA));
+    const inactiveAreaCode = `MA-${suffix()}`;
+    rejectedCodes.push(inactiveAreaCode);
+    expect(
+      (
+        await request(globalApp).post("/magazzini").send({
+          codice: inactiveAreaCode,
+          nome: "Area inattiva",
+          cittaId: areaA,
+          centroAscoltoId: centroA,
+        })
+      ).status,
+    ).toBe(400);
+    await db.update(cittaTable).set({ attivo: true }).where(eq(cittaTable.id, areaA));
+
+    const active = await request(globalApp).post("/magazzini").send({
+      nome: "Magazzino valido",
+      cittaId: areaA,
+      centroAscoltoId: centroA,
+      tipoMagazzino: "logistico",
+    });
+    expect(active.status).toBe(201);
+    ids.magazzini.push(active.body.id);
+
+    await db.update(cittaTable).set({ attivo: false }).where(eq(cittaTable.id, areaB));
+    expect(
+      (
+        await request(globalApp)
+          .patch(`/magazzini/${active.body.id}`)
+          .send({ cittaId: areaB, centroAscoltoId: null })
+      ).status,
+    ).toBe(400);
+    await db.update(cittaTable).set({ attivo: true }).where(eq(cittaTable.id, areaB));
+    await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centroB));
+    expect(
+      (
+        await request(globalApp)
+          .patch(`/magazzini/${active.body.id}`)
+          .send({ cittaId: areaB, centroAscoltoId: centroB })
+      ).status,
+    ).toBe(400);
+    await db.update(centriAscoltoTable).set({ attivo: true }).where(eq(centriAscoltoTable.id, centroB));
+
+    const mensa = await request(globalApp).post("/magazzini").send({
+      nome: "Mensa valida",
+      cittaId: areaA,
+      centroAscoltoId: centroA,
+      tipoMagazzino: "mensa",
+    });
+    expect(mensa.status).toBe(201);
+    ids.magazzini.push(mensa.body.id);
+    const [linkedMensa] = await db.select({ id: menseTable.id }).from(menseTable).where(eq(menseTable.magazzinoId, mensa.body.id));
+    expect(linkedMensa).toBeDefined();
+    ids.mense.push(linkedMensa.id);
+
+    const rejected = await db.select({ id: magazziniTable.id }).from(magazziniTable).where(inArray(magazziniTable.codice, rejectedCodes));
+    expect(rejected).toHaveLength(0);
+  });
+
+  it("impedisce nuove relazioni operative con Aree e Centri disattivati", async () => {
+    const globalApp = appAs(globalAdmin, utentiRouter, centriRouter, politicheRouter);
+    await db.update(cittaTable).set({ attivo: false }).where(eq(cittaTable.id, areaA));
+
+    const userToken = suffix();
+    expect(
+      (
+        await request(globalApp).post("/utenti").send({
+          username: `inactive_${userToken}`,
+          email: `inactive_${userToken}@example.org`,
+          password: "Password1",
+          nome: "Area",
+          cognome: "Inattiva",
+          ruoloId: operatorRoleId,
+          cittaId: areaA,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(globalApp).post("/centri-ascolto").send({
+          nome: `Centro area inattiva ${suffix()}`,
+          cittaId: areaA,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(globalApp).post("/politiche-credito-solidale").send({
+          nome: `Policy area inattiva ${suffix()}`,
+          cittaId: areaA,
+        })
+      ).status,
+    ).toBe(400);
+
+    await db.update(cittaTable).set({ attivo: false }).where(eq(cittaTable.id, areaB));
+    expect(
+      (
+        await request(globalApp)
+          .patch(`/centri-ascolto/${centroA}`)
+          .send({ cittaId: areaB })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(globalApp)
+          .patch(`/utenti/${operator.id}`)
+          .send({ cittaId: areaB })
+      ).status,
+    ).toBe(400);
+
+    await db.update(cittaTable).set({ attivo: true }).where(eq(cittaTable.id, areaA));
+    await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centroA));
+    expect(
+      (
+        await request(globalApp).post("/politiche-credito-solidale").send({
+          nome: `Policy centro inattivo ${suffix()}`,
+          cittaId: areaA,
+          centroAscoltoId: centroA,
+        })
+      ).status,
+    ).toBe(400);
+
+    const [existingPolicy] = await db
+      .insert(politicheCreditoSolidaleTable)
+      .values({ nome: `Policy storica ${suffix()}`, cittaId: areaA, centroAscoltoId: centroA })
+      .returning({ id: politicheCreditoSolidaleTable.id });
+    ids.politiche.push(existingPolicy.id);
+    expect(
+      (
+        await request(globalApp)
+          .patch(`/politiche-credito-solidale/${existingPolicy.id}`)
+          .send({ note: "Tentativo con Centro inattivo" })
+      ).status,
+    ).toBe(400);
   });
 
   it("ADM-05 impedisce all'Admin A di mutare politiche globali o di Area B", async () => {

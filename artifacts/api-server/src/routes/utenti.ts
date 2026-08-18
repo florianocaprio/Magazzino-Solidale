@@ -211,13 +211,16 @@ async function validateAssignableRole(req: Request, ruoloId: number | null): Pro
   return null;
 }
 
-async function cittaExists(cittaId: number | null): Promise<boolean> {
+async function areaIsAvailable(cittaId: number | null): Promise<boolean> {
   if (cittaId == null) return true;
-  const [row] = await db.select({ id: cittaTable.id }).from(cittaTable).where(eq(cittaTable.id, cittaId));
-  return Boolean(row);
+  const [row] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, cittaId));
+  return Boolean(row?.attivo);
 }
 
 async function validateUserTerritorialAssignment(params: { cittaId: number | null; centroAscoltoId: number | null; zonaUdsId: number | null }): Promise<string | null> {
+  if (!(await areaIsAvailable(params.cittaId))) {
+    return "L'Area selezionata non è disponibile";
+  }
   if (params.centroAscoltoId != null) {
     const [centro] = await db
       .select({
@@ -338,8 +341,8 @@ router.post("/utenti", async (req, res): Promise<void> => {
   const finalCittaId = bootstrap || finalIsSuperAdmin ? null : cittaCaller != null ? cittaCaller : (cittaId ?? null);
   const zonaCaller = callerZonaUdsId(req);
   const finalZonaUdsId = bootstrap || finalIsSuperAdmin ? null : zonaCaller != null ? zonaCaller : finalCittaId == null ? null : (zonaUdsId ?? null);
-  if (!(await cittaExists(finalCittaId))) {
-    res.status(400).json({ error: "L'area geografica selezionata non esiste" });
+  if (!(await areaIsAvailable(finalCittaId))) {
+    res.status(400).json({ error: "L'Area selezionata non è disponibile" });
     return;
   }
   const assignmentError = await validateUserTerritorialAssignment({
@@ -438,8 +441,8 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     return;
   }
   const body = parsed.data;
-  if (body.cittaId !== undefined && !(await cittaExists(body.cittaId))) {
-    res.status(400).json({ error: "L'area geografica selezionata non esiste" });
+  if (body.cittaId !== undefined && !(await areaIsAvailable(body.cittaId))) {
+    res.status(400).json({ error: "L'Area selezionata non è disponibile" });
     return;
   }
 

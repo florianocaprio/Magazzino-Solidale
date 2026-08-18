@@ -196,7 +196,7 @@ describe("BUG-DB-01 - DB vergine e autenticazione", () => {
       cittaId: 2_147_483_000,
     });
     expect(invalidCentre.status).toBe(400);
-    expect(invalidCentre.body.error).toBe("L'area selezionata non esiste");
+    expect(invalidCentre.body.error).toBe("L'Area selezionata non esiste");
   });
 });
 

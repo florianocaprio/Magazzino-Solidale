@@ -41,9 +41,11 @@ function fmt(r: typeof centriAscoltoTable.$inferSelect, beneficiariCount = 0) {
   };
 }
 
-async function cittaExists(cittaId: number): Promise<boolean> {
-  const [row] = await db.select({ id: cittaTable.id }).from(cittaTable).where(eq(cittaTable.id, cittaId));
-  return Boolean(row);
+async function validateAreaAssignment(cittaId: number): Promise<string | null> {
+  const [row] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, cittaId));
+  if (!row) return "L'Area selezionata non esiste";
+  if (!row.attivo) return "L'Area selezionata non è attiva";
+  return null;
 }
 
 router.get("/centri-ascolto", async (req, res) => {
@@ -70,9 +72,12 @@ router.post("/centri-ascolto", requireAdmin, async (req, res) => {
     return;
   }
   if (cid != null) values.cittaId = cid;
-  if (values.cittaId != null && !(await cittaExists(values.cittaId))) {
-    res.status(400).json({ error: "L'area selezionata non esiste" });
-    return;
+  if (values.cittaId != null) {
+    const areaError = await validateAreaAssignment(values.cittaId);
+    if (areaError) {
+      res.status(400).json({ error: areaError });
+      return;
+    }
   }
   const [row] = await db.insert(centriAscoltoTable).values(values).returning();
   res.status(201).json(fmt(row));
@@ -116,9 +121,12 @@ router.patch("/centri-ascolto/:id", requireAdmin, async (req, res) => {
     return;
   }
   if (cid != null) delete updates.cittaId;
-  if (updates.cittaId != null && !(await cittaExists(updates.cittaId))) {
-    res.status(400).json({ error: "L'area selezionata non esiste" });
-    return;
+  if (updates.cittaId != null) {
+    const areaError = await validateAreaAssignment(updates.cittaId);
+    if (areaError) {
+      res.status(400).json({ error: areaError });
+      return;
+    }
   }
   const [row] = await db.update(centriAscoltoTable).set(updates).where(eq(centriAscoltoTable.id, id)).returning();
   if (!row) {

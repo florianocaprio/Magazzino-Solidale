@@ -66,30 +66,34 @@ async function centroNomeOf(id: number | null): Promise<string | null> {
   return c?.nome ?? null;
 }
 
-async function validateMensaScope(cittaId: unknown, centroAscoltoId: unknown): Promise<string | null> {
-  if (!Number.isInteger(cittaId) || Number(cittaId) <= 0) {
+async function validateMagazzinoAssignment(
+  cittaId: number | null,
+  centroAscoltoId: number | null,
+  requireArea: boolean,
+): Promise<string | null> {
+  if (requireArea && cittaId == null) {
     return "Seleziona un'Area valida per la Mensa.";
   }
-  const [citta] = await db
-    .select({ id: cittaTable.id, attivo: cittaTable.attivo })
-    .from(cittaTable)
-    .where(eq(cittaTable.id, Number(cittaId)));
-  if (!citta || !citta.attivo) return "L'Area selezionata non è disponibile.";
+  if (cittaId != null) {
+    const [area] = await db
+      .select({ id: cittaTable.id, attivo: cittaTable.attivo })
+      .from(cittaTable)
+      .where(eq(cittaTable.id, cittaId));
+    if (!area || !area.attivo) return "L'Area selezionata non è disponibile.";
+  }
 
   if (centroAscoltoId == null) return null;
-  if (!Number.isInteger(centroAscoltoId) || Number(centroAscoltoId) <= 0) {
-    return "Centro di Ascolto non valido.";
-  }
   const [centro] = await db
     .select({
       cittaId: centriAscoltoTable.cittaId,
       attivo: centriAscoltoTable.attivo,
     })
     .from(centriAscoltoTable)
-    .where(eq(centriAscoltoTable.id, Number(centroAscoltoId)));
-  if (!centro || !centro.attivo) return "Il Centro di Ascolto selezionato non è attivo.";
+    .where(eq(centriAscoltoTable.id, centroAscoltoId));
+  if (!centro) return "Il Centro di Ascolto selezionato non esiste.";
+  if (!centro.attivo) return "Il Centro di Ascolto selezionato non è attivo.";
   if (centro.cittaId !== cittaId) {
-    return "Il Centro di Ascolto deve appartenere alla stessa Area della Mensa.";
+    return "Il Centro di Ascolto deve appartenere alla stessa Area del Magazzino.";
   }
   return null;
 }
@@ -113,6 +117,10 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
   const body = parsed.data;
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
+  if (cid != null && body.cittaId != null && body.cittaId !== cid) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
+    return;
+  }
   const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
   const cittaId = cid != null ? cid : (body.cittaId ?? null);
   const tipoMagazzino = parseTipoMagazzino(body.tipoMagazzino, "logistico");
@@ -139,12 +147,10 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
     stato: body.stato ?? "attivo",
     note: body.note,
   };
-  if (tipoMagazzino === "mensa") {
-    const scopeError = await validateMensaScope(cittaId, centroAscoltoId);
-    if (scopeError) {
-      res.status(400).json({ error: scopeError });
-      return;
-    }
+  const assignmentError = await validateMagazzinoAssignment(cittaId, centroAscoltoId, tipoMagazzino === "mensa");
+  if (assignmentError) {
+    res.status(400).json({ error: assignmentError });
+    return;
   }
 
   // Caller-provided codice: a duplicate is a clear client error, not a 500.
@@ -242,6 +248,10 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
     return;
   }
   const updates = { ...parsed.data };
+  if (cid != null && updates.cittaId !== undefined && updates.cittaId !== cid) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
+    return;
+  }
   if ("tipoMagazzino" in updates) {
     const tipoMagazzino = parseTipoMagazzino(updates.tipoMagazzino);
     if (!tipoMagazzino) {
@@ -267,10 +277,11 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
   const targetTipo = (updates.tipoMagazzino ?? existing.tipoMagazzino) as TipoMagazzino;
   const targetCittaId = updates.cittaId === undefined ? existing.cittaId : updates.cittaId;
   const targetCentroId = updates.centroAscoltoId === undefined ? existing.centroAscoltoId : updates.centroAscoltoId;
-  if (targetTipo === "mensa") {
-    const scopeError = await validateMensaScope(targetCittaId, targetCentroId);
-    if (scopeError) {
-      res.status(400).json({ error: scopeError });
+  const assignmentChanged = parsed.data.cittaId !== undefined || parsed.data.centroAscoltoId !== undefined || parsed.data.tipoMagazzino !== undefined;
+  if (assignmentChanged) {
+    const assignmentError = await validateMagazzinoAssignment(targetCittaId, targetCentroId, targetTipo === "mensa");
+    if (assignmentError) {
+      res.status(400).json({ error: assignmentError });
       return;
     }
   }

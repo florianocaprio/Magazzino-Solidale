@@ -168,9 +168,9 @@ function validateMaxMin(values: Partial<PolicyInsert>, existing?: PolicySelect):
 
 async function validateScope(values: Partial<PolicyInsert>, req: Request): Promise<{ status: number; error: string } | null> {
   if (values.cittaId != null) {
-    const [citta] = await db.select({ id: cittaTable.id }).from(cittaTable).where(eq(cittaTable.id, values.cittaId));
-    if (!citta) return { status: 404, error: "Città non trovata." };
-    if (!canMutateScopedResource(citta.id, callerCittaId(req))) {
+    const [area] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, values.cittaId));
+    if (!area || !area.attivo) return { status: 400, error: "L'Area selezionata non è disponibile." };
+    if (!canMutateScopedResource(area.id, callerCittaId(req))) {
       return { status: 403, error: "Area non accessibile per il tuo profilo" };
     }
   }
@@ -180,10 +180,12 @@ async function validateScope(values: Partial<PolicyInsert>, req: Request): Promi
       .select({
         id: centriAscoltoTable.id,
         cittaId: centriAscoltoTable.cittaId,
+        attivo: centriAscoltoTable.attivo,
       })
       .from(centriAscoltoTable)
       .where(eq(centriAscoltoTable.id, values.centroAscoltoId));
-    if (!centro) return { status: 404, error: "Centro di Ascolto non trovato." };
+    if (!centro) return { status: 400, error: "Il Centro di Ascolto selezionato non esiste." };
+    if (!centro.attivo) return { status: 400, error: "Il Centro di Ascolto selezionato non è attivo." };
     if (!canMutateScopedResource(centro.id, callerCentroId(req)) || !canMutateScopedResource(centro.cittaId, callerCittaId(req))) {
       return {
         status: 403,
