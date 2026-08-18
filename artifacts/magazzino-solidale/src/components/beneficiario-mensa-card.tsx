@@ -130,15 +130,17 @@ export function BeneficiarioMensaSection({
   beneficiario: BeneficiarioMensa;
   compact?: boolean;
 }) {
-  const { hasPermission } = useAuth();
+  const { hasArea, hasPermission } = useAuth();
   const { mensaAbilitato } = useModuloFlags();
 
-  if (!mensaAbilitato || !hasPermission("mensa.view")) return null;
+  const canViewMensa =
+    mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
+  if (!canViewMensa) return null;
 
   return (
     <BeneficiarioMensaCard
       beneficiario={beneficiario}
-      canManage={hasPermission("mensa.eligibility.manage")}
+      canManage={canViewMensa && hasPermission("mensa.eligibility.manage")}
       compact={compact}
     />
   );

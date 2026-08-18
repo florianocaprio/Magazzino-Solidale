@@ -5,6 +5,7 @@ import { todayEuropeRome } from "@/lib/europe-rome";
 
 const mocks = vi.hoisted(() => ({
   moduloAttivo: true,
+  areas: new Set<string>(),
   permissions: new Set<string>(),
   history: [] as Array<Record<string, unknown>>,
   historyLoading: false,
@@ -43,6 +44,7 @@ vi.mock("@workspace/api-client-react", () => ({
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
+    hasArea: (area: string) => mocks.areas.has(area),
     hasPermission: (permission: string) => mocks.permissions.has(permission),
   }),
 }));
@@ -138,6 +140,7 @@ describe("Mensa nella scheda Beneficiario", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     mocks.moduloAttivo = true;
+    mocks.areas = new Set(["mensa"]);
     mocks.permissions = new Set(["mensa.view"]);
     mocks.history = [];
     mocks.historyLoading = false;
@@ -178,6 +181,28 @@ describe("Mensa nella scheda Beneficiario", () => {
 
   it("non monta la card senza mensa.view", async () => {
     mocks.permissions.clear();
+    await renderSection();
+
+    expect(
+      document.querySelector('[data-testid="beneficiario-mensa-card"]'),
+    ).toBeNull();
+    expect(mocks.historyHook).not.toHaveBeenCalled();
+  });
+
+  it("non monta la card e non avvia query senza area Mensa", async () => {
+    mocks.areas.clear();
+    mocks.permissions = new Set(["mensa.view", "mensa.eligibility.manage"]);
+    await renderSection();
+
+    expect(
+      document.querySelector('[data-testid="beneficiario-mensa-card"]'),
+    ).toBeNull();
+    expect(mocks.historyHook).not.toHaveBeenCalled();
+    expect(mocks.menseHook).not.toHaveBeenCalled();
+  });
+
+  it("non espone gestione con manage senza mensa.view", async () => {
+    mocks.permissions = new Set(["mensa.eligibility.manage"]);
     await renderSection();
 
     expect(

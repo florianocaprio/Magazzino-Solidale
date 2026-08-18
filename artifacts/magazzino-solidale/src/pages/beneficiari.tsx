@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useListMensaAbilitazioni, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, type Beneficiario, type MensaAbilitazione } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type Beneficiario, type MensaAbilitazioneRiepilogoBeneficiario } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -31,7 +31,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
-import { getMensaEligibilityDisplay, MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
+import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
 import { createBeneficiarioWithOptionalMensa } from "@/lib/beneficiario-mensa-workflow";
 
 const makeFormSchema = (t: (k: string) => string) => z.object({
@@ -105,7 +105,7 @@ const apiErrorMessage = (err: unknown, fallback: string): string => {
 
 export default function Beneficiari() {
   const { t } = useTranslation();
-  const { user, hasPermission } = useAuth();
+  const { user, hasArea, hasPermission } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
@@ -135,20 +135,19 @@ export default function Beneficiari() {
   );
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
   const { emporioAbilitato, unitaStradaAbilitata, mensaAbilitato } = useModuloFlags();
-  const canViewMensa = mensaAbilitato && hasPermission("mensa.view");
-  const canManageMensa = mensaAbilitato && hasPermission("mensa.eligibility.manage");
-  const mensaHistory = useListMensaAbilitazioni(undefined, {
-    query: { queryKey: getListMensaAbilitazioniQueryKey(), enabled: canViewMensa },
+  const canViewMensa = mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
+  const canManageMensa = canViewMensa && hasPermission("mensa.eligibility.manage");
+  const beneficiarioIds = useMemo(() => (beneficiari ?? []).map((beneficiario) => beneficiario.id), [beneficiari]);
+  const mensaSummaryParams = useMemo(() => beneficiarioIds.length > 0 ? { beneficiarioIds: beneficiarioIds.join(",") } : undefined, [beneficiarioIds]);
+  const mensaSummary = useGetMensaAbilitazioniRiepilogoBeneficiari(mensaSummaryParams, {
+    query: {
+      queryKey: getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey(mensaSummaryParams),
+      enabled: canViewMensa && beneficiarioIds.length > 0,
+    },
   });
-  const mensaHistoryByBeneficiario = useMemo(() => {
-    const grouped = new Map<number, MensaAbilitazione[]>();
-    for (const item of mensaHistory.data ?? []) {
-      const records = grouped.get(item.beneficiarioId) ?? [];
-      records.push(item);
-      grouped.set(item.beneficiarioId, records);
-    }
-    return grouped;
-  }, [mensaHistory.data]);
+  const mensaSummaryByBeneficiario = useMemo(() => new Map<number, MensaAbilitazioneRiepilogoBeneficiario>(
+    (mensaSummary.data ?? []).map((item) => [item.beneficiarioId, item]),
+  ), [mensaSummary.data]);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -308,7 +307,10 @@ export default function Beneficiari() {
           : undefined,
       });
       await queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
-      if (shouldEnableMensa) await queryClient.invalidateQueries({ queryKey: getListMensaAbilitazioniQueryKey() });
+      if (shouldEnableMensa) {
+        await queryClient.invalidateQueries({ queryKey: getListMensaAbilitazioniQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey() });
+      }
       if (result.mensaError) {
         toast({
           title: "Beneficiario creato, abilitazione Mensa non completata",
@@ -363,11 +365,11 @@ export default function Beneficiari() {
               { header: t("beneficiari.magazzinoEmporioPreferito"), accessor: (b) => b.magazzinoEmporioPreferitoNome },
               ...(canViewMensa ? [{
                 header: "Mensa",
-                accessor: (b: Beneficiario) => mensaHistory.isLoading
+                accessor: (b: Beneficiario) => mensaSummary.isLoading
                   ? "IN CARICAMENTO"
-                  : mensaHistory.isError
+                  : mensaSummary.isError
                     ? "NON DISPONIBILE"
-                    : getMensaEligibilityDisplay(mensaHistoryByBeneficiario.get(b.id) ?? []).state.toUpperCase(),
+                    : (mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato").toUpperCase(),
               }] : []),
             ]}
             filename="beneficiari"
@@ -614,12 +616,12 @@ export default function Beneficiari() {
                   </TableCell>
                   {canViewMensa && (
                     <TableCell className="text-center">
-                      {mensaHistory.isLoading ? (
+                      {mensaSummary.isLoading ? (
                         <Skeleton className="h-6 w-24 mx-auto rounded-full" />
-                      ) : mensaHistory.isError ? (
+                      ) : mensaSummary.isError ? (
                         <span className="text-muted-foreground">-</span>
                       ) : (
-                        <MensaStatusBadge state={getMensaEligibilityDisplay(mensaHistoryByBeneficiario.get(b.id) ?? []).state} />
+                        <MensaStatusBadge state={mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato"} />
                       )}
                     </TableCell>
                   )}

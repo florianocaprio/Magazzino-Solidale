@@ -7821,6 +7821,20 @@ export const CreateMensaAbilitazioneBody = zod.object({
 })
 
 
+/**
+ * Riepilogo minimale delle abilitazioni Mensa per i beneficiari richiesti e accessibili al chiamante.
+ */
+export const GetMensaAbilitazioniRiepilogoBeneficiariQueryParams = zod.object({
+  "beneficiarioIds": zod.coerce.string().optional().describe('ID positivi separati da virgola, deduplicati dal server; massimo 500.')
+})
+
+export const GetMensaAbilitazioniRiepilogoBeneficiariResponseItem = zod.object({
+  "beneficiarioId": zod.number(),
+  "stato": zod.enum(['attiva', 'programmata', 'sospesa', 'revocata', 'scaduta', 'non_abilitato'])
+})
+export const GetMensaAbilitazioniRiepilogoBeneficiariResponse = zod.array(GetMensaAbilitazioniRiepilogoBeneficiariResponseItem)
+
+
 export const UpdateMensaAbilitazioneStatoParams = zod.object({
   "id": zod.coerce.number()
 })

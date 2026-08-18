@@ -5294,6 +5294,29 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MensaAbilitazione" }
 
+  /mensa/abilitazioni/riepilogo-beneficiari:
+    get:
+      operationId: getMensaAbilitazioniRiepilogoBeneficiari
+      tags: [mensa]
+      description: Riepilogo minimale delle abilitazioni Mensa per i beneficiari richiesti e accessibili al chiamante.
+      parameters:
+        - name: beneficiarioIds
+          in: query
+          required: false
+          description: ID positivi separati da virgola, deduplicati dal server; massimo 500.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Riepilogo batch; gli ID fuori scope sono omessi.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MensaAbilitazioneRiepilogoBeneficiario"
+        "400": { description: Elenco ID malformato o troppo esteso }
+        "403": { description: "Modulo, area o permesso non consentiti" }
+
   /mensa/abilitazioni/{id}/stato:
     post:
       operationId: updateMensaAbilitazioneStato
@@ -11854,6 +11877,16 @@ components:
         createdBy: { type: ["integer", "null"] }
         createdAt: { type: string, format: date-time }
         versione: { type: string, format: date-time }
+
+    MensaAbilitazioneRiepilogoBeneficiario:
+      type: object
+      additionalProperties: false
+      required: [beneficiarioId, stato]
+      properties:
+        beneficiarioId: { type: integer }
+        stato:
+          type: string
+          enum: [attiva, programmata, sospesa, revocata, scaduta, non_abilitato]
 
     MensaAbilitazioneInput:
       type: object

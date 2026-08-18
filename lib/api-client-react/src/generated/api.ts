@@ -106,6 +106,7 @@ import type {
   GetMapsInterventiSocialiParams,
   GetMapsRitiriNonEffettuatiParams,
   GetMaterialeDaPreparareParams,
+  GetMensaAbilitazioniRiepilogoBeneficiariParams,
   GetMensaReportParams,
   GetPreparazioneConsegneParams,
   GetReportCentroAscoltoParams,
@@ -189,6 +190,7 @@ import type {
   Mensa,
   MensaAbilitazione,
   MensaAbilitazioneInput,
+  MensaAbilitazioneRiepilogoBeneficiario,
   MensaAccesso,
   MensaAccessoInput,
   MensaAccessoTemporaneoInput,
@@ -17567,6 +17569,87 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateMensaAbilitazioneMutationOptions(options));
     }
+
+export const getGetMensaAbilitazioniRiepilogoBeneficiariUrl = (params?: GetMensaAbilitazioniRiepilogoBeneficiariParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mensa/abilitazioni/riepilogo-beneficiari?${stringifiedParams}` : `/api/mensa/abilitazioni/riepilogo-beneficiari`
+}
+
+/**
+ * Riepilogo minimale delle abilitazioni Mensa per i beneficiari richiesti e accessibili al chiamante.
+ */
+export const getMensaAbilitazioniRiepilogoBeneficiari = async (params?: GetMensaAbilitazioniRiepilogoBeneficiariParams, options?: RequestInit): Promise<MensaAbilitazioneRiepilogoBeneficiario[]> => {
+
+  return customFetch<MensaAbilitazioneRiepilogoBeneficiario[]>(getGetMensaAbilitazioniRiepilogoBeneficiariUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey = (params?: GetMensaAbilitazioniRiepilogoBeneficiariParams,) => {
+    return [
+    `/api/mensa/abilitazioni/riepilogo-beneficiari`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMensaAbilitazioniRiepilogoBeneficiariQueryOptions = <TData = Awaited<ReturnType<typeof getMensaAbilitazioniRiepilogoBeneficiari>>, TError = ErrorType<void>>(params?: GetMensaAbilitazioniRiepilogoBeneficiariParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMensaAbilitazioniRiepilogoBeneficiari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMensaAbilitazioniRiepilogoBeneficiari>>> = ({ signal }) => getMensaAbilitazioniRiepilogoBeneficiari(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMensaAbilitazioniRiepilogoBeneficiari>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMensaAbilitazioniRiepilogoBeneficiariQueryResult = NonNullable<Awaited<ReturnType<typeof getMensaAbilitazioniRiepilogoBeneficiari>>>
+export type GetMensaAbilitazioniRiepilogoBeneficiariQueryError = ErrorType<void>
+
+
+
+export function useGetMensaAbilitazioniRiepilogoBeneficiari<TData = Awaited<ReturnType<typeof getMensaAbilitazioniRiepilogoBeneficiari>>, TError = ErrorType<void>>(
+ params?: GetMensaAbilitazioniRiepilogoBeneficiariParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMensaAbilitazioniRiepilogoBeneficiari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMensaAbilitazioniRiepilogoBeneficiariQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getUpdateMensaAbilitazioneStatoUrl = (id: number,) => {
 

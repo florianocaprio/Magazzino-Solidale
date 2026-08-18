@@ -4417,6 +4417,23 @@ export interface MensaAbilitazione {
   versione: string;
 }
 
+export type MensaAbilitazioneRiepilogoBeneficiarioStato = typeof MensaAbilitazioneRiepilogoBeneficiarioStato[keyof typeof MensaAbilitazioneRiepilogoBeneficiarioStato];
+
+
+export const MensaAbilitazioneRiepilogoBeneficiarioStato = {
+  attiva: 'attiva',
+  programmata: 'programmata',
+  sospesa: 'sospesa',
+  revocata: 'revocata',
+  scaduta: 'scaduta',
+  non_abilitato: 'non_abilitato',
+} as const;
+
+export interface MensaAbilitazioneRiepilogoBeneficiario {
+  beneficiarioId: number;
+  stato: MensaAbilitazioneRiepilogoBeneficiarioStato;
+}
+
 export interface MensaAbilitazioneInput {
   beneficiarioId: number;
   mensaId: number;
@@ -5760,6 +5777,13 @@ search: string;
 export type ListMensaAbilitazioniParams = {
 beneficiarioId?: number;
 mensaId?: number;
+};
+
+export type GetMensaAbilitazioniRiepilogoBeneficiariParams = {
+/**
+ * ID positivi separati da virgola, deduplicati dal server; massimo 500.
+ */
+beneficiarioIds?: string;
 };
 
 export type ListTessereBeneficiarioParams = {

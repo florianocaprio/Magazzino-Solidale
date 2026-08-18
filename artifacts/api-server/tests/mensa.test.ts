@@ -19,8 +19,9 @@ import {
   tessereBeneficiariTable,
   trasferimentiTable,
   utentiTable,
+  zoneUdsTable,
 } from "@workspace/db";
-import mensaRouter, { activeEligibility } from "../src/routes/mensa";
+import mensaRouter, { activeEligibility, riepilogoAbilitazioneMensa } from "../src/routes/mensa";
 import beneficiariRouter from "../src/routes/beneficiari";
 import trasferimentiRouter from "../src/routes/trasferimenti";
 import {
@@ -29,11 +30,13 @@ import {
 } from "../src/lib/configurazioneAmbiente";
 import { MENSA_PERMISSIONS } from "../src/lib/permissions";
 import { dataServizioMensa, stessoGiornoServizioMensa } from "../src/lib/mensaWorkflow";
+import { areaGuard } from "../src/middlewares/auth";
 
 const ids = {
   users: [] as number[],
   cities: [] as number[],
   centers: [] as number[],
+  zones: [] as number[],
   warehouses: [] as number[],
   beneficiaries: [] as number[],
   canteens: [] as number[],
@@ -52,7 +55,7 @@ type Fixture = Awaited<ReturnType<typeof createFixture>>;
 function makeApp(
   fixture: Fixture,
   permissions: string[] = MENSA_PERMISSIONS.map((item) => item.key),
-  scope: { cittaId?: number | null; centroAscoltoId?: number | null } = {},
+  scope: { cittaId?: number | null; centroAscoltoId?: number | null; zonaUdsId?: number | null; aree?: string[] } = {},
 ): Express {
   const app = express();
   app.use(express.json());
@@ -63,14 +66,16 @@ function makeApp(
         "cittaId" in scope ? (scope.cittaId ?? null) : fixture.romeId,
       centroAscoltoId:
         "centroAscoltoId" in scope ? (scope.centroAscoltoId ?? null) : null,
+      zonaUdsId: "zonaUdsId" in scope ? (scope.zonaUdsId ?? null) : null,
       isAdmin: false,
       isSuperAdmin: false,
-      aree: ["mensa"],
+      aree: scope.aree ?? ["mensa", "sociale"],
       permessi: permissions,
       mustChangePassword: false,
     } as NonNullable<typeof req.user>;
     next();
   });
+  app.use(areaGuard);
   app.use(beneficiariRouter);
   app.use(mensaRouter);
   app.use(trasferimentiRouter);
@@ -296,6 +301,10 @@ afterEach(async () => {
     await db
       .delete(centriAscoltoTable)
       .where(inArray(centriAscoltoTable.id, ids.centers.splice(0)));
+  if (ids.zones.length)
+    await db
+      .delete(zoneUdsTable)
+      .where(inArray(zoneUdsTable.id, ids.zones.splice(0)));
   if (ids.users.length)
     await db
       .delete(utentiTable)
@@ -328,6 +337,96 @@ describe("Modulo Mensa", () => {
       new Date("2026-01-14T22:59:59Z"),
       new Date("2026-01-14T23:00:00Z"),
     )).toBe(false);
+  });
+
+  it.each([
+    [[], "non_abilitato"],
+    [[{ stato: "attiva", dataInizio: "2026-08-19", dataFine: null }], "programmata"],
+    [[{ stato: "attiva", dataInizio: "2026-08-01", dataFine: "2026-08-17" }], "scaduta"],
+    [[{ stato: "attiva", dataInizio: "2026-08-01", dataFine: "2026-08-18" }], "attiva"],
+    [[{ stato: "sospesa", dataInizio: "2026-08-01", dataFine: null }], "sospesa"],
+    [[{ stato: "revocata", dataInizio: "2026-08-01", dataFine: null }], "revocata"],
+  ] as const)("calcola lo stato sintetico Mensa %s come %s", (records, expected) => {
+    expect(riepilogoAbilitazioneMensa(records.map((record, index) => ({
+      id: index + 1,
+      mensaPrincipale: true,
+      ...record,
+    })), "2026-08-18").stato).toBe(expected);
+  });
+
+  it("restituisce un riepilogo batch minimale, deduplicato e senza PII", async () => {
+    const fixture = await createFixture();
+    const response = await request(makeApp(fixture, ["mensa.view"])).get(
+      `/mensa/abilitazioni/riepilogo-beneficiari?beneficiarioIds=${fixture.beneficiaryId},${fixture.beneficiaryId}`,
+    );
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(Object.keys(response.body[0]).sort()).toEqual(["beneficiarioId", "stato"]);
+    expect(response.body[0]).toMatchObject({
+      beneficiarioId: fixture.beneficiaryId,
+      stato: "attiva",
+    });
+    expect(JSON.stringify(response.body)).not.toMatch(/Mario|Rossi|NOTA SOCIALE|arachidi|999\.00/);
+  });
+
+  it("protegge il riepilogo con modulo, area Mensa e permesso mensa.view", async () => {
+    const fixture = await createFixture();
+    const path = `/mensa/abilitazioni/riepilogo-beneficiari?beneficiarioIds=${fixture.beneficiaryId}`;
+    expect((await request(makeApp(fixture, [])).get(path)).status).toBe(403);
+    expect((await request(makeApp(fixture, ["mensa.view"], { aree: ["sociale"] })).get(path)).status).toBe(403);
+
+    await updateModuloAmbiente("MENSA", false, null);
+    try {
+      expect((await request(makeApp(fixture, ["mensa.view"])).get(path)).status).toBe(403);
+    } finally {
+      await updateModuloAmbiente("MENSA", true, null);
+    }
+  });
+
+  it("valida gli ID del riepilogo e accetta una lista vuota", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture, ["mensa.view"]);
+    expect((await request(app).get("/mensa/abilitazioni/riepilogo-beneficiari")).body).toEqual([]);
+    for (const value of ["abc", "0", "1,,2", "-1"]) {
+      expect((await request(app).get(`/mensa/abilitazioni/riepilogo-beneficiari?beneficiarioIds=${value}`)).status).toBe(400);
+    }
+    const tooMany = Array.from({ length: 501 }, (_, index) => index + 1).join(",");
+    expect((await request(app).get(`/mensa/abilitazioni/riepilogo-beneficiari?beneficiarioIds=${tooMany}`)).status).toBe(400);
+  });
+
+  it("applica al riepilogo gli scope città, Centro di Ascolto e zona UDS", async () => {
+    const fixture = await createFixture();
+    const [centroA, centroB] = await db.insert(centriAscoltoTable).values([
+      { nome: `Centro A ${rnd()}`, cittaId: fixture.romeId },
+      { nome: `Centro B ${rnd()}`, cittaId: fixture.romeId },
+    ]).returning({ id: centriAscoltoTable.id });
+    ids.centers.push(centroA.id, centroB.id);
+    const [zonaA, zonaB] = await db.insert(zoneUdsTable).values([
+      { nome: `Zona A ${rnd()}`, cittaId: fixture.romeId },
+      { nome: `Zona B ${rnd()}`, cittaId: fixture.romeId },
+    ]).returning({ id: zoneUdsTable.id });
+    ids.zones.push(zonaA.id, zonaB.id);
+    const scoped = await db.insert(beneficiariTable).values([
+      { codice: `BEN-A-${rnd()}`, nome: "A", cognome: "Scope", cittaId: fixture.romeId, centroAscoltoId: centroA.id, zonaUdsId: zonaA.id },
+      { codice: `BEN-B-${rnd()}`, nome: "B", cognome: "Scope", cittaId: fixture.romeId, centroAscoltoId: centroB.id, zonaUdsId: zonaB.id },
+    ]).returning({ id: beneficiariTable.id });
+    ids.beneficiaries.push(...scoped.map((row) => row.id));
+    const requestedIds = [scoped[0].id, scoped[1].id, fixture.milanBeneficiaryId].join(",");
+    const path = `/mensa/abilitazioni/riepilogo-beneficiari?beneficiarioIds=${requestedIds}`;
+    const expected = [{
+      beneficiarioId: scoped[0].id,
+      stato: "non_abilitato",
+    }];
+
+    const cityScoped = await request(makeApp(fixture, ["mensa.view"])).get(path);
+    expect(cityScoped.status).toBe(200);
+    expect(cityScoped.body.map((row: { beneficiarioId: number }) => row.beneficiarioId)).not.toContain(fixture.milanBeneficiaryId);
+    const centerScoped = await request(makeApp(fixture, ["mensa.view"], { centroAscoltoId: centroA.id })).get(path);
+    expect(centerScoped.status).toBe(200);
+    expect(centerScoped.body).toEqual(expected);
+    const zoneScoped = await request(makeApp(fixture, ["mensa.view"], { zonaUdsId: zonaA.id })).get(path);
+    expect(zoneScoped.status).toBe(200);
+    expect(zoneScoped.body).toEqual(expected);
   });
 
   it("scade la principale terminata ieri e consente una nuova abilitazione oggi", async () => {

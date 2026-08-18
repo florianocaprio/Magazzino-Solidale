@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   listBeneficiari: vi.fn(),
-  listMensaAbilitazioni: vi.fn(),
+  getMensaRiepilogo: vi.fn(),
+  areas: new Set<string>(),
   permissions: new Set<string>(),
   mensaAbilitato: true,
 }));
@@ -17,8 +18,10 @@ vi.mock("@workspace/api-client-react", () => ({
     isPending: false,
   }),
   useListMense: () => ({ data: [], isLoading: false }),
-  useListMensaAbilitazioni: (params: unknown, options: unknown) =>
-    mocks.listMensaAbilitazioni(params, options),
+  useGetMensaAbilitazioniRiepilogoBeneficiari: (
+    params: unknown,
+    options: unknown,
+  ) => mocks.getMensaRiepilogo(params, options),
   useDeleteBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useBulkBeneficiari: () => ({ mutate: vi.fn(), isPending: false }),
@@ -33,6 +36,10 @@ vi.mock("@workspace/api-client-react", () => ({
   getCercaBeneficiariSimiliQueryKey: () => ["beneficiari", "simili"],
   getListCittaQueryKey: () => ["citta"],
   getListMensaAbilitazioniQueryKey: () => ["mensa-abilitazioni"],
+  getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey: (params?: unknown) => [
+    "mensa-riepilogo",
+    params,
+  ],
   getListMenseQueryKey: () => ["mense"],
 }));
 
@@ -51,6 +58,7 @@ vi.mock("@/hooks/use-toast", () => ({
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
     user: { id: 1, cittaId: 1, centroAscoltoId: 2 },
+    hasArea: (area: string) => mocks.areas.has(area),
     hasPermission: (permission: string) => mocks.permissions.has(permission),
   }),
 }));
@@ -87,6 +95,7 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.areas = new Set(["mensa"]);
     mocks.permissions = new Set();
     mocks.mensaAbilitato = true;
     mocks.listBeneficiari.mockReturnValue({
@@ -107,7 +116,7 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
       ],
       isLoading: false,
     });
-    mocks.listMensaAbilitazioni.mockReturnValue({
+    mocks.getMensaRiepilogo.mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
@@ -143,8 +152,8 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
 
     await act(async () => root.render(<Beneficiari />));
 
-    expect(mocks.listMensaAbilitazioni).toHaveBeenCalledWith(
-      undefined,
+    expect(mocks.getMensaRiepilogo).toHaveBeenCalledWith(
+      { beneficiarioIds: "10" },
       expect.objectContaining({
         query: expect.objectContaining({ enabled: false }),
       }),
@@ -168,6 +177,50 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     expect(
       document.querySelector('[data-testid="nuova-abilitazione-mensa"]'),
     ).not.toBeNull();
+  });
+
+  it.each([
+    {
+      label: "manca l'area Mensa",
+      areas: [] as string[],
+      permissions: ["mensa.view", "mensa.eligibility.manage"],
+    },
+    {
+      label: "manca mensa.view",
+      areas: ["mensa"],
+      permissions: ["mensa.eligibility.manage"],
+    },
+  ])(
+    "non mostra né abilita query Mensa quando $label",
+    async ({ areas, permissions }) => {
+      mocks.areas = new Set(areas);
+      mocks.permissions = new Set(permissions);
+
+      await act(async () => root.render(<Beneficiari />));
+
+      expect(document.body.textContent).not.toContain("NON ABILITATO");
+      expect(mocks.getMensaRiepilogo).toHaveBeenCalledWith(
+        { beneficiarioIds: "10" },
+        expect.objectContaining({
+          query: expect.objectContaining({ enabled: false }),
+        }),
+      );
+    },
+  );
+
+  it("non abilita la query riepilogo quando la lista è vuota", async () => {
+    mocks.areas = new Set(["mensa"]);
+    mocks.permissions = new Set(["mensa.view"]);
+    mocks.listBeneficiari.mockReturnValue({ data: [], isLoading: false });
+
+    await act(async () => root.render(<Beneficiari />));
+
+    expect(mocks.getMensaRiepilogo).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({
+        query: expect.objectContaining({ enabled: false }),
+      }),
+    );
   });
 
   it("usa una sola query aggregata e mostra gli stati Mensa in tabella", async () => {
@@ -216,29 +269,19 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
       ],
       isLoading: false,
     });
-    mocks.listMensaAbilitazioni.mockReturnValue({
+    mocks.getMensaRiepilogo.mockReturnValue({
       data: [
         {
-          id: 1,
           beneficiarioId: 10,
-          mensaId: 2,
-          dataInizio: "2020-01-01",
-          dataFine: null,
           stato: "attiva",
-          mensaPrincipale: true,
-          createdAt: "2020-01-01T00:00:00Z",
-          versione: "2020-01-01T00:00:00Z",
         },
         {
-          id: 2,
           beneficiarioId: 11,
-          mensaId: 2,
-          dataInizio: "2999-01-01",
-          dataFine: null,
-          stato: "attiva",
-          mensaPrincipale: true,
-          createdAt: "2020-01-01T00:00:00Z",
-          versione: "2020-01-01T00:00:00Z",
+          stato: "programmata",
+        },
+        {
+          beneficiarioId: 12,
+          stato: "non_abilitato",
         },
       ],
       isLoading: false,
@@ -247,18 +290,15 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
 
     await act(async () => root.render(<Beneficiari />));
 
-    expect(mocks.listMensaAbilitazioni).toHaveBeenCalled();
-    expect(
-      mocks.listMensaAbilitazioni.mock.calls.every(([params]) =>
-        params === undefined,
-      ),
-    ).toBe(true);
-    expect(mocks.listMensaAbilitazioni).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({
-        query: expect.objectContaining({ enabled: true }),
-      }),
-    );
+    expect(mocks.getMensaRiepilogo).toHaveBeenCalled();
+    for (const call of mocks.getMensaRiepilogo.mock.calls) {
+      expect(call).toEqual([
+        { beneficiarioIds: "10,11,12" },
+        expect.objectContaining({
+          query: expect.objectContaining({ enabled: true }),
+        }),
+      ]);
+    }
     expect(document.body.textContent).toContain("ATTIVA");
     expect(document.body.textContent).toContain("PROGRAMMATA");
     expect(document.body.textContent).toContain("NON ABILITATO");
