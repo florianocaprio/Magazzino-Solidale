@@ -169,10 +169,11 @@ limitare la chiave in Google Cloud alle origini autorizzate e alla Maps
 JavaScript API. Senza chiave restano disponibili lista operativa e percorsi.
 La geocodifica avviene nel browser solo per i layer attivi; coordinate e
 risultati Google non vengono persistiti né messi in cache dal server.
-Vengono trasmessi a Google soltanto gli indirizzi necessari al geocoding o alla
-navigazione: nomi, telefoni, codici beneficiario e contenuti sociali non fanno
-parte dei DTO MAPS né degli URL. Un errore Google degrada la sola visualizzazione
-embedded e non blocca Bolle, Consegne, stock o Interventi.
+Gli indirizzi sono dati personali: vengono trasmessi a Google soltanto quelli
+strettamente necessari al geocoding o alla navigazione. I DTO MAPS sono
+minimizzati e non includono nomi, telefoni, codici beneficiario, note o contenuti
+sociali; questi dati non fanno parte neppure degli URL. Un errore Google degrada
+la sola visualizzazione embedded e non blocca Bolle, Consegne, stock o Interventi.
 
 L'update idempotente `20260817_fase5_5_maps_ritiri.sql` aggiunge esclusivamente
 i campi strutturati del ritiro non effettuato. Viene applicato dal normale

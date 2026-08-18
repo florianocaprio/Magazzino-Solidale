@@ -109,6 +109,7 @@ export * from './consegnaUpdate';
 export * from './consegneMeseReport';
 export * from './consegnePerCentroReport';
 export * from './conversioneConsegnaInput';
+export * from './conversioneConsegnaInputFasciaOraria';
 export * from './conversioneConsegnaResult';
 export * from './createTrasferimentoMensa200';
 export * from './createTrasferimentoMensa201';

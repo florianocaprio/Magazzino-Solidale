@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, getListVolontariQueryKey, getListMezziQueryKey, getMapsRouteConsegna, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -19,8 +19,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
+import { RouteActions } from "@/components/maps/route-actions";
 import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
-import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown, Trash2, Navigation } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,7 +48,7 @@ const formSchema = z.object({
 
 export default function Consegne() {
   const { t } = useTranslation();
-  const { user, hasPermission } = useAuth();
+  const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
@@ -117,15 +118,6 @@ export default function Consegne() {
     (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
     t("consegne.toastErrore");
 
-  const openRoute = async (consegnaId: number) => {
-    try {
-      const route = await getMapsRouteConsegna(consegnaId);
-      window.open(route.url, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      toast({ title: t("maps.routeError"), description: apiErrorMessage(error), variant: "destructive" });
-    }
-  };
-  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [associatingId, setAssociatingId] = useState<number | null>(null);
@@ -578,7 +570,6 @@ export default function Consegne() {
                           {c.tipoConsegna === 'domicilio' ? (
                             <div className="space-y-1 text-blue-600">
                               <div className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {c.indirizzoConsegna || t("consegne.domicilioFallback")} {c.zona ? `(${c.zona})` : ''}</div>
-                              {hasPermission("maps.route") && c.indirizzoConsegna && <Button size="sm" variant="link" className="h-auto p-0 text-xs" onClick={() => openRoute(c.id)}><Navigation className="me-1 h-3 w-3" />{t("maps.openRoute")}</Button>}
                             </div>
                           ) : (
                             <div className="flex items-center gap-1 text-purple-600">
@@ -643,11 +634,12 @@ export default function Consegne() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {hasPermission("maps.route") && c.tipoConsegna === "domicilio" && c.indirizzoConsegna && (
-                      <Button size="sm" variant="outline" className="mb-2 gap-1 sm:mb-0 sm:me-2" onClick={() => openRoute(c.id)}>
-                        <Navigation className="h-3.5 w-3.5" /> {t("maps.openRoute")}
-                      </Button>
-                    )}
+                    <RouteActions
+                      consegnaId={c.id}
+                      available={c.tipoConsegna === "domicilio" && Boolean(c.indirizzoConsegna)}
+                      className="mb-2 justify-end sm:mb-0 sm:me-2"
+                      compact
+                    />
                     {c.stato === 'effettuata' ? (
                       <div className="flex items-center justify-end gap-2">
                         {c.bollaId != null && (

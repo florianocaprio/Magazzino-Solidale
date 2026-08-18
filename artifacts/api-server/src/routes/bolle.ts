@@ -37,8 +37,12 @@ import {
 } from "../lib/bollaDelivery";
 import { requireAllModuli } from "../lib/featureFlags";
 import { isDateOnly } from "../lib/interventiWorkflow";
-import { volontarioOverLimit } from "../lib/volontarioCarico";
-import { syncTurnoDaConsegna } from "../lib/consegneTurni";
+import {
+  ConsegnaPlanningError,
+  isFasciaConsegna,
+  syncTurnoDaConsegnaTx,
+  validateConsegnaPlanningTx,
+} from "../lib/consegneTurni";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -833,26 +837,48 @@ router.post(
   if (!isDateOnly(body.dataPrevista)) {
     res.status(400).json({ error: "dataPrevista deve essere una data YYYY-MM-DD" }); return;
   }
+  const fasciaOraria = body.fasciaOraria === undefined || body.fasciaOraria === null
+    ? null
+    : typeof body.fasciaOraria === "string" && isFasciaConsegna(body.fasciaOraria.trim())
+      ? body.fasciaOraria.trim()
+      : undefined;
+  if (fasciaOraria === undefined) {
+    res.status(400).json({ error: "fasciaOraria non valida: usare Mattina, Pomeriggio o Sera" }); return;
+  }
+  const requestedVolontarioId = body.volontarioId === undefined
+    ? undefined
+    : body.volontarioId === null
+      ? null
+      : Number.isInteger(body.volontarioId) && body.volontarioId > 0
+        ? body.volontarioId
+        : false;
+  if (requestedVolontarioId === false) {
+    res.status(400).json({ error: "volontarioId non valido" }); return;
+  }
+  const requestedMezzoId = body.mezzoId === undefined
+    ? undefined
+    : body.mezzoId === null
+      ? null
+      : Number.isInteger(body.mezzoId) && body.mezzoId > 0
+        ? body.mezzoId
+        : false;
+  if (requestedMezzoId === false) {
+    res.status(400).json({ error: "mezzoId non valido" }); return;
+  }
+  if (body.mezzoAltro !== undefined && typeof body.mezzoAltro !== "boolean") {
+    res.status(400).json({ error: "mezzoAltro deve essere booleano" }); return;
+  }
+  if (body.volontarioAltro !== undefined && body.volontarioAltro !== null && typeof body.volontarioAltro !== "string") {
+    res.status(400).json({ error: "volontarioAltro deve essere testuale o NULL" }); return;
+  }
+  if (body.noteOperative !== undefined && body.noteOperative !== null && typeof body.noteOperative !== "string") {
+    res.status(400).json({ error: "noteOperative deve essere testuale o NULL" }); return;
+  }
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
   if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" }); return;
   }
-  const volontarioId = body.volontarioId === undefined ? bolla.volontarioConsegnaId : body.volontarioId;
-  const volontarioAltro = body.volontarioAltro === undefined ? bolla.trasportatoreNome : (typeof body.volontarioAltro === "string" ? body.volontarioAltro.trim() || null : null);
-  if (volontarioId != null && (!Number.isInteger(volontarioId) || volontarioId <= 0)) {
-    res.status(400).json({ error: "volontarioId non valido" }); return;
-  }
-  if (volontarioId != null && volontarioAltro) {
-    res.status(400).json({ error: "Indicare un volontario censito oppure Altro, non entrambi" }); return;
-  }
-  if (volontarioId != null && !(await canUseVolontarioConsegna(volontarioId, bolla.beneficiarioId))) {
-    res.status(403).json({ error: "Volontario non accessibile per il centro della bolla" }); return;
-  }
-  if (volontarioId != null && await volontarioOverLimit(volontarioId, body.dataPrevista)) {
-    res.status(400).json({ error: "Il volontario ha già raggiunto il numero massimo di consegne per questo turno" }); return;
-  }
-
   let result: { consegna: typeof consegneTable.$inferSelect; existing: boolean };
   try {
     result = await db.transaction(async (tx) => {
@@ -862,8 +888,37 @@ router.post(
       if (current.consegnaId != null) {
         const [linked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, current.consegnaId));
         if (!linked) throw new BollaActionError(409, "La bolla risulta già convertita ma la consegna collegata non è disponibile");
+        const planning = await validateConsegnaPlanningTx(tx, linked, { excludeConsegnaId: linked.id });
+        await syncTurnoDaConsegnaTx(tx, linked, planning.centroAscoltoId);
         return { consegna: linked, existing: true };
       }
+      const volontarioId = requestedVolontarioId === undefined ? current.volontarioConsegnaId : requestedVolontarioId;
+      const volontarioAltro = body.volontarioAltro === undefined
+        ? current.trasportatoreNome
+        : typeof body.volontarioAltro === "string"
+          ? body.volontarioAltro.trim() || null
+          : null;
+      const mezzoId = requestedMezzoId === undefined ? current.mezzoId : requestedMezzoId;
+      const mezzoAltro = body.mezzoAltro !== undefined
+        ? body.mezzoAltro
+        : requestedMezzoId === undefined
+          ? current.mezzoAltro
+          : false;
+      if (volontarioId != null && volontarioAltro) {
+        throw new ConsegnaPlanningError(400, "Indicare un volontario censito oppure Altro, non entrambi");
+      }
+      if (mezzoId != null && mezzoAltro) {
+        throw new ConsegnaPlanningError(400, "Indicare un mezzo censito oppure Altro, non entrambi");
+      }
+      const planningInput = {
+        beneficiarioId: current.beneficiarioId,
+        dataPrevista: body.dataPrevista,
+        fasciaOraria,
+        volontarioId,
+        mezzoId,
+        mezzoAltro,
+      };
+      const planning = await validateConsegnaPlanningTx(tx, planningInput);
       const codice = `CON-${Date.now()}-${bollaId}`.slice(0, 30);
       const [created] = await tx.insert(consegneTable).values({
         codice,
@@ -871,14 +926,14 @@ router.post(
         tipoPianificazione: "consegna_pacco",
         tipoConsegna: "domicilio",
         dataPrevista: body.dataPrevista,
-        fasciaOraria: typeof body.fasciaOraria === "string" ? body.fasciaOraria.trim() || null : null,
+        fasciaOraria,
         indirizzoConsegna,
         zona: null,
         magazzinoId: current.magazzinoId,
         volontarioId,
         volontarioAltro,
-        mezzoId: Number.isInteger(body.mezzoId) ? body.mezzoId : current.mezzoId,
-        mezzoAltro: typeof body.mezzoAltro === "boolean" ? body.mezzoAltro : current.mezzoAltro,
+        mezzoId,
+        mezzoAltro,
         stato: "pianificata",
         noteOperative: typeof body.noteOperative === "string" ? body.noteOperative.trim() || null : null,
       }).returning();
@@ -887,13 +942,16 @@ router.post(
         indirizzoConsegna,
         operatoreId: req.user!.id,
       }).where(eq(bolleTable.id, bollaId));
+      await syncTurnoDaConsegnaTx(tx, created, planning.centroAscoltoId);
       return { consegna: created, existing: false };
     });
   } catch (error) {
+    if (error instanceof ConsegnaPlanningError) {
+      res.status(error.status).json({ error: error.message }); return;
+    }
     if (handleBollaActionError(error, res)) return;
     throw error;
   }
-  if (!result.existing) await syncTurnoDaConsegna(result.consegna);
   if (!result.existing) logger.info({ bollaId, consegnaId: result.consegna.id, operatoreId: req.user!.id }, "Bolla convertita in consegna domiciliare");
   res.status(result.existing ? 200 : 201).json({ created: !result.existing, consegnaId: result.consegna.id, codice: result.consegna.codice });
   },

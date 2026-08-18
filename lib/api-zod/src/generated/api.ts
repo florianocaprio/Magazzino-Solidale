@@ -5116,13 +5116,15 @@ export const convertiBollaInConsegnaBodyIndirizzoConsegnaMax = 200;
 
 
 
+
+
 export const ConvertiBollaInConsegnaBody = zod.object({
   "indirizzoConsegna": zod.string().min(1).max(convertiBollaInConsegnaBodyIndirizzoConsegnaMax),
   "dataPrevista": zod.coerce.date(),
-  "fasciaOraria": zod.string().nullish(),
-  "volontarioId": zod.number().nullish(),
+  "fasciaOraria": zod.union([zod.literal('Mattina'),zod.literal('Pomeriggio'),zod.literal('Sera'),zod.literal(null)]).nullish(),
+  "volontarioId": zod.number().min(1).nullish(),
   "volontarioAltro": zod.string().nullish(),
-  "mezzoId": zod.number().nullish(),
+  "mezzoId": zod.number().min(1).nullish(),
   "mezzoAltro": zod.boolean().optional(),
   "noteOperative": zod.string().nullish()
 })

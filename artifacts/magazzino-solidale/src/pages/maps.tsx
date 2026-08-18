@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  getMapsRouteConsegna,
   getGetMapsConsegneQueryKey,
   getGetMapsInterventiSocialiQueryKey,
   getGetMapsPuntiOperativiQueryKey,
@@ -15,7 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
-import { Map, MapPin, Navigation, CalendarDays } from "lucide-react";
+import { Map, MapPin, CalendarDays } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { GoogleOperationalMap } from "@/components/maps/google-operational-map";
+import { RouteActions } from "@/components/maps/route-actions";
 
 const LAYER_LABELS: Record<MapsLayerCode, string> = {
   "sociale.interventi_pianificati": "maps.layerSocialInterventions",
@@ -82,15 +82,6 @@ export default function MapsOperativa() {
     return next;
   });
 
-  const openRoute = async (marker: MapsMarker) => {
-    try {
-      const route = await getMapsRouteConsegna(marker.entityId);
-      window.open(route.url, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      const description = (error as { data?: { error?: string } })?.data?.error ?? t("maps.routeUnavailable");
-      toast({ title: t("maps.routeError"), description, variant: "destructive" });
-    }
-  };
   const onMapUnavailable = useCallback(
     () => toast({ title: t("maps.googleUnavailable"), description: t("maps.listFallback") }),
     [t, toast],
@@ -128,7 +119,7 @@ export default function MapsOperativa() {
           {isLoading ? <Skeleton className="h-24 w-full" /> : markers.length === 0 ? <p className="py-8 text-center text-muted-foreground">{t("maps.empty")}</p> : markers.map((marker) => (
             <div key={marker.id} className="flex flex-col justify-between gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{marker.title}</p><Badge variant="outline">{marker.status}</Badge></div><p className="truncate text-sm text-muted-foreground">{marker.address}</p>{marker.date && <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" />{new Date(marker.date).toLocaleString()}</p>}</div>
-              <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedMarker(marker)}>{t("maps.markerDetails")}</Button>{marker.actions.includes("route") && <Button size="sm" className="gap-1" onClick={() => openRoute(marker)}><Navigation className="h-4 w-4" />{t("maps.openRoute")}</Button>}</div>
+              <div className="flex shrink-0 flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedMarker(marker)}>{t("maps.markerDetails")}</Button><RouteActions consegnaId={marker.entityId} available={marker.entityType === "consegna" && marker.actions.includes("route")} compact /></div>
             </div>
           ))}
         </CardContent>
@@ -146,7 +137,7 @@ export default function MapsOperativa() {
               <div><p className="text-xs uppercase text-muted-foreground">{t("maps.address")}</p><p className="text-sm">{selectedMarker.address}</p></div>
               <div className="flex flex-col gap-2 pt-2">
                 {entityUrl(selectedMarker) && <Button asChild variant="outline"><Link href={selectedMarker.entityType === "bolla" ? `/bolle?bollaId=${selectedMarker.entityId}` : entityUrl(selectedMarker)!}>{t("maps.openOwner")}</Link></Button>}
-                {selectedMarker.actions.includes("route") && <Button className="gap-2" onClick={() => openRoute(selectedMarker)}><Navigation className="h-4 w-4" />{t("maps.openRoute")}</Button>}
+                <RouteActions consegnaId={selectedMarker.entityId} available={selectedMarker.entityType === "consegna" && selectedMarker.actions.includes("route")} />
                 {selectedMarker.actions.includes("convert_delivery") && <Button asChild><Link href={`/bolle?bollaId=${selectedMarker.entityId}`}>{t("maps.convertDelivery")}</Link></Button>}
               </div>
             </div>

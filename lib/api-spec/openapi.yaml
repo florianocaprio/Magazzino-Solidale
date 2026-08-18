@@ -11201,10 +11201,10 @@ components:
       properties:
         indirizzoConsegna: { type: string, minLength: 1, maxLength: 200 }
         dataPrevista: { type: string, format: date }
-        fasciaOraria: { type: ["string", "null"] }
-        volontarioId: { type: ["integer", "null"] }
+        fasciaOraria: { type: ["string", "null"], enum: [Mattina, Pomeriggio, Sera, null] }
+        volontarioId: { type: ["integer", "null"], minimum: 1 }
         volontarioAltro: { type: ["string", "null"] }
-        mezzoId: { type: ["integer", "null"] }
+        mezzoId: { type: ["integer", "null"], minimum: 1 }
         mezzoAltro: { type: boolean }
         noteOperative: { type: ["string", "null"] }
 

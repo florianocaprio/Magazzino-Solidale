@@ -19,6 +19,7 @@ vi.mock("@workspace/api-client-react", () => ({
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock("@/lib/auth", () => ({ useAuth: () => ({ hasPermission: () => true }) }));
 vi.mock("wouter", () => ({ Link: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a> }));
 
 import MapsOperativa from "@/pages/maps";
@@ -43,7 +44,7 @@ describe("MAPS operativa", () => {
     await act(async () => root.render(<MapsOperativa />));
     expect(document.body.textContent).toContain("maps.noApiKey");
     expect(document.body.textContent).toContain("Consegna CON-1");
-    expect(document.body.textContent).toContain("maps.openRoute");
+    expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeTruthy();
     expect(document.querySelectorAll('[role="switch"]')).toHaveLength(1);
     expect(document.querySelector('[aria-label="Mappa operativa Google Maps"]')).toBeNull();
 
@@ -57,6 +58,6 @@ describe("MAPS operativa", () => {
   it("non mostra il percorso quando il provider non autorizza l'azione", async () => {
     apiState.markerActions = ["open"];
     await act(async () => root.render(<MapsOperativa />));
-    expect(document.body.textContent).not.toContain("maps.openRoute");
+    expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeNull();
   });
 });

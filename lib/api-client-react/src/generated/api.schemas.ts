@@ -3956,6 +3956,18 @@ export interface RitiroNonEffettuatoInput {
   motivo?: string | null;
 }
 
+/**
+ * @nullable
+ */
+export type ConversioneConsegnaInputFasciaOraria = typeof ConversioneConsegnaInputFasciaOraria[keyof typeof ConversioneConsegnaInputFasciaOraria] | null;
+
+
+export const ConversioneConsegnaInputFasciaOraria = {
+  Mattina: 'Mattina',
+  Pomeriggio: 'Pomeriggio',
+  Sera: 'Sera',
+} as const;
+
 export interface ConversioneConsegnaInput {
   /**
      * @minLength 1
@@ -3964,12 +3976,18 @@ export interface ConversioneConsegnaInput {
   indirizzoConsegna: string;
   dataPrevista: string;
   /** @nullable */
-  fasciaOraria?: string | null;
-  /** @nullable */
+  fasciaOraria?: ConversioneConsegnaInputFasciaOraria;
+  /**
+     * @minimum 1
+     * @nullable
+     */
   volontarioId?: number | null;
   /** @nullable */
   volontarioAltro?: string | null;
-  /** @nullable */
+  /**
+     * @minimum 1
+     * @nullable
+     */
   mezzoId?: number | null;
   mezzoAltro?: boolean;
   /** @nullable */

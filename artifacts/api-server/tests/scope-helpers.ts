@@ -24,6 +24,7 @@ import {
   trasferimentoRigheTable,
   movimentiTable,
   turniTable,
+  turniVolontariTable,
   cittaTable,
   zoneUdsTable,
 } from "@workspace/db";
@@ -584,6 +585,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(interventiTable).where(inArray(interventiTable.id, scope.interventoIds));
   }
   if (scope.turnoIds.length > 0) {
+    await db.delete(turniVolontariTable).where(inArray(turniVolontariTable.turnoId, scope.turnoIds));
     await db.delete(turniTable).where(inArray(turniTable.id, scope.turnoIds));
   }
   if (scope.prenotazioneIds.length > 0) {

@@ -79,7 +79,7 @@ describe("MAPS — capability, scope e routing", () => {
     expect(JSON.stringify(response.body)).not.toContain("Via Segreta");
   });
 
-  it("costruisce un URL escaped senza PII e nega una consegna fuori scope", async () => {
+  it("costruisce un URL minimizzato con i soli indirizzi e nega una consegna fuori scope", async () => {
     const cityA = await createCitta(scope);
     const cityB = await createCitta(scope);
     const centre = await createCentro(scope);
@@ -95,6 +95,7 @@ describe("MAPS — capability, scope e routing", () => {
     expect(url.searchParams.get("origin")).toBe("Via dell'Origine 1, Roma");
     expect(url.searchParams.get("destination")).toBe("Via A & B 2");
     expect(allowed.body.url).not.toContain("Test");
+    expect(Object.keys(allowed.body).sort()).toEqual(["destination", "origin", "provider", "url"]);
 
     const denied = await request(app({ cittaId: cityB, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);
     expect(denied.status).toBe(403);
