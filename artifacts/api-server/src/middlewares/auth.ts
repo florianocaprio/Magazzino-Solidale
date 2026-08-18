@@ -240,8 +240,9 @@ export const requireSuperAdmin: RequestHandler = (req, res, next) => {
 
 /**
  * Enforces that the authenticated user's role grants access to the area that
- * governs the requested path. Admins bypass all checks. Paths whose first
- * segment is not area-mapped are allowed through (they are gated elsewhere).
+ * governs the requested path. Admins bypass all checks. SuperAdmin bypasses
+ * only the MAPS application-area gate; MAPS handlers still apply every caller
+ * territorial scope. Unmapped paths are allowed through and gated elsewhere.
  */
 export const areaGuard: RequestHandler = (req, res, next) => {
   const segment = req.path.split("/").filter(Boolean)[0];
@@ -256,7 +257,7 @@ export const areaGuard: RequestHandler = (req, res, next) => {
     res.status(401).json({ error: "Non autenticato" });
     return;
   }
-  if (user.isAdmin) {
+  if (user.isAdmin || (segment === "maps" && user.isSuperAdmin)) {
     next();
     return;
   }

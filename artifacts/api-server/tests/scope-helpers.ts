@@ -1,4 +1,4 @@
-import express, { type Express, type Router } from "express";
+import express, { type Express, type RequestHandler, type Router } from "express";
 import {
   db,
   centriAscoltoTable,
@@ -50,7 +50,9 @@ export function makeScopedApp(
     aree?: string[];
     permessi?: string[];
     isAdmin?: boolean;
+    isSuperAdmin?: boolean;
   },
+  middlewares: RequestHandler[] = [],
 ): Express {
   const app = express();
   app.use(express.json());
@@ -65,6 +67,7 @@ export function makeScopedApp(
           aree: string[];
           permessi: string[];
           isAdmin: boolean;
+          isSuperAdmin: boolean;
         };
       }
     ).user = {
@@ -75,9 +78,11 @@ export function makeScopedApp(
       aree: user.aree ?? ["sociale", "uds"],
       permessi: user.permessi ?? [],
       isAdmin: user.isAdmin ?? false,
+      isSuperAdmin: user.isSuperAdmin ?? false,
     };
     next();
   });
+  for (const middleware of middlewares) app.use(middleware);
   app.use(router);
   return app;
 }

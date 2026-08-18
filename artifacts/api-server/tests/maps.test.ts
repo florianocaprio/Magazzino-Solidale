@@ -5,6 +5,7 @@ import request from "supertest";
 import { db, pool, beneficiariTable, bolleTable, consegneTable, magazziniTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import mapsRouter from "../src/routes/maps";
+import { areaGuard } from "../src/middlewares/auth";
 import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 import {
@@ -13,6 +14,7 @@ import {
   createCitta,
   createCentro,
   createMagazzino,
+  createZona,
   insertConsegna,
   insertBolla,
   makeScopedApp,
@@ -31,7 +33,15 @@ beforeEach(() => { scope = newScope(); });
 afterEach(async () => { await cleanup(scope); });
 afterAll(async () => { await pool.end(); });
 
-function app(opts: { cittaId?: number | null; centroId?: number | null; zonaId?: number | null; aree?: string[]; permessi?: string[] }) {
+function app(opts: {
+  cittaId?: number | null;
+  centroId?: number | null;
+  zonaId?: number | null;
+  aree?: string[];
+  permessi?: string[];
+  isAdmin?: boolean;
+  isSuperAdmin?: boolean;
+}) {
   return makeScopedApp(mapsRouter, {
     id: 1,
     centroAscoltoId: opts.centroId ?? null,
@@ -39,10 +49,31 @@ function app(opts: { cittaId?: number | null; centroId?: number | null; zonaId?:
     zonaUdsId: opts.zonaId ?? null,
     aree: opts.aree ?? ["sociale"],
     permessi: opts.permessi ?? [],
-  });
+    isAdmin: opts.isAdmin ?? false,
+    isSuperAdmin: opts.isSuperAdmin ?? false,
+  }, [areaGuard]);
 }
 
 describe("MAPS — capability, scope e routing", () => {
+  it.each([
+    { ruolo: "Admin", isAdmin: true, isSuperAdmin: false },
+    { ruolo: "SuperAdmin", isAdmin: false, isSuperAdmin: true },
+  ])("espone le capability a $ruolo senza aree o permessi espliciti", async ({ isAdmin, isSuperAdmin }) => {
+    const response = await request(app({
+      aree: [],
+      permessi: [],
+      isAdmin,
+      isSuperAdmin,
+    })).get("/maps/capabilities");
+
+    expect(response.status).toBe(200);
+    expect(response.body.operational).toBe(true);
+    expect(response.body.layers.length).toBeGreaterThan(0);
+    expect(response.body.layers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "centro.punti_operativi" }),
+    ]));
+  });
+
   it("non espone layer senza maps.operational e non inventa capability UDS", async () => {
     const denied = await request(app({ aree: ["sociale"] })).get("/maps/capabilities");
     expect(denied.body).toEqual({ operational: false, layers: [] });
@@ -52,6 +83,100 @@ describe("MAPS — capability, scope e routing", () => {
     expect(uds.body.layers).toEqual([]);
     expect((await request(app({ aree: ["uds"], permessi: ["maps.operational"] })).get("/maps/layers/uds/interventi")).status).toBe(404);
     expect((await request(app({ aree: ["sociale"] })).get("/maps/layers/pacchi/consegne")).status).toBe(403);
+  });
+
+  it("separa il bypass applicativo Admin dagli scope città, centro e zona", async () => {
+    const cityA = await createCitta(scope);
+    const cityB = await createCitta(scope);
+    const centreA = await createCentro(scope);
+    const centreB = await createCentro(scope);
+    const zoneA = await createZona(scope, cityA);
+    const zoneB = await createZona(scope, cityB);
+    const today = dataCivileEuropeRome();
+
+    const combinations = [
+      { cityId: cityA, centreId: centreA, zoneId: zoneA.id },
+      { cityId: cityA, centreId: centreB, zoneId: zoneA.id },
+      { cityId: cityB, centreId: centreA, zoneId: zoneB.id },
+      { cityId: cityB, centreId: centreB, zoneId: zoneB.id },
+    ];
+    const deliveryIds: number[] = [];
+    for (const combination of combinations) {
+      const warehouse = await createMagazzino(scope, combination.centreId, { cittaId: combination.cityId });
+      const beneficiary = await createBeneficiario(scope, combination.centreId, {
+        cittaId: combination.cityId,
+        zonaUdsId: combination.zoneId,
+      });
+      const delivery = await insertConsegna(scope, {
+        beneficiarioId: beneficiary,
+        magazzinoId: warehouse,
+        dataPrevista: today,
+      });
+      deliveryIds.push(delivery);
+      await db.update(consegneTable)
+        .set({ indirizzoConsegna: `Via scope ${delivery}` })
+        .where(eq(consegneTable.id, delivery));
+    }
+
+    const visibleIds = async (options: Parameters<typeof app>[0]) => {
+      const response = await request(app(options))
+        .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
+      expect(response.status).toBe(200);
+      return response.body.map((marker: { entityId: number }) => marker.entityId).sort((a: number, b: number) => a - b);
+    };
+    const sorted = (values: number[]) => [...values].sort((a, b) => a - b);
+
+    expect(await visibleIds({ aree: [], isAdmin: true })).toEqual(sorted(deliveryIds));
+    expect(await visibleIds({ aree: [], isAdmin: true, cittaId: cityA }))
+      .toEqual(sorted([deliveryIds[0], deliveryIds[1]]));
+    expect(await visibleIds({ aree: [], isAdmin: true, centroId: centreA }))
+      .toEqual(sorted([deliveryIds[0], deliveryIds[2]]));
+    expect(await visibleIds({ aree: [], isAdmin: true, cittaId: cityA, centroId: centreA }))
+      .toEqual([deliveryIds[0]]);
+    expect(await visibleIds({ aree: [], isSuperAdmin: true, zonaId: zoneA.id }))
+      .toEqual(sorted([deliveryIds[0], deliveryIds[1]]));
+    expect(await visibleIds({
+      aree: ["sociale"],
+      permessi: ["maps.operational"],
+      cittaId: cityA,
+    })).toEqual(sorted([deliveryIds[0], deliveryIds[1]]));
+
+    const standardDenied = await request(app({ aree: ["sociale"], cittaId: cityA }))
+      .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
+    expect(standardDenied.status).toBe(403);
+  });
+
+  it("applica gli scope anche alle route di Admin e SuperAdmin, lasciando globali solo i caller senza scope", async () => {
+    const cityA = await createCitta(scope);
+    const cityB = await createCitta(scope);
+    const centreA = await createCentro(scope);
+    const centreB = await createCentro(scope);
+    const warehouseA = await createMagazzino(scope, centreA, { cittaId: cityA });
+    const warehouseB = await createMagazzino(scope, centreB, { cittaId: cityB });
+    await db.update(magazziniTable).set({ indirizzo: "Via Origine A 1" }).where(eq(magazziniTable.id, warehouseA));
+    await db.update(magazziniTable).set({ indirizzo: "Via Origine B 1" }).where(eq(magazziniTable.id, warehouseB));
+    const beneficiaryA = await createBeneficiario(scope, centreA, { cittaId: cityA });
+    const beneficiaryB = await createBeneficiario(scope, centreB, { cittaId: cityB });
+    const deliveryA = await insertConsegna(scope, { beneficiarioId: beneficiaryA, magazzinoId: warehouseA });
+    const deliveryB = await insertConsegna(scope, { beneficiarioId: beneficiaryB, magazzinoId: warehouseB });
+    await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione A 1" }).where(eq(consegneTable.id, deliveryA));
+    await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione B 1" }).where(eq(consegneTable.id, deliveryB));
+
+    expect((await request(app({ aree: [], isAdmin: true, cittaId: cityA }))
+      .get(`/maps/routes/consegne/${deliveryA}`)).status).toBe(200);
+    expect((await request(app({ aree: [], isAdmin: true, cittaId: cityA }))
+      .get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(403);
+    expect((await request(app({ aree: [], isSuperAdmin: true, centroId: centreA }))
+      .get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(403);
+    expect((await request(app({ aree: [], isSuperAdmin: true }))
+      .get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(200);
+    expect((await request(app({ aree: [], isAdmin: true }))
+      .get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(200);
+    expect((await request(app({
+      aree: ["sociale"],
+      permessi: ["maps.route"],
+      cittaId: cityA,
+    })).get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(403);
   });
 
   it("restituisce solo consegne della città e del centro del caller", async () => {

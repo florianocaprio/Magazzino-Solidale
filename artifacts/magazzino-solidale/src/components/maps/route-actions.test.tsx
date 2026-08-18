@@ -3,14 +3,24 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ getRoute: vi.fn() }));
-const auth = vi.hoisted(() => ({ allowed: true }));
+const auth = vi.hoisted(() => ({
+  allowed: true,
+  isAdmin: false,
+  isSuperAdmin: false,
+}));
 const notifications = vi.hoisted(() => ({ toast: vi.fn() }));
 
 vi.mock("@workspace/api-client-react", () => ({
   getMapsRouteConsegna: api.getRoute,
 }));
 vi.mock("@/lib/auth", () => ({
-  useAuth: () => ({ hasPermission: () => auth.allowed }),
+  useAuth: () => ({
+    user: {
+      isAdmin: auth.isAdmin,
+      isSuperAdmin: auth.isSuperAdmin,
+    },
+    hasPermission: () => auth.allowed,
+  }),
 }));
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: notifications.toast }),
@@ -33,6 +43,8 @@ describe("azioni condivise percorso", () => {
 
   beforeEach(() => {
     auth.allowed = true;
+    auth.isAdmin = false;
+    auth.isSuperAdmin = false;
     api.getRoute.mockReset().mockResolvedValue({ url: "https://www.google.com/maps/dir/?api=1" });
     notifications.toast.mockReset();
     Object.defineProperty(navigator, "clipboard", {
@@ -118,5 +130,17 @@ describe("azioni condivise percorso", () => {
     auth.allowed = true;
     await act(async () => root.render(<RouteActions consegnaId={10} available={false} />));
     expect(document.querySelector("button")).toBeNull();
+  });
+
+  it.each([
+    { ruolo: "Admin", isAdmin: true, isSuperAdmin: false },
+    { ruolo: "SuperAdmin", isAdmin: false, isSuperAdmin: true },
+  ])("espone le azioni a $ruolo senza permission applicativa esplicita", async ({ isAdmin, isSuperAdmin }) => {
+    auth.allowed = false;
+    auth.isAdmin = isAdmin;
+    auth.isSuperAdmin = isSuperAdmin;
+
+    await act(async () => root.render(<RouteActions consegnaId={12} available />));
+    expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeTruthy();
   });
 });

@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { hasMapsPermission } from "@/lib/maps-access";
 import { cn } from "@/lib/utils";
 
 type RouteActionsProps = {
@@ -29,12 +30,12 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 export function RouteActions({ consegnaId, available, className, compact = false }: RouteActionsProps) {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { t } = useTranslation();
   const { toast } = useToast();
   const [manualUrl, setManualUrl] = useState<string | null>(null);
 
-  if (!available || !hasPermission("maps.route")) return null;
+  if (!available || !hasMapsPermission(user, hasPermission, "maps.route")) return null;
 
   const loadUrl = async (): Promise<string | null> => {
     try {

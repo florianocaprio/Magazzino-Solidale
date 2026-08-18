@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type RequestHandler } from "express";
 import {
   beneficiariTable,
   bolleTable,
@@ -18,7 +18,6 @@ import {
   lte,
   type SQL,
 } from "drizzle-orm";
-import { requirePermission } from "../middlewares/auth";
 import { isModuloAttivo, requireAllModuli, requireModulo } from "../lib/featureFlags";
 import {
   callerCentroId,
@@ -63,12 +62,35 @@ type MapsMarker = {
   actions: Array<"open" | "route" | "convert_delivery">;
 };
 
-function hasArea(req: Request, area: string): boolean {
-  return !!req.user && (req.user.isAdmin || req.user.aree.includes(area));
+// Admin e SuperAdmin possono usare la funzione MAPS senza aree applicative
+// assegnate. Gli scope territoriali restano separati e sono sempre ricavati
+// dai caller*Id(req) nei singoli handler, senza bypass basati sul ruolo.
+function isMapsApplicationAdministrator(req: Request): boolean {
+  return req.user?.isAdmin === true || req.user?.isSuperAdmin === true;
 }
 
-function hasPermission(req: Request, permission: string): boolean {
-  return !!req.user && (req.user.isAdmin || req.user.permessi.includes(permission));
+function hasMapsArea(req: Request, area: string): boolean {
+  return !!req.user
+    && (isMapsApplicationAdministrator(req) || req.user.aree.includes(area));
+}
+
+function hasMapsPermission(req: Request, permission: string): boolean {
+  return !!req.user
+    && (isMapsApplicationAdministrator(req) || req.user.permessi.includes(permission));
+}
+
+function requireMapsPermission(permission: string): RequestHandler {
+  return (req, res, next) => {
+    if (!req.user) {
+      res.status(401).json({ error: "Non autenticato" });
+      return;
+    }
+    if (hasMapsPermission(req, permission)) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "Permesso non consentito per il ruolo" });
+  };
 }
 
 function addCivilDays(value: string, days: number): string {
@@ -101,7 +123,7 @@ function sendDateWindowError(error: unknown, res: import("express").Response): v
 
 async function capabilities(req: Request) {
   const layers: Array<{ code: MapsLayerCode; domain: string; label: string; routeSupported: boolean }> = [];
-  const operational = hasPermission(req, "maps.operational");
+  const operational = hasMapsPermission(req, "maps.operational");
   if (!operational) return { operational: false, layers };
 
   const [centro, consegne, magazzino, bolle, uds] = await Promise.all([
@@ -111,16 +133,16 @@ async function capabilities(req: Request) {
     isModuloAttivo("BOLLE"),
     isModuloAttivo("UDS"),
   ]);
-  if (hasArea(req, "sociale") && centro) {
+  if (hasMapsArea(req, "sociale") && centro) {
     layers.push({ code: "sociale.interventi_pianificati", domain: "sociale", label: "Interventi pianificati", routeSupported: false });
   }
-  if (hasArea(req, "sociale") && centro && consegne) {
-    layers.push({ code: "pacchi.consegne", domain: "pacchi", label: "Consegne a domicilio", routeSupported: hasPermission(req, "maps.route") });
+  if (hasMapsArea(req, "sociale") && centro && consegne) {
+    layers.push({ code: "pacchi.consegne", domain: "pacchi", label: "Consegne a domicilio", routeSupported: hasMapsPermission(req, "maps.route") });
   }
-  if (hasArea(req, "sociale") && magazzino && bolle) {
+  if (hasMapsArea(req, "sociale") && magazzino && bolle) {
     layers.push({ code: "pacchi.ritiri_non_effettuati", domain: "pacchi", label: "Ritiri non effettuati", routeSupported: false });
   }
-  if ((hasArea(req, "magazzino") || hasArea(req, "sociale")) && magazzino) {
+  if ((hasMapsArea(req, "magazzino") || hasMapsArea(req, "sociale")) && magazzino) {
     layers.push({ code: "centro.punti_operativi", domain: "centro", label: "Punti operativi", routeSupported: false });
   }
   // Il modulo UDS viene valutato intenzionalmente: finché il dominio non espone
@@ -135,10 +157,10 @@ router.get("/maps/capabilities", async (req, res) => {
 
 router.get(
   "/maps/layers/sociale/interventi",
-  requirePermission("maps.operational"),
+  requireMapsPermission("maps.operational"),
   requireModulo("CENTRO_ASCOLTO"),
   async (req, res) => {
-    if (!hasArea(req, "sociale")) { res.status(403).json({ error: "Area Sociale non consentita" }); return; }
+    if (!hasMapsArea(req, "sociale")) { res.status(403).json({ error: "Area Sociale non consentita" }); return; }
     let range: ReturnType<typeof dateWindow>;
     try { range = dateWindow(req); } catch (error) { sendDateWindowError(error, res); return; }
     const conditions: SQL[] = [
@@ -176,10 +198,10 @@ router.get(
 
 router.get(
   "/maps/layers/pacchi/consegne",
-  requirePermission("maps.operational"),
+  requireMapsPermission("maps.operational"),
   requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]),
   async (req, res) => {
-    if (!hasArea(req, "sociale")) { res.status(403).json({ error: "Area Sociale non consentita" }); return; }
+    if (!hasMapsArea(req, "sociale")) { res.status(403).json({ error: "Area Sociale non consentita" }); return; }
     let range: ReturnType<typeof dateWindow>;
     try { range = dateWindow(req); } catch (error) { sendDateWindowError(error, res); return; }
     const conditions: SQL[] = [
@@ -197,7 +219,7 @@ router.get(
     const rows = await db.select({ id: consegneTable.id, codice: consegneTable.codice, stato: consegneTable.stato, indirizzo: consegneTable.indirizzoConsegna, data: consegneTable.dataPrevista, fascia: consegneTable.fasciaOraria })
       .from(consegneTable).innerJoin(beneficiariTable, eq(consegneTable.beneficiarioId, beneficiariTable.id))
       .where(and(...conditions)).limit(500);
-    const routeAllowed = hasPermission(req, "maps.route");
+    const routeAllowed = hasMapsPermission(req, "maps.route");
     const markers: MapsMarker[] = rows.flatMap((row) => row.indirizzo?.trim() ? [{
       id: `pacchi.consegna:${row.id}`,
       layer: "pacchi.consegne",
@@ -216,10 +238,10 @@ router.get(
 
 router.get(
   "/maps/layers/pacchi/ritiri-non-effettuati",
-  requirePermission("maps.operational"),
+  requireMapsPermission("maps.operational"),
   requireAllModuli(["MAGAZZINO_SOLIDALE", "BOLLE"]),
   async (req, res) => {
-    if (!hasArea(req, "sociale")) { res.status(403).json({ error: "Area Sociale non consentita" }); return; }
+    if (!hasMapsArea(req, "sociale")) { res.status(403).json({ error: "Area Sociale non consentita" }); return; }
     let range: ReturnType<typeof dateWindow>;
     try { range = dateWindow(req); } catch (error) { sendDateWindowError(error, res); return; }
     const conditions: SQL[] = [
@@ -257,10 +279,10 @@ router.get(
 
 router.get(
   "/maps/layers/centro/punti-operativi",
-  requirePermission("maps.operational"),
+  requireMapsPermission("maps.operational"),
   requireModulo("MAGAZZINO_SOLIDALE"),
   async (req, res) => {
-    if (!hasArea(req, "magazzino") && !hasArea(req, "sociale")) { res.status(403).json({ error: "Area operativa non consentita" }); return; }
+    if (!hasMapsArea(req, "magazzino") && !hasMapsArea(req, "sociale")) { res.status(403).json({ error: "Area operativa non consentita" }); return; }
     const visibleWarehouses = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
     const warehouseCondition = magazzinoScopeFilter(magazziniTable.id, visibleWarehouses);
     const warehouses = await db.select({ id: magazziniTable.id, nome: magazziniTable.nome, stato: magazziniTable.stato, indirizzo: magazziniTable.indirizzo, comune: magazziniTable.comune })
@@ -283,10 +305,10 @@ router.get(
 
 router.get(
   "/maps/routes/consegne/:id",
-  requirePermission("maps.route"),
+  requireMapsPermission("maps.route"),
   requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]),
   async (req, res) => {
-    if (!hasArea(req, "sociale")) { res.status(403).json({ error: "Area Sociale non consentita" }); return; }
+    if (!hasMapsArea(req, "sociale")) { res.status(403).json({ error: "Area Sociale non consentita" }); return; }
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "ID consegna non valido" }); return; }
     const [row] = await db.select({ consegna: consegneTable, origine: magazziniTable.indirizzo, origineComune: magazziniTable.comune })

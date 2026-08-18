@@ -16,6 +16,7 @@ import { useIdleLogout } from "@/lib/use-idle-logout";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
+import { canAccessMapsApplication } from "@/lib/maps-access";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const IDLE_KEEPALIVE_MS = 5 * 60 * 1000;
@@ -180,6 +181,14 @@ function RequirePermission({
   return <>{children}</>;
 }
 
+export function RequireMapsAccess({ children }: { children: React.ReactNode }) {
+  const { user, hasArea, hasPermission } = useAuth();
+  if (!canAccessMapsApplication(user, hasArea, hasPermission)) {
+    return <NotAuthorized />;
+  }
+  return <>{children}</>;
+}
+
 function MensaRoute({ view, permission }: { view: MensaView; permission: string }) {
   return (
     <Guard area="mensa">
@@ -236,11 +245,9 @@ function AppRoutes() {
         </Route>
         <Route path="/maps">
           {() => (
-            <Guard area={["sociale", "magazzino"]}>
-              <RequirePermission permission="maps.operational">
-                <MapsOperativa />
-              </RequirePermission>
-            </Guard>
+            <RequireMapsAccess>
+              <MapsOperativa />
+            </RequireMapsAccess>
           )}
         </Route>
         <Route path="/prodotti">

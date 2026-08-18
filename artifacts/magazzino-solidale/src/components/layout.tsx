@@ -70,6 +70,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import {
+  canAccessMapsApplication,
+  canShowMapsNavigation,
+} from "@/lib/maps-access";
 import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "@/lib/i18n";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
@@ -642,7 +646,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, hasArea, hasPermission, logout } = useAuth();
   const { t } = useTranslation();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
-  const canAskMaps = hasPermission("maps.operational") && (hasArea("sociale") || hasArea("magazzino"));
+  const canAskMaps = canAccessMapsApplication(user, hasArea, hasPermission);
   const { data: mapsCapabilities } = useGetMapsCapabilities({
     query: { queryKey: getGetMapsCapabilitiesQueryKey(), enabled: canAskMaps, staleTime: 5 * 60 * 1000 },
   });
@@ -650,6 +654,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.superAdmin) return user?.isSuperAdmin === true;
     if (item.public) return true;
+    if (item.key === "maps") {
+      return canShowMapsNavigation(
+        user,
+        hasArea,
+        hasPermission,
+        mapsCapabilities?.layers.length ?? 0,
+      );
+    }
     const itemAreas = Array.isArray(item.area) ? item.area : item.area ? [item.area] : [];
     return itemAreas.some(hasArea) &&
       (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
