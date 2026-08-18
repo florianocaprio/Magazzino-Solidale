@@ -6287,6 +6287,7 @@ components:
           type: string
         nome:
           type: string
+          minLength: 1
         indirizzo:
           type: ["string", "null"]
         comune:
@@ -6385,6 +6386,7 @@ components:
           type: string
         nome:
           type: string
+          minLength: 1
         indirizzo:
           type: string
         comune:
@@ -6418,6 +6420,7 @@ components:
           type: string
         nome:
           type: string
+          minLength: 1
         indirizzo:
           type: string
         comune:
@@ -8872,10 +8875,12 @@ components:
 
     ImpostazioniEmail:
       type: object
+      description: Le credenziali SMTP sono gestite esclusivamente tramite variabili MAIL_* e secret di ambiente; i campi SMTP restituiti sono legacy e non usati dal runtime.
       properties:
         provider:
           type: string
           enum: [connector, smtp]
+          deprecated: true
         mittenteEmail:
           type: ["string", "null"]
         mittenteNome:
@@ -8884,39 +8889,34 @@ components:
           type: ["string", "null"]
         smtpHost:
           type: ["string", "null"]
+          deprecated: true
         smtpPort:
           type: ["integer", "null"]
+          deprecated: true
         smtpSecure:
           type: boolean
+          deprecated: true
         smtpUser:
           type: ["string", "null"]
+          deprecated: true
         hasPassword:
+          type: boolean
+          deprecated: true
+        smtpManagedByEnvironment:
           type: boolean
         dataAggiornamento:
           type: string
-      required: [provider, smtpSecure, hasPassword]
+      required: [provider, smtpSecure, hasPassword, smtpManagedByEnvironment]
 
     ImpostazioniEmailUpdate:
       type: object
+      description: Aggiorna solo metadati non sensibili. Server e credenziali SMTP devono essere configurati tramite MAIL_* e secret di ambiente.
       properties:
-        provider:
-          type: string
-          enum: [connector, smtp]
         mittenteEmail:
           type: ["string", "null"]
         mittenteNome:
           type: ["string", "null"]
         adminEmail:
-          type: ["string", "null"]
-        smtpHost:
-          type: ["string", "null"]
-        smtpPort:
-          type: ["integer", "null"]
-        smtpSecure:
-          type: boolean
-        smtpUser:
-          type: ["string", "null"]
-        smtpPassword:
           type: ["string", "null"]
 
     ImpostazioniModuli:
@@ -12277,6 +12277,7 @@ components:
         newPassword:
           type: string
           minLength: 8
+          description: Deve contenere almeno una lettera e un numero.
       required: [newPassword]
 
     ForgotPasswordInput:
@@ -12296,6 +12297,7 @@ components:
         newPassword:
           type: string
           minLength: 8
+          description: Deve contenere almeno una lettera e un numero.
         confirmPassword:
           type: string
           minLength: 1
@@ -12371,7 +12373,8 @@ components:
           minLength: 1
         password:
           type: string
-          minLength: 6
+          minLength: 8
+          description: Deve contenere almeno una lettera e un numero.
         nome:
           type: string
           minLength: 1

@@ -10,6 +10,7 @@ import type { MagazzinoTipoMagazzino } from './magazzinoTipoMagazzino';
 export interface Magazzino {
   id: number;
   codice: string;
+  /** @minLength 1 */
   nome: string;
   /** @nullable */
   indirizzo?: string | null;

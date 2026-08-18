@@ -7,7 +7,11 @@
  */
 import type { ImpostazioniEmailProvider } from './impostazioniEmailProvider';
 
+/**
+ * Le credenziali SMTP sono gestite esclusivamente tramite variabili MAIL_* e secret di ambiente; i campi SMTP restituiti sono legacy e non usati dal runtime.
+ */
 export interface ImpostazioniEmail {
+  /** @deprecated */
   provider: ImpostazioniEmailProvider;
   /** @nullable */
   mittenteEmail?: string | null;
@@ -15,13 +19,25 @@ export interface ImpostazioniEmail {
   mittenteNome?: string | null;
   /** @nullable */
   adminEmail?: string | null;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpHost?: string | null;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpPort?: number | null;
+  /** @deprecated */
   smtpSecure: boolean;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpUser?: string | null;
+  /** @deprecated */
   hasPassword: boolean;
+  smtpManagedByEnvironment: boolean;
   dataAggiornamento?: string;
 }

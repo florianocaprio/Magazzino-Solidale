@@ -168,7 +168,6 @@ export * from './healthStatus';
 export * from './impostazioniEmail';
 export * from './impostazioniEmailProvider';
 export * from './impostazioniEmailUpdate';
-export * from './impostazioniEmailUpdateProvider';
 export * from './impostazioniModuli';
 export * from './impostazioniModuliUpdate';
 export * from './impostazioniStampa';

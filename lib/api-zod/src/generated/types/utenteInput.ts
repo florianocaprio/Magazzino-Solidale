@@ -11,7 +11,10 @@ export interface UtenteInput {
   username: string;
   /** @minLength 1 */
   email: string;
-  /** @minLength 6 */
+  /**
+     * Deve contenere almeno una lettera e un numero.
+     * @minLength 8
+     */
   password: string;
   /** @minLength 1 */
   nome: string;

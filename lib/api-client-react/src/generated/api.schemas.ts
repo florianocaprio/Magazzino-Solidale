@@ -339,6 +339,7 @@ export const MagazzinoTipoMagazzino = {
 export interface Magazzino {
   id: number;
   codice: string;
+  /** @minLength 1 */
   nome: string;
   /** @nullable */
   indirizzo?: string | null;
@@ -592,6 +593,7 @@ export const MagazzinoInputTipoMagazzino = {
 
 export interface MagazzinoInput {
   codice?: string;
+  /** @minLength 1 */
   nome: string;
   indirizzo?: string;
   comune?: string;
@@ -623,6 +625,7 @@ export const MagazzinoUpdateTipoMagazzino = {
 
 export interface MagazzinoUpdate {
   codice?: string;
+  /** @minLength 1 */
   nome?: string;
   indirizzo?: string;
   comune?: string;
@@ -2383,6 +2386,9 @@ export interface ImpostazioniStampaUpdate {
   footerBolla?: string | null;
 }
 
+/**
+ * @deprecated
+ */
 export type ImpostazioniEmailProvider = typeof ImpostazioniEmailProvider[keyof typeof ImpostazioniEmailProvider];
 
 
@@ -2391,7 +2397,11 @@ export const ImpostazioniEmailProvider = {
   smtp: 'smtp',
 } as const;
 
+/**
+ * Le credenziali SMTP sono gestite esclusivamente tramite variabili MAIL_* e secret di ambiente; i campi SMTP restituiti sono legacy e non usati dal runtime.
+ */
 export interface ImpostazioniEmail {
+  /** @deprecated */
   provider: ImpostazioniEmailProvider;
   /** @nullable */
   mittenteEmail?: string | null;
@@ -2399,42 +2409,39 @@ export interface ImpostazioniEmail {
   mittenteNome?: string | null;
   /** @nullable */
   adminEmail?: string | null;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpHost?: string | null;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpPort?: number | null;
+  /** @deprecated */
   smtpSecure: boolean;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpUser?: string | null;
+  /** @deprecated */
   hasPassword: boolean;
+  smtpManagedByEnvironment: boolean;
   dataAggiornamento?: string;
 }
 
-export type ImpostazioniEmailUpdateProvider = typeof ImpostazioniEmailUpdateProvider[keyof typeof ImpostazioniEmailUpdateProvider];
-
-
-export const ImpostazioniEmailUpdateProvider = {
-  connector: 'connector',
-  smtp: 'smtp',
-} as const;
-
+/**
+ * Aggiorna solo metadati non sensibili. Server e credenziali SMTP devono essere configurati tramite MAIL_* e secret di ambiente.
+ */
 export interface ImpostazioniEmailUpdate {
-  provider?: ImpostazioniEmailUpdateProvider;
   /** @nullable */
   mittenteEmail?: string | null;
   /** @nullable */
   mittenteNome?: string | null;
   /** @nullable */
   adminEmail?: string | null;
-  /** @nullable */
-  smtpHost?: string | null;
-  /** @nullable */
-  smtpPort?: number | null;
-  smtpSecure?: boolean;
-  /** @nullable */
-  smtpUser?: string | null;
-  /** @nullable */
-  smtpPassword?: string | null;
 }
 
 export interface ImpostazioniModuli {
@@ -4826,7 +4833,10 @@ export interface LoginInput {
 }
 
 export interface ChangePasswordInput {
-  /** @minLength 8 */
+  /**
+     * Deve contenere almeno una lettera e un numero.
+     * @minLength 8
+     */
   newPassword: string;
 }
 
@@ -4838,7 +4848,10 @@ export interface ForgotPasswordInput {
 export interface ResetPasswordInput {
   /** @minLength 1 */
   token: string;
-  /** @minLength 8 */
+  /**
+     * Deve contenere almeno una lettera e un numero.
+     * @minLength 8
+     */
   newPassword: string;
   /** @minLength 1 */
   confirmPassword?: string;
@@ -4888,7 +4901,10 @@ export interface UtenteInput {
   username: string;
   /** @minLength 1 */
   email: string;
-  /** @minLength 6 */
+  /**
+     * Deve contenere almeno una lettera e un numero.
+     * @minLength 8
+     */
   password: string;
   /** @minLength 1 */
   nome: string;

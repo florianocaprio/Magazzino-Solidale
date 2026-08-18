@@ -5,23 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ImpostazioniEmailUpdateProvider } from './impostazioniEmailUpdateProvider';
 
+/**
+ * Aggiorna solo metadati non sensibili. Server e credenziali SMTP devono essere configurati tramite MAIL_* e secret di ambiente.
+ */
 export interface ImpostazioniEmailUpdate {
-  provider?: ImpostazioniEmailUpdateProvider;
   /** @nullable */
   mittenteEmail?: string | null;
   /** @nullable */
   mittenteNome?: string | null;
   /** @nullable */
   adminEmail?: string | null;
-  /** @nullable */
-  smtpHost?: string | null;
-  /** @nullable */
-  smtpPort?: number | null;
-  smtpSecure?: boolean;
-  /** @nullable */
-  smtpUser?: string | null;
-  /** @nullable */
-  smtpPassword?: string | null;
 }

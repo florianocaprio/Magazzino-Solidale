@@ -6,6 +6,7 @@ import {
   VALID_BOLLA_TEMPLATES,
   type BollaTemplate,
 } from "../lib/impostazioniStampa";
+import { requireGlobalAdmin } from "../lib/adminScope";
 
 const router: IRouter = Router();
 
@@ -14,7 +15,7 @@ router.get("/impostazioni-stampa", async (_req, res) => {
   res.json(formatImpostazioniStampa(row));
 });
 
-router.put("/impostazioni-stampa", async (req, res) => {
+router.put("/impostazioni-stampa", requireGlobalAdmin, async (req, res) => {
   const { templateBolla, footerBolla } = req.body ?? {};
   if (
     templateBolla !== undefined &&

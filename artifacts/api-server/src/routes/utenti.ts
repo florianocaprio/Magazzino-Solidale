@@ -11,6 +11,7 @@ import { logSystemEvent, systemLogMetaFromRequest } from "../lib/systemLog";
 import { isValidUserEmail, normalizeEmail } from "../lib/userEmail";
 import { sendPasswordResetEmail } from "../lib/emailService";
 import { ADMIN_RESET_EMAIL_INVALID_MESSAGE, ADMIN_RESET_LINK_SENT_MESSAGE, createPasswordResetLinkForUser, invalidateActivePasswordResetTokens } from "../lib/passwordReset";
+import { validatePassword } from "../lib/passwordPolicy";
 
 const router: IRouter = Router();
 
@@ -216,6 +217,36 @@ async function cittaExists(cittaId: number | null): Promise<boolean> {
   return Boolean(row);
 }
 
+async function validateUserTerritorialAssignment(params: { cittaId: number | null; centroAscoltoId: number | null; zonaUdsId: number | null }): Promise<string | null> {
+  if (params.centroAscoltoId != null) {
+    const [centro] = await db
+      .select({
+        cittaId: centriAscoltoTable.cittaId,
+        attivo: centriAscoltoTable.attivo,
+      })
+      .from(centriAscoltoTable)
+      .where(eq(centriAscoltoTable.id, params.centroAscoltoId));
+    if (!centro || !centro.attivo) {
+      return "Il Centro di Ascolto selezionato non è disponibile";
+    }
+    if (centro.cittaId !== params.cittaId) {
+      return "Il Centro di Ascolto deve appartenere alla stessa Area dell'utente";
+    }
+  }
+
+  if (params.zonaUdsId != null) {
+    const [zona] = await db.select({ cittaId: zoneUdsTable.cittaId, attivo: zoneUdsTable.attivo }).from(zoneUdsTable).where(eq(zoneUdsTable.id, params.zonaUdsId));
+    if (!zona || !zona.attivo) {
+      return "La Zona UDS selezionata non è disponibile";
+    }
+    if (zona.cittaId !== params.cittaId) {
+      return "La Zona UDS deve appartenere alla stessa Area dell'utente";
+    }
+  }
+
+  return null;
+}
+
 function requireCallerSuperAdmin(req: Request, res: Response): boolean {
   if (req.user?.isSuperAdmin) return true;
   res.status(403).json({ error: "Operazione riservata ai Super Admin" });
@@ -263,6 +294,11 @@ router.post("/utenti", async (req, res): Promise<void> => {
     return;
   }
   const { username, email, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId, cittaId, zonaUdsId } = parsed.data;
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    res.status(400).json({ error: passwordError });
+    return;
+  }
   const normalizedEmail = normalizeEmail(email);
   if (!isValidUserEmail(normalizedEmail)) {
     res.status(400).json({ error: "Email non valida" });
@@ -287,15 +323,32 @@ router.post("/utenti", async (req, res): Promise<void> => {
   // A centro-bound admin can only create users inside their own centro; the
   // caller's centro is auto-assigned and locked (any body value is ignored).
   const caller = callerCentroId(req);
+  if (caller != null && centroAscoltoId != null && centroAscoltoId !== caller) {
+    res.status(403).json({ error: "Centro non accessibile per il tuo profilo" });
+    return;
+  }
   const finalCentroId = bootstrap || finalIsSuperAdmin ? null : caller != null ? caller : (centroAscoltoId ?? null);
   // Likewise a città-bound admin can only create users inside their own città;
   // the caller's città is auto-assigned and locked (any body value is ignored).
   const cittaCaller = callerCittaId(req);
+  if (cittaCaller != null && cittaId != null && cittaId !== cittaCaller) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
+    return;
+  }
   const finalCittaId = bootstrap || finalIsSuperAdmin ? null : cittaCaller != null ? cittaCaller : (cittaId ?? null);
   const zonaCaller = callerZonaUdsId(req);
   const finalZonaUdsId = bootstrap || finalIsSuperAdmin ? null : zonaCaller != null ? zonaCaller : finalCittaId == null ? null : (zonaUdsId ?? null);
   if (!(await cittaExists(finalCittaId))) {
     res.status(400).json({ error: "L'area geografica selezionata non esiste" });
+    return;
+  }
+  const assignmentError = await validateUserTerritorialAssignment({
+    cittaId: finalCittaId,
+    centroAscoltoId: finalCentroId,
+    zonaUdsId: finalZonaUdsId,
+  });
+  if (assignmentError) {
+    res.status(400).json({ error: assignmentError });
     return;
   }
 
@@ -334,7 +387,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
       zonaUdsId: finalZonaUdsId,
       attivo: attivo ?? true,
       isSuperAdmin: finalIsSuperAdmin,
-      mustChangePassword: false,
+      mustChangePassword: true,
       lastPasswordChangeAt: new Date(),
     })
     .returning({ id: utentiTable.id });
@@ -520,6 +573,17 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     updates.cittaId = null;
     updates.zonaUdsId = null;
   }
+  if (body.cittaId !== undefined || body.centroAscoltoId !== undefined || body.zonaUdsId !== undefined || updates.isSuperAdmin === true) {
+    const assignmentError = await validateUserTerritorialAssignment({
+      cittaId: updates.cittaId !== undefined ? (updates.cittaId ?? null) : target.cittaId,
+      centroAscoltoId: updates.centroAscoltoId !== undefined ? (updates.centroAscoltoId ?? null) : target.centroAscoltoId,
+      zonaUdsId: updates.zonaUdsId !== undefined ? (updates.zonaUdsId ?? null) : target.zonaUdsId,
+    });
+    if (assignmentError) {
+      res.status(400).json({ error: assignmentError });
+      return;
+    }
+  }
   const effectiveActive = updates.attivo ?? target.attivo;
   if (target.isSuperAdmin && (!effectiveIsSuperAdmin || !effectiveActive)) {
     if (!(await otherActiveSuperAdminExists(id))) {
@@ -623,7 +687,17 @@ router.delete("/utenti/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  await db.delete(utentiTable).where(eq(utentiTable.id, id));
+  await db.update(utentiTable).set({ attivo: false }).where(eq(utentiTable.id, id));
+  await invalidateActivePasswordResetTokens(id);
+  await logSystemEvent({
+    evento: "USER_DISABLED",
+    esito: "SUCCESS",
+    targetUserId: id,
+    userEmail: target.email,
+    username: target.username,
+    ...systemLogMetaFromRequest(req),
+    details: { source: "delete_endpoint", preservedForHistory: true },
+  });
   res.status(204).send();
 });
 

@@ -66,10 +66,13 @@ export const GetMovimentiRecentiResponse = zod.array(GetMovimentiRecentiResponse
 /**
  * @summary List all warehouses
  */
+
+
+
 export const ListMagazziniResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
-  "nome": zod.string(),
+  "nome": zod.string().min(1),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
   "zona": zod.string().nullish(),
@@ -91,9 +94,12 @@ export const ListMagazziniResponse = zod.array(ListMagazziniResponseItem)
  * Creates a warehouse. When tipoMagazzino is mensa, cittaId (the Area) is required and the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
+
+
+
 export const CreateMagazzinoBody = zod.object({
   "codice": zod.string().optional(),
-  "nome": zod.string(),
+  "nome": zod.string().min(1),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
   "zona": zod.string().optional(),
@@ -112,10 +118,13 @@ export const GetMagazzinoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const GetMagazzinoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
-  "nome": zod.string(),
+  "nome": zod.string().min(1),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
   "zona": zod.string().nullish(),
@@ -139,9 +148,12 @@ export const UpdateMagazzinoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const UpdateMagazzinoBody = zod.object({
   "codice": zod.string().optional(),
-  "nome": zod.string().optional(),
+  "nome": zod.string().min(1).optional(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
   "zona": zod.string().optional(),
@@ -155,10 +167,13 @@ export const UpdateMagazzinoBody = zod.object({
   "note": zod.string().optional()
 })
 
+
+
+
 export const UpdateMagazzinoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
-  "nome": zod.string(),
+  "nome": zod.string().min(1),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
   "zona": zod.string().nullish(),
@@ -5657,21 +5672,16 @@ export const GetImpostazioniEmailResponse = zod.object({
   "smtpSecure": zod.boolean(),
   "smtpUser": zod.string().nullish(),
   "hasPassword": zod.boolean(),
+  "smtpManagedByEnvironment": zod.boolean(),
   "dataAggiornamento": zod.string().optional()
-})
+}).describe('Le credenziali SMTP sono gestite esclusivamente tramite variabili MAIL_\* e secret di ambiente; i campi SMTP restituiti sono legacy e non usati dal runtime.')
 
 
 export const UpdateImpostazioniEmailBody = zod.object({
-  "provider": zod.enum(['connector', 'smtp']).optional(),
   "mittenteEmail": zod.string().nullish(),
   "mittenteNome": zod.string().nullish(),
-  "adminEmail": zod.string().nullish(),
-  "smtpHost": zod.string().nullish(),
-  "smtpPort": zod.number().nullish(),
-  "smtpSecure": zod.boolean().optional(),
-  "smtpUser": zod.string().nullish(),
-  "smtpPassword": zod.string().nullish()
-})
+  "adminEmail": zod.string().nullish()
+}).describe('Aggiorna solo metadati non sensibili. Server e credenziali SMTP devono essere configurati tramite MAIL_\* e secret di ambiente.')
 
 export const UpdateImpostazioniEmailResponse = zod.object({
   "provider": zod.enum(['connector', 'smtp']),
@@ -5683,8 +5693,9 @@ export const UpdateImpostazioniEmailResponse = zod.object({
   "smtpSecure": zod.boolean(),
   "smtpUser": zod.string().nullish(),
   "hasPassword": zod.boolean(),
+  "smtpManagedByEnvironment": zod.boolean(),
   "dataAggiornamento": zod.string().optional()
-})
+}).describe('Le credenziali SMTP sono gestite esclusivamente tramite variabili MAIL_\* e secret di ambiente; i campi SMTP restituiti sono legacy e non usati dal runtime.')
 
 
 export const GetImpostazioniModuliResponse = zod.object({
@@ -7627,7 +7638,7 @@ export const resetPasswordBodyNewPasswordMin = 8;
 
 export const ResetPasswordBody = zod.object({
   "token": zod.string().min(1),
-  "newPassword": zod.string().min(resetPasswordBodyNewPasswordMin),
+  "newPassword": zod.string().min(resetPasswordBodyNewPasswordMin).describe('Deve contenere almeno una lettera e un numero.'),
   "confirmPassword": zod.string().min(1).optional()
 })
 
@@ -7641,7 +7652,7 @@ export const changePasswordBodyNewPasswordMin = 8;
 
 
 export const ChangePasswordBody = zod.object({
-  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
+  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin).describe('Deve contenere almeno una lettera e un numero.')
 })
 
 
@@ -8343,7 +8354,7 @@ export const ListUtentiResponse = zod.array(ListUtentiResponseItem)
 
 
 
-export const createUtenteBodyPasswordMin = 6;
+export const createUtenteBodyPasswordMin = 8;
 
 
 
@@ -8352,7 +8363,7 @@ export const createUtenteBodyPasswordMin = 6;
 export const CreateUtenteBody = zod.object({
   "username": zod.string().min(1),
   "email": zod.string().min(1),
-  "password": zod.string().min(createUtenteBodyPasswordMin),
+  "password": zod.string().min(createUtenteBodyPasswordMin).describe('Deve contenere almeno una lettera e un numero.'),
   "nome": zod.string().min(1),
   "cognome": zod.string().min(1),
   "matricola": zod.string().nullish(),

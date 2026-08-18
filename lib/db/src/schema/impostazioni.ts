@@ -17,8 +17,9 @@ export type UpdateImpostazioniStampa = z.infer<typeof updateImpostazioniStampaSc
 export type ImpostazioniStampa = typeof impostazioniStampaTable.$inferSelect;
 
 // Singleton: una sola riga (id = 1) con la configurazione email.
-// provider: "connector" = connettore Gmail Replit (default); "smtp" = SMTP custom.
-// smtpPassword è write-only: mai restituita dalle API (solo flag hasPassword).
+// Campi SMTP mantenuti esclusivamente per compatibilità con installazioni legacy.
+// Il runtime usa solo MAIL_* da environment/secrets e non aggiorna più le
+// credenziali nel DB; una rimozione fisica richiederà una migration separata.
 export const impostazioniEmailTable = pgTable("impostazioni_email", {
   id: integer("id").primaryKey().default(1),
   provider: varchar("provider", { length: 20 }).notNull().default("connector"),

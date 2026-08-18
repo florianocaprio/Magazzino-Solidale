@@ -9,6 +9,7 @@ import type { MagazzinoInputTipoMagazzino } from './magazzinoInputTipoMagazzino'
 
 export interface MagazzinoInput {
   codice?: string;
+  /** @minLength 1 */
   nome: string;
   indirizzo?: string;
   comune?: string;

@@ -78,6 +78,7 @@ import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "@/lib/i18n";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { getGetMapsCapabilitiesQueryKey, useGetMapsCapabilities } from "@workspace/api-client-react";
+import { canManageGlobalAdminResources } from "@/lib/admin-scope";
 
 export type NavItem = {
   key: string;
@@ -89,6 +90,7 @@ export type NavItem = {
   moduloCodiciAll?: readonly string[];
   moduloCodiciAny?: readonly string[];
   superAdmin?: boolean;
+  globalAdmin?: boolean;
   public?: boolean;
   permission?: string;
   sourceAreas?: readonly string[];
@@ -476,6 +478,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: MapPin,
     groupKey: "amministrazione",
     area: "amministrazione",
+    globalAdmin: true,
   },
   {
     key: "zoneUds",
@@ -498,6 +501,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     groupKey: "amministrazione",
     area: "amministrazione",
+    globalAdmin: true,
   },
   {
     key: "ruoliVolontari",
@@ -506,6 +510,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "amministrazione",
     area: "amministrazione",
     moduloCodice: "VOLONTARI",
+    globalAdmin: true,
   },
   {
     key: "tipiIntervento",
@@ -514,6 +519,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "amministrazione",
     area: "amministrazione",
     moduloCodiciAny: ["CENTRO_ASCOLTO", "UDS"],
+    globalAdmin: true,
   },
   {
     key: "tipologieFornitore",
@@ -522,6 +528,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "amministrazione",
     area: "amministrazione",
     moduloCodice: "FORNITORI",
+    globalAdmin: true,
   },
   {
     key: "impostazioniStampa",
@@ -529,6 +536,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Printer,
     groupKey: "amministrazione",
     area: "amministrazione",
+    globalAdmin: true,
   },
 
   {
@@ -653,6 +661,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.superAdmin) return user?.isSuperAdmin === true;
+    if (item.globalAdmin && !canManageGlobalAdminResources(user)) return false;
     if (item.public) return true;
     if (item.key === "maps") {
       return canShowMapsNavigation(
