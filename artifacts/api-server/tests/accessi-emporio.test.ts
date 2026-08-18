@@ -29,15 +29,17 @@ const magazzinoIds: number[] = [];
 const beneficiarioIds: number[] = [];
 const consegnaIds: number[] = [];
 
-function makeApp(): Express {
+function makeApp(options: { isAdmin?: boolean; permessi?: string[] } = {}): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as unknown as { user: { id: number; centroAscoltoId: number | null; cittaId: number | null; isAdmin: boolean } }).user = {
+    (req as unknown as { user: { id: number; centroAscoltoId: number | null; cittaId: number | null; isAdmin: boolean; permessi: string[]; aree: string[] } }).user = {
       id: 1,
       centroAscoltoId: null,
       cittaId: null,
-      isAdmin: true,
+      isAdmin: options.isAdmin ?? true,
+      permessi: options.permessi ?? [],
+      aree: ["emporio"],
     };
     next();
   });
@@ -153,6 +155,16 @@ afterAll(async () => {
 });
 
 describe("Accessi Emporio", () => {
+  it("separa i permessi di lettura e gestione degli accessi", async () => {
+    const none = makeApp({ isAdmin: false, permessi: [] });
+    expect((await request(none).get("/accessi-emporio")).status).toBe(403);
+    expect((await request(none).post("/accessi-emporio").send({})).status).toBe(403);
+
+    const viewOnly = makeApp({ isAdmin: false, permessi: ["emporio.access.view"] });
+    expect((await request(viewOnly).get("/accessi-emporio")).status).toBe(200);
+    expect((await request(viewOnly).post("/accessi-emporio").send({})).status).toBe(403);
+  });
+
   it("crea un Accesso Emporio con beneficiario eleggibile", async () => {
     const { res } = await createAccesso();
     expect(res.status).toBe(201);
@@ -207,6 +219,18 @@ describe("Accessi Emporio", () => {
       .send({ beneficiarioId, magazzinoEmporioId: magazzinoId, dataOraInizio: "2026-07-10T09:00:00" });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe(creditoRichiestoMsg);
+  });
+
+  it("blocca un nuovo accesso per un beneficiario inattivo", async () => {
+    const cittaId = await createCitta();
+    const centroId = await createCentro(cittaId);
+    const magazzinoId = await createMagazzino("emporio", cittaId, centroId);
+    const beneficiarioId = await createBeneficiario({ cittaId, centroAscoltoId: centroId, attivo: false });
+    const res = await request(makeApp())
+      .post("/accessi-emporio")
+      .send({ beneficiarioId, magazzinoEmporioId: magazzinoId, dataOraInizio: "2026-07-10T09:00:00" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/non è attivo/i);
   });
 
   it("blocca beneficiario con Credito Solidale non attivo", async () => {

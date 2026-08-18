@@ -23,6 +23,8 @@ vi.mock("@workspace/api-client-react", () => ({
     options: unknown,
   ) => mocks.getMensaRiepilogo(params, options),
   useDeleteBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
+  useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn().mockResolvedValue({ autorizzato: true }) }),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useBulkBeneficiari: () => ({ mutate: vi.fn(), isPending: false }),
   useListCentriAscolto: () => ({ data: [] }),
@@ -59,7 +61,7 @@ vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
     user: { id: 1, cittaId: 1, centroAscoltoId: 2 },
     hasArea: (area: string) => mocks.areas.has(area),
-    hasPermission: (permission: string) => mocks.permissions.has(permission),
+    hasPermission: (permission: string) => permission.startsWith("beneficiari.") || mocks.permissions.has(permission),
   }),
 }));
 

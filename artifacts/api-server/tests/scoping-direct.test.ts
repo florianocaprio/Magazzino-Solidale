@@ -8,7 +8,7 @@ import utentiRouter from "../src/routes/utenti";
 import scarichiRouter from "../src/routes/scarichi";
 import approvvigionamentiRouter from "../src/routes/approvvigionamenti";
 import beneficiariRouter from "../src/routes/beneficiari";
-import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentro, createMagazzino, createProdotto, createBeneficiario, createCitta, createFornitore, createVolontario, createMezzo, createRuolo, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
+import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentroRec, createMagazzino, createProdotto, createBeneficiario, createCitta, createFornitore, createVolontario, createMezzo, createRuolo, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
 
 /**
  * Centro scoping for direct-column entities: each row carries its own
@@ -33,10 +33,10 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   scope = newScope();
-  centroA = await createCentro(scope);
-  centroB = await createCentro(scope);
   cittaA = await createCitta(scope);
   cittaB = await createCitta(scope);
+  centroA = (await createCentroRec(scope, { cittaId: cittaA })).id;
+  centroB = (await createCentroRec(scope, { cittaId: cittaB })).id;
 });
 
 afterEach(async () => {
@@ -364,6 +364,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     ).get("/beneficiari");
     expect(res.status).toBe(200);
@@ -391,6 +392,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     ).get(`/beneficiari/${bB}`);
     expect(res.status).toBe(403);
@@ -401,6 +403,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     )
       .post("/beneficiari")
@@ -421,10 +424,11 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     )
       .patch(`/beneficiari/${bB}`)
-      .send({ nome: "Hack" });
+      .send({ nome: "Hack", versione: 1 });
     expect(res.status).toBe(403);
   });
 
@@ -434,6 +438,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     ).delete(`/beneficiari/${bB}`);
     expect(res.status).toBe(403);
@@ -444,6 +449,7 @@ describe("Beneficiari — scoping per centro", () => {
     const appA = makeScopedApp(beneficiariRouter, {
       id: operatoreId,
       centroAscoltoId: centroA,
+      cittaId: cittaA,
     });
     expect((await request(appA).get(`/beneficiari/${bB}/nucleo`)).status).toBe(403);
     expect((await request(appA).post(`/beneficiari/${bB}/nucleo`).send({})).status).toBe(403);

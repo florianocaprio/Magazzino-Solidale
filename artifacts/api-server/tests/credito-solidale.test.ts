@@ -27,7 +27,13 @@ async function setEmporioEnabled(enabled: boolean): Promise<void> {
   await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
-function makeApp(user: { centroAscoltoId: number | null; cittaId: number | null; isAdmin?: boolean }): Express {
+function makeApp(user: {
+  centroAscoltoId: number | null;
+  cittaId: number | null;
+  isAdmin?: boolean;
+  aree?: string[];
+  permessi?: string[];
+}): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -35,6 +41,8 @@ function makeApp(user: { centroAscoltoId: number | null; cittaId: number | null;
       id: 1,
       ...user,
       isAdmin: user.isAdmin ?? true,
+      aree: user.aree ?? ["sociale", "uds", "emporio"],
+      permessi: user.permessi ?? [],
     };
     next();
   });
@@ -244,6 +252,38 @@ describe("Politiche Credito Solidale", () => {
 });
 
 describe("Movimenti Credito Solidale", () => {
+  it.each(["sociale", "uds"])("nega ricarica, rettifica e storno all'operatore %s senza credito.adjust", async (area) => {
+    const beneficiarioId = await createBeneficiario({
+      cittaId: null,
+      creditoSolidaleAbilitato: true,
+      creditoSolidaleStato: "attivo",
+    });
+    const denied = makeApp({ centroAscoltoId: null, cittaId: null, isAdmin: false, aree: [area], permessi: [] });
+    expect((await request(denied).post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`).send({ variazioneCredito: 10, motivo: "No" })).status).toBe(403);
+    expect((await request(denied).post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`).send({ variazioneCredito: 10, motivo: "No" })).status).toBe(403);
+    expect((await request(denied).post("/credito-solidale/movimenti/1/storno").send({ motivo: "No" })).status).toBe(403);
+  });
+
+  it("separa credito.adjust da credito.monthly.execute", async () => {
+    const adjustOnly = makeApp({
+      centroAscoltoId: null,
+      cittaId: null,
+      isAdmin: false,
+      aree: ["sociale"],
+      permessi: ["credito.adjust"],
+    });
+    expect((await request(adjustOnly).post("/credito-solidale/ricariche-mensili/esegui").send({})).status).toBe(403);
+    const monthlyOnly = makeApp({
+      centroAscoltoId: null,
+      cittaId: null,
+      isAdmin: false,
+      aree: ["sociale"],
+      permessi: ["credito.monthly.execute"],
+    });
+    const beneficiarioId = await createBeneficiario({ creditoSolidaleAbilitato: true, creditoSolidaleStato: "attivo" });
+    expect((await request(monthlyOnly).post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`).send({ variazioneCredito: 10, motivo: "No" })).status).toBe(403);
+  });
+
   it("crea una ricarica manuale e aggiorna il saldo solo tramite movimento", async () => {
     const beneficiarioId = await createBeneficiario({
       creditoSolidaleAbilitato: true,

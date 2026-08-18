@@ -1348,6 +1348,8 @@ describe("Modulo Mensa", () => {
     const permissions = [
       ...MENSA_PERMISSIONS.map((item) => item.key),
       "beneficiari.cards.manage",
+      "beneficiari.view",
+      "beneficiari.manage",
     ];
     const app = makeApp(fixture, permissions);
     await db
@@ -1368,7 +1370,7 @@ describe("Modulo Mensa", () => {
 
     const incomplete = await request(app)
       .patch(`/beneficiari/${fixture.beneficiaryId}`)
-      .send({ statoAnagrafica: "completa" });
+      .send({ statoAnagrafica: "completa", versione: 1 });
     expect(incomplete.status).toBe(400);
     const [center] = await db.insert(centriAscoltoTable)
       .values({ nome: `Centro ${rnd()}`, cittaId: fixture.romeId })
@@ -1379,6 +1381,7 @@ describe("Modulo Mensa", () => {
       centroAscoltoId: center.id,
       sesso: "M",
       fasciaEtaPresunta: "30_64",
+      versione: 1,
     });
     expect(completed.status).toBe(200);
     expect(completed.body.statoAnagrafica).toBe("completa");

@@ -15,6 +15,7 @@ import {
   zoneUdsTable,
 } from "@workspace/db";
 import beneficiariRouter from "../src/routes/beneficiari";
+import creditoSolidaleRouter from "../src/routes/credito-solidale";
 import impostazioniModuliRouter from "../src/routes/impostazioni-moduli";
 import magazziniRouter from "../src/routes/magazzini";
 import politicheCreditoSolidaleRouter from "../src/routes/politiche-credito-solidale";
@@ -64,6 +65,7 @@ function makeApp(isSuperAdmin = false): Express {
   app.use(magazziniRouter);
   app.use(prodottiRouter);
   app.use(beneficiariRouter);
+  app.use(creditoSolidaleRouter);
   app.use(zoneUdsRouter);
   app.use(politicheCreditoSolidaleRouter);
   return app;
@@ -153,15 +155,20 @@ describe("Impostazioni moduli", () => {
     expect(prodotto.status).toBe(403);
     expect(prodotto.body.error).toBe(EMPORIO_DISABLED_MSG);
 
-    const beneficiarioCredito = await request(app)
+    const beneficiario = await request(app)
       .post("/beneficiari")
-      .send({ nome: "Credito", cognome: rnd(), sesso: "M", centroAscoltoId: centroId, creditoSolidaleAbilitato: true });
+      .send({ nome: "Credito", cognome: rnd(), sesso: "M", cittaId, centroAscoltoId: centroId });
+    expect(beneficiario.status).toBe(201);
+    beneficiarioIds.push(beneficiario.body.id);
+    const beneficiarioCredito = await request(app)
+      .patch(`/credito-solidale/beneficiari/${beneficiario.body.id}/configurazione`)
+      .send({ creditoSolidaleAbilitato: true });
     expect(beneficiarioCredito.status).toBe(403);
     expect(beneficiarioCredito.body.error).toBe(EMPORIO_DISABLED_MSG);
 
     const beneficiarioQuota = await request(app)
-      .post("/beneficiari")
-      .send({ nome: "Quota", cognome: rnd(), sesso: "F", creditoSolidaleMensileAssegnato: 40 });
+      .patch(`/credito-solidale/beneficiari/${beneficiario.body.id}/configurazione`)
+      .send({ creditoSolidaleMensileAssegnato: 40 });
     expect(beneficiarioQuota.status).toBe(403);
     expect(beneficiarioQuota.body.error).toBe(EMPORIO_DISABLED_MSG);
 
@@ -177,21 +184,28 @@ describe("Impostazioni moduli", () => {
     const cittaId = await createCitta();
     const centroId = await createCentro(cittaId);
 
-    const res = await request(makeApp())
+    const app = makeApp();
+    const created = await request(app)
       .post("/beneficiari")
       .send({
         nome: "Quota",
         cognome: rnd(),
         sesso: "M",
+        cittaId,
         centroAscoltoId: centroId,
+      });
+    expect(created.status).toBe(201);
+    beneficiarioIds.push(created.body.id);
+    const res = await request(app)
+      .patch(`/credito-solidale/beneficiari/${created.body.id}/configurazione`)
+      .send({
         creditoSolidaleAbilitato: true,
         creditoSolidaleMensileAssegnato: 70,
         creditoSolidaleMensileSuggerito: 60,
         creditoSolidaleMotivoModifica: "Esigenza temporanea",
       });
 
-    expect(res.status).toBe(201);
-    beneficiarioIds.push(res.body.id);
+    expect(res.status).toBe(200);
     expect(res.body.creditoSolidaleMensileAssegnato).toBe(70);
     expect(res.body.creditoSolidaleMensileManuale).toBe(true);
     expect(res.body.creditoSolidaleMotivoModifica).toBe("Esigenza temporanea");
@@ -223,7 +237,7 @@ describe("Impostazioni moduli", () => {
 
     const patchUds = await request(app)
       .patch(`/beneficiari/${beneficiario.id}`)
-      .send({ uds: true, cittaId });
+      .send({ uds: true, cittaId, versione: 1 });
     expect(patchUds.status).toBe(403);
     expect(patchUds.body.error).toBe(UDS_DISABLED_MSG);
   });

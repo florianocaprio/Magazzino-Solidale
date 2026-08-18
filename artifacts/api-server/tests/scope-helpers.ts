@@ -27,6 +27,7 @@ import {
   turniVolontariTable,
   cittaTable,
   zoneUdsTable,
+  auditConfigurazioniTable,
 } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 
@@ -76,7 +77,8 @@ export function makeScopedApp(
       cittaId: user.cittaId ?? null,
       zonaUdsId: user.zonaUdsId ?? null,
       aree: user.aree ?? ["sociale", "uds"],
-      permessi: user.permessi ?? [],
+      // Questi test isolano lo scoping territoriale, non l'RBAC.
+      permessi: user.permessi ?? ["beneficiari.view", "beneficiari.manage", "beneficiari.sensitive.view", "beneficiari.deactivate"],
       isAdmin: user.isAdmin ?? false,
       isSuperAdmin: user.isSuperAdmin ?? false,
     };
@@ -642,6 +644,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   }
   if (scope.utenteIds.length > 0) {
     await db.delete(interventiTable).where(inArray(interventiTable.operatoreId, scope.utenteIds));
+    await db
+      .delete(auditConfigurazioniTable)
+      .where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
     await db.delete(utentiTable).where(inArray(utentiTable.id, scope.utenteIds));
   }
   if (scope.ruoloIds.length > 0) {
