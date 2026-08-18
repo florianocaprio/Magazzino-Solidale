@@ -38,10 +38,13 @@ import {
 import {
   callerCittaId,
   callerCentroId,
+  callerZonaUdsId,
   canAccessCitta,
   canAccessMagazzino,
+  centroScopeFilter,
   cittaScopeFilter,
   visibleMagazzinoIds,
+  zonaUdsScopeFilter,
 } from "../lib/centroScope";
 import { isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
@@ -66,6 +69,7 @@ const ABILITAZIONE_STATI = [
   "scaduta",
 ] as const;
 const TESSERA_STATI = ["attiva", "sospesa", "revocata", "scaduta"] as const;
+const MAX_RIEPILOGO_BENEFICIARI_IDS = 500;
 const ACCESSO_MOTIVI = {
   CONSENTITO: "CONSENTITO",
   TESSERA_NON_VALIDA: "TESSERA_NON_VALIDA",
@@ -87,6 +91,10 @@ const ACCESSO_MOTIVI = {
 type AbilitazioneStato = (typeof ABILITAZIONE_STATI)[number];
 type TesseraStato = (typeof TESSERA_STATI)[number];
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function isAbilitazioneStato(value: unknown): value is AbilitazioneStato {
+  return typeof value === "string" && ABILITAZIONE_STATI.some((stato) => stato === value);
+}
 
 class MensaError extends Error {
   constructor(
@@ -119,6 +127,22 @@ function positiveInt(value: unknown, field: string): number {
 function optionalPositiveInt(value: unknown, field: string): number | null {
   if (value == null || value === "") return null;
   return positiveInt(value, field);
+}
+
+function beneficiarioIdsQuery(value: unknown): number[] {
+  if (value == null || value === "") return [];
+  if (typeof value !== "string") {
+    throw new MensaError(400, "beneficiarioIds non valido");
+  }
+  const parts = value.split(",");
+  if (parts.some((part) => !/^\d+$/.test(part))) {
+    throw new MensaError(400, "beneficiarioIds deve contenere ID positivi separati da virgola");
+  }
+  const ids = [...new Set(parts.map((part) => positiveInt(part, "beneficiarioIds")))];
+  if (ids.length > MAX_RIEPILOGO_BENEFICIARI_IDS) {
+    throw new MensaError(400, `Sono consentiti al massimo ${MAX_RIEPILOGO_BENEFICIARI_IDS} beneficiari`);
+  }
+  return ids;
 }
 
 function text(value: unknown, field: string, max: number): string {
@@ -351,6 +375,77 @@ function formatAbilitazione(row: {
     createdAt: row.abilitazione.createdAt.toISOString(),
     versione: row.abilitazione.updatedAt.toISOString(),
   };
+}
+
+type MensaRiepilogoStato = AbilitazioneStato | "programmata" | "non_abilitato";
+type MensaRiepilogoHistoryRow = {
+  id: number;
+  dataInizio: string;
+  dataFine: string | null;
+  stato: AbilitazioneStato;
+  mensaPrincipale: boolean;
+};
+
+export function riepilogoAbilitazioneMensa(records: readonly MensaRiepilogoHistoryRow[], today: string) {
+  const current = records.find((item) =>
+    item.mensaPrincipale && item.stato === "attiva" && item.dataInizio <= today
+    && (item.dataFine == null || item.dataFine >= today));
+  const shown = current ?? records.find((item) => item.mensaPrincipale) ?? records[0] ?? null;
+  if (!shown) {
+    return { stato: "non_abilitato" as const };
+  }
+  const stato: MensaRiepilogoStato = shown.stato === "attiva" && shown.dataInizio > today
+    ? "programmata"
+    : shown.stato === "attiva" && shown.dataFine != null && shown.dataFine < today
+      ? "scaduta"
+      : shown.stato;
+  return { stato };
+}
+
+async function loadRiepilogoAbilitazioniBeneficiari(req: Request, beneficiarioIds: number[]) {
+  if (beneficiarioIds.length === 0) return [];
+  const conditions: SQL[] = [inArray(beneficiariTable.id, beneficiarioIds)];
+  const scopes = [
+    centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req)),
+    cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req)),
+    zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req)),
+  ];
+  for (const scope of scopes) if (scope) conditions.push(scope);
+
+  // Una sola query batch, limitata agli ID richiesti e senza PII.
+  const rows = await db
+    .select({
+      beneficiarioId: beneficiariTable.id,
+      id: mensaAbilitazioniTable.id,
+      dataInizio: mensaAbilitazioniTable.dataInizio,
+      dataFine: mensaAbilitazioniTable.dataFine,
+      stato: mensaAbilitazioniTable.stato,
+      mensaPrincipale: mensaAbilitazioniTable.mensaPrincipale,
+    })
+    .from(beneficiariTable)
+    .leftJoin(mensaAbilitazioniTable, eq(mensaAbilitazioniTable.beneficiarioId, beneficiariTable.id))
+    .where(and(...conditions))
+    .orderBy(desc(mensaAbilitazioniTable.createdAt), desc(mensaAbilitazioniTable.id));
+
+  const histories = new Map<number, MensaRiepilogoHistoryRow[]>();
+  for (const row of rows) {
+    const records = histories.get(row.beneficiarioId) ?? [];
+    if (row.id != null && row.dataInizio != null && isAbilitazioneStato(row.stato) && row.mensaPrincipale != null) {
+      records.push({
+        id: row.id,
+        dataInizio: row.dataInizio,
+        dataFine: row.dataFine,
+        stato: row.stato,
+        mensaPrincipale: row.mensaPrincipale,
+      });
+    }
+    histories.set(row.beneficiarioId, records);
+  }
+  const today = dataServizioMensa();
+  return beneficiarioIds.flatMap((beneficiarioId) => {
+    const history = histories.get(beneficiarioId);
+    return history == null ? [] : [{ beneficiarioId, ...riepilogoAbilitazioneMensa(history, today) }];
+  });
 }
 
 async function loadAbilitazione(id: number) {
@@ -2097,6 +2192,20 @@ router.get(
         .orderBy(desc(beneficiariTable.id))
         .limit(20);
       res.json(rows);
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.get(
+  "/mensa/abilitazioni/riepilogo-beneficiari",
+  requirePermission("mensa.view"),
+  async (req, res) => {
+    try {
+      const beneficiarioIds = beneficiarioIdsQuery(req.query.beneficiarioIds);
+      res.json(await loadRiepilogoAbilitazioniBeneficiari(req, beneficiarioIds));
     } catch (error) {
       if (sendMensaError(error, res)) return;
       throw error;

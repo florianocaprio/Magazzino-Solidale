@@ -36,6 +36,14 @@ import {
   syncInterventoBolla,
 } from "../lib/bollaDelivery";
 import { requireAllModuli } from "../lib/featureFlags";
+import { isDateOnly } from "../lib/interventiWorkflow";
+import {
+  ConsegnaPlanningError,
+  isFasciaConsegna,
+  syncTurnoDaConsegnaTx,
+  validateConsegnaPlanningTx,
+} from "../lib/consegneTurni";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -146,6 +154,9 @@ async function buildDettaglio(id: number) {
     noteConsegna: row.b.noteConsegna ?? null,
     confermaRicezione: row.b.confermaRicezione,
     noteRicezione: row.b.noteRicezione ?? null,
+    ritiroNonEffettuatoAt: row.b.ritiroNonEffettuatoAt?.toISOString() ?? null,
+    ritiroNonEffettuatoOperatoreId: row.b.ritiroNonEffettuatoOperatoreId ?? null,
+    ritiroNonEffettuatoMotivo: row.b.ritiroNonEffettuatoMotivo ?? null,
     operatoreId: row.b.operatoreId ?? null,
     operatoreCodice: row.operatoreMatricola ?? row.operatoreUsername ?? null,
     dataCreazione: row.b.dataCreazione.toISOString(),
@@ -416,6 +427,9 @@ router.get("/bolle", async (req, res) => {
     noteConsegna: r.b.noteConsegna ?? null,
     confermaRicezione: r.b.confermaRicezione,
     noteRicezione: r.b.noteRicezione ?? null,
+    ritiroNonEffettuatoAt: r.b.ritiroNonEffettuatoAt?.toISOString() ?? null,
+    ritiroNonEffettuatoOperatoreId: r.b.ritiroNonEffettuatoOperatoreId ?? null,
+    ritiroNonEffettuatoMotivo: r.b.ritiroNonEffettuatoMotivo ?? null,
     operatoreId: r.b.operatoreId ?? null,
     operatoreCodice: r.operatoreMatricola ?? r.operatoreUsername ?? null,
     dataCreazione: r.b.dataCreazione.toISOString(),
@@ -764,6 +778,184 @@ router.post("/bolle/:id/consegna", async (req, res) => {
   const det = await buildDettaglio(bollaId);
   res.json(det);
 });
+
+// ─── ESITO RITIRO (separato dallo stato logistico) ──────────────────────────
+
+router.post("/bolle/:id/ritiro-non-effettuato", async (req, res) => {
+  const bollaId = Number(req.params.id);
+  if (!Number.isInteger(bollaId) || bollaId <= 0) {
+    res.status(400).json({ error: "ID bolla non valido" }); return;
+  }
+  const motivoRaw = req.body?.motivo;
+  if (motivoRaw != null && typeof motivoRaw !== "string") {
+    res.status(400).json({ error: "Il motivo deve essere testuale" }); return;
+  }
+  const motivo = typeof motivoRaw === "string" ? motivoRaw.trim() || null : null;
+  if (motivo && motivo.length > 500) {
+    res.status(400).json({ error: "Il motivo non può superare 500 caratteri" }); return;
+  }
+  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
+  if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" }); return;
+  }
+  try {
+    const recorded = await db.transaction(async (tx) => {
+      const current = await lockBolla(tx, bollaId);
+      if (current.consegnaId != null) throw new BollaActionError(409, "La bolla è già associata a una consegna");
+      if (current.stato !== "confermato") throw new BollaActionError(409, "Il ritiro non effettuato è registrabile solo su una bolla confermata per il ritiro in sede");
+      if (current.ritiroNonEffettuatoAt != null) return false;
+      await tx.update(bolleTable).set({
+        ritiroNonEffettuatoAt: new Date(),
+        ritiroNonEffettuatoOperatoreId: req.user!.id,
+        ritiroNonEffettuatoMotivo: motivo,
+        operatoreId: req.user!.id,
+      }).where(eq(bolleTable.id, bollaId));
+      return true;
+    });
+    if (recorded) logger.info({ bollaId, operatoreId: req.user!.id }, "Ritiro bolla segnato come non effettuato");
+  } catch (error) {
+    if (handleBollaActionError(error, res)) return;
+    throw error;
+  }
+  res.json(await buildDettaglio(bollaId));
+});
+
+router.post(
+  "/bolle/:id/converti-consegna",
+  requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]),
+  async (req, res) => {
+  const bollaId = Number(req.params.id);
+  if (!Number.isInteger(bollaId) || bollaId <= 0) {
+    res.status(400).json({ error: "ID bolla non valido" }); return;
+  }
+  const body = req.body ?? {};
+  const indirizzoConsegna = typeof body.indirizzoConsegna === "string" ? body.indirizzoConsegna.trim() : "";
+  if (!indirizzoConsegna || indirizzoConsegna.length > 200) {
+    res.status(400).json({ error: "Indirizzo di consegna obbligatorio (massimo 200 caratteri)" }); return;
+  }
+  if (!isDateOnly(body.dataPrevista)) {
+    res.status(400).json({ error: "dataPrevista deve essere una data YYYY-MM-DD" }); return;
+  }
+  const fasciaOraria = body.fasciaOraria === undefined || body.fasciaOraria === null
+    ? null
+    : typeof body.fasciaOraria === "string" && isFasciaConsegna(body.fasciaOraria.trim())
+      ? body.fasciaOraria.trim()
+      : undefined;
+  if (fasciaOraria === undefined) {
+    res.status(400).json({ error: "fasciaOraria non valida: usare Mattina, Pomeriggio o Sera" }); return;
+  }
+  const requestedVolontarioId = body.volontarioId === undefined
+    ? undefined
+    : body.volontarioId === null
+      ? null
+      : Number.isInteger(body.volontarioId) && body.volontarioId > 0
+        ? body.volontarioId
+        : false;
+  if (requestedVolontarioId === false) {
+    res.status(400).json({ error: "volontarioId non valido" }); return;
+  }
+  const requestedMezzoId = body.mezzoId === undefined
+    ? undefined
+    : body.mezzoId === null
+      ? null
+      : Number.isInteger(body.mezzoId) && body.mezzoId > 0
+        ? body.mezzoId
+        : false;
+  if (requestedMezzoId === false) {
+    res.status(400).json({ error: "mezzoId non valido" }); return;
+  }
+  if (body.mezzoAltro !== undefined && typeof body.mezzoAltro !== "boolean") {
+    res.status(400).json({ error: "mezzoAltro deve essere booleano" }); return;
+  }
+  if (body.volontarioAltro !== undefined && body.volontarioAltro !== null && typeof body.volontarioAltro !== "string") {
+    res.status(400).json({ error: "volontarioAltro deve essere testuale o NULL" }); return;
+  }
+  if (body.noteOperative !== undefined && body.noteOperative !== null && typeof body.noteOperative !== "string") {
+    res.status(400).json({ error: "noteOperative deve essere testuale o NULL" }); return;
+  }
+  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
+  if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" }); return;
+  }
+  let result: { consegna: typeof consegneTable.$inferSelect; existing: boolean };
+  try {
+    result = await db.transaction(async (tx) => {
+      const current = await lockBolla(tx, bollaId);
+      if (current.ritiroNonEffettuatoAt == null) throw new BollaActionError(409, "La bolla non è marcata come ritiro non effettuato");
+      if (current.stato !== "confermato") throw new BollaActionError(409, "La bolla non è più convertibile");
+      if (current.consegnaId != null) {
+        const [linked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, current.consegnaId));
+        if (!linked) throw new BollaActionError(409, "La bolla risulta già convertita ma la consegna collegata non è disponibile");
+        const planning = await validateConsegnaPlanningTx(tx, linked, { excludeConsegnaId: linked.id });
+        await syncTurnoDaConsegnaTx(tx, linked, planning.centroAscoltoId);
+        return { consegna: linked, existing: true };
+      }
+      const volontarioId = requestedVolontarioId === undefined ? current.volontarioConsegnaId : requestedVolontarioId;
+      const volontarioAltro = body.volontarioAltro === undefined
+        ? current.trasportatoreNome
+        : typeof body.volontarioAltro === "string"
+          ? body.volontarioAltro.trim() || null
+          : null;
+      const mezzoId = requestedMezzoId === undefined ? current.mezzoId : requestedMezzoId;
+      const mezzoAltro = body.mezzoAltro !== undefined
+        ? body.mezzoAltro
+        : requestedMezzoId === undefined
+          ? current.mezzoAltro
+          : false;
+      if (volontarioId != null && volontarioAltro) {
+        throw new ConsegnaPlanningError(400, "Indicare un volontario censito oppure Altro, non entrambi");
+      }
+      if (mezzoId != null && mezzoAltro) {
+        throw new ConsegnaPlanningError(400, "Indicare un mezzo censito oppure Altro, non entrambi");
+      }
+      const planningInput = {
+        beneficiarioId: current.beneficiarioId,
+        dataPrevista: body.dataPrevista,
+        fasciaOraria,
+        volontarioId,
+        mezzoId,
+        mezzoAltro,
+      };
+      const planning = await validateConsegnaPlanningTx(tx, planningInput);
+      const codice = `CON-${Date.now()}-${bollaId}`.slice(0, 30);
+      const [created] = await tx.insert(consegneTable).values({
+        codice,
+        beneficiarioId: current.beneficiarioId,
+        tipoPianificazione: "consegna_pacco",
+        tipoConsegna: "domicilio",
+        dataPrevista: body.dataPrevista,
+        fasciaOraria,
+        indirizzoConsegna,
+        zona: null,
+        magazzinoId: current.magazzinoId,
+        volontarioId,
+        volontarioAltro,
+        mezzoId,
+        mezzoAltro,
+        stato: "pianificata",
+        noteOperative: typeof body.noteOperative === "string" ? body.noteOperative.trim() || null : null,
+      }).returning();
+      await tx.update(bolleTable).set({
+        consegnaId: created.id,
+        indirizzoConsegna,
+        operatoreId: req.user!.id,
+      }).where(eq(bolleTable.id, bollaId));
+      await syncTurnoDaConsegnaTx(tx, created, planning.centroAscoltoId);
+      return { consegna: created, existing: false };
+    });
+  } catch (error) {
+    if (error instanceof ConsegnaPlanningError) {
+      res.status(error.status).json({ error: error.message }); return;
+    }
+    if (handleBollaActionError(error, res)) return;
+    throw error;
+  }
+  if (!result.existing) logger.info({ bollaId, consegnaId: result.consegna.id, operatoreId: req.user!.id }, "Bolla convertita in consegna domiciliare");
+  res.status(result.existing ? 200 : 201).json({ created: !result.existing, consegnaId: result.consegna.id, codice: result.consegna.codice });
+  },
+);
 
 // ─── ANNULLA ──────────────────────────────────────────────────────────────────
 

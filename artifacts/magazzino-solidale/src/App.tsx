@@ -16,6 +16,7 @@ import { useIdleLogout } from "@/lib/use-idle-logout";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
+import { canAccessMapsApplication } from "@/lib/maps-access";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const IDLE_KEEPALIVE_MS = 5 * 60 * 1000;
@@ -66,6 +67,7 @@ import SuperAdminAuditConfigurazioni from "@/pages/super-admin-audit-configurazi
 import SuperAdminLogSistema from "@/pages/super-admin-log-sistema";
 import SostieniProgetto from "@/pages/sostieni-progetto";
 import MensaPage, { type MensaView } from "@/pages/mensa";
+import MapsOperativa from "@/pages/maps";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -179,6 +181,14 @@ function RequirePermission({
   return <>{children}</>;
 }
 
+export function RequireMapsAccess({ children }: { children: React.ReactNode }) {
+  const { user, hasArea, hasPermission } = useAuth();
+  if (!canAccessMapsApplication(user, hasArea, hasPermission)) {
+    return <NotAuthorized />;
+  }
+  return <>{children}</>;
+}
+
 function MensaRoute({ view, permission }: { view: MensaView; permission: string }) {
   return (
     <Guard area="mensa">
@@ -231,6 +241,13 @@ function AppRoutes() {
             <Guard area="amministrazione">
               <Magazzini />
             </Guard>
+          )}
+        </Route>
+        <Route path="/maps">
+          {() => (
+            <RequireMapsAccess>
+              <MapsOperativa />
+            </RequireMapsAccess>
           )}
         </Route>
         <Route path="/prodotti">

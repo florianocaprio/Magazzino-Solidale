@@ -2,11 +2,26 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { listBeneficiari } = vi.hoisted(() => ({ listBeneficiari: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  listBeneficiari: vi.fn(),
+  getMensaRiepilogo: vi.fn(),
+  areas: new Set<string>(),
+  permissions: new Set<string>(),
+  mensaAbilitato: true,
+}));
 
 vi.mock("@workspace/api-client-react", () => ({
-  useListBeneficiari: (params: unknown) => listBeneficiari(params),
-  useCreateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
+  useListBeneficiari: (params: unknown) => mocks.listBeneficiari(params),
+  useCreateBeneficiario: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateMensaAbilitazione: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useListMense: () => ({ data: [], isLoading: false }),
+  useGetMensaAbilitazioniRiepilogoBeneficiari: (
+    params: unknown,
+    options: unknown,
+  ) => mocks.getMensaRiepilogo(params, options),
   useDeleteBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useBulkBeneficiari: () => ({ mutate: vi.fn(), isPending: false }),
@@ -20,6 +35,12 @@ vi.mock("@workspace/api-client-react", () => ({
   getGetBeneficiarioQueryKey: (id: number) => ["beneficiari", id],
   getCercaBeneficiariSimiliQueryKey: () => ["beneficiari", "simili"],
   getListCittaQueryKey: () => ["citta"],
+  getListMensaAbilitazioniQueryKey: () => ["mensa-abilitazioni"],
+  getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey: (params?: unknown) => [
+    "mensa-riepilogo",
+    params,
+  ],
+  getListMenseQueryKey: () => ["mense"],
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -35,7 +56,11 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
-  useAuth: () => ({ user: { id: 1, cittaId: 1, centroAscoltoId: 2 } }),
+  useAuth: () => ({
+    user: { id: 1, cittaId: 1, centroAscoltoId: 2 },
+    hasArea: (area: string) => mocks.areas.has(area),
+    hasPermission: (permission: string) => mocks.permissions.has(permission),
+  }),
 }));
 
 vi.mock("@/lib/use-moduli", () => ({
@@ -44,6 +69,7 @@ vi.mock("@/lib/use-moduli", () => ({
   useModuloFlags: () => ({
     emporioAbilitato: true,
     unitaStradaAbilitata: true,
+    mensaAbilitato: mocks.mensaAbilitato,
   }),
 }));
 
@@ -69,7 +95,10 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
-    listBeneficiari.mockReturnValue({
+    mocks.areas = new Set(["mensa"]);
+    mocks.permissions = new Set();
+    mocks.mensaAbilitato = true;
+    mocks.listBeneficiari.mockReturnValue({
       data: [
         {
           id: 10,
@@ -86,6 +115,11 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
         },
       ],
       isLoading: false,
+    });
+    mocks.getMensaRiepilogo.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
     });
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -107,8 +141,166 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
       document.querySelectorAll('[role="combobox"]'),
     ).find((element) => element.textContent?.includes("Tutte le anagrafiche"));
     expect(filter).toBeDefined();
-    expect(listBeneficiari).toHaveBeenCalledWith(
+    expect(mocks.listBeneficiari).toHaveBeenCalledWith(
       expect.objectContaining({ statoAnagrafica: undefined }),
     );
+  });
+
+  it("non abilita richieste né UI Mensa quando il modulo è disattivato", async () => {
+    mocks.mensaAbilitato = false;
+    mocks.permissions = new Set(["mensa.view", "mensa.eligibility.manage"]);
+
+    await act(async () => root.render(<Beneficiari />));
+
+    expect(mocks.getMensaRiepilogo).toHaveBeenCalledWith(
+      { beneficiarioIds: "10" },
+      expect.objectContaining({
+        query: expect.objectContaining({ enabled: false }),
+      }),
+    );
+    expect(document.body.textContent).not.toContain("NON ABILITATO");
+  });
+
+  it("mostra l'abilitazione nel nuovo beneficiario solo a chi può gestirla", async () => {
+    mocks.permissions = new Set(["mensa.view"]);
+    await act(async () => root.render(<Beneficiari />));
+    const newButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("beneficiari.newBeneficiario"),
+    );
+    await act(async () => newButton?.click());
+    expect(
+      document.querySelector('[data-testid="nuova-abilitazione-mensa"]'),
+    ).toBeNull();
+
+    mocks.permissions.add("mensa.eligibility.manage");
+    await act(async () => root.render(<Beneficiari />));
+    expect(
+      document.querySelector('[data-testid="nuova-abilitazione-mensa"]'),
+    ).not.toBeNull();
+  });
+
+  it.each([
+    {
+      label: "manca l'area Mensa",
+      areas: [] as string[],
+      permissions: ["mensa.view", "mensa.eligibility.manage"],
+    },
+    {
+      label: "manca mensa.view",
+      areas: ["mensa"],
+      permissions: ["mensa.eligibility.manage"],
+    },
+  ])(
+    "non mostra né abilita query Mensa quando $label",
+    async ({ areas, permissions }) => {
+      mocks.areas = new Set(areas);
+      mocks.permissions = new Set(permissions);
+
+      await act(async () => root.render(<Beneficiari />));
+
+      expect(document.body.textContent).not.toContain("NON ABILITATO");
+      expect(mocks.getMensaRiepilogo).toHaveBeenCalledWith(
+        { beneficiarioIds: "10" },
+        expect.objectContaining({
+          query: expect.objectContaining({ enabled: false }),
+        }),
+      );
+    },
+  );
+
+  it("non abilita la query riepilogo quando la lista è vuota", async () => {
+    mocks.areas = new Set(["mensa"]);
+    mocks.permissions = new Set(["mensa.view"]);
+    mocks.listBeneficiari.mockReturnValue({ data: [], isLoading: false });
+
+    await act(async () => root.render(<Beneficiari />));
+
+    expect(mocks.getMensaRiepilogo).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({
+        query: expect.objectContaining({ enabled: false }),
+      }),
+    );
+  });
+
+  it("usa una sola query aggregata e mostra gli stati Mensa in tabella", async () => {
+    mocks.permissions = new Set(["mensa.view"]);
+    mocks.listBeneficiari.mockReturnValue({
+      data: [
+        {
+          id: 10,
+          codice: "BEN-10",
+          cognome: "Attiva",
+          nome: "Persona",
+          statoAnagrafica: "completa",
+          priorita: "media",
+          numComponenti: 1,
+          creditoSolidaleStato: "non_abilitato",
+          consegnaDomicilio: false,
+          uds: false,
+          attivo: true,
+        },
+        {
+          id: 11,
+          codice: "BEN-11",
+          cognome: "Programmata",
+          nome: "Persona",
+          statoAnagrafica: "completa",
+          priorita: "media",
+          numComponenti: 1,
+          creditoSolidaleStato: "non_abilitato",
+          consegnaDomicilio: false,
+          uds: false,
+          attivo: true,
+        },
+        {
+          id: 12,
+          codice: "BEN-12",
+          cognome: "Senza",
+          nome: "Persona",
+          statoAnagrafica: "completa",
+          priorita: "media",
+          numComponenti: 1,
+          creditoSolidaleStato: "non_abilitato",
+          consegnaDomicilio: false,
+          uds: false,
+          attivo: true,
+        },
+      ],
+      isLoading: false,
+    });
+    mocks.getMensaRiepilogo.mockReturnValue({
+      data: [
+        {
+          beneficiarioId: 10,
+          stato: "attiva",
+        },
+        {
+          beneficiarioId: 11,
+          stato: "programmata",
+        },
+        {
+          beneficiarioId: 12,
+          stato: "non_abilitato",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    await act(async () => root.render(<Beneficiari />));
+
+    expect(mocks.getMensaRiepilogo).toHaveBeenCalled();
+    for (const call of mocks.getMensaRiepilogo.mock.calls) {
+      expect(call).toEqual([
+        { beneficiarioIds: "10,11,12" },
+        expect.objectContaining({
+          query: expect.objectContaining({ enabled: true }),
+        }),
+      ]);
+    }
+    expect(document.body.textContent).toContain("ATTIVA");
+    expect(document.body.textContent).toContain("PROGRAMMATA");
+    expect(document.body.textContent).toContain("NON ABILITATO");
   });
 });

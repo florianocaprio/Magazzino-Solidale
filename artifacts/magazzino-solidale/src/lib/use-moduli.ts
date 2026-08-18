@@ -69,6 +69,7 @@ export function useModuloFlags() {
   return {
     ...query,
     emporioAbilitato: hasConfig ? activeCodes.has("EMPORIO_SOLIDALE") : false,
+    mensaAbilitato: hasConfig ? activeCodes.has("MENSA") : false,
     unitaStradaAbilitata: hasConfig ? activeCodes.has("UDS") : true,
   };
 }

@@ -143,6 +143,48 @@ Le route storiche `/report-uds`, `/mensa/report` e gli endpoint legacy sotto
 modifiche allo schema database. Le limitazioni del modello SIFEAD sono mostrate
 come dati mancanti, mai convertite in zeri o inferenze da note libere.
 
+## MAPS operativo
+
+MAPS è un adapter tecnico trasversale: non è un'area di business e non amplia
+la visibilità dei dati. L'API restituisce solo i layer consentiti da aree,
+moduli, permission e scope Centro/Città/Zona del chiamante. I ruoli operativi
+esistenti non ricevono automaticamente i permessi `maps.route` e
+`maps.operational`: l'amministratore deve assegnarli esplicitamente.
+
+> MAPS does not grant access to domain data. It only projects data already
+> accessible to the caller.
+
+`GET /maps/capabilities` elenca soltanto i provider effettivamente disponibili;
+un provider non autorizzato o privo di localizzazione semantica non compare. I
+provider iniziali sono interventi Sociali pianificati, consegne Pacchi, ritiri
+non effettuati con domicilio utilizzabile e punti operativi. UDS resta separato:
+non avendo oggi un luogo d'intervento semanticamente affidabile, non espone né
+capability né marker. Le letture sono mantenute in endpoint distinti e
+riapplicano server-side area, moduli e scope del dominio proprietario; non esiste
+un archivio geografico generale interrogabile.
+
+I percorsi esterni usano Google Maps URLs e non richiedono chiavi. Per la mappa
+interattiva valorizzare `VITE_GOOGLE_MAPS_API_KEY` al momento della build web e
+limitare la chiave in Google Cloud alle origini autorizzate e alla Maps
+JavaScript API. Senza chiave restano disponibili lista operativa e percorsi.
+La geocodifica avviene nel browser solo per i layer attivi; coordinate e
+risultati Google non vengono persistiti né messi in cache dal server.
+Gli indirizzi sono dati personali: vengono trasmessi a Google soltanto quelli
+strettamente necessari al geocoding o alla navigazione. I DTO MAPS sono
+minimizzati e non includono nomi, telefoni, codici beneficiario, note o contenuti
+sociali; questi dati non fanno parte neppure degli URL. Un errore Google degrada
+la sola visualizzazione embedded e non blocca Bolle, Consegne, stock o Interventi.
+
+L'update idempotente `20260817_fase5_5_maps_ritiri.sql` aggiunge esclusivamente
+i campi strutturati del ritiro non effettuato. Viene applicato dal normale
+comando `pnpm --filter @workspace/db run update`; prima di aggiornare un database
+esistente eseguire sempre il dump descritto nella sezione Docker.
+
+Per verificare la fase eseguire codegen, typecheck, suite API e frontend e build
+Docker `api web`. La Fase 5-5 non comprende ottimizzazione multi-tappa, tracking
+GPS, analytics/heatmap, PostGIS o un layer UDS ricavato da dati non pertinenti;
+queste estensioni restano candidate per la 5-5.2.
+
 ## Note
 
 - I segreti vanno **solo** nel file `.env`, che è escluso dal versionamento.

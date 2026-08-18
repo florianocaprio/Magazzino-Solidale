@@ -5,6 +5,89 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export type MapsLayerCode = typeof MapsLayerCode[keyof typeof MapsLayerCode];
+
+
+export const MapsLayerCode = {
+  socialeinterventi_pianificati: 'sociale.interventi_pianificati',
+  pacchiconsegne: 'pacchi.consegne',
+  pacchiritiri_non_effettuati: 'pacchi.ritiri_non_effettuati',
+  centropunti_operativi: 'centro.punti_operativi',
+} as const;
+
+export type MapsLayerCapabilityDomain = typeof MapsLayerCapabilityDomain[keyof typeof MapsLayerCapabilityDomain];
+
+
+export const MapsLayerCapabilityDomain = {
+  sociale: 'sociale',
+  pacchi: 'pacchi',
+  centro: 'centro',
+} as const;
+
+export interface MapsLayerCapability {
+  code: MapsLayerCode;
+  domain: MapsLayerCapabilityDomain;
+  label: string;
+  routeSupported: boolean;
+}
+
+export interface MapsCapabilities {
+  operational: boolean;
+  layers: MapsLayerCapability[];
+}
+
+export type MapsMarkerEntityType = typeof MapsMarkerEntityType[keyof typeof MapsMarkerEntityType];
+
+
+export const MapsMarkerEntityType = {
+  intervento: 'intervento',
+  consegna: 'consegna',
+  bolla: 'bolla',
+  magazzino: 'magazzino',
+  centro_ascolto: 'centro_ascolto',
+} as const;
+
+export type MapsMarkerActionsItem = typeof MapsMarkerActionsItem[keyof typeof MapsMarkerActionsItem];
+
+
+export const MapsMarkerActionsItem = {
+  open: 'open',
+  route: 'route',
+  convert_delivery: 'convert_delivery',
+} as const;
+
+/**
+ * DTO geografico minimizzato; non contiene dati sociali o anagrafici
+ */
+export interface MapsMarker {
+  id: string;
+  layer: MapsLayerCode;
+  entityType: MapsMarkerEntityType;
+  entityId: number;
+  title: string;
+  /** @nullable */
+  subtitle: string | null;
+  status: string;
+  address: string;
+  /** @nullable */
+  date: string | null;
+  actions: MapsMarkerActionsItem[];
+}
+
+export type MapsRouteProvider = typeof MapsRouteProvider[keyof typeof MapsRouteProvider];
+
+
+export const MapsRouteProvider = {
+  'google-maps-url': 'google-maps-url',
+} as const;
+
+export interface MapsRoute {
+  origin: string;
+  destination: string;
+  provider: MapsRouteProvider;
+  url: string;
+}
+
 export type ReportingDashboardSection = typeof ReportingDashboardSection[keyof typeof ReportingDashboardSection];
 
 
@@ -3771,6 +3854,12 @@ export interface Bolla {
   /** @nullable */
   noteRicezione?: string | null;
   /** @nullable */
+  ritiroNonEffettuatoAt?: string | null;
+  /** @nullable */
+  ritiroNonEffettuatoOperatoreId?: number | null;
+  /** @nullable */
+  ritiroNonEffettuatoMotivo?: string | null;
+  /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
@@ -3833,6 +3922,12 @@ export interface BollaDettaglio {
   /** @nullable */
   noteRicezione?: string | null;
   /** @nullable */
+  ritiroNonEffettuatoAt?: string | null;
+  /** @nullable */
+  ritiroNonEffettuatoOperatoreId?: number | null;
+  /** @nullable */
+  ritiroNonEffettuatoMotivo?: string | null;
+  /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
@@ -3851,6 +3946,58 @@ export interface BollaRigaInput {
 export interface ConsegnaRicezioneInput {
   noteRicezione?: string;
   confermaRicezione?: boolean;
+}
+
+export interface RitiroNonEffettuatoInput {
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  motivo?: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type ConversioneConsegnaInputFasciaOraria = typeof ConversioneConsegnaInputFasciaOraria[keyof typeof ConversioneConsegnaInputFasciaOraria] | null;
+
+
+export const ConversioneConsegnaInputFasciaOraria = {
+  Mattina: 'Mattina',
+  Pomeriggio: 'Pomeriggio',
+  Sera: 'Sera',
+} as const;
+
+export interface ConversioneConsegnaInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  indirizzoConsegna: string;
+  dataPrevista: string;
+  /** @nullable */
+  fasciaOraria?: ConversioneConsegnaInputFasciaOraria;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  volontarioId?: number | null;
+  /** @nullable */
+  volontarioAltro?: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  mezzoId?: number | null;
+  mezzoAltro?: boolean;
+  /** @nullable */
+  noteOperative?: string | null;
+}
+
+export interface ConversioneConsegnaResult {
+  created: boolean;
+  consegnaId: number;
+  codice: string;
 }
 
 export interface BollaInput {
@@ -4268,6 +4415,23 @@ export interface MensaAbilitazione {
   createdBy?: number | null;
   createdAt: string;
   versione: string;
+}
+
+export type MensaAbilitazioneRiepilogoBeneficiarioStato = typeof MensaAbilitazioneRiepilogoBeneficiarioStato[keyof typeof MensaAbilitazioneRiepilogoBeneficiarioStato];
+
+
+export const MensaAbilitazioneRiepilogoBeneficiarioStato = {
+  attiva: 'attiva',
+  programmata: 'programmata',
+  sospesa: 'sospesa',
+  revocata: 'revocata',
+  scaduta: 'scaduta',
+  non_abilitato: 'non_abilitato',
+} as const;
+
+export interface MensaAbilitazioneRiepilogoBeneficiario {
+  beneficiarioId: number;
+  stato: MensaAbilitazioneRiepilogoBeneficiarioStato;
 }
 
 export interface MensaAbilitazioneInput {
@@ -4826,6 +4990,16 @@ export type ReportTipoInterventoParameter = string;
 
 export type ReportTipoServizioParameter = string;
 
+/**
+ * Data civile iniziale Europe/Rome; default oggi
+ */
+export type MapsDaParameter = string;
+
+/**
+ * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+ */
+export type MapsAParameter = string;
+
 export type ListProdottiParams = {
 categoria?: string;
 tipo?: string;
@@ -5139,6 +5313,39 @@ export type ListBolleParams = {
 stato?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
+};
+
+export type GetMapsInterventiSocialiParams = {
+/**
+ * Data civile iniziale Europe/Rome; default oggi
+ */
+da?: MapsDaParameter;
+/**
+ * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+ */
+a?: MapsAParameter;
+};
+
+export type GetMapsConsegneParams = {
+/**
+ * Data civile iniziale Europe/Rome; default oggi
+ */
+da?: MapsDaParameter;
+/**
+ * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+ */
+a?: MapsAParameter;
+};
+
+export type GetMapsRitiriNonEffettuatiParams = {
+/**
+ * Data civile iniziale Europe/Rome; default oggi
+ */
+da?: MapsDaParameter;
+/**
+ * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+ */
+a?: MapsAParameter;
 };
 
 export type ListZoneUdsParams = {
@@ -5570,6 +5777,13 @@ search: string;
 export type ListMensaAbilitazioniParams = {
 beneficiarioId?: number;
 mensaId?: number;
+};
+
+export type GetMensaAbilitazioniRiepilogoBeneficiariParams = {
+/**
+ * ID positivi separati da virgola, deduplicati dal server; massimo 500.
+ */
+beneficiarioIds?: string;
 };
 
 export type ListTessereBeneficiarioParams = {

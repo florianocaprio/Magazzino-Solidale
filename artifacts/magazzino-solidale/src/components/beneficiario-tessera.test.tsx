@@ -32,6 +32,9 @@ vi.mock("@workspace/api-client-react", () => ({
     createdAt: "2025-01-01T00:00:00.000Z", versione: "2025-01-01T00:00:00.000Z",
   }], isLoading: false }),
   useCreateTesseraBeneficiarioDaAnagrafica: () => ({ mutate: createCardMutate, isPending: false }),
+  useCreateMensaAbilitazione: () => ({ mutate: vi.fn(), isPending: false }),
+  useListMensaAbilitazioni: () => ({ data: [], isLoading: false, isError: false }),
+  useListMense: () => ({ data: [], isLoading: false }),
   useListAccessiEmporio: () => ({ data: [] }),
   useListCentriAscolto: () => ({ data: [{ id: 7, nome: "Centro Roma", attivo: true }] }),
   useListMagazzini: () => ({ data: [] }),
@@ -53,6 +56,8 @@ vi.mock("@workspace/api-client-react", () => ({
   getCalcolaCreditoSolidaleBeneficiarioQueryKey: () => ["calcolo"],
   getGetCreditoSolidaleBeneficiarioSaldoQueryKey: () => ["saldo"],
   getListCreditoSolidaleBeneficiarioMovimentiQueryKey: () => ["movimenti"],
+  getListMensaAbilitazioniQueryKey: () => ["mensa-abilitazioni"],
+  getListMenseQueryKey: () => ["mense"],
 }));
 
 vi.mock("wouter", () => ({
@@ -62,8 +67,8 @@ vi.mock("wouter", () => ({
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
-vi.mock("@/lib/auth", () => ({ useAuth: () => ({ user: { id: 1, cittaId: 1, centroAscoltoId: 7 }, hasPermission: () => true }) }));
-vi.mock("@/lib/use-moduli", () => ({ EMPORIO_DISABLED_MESSAGE: "", UNITA_STRADA_DISABLED_MESSAGE: "", useModuloFlags: () => ({ emporioAbilitato: true, unitaStradaAbilitata: true }) }));
+vi.mock("@/lib/auth", () => ({ useAuth: () => ({ user: { id: 1, cittaId: 1, centroAscoltoId: 7 }, hasArea: () => true, hasPermission: () => true }) }));
+vi.mock("@/lib/use-moduli", () => ({ EMPORIO_DISABLED_MESSAGE: "", UNITA_STRADA_DISABLED_MESSAGE: "", useModuloFlags: () => ({ emporioAbilitato: true, unitaStradaAbilitata: true, mensaAbilitato: true }) }));
 vi.mock("@/lib/branding-ambiente", () => ({ loadTesseraBrandingForPdf: vi.fn() }));
 vi.mock("@/lib/tessera-pdf", () => ({ generateTesseraPdf: vi.fn(), buildTesseraLabels: vi.fn() }));
 vi.mock("@/components/export-buttons", () => ({ ExportButtons: () => null }));
@@ -102,5 +107,18 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
       { id: 42, data: { motivoSostituzione: "Tessera deteriorata" } },
       expect.any(Object),
     );
+  });
+
+  it("include la gestione Mensa condivisa nella modifica del beneficiario", async () => {
+    await act(async () => root.render(<BeneficiarioDettaglio />));
+    const edit = Array.from(document.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("beneficiarioDettaglio.editAnagrafica"),
+    );
+    await act(async () => edit?.click());
+
+    expect(
+      document.querySelectorAll('[data-testid="beneficiario-mensa-card"]'),
+    ).toHaveLength(2);
+    expect(document.body.textContent).toContain("Abilita alla Mensa");
   });
 });

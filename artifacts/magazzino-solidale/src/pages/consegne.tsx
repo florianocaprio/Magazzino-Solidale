@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
+import { RouteActions } from "@/components/maps/route-actions";
 import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
 import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -116,7 +117,7 @@ export default function Consegne() {
     (e as { data?: { error?: string } })?.data?.error ??
     (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
     t("consegne.toastErrore");
-  
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [associatingId, setAssociatingId] = useState<number | null>(null);
@@ -567,8 +568,8 @@ export default function Consegne() {
                       ) : (
                         <>
                           {c.tipoConsegna === 'domicilio' ? (
-                            <div className="flex items-center gap-1 text-blue-600">
-                              <MapPin className="h-3 w-3" /> {c.indirizzoConsegna || t("consegne.domicilioFallback")} {c.zona ? `(${c.zona})` : ''}
+                            <div className="space-y-1 text-blue-600">
+                              <div className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {c.indirizzoConsegna || t("consegne.domicilioFallback")} {c.zona ? `(${c.zona})` : ''}</div>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1 text-purple-600">
@@ -633,6 +634,12 @@ export default function Consegne() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
+                    <RouteActions
+                      consegnaId={c.id}
+                      available={c.tipoConsegna === "domicilio" && Boolean(c.indirizzoConsegna)}
+                      className="mb-2 justify-end sm:mb-0 sm:me-2"
+                      compact
+                    />
                     {c.stato === 'effettuata' ? (
                       <div className="flex items-center justify-end gap-2">
                         {c.bollaId != null && (

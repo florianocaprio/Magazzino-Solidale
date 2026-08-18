@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 const moduleState = vi.hoisted(() => ({
   activeCodes: new Set<string>(),
   areas: new Set<string>(),
+  permissions: new Set<string>(),
+  isAdmin: false,
+  isSuperAdmin: false,
 }));
 
 vi.mock("@/lib/use-moduli", async (importOriginal) => ({
@@ -18,7 +21,12 @@ vi.mock("@/lib/use-moduli", async (importOriginal) => ({
 vi.mock("@/lib/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/auth")>()),
   useAuth: () => ({
+    user: {
+      isAdmin: moduleState.isAdmin,
+      isSuperAdmin: moduleState.isSuperAdmin,
+    },
     hasArea: (area: string) => moduleState.areas.has(area),
+    hasPermission: (permission: string) => moduleState.permissions.has(permission),
   }),
 }));
 
@@ -27,7 +35,12 @@ vi.mock("react-i18next", async (importOriginal) => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-import { RequireAnyModulo, RequireAreaModulo, RequireModulo } from "@/App";
+import {
+  RequireAnyModulo,
+  RequireAreaModulo,
+  RequireMapsAccess,
+  RequireModulo,
+} from "@/App";
 
 describe("RequireModulo", () => {
   it("blocca il contenuto della route quando il modulo è disabilitato", () => {
@@ -41,6 +54,43 @@ describe("RequireModulo", () => {
 
     expect(html).toContain("superAdmin.moduleDisabled.title");
     expect(html).not.toContain("pagina scarichi");
+  });
+
+  it.each([
+    { ruolo: "Admin", isAdmin: true, isSuperAdmin: false },
+    { ruolo: "SuperAdmin", isAdmin: false, isSuperAdmin: true },
+  ])("consente /maps a $ruolo senza aree o permessi espliciti", ({ isAdmin, isSuperAdmin }) => {
+    moduleState.areas.clear();
+    moduleState.permissions.clear();
+    moduleState.isAdmin = isAdmin;
+    moduleState.isSuperAdmin = isSuperAdmin;
+
+    const html = renderToStaticMarkup(
+      <RequireMapsAccess><span>MAPS operativa</span></RequireMapsAccess>,
+    );
+    expect(html).toContain("MAPS operativa");
+
+    moduleState.isAdmin = false;
+    moduleState.isSuperAdmin = false;
+  });
+
+  it("mantiene area e permesso obbligatori per /maps agli utenti standard", () => {
+    moduleState.isAdmin = false;
+    moduleState.isSuperAdmin = false;
+    moduleState.areas.clear();
+    moduleState.permissions.clear();
+
+    const denied = renderToStaticMarkup(
+      <RequireMapsAccess><span>MAPS operativa</span></RequireMapsAccess>,
+    );
+    expect(denied).not.toContain("MAPS operativa");
+
+    moduleState.areas.add("sociale");
+    moduleState.permissions.add("maps.operational");
+    const allowed = renderToStaticMarkup(
+      <RequireMapsAccess><span>MAPS operativa</span></RequireMapsAccess>,
+    );
+    expect(allowed).toContain("MAPS operativa");
   });
 
   it("rende il contenuto della route quando il modulo è abilitato", () => {

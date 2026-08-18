@@ -22,6 +22,7 @@ tags:
   - name: interventi
   - name: consegne
   - name: bolle
+  - name: maps
   - name: volontari
   - name: mezzi
   - name: approvazioni-logistica
@@ -3005,6 +3006,144 @@ paths:
               schema:
                 $ref: "#/components/schemas/BollaDettaglio"
 
+  /bolle/{id}/ritiro-non-effettuato:
+    post:
+      operationId: segnalaRitiroNonEffettuato
+      tags: [bolle]
+      summary: Registra l'esito di mancato ritiro senza cambiare lo stato logistico della bolla
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RitiroNonEffettuatoInput" }
+      responses:
+        "200":
+          description: Esito registrato in modo idempotente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BollaDettaglio" }
+        "409": { description: Bolla non compatibile con il ritiro in sede }
+
+  /bolle/{id}/converti-consegna:
+    post:
+      operationId: convertiBollaInConsegna
+      tags: [bolle]
+      summary: Converte in modo transazionale e idempotente un mancato ritiro in consegna domiciliare
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConversioneConsegnaInput" }
+      responses:
+        "200":
+          description: Consegna già esistente restituita senza duplicazione
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversioneConsegnaResult" }
+        "201":
+          description: Consegna creata e collegata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversioneConsegnaResult" }
+        "403": { description: "Area, moduli o scope non consentiti" }
+        "409": { description: Bolla non convertibile }
+
+  # ─── MAPS (adapter tecnico, non area di business) ─────────────────────────
+  /maps/capabilities:
+    get:
+      operationId: getMapsCapabilities
+      tags: [maps]
+      summary: Restituisce esclusivamente i layer MAPS autorizzati per il caller
+      responses:
+        "200":
+          description: Capability derivate da aree, moduli, permission e scope del caller
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MapsCapabilities" }
+
+  /maps/layers/sociale/interventi:
+    get:
+      operationId: getMapsInterventiSociali
+      tags: [maps]
+      parameters:
+        - $ref: "#/components/parameters/MapsDa"
+        - $ref: "#/components/parameters/MapsA"
+      responses:
+        "200":
+          description: Interventi pianificati con sede esplicita, minimizzati e scoped
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+
+  /maps/layers/pacchi/consegne:
+    get:
+      operationId: getMapsConsegne
+      tags: [maps]
+      parameters:
+        - $ref: "#/components/parameters/MapsDa"
+        - $ref: "#/components/parameters/MapsA"
+      responses:
+        "200":
+          description: Consegne domiciliari scoped con snapshot di indirizzo
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+
+  /maps/layers/pacchi/ritiri-non-effettuati:
+    get:
+      operationId: getMapsRitiriNonEffettuati
+      tags: [maps]
+      parameters:
+        - $ref: "#/components/parameters/MapsDa"
+        - $ref: "#/components/parameters/MapsA"
+      responses:
+        "200":
+          description: Ritiri non effettuati ancora da convertire e dotati di domicilio utilizzabile, scoped sul dominio Bolla
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+
+  /maps/layers/centro/punti-operativi:
+    get:
+      operationId: getMapsPuntiOperativi
+      tags: [maps]
+      responses:
+        "200":
+          description: Magazzini e Centri di Ascolto attivi con indirizzo e accessibili al caller
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+
+  /maps/routes/consegne/{id}:
+    get:
+      operationId: getMapsRouteConsegna
+      tags: [maps]
+      summary: Costruisce un Google Maps URL per una consegna domiciliare già autorizzata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Percorso esterno; contiene solo origine e destinazione operative
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MapsRoute" }
+        "403": { description: "Permission, area o scope non consentiti" }
+        "404": { description: Consegna non trovata }
+        "422": { description: Tipo o indirizzi non compatibili con il routing }
+
   # ─── CENTRI DI ASCOLTO ─────────────────────────────────────────────────────
   /ruoli-volontari:
     get:
@@ -5155,6 +5294,29 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MensaAbilitazione" }
 
+  /mensa/abilitazioni/riepilogo-beneficiari:
+    get:
+      operationId: getMensaAbilitazioniRiepilogoBeneficiari
+      tags: [mensa]
+      description: Riepilogo minimale delle abilitazioni Mensa per i beneficiari richiesti e accessibili al chiamante.
+      parameters:
+        - name: beneficiarioIds
+          in: query
+          required: false
+          description: ID positivi separati da virgola, deduplicati dal server; massimo 500.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Riepilogo batch; gli ID fuori scope sono omessi.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MensaAbilitazioneRiepilogoBeneficiario"
+        "400": { description: Elenco ID malformato o troppo esteso }
+        "403": { description: "Modulo, area o permesso non consentiti" }
+
   /mensa/abilitazioni/{id}/stato:
     post:
       operationId: updateMensaAbilitazioneStato
@@ -5745,7 +5907,62 @@ components:
       name: tipoServizio
       in: query
       schema: { type: string }
+    MapsDa:
+      name: da
+      in: query
+      description: Data civile iniziale Europe/Rome; default oggi
+      schema: { type: string, format: date }
+    MapsA:
+      name: a
+      in: query
+      description: Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+      schema: { type: string, format: date }
   schemas:
+    MapsLayerCode:
+      type: string
+      enum: [sociale.interventi_pianificati, pacchi.consegne, pacchi.ritiri_non_effettuati, centro.punti_operativi]
+    MapsLayerCapability:
+      type: object
+      required: [code, domain, label, routeSupported]
+      properties:
+        code: { $ref: "#/components/schemas/MapsLayerCode" }
+        domain: { type: string, enum: [sociale, pacchi, centro] }
+        label: { type: string }
+        routeSupported: { type: boolean }
+    MapsCapabilities:
+      type: object
+      required: [operational, layers]
+      properties:
+        operational: { type: boolean }
+        layers:
+          type: array
+          items: { $ref: "#/components/schemas/MapsLayerCapability" }
+    MapsMarker:
+      type: object
+      description: DTO geografico minimizzato; non contiene dati sociali o anagrafici
+      required: [id, layer, entityType, entityId, title, subtitle, status, address, date, actions]
+      properties:
+        id: { type: string }
+        layer: { $ref: "#/components/schemas/MapsLayerCode" }
+        entityType: { type: string, enum: [intervento, consegna, bolla, magazzino, centro_ascolto] }
+        entityId: { type: integer }
+        title: { type: string }
+        subtitle: { type: [string, "null"] }
+        status: { type: string }
+        address: { type: string }
+        date: { type: [string, "null"] }
+        actions:
+          type: array
+          items: { type: string, enum: [open, route, convert_delivery] }
+    MapsRoute:
+      type: object
+      required: [origin, destination, provider, url]
+      properties:
+        origin: { type: string }
+        destination: { type: string }
+        provider: { type: string, enum: [google-maps-url] }
+        url: { type: string, format: uri }
+
     ReportingDashboard:
       type: object
       required: [section, filters, kpi, series, tables, quality, definitions, generatedAt, timezone]
@@ -10844,6 +11061,13 @@ components:
           type: boolean
         noteRicezione:
           type: ["string", "null"]
+        ritiroNonEffettuatoAt:
+          type: ["string", "null"]
+          format: date-time
+        ritiroNonEffettuatoOperatoreId:
+          type: ["integer", "null"]
+        ritiroNonEffettuatoMotivo:
+          type: ["string", "null"]
         operatoreId:
           type: ["integer", "null"]
         operatoreCodice:
@@ -10910,6 +11134,13 @@ components:
         confermaRicezione:
           type: boolean
         noteRicezione:
+          type: ["string", "null"]
+        ritiroNonEffettuatoAt:
+          type: ["string", "null"]
+          format: date-time
+        ritiroNonEffettuatoOperatoreId:
+          type: ["integer", "null"]
+        ritiroNonEffettuatoMotivo:
           type: ["string", "null"]
         operatoreId:
           type: ["integer", "null"]
@@ -10981,6 +11212,32 @@ components:
           type: string
         confermaRicezione:
           type: boolean
+
+    RitiroNonEffettuatoInput:
+      type: object
+      properties:
+        motivo: { type: ["string", "null"], maxLength: 500 }
+
+    ConversioneConsegnaInput:
+      type: object
+      required: [indirizzoConsegna, dataPrevista]
+      properties:
+        indirizzoConsegna: { type: string, minLength: 1, maxLength: 200 }
+        dataPrevista: { type: string, format: date }
+        fasciaOraria: { type: ["string", "null"], enum: [Mattina, Pomeriggio, Sera, null] }
+        volontarioId: { type: ["integer", "null"], minimum: 1 }
+        volontarioAltro: { type: ["string", "null"] }
+        mezzoId: { type: ["integer", "null"], minimum: 1 }
+        mezzoAltro: { type: boolean }
+        noteOperative: { type: ["string", "null"] }
+
+    ConversioneConsegnaResult:
+      type: object
+      required: [created, consegnaId, codice]
+      properties:
+        created: { type: boolean }
+        consegnaId: { type: integer }
+        codice: { type: string }
 
     BollaInput:
       type: object
@@ -11620,6 +11877,16 @@ components:
         createdBy: { type: ["integer", "null"] }
         createdAt: { type: string, format: date-time }
         versione: { type: string, format: date-time }
+
+    MensaAbilitazioneRiepilogoBeneficiario:
+      type: object
+      additionalProperties: false
+      required: [beneficiarioId, stato]
+      properties:
+        beneficiarioId: { type: integer }
+        stato:
+          type: string
+          enum: [attiva, programmata, sospesa, revocata, scaduta, non_abilitato]
 
     MensaAbilitazioneInput:
       type: object

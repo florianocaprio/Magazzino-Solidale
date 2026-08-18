@@ -23,12 +23,15 @@ import {
   useListScarichi,
   useListConsegne,
   useAssociaBolla,
+  useSegnalaRitiroNonEffettuato,
+  useConvertiBollaInConsegna,
   getBolla,
   getListBolleQueryKey,
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
   getListConsegneQueryKey,
   getListVolontariQueryKey,
+  type ConversioneConsegnaInputFasciaOraria,
   type Trasferimento,
   type Scarico,
 } from "@workspace/api-client-react";
@@ -48,11 +51,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
+import { RouteActions } from "@/components/maps/route-actions";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { volontarioLabel } from "@/lib/volontari-label";
-import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowLeft, ArrowRightLeft, ScanLine, CalendarClock } from "lucide-react";
+import { Plus, FileText, Trash2, PackagePlus, PackageMinus, CheckCircle, Truck, ChevronRight, XCircle, Pencil, User, Download, ArrowRight, ArrowLeft, ArrowRightLeft, ScanLine, CalendarClock, AlertTriangle, House } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { generateBollaPdf, type BollaTemplate } from "@/lib/bolla-pdf";
@@ -703,6 +707,13 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
   const [assegnaOpen, setAssegnaOpen] = useState(false);
+  const [ritiroOpen, setRitiroOpen] = useState(false);
+  const [ritiroMotivo, setRitiroMotivo] = useState("");
+  const [conversioneOpen, setConversioneOpen] = useState(false);
+  const [conversioneIndirizzo, setConversioneIndirizzo] = useState("");
+  const [conversioneData, setConversioneData] = useState("");
+  const [conversioneFascia, setConversioneFascia] = useState<Exclude<ConversioneConsegnaInputFasciaOraria, null>>("Mattina");
+  const [conversioneNote, setConversioneNote] = useState("");
   const [printing, setPrinting] = useState(false);
   const { data: bolla, isLoading } = useGetBolla(bollaId);
   const { data: beneficiari } = useListBeneficiari();
@@ -717,6 +728,8 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const annullaBolla = useAnnullaBolla();
   const updateBolla = useUpdateBolla();
   const associaBolla = useAssociaBolla();
+  const segnalaRitiro = useSegnalaRitiroNonEffettuato();
+  const convertiConsegna = useConvertiBollaInConsegna();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -786,6 +799,44 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
         onError: (err) => toast({ title: t("bolle.error"), description: errMsg(err, t("bolle.annullaError")), variant: "destructive" }),
       }
     );
+  };
+
+  const onRitiroNonEffettuato = () => {
+    segnalaRitiro.mutate({ id: bollaId, data: { motivo: ritiroMotivo.trim() || null } }, {
+      onSuccess: () => {
+        invalidateAll();
+        setRitiroOpen(false);
+        setRitiroMotivo("");
+        toast({ title: t("maps.missedRecorded") });
+      },
+      onError: (error) => toast({ title: t("bolle.error"), description: errMsg(error, t("maps.missedError")), variant: "destructive" }),
+    });
+  };
+
+  const openConversione = () => {
+    setConversioneIndirizzo(bolla?.beneficiarioIndirizzo?.trim() ?? "");
+    setConversioneData(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
+    setConversioneFascia("Mattina");
+    setConversioneNote("");
+    setConversioneOpen(true);
+  };
+
+  const onConvertiConsegna = () => {
+    if (!conversioneIndirizzo.trim() || !conversioneData) return;
+    convertiConsegna.mutate({ id: bollaId, data: {
+      indirizzoConsegna: conversioneIndirizzo.trim(),
+      dataPrevista: conversioneData,
+      fasciaOraria: conversioneFascia,
+      noteOperative: conversioneNote.trim() || null,
+    } }, {
+      onSuccess: (result) => {
+        invalidateAll();
+        queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
+        setConversioneOpen(false);
+        toast({ title: result.created ? t("maps.deliveryCreated") : t("maps.deliveryExisting") });
+      },
+      onError: (error) => toast({ title: t("bolle.error"), description: errMsg(error, t("maps.conversionError")), variant: "destructive" }),
+    });
   };
 
   const onAssegna = (consegnaId: number) => {
@@ -1061,6 +1112,12 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
                 <strong>{t("bolle.prontaTitle")}</strong>{t("bolle.prontaText")}
               </div>
             )}
+            {bolla.ritiroNonEffettuatoAt && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <div className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" />{t("maps.missedPickup")}</div>
+                {bolla.ritiroNonEffettuatoMotivo && <p className="mt-1">{bolla.ritiroNonEffettuatoMotivo}</p>}
+              </div>
+            )}
             {isBozza && (
               <Button
                 className="w-full gap-2"
@@ -1073,25 +1130,29 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
             )}
             {isConfermato && !hideConsegnaActions && (
               <>
-                <Button
-                  className="w-full gap-2 bg-green-600 hover:bg-green-700"
-                  onClick={onConsegna}
-                  disabled={consegnaBolla.isPending}
-                >
-                  <Truck className="h-4 w-4" />
-                  {consegnaBolla.isPending ? t("bolle.registrazione") : t("bolle.segnaConsegnata")}
-                </Button>
+                {!bolla.ritiroNonEffettuatoAt && <Button className="w-full gap-2 bg-green-600 hover:bg-green-700" onClick={onConsegna} disabled={consegnaBolla.isPending}><Truck className="h-4 w-4" />{consegnaBolla.isPending ? t("bolle.registrazione") : t("bolle.segnaConsegnata")}</Button>}
+                {bolla.consegnaId == null && !bolla.ritiroNonEffettuatoAt && (
+                  <Button variant="outline" className="w-full gap-2 border-amber-300 text-amber-800" onClick={() => setRitiroOpen(true)}><AlertTriangle className="h-4 w-4" />{t("maps.reportMissedPickup")}</Button>
+                )}
+                {bolla.consegnaId == null && bolla.ritiroNonEffettuatoAt && (
+                  <Button className="w-full gap-2" onClick={openConversione}><House className="h-4 w-4" />{t("maps.convertDelivery")}</Button>
+                )}
                 {bolla.consegnaId != null && (
                   <p className="text-xs text-muted-foreground text-center">{t("bolle.giaAssegnata")}</p>
                 )}
-                <Button
-                  variant="outline"
-                  className="w-full gap-2"
-                  onClick={() => setAssegnaOpen(true)}
-                >
-                  <CalendarClock className="h-4 w-4" />
-                  {t("bolle.assegnaPianificazione")}
-                </Button>
+                {bolla.consegnaId != null && (
+                  <RouteActions
+                    consegnaId={bolla.consegnaId}
+                    available={Boolean(bolla.indirizzoConsegna)}
+                    className="justify-center"
+                  />
+                )}
+                {!bolla.ritiroNonEffettuatoAt && (
+                  <Button variant="outline" className="w-full gap-2" onClick={() => setAssegnaOpen(true)}>
+                    <CalendarClock className="h-4 w-4" />
+                    {t("bolle.assegnaPianificazione")}
+                  </Button>
+                )}
               </>
             )}
             {/* Annulla */}
@@ -1221,6 +1282,26 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
         </DialogContent>
       </Dialog>
 
+      <Dialog open={ritiroOpen} onOpenChange={setRitiroOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t("maps.reportMissedPickup")}</DialogTitle></DialogHeader>
+          <div className="space-y-2"><Label htmlFor="ritiro-motivo">{t("maps.optionalReason")}</Label><Input id="ritiro-motivo" value={ritiroMotivo} maxLength={500} onChange={(event) => setRitiroMotivo(event.target.value)} /></div>
+          <DialogFooter><Button variant="outline" onClick={() => setRitiroOpen(false)}>{t("common.cancel")}</Button><Button onClick={onRitiroNonEffettuato} disabled={segnalaRitiro.isPending}>{t("common.confirm")}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={conversioneOpen} onOpenChange={setConversioneOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t("maps.convertDelivery")}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2"><Label htmlFor="conversione-indirizzo">{t("common.address")}</Label><Input id="conversione-indirizzo" value={conversioneIndirizzo} maxLength={200} onChange={(event) => setConversioneIndirizzo(event.target.value)} /></div>
+            <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="conversione-data">{t("common.date")}</Label><Input id="conversione-data" type="date" value={conversioneData} onChange={(event) => setConversioneData(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="conversione-fascia">{t("consegne.colFasciaOraria")}</Label><Select value={conversioneFascia} onValueChange={(value) => setConversioneFascia(value as Exclude<ConversioneConsegnaInputFasciaOraria, null>)}><SelectTrigger id="conversione-fascia"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Mattina">{t("consegne.fasciaMattina")}</SelectItem><SelectItem value="Pomeriggio">{t("consegne.fasciaPomeriggio")}</SelectItem><SelectItem value="Sera">{t("consegne.fasciaSera")}</SelectItem></SelectContent></Select></div></div>
+            <div className="space-y-2"><Label htmlFor="conversione-note">{t("common.notes")}</Label><Input id="conversione-note" value={conversioneNote} onChange={(event) => setConversioneNote(event.target.value)} /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setConversioneOpen(false)}>{t("common.cancel")}</Button><Button onClick={onConvertiConsegna} disabled={!conversioneIndirizzo.trim() || !conversioneData || convertiConsegna.isPending}>{t("common.confirm")}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
@@ -1266,7 +1347,11 @@ export default function Bolle() {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedBollaId, setSelectedBollaId] = useState<number | null>(null);
+  const [selectedBollaId, setSelectedBollaId] = useState<number | null>(() => {
+    const value = new URLSearchParams(window.location.search).get("bollaId");
+    const parsed = value == null ? null : Number(value);
+    return parsed != null && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  });
   const [downloadingTrasfId, setDownloadingTrasfId] = useState<number | null>(null);
   const [downloadingScarId, setDownloadingScarId] = useState<number | null>(null);
   const [downloadingBollaId, setDownloadingBollaId] = useState<number | null>(null);

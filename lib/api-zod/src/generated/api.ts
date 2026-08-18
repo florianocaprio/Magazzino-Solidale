@@ -4702,6 +4702,9 @@ export const ListBolleResponseItem = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -4750,6 +4753,9 @@ export const GetBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
@@ -4810,6 +4816,9 @@ export const UpdateBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
@@ -4906,6 +4915,9 @@ export const ConfermaBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
@@ -4955,6 +4967,9 @@ export const AnnullaBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
@@ -5009,6 +5024,9 @@ export const ConsegnaBollaResponse = zod.object({
   "noteConsegna": zod.string().nullish(),
   "confermaRicezione": zod.boolean(),
   "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "dataCreazione": zod.string(),
@@ -5024,6 +5042,201 @@ export const ConsegnaBollaResponse = zod.object({
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
 }))
+})
+
+
+/**
+ * @summary Registra l'esito di mancato ritiro senza cambiare lo stato logistico della bolla
+ */
+export const SegnalaRitiroNonEffettuatoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const segnalaRitiroNonEffettuatoBodyMotivoMax = 500;
+
+
+
+export const SegnalaRitiroNonEffettuatoBody = zod.object({
+  "motivo": zod.string().max(segnalaRitiroNonEffettuatoBodyMotivoMax).nullish()
+})
+
+export const SegnalaRitiroNonEffettuatoResponse = zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "magazzinoIndirizzo": zod.string().nullish(),
+  "magazzinoComune": zod.string().nullish(),
+  "beneficiarioIndirizzo": zod.string().nullish(),
+  "beneficiarioTelefono": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Converte in modo transazionale e idempotente un mancato ritiro in consegna domiciliare
+ */
+export const ConvertiBollaInConsegnaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const convertiBollaInConsegnaBodyIndirizzoConsegnaMax = 200;
+
+
+
+
+
+export const ConvertiBollaInConsegnaBody = zod.object({
+  "indirizzoConsegna": zod.string().min(1).max(convertiBollaInConsegnaBodyIndirizzoConsegnaMax),
+  "dataPrevista": zod.coerce.date(),
+  "fasciaOraria": zod.union([zod.literal('Mattina'),zod.literal('Pomeriggio'),zod.literal('Sera'),zod.literal(null)]).nullish(),
+  "volontarioId": zod.number().min(1).nullish(),
+  "volontarioAltro": zod.string().nullish(),
+  "mezzoId": zod.number().min(1).nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "noteOperative": zod.string().nullish()
+})
+
+export const ConvertiBollaInConsegnaResponse = zod.object({
+  "created": zod.boolean(),
+  "consegnaId": zod.number(),
+  "codice": zod.string()
+})
+
+
+/**
+ * @summary Restituisce esclusivamente i layer MAPS autorizzati per il caller
+ */
+export const GetMapsCapabilitiesResponse = zod.object({
+  "operational": zod.boolean(),
+  "layers": zod.array(zod.object({
+  "code": zod.enum(['sociale.interventi_pianificati', 'pacchi.consegne', 'pacchi.ritiri_non_effettuati', 'centro.punti_operativi']),
+  "domain": zod.enum(['sociale', 'pacchi', 'centro']),
+  "label": zod.string(),
+  "routeSupported": zod.boolean()
+}))
+})
+
+
+export const GetMapsInterventiSocialiQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome; default oggi'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome; default da + 7 giorni, massimo 31 giorni')
+})
+
+export const GetMapsInterventiSocialiResponseItem = zod.object({
+  "id": zod.string(),
+  "layer": zod.enum(['sociale.interventi_pianificati', 'pacchi.consegne', 'pacchi.ritiri_non_effettuati', 'centro.punti_operativi']),
+  "entityType": zod.enum(['intervento', 'consegna', 'bolla', 'magazzino', 'centro_ascolto']),
+  "entityId": zod.number(),
+  "title": zod.string(),
+  "subtitle": zod.string().nullable(),
+  "status": zod.string(),
+  "address": zod.string(),
+  "date": zod.string().nullable(),
+  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery']))
+}).describe('DTO geografico minimizzato; non contiene dati sociali o anagrafici')
+export const GetMapsInterventiSocialiResponse = zod.array(GetMapsInterventiSocialiResponseItem)
+
+
+export const GetMapsConsegneQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome; default oggi'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome; default da + 7 giorni, massimo 31 giorni')
+})
+
+export const GetMapsConsegneResponseItem = zod.object({
+  "id": zod.string(),
+  "layer": zod.enum(['sociale.interventi_pianificati', 'pacchi.consegne', 'pacchi.ritiri_non_effettuati', 'centro.punti_operativi']),
+  "entityType": zod.enum(['intervento', 'consegna', 'bolla', 'magazzino', 'centro_ascolto']),
+  "entityId": zod.number(),
+  "title": zod.string(),
+  "subtitle": zod.string().nullable(),
+  "status": zod.string(),
+  "address": zod.string(),
+  "date": zod.string().nullable(),
+  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery']))
+}).describe('DTO geografico minimizzato; non contiene dati sociali o anagrafici')
+export const GetMapsConsegneResponse = zod.array(GetMapsConsegneResponseItem)
+
+
+export const GetMapsRitiriNonEffettuatiQueryParams = zod.object({
+  "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome; default oggi'),
+  "a": zod.date().optional().describe('Data civile finale Europe\/Rome; default da + 7 giorni, massimo 31 giorni')
+})
+
+export const GetMapsRitiriNonEffettuatiResponseItem = zod.object({
+  "id": zod.string(),
+  "layer": zod.enum(['sociale.interventi_pianificati', 'pacchi.consegne', 'pacchi.ritiri_non_effettuati', 'centro.punti_operativi']),
+  "entityType": zod.enum(['intervento', 'consegna', 'bolla', 'magazzino', 'centro_ascolto']),
+  "entityId": zod.number(),
+  "title": zod.string(),
+  "subtitle": zod.string().nullable(),
+  "status": zod.string(),
+  "address": zod.string(),
+  "date": zod.string().nullable(),
+  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery']))
+}).describe('DTO geografico minimizzato; non contiene dati sociali o anagrafici')
+export const GetMapsRitiriNonEffettuatiResponse = zod.array(GetMapsRitiriNonEffettuatiResponseItem)
+
+
+export const GetMapsPuntiOperativiResponseItem = zod.object({
+  "id": zod.string(),
+  "layer": zod.enum(['sociale.interventi_pianificati', 'pacchi.consegne', 'pacchi.ritiri_non_effettuati', 'centro.punti_operativi']),
+  "entityType": zod.enum(['intervento', 'consegna', 'bolla', 'magazzino', 'centro_ascolto']),
+  "entityId": zod.number(),
+  "title": zod.string(),
+  "subtitle": zod.string().nullable(),
+  "status": zod.string(),
+  "address": zod.string(),
+  "date": zod.string().nullable(),
+  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery']))
+}).describe('DTO geografico minimizzato; non contiene dati sociali o anagrafici')
+export const GetMapsPuntiOperativiResponse = zod.array(GetMapsPuntiOperativiResponseItem)
+
+
+/**
+ * @summary Costruisce un Google Maps URL per una consegna domiciliare già autorizzata
+ */
+export const GetMapsRouteConsegnaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMapsRouteConsegnaResponse = zod.object({
+  "origin": zod.string(),
+  "destination": zod.string(),
+  "provider": zod.enum(['google-maps-url']),
+  "url": zod.string().url()
 })
 
 
@@ -7606,6 +7819,20 @@ export const CreateMensaAbilitazioneBody = zod.object({
   "mensaPrincipale": zod.boolean().optional(),
   "motivo": zod.string().nullish()
 })
+
+
+/**
+ * Riepilogo minimale delle abilitazioni Mensa per i beneficiari richiesti e accessibili al chiamante.
+ */
+export const GetMensaAbilitazioniRiepilogoBeneficiariQueryParams = zod.object({
+  "beneficiarioIds": zod.coerce.string().optional().describe('ID positivi separati da virgola, deduplicati dal server; massimo 500.')
+})
+
+export const GetMensaAbilitazioniRiepilogoBeneficiariResponseItem = zod.object({
+  "beneficiarioId": zod.number(),
+  "stato": zod.enum(['attiva', 'programmata', 'sospesa', 'revocata', 'scaduta', 'non_abilitato'])
+})
+export const GetMensaAbilitazioniRiepilogoBeneficiariResponse = zod.array(GetMensaAbilitazioniRiepilogoBeneficiariResponseItem)
 
 
 export const UpdateMensaAbilitazioneStatoParams = zod.object({

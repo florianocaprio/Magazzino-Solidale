@@ -81,6 +81,10 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   "cassa-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
   "spese-emporio": [EMPORIO_AREA_KEY, "sociale", "uds"],
   mensa: MENSA_AREA_KEY,
+  // MAPS è un adapter tecnico: agli utenti standard il segmento richiede almeno
+  // un'area sorgente. areaGuard ammette Admin/SuperAdmin senza aree applicative;
+  // i singoli provider applicano comunque moduli e scope territoriali.
+  maps: ["sociale", "magazzino", "uds"],
   utenti: "amministrazione",
   ruoli: "amministrazione",
   aree: "amministrazione",

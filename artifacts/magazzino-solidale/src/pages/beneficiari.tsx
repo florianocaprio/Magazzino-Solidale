@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type Beneficiario, type MensaAbilitazioneRiepilogoBeneficiario } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -30,6 +30,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
+import { todayEuropeRome } from "@/lib/europe-rome";
+import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
+import { createBeneficiarioWithOptionalMensa } from "@/lib/beneficiario-mensa-workflow";
 
 const makeFormSchema = (t: (k: string) => string) => z.object({
   cognome: z.string().min(2),
@@ -49,6 +52,10 @@ const makeFormSchema = (t: (k: string) => string) => z.object({
   numComponenti: z.coerce.number().min(1).default(1),
   priorita: z.string().default("media"),
   centroAscoltoId: z.string().optional(),
+  abilitaMensa: z.boolean().default(false),
+  mensaId: z.string().optional(),
+  mensaDataInizio: z.string().optional(),
+  mensaDataFine: z.string().optional(),
   creditoSolidaleAbilitato: z.boolean().default(false),
   creditoSolidaleStato: z.enum(STATI_CREDITO_SOLIDALE).default("non_abilitato"),
   creditoSolidaleNote: z.string().optional(),
@@ -98,7 +105,7 @@ const apiErrorMessage = (err: unknown, fallback: string): string => {
 
 export default function Beneficiari() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasArea, hasPermission } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
@@ -127,7 +134,20 @@ export default function Beneficiari() {
     [magazzini],
   );
   const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
-  const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
+  const { emporioAbilitato, unitaStradaAbilitata, mensaAbilitato } = useModuloFlags();
+  const canViewMensa = mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
+  const canManageMensa = canViewMensa && hasPermission("mensa.eligibility.manage");
+  const beneficiarioIds = useMemo(() => (beneficiari ?? []).map((beneficiario) => beneficiario.id), [beneficiari]);
+  const mensaSummaryParams = useMemo(() => beneficiarioIds.length > 0 ? { beneficiarioIds: beneficiarioIds.join(",") } : undefined, [beneficiarioIds]);
+  const mensaSummary = useGetMensaAbilitazioniRiepilogoBeneficiari(mensaSummaryParams, {
+    query: {
+      queryKey: getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey(mensaSummaryParams),
+      enabled: canViewMensa && beneficiarioIds.length > 0,
+    },
+  });
+  const mensaSummaryByBeneficiario = useMemo(() => new Map<number, MensaAbilitazioneRiepilogoBeneficiario>(
+    (mensaSummary.data ?? []).map((item) => [item.beneficiarioId, item]),
+  ), [mensaSummary.data]);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -137,6 +157,7 @@ export default function Beneficiari() {
   const [schedaId, setSchedaId] = useState<number | null>(null);
 
   const createBeneficiario = useCreateBeneficiario();
+  const createMensaAbilitazione = useCreateMensaAbilitazione();
   const deleteBeneficiario = useDeleteBeneficiario();
   const updateBeneficiario = useUpdateBeneficiario();
   const bulkBeneficiari = useBulkBeneficiari();
@@ -159,6 +180,7 @@ export default function Beneficiari() {
       cognome: "", nome: "", soprannome: "", codiceFiscale: "", dataNascita: "", sesso: "",
       cittadinanza: "", areaProvenienza: "", residenza: "", domicilio: "", comune: "", zonaMunicipio: "",
       telefono: "", email: "", numComponenti: 1, priorita: "media", centroAscoltoId: "",
+      abilitaMensa: false, mensaId: "", mensaDataInizio: todayEuropeRome(), mensaDataFine: "",
       creditoSolidaleAbilitato: false, creditoSolidaleStato: "non_abilitato", creditoSolidaleNote: "",
       magazzinoEmporioPreferitoId: NO_EMPORIO,
       consegnaDomicilio: false, motivoConsegnaDomicilio: "", restrizioniAlimentari: "",
@@ -166,6 +188,7 @@ export default function Beneficiari() {
     }
   });
   const creditoSolidaleAbilitato = form.watch("creditoSolidaleAbilitato");
+  const abilitaMensa = form.watch("abilitaMensa");
 
   const watchUds = form.watch("uds");
   const formCitta = isCittaGlobal
@@ -199,7 +222,7 @@ export default function Beneficiari() {
 
   const resetDup = () => { setDupDismissed(false); setDupParams({}); };
 
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = async (data: FormValues) => {
     const {
       centroAscoltoId,
       codiceFiscale,
@@ -208,6 +231,10 @@ export default function Beneficiari() {
       uds,
       magazzinoEmporioPreferitoId,
       creditoSolidaleNote,
+      abilitaMensa: shouldEnableMensa,
+      mensaId,
+      mensaDataInizio,
+      mensaDataFine,
       ...rest
     } = data;
     // A città-global admin must pin a città when flagging a person as UDS,
@@ -226,6 +253,23 @@ export default function Beneficiari() {
       });
       return;
     }
+    if (shouldEnableMensa) {
+      if (!formCitta) {
+        form.setError("cittaId", { type: "manual", message: "Seleziona l'Area" });
+        toast({ title: "Mensa", description: "Seleziona l'Area del beneficiario.", variant: "destructive" });
+        return;
+      }
+      if (!mensaId) {
+        form.setError("mensaId", { type: "manual", message: "Seleziona una Mensa" });
+        toast({ title: "Mensa", description: "Seleziona la Mensa principale.", variant: "destructive" });
+        return;
+      }
+      if (!mensaDataInizio || (mensaDataFine && mensaDataFine < mensaDataInizio)) {
+        form.setError("mensaDataFine", { type: "manual", message: "Intervallo di validità non valido" });
+        toast({ title: "Mensa", description: "Controlla le date dell'abilitazione.", variant: "destructive" });
+        return;
+      }
+    }
     const payload: Record<string, unknown> = {
       ...rest,
       uds,
@@ -241,24 +285,51 @@ export default function Beneficiari() {
           ? parseInt(magazzinoEmporioPreferitoId)
           : null,
     };
+    if ((uds || shouldEnableMensa) && isCittaGlobal && cittaId) {
+      payload.cittaId = parseInt(cittaId);
+    }
     if (uds) {
-      if (isCittaGlobal && cittaId) payload.cittaId = parseInt(cittaId);
       if (zonaUdsId && zonaUdsId !== NO_ZONE) payload.zonaUdsId = parseInt(zonaUdsId);
     }
-    createBeneficiario.mutate({ data: payload as never }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
-        toast({ title: t("beneficiari.toastAdded") });
-        setIsFormOpen(false);
-        resetDup();
-        form.reset();
-      },
-      onError: (err) => toast({
-        title: t("beneficiari.creditoSolidaleSection"),
+    try {
+      const result = await createBeneficiarioWithOptionalMensa({
+        createBeneficiario: () => createBeneficiario.mutateAsync({ data: payload as never }),
+        createMensaAbilitazione: shouldEnableMensa
+          ? (beneficiarioId) => createMensaAbilitazione.mutateAsync({
+              data: {
+                beneficiarioId,
+                mensaId: Number(mensaId),
+                dataInizio: mensaDataInizio!,
+                dataFine: mensaDataFine || null,
+                mensaPrincipale: true,
+              },
+            })
+          : undefined,
+      });
+      await queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+      if (shouldEnableMensa) {
+        await queryClient.invalidateQueries({ queryKey: getListMensaAbilitazioniQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey() });
+      }
+      if (result.mensaError) {
+        toast({
+          title: "Beneficiario creato, abilitazione Mensa non completata",
+          description: apiErrorMessage(result.mensaError, "Apri il beneficiario e riprova l'abilitazione Mensa."),
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: shouldEnableMensa ? "Beneficiario creato e abilitato alla Mensa" : t("beneficiari.toastAdded") });
+      }
+      setIsFormOpen(false);
+      resetDup();
+      form.reset();
+    } catch (err) {
+      toast({
+        title: "Beneficiario non creato",
         description: apiErrorMessage(err, t("beneficiari.creditoSolidaleCentroAscoltoRichiesto")),
         variant: "destructive",
-      }),
-    });
+      });
+    }
   };
 
   const getPriorityBadge = (priorita: string) => {
@@ -292,6 +363,14 @@ export default function Beneficiari() {
               { header: t("beneficiari.centroAscolto"), accessor: (b) => b.centroAscoltoNome },
               { header: t("beneficiari.creditoSolidaleStato"), accessor: (b) => t(creditoSolidaleLabelKey(b.creditoSolidaleStato)) },
               { header: t("beneficiari.magazzinoEmporioPreferito"), accessor: (b) => b.magazzinoEmporioPreferitoNome },
+              ...(canViewMensa ? [{
+                header: "Mensa",
+                accessor: (b: Beneficiario) => mensaSummary.isLoading
+                  ? "IN CARICAMENTO"
+                  : mensaSummary.isError
+                    ? "NON DISPONIBILE"
+                    : (mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato").toUpperCase(),
+              }] : []),
             ]}
             filename="beneficiari"
             title={t("beneficiari.exportTitle")}
@@ -300,7 +379,14 @@ export default function Beneficiari() {
           <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" /> {t("bulkImport.button")}
           </Button>
-          <Button onClick={() => { form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : ""); setDupDismissed(false); setDupParams({}); setIsFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
+          <Button onClick={() => {
+            form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "");
+            form.setValue("abilitaMensa", false);
+            form.setValue("mensaId", "");
+            form.setValue("mensaDataInizio", todayEuropeRome());
+            form.setValue("mensaDataFine", "");
+            setDupDismissed(false); setDupParams({}); setIsFormOpen(true);
+          }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
         </div>
       </div>
 
@@ -467,6 +553,7 @@ export default function Beneficiari() {
                 <TableHead className="text-center">{t("beneficiari.colComponenti")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.creditoSolidaleSection")}</TableHead>
+                {canViewMensa && <TableHead className="text-center">Mensa</TableHead>}
                 <TableHead className="text-center">{t("beneficiari.colDomicilio")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -483,6 +570,7 @@ export default function Beneficiari() {
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
+                    {canViewMensa && <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
@@ -490,7 +578,7 @@ export default function Beneficiari() {
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isGlobal ? 10 : 9} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={(isGlobal ? 10 : 9) + (canViewMensa ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
                 <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
@@ -526,6 +614,17 @@ export default function Beneficiari() {
                       {t(creditoSolidaleLabelKey(b.creditoSolidaleStato))}
                     </Badge>
                   </TableCell>
+                  {canViewMensa && (
+                    <TableCell className="text-center">
+                      {mensaSummary.isLoading ? (
+                        <Skeleton className="h-6 w-24 mx-auto rounded-full" />
+                      ) : mensaSummary.isError ? (
+                        <span className="text-muted-foreground">-</span>
+                      ) : (
+                        <MensaStatusBadge state={mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato"} />
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="text-center">
                     {b.consegnaDomicilio && <Home className="h-4 w-4 text-blue-500 mx-auto" />}
                   </TableCell>
@@ -713,6 +812,43 @@ export default function Beneficiari() {
                   </FormItem>
                 )} />
 
+                {isCittaGlobal && (watchUds || abilitaMensa) && (
+                  <FormField control={form.control} name="cittaId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Area</FormLabel>
+                      <Select value={field.value || ""} onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue("zonaUdsId", NO_ZONE);
+                        form.setValue("mensaId", "");
+                      }}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Seleziona un'Area" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {cittaList?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
+
+                {canManageMensa && (
+                  <NuovaAbilitazioneMensaFields
+                    enabled={abilitaMensa}
+                    onEnabledChange={(checked) => {
+                      form.setValue("abilitaMensa", checked);
+                      form.setValue("mensaId", "");
+                      if (checked) form.setValue("mensaDataInizio", todayEuropeRome());
+                    }}
+                    cittaId={formCitta}
+                    mensaId={form.watch("mensaId") ?? ""}
+                    onMensaIdChange={(value) => form.setValue("mensaId", value)}
+                    dataInizio={form.watch("mensaDataInizio") ?? ""}
+                    onDataInizioChange={(value) => form.setValue("mensaDataInizio", value)}
+                    dataFine={form.watch("mensaDataFine") ?? ""}
+                    onDataFineChange={(value) => form.setValue("mensaDataFine", value)}
+                  />
+                )}
+
                 <div className="rounded-md border p-3 space-y-3">
                   <div>
                     <h4 className="text-sm font-medium">{t("beneficiari.creditoSolidaleSection")}</h4>
@@ -814,20 +950,6 @@ export default function Beneficiari() {
                   )} />
                   {watchUds && (
                     <>
-                      {isCittaGlobal && (
-                        <FormField control={form.control} name="cittaId" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
-                            <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NO_ZONE); }} disabled={!unitaStradaAbilitata}>
-                              <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                      )}
                       <FormField control={form.control} name="zonaUdsId" render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
@@ -846,7 +968,7 @@ export default function Beneficiari() {
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); resetDup(); form.reset(); }}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createBeneficiario.isPending}>{t("common.save")}</Button>
+                  <Button type="submit" disabled={createBeneficiario.isPending || createMensaAbilitazione.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
             </Form>

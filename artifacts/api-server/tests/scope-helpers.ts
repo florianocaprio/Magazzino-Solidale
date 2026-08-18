@@ -1,4 +1,4 @@
-import express, { type Express, type Router } from "express";
+import express, { type Express, type RequestHandler, type Router } from "express";
 import {
   db,
   centriAscoltoTable,
@@ -24,6 +24,7 @@ import {
   trasferimentoRigheTable,
   movimentiTable,
   turniTable,
+  turniVolontariTable,
   cittaTable,
   zoneUdsTable,
 } from "@workspace/db";
@@ -45,8 +46,13 @@ export function makeScopedApp(
     id: number;
     centroAscoltoId: number | null;
     cittaId?: number | null;
+    zonaUdsId?: number | null;
     aree?: string[];
+    permessi?: string[];
+    isAdmin?: boolean;
+    isSuperAdmin?: boolean;
   },
+  middlewares: RequestHandler[] = [],
 ): Express {
   const app = express();
   app.use(express.json());
@@ -57,17 +63,26 @@ export function makeScopedApp(
           id: number;
           centroAscoltoId: number | null;
           cittaId: number | null;
+          zonaUdsId: number | null;
           aree: string[];
+          permessi: string[];
+          isAdmin: boolean;
+          isSuperAdmin: boolean;
         };
       }
     ).user = {
       id: user.id,
       centroAscoltoId: user.centroAscoltoId,
       cittaId: user.cittaId ?? null,
+      zonaUdsId: user.zonaUdsId ?? null,
       aree: user.aree ?? ["sociale", "uds"],
+      permessi: user.permessi ?? [],
+      isAdmin: user.isAdmin ?? false,
+      isSuperAdmin: user.isSuperAdmin ?? false,
     };
     next();
   });
+  for (const middleware of middlewares) app.use(middleware);
   app.use(router);
   return app;
 }
@@ -575,6 +590,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(interventiTable).where(inArray(interventiTable.id, scope.interventoIds));
   }
   if (scope.turnoIds.length > 0) {
+    await db.delete(turniVolontariTable).where(inArray(turniVolontariTable.turnoId, scope.turnoIds));
     await db.delete(turniTable).where(inArray(turniTable.id, scope.turnoIds));
   }
   if (scope.prenotazioneIds.length > 0) {
