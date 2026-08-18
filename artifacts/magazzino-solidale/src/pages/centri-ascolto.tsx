@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Building2, Users } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Power, Trash2, Building2, Users } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -259,9 +259,11 @@ export default function CentriAscolto() {
                         <DropdownMenuItem onClick={() => handleEdit(c)}>
                           <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(c.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
-                        </DropdownMenuItem>
+                        {c.attivo && (
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(c.id)}>
+                            <Power className="mr-2 h-4 w-4" /> {t("common.deactivate")}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -394,7 +396,7 @@ export default function CentriAscolto() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.deactivate")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
