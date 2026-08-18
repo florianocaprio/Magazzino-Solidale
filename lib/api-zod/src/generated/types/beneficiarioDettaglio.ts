@@ -9,6 +9,7 @@ import type { BeneficiarioDettaglioCreditoSolidaleStato } from './beneficiarioDe
 import type { BeneficiarioDettaglioFasciaEtaCorrente } from './beneficiarioDettaglioFasciaEtaCorrente';
 import type { BeneficiarioDettaglioFasciaEtaOrigine } from './beneficiarioDettaglioFasciaEtaOrigine';
 import type { BeneficiarioDettaglioFasciaEtaPresunta } from './beneficiarioDettaglioFasciaEtaPresunta';
+import type { BeneficiarioDettaglioPriorita } from './beneficiarioDettaglioPriorita';
 import type { BeneficiarioDettaglioStatoAnagrafica } from './beneficiarioDettaglioStatoAnagrafica';
 import type { Consegna } from './consegna';
 import type { Intervento } from './intervento';
@@ -64,7 +65,7 @@ export interface BeneficiarioDettaglio {
   allergie?: string | null;
   /** @nullable */
   notePaccoAlimentare?: string | null;
-  priorita: string;
+  priorita: BeneficiarioDettaglioPriorita;
   consegnaDomicilio: boolean;
   /** @nullable */
   motivoConsegnaDomicilio?: string | null;
@@ -72,8 +73,8 @@ export interface BeneficiarioDettaglio {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
-  creditoSolidaleAbilitato: boolean;
-  creditoSolidaleStato: BeneficiarioDettaglioCreditoSolidaleStato;
+  creditoSolidaleAbilitato?: boolean;
+  creditoSolidaleStato?: BeneficiarioDettaglioCreditoSolidaleStato;
   /** @nullable */
   creditoSolidaleDataAbilitazione?: Date | null;
   /** @nullable */
@@ -83,15 +84,15 @@ export interface BeneficiarioDettaglio {
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
   /** @nullable */
-  creditoSolidaleMensileAssegnato: number | null;
-  creditoSolidaleSaldo: number;
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleSaldo?: number;
   /** @nullable */
-  creditoSolidaleDataUltimoMovimento: Date | null;
-  creditoSolidaleMensileManuale: boolean;
+  creditoSolidaleDataUltimoMovimento?: Date | null;
+  creditoSolidaleMensileManuale?: boolean;
   /** @nullable */
-  creditoSolidaleMotivoModifica: string | null;
+  creditoSolidaleMotivoModifica?: string | null;
   /** @nullable */
-  creditoSolidaleDataUltimaModificaQuota: Date | null;
+  creditoSolidaleDataUltimaModificaQuota?: Date | null;
   uds?: boolean;
   attivo: boolean;
   /** @nullable */
@@ -112,4 +113,7 @@ export interface BeneficiarioDettaglio {
   interventi?: Intervento[];
   consegne?: Consegna[];
   dataCreazione: string;
+  dataAggiornamento: string;
+  /** @minimum 1 */
+  versione: number;
 }

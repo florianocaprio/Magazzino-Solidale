@@ -44,6 +44,7 @@ import {
   validateConsegnaPlanningTx,
 } from "../lib/consegneTurni";
 import { logger } from "../lib/logger";
+import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 
 const router: IRouter = Router();
 
@@ -445,6 +446,10 @@ router.post("/bolle", async (req, res) => {
   const zid = callerZonaUdsId(req);
   if ((caller != null || cid != null || zid != null) && !(await canUseBeneficiario(body.beneficiarioId, caller, cid, zid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    return;
+  }
+  if (!(await isBeneficiarioActive(body.beneficiarioId))) {
+    res.status(400).json({ error: "Il Beneficiario deve essere attivo per creare una nuova Bolla." });
     return;
   }
   if ((caller != null || cid != null) && body.magazzinoId != null) {

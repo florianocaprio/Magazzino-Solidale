@@ -31,6 +31,7 @@ import { buildIcs } from "../lib/ics";
 import { completeBollaDelivery, handleBollaActionError } from "../lib/bollaDelivery";
 import { requireAllModuli } from "../lib/featureFlags";
 import { syncTurnoDaConsegna } from "../lib/consegneTurni";
+import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 
 const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
@@ -176,6 +177,10 @@ router.post("/consegne", async (req, res) => {
   }
   if ((caller != null || cid != null || zid != null) && !(await canUseBeneficiario(body.beneficiarioId, caller, cid, zid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
+    return;
+  }
+  if (!(await isBeneficiarioActive(body.beneficiarioId))) {
+    res.status(400).json({ error: "Il Beneficiario deve essere attivo per creare una nuova Consegna." });
     return;
   }
   if ((caller != null || cid != null) && body.magazzinoId != null

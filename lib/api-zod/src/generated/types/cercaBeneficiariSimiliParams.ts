@@ -18,7 +18,7 @@ soprannome?: string;
 telefono?: string;
 dataNascita?: string;
 /**
- * Required for global users; ignored for users already scoped to a città, whose own città is always used
+ * Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
  * @minimum 1
  */
 cittaId?: number;

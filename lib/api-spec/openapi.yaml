@@ -1060,6 +1060,21 @@ paths:
           schema:
             type: string
             enum: [provvisoria, completa]
+        - name: page
+          in: query
+          description: Pagina richiesta, a partire da 1.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Numero massimo di risultati per pagina.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
       responses:
         "200":
           description: List of beneficiaries
@@ -1068,7 +1083,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Beneficiario"
+                  $ref: "#/components/schemas/BeneficiarioDirectory"
     post:
       operationId: createBeneficiario
       tags: [beneficiari]
@@ -1090,7 +1105,7 @@ paths:
     get:
       operationId: cercaBeneficiariSimili
       tags: [beneficiari]
-      summary: Person lookup and fuzzy duplicate suggestions within one città
+      summary: Ricerca persone e suggerimenti anti-duplicato all'interno di una sola Area
       parameters:
         - name: search
           in: query
@@ -1120,7 +1135,7 @@ paths:
             type: string
         - name: cittaId
           in: query
-          description: Required for global users; ignored for users already scoped to a città, whose own città is always used
+          description: Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
           schema:
             type: integer
             minimum: 1
@@ -1205,6 +1220,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Beneficiario"
+        "409":
+          description: La versione inviata non è più corrente
     delete:
       operationId: deleteBeneficiario
       tags: [beneficiari]
@@ -1216,7 +1233,56 @@ paths:
             type: integer
       responses:
         "204":
-          description: Deleted
+          description: Beneficiario disattivato; storico preservato
+
+  /beneficiari/{id}/stato:
+    patch:
+      operationId: updateBeneficiarioStato
+      tags: [beneficiari]
+      summary: Disattiva o riattiva un beneficiario preservandone lo storico
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeneficiarioStatoInput"
+      responses:
+        "200":
+          description: Stato aggiornato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beneficiario"
+        "409":
+          description: La versione inviata non è più corrente
+
+  /beneficiari/export/authorize:
+    post:
+      operationId: authorizeBeneficiariExport
+      tags: [beneficiari]
+      summary: Autorizza e registra nell'audit un'esportazione di dati beneficiari
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeneficiariExportInput"
+      responses:
+        "200":
+          description: Esportazione autorizzata e auditata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [autorizzato, auditId]
+                properties:
+                  autorizzato: { type: boolean }
+                  auditId: { type: integer }
 
   /beneficiari/{id}/nucleo:
     get:
@@ -1261,6 +1327,31 @@ paths:
                 $ref: "#/components/schemas/NucleoFamiliare"
 
   /beneficiari/{id}/nucleo/{membroId}:
+    patch:
+      operationId: updateNucleoFamiliare
+      tags: [beneficiari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: membroId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NucleoFamiliareInput"
+      responses:
+        "200":
+          description: Membro aggiornato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NucleoFamiliare"
     delete:
       operationId: deleteNucleoFamiliare
       tags: [beneficiari]
@@ -4037,6 +4128,26 @@ paths:
                 items:
                   $ref: "#/components/schemas/CreditoSolidaleMovimento"
 
+  /credito-solidale/beneficiari:
+    get:
+      operationId: listCreditoSolidaleBeneficiari
+      tags: [credito-solidale]
+      summary: Elenco economico dedicato ai soli utenti con permesso Credito Solidale
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+        - { name: centroAscoltoId, in: query, schema: { type: integer } }
+        - { name: cittaId, in: query, description: Identificativo tecnico legacy dell'Area, schema: { type: integer } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200":
+          description: Proiezione dedicata Credito Solidale
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CreditoSolidaleBeneficiario" }
+
   /credito-solidale/beneficiari/{beneficiarioId}/saldo:
     get:
       operationId: getCreditoSolidaleBeneficiarioSaldo
@@ -4054,6 +4165,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreditoSolidaleSaldo"
+
+  /credito-solidale/beneficiari/{beneficiarioId}/configurazione:
+    patch:
+      operationId: updateCreditoSolidaleBeneficiarioConfigurazione
+      tags: [credito-solidale]
+      summary: Aggiorna abilitazione e quota senza esporle al DTO anagrafico generico
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditoSolidaleConfigurazioneInput"
+      responses:
+        "200":
+          description: Configurazione aggiornata e auditata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleConfigurazione"
 
   /credito-solidale/beneficiari/{beneficiarioId}/refresh-credito:
     post:
@@ -7496,7 +7631,7 @@ components:
     # ── Beneficiari ───────────────────────────────────────────────────────
     BeneficiarioSimile:
       type: object
-      required: [id, codice, nome, cognome, score]
+      required: [id, codice, nome, cognome, uds, versione, score]
       properties:
         id:
           type: integer
@@ -7526,10 +7661,47 @@ components:
           type: ["string", "null"]
         uds:
           type: boolean
+        versione:
+          type: integer
+          minimum: 1
         score:
           type: number
+
+    BeneficiarioDirectory:
+      type: object
+      description: Proiezione minima usata negli elenchi, priva di dati sociali ed economici sensibili.
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        statoAnagrafica: { type: string, enum: [provvisoria, completa] }
+        cognome: { type: string }
+        nome: { type: string }
+        soprannome: { type: ["string", "null"] }
+        dataNascita: { type: ["string", "null"] }
+        fasciaEtaPresunta:
+          type: ["string", "null"]
+          enum: ["0_17", "18_29", "30_64", "65_plus", null]
+        fasciaEtaCorrente:
+          type: string
+          enum: ["0_17", "18_29", "30_64", "65_plus", "non_determinata"]
+        fasciaEtaOrigine: { type: string, enum: [calcolata, presunta, non_determinata] }
+        telefono: { type: ["string", "null"] }
+        centroAscoltoId: { type: ["integer", "null"] }
+        centroAscoltoNome: { type: ["string", "null"] }
+        cittaId: { type: ["integer", "null"], description: Identificativo tecnico legacy dell'Area. }
+        cittaNome: { type: ["string", "null"] }
+        zonaUdsId: { type: ["integer", "null"] }
+        zonaUdsNome: { type: ["string", "null"] }
+        uds: { type: boolean }
+        attivo: { type: boolean }
+        priorita: { type: string, enum: [bassa, media, alta, urgente] }
+        consegnaDomicilio: { type: boolean }
+        versione: { type: integer, minimum: 1 }
+      required: [id, codice, statoAnagrafica, cognome, nome, fasciaEtaPresunta, fasciaEtaCorrente, fasciaEtaOrigine, uds, attivo, priorita, consegnaDomicilio, versione]
+
     Beneficiario:
       type: object
+      description: Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
       properties:
         id:
           type: integer
@@ -7581,6 +7753,7 @@ components:
           type: integer
         priorita:
           type: string
+          enum: [bassa, media, alta, urgente]
         consegnaDomicilio:
           type: boolean
         centroAscoltoId:
@@ -7633,6 +7806,11 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
+        dataAggiornamento:
+          type: string
+        versione:
+          type: integer
+          minimum: 1
       required:
         [
           id,
@@ -7648,17 +7826,11 @@ components:
           numAnziani,
           priorita,
           consegnaDomicilio,
-          creditoSolidaleAbilitato,
-          creditoSolidaleStato,
-          creditoSolidaleMensileAssegnato,
-          creditoSolidaleSaldo,
-          creditoSolidaleDataUltimoMovimento,
-          creditoSolidaleMensileManuale,
-          creditoSolidaleMotivoModifica,
-          creditoSolidaleDataUltimaModificaQuota,
           uds,
           attivo,
           dataCreazione,
+          dataAggiornamento,
+          versione,
         ]
 
     BeneficiarioDettaglio:
@@ -7730,6 +7902,7 @@ components:
           type: ["string", "null"]
         priorita:
           type: string
+          enum: [bassa, media, alta, urgente]
         consegnaDomicilio:
           type: boolean
         motivoConsegnaDomicilio:
@@ -7798,6 +7971,11 @@ components:
             $ref: "#/components/schemas/Consegna"
         dataCreazione:
           type: string
+        dataAggiornamento:
+          type: string
+        versione:
+          type: integer
+          minimum: 1
       required:
         [
           id,
@@ -7816,20 +7994,15 @@ components:
           numDisabili,
           priorita,
           consegnaDomicilio,
-          creditoSolidaleAbilitato,
-          creditoSolidaleStato,
-          creditoSolidaleMensileAssegnato,
-          creditoSolidaleSaldo,
-          creditoSolidaleDataUltimoMovimento,
-          creditoSolidaleMensileManuale,
-          creditoSolidaleMotivoModifica,
-          creditoSolidaleDataUltimaModificaQuota,
           attivo,
           dataCreazione,
+          dataAggiornamento,
+          versione,
         ]
 
     BeneficiarioInput:
       type: object
+      additionalProperties: false
       properties:
         codice:
           type: string
@@ -7885,35 +8058,15 @@ components:
           type: string
         priorita:
           type: string
+          enum: [bassa, media, alta, urgente]
         consegnaDomicilio:
           type: boolean
         motivoConsegnaDomicilio:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
-        creditoSolidaleAbilitato:
-          type: boolean
-        creditoSolidaleStato:
-          type: string
-          enum: [non_abilitato, attivo, sospeso, revocato]
-        creditoSolidaleDataAbilitazione:
-          type: ["string", "null"]
-          format: date-time
-        creditoSolidaleNote:
-          type: ["string", "null"]
         magazzinoEmporioPreferitoId:
           type: ["integer", "null"]
-        creditoSolidaleMensileAssegnato:
-          type: ["number", "null"]
-        creditoSolidaleMensileManuale:
-          type: boolean
-        creditoSolidaleMotivoModifica:
-          type: ["string", "null"]
-        creditoSolidaleDataUltimaModificaQuota:
-          type: ["string", "null"]
-          format: date-time
-        creditoSolidaleMensileSuggerito:
-          type: ["number", "null"]
         dataPresaInCarico:
           type: string
         noteInterne:
@@ -7935,6 +8088,7 @@ components:
 
     BeneficiarioUpdate:
       type: object
+      additionalProperties: false
       properties:
         codiceFiscale:
           type: ["string", "null"]
@@ -7989,38 +8143,16 @@ components:
           type: string
         priorita:
           type: string
+          enum: [bassa, media, alta, urgente]
         consegnaDomicilio:
           type: boolean
         motivoConsegnaDomicilio:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
-        creditoSolidaleAbilitato:
-          type: boolean
-        creditoSolidaleStato:
-          type: string
-          enum: [non_abilitato, attivo, sospeso, revocato]
-        creditoSolidaleDataAbilitazione:
-          type: ["string", "null"]
-          format: date-time
-        creditoSolidaleNote:
-          type: ["string", "null"]
         magazzinoEmporioPreferitoId:
           type: ["integer", "null"]
-        creditoSolidaleMensileAssegnato:
-          type: ["number", "null"]
-        creditoSolidaleMensileManuale:
-          type: boolean
-        creditoSolidaleMotivoModifica:
-          type: ["string", "null"]
-        creditoSolidaleDataUltimaModificaQuota:
-          type: ["string", "null"]
-          format: date-time
-        creditoSolidaleMensileSuggerito:
-          type: ["number", "null"]
         uds:
-          type: boolean
-        attivo:
           type: boolean
         noteInterne:
           type: string
@@ -8035,6 +8167,27 @@ components:
           enum: [M, F, ALTRO]
         areaProvenienza:
           type: string
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
+
+    BeneficiarioStatoInput:
+      type: object
+      additionalProperties: false
+      properties:
+        attivo: { type: boolean }
+        versione: { type: integer, minimum: 1 }
+      required: [attivo, versione]
+
+    BeneficiariExportInput:
+      type: object
+      additionalProperties: false
+      properties:
+        tipo: { type: string, enum: [lista, scheda, dossier, interventi] }
+        beneficiarioId: { type: ["integer", "null"] }
+        numeroRecord: { type: integer, minimum: 0, maximum: 100000 }
+      required: [tipo, numeroRecord]
 
     PoliticaCreditoSolidale:
       type: object
@@ -8358,6 +8511,28 @@ components:
           annullatoDaMovimentoId,
         ]
 
+    CreditoSolidaleBeneficiario:
+      type: object
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        codiceFiscale: { type: ["string", "null"] }
+        cognome: { type: string }
+        nome: { type: string }
+        centroAscoltoId: { type: ["integer", "null"] }
+        centroAscoltoNome: { type: ["string", "null"] }
+        cittaId: { type: ["integer", "null"], description: Identificativo tecnico legacy dell'Area. }
+        cittaNome: { type: ["string", "null"] }
+        attivo: { type: boolean }
+        creditoSolidaleAbilitato: { type: boolean }
+        creditoSolidaleStato: { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleSaldo: { type: number }
+        creditoSolidaleMensileAssegnato: { type: ["number", "null"] }
+        creditoSolidaleDataUltimoMovimento: { type: ["string", "null"], format: date-time }
+        magazzinoEmporioPreferitoId: { type: ["integer", "null"] }
+        magazzinoEmporioPreferitoNome: { type: ["string", "null"] }
+      required: [id, codice, cognome, nome, attivo, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleSaldo]
+
     CreditoSolidaleSaldo:
       type: object
       properties:
@@ -8387,6 +8562,30 @@ components:
           creditoSolidaleMensileAssegnato,
           dataUltimoMovimento,
         ]
+
+    CreditoSolidaleConfigurazioneInput:
+      type: object
+      additionalProperties: false
+      properties:
+        creditoSolidaleAbilitato: { type: boolean }
+        creditoSolidaleStato: { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleNote: { type: ["string", "null"] }
+        creditoSolidaleMensileAssegnato: { type: ["number", "null"], minimum: 0 }
+        creditoSolidaleMensileSuggerito: { type: ["number", "null"], minimum: 0 }
+        creditoSolidaleMotivoModifica: { type: ["string", "null"] }
+
+    CreditoSolidaleConfigurazione:
+      type: object
+      properties:
+        beneficiarioId: { type: integer }
+        creditoSolidaleAbilitato: { type: boolean }
+        creditoSolidaleStato: { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleNote: { type: ["string", "null"] }
+        creditoSolidaleMensileAssegnato: { type: ["number", "null"] }
+        creditoSolidaleMensileManuale: { type: boolean }
+        creditoSolidaleMotivoModifica: { type: ["string", "null"] }
+        creditoSolidaleDataUltimaModificaQuota: { type: ["string", "null"], format: date-time }
+      required: [beneficiarioId, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleNote, creditoSolidaleMensileAssegnato, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota]
 
     CreditoSolidaleRefreshInput:
       type: object

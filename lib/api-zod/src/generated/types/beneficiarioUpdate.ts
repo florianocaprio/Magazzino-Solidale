@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiarioUpdateCreditoSolidaleStato } from './beneficiarioUpdateCreditoSolidaleStato';
 import type { BeneficiarioUpdateFasciaEtaPresunta } from './beneficiarioUpdateFasciaEtaPresunta';
+import type { BeneficiarioUpdatePriorita } from './beneficiarioUpdatePriorita';
 import type { BeneficiarioUpdateSesso } from './beneficiarioUpdateSesso';
 import type { BeneficiarioUpdateStatoAnagrafica } from './beneficiarioUpdateStatoAnagrafica';
 
@@ -41,30 +41,14 @@ export interface BeneficiarioUpdate {
   restrizioniAlimentari?: string;
   allergie?: string;
   notePaccoAlimentare?: string;
-  priorita?: string;
+  priorita?: BeneficiarioUpdatePriorita;
   consegnaDomicilio?: boolean;
   motivoConsegnaDomicilio?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
-  creditoSolidaleAbilitato?: boolean;
-  creditoSolidaleStato?: BeneficiarioUpdateCreditoSolidaleStato;
-  /** @nullable */
-  creditoSolidaleDataAbilitazione?: Date | null;
-  /** @nullable */
-  creditoSolidaleNote?: string | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
-  /** @nullable */
-  creditoSolidaleMensileAssegnato?: number | null;
-  creditoSolidaleMensileManuale?: boolean;
-  /** @nullable */
-  creditoSolidaleMotivoModifica?: string | null;
-  /** @nullable */
-  creditoSolidaleDataUltimaModificaQuota?: Date | null;
-  /** @nullable */
-  creditoSolidaleMensileSuggerito?: number | null;
   uds?: boolean;
-  attivo?: boolean;
   noteInterne?: string;
   soprannome?: string;
   /** @nullable */
@@ -73,4 +57,6 @@ export interface BeneficiarioUpdate {
   zonaUdsId?: number | null;
   sesso?: BeneficiarioUpdateSesso;
   areaProvenienza?: string;
+  /** @minimum 1 */
+  versione: number;
 }

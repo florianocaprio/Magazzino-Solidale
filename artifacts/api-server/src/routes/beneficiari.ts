@@ -1,10 +1,10 @@
 import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
+import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable, tessereBeneficiariTable, zoneUdsTable } from "@workspace/db";
 import { db } from "@workspace/db";
-import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable, tessereBeneficiariTable } from "@workspace/db";
 import { calcolaEta, isFasciaEtaPresunta, risolviFasciaEta } from "@workspace/api-zod";
 import { runBulk } from "../lib/bulk";
-import { eq, and, or, ilike, inArray, sql, desc, ne, type SQL } from "drizzle-orm";
+import { eq, and, or, ilike, inArray, isNull, sql, desc, ne, type SQL } from "drizzle-orm";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
   callerCentroId,
@@ -29,8 +29,36 @@ import {
 import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
 import { formatTesseraBeneficiario, issueTesseraBeneficiario, TesseraBeneficiarioError } from "../lib/tesseraBeneficiarioService";
 import { requirePermission } from "../middlewares/auth";
+import {
+  canAccessBeneficiarioRecord,
+  canViewBeneficiarioRecord,
+  hasPermission,
+  validateBeneficiarioTerritorialAssignment,
+  visibleInterventoAmbiti,
+} from "../lib/beneficiarioPolicy";
+import {
+  CreateBeneficiarioInput,
+  AuthorizeBeneficiariExportInput,
+  NucleoFamiliareInput,
+  NucleoFamiliareUpdateInput,
+  UpdateBeneficiarioInput,
+  UpdateBeneficiarioStatusInput,
+  normalizeCodiceFiscale,
+  validateBeneficiarioCompleto,
+  zodErrorMessage,
+} from "../lib/beneficiarioValidation";
 
 const router: IRouter = Router();
+
+const SOCIAL_SENSITIVE_FIELDS = new Set([
+  "restrizioniAlimentari",
+  "allergie",
+  "notePaccoAlimentare",
+  "noteInterne",
+  "numFigliMaschi",
+  "numFiglieFemmine",
+  "numDisabili",
+]);
 
 import { DATA_NASCITA_FUTURA_MSG, hasFutureBirthDate } from "../lib/bug5Validation";
 
@@ -43,7 +71,7 @@ const CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG =
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
 type CreditoSolidaleStato = (typeof STATI_CREDITO_SOLIDALE)[number];
 
-// Normalize a loosely-typed body flag to a real boolean so the città-boundary
+// Normalize a loosely-typed body flag to a real boolean so the Area boundary
 // guard checks the same value that gets persisted (avoids `uds:"true"` /
 // `uds:1` type-confusion bypasses on the unvalidated body).
 function toBool(v: unknown): boolean {
@@ -298,7 +326,7 @@ async function validateMagazzinoEmporioPreferito(
     return { error: "Risorsa non accessibile per il tuo centro", status: 403 };
   }
   if (!canAccessCitta(magazzino.cittaId, callerCittaId(req))) {
-    return { error: "Risorsa non accessibile per la tua città", status: 403 };
+    return { error: "Risorsa non accessibile per la tua Area", status: 403 };
   }
   if (magazzino.tipoMagazzino !== "emporio" && magazzino.tipoMagazzino !== "misto") {
     return { error: "Il magazzino selezionato non è un Emporio Solidale." };
@@ -374,12 +402,78 @@ function fmtBenef(
     attivo: r.attivo,
     dataPresaInCarico: r.dataPresaInCarico ?? null,
     noteInterne: r.noteInterne ?? null,
+    versione: r.versione,
     dataCreazione: r.dataCreazione.toISOString(),
+    dataAggiornamento: r.dataAggiornamento.toISOString(),
   };
 }
 
-router.get("/beneficiari", async (req, res) => {
+function fmtBenefForRequest(
+  r: typeof beneficiariTable.$inferSelect,
+  req: Request,
+  centroNome?: string | null,
+  cittaNome?: string | null,
+  magazzinoEmporioPreferitoNome?: string | null,
+) {
+  const result = fmtBenef(r, centroNome, cittaNome, magazzinoEmporioPreferitoNome) as Record<string, unknown>;
+  if (!hasPermission(req, "beneficiari.sensitive.view")) {
+    for (const key of ["codiceFiscale", ...SOCIAL_SENSITIVE_FIELDS]) delete result[key];
+  }
+  if (!hasPermission(req, "credito.view")) {
+    for (const key of Object.keys(result)) {
+      if (key.startsWith("creditoSolidale")) delete result[key];
+    }
+  }
+  return result;
+}
+
+function parseOptionalPositiveQueryId(value: string | undefined): number | null | "invalid" {
+  if (value == null || value.trim() === "") return null;
+  const parsed = Number(value);
+  return /^\d+$/.test(value.trim()) && Number.isSafeInteger(parsed) && parsed > 0 ? parsed : "invalid";
+}
+
+function fmtBeneficiarioDirectory(
+  r: typeof beneficiariTable.$inferSelect,
+  centroNome?: string | null,
+  cittaNome?: string | null,
+  zonaUdsNome?: string | null,
+) {
+  const fasciaEta = risolviFasciaEta(r.dataNascita, r.fasciaEtaPresunta);
+  return {
+    id: r.id,
+    codice: r.codice,
+    statoAnagrafica: r.statoAnagrafica,
+    cognome: r.cognome,
+    nome: r.nome,
+    soprannome: r.soprannome ?? null,
+    dataNascita: r.dataNascita ?? null,
+    fasciaEtaPresunta: r.fasciaEtaPresunta ?? null,
+    fasciaEtaCorrente: fasciaEta.fascia,
+    fasciaEtaOrigine: fasciaEta.origine,
+    telefono: r.telefono ?? null,
+    centroAscoltoId: r.centroAscoltoId ?? null,
+    centroAscoltoNome: centroNome ?? null,
+    cittaId: r.cittaId ?? null,
+    cittaNome: cittaNome ?? null,
+    zonaUdsId: r.zonaUdsId ?? null,
+    zonaUdsNome: zonaUdsNome ?? null,
+    uds: r.uds,
+    attivo: r.attivo,
+    priorita: r.priorita,
+    consegnaDomicilio: r.consegnaDomicilio,
+    versione: r.versione,
+  };
+}
+
+router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, res) => {
   const { search, priorita, domicilio, centroAscoltoId, cittaId, zonaUdsId, uds, attivo, statoAnagrafica } = req.query as Record<string, string>;
+  const page = req.query.page == null ? 1 : Number(req.query.page);
+  const limit = req.query.limit == null ? 50 : Number(req.query.limit);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: "Paginazione non valida: page >= 1 e limit compreso tra 1 e 100." });
+    return;
+  }
   const conditions: SQL[] = [];
   if (search) {
     const q = `%${search}%`;
@@ -400,39 +494,58 @@ router.get("/beneficiari", async (req, res) => {
     conditions.push(eq(beneficiariTable.statoAnagrafica, statoAnagrafica));
   }
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
-  // Città and zona are HARD boundaries when present on the caller; explicit
+  // Area and Zona are boundaries when present on the caller; explicit
   // query params let a global caller narrow the result.
-  if (cittaId) conditions.push(eq(beneficiariTable.cittaId, parseInt(cittaId)));
-  if (zonaUdsId) conditions.push(eq(beneficiariTable.zonaUdsId, parseInt(zonaUdsId)));
+  const requestedAreaId = parseOptionalPositiveQueryId(cittaId);
+  const requestedZonaId = parseOptionalPositiveQueryId(zonaUdsId);
+  const requestedCentroId = parseOptionalPositiveQueryId(centroAscoltoId);
+  if ([requestedAreaId, requestedZonaId, requestedCentroId].includes("invalid")) {
+    res.status(400).json({ error: "I filtri Area, Centro e Zona devono essere identificativi numerici validi." });
+    return;
+  }
+  if (requestedAreaId != null) conditions.push(eq(beneficiariTable.cittaId, requestedAreaId as number));
+  if (requestedZonaId != null) conditions.push(eq(beneficiariTable.zonaUdsId, requestedZonaId as number));
   if (uds === "true") conditions.push(eq(beneficiariTable.uds, true));
   const caller = callerCentroId(req);
-  if (caller != null) {
+  const areaWideUdsDirectory = req.user?.aree?.includes("uds") === true
+    && req.user?.aree?.includes("sociale") !== true;
+  if (caller != null && !areaWideUdsDirectory) {
     const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
     if (f) conditions.push(f);
-  } else if (centroAscoltoId) {
-    conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+  } else if (requestedCentroId != null) {
+    conditions.push(eq(beneficiariTable.centroAscoltoId, requestedCentroId as number));
   }
   const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
   if (cittaFilter) conditions.push(cittaFilter);
-  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
+  const zonaFilter = areaWideUdsDirectory ? undefined : zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
   if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
   else if (attivo === "false") conditions.push(eq(beneficiariTable.attivo, false));
 
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const [{ total }] = await db.select({ total: sql<number>`count(*)::int` })
+    .from(beneficiariTable).where(where);
   const rows = await db
     .select({
       b: beneficiariTable,
       centroNome: centriAscoltoTable.nome,
       cittaNome: cittaTable.nome,
       magazzinoEmporioPreferitoNome: magazziniTable.nome,
+      zonaUdsNome: zoneUdsTable.nome,
     })
     .from(beneficiariTable)
     .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
     .leftJoin(magazziniTable, eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(beneficiariTable.dataCreazione), desc(beneficiariTable.id));
-  res.json(rows.map(r => fmtBenef(r.b, r.centroNome, r.cittaNome, r.magazzinoEmporioPreferitoNome)));
+    .leftJoin(zoneUdsTable, eq(beneficiariTable.zonaUdsId, zoneUdsTable.id))
+    .where(where)
+    .orderBy(desc(beneficiariTable.dataCreazione), desc(beneficiariTable.id))
+    .limit(limit)
+    .offset((page - 1) * limit);
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("X-Page", String(page));
+  res.setHeader("X-Page-Size", String(limit));
+  res.json(rows.map(r => fmtBeneficiarioDirectory(r.b, r.centroNome, r.cittaNome, r.zonaUdsNome)));
 });
 
 type BeneficiarioTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -441,6 +554,8 @@ interface BeneficiarioCreationOptions {
   cittaId?: number;
   centroAscoltoId?: number | null;
   zonaUdsId?: number | null;
+  /** Internal domain workflow already protected by its own purpose-specific permissions. */
+  allowSensitiveFields?: boolean;
 }
 
 export async function createBeneficiarioOne(
@@ -448,7 +563,13 @@ export async function createBeneficiarioOne(
   req: Request,
   options: BeneficiarioCreationOptions = {},
 ): Promise<{ row: typeof beneficiariTable.$inferSelect } | { error: string; status?: number }> {
-  const b = body as Record<string, any>;
+  const parsed = CreateBeneficiarioInput.safeParse(body);
+  if (!parsed.success) return { error: zodErrorMessage(parsed.error), status: 400 };
+  const b = parsed.data;
+  if (!options.allowSensitiveFields && !hasPermission(req, "beneficiari.sensitive.view")
+    && Object.keys(b).some((key) => SOCIAL_SENSITIVE_FIELDS.has(key))) {
+    return { error: "Non hai il permesso di modificare i dati sociali sensibili.", status: 403 };
+  }
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
@@ -456,14 +577,16 @@ export async function createBeneficiarioOne(
   if (await codiceBeneficiarioEsiste(codice)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
   const sesso = normalizzaSesso(b.sesso);
   if (!sesso) return { error: SESSO_OBBLIGATORIO_MSG, status: 400 };
-  const values: Record<string, any> = { ...b, codice, sesso };
-  if ("statoAnagrafica" in values && !["provvisoria", "completa"].includes(values.statoAnagrafica)) {
-    return { error: "Stato anagrafica non valido", status: 400 };
-  }
+  const values: Record<string, any> = {
+    ...b,
+    codice,
+    codiceFiscale: normalizeCodiceFiscale(b.codiceFiscale),
+    sesso,
+    statoAnagrafica: b.statoAnagrafica ?? "provvisoria",
+    attivo: true,
+  };
   const eta = normalizeEtaFields(values, b);
   if (eta.error) return { error: eta.error, status: 400 };
-  delete values.creditoSolidaleSaldo;
-  delete values.creditoSolidaleDataUltimoMovimento;
   if ("uds" in values) values.uds = toBool(values.uds);
   if (caller != null) values.centroAscoltoId = caller;
   if (cid != null) values.cittaId = cid;
@@ -471,29 +594,20 @@ export async function createBeneficiarioOne(
   if (options.cittaId != null) values.cittaId = options.cittaId;
   if ("centroAscoltoId" in options) values.centroAscoltoId = options.centroAscoltoId;
   if ("zonaUdsId" in options) values.zonaUdsId = options.zonaUdsId;
-  // Città is the HARD UDS boundary: a città-global caller must pin a città when
-  // creating a UDS person, otherwise the row would be visible across all cities.
-  if (values.uds === true && cid == null && values.cittaId == null) {
-    return { error: "La città è obbligatoria per una persona UDS" };
-  }
-  const credito = normalizeCreditoSolidaleFields(values, b);
-  if (credito.error) return { error: credito.error, status: 400 };
-  if (values.creditoSolidaleAbilitato === true && values.centroAscoltoId == null) {
-    return { error: CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG, status: 400 };
-  }
-  const quota = normalizeCreditoSolidaleQuotaFields(values, b);
-  if (quota.error) return { error: quota.error, status: 400 };
+  const scopeError = await validateBeneficiarioTerritorialAssignment({
+    cittaId: values.cittaId ?? null,
+    centroAscoltoId: values.centroAscoltoId ?? null,
+    zonaUdsId: values.zonaUdsId ?? null,
+    magazzinoEmporioPreferitoId: values.magazzinoEmporioPreferitoId ?? null,
+  }, { requireArea: true, requireActiveArea: true });
+  if (scopeError) return scopeError;
+
   if ("magazzinoEmporioPreferitoId" in b) {
     const emporio = await validateMagazzinoEmporioPreferito(b.magazzinoEmporioPreferitoId, req);
     if ("error" in emporio) return { error: emporio.error, status: emporio.status ?? 400 };
     values.magazzinoEmporioPreferitoId = emporio.value;
   }
-  const createsEmporioData =
-    values.creditoSolidaleAbilitato === true ||
-    values.magazzinoEmporioPreferitoId != null ||
-    quota.quotaChanged ||
-    quota.motivoChanged;
-  if (createsEmporioData && !(await isEmporioEnabled())) {
+  if (values.magazzinoEmporioPreferitoId != null && !(await isEmporioEnabled())) {
     return { error: EMPORIO_DISABLED_MSG, status: 403 };
   }
   const createsUdsData =
@@ -503,9 +617,40 @@ export async function createBeneficiarioOne(
   if (createsUdsData && !(await isUnitaStradaEnabled())) {
     return { error: UNITA_STRADA_DISABLED_MSG, status: 403 };
   }
+  const completeError = validateBeneficiarioCompleto({
+    statoAnagrafica: values.statoAnagrafica,
+    nome: values.nome,
+    cognome: values.cognome,
+    sesso: values.sesso,
+    dataNascita: values.dataNascita ?? null,
+    fasciaEtaPresunta: values.fasciaEtaPresunta ?? null,
+    centroAscoltoId: values.centroAscoltoId ?? null,
+  });
+  if (completeError) return { error: completeError, status: 400 };
+
+  const persist = async (executor: typeof db | BeneficiarioTx) => {
+    const [row] = await executor.insert(beneficiariTable)
+      .values(values as typeof beneficiariTable.$inferInsert).returning();
+    await executor.insert(auditConfigurazioniTable).values({
+      area: "beneficiari",
+      chiave: `beneficiario:${row.id}`,
+      azione: "creazione",
+      valoreNuovo: {
+        beneficiarioId: row.id,
+        statoAnagrafica: row.statoAnagrafica,
+        cittaId: row.cittaId,
+        centroAscoltoId: row.centroAscoltoId,
+        zonaUdsId: row.zonaUdsId,
+      },
+      utenteId: req.user?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+    });
+    return row;
+  };
   try {
-    const executor = options.executor ?? db;
-    const [row] = await executor.insert(beneficiariTable).values(values as typeof beneficiariTable.$inferInsert).returning();
+    const row = options.executor
+      ? await persist(options.executor)
+      : await db.transaction((tx) => persist(tx));
     return { row };
   } catch (e) {
     if (isCodiceBeneficiarioUniqueViolation(e)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
@@ -513,33 +658,45 @@ export async function createBeneficiarioOne(
   }
 }
 
-router.post("/beneficiari", async (req, res) => {
+router.post("/beneficiari", requirePermission("beneficiari.manage"), async (req, res) => {
   const r = await createBeneficiarioOne(req.body, req);
   if ("error" in r) { res.status(r.status ?? 400).json({ error: r.error }); return; }
-  res.status(201).json(fmtBenef(
+  res.status(201).json(fmtBenefForRequest(
     r.row,
+    req,
     null,
     null,
     await magazzinoEmporioNomeOf(r.row.magazzinoEmporioPreferitoId),
   ));
 });
 
-router.post("/beneficiari/bulk", async (req, res) => {
-  const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
+router.post("/beneficiari/bulk", requirePermission("beneficiari.manage"), async (req, res) => {
+  const righe = req.body?.righe;
+  if (!Array.isArray(righe)) { res.status(400).json({ error: "Il campo righe deve essere un array." }); return; }
+  if (righe.length > 500) { res.status(400).json({ error: "Il bulk Beneficiari accetta al massimo 500 righe." }); return; }
   const result = await runBulk(righe, async (row) => {
-    const r = await createBeneficiarioOne(row, req);
+    if (row == null || typeof row !== "object" || Array.isArray(row)) return { error: "Riga non valida." };
+    const r = await createBeneficiarioOne(row as Record<string, unknown>, req);
     return "error" in r ? { error: r.error } : { ok: true };
+  });
+  await db.insert(auditConfigurazioniTable).values({
+    area: "beneficiari",
+    chiave: "beneficiari:bulk",
+    azione: "import-bulk",
+    valoreNuovo: { righe: righe.length, creati: result.creati, errori: result.errori.length },
+    utenteId: req.user?.id ?? null,
+    ip: req.ip ?? req.socket.remoteAddress ?? null,
   });
   res.json(result);
 });
 
-// Fuzzy person-duplicate suggestion (pg_trgm). Scoped HARD to the caller's città
-// so a duplicate is never surfaced across cities. The UDS lookup deliberately
-// ignores centro/zona: an operator may find every shared person in their città,
+// Fuzzy person-duplicate suggestion (pg_trgm). Scoped HARD to the caller's Area
+// so a duplicate is never surfaced across Areas. The UDS lookup deliberately
+// ignores Centro/Zona: an operator may find every shared person in their Area,
 // including Sociale-only people and UDS people assigned to another zona.
 // MUST stay registered before "/beneficiari/:id" so the literal segment is not
 // captured as an id.
-router.get("/beneficiari/cerca-simili", async (req, res) => {
+router.get("/beneficiari/cerca-simili", requirePermission("beneficiari.duplicates.search"), async (req, res) => {
   const q = req.query as Record<string, string>;
   const search = (q.search ?? "").trim().toLowerCase();
   const nome = (q.nome ?? "").trim();
@@ -554,8 +711,8 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
   };
   const excludeId = toIntOrNull(q.excludeId);
 
-  // A global caller must always choose one valid città explicitly. Scoped
-  // callers cannot override their own città, even by sending another value.
+  // A global caller must always choose one valid Area explicitly. Scoped
+  // callers cannot override their own Area, even by sending another value.
   const callerCitta = callerCittaId(req);
   let cittaId: number;
   if (callerCitta != null) {
@@ -563,7 +720,7 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
   } else {
     const rawCitta = q.cittaId as unknown;
     if (rawCitta == null || (typeof rawCitta === "string" && !rawCitta.trim())) {
-      res.status(400).json({ error: "Seleziona una città per cercare le persone." });
+      res.status(400).json({ error: "Seleziona un'Area per cercare le persone." });
       return;
     }
     const requestedCitta = typeof rawCitta === "string" ? rawCitta.trim() : "";
@@ -574,7 +731,7 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
       parsedCitta <= 0 ||
       parsedCitta > 2_147_483_647
     ) {
-      res.status(400).json({ error: "La città selezionata non è valida." });
+      res.status(400).json({ error: "L'Area selezionata non è valida." });
       return;
     }
     cittaId = parsedCitta;
@@ -592,12 +749,39 @@ router.get("/beneficiari/cerca-simili", async (req, res) => {
   }));
 });
 
+router.post("/beneficiari/export/authorize", requirePermission("beneficiari.export"), async (req, res) => {
+  const parsed = AuthorizeBeneficiariExportInput.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: zodErrorMessage(parsed.error) }); return; }
+  if (parsed.data.beneficiarioId != null) {
+    const access = await scopedBeneficiario(parsed.data.beneficiarioId, req);
+    if ("error" in access) { res.status(access.status).json({ error: access.error }); return; }
+  }
+  const [audit] = await db.insert(auditConfigurazioniTable).values({
+    area: "beneficiari",
+    chiave: parsed.data.beneficiarioId == null ? "beneficiari:export" : `beneficiario:${parsed.data.beneficiarioId}`,
+    azione: "export-autorizzato",
+    valoreNuovo: {
+      tipo: parsed.data.tipo,
+      beneficiarioId: parsed.data.beneficiarioId ?? null,
+      numeroRecord: parsed.data.numeroRecord,
+      cittaId: callerCittaId(req),
+      centroAscoltoId: callerCentroId(req),
+      zonaUdsId: callerZonaUdsId(req),
+    },
+    utenteId: req.user?.id ?? null,
+    ip: req.ip ?? req.socket.remoteAddress ?? null,
+  }).returning({ id: auditConfigurazioniTable.id });
+  res.json({ autorizzato: true, auditId: audit.id });
+});
+
 router.get("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.manage"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
   const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!beneficiario) { res.status(404).json({ error: "Beneficiario non trovato" }); return; }
-  if (!canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req)) || !canAccessCitta(beneficiario.cittaId, callerCittaId(req))) {
+  if (!canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req))
+    || !canAccessCitta(beneficiario.cittaId, callerCittaId(req))
+    || !canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req))) {
     res.status(403).json({ error: "Beneficiario non accessibile" }); return;
   }
   const rows = await db.select().from(tessereBeneficiariTable)
@@ -611,7 +795,9 @@ router.post("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.man
   if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
   const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!beneficiario) { res.status(404).json({ error: "Beneficiario non trovato" }); return; }
-  if (!canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req)) || !canAccessCitta(beneficiario.cittaId, callerCittaId(req))) {
+  if (!canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req))
+    || !canAccessCitta(beneficiario.cittaId, callerCittaId(req))
+    || !canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req))) {
     res.status(403).json({ error: "Beneficiario non accessibile" }); return;
   }
   if (!beneficiario.attivo) { res.status(409).json({ error: "Il beneficiario non è attivo" }); return; }
@@ -639,20 +825,12 @@ router.post("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.man
   }
 });
 
-router.get("/beneficiari/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.get("/beneficiari/:id", requirePermission("beneficiari.view"), async (req, res) => {
+  const id = Number(req.params.id);
   const [row] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
-    return;
-  }
-  if (!canAccessCitta(row.cittaId, callerCittaId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
-    return;
-  }
-  if (!canAccessZonaUds(row.zonaUdsId, callerZonaUdsId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua zona" });
+  if (!canViewBeneficiarioRecord(row, req)) {
+    res.status(403).json({ error: "Beneficiario non accessibile per il tuo profilo" });
     return;
   }
 
@@ -662,8 +840,23 @@ router.get("/beneficiari/:id", async (req, res) => {
     centroNome = c?.nome ?? null;
   }
 
-  const nucleo = await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, id));
-  const interventi = await db.select().from(interventiTable).where(eq(interventiTable.beneficiarioId, id)).limit(20);
+  const canViewSensitive = hasPermission(req, "beneficiari.sensitive.view");
+  const canViewCredito = hasPermission(req, "credito.view");
+  const ambiti = visibleInterventoAmbiti(req);
+  const nucleo = canViewSensitive
+    ? await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, id))
+    : [];
+  const interventi = ambiti.length > 0
+    ? await db.select().from(interventiTable).where(and(
+      eq(interventiTable.beneficiarioId, id),
+      ambiti.includes("sociale")
+        ? or(inArray(interventiTable.ambito, ambiti), isNull(interventiTable.ambito))
+        : inArray(interventiTable.ambito, ambiti),
+    )).orderBy(
+      desc(sql`coalesce(${interventiTable.dataIntervento}, ${interventiTable.dataCreazione}::date)`),
+      desc(interventiTable.id),
+    ).limit(20)
+    : [];
   const interventoIds = interventi.map((intervento) => intervento.id);
   const successori = interventoIds.length > 0
     ? await db.select({ id: interventiTable.id, precedenteId: interventiTable.interventoPrecedenteId }).from(interventiTable).where(inArray(interventiTable.interventoPrecedenteId, interventoIds))
@@ -672,10 +865,20 @@ router.get("/beneficiari/:id", async (req, res) => {
     ? await db.select().from(bisogniPianificatiTable).where(inArray(bisogniPianificatiTable.interventoId, interventoIds))
     : [];
   const today = dataCivileEuropeRome();
-  const consegne = await db.select().from(consegneTable).where(eq(consegneTable.beneficiarioId, id)).limit(20);
+  const consegne = canViewSensitive
+    ? await db.select().from(consegneTable).where(eq(consegneTable.beneficiarioId, id))
+      .orderBy(desc(consegneTable.dataCreazione), desc(consegneTable.id)).limit(20)
+    : [];
 
+  const anagrafica = fmtBenefForRequest(
+    row,
+    req,
+    centroNome,
+    null,
+    await magazzinoEmporioNomeOf(row.magazzinoEmporioPreferitoId),
+  );
   res.json({
-    ...fmtBenef(row, centroNome, null, await magazzinoEmporioNomeOf(row.magazzinoEmporioPreferitoId)),
+    ...anagrafica,
     nucleo: nucleo.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, sesso: n.sesso ?? null })),
     interventi: interventi.map(i => ({
       id: i.id,
@@ -689,8 +892,8 @@ router.get("/beneficiari/:id", async (req, res) => {
       descrizione: i.descrizione ?? null,
       esito: i.esito ?? null,
       prossimAzione: i.prossimAzione ?? null,
-      note: i.note ?? null,
-      noteUds: i.noteUds ?? null,
+      note: i.ambito === "uds" ? null : i.note ?? null,
+      noteUds: i.ambito === "uds" ? i.noteUds ?? null : null,
       dataFollowup: i.dataFollowup ?? null,
       scadenzaIsee: i.scadenzaIsee ?? null,
       scadenzaRinnovo: i.scadenzaRinnovo ?? null,
@@ -726,32 +929,40 @@ router.get("/beneficiari/:id", async (req, res) => {
   });
 });
 
-router.patch("/beneficiari/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async (req, res) => {
+  const id = Number(req.params.id);
+  const parsed = UpdateBeneficiarioInput.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: zodErrorMessage(parsed.error) }); return; }
+  const input = parsed.data;
+  if (!hasPermission(req, "beneficiari.sensitive.view")
+    && Object.keys(input).some((key) => SOCIAL_SENSITIVE_FIELDS.has(key))) {
+    res.status(403).json({ error: "Non hai il permesso di modificare i dati sociali sensibili." });
+    return;
+  }
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  const patchKeys = Object.keys(req.body ?? {});
+  const patchKeys = Object.keys(input);
   const isInitialUdsLink = !existing.uds
-    && toBool(req.body?.uds) === true
+    && toBool(input.uds) === true
     && patchKeys.length > 0
-    && patchKeys.every((key) => key === "uds" || key === "zonaUdsId" || key === "fasciaEtaPresunta");
+    && patchKeys.every((key) => key === "uds" || key === "zonaUdsId" || key === "fasciaEtaPresunta" || key === "versione");
   const canLinkWithinCallerCitta = isInitialUdsLink
     && cid != null
     && existing.cittaId === cid;
 
   // The shared-directory UDS action is the only mutation allowed across centro
-  // and zona boundaries, and only for a non-UDS person in the caller's exact
-  // città. Every other patch retains the standard territorial checks.
+  // and Zona boundaries, and only for a non-UDS person in the caller's exact
+  // Area. Every other patch retains the standard territorial checks.
   if (!canLinkWithinCallerCitta) {
     if (!canAccessCentro(existing.centroAscoltoId, caller)) {
       res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
       return;
     }
     if (!canAccessCitta(existing.cittaId, cid)) {
-      res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+      res.status(403).json({ error: "Risorsa non accessibile per la tua Area" });
       return;
     }
     if (!canAccessZonaUds(existing.zonaUdsId, zid)) {
@@ -759,24 +970,26 @@ router.patch("/beneficiari/:id", async (req, res) => {
       return;
     }
   }
-  const updates = { ...req.body, dataAggiornamento: new Date() };
+  const { versione, ...inputUpdates } = input;
+  const updates: Record<string, any> = { ...inputUpdates, dataAggiornamento: new Date() };
   if ("statoAnagrafica" in updates && !["provvisoria", "completa"].includes(String(updates.statoAnagrafica))) {
     res.status(400).json({ error: "Stato anagrafica non valido" }); return;
   }
-  const eta = normalizeEtaFields(updates, req.body as Record<string, unknown>);
+  const eta = normalizeEtaFields(updates, inputUpdates as Record<string, unknown>);
   if (eta.error) {
     res.status(400).json({ error: eta.error });
     return;
   }
+  if ("codiceFiscale" in updates) updates.codiceFiscale = normalizeCodiceFiscale(updates.codiceFiscale);
   delete updates.creditoSolidaleSaldo;
   delete updates.creditoSolidaleDataUltimoMovimento;
   if ("uds" in updates) updates.uds = toBool(updates.uds);
-  const credito = normalizeCreditoSolidaleFields(updates, req.body as Record<string, unknown>, existing);
+  const credito = normalizeCreditoSolidaleFields(updates, inputUpdates as Record<string, unknown>, existing);
   if (credito.error) {
     res.status(400).json({ error: credito.error });
     return;
   }
-  const quota = normalizeCreditoSolidaleQuotaFields(updates, req.body as Record<string, unknown>, existing);
+  const quota = normalizeCreditoSolidaleQuotaFields(updates, inputUpdates as Record<string, unknown>, existing);
   if (quota.error) {
     res.status(400).json({ error: quota.error });
     return;
@@ -827,9 +1040,16 @@ router.patch("/beneficiari/:id", async (req, res) => {
     const sesso = normalizzaSesso(updates.sesso ?? existing.sesso);
     const dataNascita = (updates.dataNascita ?? existing.dataNascita) as string | null | undefined;
     const fasciaEtaPresunta = updates.fasciaEtaPresunta ?? existing.fasciaEtaPresunta;
-    if (!nome || !cognome || !sesso || (calcolaEta(dataNascita ?? "") == null && !isFasciaEtaPresunta(fasciaEtaPresunta))) {
-      res.status(400).json({ error: "Completa nome, cognome, sesso e data di nascita o fascia d'età presunta" }); return;
-    }
+    const completeError = validateBeneficiarioCompleto({
+      statoAnagrafica: "completa",
+      nome,
+      cognome,
+      sesso: sesso ?? null,
+      dataNascita: dataNascita ?? null,
+      fasciaEtaPresunta: typeof fasciaEtaPresunta === "string" ? fasciaEtaPresunta : null,
+      centroAscoltoId: centroId,
+    });
+    if (completeError) { res.status(400).json({ error: completeError }); return; }
     updates.nome = nome;
     updates.cognome = cognome;
     updates.sesso = sesso;
@@ -876,9 +1096,8 @@ router.patch("/beneficiari/:id", async (req, res) => {
     res.status(403).json({ error: UNITA_STRADA_DISABLED_MSG });
     return;
   }
-  // Mirror the POST città-HARD-boundary guard: a UDS person must never end up
-  // with a null città (cross-città visibility leak). A scoped caller auto-pins
-  // their own città (even on legacy null-città rows); a global caller must
+  // Un collegamento UDS non può restare senza Area. Un caller territoriale
+  // assegna la propria Area anche ai record legacy; un caller globale deve
   // supply one explicitly.
   const resultingUds = "uds" in updates ? updates.uds === true : existing.uds === true;
   const resultingCitta = "cittaId" in updates ? updates.cittaId : existing.cittaId;
@@ -886,28 +1105,63 @@ router.patch("/beneficiari/:id", async (req, res) => {
     if (cid != null) {
       updates.cittaId = cid;
     } else {
-      res.status(400).json({ error: "La città è obbligatoria per una persona UDS" });
+      res.status(400).json({ error: "L'Area è obbligatoria per una persona UDS" });
       return;
     }
   }
+  const assignmentChanged = ["cittaId", "centroAscoltoId", "zonaUdsId", "magazzinoEmporioPreferitoId"]
+    .some((key) => key in updates);
+  if (assignmentChanged || (existing.statoAnagrafica === "provvisoria" && updates.statoAnagrafica === "completa")) {
+    const assignmentError = await validateBeneficiarioTerritorialAssignment({
+      cittaId: ("cittaId" in updates ? updates.cittaId : existing.cittaId) ?? null,
+      centroAscoltoId: ("centroAscoltoId" in updates ? updates.centroAscoltoId : existing.centroAscoltoId) ?? null,
+      zonaUdsId: ("zonaUdsId" in updates ? updates.zonaUdsId : existing.zonaUdsId) ?? null,
+      magazzinoEmporioPreferitoId: ("magazzinoEmporioPreferitoId" in updates
+        ? updates.magazzinoEmporioPreferitoId
+        : existing.magazzinoEmporioPreferitoId) ?? null,
+    }, { requireArea: true, requireActiveArea: true });
+    if (assignmentError) { res.status(assignmentError.status).json({ error: assignmentError.error }); return; }
+  }
+  const changedFields = Object.keys(inputUpdates);
+  updates.versione = sql`${beneficiariTable.versione} + 1`;
   try {
     const row = await db.transaction(async (tx) => {
-      const [updated] = await tx.update(beneficiariTable).set(updates).where(eq(beneficiariTable.id, id)).returning();
-      if (updated.statoAnagrafica !== existing.statoAnagrafica && updated.statoAnagrafica === "completa") {
-        await tx.insert(auditConfigurazioniTable).values({
-          area: "beneficiari",
-          chiave: `beneficiario:${id}`,
-          azione: "completamento-anagrafica",
-          valorePrecedente: { statoAnagrafica: existing.statoAnagrafica },
-          valoreNuovo: { statoAnagrafica: updated.statoAnagrafica, centroAscoltoId: updated.centroAscoltoId },
-          utenteId: req.user?.id ?? null,
-          ip: req.ip ?? req.socket.remoteAddress ?? null,
-        });
-      }
+      const [updated] = await tx.update(beneficiariTable).set(updates).where(and(
+        eq(beneficiariTable.id, id),
+        eq(beneficiariTable.versione, versione),
+      )).returning();
+      if (!updated) return null;
+      await tx.insert(auditConfigurazioniTable).values({
+        area: "beneficiari",
+        chiave: `beneficiario:${id}`,
+        azione: updated.statoAnagrafica !== existing.statoAnagrafica && updated.statoAnagrafica === "completa"
+          ? "completamento-anagrafica"
+          : "modifica-anagrafica",
+        valorePrecedente: {
+          versione: existing.versione,
+          statoAnagrafica: existing.statoAnagrafica,
+          cittaId: existing.cittaId,
+          centroAscoltoId: existing.centroAscoltoId,
+          zonaUdsId: existing.zonaUdsId,
+          campiModificati: changedFields,
+        },
+        valoreNuovo: {
+          versione: updated.versione,
+          statoAnagrafica: updated.statoAnagrafica,
+          cittaId: updated.cittaId,
+          centroAscoltoId: updated.centroAscoltoId,
+          zonaUdsId: updated.zonaUdsId,
+          campiModificati: changedFields,
+        },
+        utenteId: req.user?.id ?? null,
+        ip: req.ip ?? req.socket.remoteAddress ?? null,
+      });
       return updated;
     });
-    res.json(fmtBenef(
+    if (!row) { res.status(409).json({ error: "Il Beneficiario è stato modificato da un altro utente. Ricarica la scheda e riprova." }); return; }
+    res.json(fmtBenefForRequest(
       row,
+      req,
       null,
       null,
       await magazzinoEmporioNomeOf(row.magazzinoEmporioPreferitoId),
@@ -921,8 +1175,43 @@ router.patch("/beneficiari/:id", async (req, res) => {
   }
 });
 
-router.delete("/beneficiari/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.patch("/beneficiari/:id/stato", requirePermission("beneficiari.deactivate"), async (req, res) => {
+  const id = Number(req.params.id);
+  const parsed = UpdateBeneficiarioStatusInput.safeParse(req.body);
+  if (!Number.isSafeInteger(id) || id <= 0 || !parsed.success) {
+    res.status(400).json({ error: parsed.success ? "Beneficiario non valido." : zodErrorMessage(parsed.error) });
+    return;
+  }
+  const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Beneficiario non trovato." }); return; }
+  if (!canAccessBeneficiarioRecord(existing, req)) { res.status(403).json({ error: "Beneficiario non accessibile." }); return; }
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx.update(beneficiariTable).set({
+      attivo: parsed.data.attivo,
+      versione: sql`${beneficiariTable.versione} + 1`,
+      dataAggiornamento: new Date(),
+    }).where(and(
+      eq(beneficiariTable.id, id),
+      eq(beneficiariTable.versione, parsed.data.versione),
+    )).returning();
+    if (!row) return null;
+    await tx.insert(auditConfigurazioniTable).values({
+      area: "beneficiari",
+      chiave: `beneficiario:${id}`,
+      azione: row.attivo ? "riattivazione" : "disattivazione",
+      valorePrecedente: { attivo: existing.attivo, versione: existing.versione },
+      valoreNuovo: { attivo: row.attivo, versione: row.versione },
+      utenteId: req.user?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+    });
+    return row;
+  });
+  if (!updated) { res.status(409).json({ error: "Versione Beneficiario superata." }); return; }
+  res.json(fmtBenefForRequest(updated, req));
+});
+
+router.delete("/beneficiari/:id", requirePermission("beneficiari.deactivate"), async (req, res) => {
+  const id = Number(req.params.id);
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCentro(existing.centroAscoltoId, callerCentroId(req))) {
@@ -930,58 +1219,110 @@ router.delete("/beneficiari/:id", async (req, res) => {
     return;
   }
   if (!canAccessCitta(existing.cittaId, callerCittaId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    res.status(403).json({ error: "Risorsa non accessibile per la tua Area" });
     return;
   }
   if (!canAccessZonaUds(existing.zonaUdsId, callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per la tua zona" });
     return;
   }
-  await db.delete(beneficiariTable).where(eq(beneficiariTable.id, id));
+  if (!existing.attivo) { res.status(204).send(); return; }
+  await db.transaction(async (tx) => {
+    const [updated] = await tx.update(beneficiariTable).set({
+      attivo: false,
+      versione: sql`${beneficiariTable.versione} + 1`,
+      dataAggiornamento: new Date(),
+    }).where(eq(beneficiariTable.id, id)).returning();
+    await tx.insert(auditConfigurazioniTable).values({
+      area: "beneficiari",
+      chiave: `beneficiario:${id}`,
+      azione: "disattivazione",
+      valorePrecedente: { attivo: true, versione: existing.versione },
+      valoreNuovo: { attivo: false, versione: updated.versione },
+      utenteId: req.user?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+    });
+  });
   res.status(204).send();
 });
 
-router.get("/beneficiari/:id/nucleo", async (req, res) => {
-  const id = parseInt(req.params.id);
-  if (
-    !canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))
-    || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))
-    || !canAccessZonaUds(await beneficiarioZonaUdsId(id), callerZonaUdsId(req))
-  ) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
-    return;
-  }
+async function scopedBeneficiario(
+  id: number,
+  req: Request,
+): Promise<
+  | { beneficiario: typeof beneficiariTable.$inferSelect }
+  | { status: 403 | 404; error: string }
+> {
+  const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
+  if (!beneficiario) return { status: 404, error: "Beneficiario non trovato." } as const;
+  if (!canAccessBeneficiarioRecord(beneficiario, req)) return { status: 403, error: "Beneficiario non accessibile." } as const;
+  return { beneficiario } as const;
+}
+
+router.get("/beneficiari/:id/nucleo", requirePermission("beneficiari.sensitive.view"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido." }); return; }
+  const access = await scopedBeneficiario(id, req);
+  if ("error" in access) { res.status(access.status).json({ error: access.error }); return; }
   const rows = await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, id));
   res.json(rows.map(n => ({ ...n, dataNascita: n.dataNascita ?? null, sesso: n.sesso ?? null, tagliaVestiti: n.tagliaVestiti ?? null, numeroScarpe: n.numeroScarpe ?? null })));
 });
 
-router.post("/beneficiari/:id/nucleo", async (req, res) => {
-  const id = parseInt(req.params.id);
-  if (
-    !canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))
-    || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))
-    || !canAccessZonaUds(await beneficiarioZonaUdsId(id), callerZonaUdsId(req))
-  ) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
-    return;
-  }
-  const [row] = await db.insert(nucleoFamiliareTable).values({ ...req.body, beneficiarioId: id }).returning();
+router.post("/beneficiari/:id/nucleo", requirePermission("beneficiari.manage"), requirePermission("beneficiari.sensitive.view"), async (req, res) => {
+  const id = Number(req.params.id);
+  const access = Number.isSafeInteger(id) && id > 0 ? await scopedBeneficiario(id, req) : { status: 400, error: "Beneficiario non valido." } as const;
+  if ("error" in access) { res.status(access.status).json({ error: access.error }); return; }
+  const parsed = NucleoFamiliareInput.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: zodErrorMessage(parsed.error) }); return; }
+  const row = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(nucleoFamiliareTable).values({ ...parsed.data, beneficiarioId: id }).returning();
+    await tx.insert(auditConfigurazioniTable).values({
+      area: "beneficiari", chiave: `beneficiario:${id}:nucleo`, azione: "aggiunta-membro-nucleo",
+      valoreNuovo: { membroId: created.id, campiCompilati: Object.keys(parsed.data) },
+      utenteId: req.user?.id ?? null, ip: req.ip ?? req.socket.remoteAddress ?? null,
+    });
+    return created;
+  });
   res.status(201).json(row);
 });
 
-router.delete("/beneficiari/:id/nucleo/:membroId", async (req, res) => {
-  const id = parseInt(req.params.id);
-  if (
-    !canAccessCentro(await beneficiarioCentroId(id), callerCentroId(req))
-    || !canAccessCitta(await beneficiarioCittaId(id), callerCittaId(req))
-    || !canAccessZonaUds(await beneficiarioZonaUdsId(id), callerZonaUdsId(req))
-  ) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
-    return;
-  }
-  await db
-    .delete(nucleoFamiliareTable)
-    .where(and(eq(nucleoFamiliareTable.id, parseInt(req.params.membroId)), eq(nucleoFamiliareTable.beneficiarioId, id)));
+router.patch("/beneficiari/:id/nucleo/:membroId", requirePermission("beneficiari.manage"), requirePermission("beneficiari.sensitive.view"), async (req, res) => {
+  const id = Number(req.params.id);
+  const membroId = Number(req.params.membroId);
+  const access = Number.isSafeInteger(id) && id > 0 ? await scopedBeneficiario(id, req) : { status: 400, error: "Beneficiario non valido." } as const;
+  if ("error" in access) { res.status(access.status).json({ error: access.error }); return; }
+  if (!Number.isSafeInteger(membroId) || membroId <= 0) { res.status(400).json({ error: "Membro non valido." }); return; }
+  const parsed = NucleoFamiliareUpdateInput.safeParse(req.body);
+  if (!parsed.success || Object.keys(parsed.data).length === 0) { res.status(400).json({ error: parsed.success ? "Nessun campo da aggiornare." : zodErrorMessage(parsed.error) }); return; }
+  const row = await db.transaction(async (tx) => {
+    const [updated] = await tx.update(nucleoFamiliareTable).set(parsed.data).where(and(
+      eq(nucleoFamiliareTable.id, membroId), eq(nucleoFamiliareTable.beneficiarioId, id),
+    )).returning();
+    if (!updated) return null;
+    await tx.insert(auditConfigurazioniTable).values({
+      area: "beneficiari", chiave: `beneficiario:${id}:nucleo`, azione: "modifica-membro-nucleo",
+      valoreNuovo: { membroId, campiModificati: Object.keys(parsed.data) },
+      utenteId: req.user?.id ?? null, ip: req.ip ?? req.socket.remoteAddress ?? null,
+    });
+    return updated;
+  });
+  if (!row) { res.status(404).json({ error: "Membro del nucleo non trovato." }); return; }
+  res.json(row);
+});
+
+router.delete("/beneficiari/:id/nucleo/:membroId", requirePermission("beneficiari.manage"), requirePermission("beneficiari.sensitive.view"), async (req, res) => {
+  const id = Number(req.params.id);
+  const membroId = Number(req.params.membroId);
+  const access = Number.isSafeInteger(id) && id > 0 ? await scopedBeneficiario(id, req) : { status: 400, error: "Beneficiario non valido." } as const;
+  if ("error" in access) { res.status(access.status).json({ error: access.error }); return; }
+  await db.transaction(async (tx) => {
+    const [deleted] = await tx.delete(nucleoFamiliareTable)
+      .where(and(eq(nucleoFamiliareTable.id, membroId), eq(nucleoFamiliareTable.beneficiarioId, id))).returning({ id: nucleoFamiliareTable.id });
+    if (deleted) await tx.insert(auditConfigurazioniTable).values({
+      area: "beneficiari", chiave: `beneficiario:${id}:nucleo`, azione: "rimozione-membro-nucleo",
+      valorePrecedente: { membroId }, utenteId: req.user?.id ?? null, ip: req.ip ?? req.socket.remoteAddress ?? null,
+    });
+  });
   res.status(204).send();
 });
 

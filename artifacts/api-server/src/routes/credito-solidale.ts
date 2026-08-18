@@ -1,11 +1,13 @@
 import { Router, type IRouter, type Request } from "express";
-import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import {
   beneficiariTable,
+  auditConfigurazioniTable,
   centriAscoltoTable,
   cittaTable,
   creditoSolidaleMovimentiTable,
   db,
+  magazziniTable,
   politicheCreditoSolidaleTable,
 } from "@workspace/db";
 import {
@@ -20,6 +22,8 @@ import {
 } from "../lib/centroScope";
 import { requireModulo } from "../lib/featureFlags";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
+import { requirePermission } from "../middlewares/auth";
+import { UpdateBeneficiarioCreditoInput, zodErrorMessage } from "../lib/beneficiarioValidation";
 
 const router: IRouter = Router();
 
@@ -453,7 +457,7 @@ async function buildMonthlyPreview(req: Request, body: Record<string, unknown>) 
   };
 }
 
-router.get("/credito-solidale/calcola-beneficiario/:beneficiarioId", async (req, res) => {
+router.get("/credito-solidale/calcola-beneficiario/:beneficiarioId", requirePermission("credito.view"), async (req, res) => {
   const beneficiarioId = Number(req.params.beneficiarioId);
   if (!Number.isInteger(beneficiarioId)) {
     res.status(404).json({ error: BENEFICIARIO_NOT_FOUND_MSG });
@@ -488,7 +492,74 @@ router.get("/credito-solidale/calcola-beneficiario/:beneficiarioId", async (req,
   });
 });
 
-router.get("/credito-solidale/movimenti", async (req, res) => {
+router.get("/credito-solidale/beneficiari", requirePermission("credito.view"), async (req, res) => {
+  const q = req.query as Record<string, string | undefined>;
+  const page = q.page == null ? 1 : Number(q.page);
+  const limit = q.limit == null ? 50 : Number(q.limit);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: "Paginazione non valida: page >= 1 e limit compreso tra 1 e 100." });
+    return;
+  }
+  const centro = parseOptionalId(q.centroAscoltoId);
+  const area = parseOptionalId(q.cittaId);
+  if (centro.error || area.error) { res.status(400).json({ error: "Filtro Area o Centro non valido." }); return; }
+  const conditions: SQL[] = [];
+  if (q.search?.trim()) {
+    const search = `%${q.search.trim()}%`;
+    const predicate = or(
+      ilike(beneficiariTable.nome, search),
+      ilike(beneficiariTable.cognome, search),
+      ilike(beneficiariTable.codice, search),
+      ilike(beneficiariTable.codiceFiscale, search),
+    );
+    if (predicate) conditions.push(predicate);
+  }
+  const callerCentro = callerCentroId(req);
+  const callerArea = callerCittaId(req);
+  if (callerCentro != null) {
+    const scoped = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentro);
+    if (scoped) conditions.push(scoped);
+  } else if (centro.value != null) conditions.push(eq(beneficiariTable.centroAscoltoId, centro.value));
+  const areaScoped = cittaScopeFilter(beneficiariTable.cittaId, callerArea);
+  if (areaScoped) conditions.push(areaScoped);
+  else if (area.value != null) conditions.push(eq(beneficiariTable.cittaId, area.value));
+  const where = conditions.length ? and(...conditions) : undefined;
+  const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(beneficiariTable).where(where);
+  const rows = await db.select({
+    beneficiario: beneficiariTable,
+    centroAscoltoNome: centriAscoltoTable.nome,
+    cittaNome: cittaTable.nome,
+    magazzinoEmporioPreferitoNome: magazziniTable.nome,
+  }).from(beneficiariTable)
+    .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+    .leftJoin(magazziniTable, eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id))
+    .where(where)
+    .orderBy(desc(beneficiariTable.cognome), desc(beneficiariTable.nome), desc(beneficiariTable.id))
+    .limit(limit).offset((page - 1) * limit);
+  res.setHeader("X-Total-Count", String(total));
+  res.json(rows.map(({ beneficiario: b, centroAscoltoNome, cittaNome, magazzinoEmporioPreferitoNome }) => ({
+    id: b.id,
+    codice: b.codice,
+    codiceFiscale: b.codiceFiscale ?? null,
+    cognome: b.cognome,
+    nome: b.nome,
+    centroAscoltoId: b.centroAscoltoId ?? null,
+    centroAscoltoNome: centroAscoltoNome ?? null,
+    cittaId: b.cittaId ?? null,
+    cittaNome: cittaNome ?? null,
+    attivo: b.attivo,
+    creditoSolidaleAbilitato: b.creditoSolidaleAbilitato,
+    creditoSolidaleStato: b.creditoSolidaleStato,
+    creditoSolidaleSaldo: Number(b.creditoSolidaleSaldo ?? "0"),
+    creditoSolidaleMensileAssegnato: b.creditoSolidaleMensileAssegnato == null ? null : Number(b.creditoSolidaleMensileAssegnato),
+    creditoSolidaleDataUltimoMovimento: b.creditoSolidaleDataUltimoMovimento?.toISOString() ?? null,
+    magazzinoEmporioPreferitoId: b.magazzinoEmporioPreferitoId ?? null,
+    magazzinoEmporioPreferitoNome: magazzinoEmporioPreferitoNome ?? null,
+  })));
+});
+
+router.get("/credito-solidale/movimenti", requirePermission("credito.view"), async (req, res) => {
   const q = req.query as Record<string, string | undefined>;
   const conditions: SQL[] = [];
   const callerCentro = callerCentroId(req);
@@ -515,7 +586,7 @@ router.get("/credito-solidale/movimenti", async (req, res) => {
   res.json(rows.map(fmtMovimento));
 });
 
-router.get("/credito-solidale/beneficiari/:beneficiarioId/saldo", async (req, res) => {
+router.get("/credito-solidale/beneficiari/:beneficiarioId/saldo", requirePermission("credito.view"), async (req, res) => {
   const beneficiarioId = Number(req.params.beneficiarioId);
   const [b] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, beneficiarioId));
   if (!b) {
@@ -537,7 +608,78 @@ router.get("/credito-solidale/beneficiari/:beneficiarioId/saldo", async (req, re
   });
 });
 
-router.post("/credito-solidale/beneficiari/:beneficiarioId/refresh-credito", async (req, res) => {
+router.patch("/credito-solidale/beneficiari/:beneficiarioId/configurazione", requirePermission("credito.quota.manage"), async (req, res) => {
+  if (!(await isEmporioEnabled())) { res.status(403).json({ error: EMPORIO_DISABLED_MSG }); return; }
+  const parsed = UpdateBeneficiarioCreditoInput.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: zodErrorMessage(parsed.error) }); return; }
+  if (Object.keys(parsed.data).length === 0) { res.status(400).json({ error: "Nessun campo Credito Solidale da aggiornare." }); return; }
+  const beneficiarioId = Number(req.params.beneficiarioId);
+  const access = await requireAccessibleBeneficiario(beneficiarioId, req);
+  if ("error" in access) { res.status(access.status ?? 400).json({ error: access.error }); return; }
+  const existing = access.beneficiario;
+  const input = parsed.data;
+  const enabled = input.creditoSolidaleAbilitato ?? existing.creditoSolidaleAbilitato;
+  let stato = input.creditoSolidaleStato ?? existing.creditoSolidaleStato;
+  if (!enabled) stato = "non_abilitato";
+  else if (stato === "non_abilitato") stato = "attivo";
+  if (enabled && existing.centroAscoltoId == null) {
+    res.status(400).json({ error: "Associa un Centro di Ascolto prima di abilitare il Credito Solidale." });
+    return;
+  }
+  const updates: Partial<typeof beneficiariTable.$inferInsert> = {
+    creditoSolidaleAbilitato: enabled,
+    creditoSolidaleStato: stato,
+    dataAggiornamento: new Date(),
+  };
+  if (input.creditoSolidaleNote !== undefined) updates.creditoSolidaleNote = input.creditoSolidaleNote;
+  if (input.creditoSolidaleMensileAssegnato !== undefined) {
+    const assegnato = input.creditoSolidaleMensileAssegnato;
+    updates.creditoSolidaleMensileAssegnato = assegnato == null ? null : decimalString(assegnato);
+    updates.creditoSolidaleMensileManuale = assegnato != null
+      && input.creditoSolidaleMensileSuggerito != null
+      && round2(assegnato) !== round2(input.creditoSolidaleMensileSuggerito);
+    updates.creditoSolidaleDataUltimaModificaQuota = new Date();
+  }
+  if (input.creditoSolidaleMotivoModifica !== undefined) {
+    updates.creditoSolidaleMotivoModifica = input.creditoSolidaleMotivoModifica;
+  }
+  if (enabled && !existing.creditoSolidaleAbilitato) updates.creditoSolidaleDataAbilitazione = new Date();
+
+  const row = await db.transaction(async (tx) => {
+    const [updated] = await tx.update(beneficiariTable).set(updates)
+      .where(eq(beneficiariTable.id, beneficiarioId)).returning();
+    await tx.insert(auditConfigurazioniTable).values({
+      area: "beneficiari",
+      chiave: `beneficiario:${beneficiarioId}:credito-solidale`,
+      azione: "configurazione-credito",
+      valorePrecedente: {
+        abilitato: existing.creditoSolidaleAbilitato,
+        stato: existing.creditoSolidaleStato,
+        quota: existing.creditoSolidaleMensileAssegnato == null ? null : Number(existing.creditoSolidaleMensileAssegnato),
+      },
+      valoreNuovo: {
+        abilitato: updated.creditoSolidaleAbilitato,
+        stato: updated.creditoSolidaleStato,
+        quota: updated.creditoSolidaleMensileAssegnato == null ? null : Number(updated.creditoSolidaleMensileAssegnato),
+      },
+      utenteId: req.user?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+    });
+    return updated;
+  });
+  res.json({
+    beneficiarioId: row.id,
+    creditoSolidaleAbilitato: row.creditoSolidaleAbilitato,
+    creditoSolidaleStato: row.creditoSolidaleStato,
+    creditoSolidaleNote: row.creditoSolidaleNote ?? null,
+    creditoSolidaleMensileAssegnato: row.creditoSolidaleMensileAssegnato == null ? null : Number(row.creditoSolidaleMensileAssegnato),
+    creditoSolidaleMensileManuale: row.creditoSolidaleMensileManuale,
+    creditoSolidaleMotivoModifica: row.creditoSolidaleMotivoModifica ?? null,
+    creditoSolidaleDataUltimaModificaQuota: row.creditoSolidaleDataUltimaModificaQuota?.toISOString() ?? null,
+  });
+});
+
+router.post("/credito-solidale/beneficiari/:beneficiarioId/refresh-credito", requirePermission("credito.adjust"), async (req, res) => {
   if (!(await isEmporioEnabled())) {
     res.status(403).json({ error: EMPORIO_DISABLED_MSG });
     return;
@@ -608,7 +750,7 @@ router.post("/credito-solidale/beneficiari/:beneficiarioId/refresh-credito", asy
   });
 });
 
-router.get("/credito-solidale/beneficiari/:beneficiarioId/movimenti", async (req, res) => {
+router.get("/credito-solidale/beneficiari/:beneficiarioId/movimenti", requirePermission("credito.view"), async (req, res) => {
   const beneficiarioId = Number(req.params.beneficiarioId);
   const [b] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, beneficiarioId));
   if (!b) {
@@ -624,7 +766,7 @@ router.get("/credito-solidale/beneficiari/:beneficiarioId/movimenti", async (req
   res.json(rows.map(fmtMovimento));
 });
 
-router.post("/credito-solidale/beneficiari/:beneficiarioId/ricarica-manuale", async (req, res) => {
+router.post("/credito-solidale/beneficiari/:beneficiarioId/ricarica-manuale", requirePermission("credito.adjust"), async (req, res) => {
   const beneficiarioId = Number(req.params.beneficiarioId);
   const access = await requireAccessibleBeneficiario(beneficiarioId, req);
   if ("error" in access) {
@@ -653,7 +795,7 @@ router.post("/credito-solidale/beneficiari/:beneficiarioId/ricarica-manuale", as
   res.status(201).json(fmtMovimento(rows[0]));
 });
 
-router.post("/credito-solidale/beneficiari/:beneficiarioId/rettifica", async (req, res) => {
+router.post("/credito-solidale/beneficiari/:beneficiarioId/rettifica", requirePermission("credito.adjust"), async (req, res) => {
   const beneficiarioId = Number(req.params.beneficiarioId);
   const access = await requireAccessibleBeneficiario(beneficiarioId, req);
   if ("error" in access) {
@@ -687,7 +829,7 @@ router.post("/credito-solidale/beneficiari/:beneficiarioId/rettifica", async (re
   res.status(201).json(fmtMovimento(rows[0]));
 });
 
-router.post("/credito-solidale/movimenti/:id/storno", async (req, res) => {
+router.post("/credito-solidale/movimenti/:id/storno", requirePermission("credito.adjust"), async (req, res) => {
   if (!(await isEmporioEnabled())) {
     res.status(403).json({ error: EMPORIO_DISABLED_MSG });
     return;
@@ -746,7 +888,7 @@ router.post("/credito-solidale/movimenti/:id/storno", async (req, res) => {
   res.status(201).json(fmtMovimento(rows[0]));
 });
 
-router.post("/credito-solidale/ricariche-mensili/preview", async (req, res) => {
+router.post("/credito-solidale/ricariche-mensili/preview", requirePermission("credito.view"), async (req, res) => {
   const preview = await buildMonthlyPreview(req, req.body ?? {});
   if ("error" in preview) {
     res.status(preview.status ?? 400).json({ error: preview.error });
@@ -755,7 +897,7 @@ router.post("/credito-solidale/ricariche-mensili/preview", async (req, res) => {
   res.json(preview);
 });
 
-router.post("/credito-solidale/ricariche-mensili/esegui", async (req, res) => {
+router.post("/credito-solidale/ricariche-mensili/esegui", requirePermission("credito.monthly.execute"), async (req, res) => {
   if (!(await isEmporioEnabled())) {
     res.status(403).json({ error: EMPORIO_DISABLED_MSG });
     return;

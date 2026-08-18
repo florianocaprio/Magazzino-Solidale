@@ -1250,7 +1250,6 @@ router.post(
           ),
           statoAnagrafica: "provvisoria",
           uds: false,
-          attivo: true,
         };
         duplicates = await searchBeneficiariDuplicates({
           cittaId: mensa.mensa.cittaId,
@@ -1278,6 +1277,7 @@ router.post(
             cittaId: mensa.mensa.cittaId,
             centroAscoltoId: null,
             zonaUdsId: null,
+            allowSensitiveFields: true,
           });
           if ("error" in created) {
             throw new MensaError(created.status ?? 400, created.error);

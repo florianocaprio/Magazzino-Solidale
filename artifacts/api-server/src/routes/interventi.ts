@@ -1005,7 +1005,7 @@ async function successoriFor(
 
 type BeneficiarioAccess = Pick<
   typeof beneficiariTable.$inferSelect,
-  "id" | "uds" | "cittaId" | "centroAscoltoId" | "zonaUdsId"
+  "id" | "uds" | "attivo" | "cittaId" | "centroAscoltoId" | "zonaUdsId"
 >;
 
 async function beneficiarioAccess(
@@ -1015,6 +1015,7 @@ async function beneficiarioAccess(
     .select({
       id: beneficiariTable.id,
       uds: beneficiariTable.uds,
+      attivo: beneficiariTable.attivo,
       cittaId: beneficiariTable.cittaId,
       centroAscoltoId: beneficiariTable.centroAscoltoId,
       zonaUdsId: beneficiariTable.zonaUdsId,
@@ -1072,7 +1073,7 @@ async function canCreateForAmbito(
   if (!(await isServizioInterventoAttivo(ambito))) return false;
   const beneficiario = await beneficiarioAccess(beneficiarioId);
   return (
-    beneficiario != null && canAccessInterventoAmbito(ambito, beneficiario, req)
+    beneficiario?.attivo === true && canAccessInterventoAmbito(ambito, beneficiario, req)
   );
 }
 
@@ -1126,6 +1127,7 @@ async function requireAccessibleIntervento(
       beneficiario: {
         id: beneficiariTable.id,
         uds: beneficiariTable.uds,
+        attivo: beneficiariTable.attivo,
         cittaId: beneficiariTable.cittaId,
         centroAscoltoId: beneficiariTable.centroAscoltoId,
         zonaUdsId: beneficiariTable.zonaUdsId,

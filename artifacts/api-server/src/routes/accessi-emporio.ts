@@ -20,6 +20,7 @@ import {
 } from "../lib/centroScope";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
 import { requireModulo } from "../lib/featureFlags";
+import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 router.use(
@@ -101,13 +102,21 @@ function validateBeneficiarioAccesso(beneficiario: typeof beneficiariTable.$infe
   return null;
 }
 
-async function validateMagazzinoEmporio(id: number, req: import("express").Request): Promise<{ error: string; status: number } | { magazzino: typeof magazziniTable.$inferSelect }> {
+async function validateMagazzinoEmporio(
+  id: number,
+  req: import("express").Request,
+  beneficiario?: typeof beneficiariTable.$inferSelect | null,
+): Promise<{ error: string; status: number } | { magazzino: typeof magazziniTable.$inferSelect }> {
   const [magazzino] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
   if (!magazzino || !["emporio", "misto"].includes(magazzino.tipoMagazzino)) {
     return { error: MSG_MAGAZZINO_EMPORIO, status: 400 };
   }
   if (!(await canAccessMagazzino(id, callerCentroId(req), callerCittaId(req)))) {
     return { error: "Magazzino non accessibile per il tuo profilo", status: 403 };
+  }
+  if (magazzino.stato !== "attivo") return { error: "L'Emporio selezionato non è attivo.", status: 400 };
+  if (beneficiario && magazzino.cittaId !== beneficiario.cittaId) {
+    return { error: "L'Emporio deve appartenere alla stessa Area del Beneficiario.", status: 400 };
   }
   return { magazzino };
 }
@@ -196,7 +205,7 @@ function selectAccessi(conditions: SQL[] = []) {
     .orderBy(desc(consegneTable.dataOraInizio), desc(consegneTable.id));
 }
 
-router.get("/accessi-emporio", async (req, res) => {
+router.get("/accessi-emporio", requirePermission("emporio.access.view"), async (req, res) => {
   const q = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (q.dataDa) conditions.push(gte(consegneTable.dataOraInizio, new Date(`${q.dataDa}T00:00:00.000`)));
@@ -234,7 +243,7 @@ router.get("/accessi-emporio", async (req, res) => {
   res.json(rows.map(formatAccesso));
 });
 
-router.get("/accessi-emporio/beneficiari/ricerca", async (req, res) => {
+router.get("/accessi-emporio/beneficiari/ricerca", requirePermission("emporio.access.view"), async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const q = req.query as Record<string, string | undefined>;
   const search = asText(q.search);
@@ -295,7 +304,7 @@ router.get("/accessi-emporio/beneficiari/ricerca", async (req, res) => {
   })));
 });
 
-router.get("/accessi-emporio/:id", async (req, res) => {
+router.get("/accessi-emporio/:id", requirePermission("emporio.access.view"), async (req, res) => {
   const id = Number(req.params.id);
   const rows = await selectAccessi([eq(consegneTable.id, id)]).limit(1);
   if (rows.length === 0) { res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO }); return; }
@@ -307,7 +316,7 @@ router.get("/accessi-emporio/:id", async (req, res) => {
   res.json(formatAccesso(row));
 });
 
-router.post("/accessi-emporio", async (req, res) => {
+router.post("/accessi-emporio", requirePermission("emporio.access.manage"), async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const beneficiarioId = asInt(req.body?.beneficiarioId);
   const magazzinoEmporioId = asInt(req.body?.magazzinoEmporioId);
@@ -329,7 +338,7 @@ router.post("/accessi-emporio", async (req, res) => {
   const beneficiario = await loadBeneficiario(beneficiarioId);
   const beneficiarioError = validateBeneficiarioAccesso(beneficiario);
   if (beneficiarioError) { res.status(400).json({ error: beneficiarioError }); return; }
-  const emporio = await validateMagazzinoEmporio(magazzinoEmporioId, req);
+  const emporio = await validateMagazzinoEmporio(magazzinoEmporioId, req, beneficiario);
   if ("error" in emporio) { res.status(emporio.status).json({ error: emporio.error }); return; }
   if (await hasDuplicateAccesso(beneficiarioId, dataOraInizio)) {
     res.status(409).json({ error: MSG_DUPLICATO });
@@ -357,7 +366,7 @@ router.post("/accessi-emporio", async (req, res) => {
   res.status(201).json(formatAccesso(rows[0]));
 });
 
-router.patch("/accessi-emporio/:id", async (req, res) => {
+router.patch("/accessi-emporio/:id", requirePermission("emporio.access.manage"), async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const id = Number(req.params.id);
   const [existing] = await db.select().from(consegneTable).where(and(eq(consegneTable.id, id), eq(consegneTable.tipoPianificazione, TIPO_ACCESSO)));
@@ -386,7 +395,7 @@ router.patch("/accessi-emporio/:id", async (req, res) => {
   const beneficiario = await loadBeneficiario(beneficiarioId);
   const beneficiarioError = validateBeneficiarioAccesso(beneficiario);
   if (beneficiarioError) { res.status(400).json({ error: beneficiarioError }); return; }
-  const emporio = await validateMagazzinoEmporio(magazzinoEmporioId, req);
+  const emporio = await validateMagazzinoEmporio(magazzinoEmporioId, req, beneficiario);
   if ("error" in emporio) { res.status(emporio.status).json({ error: emporio.error }); return; }
   if (await hasDuplicateAccesso(beneficiarioId, dataOraInizio, id)) {
     res.status(409).json({ error: MSG_DUPLICATO });
@@ -412,7 +421,7 @@ router.patch("/accessi-emporio/:id", async (req, res) => {
   res.json(formatAccesso(rows[0]));
 });
 
-router.patch("/accessi-emporio/:id/stato", async (req, res) => {
+router.patch("/accessi-emporio/:id/stato", requirePermission("emporio.access.manage"), async (req, res) => {
   if (!(await assertEmporioEnabled(res))) return;
   const id = Number(req.params.id);
   const stato = req.body?.statoAccessoEmporio ?? req.body?.stato;

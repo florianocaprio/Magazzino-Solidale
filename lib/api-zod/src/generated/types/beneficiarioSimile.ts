@@ -29,6 +29,8 @@ export interface BeneficiarioSimile {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
-  uds?: boolean;
+  uds: boolean;
+  /** @minimum 1 */
+  versione: number;
   score: number;
 }

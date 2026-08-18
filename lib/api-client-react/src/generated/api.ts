@@ -38,12 +38,16 @@ import type {
   AuditConfigurazione,
   AuthMessageResponse,
   AuthUser,
+  AuthorizeBeneficiariExport200,
   BeneficiariBulkInput,
+  BeneficiariExportInput,
   Beneficiario,
   BeneficiarioAccessoEmporioSearchResult,
   BeneficiarioDettaglio,
+  BeneficiarioDirectory,
   BeneficiarioInput,
   BeneficiarioSimile,
+  BeneficiarioStatoInput,
   BeneficiarioUpdate,
   BisognoPianificato,
   BisognoPianificatoInput,
@@ -82,7 +86,10 @@ import type {
   ConversioneConsegnaResult,
   CreateTrasferimentoMensa200,
   CreateTrasferimentoMensa201,
+  CreditoSolidaleBeneficiario,
   CreditoSolidaleCalcolo,
+  CreditoSolidaleConfigurazione,
+  CreditoSolidaleConfigurazioneInput,
   CreditoSolidaleMovimento,
   CreditoSolidaleRefreshInput,
   CreditoSolidaleRefreshResult,
@@ -152,6 +159,7 @@ import type {
   ListBeneficiariParams,
   ListBolleParams,
   ListConsegneParams,
+  ListCreditoSolidaleBeneficiariParams,
   ListCreditoSolidaleMovimentiParams,
   ListFornitoriParams,
   ListGiacenzeMensaParams,
@@ -3877,9 +3885,9 @@ export const getListBeneficiariUrl = (params?: ListBeneficiariParams,) => {
   return stringifiedParams.length > 0 ? `/api/beneficiari?${stringifiedParams}` : `/api/beneficiari`
 }
 
-export const listBeneficiari = async (params?: ListBeneficiariParams, options?: RequestInit): Promise<Beneficiario[]> => {
+export const listBeneficiari = async (params?: ListBeneficiariParams, options?: RequestInit): Promise<BeneficiarioDirectory[]> => {
 
-  return customFetch<Beneficiario[]>(getListBeneficiariUrl(params),
+  return customFetch<BeneficiarioDirectory[]>(getListBeneficiariUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4021,7 +4029,7 @@ export const getCercaBeneficiariSimiliUrl = (params?: CercaBeneficiariSimiliPara
 }
 
 /**
- * @summary Person lookup and fuzzy duplicate suggestions within one città
+ * @summary Ricerca persone e suggerimenti anti-duplicato all'interno di una sola Area
  */
 export const cercaBeneficiariSimili = async (params?: CercaBeneficiariSimiliParams, options?: RequestInit): Promise<BeneficiarioSimile[]> => {
 
@@ -4068,7 +4076,7 @@ export type CercaBeneficiariSimiliQueryError = ErrorType<CercaBeneficiariSimili4
 
 
 /**
- * @summary Person lookup and fuzzy duplicate suggestions within one città
+ * @summary Ricerca persone e suggerimenti anti-duplicato all'interno di una sola Area
  */
 
 export function useCercaBeneficiariSimili<TData = Awaited<ReturnType<typeof cercaBeneficiariSimili>>, TError = ErrorType<CercaBeneficiariSimili400>>(
@@ -4249,7 +4257,7 @@ export const updateBeneficiario = async (id: number,
 
 
 
-export const getUpdateBeneficiarioMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateBeneficiarioMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiario>>, TError,{id: number;data: BodyType<BeneficiarioUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiario>>, TError,{id: number;data: BodyType<BeneficiarioUpdate>}, TContext> => {
 
@@ -4278,9 +4286,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateBeneficiarioMutationResult = NonNullable<Awaited<ReturnType<typeof updateBeneficiario>>>
     export type UpdateBeneficiarioMutationBody = BodyType<BeneficiarioUpdate>
-    export type UpdateBeneficiarioMutationError = ErrorType<unknown>
+    export type UpdateBeneficiarioMutationError = ErrorType<void>
 
-    export const useUpdateBeneficiario = <TError = ErrorType<unknown>,
+    export const useUpdateBeneficiario = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiario>>, TError,{id: number;data: BodyType<BeneficiarioUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateBeneficiario>>,
@@ -4353,6 +4361,149 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteBeneficiarioMutationOptions(options));
+    }
+
+export const getUpdateBeneficiarioStatoUrl = (id: number,) => {
+
+
+
+
+  return `/api/beneficiari/${id}/stato`
+}
+
+/**
+ * @summary Disattiva o riattiva un beneficiario preservandone lo storico
+ */
+export const updateBeneficiarioStato = async (id: number,
+    beneficiarioStatoInput: BeneficiarioStatoInput, options?: RequestInit): Promise<Beneficiario> => {
+
+  return customFetch<Beneficiario>(getUpdateBeneficiarioStatoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      beneficiarioStatoInput,)
+  }
+);}
+
+
+
+
+export const getUpdateBeneficiarioStatoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiarioStato>>, TError,{id: number;data: BodyType<BeneficiarioStatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiarioStato>>, TError,{id: number;data: BodyType<BeneficiarioStatoInput>}, TContext> => {
+
+const mutationKey = ['updateBeneficiarioStato'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBeneficiarioStato>>, {id: number;data: BodyType<BeneficiarioStatoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateBeneficiarioStato(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBeneficiarioStatoMutationResult = NonNullable<Awaited<ReturnType<typeof updateBeneficiarioStato>>>
+    export type UpdateBeneficiarioStatoMutationBody = BodyType<BeneficiarioStatoInput>
+    export type UpdateBeneficiarioStatoMutationError = ErrorType<void>
+
+    /**
+ * @summary Disattiva o riattiva un beneficiario preservandone lo storico
+ */
+export const useUpdateBeneficiarioStato = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiarioStato>>, TError,{id: number;data: BodyType<BeneficiarioStatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBeneficiarioStato>>,
+        TError,
+        {id: number;data: BodyType<BeneficiarioStatoInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateBeneficiarioStatoMutationOptions(options));
+    }
+
+export const getAuthorizeBeneficiariExportUrl = () => {
+
+
+
+
+  return `/api/beneficiari/export/authorize`
+}
+
+/**
+ * @summary Autorizza e registra nell'audit un'esportazione di dati beneficiari
+ */
+export const authorizeBeneficiariExport = async (beneficiariExportInput: BeneficiariExportInput, options?: RequestInit): Promise<AuthorizeBeneficiariExport200> => {
+
+  return customFetch<AuthorizeBeneficiariExport200>(getAuthorizeBeneficiariExportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      beneficiariExportInput,)
+  }
+);}
+
+
+
+
+export const getAuthorizeBeneficiariExportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authorizeBeneficiariExport>>, TError,{data: BodyType<BeneficiariExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof authorizeBeneficiariExport>>, TError,{data: BodyType<BeneficiariExportInput>}, TContext> => {
+
+const mutationKey = ['authorizeBeneficiariExport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authorizeBeneficiariExport>>, {data: BodyType<BeneficiariExportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authorizeBeneficiariExport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthorizeBeneficiariExportMutationResult = NonNullable<Awaited<ReturnType<typeof authorizeBeneficiariExport>>>
+    export type AuthorizeBeneficiariExportMutationBody = BodyType<BeneficiariExportInput>
+    export type AuthorizeBeneficiariExportMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Autorizza e registra nell'audit un'esportazione di dati beneficiari
+ */
+export const useAuthorizeBeneficiariExport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authorizeBeneficiariExport>>, TError,{data: BodyType<BeneficiariExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof authorizeBeneficiariExport>>,
+        TError,
+        {data: BodyType<BeneficiariExportInput>},
+        TContext
+      > => {
+      return useMutation(getAuthorizeBeneficiariExportMutationOptions(options));
     }
 
 export const getGetNucleoFamiliareUrl = (id: number,) => {
@@ -4490,6 +4641,74 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getAddNucleoFamiliareMutationOptions(options));
+    }
+
+export const getUpdateNucleoFamiliareUrl = (id: number,
+    membroId: number,) => {
+
+
+
+
+  return `/api/beneficiari/${id}/nucleo/${membroId}`
+}
+
+export const updateNucleoFamiliare = async (id: number,
+    membroId: number,
+    nucleoFamiliareInput: NucleoFamiliareInput, options?: RequestInit): Promise<NucleoFamiliare> => {
+
+  return customFetch<NucleoFamiliare>(getUpdateNucleoFamiliareUrl(id,membroId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nucleoFamiliareInput,)
+  }
+);}
+
+
+
+
+export const getUpdateNucleoFamiliareMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareInput>}, TContext> => {
+
+const mutationKey = ['updateNucleoFamiliare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateNucleoFamiliare>>, {id: number;membroId: number;data: BodyType<NucleoFamiliareInput>}> = (props) => {
+          const {id,membroId,data} = props ?? {};
+
+          return  updateNucleoFamiliare(id,membroId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateNucleoFamiliareMutationResult = NonNullable<Awaited<ReturnType<typeof updateNucleoFamiliare>>>
+    export type UpdateNucleoFamiliareMutationBody = BodyType<NucleoFamiliareInput>
+    export type UpdateNucleoFamiliareMutationError = ErrorType<unknown>
+
+    export const useUpdateNucleoFamiliare = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateNucleoFamiliare>>,
+        TError,
+        {id: number;membroId: number;data: BodyType<NucleoFamiliareInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateNucleoFamiliareMutationOptions(options));
     }
 
 export const getDeleteNucleoFamiliareUrl = (id: number,
@@ -13165,6 +13384,90 @@ export function useListCreditoSolidaleMovimenti<TData = Awaited<ReturnType<typeo
 
 
 
+export const getListCreditoSolidaleBeneficiariUrl = (params?: ListCreditoSolidaleBeneficiariParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/credito-solidale/beneficiari?${stringifiedParams}` : `/api/credito-solidale/beneficiari`
+}
+
+/**
+ * @summary Elenco economico dedicato ai soli utenti con permesso Credito Solidale
+ */
+export const listCreditoSolidaleBeneficiari = async (params?: ListCreditoSolidaleBeneficiariParams, options?: RequestInit): Promise<CreditoSolidaleBeneficiario[]> => {
+
+  return customFetch<CreditoSolidaleBeneficiario[]>(getListCreditoSolidaleBeneficiariUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCreditoSolidaleBeneficiariQueryKey = (params?: ListCreditoSolidaleBeneficiariParams,) => {
+    return [
+    `/api/credito-solidale/beneficiari`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCreditoSolidaleBeneficiariQueryOptions = <TData = Awaited<ReturnType<typeof listCreditoSolidaleBeneficiari>>, TError = ErrorType<unknown>>(params?: ListCreditoSolidaleBeneficiariParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreditoSolidaleBeneficiari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCreditoSolidaleBeneficiariQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCreditoSolidaleBeneficiari>>> = ({ signal }) => listCreditoSolidaleBeneficiari(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCreditoSolidaleBeneficiari>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCreditoSolidaleBeneficiariQueryResult = NonNullable<Awaited<ReturnType<typeof listCreditoSolidaleBeneficiari>>>
+export type ListCreditoSolidaleBeneficiariQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Elenco economico dedicato ai soli utenti con permesso Credito Solidale
+ */
+
+export function useListCreditoSolidaleBeneficiari<TData = Awaited<ReturnType<typeof listCreditoSolidaleBeneficiari>>, TError = ErrorType<unknown>>(
+ params?: ListCreditoSolidaleBeneficiariParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreditoSolidaleBeneficiari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCreditoSolidaleBeneficiariQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetCreditoSolidaleBeneficiarioSaldoUrl = (beneficiarioId: number,) => {
 
 
@@ -13235,6 +13538,78 @@ export function useGetCreditoSolidaleBeneficiarioSaldo<TData = Awaited<ReturnTyp
 
 
 
+
+export const getUpdateCreditoSolidaleBeneficiarioConfigurazioneUrl = (beneficiarioId: number,) => {
+
+
+
+
+  return `/api/credito-solidale/beneficiari/${beneficiarioId}/configurazione`
+}
+
+/**
+ * @summary Aggiorna abilitazione e quota senza esporle al DTO anagrafico generico
+ */
+export const updateCreditoSolidaleBeneficiarioConfigurazione = async (beneficiarioId: number,
+    creditoSolidaleConfigurazioneInput: CreditoSolidaleConfigurazioneInput, options?: RequestInit): Promise<CreditoSolidaleConfigurazione> => {
+
+  return customFetch<CreditoSolidaleConfigurazione>(getUpdateCreditoSolidaleBeneficiarioConfigurazioneUrl(beneficiarioId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      creditoSolidaleConfigurazioneInput,)
+  }
+);}
+
+
+
+
+export const getUpdateCreditoSolidaleBeneficiarioConfigurazioneMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCreditoSolidaleBeneficiarioConfigurazione>>, TError,{beneficiarioId: number;data: BodyType<CreditoSolidaleConfigurazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCreditoSolidaleBeneficiarioConfigurazione>>, TError,{beneficiarioId: number;data: BodyType<CreditoSolidaleConfigurazioneInput>}, TContext> => {
+
+const mutationKey = ['updateCreditoSolidaleBeneficiarioConfigurazione'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCreditoSolidaleBeneficiarioConfigurazione>>, {beneficiarioId: number;data: BodyType<CreditoSolidaleConfigurazioneInput>}> = (props) => {
+          const {beneficiarioId,data} = props ?? {};
+
+          return  updateCreditoSolidaleBeneficiarioConfigurazione(beneficiarioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCreditoSolidaleBeneficiarioConfigurazioneMutationResult = NonNullable<Awaited<ReturnType<typeof updateCreditoSolidaleBeneficiarioConfigurazione>>>
+    export type UpdateCreditoSolidaleBeneficiarioConfigurazioneMutationBody = BodyType<CreditoSolidaleConfigurazioneInput>
+    export type UpdateCreditoSolidaleBeneficiarioConfigurazioneMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Aggiorna abilitazione e quota senza esporle al DTO anagrafico generico
+ */
+export const useUpdateCreditoSolidaleBeneficiarioConfigurazione = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCreditoSolidaleBeneficiarioConfigurazione>>, TError,{beneficiarioId: number;data: BodyType<CreditoSolidaleConfigurazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCreditoSolidaleBeneficiarioConfigurazione>>,
+        TError,
+        {beneficiarioId: number;data: BodyType<CreditoSolidaleConfigurazioneInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCreditoSolidaleBeneficiarioConfigurazioneMutationOptions(options));
+    }
 
 export const getRefreshCreditoSolidaleBeneficiarioUrl = (beneficiarioId: number,) => {
 
