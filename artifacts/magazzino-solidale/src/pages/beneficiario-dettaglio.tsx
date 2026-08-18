@@ -32,6 +32,7 @@ import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
 import { InterventoStatoBadge, interventoDataLabel } from "@/components/intervento-workflow";
+import { BeneficiarioMensaSection } from "@/components/beneficiario-mensa-card";
 
 const NONE_VALUE = "__none__";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -264,6 +265,8 @@ export default function BeneficiarioDettaglio() {
       )}
 
       <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />
+
+      <BeneficiarioMensaSection beneficiario={b} />
 
       {b.creditoSolidaleAbilitato && (
         <Card>

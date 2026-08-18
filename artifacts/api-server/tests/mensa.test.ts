@@ -383,6 +383,80 @@ describe("Modulo Mensa", () => {
     expect(response.status).toBe(409);
   });
 
+  it("mantiene esplicita e protetta l'abilitazione dalla scheda Beneficiario", async () => {
+    const fixture = await createFixture();
+    await db
+      .delete(mensaAbilitazioniTable)
+      .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+    const app = makeApp(fixture);
+
+    const deniedBefore = await verify(app, fixture);
+    expect(deniedBefore.status).toBe(201);
+    expect(deniedBefore.body).toMatchObject({
+      esito: "negato",
+      motivoEsito: "ABILITAZIONE_NON_PRESENTE",
+    });
+
+    const viewOnly = makeApp(fixture, ["mensa.view"]);
+    const visibleHistory = await request(viewOnly).get(
+      `/mensa/abilitazioni?beneficiarioId=${fixture.beneficiaryId}`,
+    );
+    expect(visibleHistory.status).toBe(200);
+    expect(visibleHistory.body).toEqual([]);
+    const forbiddenCreate = await request(viewOnly)
+      .post("/mensa/abilitazioni")
+      .send({
+        beneficiarioId: fixture.beneficiaryId,
+        mensaId: fixture.mensaA,
+        dataInizio: dataServizioMensa(),
+        mensaPrincipale: true,
+      });
+    expect(forbiddenCreate.status).toBe(403);
+
+    const outsideScope = await request(app)
+      .post("/mensa/abilitazioni")
+      .send({
+        beneficiarioId: fixture.milanBeneficiaryId,
+        mensaId: fixture.mensaMilan,
+        dataInizio: dataServizioMensa(),
+        mensaPrincipale: true,
+      });
+    expect(outsideScope.status).toBe(403);
+
+    const created = await request(app)
+      .post("/mensa/abilitazioni")
+      .send({
+        beneficiarioId: fixture.beneficiaryId,
+        mensaId: fixture.mensaA,
+        dataInizio: dataServizioMensa(),
+        mensaPrincipale: true,
+      });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({
+      beneficiarioId: fixture.beneficiaryId,
+      mensaId: fixture.mensaA,
+      stato: "attiva",
+      mensaPrincipale: true,
+    });
+
+    const allowedAfter = await verify(app, fixture);
+    expect(allowedAfter.status).toBe(201);
+    expect(allowedAfter.body).toMatchObject({
+      esito: "consentito",
+      motivoEsito: "CONSENTITO",
+    });
+
+    const duplicate = await request(app)
+      .post("/mensa/abilitazioni")
+      .send({
+        beneficiarioId: fixture.beneficiaryId,
+        mensaId: fixture.mensaB,
+        dataInizio: dataServizioMensa(),
+        mensaPrincipale: true,
+      });
+    expect(duplicate.status).toBe(409);
+  });
+
   it.each(["sospesa", "revocata"] as const)(
     "non considera bloccante una principale %s",
     async (stato) => {
