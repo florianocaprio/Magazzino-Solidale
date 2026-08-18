@@ -9,7 +9,7 @@ import authRouter from "../src/routes/auth";
 /**
  * The password change flow was simplified: the endpoint no longer requires the
  * current password. Any authenticated session may set a new password as long as
- * it is at least 8 characters (the confirmation match is enforced client-side).
+ * it respects the shared server-side policy (8 characters, letter and number).
  */
 
 const createdUserIds: number[] = [];
@@ -92,6 +92,25 @@ describe("POST /auth/change-password", () => {
       true,
     );
   });
+
+  it.each(["solotesto", "12345678"])(
+    "rejects a password without both a letter and a number: %s",
+    async (newPassword) => {
+      const userId = await createUser(false);
+      const res = await request(makeApp(userId))
+        .post("/auth/change-password")
+        .send({ newPassword });
+
+      expect(res.status).toBe(400);
+      const [row] = await db
+        .select()
+        .from(utentiTable)
+        .where(eq(utentiTable.id, userId));
+      expect(await bcrypt.compare("vecchiaPassword1", row.passwordHash)).toBe(
+        true,
+      );
+    },
+  );
 
   it("ignores a currentPassword field if the client still sends one", async () => {
     const userId = await createUser(false);

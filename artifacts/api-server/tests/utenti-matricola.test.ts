@@ -153,7 +153,7 @@ describe("PATCH /utenti/:id — auto-generazione matricola in modifica", () => {
 });
 
 describe("POST /utenti — accesso immediato", () => {
-  it("crea l'utente senza obbligo di cambio password al primo accesso", async () => {
+  it("crea l'utente con obbligo di cambio password al primo accesso", async () => {
     const res = await request(app)
       .post("/utenti")
       .send({
@@ -166,10 +166,10 @@ describe("POST /utenti — accesso immediato", () => {
       });
     expect(res.status).toBe(201);
     createdUserIds.push(res.body.id);
-    expect(res.body.mustChangePassword).toBe(false);
+    expect(res.body.mustChangePassword).toBe(true);
 
     const [row] = await db.select({ mustChangePassword: utentiTable.mustChangePassword }).from(utentiTable).where(eq(utentiTable.id, res.body.id));
-    expect(row.mustChangePassword).toBe(false);
+    expect(row.mustChangePassword).toBe(true);
   });
 
   it("persiste e restituisce città e zona UDS", async () => {

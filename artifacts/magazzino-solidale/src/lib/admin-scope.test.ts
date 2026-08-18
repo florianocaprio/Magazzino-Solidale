@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ruoliNelPerimetro } from "./admin-scope";
+import { canManageGlobalAdminResources, ruoliNelPerimetro } from "./admin-scope";
 
 describe("amministratore limitato", () => {
   const ruoli = [
@@ -14,5 +14,17 @@ describe("amministratore limitato", () => {
 
   it("lascia al Super Admin l'intero catalogo", () => {
     expect(ruoliNelPerimetro(ruoli, [], true)).toEqual(ruoli);
+  });
+});
+
+describe("canManageGlobalAdminResources", () => {
+  it("consente Admin globale e SuperAdmin", () => {
+    expect(canManageGlobalAdminResources({ isAdmin: true, cittaId: null })).toBe(true);
+    expect(canManageGlobalAdminResources({ isSuperAdmin: true, cittaId: null })).toBe(true);
+  });
+
+  it("nega Admin di Area e operatori", () => {
+    expect(canManageGlobalAdminResources({ isAdmin: true, cittaId: 1 })).toBe(false);
+    expect(canManageGlobalAdminResources({ isAdmin: false, cittaId: null })).toBe(false);
   });
 });

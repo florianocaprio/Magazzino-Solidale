@@ -166,7 +166,7 @@ describe("Volontari — scoping per centro", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST auto-assegna e blocca il centro del caller", async () => {
+  it("POST rifiuta l'assegnazione esplicita a un altro centro", async () => {
     const res = await request(
       makeScopedApp(volontariRouter, {
         id: operatoreId,
@@ -333,9 +333,7 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
         ruoloId,
         centroAscoltoId: centroB,
       });
-    expect(res.status).toBe(201);
-    scope.utenteIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.status).toBe(403);
   });
 
   it("PATCH /:id fuori centro → 403", async () => {
