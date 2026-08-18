@@ -1214,6 +1214,8 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 <CreditoSolidaleQuotaPanel b={b} enabled={creditoSolidaleAbilitato} emporioAbilitato={emporioAbilitato} />
               </div>
 
+              <BeneficiarioMensaSection beneficiario={b} compact />
+
               <div className="rounded-md border p-3 space-y-3">
                 {!unitaStradaAbilitata && (
                   <p className="text-xs text-muted-foreground">{UNITA_STRADA_DISABLED_MESSAGE}</p>

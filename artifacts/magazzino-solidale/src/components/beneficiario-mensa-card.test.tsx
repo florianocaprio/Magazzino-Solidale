@@ -197,6 +197,37 @@ describe("Mensa nella scheda Beneficiario", () => {
     expect(document.body.textContent).not.toContain("Abilita alla Mensa");
   });
 
+  it("mostra PROGRAMMATA per un'abilitazione attiva con inizio futuro", async () => {
+    mocks.history = [
+      {
+        ...activeEligibility,
+        dataInizio: "2999-01-01",
+      },
+    ];
+    await renderSection();
+
+    expect(document.body.textContent).toContain(
+      "Abilitazione Mensa programmata",
+    );
+    expect(document.body.textContent).toContain("PROGRAMMATA");
+    expect(document.body.textContent).not.toContain("Non abilitato alla Mensa");
+  });
+
+  it("riusa la stessa gestione nella variante compatta della modifica rapida", async () => {
+    mocks.permissions.add("mensa.eligibility.manage");
+    await act(async () =>
+      root.render(
+        <BeneficiarioMensaSection beneficiario={beneficiario} compact />,
+      ),
+    );
+
+    expect(
+      document.querySelector('[data-testid="beneficiario-mensa-card"]'),
+    ).not.toBeNull();
+    expect(document.body.textContent).toContain("NON ABILITATO");
+    expect(document.body.textContent).toContain("Abilita alla Mensa");
+  });
+
   it("non propone una seconda abilitazione quando ne esiste già una attiva", async () => {
     mocks.permissions.add("mensa.eligibility.manage");
     mocks.history = [activeEligibility];
