@@ -346,6 +346,14 @@ afterAll(async () => {
 });
 
 describe("viste operative degli interventi Sociali", () => {
+  it("nega l'ambito Sociale a un operatore con sola area Emporio", async () => {
+    const response = await request(makeApp({ aree: ["emporio"] }))
+      .get("/interventi")
+      .query({ ambito: "sociale" });
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("Ambito sociale non consentito");
+  });
+
   it.each([
     ["da_pianificare", 2, ["da_pianificare"]],
     ["pianificati", 1, ["pianificato"]],

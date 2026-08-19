@@ -653,6 +653,17 @@ export function isNavItemEnabledByCapabilities(
   return !item.requiresMapsLayer || mapsLayerCount > 0;
 }
 
+export function isNavItemEnabledByAccess(
+  item: NavItem,
+  hasArea: (area: string) => boolean,
+  hasPermission: (permission: string) => boolean,
+): boolean {
+  const itemAreas = Array.isArray(item.area) ? item.area : item.area ? [item.area] : [];
+  return itemAreas.some(hasArea) &&
+    (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
+    (!item.permission || hasPermission(item.permission));
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, hasPermission, logout } = useAuth();
@@ -675,10 +686,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         mapsCapabilities?.layers.length ?? 0,
       );
     }
-    const itemAreas = Array.isArray(item.area) ? item.area : item.area ? [item.area] : [];
-    return itemAreas.some(hasArea) &&
-      (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
-      (!item.permission || hasPermission(item.permission)) &&
+    return isNavItemEnabledByAccess(item, hasArea, hasPermission) &&
       isNavItemEnabledByCapabilities(item, mapsCapabilities?.layers.length ?? 0);
   }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo));
 

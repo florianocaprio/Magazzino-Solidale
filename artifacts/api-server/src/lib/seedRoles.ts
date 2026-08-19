@@ -46,6 +46,17 @@ export function defaultEmporioPermissions(current: string[] | null | undefined):
   );
 }
 
+export function roleAreasAfterEmporioSeed(
+  roleName: string,
+  current: string[] | null | undefined,
+): string[] {
+  if (roleName !== EMPORIO_ROLE_NAME) return [...(current ?? [])];
+  return [...new Set([
+    ...(current ?? []).filter((area) => area !== "sociale"),
+    EMPORIO_AREA_KEY,
+  ])];
+}
+
 export async function ensureSuperAdminRole(): Promise<number> {
   const [existing] = await db
     .select({ id: ruoliTable.id })
@@ -159,8 +170,8 @@ export async function seedRoles(): Promise<void> {
   }
 
   // Operational Emporio role. Keep it non-admin and grant only the areas used
-  // by the current Emporio UI/API flows. Existing customizations are preserved;
-  // only the newly required Emporio area is appended when missing.
+  // by the current Emporio UI/API flows. The generic Sociale area is removed
+  // only from this standard role; differently named custom roles are untouched.
   const [emporioRole] = await db
     .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
     .from(ruoliTable)
@@ -169,7 +180,7 @@ export async function seedRoles(): Promise<void> {
     await db.insert(ruoliTable).values({
       nome: EMPORIO_ROLE_NAME,
       descrizione: "Operatore Emporio Solidale",
-      aree: ["generale", "magazzino", "sociale", EMPORIO_AREA_KEY],
+      aree: ["generale", "magazzino", EMPORIO_AREA_KEY],
       permessi: [...EMPORIO_OPERATOR_PERMISSIONS],
       isAdmin: false,
     });
@@ -178,9 +189,7 @@ export async function seedRoles(): Promise<void> {
     await db
       .update(ruoliTable)
       .set({
-        aree: emporioRole.aree.includes(EMPORIO_AREA_KEY)
-          ? emporioRole.aree
-          : [...emporioRole.aree, EMPORIO_AREA_KEY],
+        aree: roleAreasAfterEmporioSeed(EMPORIO_ROLE_NAME, emporioRole.aree),
         // Il ruolo standard usa le API Emporio minimizzate. I ruoli custom non
         // vengono toccati e possono ricevere beneficiari.view esplicitamente.
         permessi: defaultEmporioPermissions(emporioRole.permessi),

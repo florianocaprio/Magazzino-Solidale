@@ -28,6 +28,7 @@ vi.mock("@workspace/api-client-react", () => ({
   useDeleteBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
   useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn().mockResolvedValue({ autorizzato: true }) }),
+  getMensaAbilitazioniRiepilogoBeneficiari: vi.fn().mockResolvedValue([]),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useBulkBeneficiari: () => ({ mutate: vi.fn(), isPending: false }),
   listBeneficiari: vi.fn().mockResolvedValue([]),

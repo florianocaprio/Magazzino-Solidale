@@ -33,7 +33,7 @@ import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
 import { createBeneficiarioWithOptionalMensa } from "@/lib/beneficiario-mensa-workflow";
-import { BENEFICIARI_PAGE_SIZE, fetchAllBeneficiariPages } from "@/lib/beneficiari-pagination";
+import { BENEFICIARI_PAGE_SIZE, fetchBeneficiariExportRows, type BeneficiarioExportRow } from "@/lib/beneficiari-pagination";
 import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requireGlobalBeneficiarioArea } from "@/lib/beneficiario-create-ui";
 
 const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.object({
@@ -160,6 +160,16 @@ export default function Beneficiari() {
   const mensaSummaryByBeneficiario = useMemo(() => new Map<number, MensaAbilitazioneRiepilogoBeneficiario>(
     (mensaSummary.data ?? []).map((item) => [item.beneficiarioId, item]),
   ), [mensaSummary.data]);
+  const currentExportRows = useMemo<BeneficiarioExportRow[]>(() => (beneficiari ?? []).map((row) => ({
+    ...row,
+    ...(canViewMensa ? {
+      mensaStatoExport: mensaSummary.isLoading
+        ? "IN CARICAMENTO"
+        : mensaSummary.isError
+          ? "NON DISPONIBILE"
+          : (mensaSummaryByBeneficiario.get(row.id)?.stato ?? "").toUpperCase(),
+    } : {}),
+  })), [beneficiari, canViewMensa, mensaSummary.isError, mensaSummary.isLoading, mensaSummaryByBeneficiario]);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -366,8 +376,8 @@ export default function Beneficiari() {
           <p className="text-muted-foreground">{t("beneficiari.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          {canExport && <ExportButtons
-            rows={beneficiari ?? []}
+          {canExport && <ExportButtons<BeneficiarioExportRow>
+            rows={currentExportRows}
             columns={[
               { header: t("common.code"), accessor: (b) => b.codice },
               { header: t("common.surname"), accessor: (b) => b.cognome },
@@ -376,14 +386,10 @@ export default function Beneficiari() {
               { header: t("beneficiari.centroAscolto"), accessor: (b) => b.centroAscoltoNome },
               ...(canViewMensa ? [{
                 header: "Mensa",
-                accessor: (b: BeneficiarioDirectory) => mensaSummary.isLoading
-                  ? "IN CARICAMENTO"
-                  : mensaSummary.isError
-                    ? "NON DISPONIBILE"
-                    : (mensaSummaryByBeneficiario.get(b.id)?.stato ?? "").toUpperCase(),
+                accessor: (b: BeneficiarioExportRow) => b.mensaStatoExport ?? "",
               }] : []),
             ]}
-            loadRows={() => fetchAllBeneficiariPages(beneficiariFilters)}
+            loadRows={() => fetchBeneficiariExportRows(beneficiariFilters, canViewMensa)}
             beforeExport={(_format, exportRows) => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: exportRows.length, beneficiarioId: null } }).then(() => undefined)}
             filename="beneficiari"
             title={t("beneficiari.exportTitle")}

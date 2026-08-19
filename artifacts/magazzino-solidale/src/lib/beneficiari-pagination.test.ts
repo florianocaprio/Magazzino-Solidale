@@ -3,6 +3,7 @@ import type { BeneficiarioDirectory } from "@workspace/api-client-react";
 import {
   BENEFICIARI_EXPORT_PAGE_SIZE,
   fetchAllBeneficiariPages,
+  fetchBeneficiariExportRows,
 } from "./beneficiari-pagination";
 
 const rows = (start: number, count: number) => Array.from(
@@ -33,5 +34,47 @@ describe("paginazione ed export Beneficiari", () => {
       { search: "rossi", page: 2, limit: 100 },
       { search: "rossi", page: 3, limit: 100 },
     ]);
+  });
+
+  it("arricchisce oltre 100 Beneficiari con riepiloghi Mensa in chunk, senza N+1", async () => {
+    const allRows = rows(1, 205);
+    const fetchPages = vi.fn().mockResolvedValue(allRows);
+    const fetchMensaSummary = vi.fn(async ({ beneficiarioIds }: { beneficiarioIds?: string }) =>
+      (beneficiarioIds ?? "").split(",").filter(Boolean).map((id) => ({
+        beneficiarioId: Number(id),
+        stato: Number(id) > 200 ? "attiva" : "non_abilitato",
+      })),
+    );
+
+    const result = await fetchBeneficiariExportRows(
+      { search: "rossi" },
+      true,
+      fetchPages,
+      fetchMensaSummary,
+    );
+
+    expect(result).toHaveLength(205);
+    expect(result[204]).toEqual(expect.objectContaining({
+      id: 205,
+      mensaStatoExport: "ATTIVA",
+    }));
+    expect(fetchMensaSummary).toHaveBeenCalledTimes(3);
+    expect(fetchMensaSummary.mock.calls.map(([params]) =>
+      params.beneficiarioIds?.split(",").length,
+    )).toEqual([100, 100, 5]);
+  });
+
+  it("senza visibilità Mensa non richiede riepiloghi né espone il dato", async () => {
+    const fetchMensaSummary = vi.fn();
+    const result = await fetchBeneficiariExportRows(
+      {},
+      false,
+      vi.fn().mockResolvedValue(rows(1, 101)),
+      fetchMensaSummary,
+    );
+
+    expect(result).toHaveLength(101);
+    expect(result[100]).not.toHaveProperty("mensaStatoExport");
+    expect(fetchMensaSummary).not.toHaveBeenCalled();
   });
 });
