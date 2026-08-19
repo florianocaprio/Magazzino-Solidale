@@ -121,6 +121,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Package,
     groupKey: "magazzino",
     area: "magazzino",
+    permission: "magazzino.view",
   },
   {
     key: "lotti",
@@ -129,6 +130,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "magazzino",
     area: "magazzino",
     moduloCodice: "LOTTI",
+    permission: "magazzino.view",
   },
   {
     key: "movimenti",
@@ -136,6 +138,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ArrowRightLeft,
     groupKey: "magazzino",
     area: "magazzino",
+    permission: "magazzino.view",
   },
   {
     key: "giacenze",
@@ -143,6 +146,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: TrendingUpDown,
     groupKey: "magazzino",
     area: "magazzino",
+    permission: "magazzino.view",
   },
   {
     key: "trasferimenti",
@@ -151,6 +155,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "magazzino",
     area: "magazzino",
     moduloCodice: "TRASFERIMENTI",
+    permission: "magazzino.view",
   },
   {
     key: "preparazioneConsegne",
@@ -159,6 +164,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "magazzino",
     area: "magazzino",
     moduloCodice: "MAGAZZINO_SOLIDALE",
+    permission: "magazzino.view",
   },
 
   {
@@ -205,8 +211,9 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/bolle",
     icon: FileText,
     groupKey: "magazzino",
-    area: "sociale",
+    area: ["sociale", "magazzino"],
     moduloCodiciAll: ["MAGAZZINO_SOLIDALE", "BOLLE"],
+    permission: "bolle.view",
   },
   {
     key: "turni",
@@ -223,6 +230,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "magazzino",
     area: "magazzino",
     moduloCodice: "SCARICHI",
+    permission: "magazzino.view",
   },
 
   {
@@ -388,6 +396,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodice: "APPROVVIGIONAMENTI",
+    permission: "approvvigionamenti.view",
   },
   {
     key: "maps",

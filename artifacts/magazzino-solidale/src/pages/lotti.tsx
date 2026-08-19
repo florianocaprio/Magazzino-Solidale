@@ -5,7 +5,8 @@ import {
   useListProdotti,
   useListFornitori,
   useCreateLotto,
-  useCreateMovimento,
+  useRettificaLotto,
+  type Lotto,
   getListGiacenzeQueryKey,
   getListLottiQueryKey,
   getListMovimentiQueryKey,
@@ -18,13 +19,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ExportButtons } from "@/components/export-buttons";
-import { Calendar, Filter, Plus, Info } from "lucide-react";
+import { Calendar, Filter, Plus, Info, ClipboardPen } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { useForm } from "react-hook-form";
@@ -32,13 +34,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/lib/auth";
 
 const nuovoLottoSchema = z.object({
   prodottoId: z.string().min(1),
   magazzinoId: z.string().min(1),
   quantita: z.coerce.number().positive(),
   dataCarico: z.string().min(1),
-  causale: z.string().min(1),
+  causale: z.enum(["acquisto", "donazione", "fse_plus"]),
   provenienza: z.enum(["fseplus", "fornitore"]),
   fornitoreId: z.string().optional(),
   codiceLotto: z.string().optional(),
@@ -54,7 +57,6 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
   const { data: prodotti } = useListProdotti();
   const { data: fornitori } = useListFornitori();
   const createLotto = useCreateLotto();
-  const createMovimento = useCreateMovimento();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -63,7 +65,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
     magazzinoId: z.string().min(1, t("lotti.valMagazzino")),
     quantita: z.coerce.number().positive(t("lotti.valQuantita")),
     dataCarico: z.string().min(1, t("common.requiredField")),
-    causale: z.string().min(1, t("common.requiredField")),
+    causale: z.enum(["acquisto", "donazione", "fse_plus"]),
     provenienza: z.enum(["fseplus", "fornitore"]),
     fornitoreId: z.string().optional(),
     codiceLotto: z.string().optional(),
@@ -108,7 +110,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const submitting = createLotto.isPending || createMovimento.isPending;
+  const submitting = createLotto.isPending;
 
   const onSubmit = (data: NuovoLottoValues) => {
     const prodotto = prodotti?.find((p) => p.id.toString() === data.prodottoId);
@@ -123,6 +125,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
           magazzinoId: parseInt(data.magazzinoId),
           dataCarico: data.dataCarico,
           quantitaCaricata: data.quantita,
+          causale: data.causale,
           fsePlus: data.provenienza === "fseplus",
           fornitoreId: data.provenienza === "fornitore" && data.fornitoreId ? parseInt(data.fornitoreId) : undefined,
           codiceLotto: data.codiceLotto || undefined,
@@ -131,46 +134,15 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
         },
       },
       {
-        onSuccess: (lotto) => {
-          const invalidateStock = () => {
-            queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
-            queryClient.invalidateQueries({ queryKey: getListLottiQueryKey() });
-            queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
-          };
-          createMovimento.mutate(
-            {
-              data: {
-                tipoMovimento: "carico",
-                tipoDettaglio: data.causale,
-                dataMovimento: data.dataCarico,
-                magazzinoId: parseInt(data.magazzinoId),
-                prodottoId: prodotto.id,
-                lottoId: lotto.id,
-                quantita: data.quantita,
-                unitaMisura: prodotto.unitaMisura,
-                note: data.note || undefined,
-              },
-            },
-            {
-              onSuccess: () => {
-                invalidateStock();
-                toast({
-                  title: t("lotti.toastLottoCaricato"),
-                  description: t("lotti.toastLottoCaricatoDesc", { qty: data.quantita, um: prodotto.unitaMisura, nome: prodotto.nome }),
-                });
-                onClose();
-              },
-              onError: () => {
-                invalidateStock();
-                toast({
-                  title: t("lotti.toastLogIncompleto"),
-                  description: t("lotti.toastLogIncompletoDesc"),
-                  variant: "destructive",
-                });
-                onClose();
-              },
-            },
-          );
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListLottiQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
+          toast({
+            title: t("lotti.toastLottoCaricato"),
+            description: t("lotti.toastLottoCaricatoDesc", { qty: data.quantita, um: prodotto.unitaMisura, nome: prodotto.nome }),
+          });
+          onClose();
         },
         onError: () =>
           toast({ title: t("lotti.toastErrorTitle"), description: t("lotti.toastImpossibileCreare"), variant: "destructive" }),
@@ -205,7 +177,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
                     <SelectTrigger><SelectValue placeholder={t("lotti.phProdotto")} /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {prodotti?.map((p) => (
+                    {prodotti?.filter((p) => p.attivo).map((p) => (
                       <SelectItem key={p.id} value={p.id.toString()}>{p.nome}</SelectItem>
                     ))}
                   </SelectContent>
@@ -222,7 +194,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
                     <SelectTrigger><SelectValue placeholder={t("lotti.phMagazzino")} /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {magazzini?.map((m) => (
+                    {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
                       <SelectItem key={m.id} value={m.id.toString()}>{m.nome}</SelectItem>
                     ))}
                   </SelectContent>
@@ -257,7 +229,6 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
                   <SelectContent>
                     <SelectItem value="donazione">{t("lotti.causaleDonazione")}</SelectItem>
                     <SelectItem value="acquisto">{t("lotti.causaleAcquisto")}</SelectItem>
-                    <SelectItem value="rettifica_inventario">{t("lotti.causaleRettifica")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -289,7 +260,7 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
                       <SelectTrigger><SelectValue placeholder={t("lotti.phFornitore")} /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {fornitori?.map((f) => (
+                      {fornitori?.filter((f) => f.attivo).map((f) => (
                         <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>
                       ))}
                     </SelectContent>
@@ -334,12 +305,90 @@ function NuovoLottoDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+function RettificaDialog({ lotto, onClose }: { lotto: Lotto; onClose: () => void }) {
+  const [delta, setDelta] = useState("");
+  const [causale, setCausale] = useState<"inventario_fisico" | "errore_registrazione" | "deterioramento" | "altro">("inventario_fisico");
+  const [motivazione, setMotivazione] = useState("");
+  const [note, setNote] = useState("");
+  const mutation = useRettificaLotto();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const parsedDelta = Number(delta);
+  const valid = Number.isFinite(parsedDelta) && parsedDelta !== 0 && (causale !== "altro" || motivazione.trim().length > 0);
+
+  const submit = () => {
+    if (!valid) return;
+    mutation.mutate({
+      id: lotto.id,
+      data: { delta: parsedDelta, causale, motivazione: motivazione || undefined, note: note || undefined },
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListLottiQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
+        toast({ title: "Rettifica inventariale registrata" });
+        onClose();
+      },
+      onError: (error) => toast({
+        title: "Rettifica non registrata",
+        description: (error as { data?: { error?: string } })?.data?.error ?? "Verifica quantità e causale.",
+        variant: "destructive",
+      }),
+    });
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rettifica inventariale</DialogTitle>
+          <DialogDescription>
+            Lotto {lotto.codiceLotto ?? `#${lotto.id}`} · residuo attuale {lotto.quantitaResidua}. Usa un valore positivo per aumentare e negativo per diminuire.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="rettifica-delta">Variazione quantità</Label>
+            <Input id="rettifica-delta" type="number" step="0.01" value={delta} onChange={(event) => setDelta(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Causale</Label>
+            <Select value={causale} onValueChange={(value) => setCausale(value as typeof causale)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inventario_fisico">Inventario fisico</SelectItem>
+                <SelectItem value="errore_registrazione">Errore di registrazione</SelectItem>
+                <SelectItem value="deterioramento">Deterioramento / rettifica</SelectItem>
+                <SelectItem value="altro">Altro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {causale === "altro" && <div className="space-y-2">
+            <Label htmlFor="rettifica-motivazione">Motivazione obbligatoria</Label>
+            <Input id="rettifica-motivazione" value={motivazione} onChange={(event) => setMotivazione(event.target.value)} />
+          </div>}
+          <div className="space-y-2">
+            <Label htmlFor="rettifica-note">Note</Label>
+            <Input id="rettifica-note" value={note} onChange={(event) => setNote(event.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Annulla</Button>
+          <Button onClick={submit} disabled={!valid || mutation.isPending}>Registra rettifica</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Lotti() {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
   const [magazzinoId, setMagazzinoId] = useState<string>("all");
   const [prodottoId, setProdottoId] = useState<string>("all");
   const [inScadenza, setInScadenza] = useState(false);
   const [nuovoOpen, setNuovoOpen] = useState(false);
+  const [rettificaLotto, setRettificaLotto] = useState<Lotto | null>(null);
   
   const { data: magazzini } = useListMagazzini();
   const { data: prodotti } = useListProdotti();
@@ -385,13 +434,14 @@ export default function Lotti() {
             title={t("lotti.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setNuovoOpen(true)}>
+          {hasPermission("magazzino.stock.receive") && <Button onClick={() => setNuovoOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> {t("lotti.newLot")}
-          </Button>
+          </Button>}
         </div>
       </div>
 
       {nuovoOpen && <NuovoLottoDialog onClose={() => setNuovoOpen(false)} />}
+      {rettificaLotto && <RettificaDialog lotto={rettificaLotto} onClose={() => setRettificaLotto(null)} />}
 
       <Card>
         <CardHeader className="py-4 border-b bg-muted/20">
@@ -445,6 +495,7 @@ export default function Lotti() {
                 <TableHead className="text-right">{t("lotti.colQtaIniziale")}</TableHead>
                 <TableHead className="text-right">{t("lotti.colQtaResidua")}</TableHead>
                 <TableHead className="w-[100px] text-center">{t("lotti.colStato")}</TableHead>
+                {hasPermission("magazzino.stock.adjust") && <TableHead className="w-[120px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -463,7 +514,7 @@ export default function Lotti() {
                 ))
               ) : lotti?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={hasPermission("magazzino.stock.adjust") ? 9 : 8} className="h-32 text-center text-muted-foreground">
                     {t("lotti.noResults")}
                   </TableCell>
                 </TableRow>
@@ -508,6 +559,13 @@ export default function Lotti() {
                         </Badge>
                       )}
                     </TableCell>
+                    {hasPermission("magazzino.stock.adjust") && <TableCell>
+                      {magazzini?.find((m) => m.id === lotto.magazzinoId)?.stato === "attivo" && (
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setRettificaLotto(lotto)}>
+                          <ClipboardPen className="h-3.5 w-3.5" /> Rettifica
+                        </Button>
+                      )}
+                    </TableCell>}
                   </TableRow>
                 );
               })}

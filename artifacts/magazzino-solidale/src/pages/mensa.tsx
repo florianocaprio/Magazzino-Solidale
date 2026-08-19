@@ -978,6 +978,7 @@ function AbilitazioniView() {
 
 type TransferRow = {
   id: number;
+  versione: number;
   codice: string;
   stato: string;
   mensaNome?: string;
@@ -1141,7 +1142,7 @@ function TrasferimentiView() {
                       <Button
                         size="sm"
                         onClick={() =>
-                          start.mutate({ id: row.id }, { onSuccess: refresh })
+                          start.mutate({ id: row.id, data: { versione: row.versione } }, { onSuccess: refresh })
                         }
                       >
                         Avvia
@@ -1152,7 +1153,7 @@ function TrasferimentiView() {
                         size="sm"
                         onClick={() =>
                           confirm.mutate(
-                            { id: row.id, data: {} },
+                            { id: row.id, data: { versione: row.versione } },
                             { onSuccess: refresh },
                           )
                         }

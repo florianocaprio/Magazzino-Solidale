@@ -9,7 +9,6 @@ import {
   useListFornitori,
   useBulkProdotti,
   useCreateLotto,
-  useCreateMovimento,
   getListProdottiQueryKey,
   getListGiacenzeQueryKey,
   getListLottiQueryKey,
@@ -36,6 +35,7 @@ import { generateProdottiBarcodePdf } from "@/lib/prodotti-barcode-pdf";
 import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus, Barcode, Upload } from "lucide-react";
 import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
+import { useAuth } from "@/lib/auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -91,7 +91,7 @@ const makeCaricoSchema = (t: (key: string) => string) => z.object({
   magazzinoId: z.string().min(1, t("prodotti.errSelectMagazzino")),
   quantita: z.coerce.number().positive(t("prodotti.errQuantitaPositive")),
   dataCarico: z.string().min(1, t("common.requiredField")),
-  causale: z.string().min(1, t("common.requiredField")),
+  causale: z.enum(["acquisto", "donazione", "fse_plus"]),
   provenienza: z.enum(["fseplus", "fornitore"]),
   fornitoreId: z.string().optional(),
   codiceLotto: z.string().optional(),
@@ -119,7 +119,6 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
   const { data: magazzini } = useListMagazzini();
   const { data: fornitori } = useListFornitori();
   const createLotto = useCreateLotto();
-  const createMovimento = useCreateMovimento();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -142,7 +141,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
 
   const provenienza = form.watch("provenienza");
 
-  const submitting = createLotto.isPending || createMovimento.isPending;
+  const submitting = createLotto.isPending;
 
   const onSubmit = (data: CaricoValues) => {
     createLotto.mutate(
@@ -152,6 +151,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
           magazzinoId: parseInt(data.magazzinoId),
           dataCarico: data.dataCarico,
           quantitaCaricata: data.quantita,
+          causale: data.causale,
           fsePlus: data.provenienza === "fseplus",
           fornitoreId: data.provenienza === "fornitore" && data.fornitoreId ? parseInt(data.fornitoreId) : undefined,
           codiceLotto: data.codiceLotto || undefined,
@@ -160,49 +160,15 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
         },
       },
       {
-        onSuccess: (lotto) => {
-          const invalidateStock = () => {
-            queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
-            queryClient.invalidateQueries({ queryKey: getListLottiQueryKey() });
-            queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
-          };
-          createMovimento.mutate(
-            {
-              data: {
-                tipoMovimento: "carico",
-                tipoDettaglio: data.causale,
-                dataMovimento: data.dataCarico,
-                magazzinoId: parseInt(data.magazzinoId),
-                prodottoId: prodotto.id,
-                lottoId: lotto.id,
-                quantita: data.quantita,
-                unitaMisura: prodotto.unitaMisura,
-                note: data.note || undefined,
-              },
-            },
-            {
-              onSuccess: () => {
-                invalidateStock();
-                toast({
-                  title: t("prodotti.toastCaricoTitle"),
-                  description: t("prodotti.toastCaricoDesc", { quantita: data.quantita, um: prodotto.unitaMisura, nome: prodotto.nome }),
-                });
-                onClose();
-              },
-              onError: () => {
-                // The lotto (and therefore the stock) was already created; only the
-                // audit movement failed. Refresh stock and warn — do NOT keep the form
-                // open, or re-submitting would load the quantity a second time.
-                invalidateStock();
-                toast({
-                  title: t("prodotti.toastCaricoIncompletoTitle"),
-                  description: t("prodotti.toastCaricoIncompletoDesc"),
-                  variant: "destructive",
-                });
-                onClose();
-              },
-            },
-          );
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListLottiQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
+          toast({
+            title: t("prodotti.toastCaricoTitle"),
+            description: t("prodotti.toastCaricoDesc", { quantita: data.quantita, um: prodotto.unitaMisura, nome: prodotto.nome }),
+          });
+          onClose();
         },
         onError: () =>
           toast({ title: t("prodotti.toastErrorTitle"), description: t("prodotti.toastCaricoError"), variant: "destructive" }),
@@ -233,7 +199,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {magazzini?.map((m) => (
+                      {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
                         <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                       ))}
                     </SelectContent>
@@ -271,7 +237,6 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
                     <SelectContent>
                       <SelectItem value="donazione">{t("prodotti.causale_donazione")}</SelectItem>
                       <SelectItem value="acquisto">{t("prodotti.causale_acquisto")}</SelectItem>
-                      <SelectItem value="rettifica_inventario">{t("prodotti.causale_rettifica")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -303,7 +268,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
                         <SelectTrigger><SelectValue placeholder={t("prodotti.selectFornitore")} /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {fornitori?.map((f) => (
+                        {fornitori?.filter((f) => f.attivo).map((f) => (
                           <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>
                         ))}
                       </SelectContent>
@@ -403,6 +368,9 @@ function ProdottoLotti({ prodottoId }: { prodottoId: number }) {
 
 export default function Prodotti() {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
+  const canManageProducts = hasPermission("magazzino.products.manage");
+  const canReceiveStock = hasPermission("magazzino.stock.receive");
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState("all");
   
@@ -518,6 +486,15 @@ export default function Prodotti() {
     });
   };
 
+  const handleReactivate = (id: number) => {
+    updateProdotto.mutate({ id, data: { attivo: true } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
+        toast({ title: "Prodotto riattivato" });
+      },
+    });
+  };
+
   const tipoColors: Record<string, string> = {
     alimentare: "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20",
     igiene: "bg-teal-500/10 text-teal-700 hover:bg-teal-500/20",
@@ -574,12 +551,16 @@ export default function Prodotti() {
           >
             <Barcode className="h-4 w-4" /> {t("prodotti.exportBarcodes")}
           </Button>
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" /> {t("bulkImport.button")}
-          </Button>
-          <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> {t("prodotti.newProduct")}
-          </Button>
+          {canManageProducts && (
+            <>
+              <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+                <Upload className="h-4 w-4" /> {t("bulkImport.button")}
+              </Button>
+              <Button onClick={handleCreate} className="gap-2">
+                <Plus className="h-4 w-4" /> {t("prodotti.newProduct")}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -734,7 +715,7 @@ export default function Prodotti() {
                   </TableCell>
                 </TableRow>
               ) : prodotti?.map((prodotto) => (
-                <TableRow key={prodotto.id}>
+                <TableRow key={prodotto.id} className={!prodotto.attivo ? "opacity-60" : undefined}>
                   <TableCell className="font-medium text-xs font-mono">{prodotto.codice}</TableCell>
                   <TableCell>
                     <div className="font-medium">{prodotto.nome}</div>
@@ -760,6 +741,7 @@ export default function Prodotti() {
                           {t("prodotti.badgeEmporio")}
                         </Badge>
                       )}
+                      {!prodotto.attivo && <Badge variant="secondary">Inattivo</Badge>}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -771,7 +753,7 @@ export default function Prodotti() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setCaricoProdotto({
+                        {canReceiveStock && prodotto.attivo && <DropdownMenuItem onClick={() => setCaricoProdotto({
                           id: prodotto.id,
                           nome: prodotto.nome,
                           unitaMisura: prodotto.unitaMisura,
@@ -782,15 +764,18 @@ export default function Prodotti() {
                         })}>
                           <PackagePlus className="mr-2 h-4 w-4" />
                           {t("prodotti.loadToWarehouse")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(prodotto)}>
+                        </DropdownMenuItem>}
+                        {canManageProducts && <DropdownMenuItem onClick={() => handleEdit(prodotto)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           {t("common.edit")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(prodotto.id)}>
+                        </DropdownMenuItem>}
+                        {canManageProducts && prodotto.attivo && <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(prodotto.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
-                          {t("common.delete")}
-                        </DropdownMenuItem>
+                          {t("prodotti.deactivate")}
+                        </DropdownMenuItem>}
+                        {canManageProducts && !prodotto.attivo && <DropdownMenuItem onClick={() => handleReactivate(prodotto.id)}>
+                          Riattiva prodotto
+                        </DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -1056,7 +1041,7 @@ export default function Prodotti() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {t("common.delete")}
+              {t("prodotti.deactivate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
