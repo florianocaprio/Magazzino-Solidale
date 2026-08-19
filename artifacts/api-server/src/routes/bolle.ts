@@ -5,6 +5,7 @@ import {
   lottiTable, prodottiTable, volontariTable,
   consegneTable, utentiTable, centriAscoltoTable,
   prenotazioniMagazzinoTable, speseEmporioRigheTable, speseEmporioTable,
+  movimentiTable,
 } from "@workspace/db";
 import { eq, and, desc, asc, gt, sum, sql, type SQL } from "drizzle-orm";
 import {
@@ -33,10 +34,9 @@ import {
   removeInterventoBolla,
   scarichiFisiciBolla,
   stornoRigaTx,
-  syncInterventoBolla,
 } from "../lib/bollaDelivery";
 import { requireAllModuli } from "../lib/featureFlags";
-import { isDateOnly } from "../lib/interventiWorkflow";
+import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
   ConsegnaPlanningError,
   isFasciaConsegna,
@@ -45,6 +45,8 @@ import {
 } from "../lib/consegneTurni";
 import { logger } from "../lib/logger";
 import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
+import { requirePermission } from "../middlewares/auth";
+import { InventoryLedgerError, requireOperationalMagazzino } from "../lib/inventoryLedger";
 
 const router: IRouter = Router();
 
@@ -107,7 +109,6 @@ async function buildDettaglio(id: number) {
       prodottoNome: prodottiTable.nome,
       codiceLotto: lottiTable.codiceLotto,
       lottoFsePlus: lottiTable.fsePlus,
-      prodottoFsePlus: prodottiTable.fsePlus,
     })
     .from(bollaRigheTable)
     .leftJoin(prodottiTable, eq(bollaRigheTable.prodottoId, prodottiTable.id))
@@ -122,13 +123,30 @@ async function buildDettaglio(id: number) {
           prodottoNome: prodottiTable.nome,
           codiceLotto: lottiTable.codiceLotto,
           lottoFsePlus: lottiTable.fsePlus,
-          prodottoFsePlus: prodottiTable.fsePlus,
         })
         .from(speseEmporioRigheTable)
         .innerJoin(speseEmporioTable, eq(speseEmporioRigheTable.spesaEmporioId, speseEmporioTable.id))
         .leftJoin(prodottiTable, eq(speseEmporioRigheTable.prodottoId, prodottiTable.id))
         .leftJoin(lottiTable, eq(speseEmporioRigheTable.lottoId, lottiTable.id))
         .where(eq(speseEmporioTable.bollaId, id));
+
+  const provenanceRows = await db.select({
+    bollaRigaId: movimentiTable.bollaRigaId,
+    fsePlus: lottiTable.fsePlus,
+    quantita: sql<string>`sum(${movimentiTable.quantita})`,
+  })
+    .from(movimentiTable)
+    .innerJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
+    .where(and(eq(movimentiTable.bollaId, id), eq(movimentiTable.tipoMovimento, "scarico")))
+    .groupBy(movimentiTable.bollaRigaId, lottiTable.fsePlus);
+  const provenance = new Map<number, { fse: number; nonFse: number }>();
+  for (const movement of provenanceRows) {
+    if (movement.bollaRigaId == null) continue;
+    const split = provenance.get(movement.bollaRigaId) ?? { fse: 0, nonFse: 0 };
+    if (movement.fsePlus) split.fse += Number(movement.quantita ?? 0);
+    else split.nonFse += Number(movement.quantita ?? 0);
+    provenance.set(movement.bollaRigaId, split);
+  }
 
   return {
     id: row.b.id,
@@ -161,29 +179,40 @@ async function buildDettaglio(id: number) {
     operatoreId: row.b.operatoreId ?? null,
     operatoreCodice: row.operatoreMatricola ?? row.operatoreUsername ?? null,
     dataCreazione: row.b.dataCreazione.toISOString(),
-    righe: righe.length > 0 ? righe.map(r => ({
+    righe: righe.length > 0 ? righe.map(r => {
+      const split = provenance.get(r.r.id) ?? { fse: 0, nonFse: 0 };
+      return {
       id: r.r.id,
       bollaId: r.r.bollaId,
       prodottoId: r.r.prodottoId,
       prodottoNome: r.prodottoNome ?? null,
       lottoId: r.r.lottoId ?? null,
       codiceLotto: r.codiceLotto ?? null,
-      fsePlus: r.r.lottoId ? !!r.lottoFsePlus : !!r.prodottoFsePlus,
+      fsePlus: split.fse > 0 ? split.nonFse === 0 : (r.r.lottoId ? !!r.lottoFsePlus : false),
+      fsePlusQuantita: split.fse,
+      nonFsePlusQuantita: split.nonFse,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: r.r.note ?? null,
-    })) : righeFallbackEmporio.map(r => ({
-      id: r.r.bollaRigaId ?? r.r.id,
+      };
+    }) : righeFallbackEmporio.map(r => {
+      const effectiveRigaId = r.r.bollaRigaId ?? r.r.id;
+      const split = provenance.get(effectiveRigaId) ?? { fse: 0, nonFse: 0 };
+      return {
+      id: effectiveRigaId,
       bollaId: id,
       prodottoId: r.r.prodottoId,
       prodottoNome: r.prodottoNome ?? r.r.descrizioneProdotto ?? null,
       lottoId: r.r.lottoId ?? null,
       codiceLotto: r.codiceLotto ?? null,
-      fsePlus: r.r.lottoId ? !!r.lottoFsePlus : !!r.prodottoFsePlus,
+      fsePlus: split.fse > 0 ? split.nonFse === 0 : (r.r.lottoId ? !!r.lottoFsePlus : false),
+      fsePlusQuantita: split.fse,
+      nonFsePlusQuantita: split.nonFse,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: "pz",
       note: "Riga da Spesa Emporio",
-    })),
+      };
+    }),
   };
 }
 
@@ -364,8 +393,14 @@ async function prenotaRigaFEFO(
 
 // ─── LIST ────────────────────────────────────────────────────────────────────
 
-router.get("/bolle", async (req, res) => {
+router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
   const { stato, magazzinoId, centroAscoltoId } = req.query as Record<string, string>;
+  const page = req.query.page == null ? 1 : Number(req.query.page);
+  const limit = req.query.limit == null ? 50 : Number(req.query.limit);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: "Paginazione non valida: page >= 1 e limit tra 1 e 100" });
+    return;
+  }
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(bolleTable.stato, stato));
   if (magazzinoId) {
@@ -387,6 +422,11 @@ router.get("/bolle", async (req, res) => {
   const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
 
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const [{ total }] = await db.select({ total: sql<number>`count(*)::int` })
+    .from(bolleTable)
+    .leftJoin(beneficiariTable, eq(bolleTable.beneficiarioId, beneficiariTable.id))
+    .where(where);
   const rows = await db
     .select({
       b: bolleTable,
@@ -403,10 +443,14 @@ router.get("/bolle", async (req, res) => {
     .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(magazziniTable, eq(bolleTable.magazzinoId, magazziniTable.id))
     .leftJoin(utentiTable, eq(bolleTable.operatoreId, utentiTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(where)
     .orderBy(desc(bolleTable.dataCreazione))
-    .limit(200);
+    .limit(limit)
+    .offset((page - 1) * limit);
 
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("X-Page", String(page));
+  res.setHeader("X-Page-Size", String(limit));
   res.json(rows.map(r => ({
     id: r.b.id,
     numeroBolla: r.b.numeroBolla,
@@ -439,8 +483,31 @@ router.get("/bolle", async (req, res) => {
 
 // ─── CREATE ──────────────────────────────────────────────────────────────────
 
-router.post("/bolle", async (req, res) => {
+router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
   const body = { ...req.body };
+  const accepted = new Set([
+    "beneficiarioId", "consegnaId", "magazzinoId", "dataBolla", "indirizzoConsegna",
+    "volontarioConsegnaId", "trasportatoreNome", "mezzoId", "mezzoAltro", "noteConsegna",
+  ]);
+  const serverManaged = [
+    "numeroBolla", "stato", "operatoreId", "confermaRicezione", "noteRicezione",
+    "firmaNota", "ritiroNonEffettuatoAt", "ritiroNonEffettuatoOperatoreId", "ritiroNonEffettuatoMotivo",
+  ];
+  const forbidden = serverManaged.filter((key) => key in body);
+  if (forbidden.length > 0) {
+    res.status(400).json({ error: `Campi gestiti dal server non accettati: ${forbidden.join(", ")}` });
+    return;
+  }
+  const unsupported = Object.keys(body).filter((key) => !accepted.has(key));
+  if (unsupported.length > 0) {
+    res.status(400).json({ error: `Campi Bolla non supportati: ${unsupported.join(", ")}` });
+    return;
+  }
+  if (!Number.isInteger(body.beneficiarioId) || body.beneficiarioId <= 0
+      || !Number.isInteger(body.magazzinoId) || body.magazzinoId <= 0) {
+    res.status(400).json({ error: "Beneficiario e Magazzino non validi" });
+    return;
+  }
   const caller = callerCentroId(req);
   const cid = callerCittaId(req);
   const zid = callerZonaUdsId(req);
@@ -458,6 +525,12 @@ router.post("/bolle", async (req, res) => {
       res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
       return;
     }
+  }
+  const [magazzino] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, body.magazzinoId));
+  if (!magazzino) { res.status(404).json({ error: "Magazzino non trovato" }); return; }
+  if (magazzino.stato !== "attivo") {
+    res.status(400).json({ error: "Il Magazzino selezionato non è attivo" });
+    return;
   }
   if (body.volontarioConsegnaId != null && body.trasportatoreNome != null) {
     res.status(400).json({ error: "Indicare un volontario OPPURE un trasportatore esterno, non entrambi" });
@@ -494,21 +567,46 @@ router.post("/bolle", async (req, res) => {
     res.status(403).json({ error: "Volontario non accessibile per il centro della bolla" });
     return;
   }
-  const anno = new Date().getFullYear();
-  const existing = await db.select({ n: bolleTable.numeroBolla }).from(bolleTable).orderBy(desc(bolleTable.id)).limit(1);
-  const lastNum = existing.length > 0 ? parseInt(existing[0].n.split("-").pop() ?? "0") : 0;
-  const numeroBolla = `BOLLA-${anno}-${String(lastNum + 1).padStart(4, "0")}`;
-  const dataBolla = body.dataBolla ?? new Date().toISOString().split("T")[0];
-
-  const [row] = await db.insert(bolleTable).values({ ...body, numeroBolla, dataBolla, operatoreId: req.user!.id }).returning();
+  if (body.dataBolla != null && !isDateOnly(body.dataBolla)) {
+    res.status(400).json({ error: "Data Bolla non valida" });
+    return;
+  }
+  const dataBolla = body.dataBolla ?? dataCivileEuropeRome(new Date());
+  const row = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('bolle.numero_bolla'))`);
+    const anno = Number(dataBolla.slice(0, 4));
+    const existing = await tx.select({ n: bolleTable.numeroBolla })
+      .from(bolleTable)
+      .where(sql`${bolleTable.numeroBolla} like ${`BOLLA-${anno}-%`}`)
+      .orderBy(desc(bolleTable.id))
+      .limit(1);
+    const lastNum = existing.length > 0 ? Number(existing[0].n.split("-").pop() ?? 0) : 0;
+    const numeroBolla = `BOLLA-${anno}-${String(lastNum + 1).padStart(4, "0")}`;
+    const [created] = await tx.insert(bolleTable).values({
+      numeroBolla,
+      dataBolla,
+      beneficiarioId: body.beneficiarioId,
+      consegnaId: body.consegnaId ?? null,
+      magazzinoId: body.magazzinoId,
+      indirizzoConsegna: body.indirizzoConsegna ?? null,
+      volontarioConsegnaId: body.volontarioConsegnaId ?? null,
+      trasportatoreNome: body.trasportatoreNome ?? null,
+      mezzoId: body.mezzoId ?? null,
+      mezzoAltro: body.mezzoAltro === true,
+      noteConsegna: body.noteConsegna ?? null,
+      stato: "bozza",
+      operatoreId: req.user!.id,
+    }).returning();
+    return created;
+  });
   const det = await buildDettaglio(row.id);
   res.status(201).json(det);
 });
 
 // ─── GET BY ID ───────────────────────────────────────────────────────────────
 
-router.get("/bolle/:id/righe", async (req, res) => {
-  const det = await buildDettaglio(parseInt(req.params.id));
+router.get("/bolle/:id/righe", requirePermission("bolle.view"), async (req, res) => {
+  const det = await buildDettaglio(Number(req.params.id));
   if (!det) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(det.beneficiarioId), callerCentroId(req))
       || !canAccessCitta(await beneficiarioCittaId(det.beneficiarioId), callerCittaId(req))
@@ -519,8 +617,8 @@ router.get("/bolle/:id/righe", async (req, res) => {
   res.json(det.righe);
 });
 
-router.get("/bolle/:id", async (req, res) => {
-  const det = await buildDettaglio(parseInt(req.params.id));
+router.get("/bolle/:id", requirePermission("bolle.view"), async (req, res) => {
+  const det = await buildDettaglio(Number(req.params.id));
   if (!det) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(det.beneficiarioId), callerCentroId(req))
       || !canAccessCitta(await beneficiarioCittaId(det.beneficiarioId), callerCittaId(req))
@@ -533,8 +631,8 @@ router.get("/bolle/:id", async (req, res) => {
 
 // ─── UPDATE (magazzino/beneficiario/volontario) ──────────────────────────────
 
-router.patch("/bolle/:id", async (req, res) => {
-  const bollaId = parseInt(req.params.id);
+router.patch("/bolle/:id", requirePermission("bolle.manage"), async (req, res) => {
+  const bollaId = Number(req.params.id);
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
@@ -547,20 +645,29 @@ router.patch("/bolle/:id", async (req, res) => {
     return;
   }
 
+  if (bolla.stato !== "bozza") {
+    res.status(409).json({ error: "Una Bolla confermata o consegnata non è modificabile; usa le azioni dedicate" });
+    return;
+  }
   const body = { ...req.body };
+  const allowed = new Set([
+    "beneficiarioId", "magazzinoId", "indirizzoConsegna", "volontarioConsegnaId",
+    "trasportatoreNome", "mezzoId", "mezzoAltro", "noteConsegna", "dataBolla",
+  ]);
+  const unsupported = Object.keys(body).filter((key) => !allowed.has(key));
+  if (unsupported.length > 0) {
+    res.status(400).json({ error: `Campi non modificabili dal PATCH Bolla: ${unsupported.join(", ")}` });
+    return;
+  }
+  if (body.dataBolla != null && !isDateOnly(body.dataBolla)) {
+    res.status(400).json({ error: "Data Bolla non valida" });
+    return;
+  }
   if ((caller != null || cid != null || zid != null) && body.beneficiarioId != null && body.beneficiarioId !== bolla.beneficiarioId
       && !(await canUseBeneficiario(body.beneficiarioId, caller, cid, zid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
     return;
   }
-
-  // i cambi di stato passano solo dagli endpoint dedicati (/conferma, /consegna, /annulla)
-  // per garantire scarichi/storni e sincronizzazione dell'intervento collegato
-  if (body.stato !== undefined && body.stato !== bolla.stato) {
-    res.status(400).json({ error: "Lo stato della bolla si cambia solo tramite le azioni dedicate (conferma, consegna, annulla)" });
-    return;
-  }
-  delete body.stato;
 
   // trasportatore: volontario OPPURE nome esterno, mai entrambi (coerente col POST e con la UI)
   const nextVolontario = body.volontarioConsegnaId !== undefined ? body.volontarioConsegnaId : bolla.volontarioConsegnaId;
@@ -593,15 +700,18 @@ router.patch("/bolle/:id", async (req, res) => {
       res.status(400).json({ error: "Il magazzino si può cambiare solo quando la bolla è in bozza" });
       return;
     }
-    await db.delete(bollaRigheTable).where(eq(bollaRigheTable.bollaId, bollaId));
+    const [targetMagazzino] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, body.magazzinoId));
+    if (!targetMagazzino) { res.status(404).json({ error: "Magazzino non trovato" }); return; }
+    if (targetMagazzino.stato !== "attivo") { res.status(400).json({ error: "Il Magazzino selezionato non è attivo" }); return; }
   }
 
-  const [row] = await db.update(bolleTable).set({ ...body, operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId)).returning();
-
-  // se è cambiato il beneficiario su una bolla consegnata, allinea l'intervento collegato
-  if (row.stato === "consegnato" && body.beneficiarioId && body.beneficiarioId !== bolla.beneficiarioId) {
-    await syncInterventoBolla(bollaId);
-  }
+  const row = await db.transaction(async (tx) => {
+    if (body.magazzinoId && body.magazzinoId !== bolla.magazzinoId) {
+      await tx.delete(bollaRigheTable).where(eq(bollaRigheTable.bollaId, bollaId));
+    }
+    const [updated] = await tx.update(bolleTable).set({ ...body, operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId)).returning();
+    return updated;
+  });
 
   const det = await buildDettaglio(row.id);
   res.json(det);
@@ -609,8 +719,8 @@ router.patch("/bolle/:id", async (req, res) => {
 
 // ─── RIGHE — ADD ─────────────────────────────────────────────────────────────
 
-router.post("/bolle/:id/righe", async (req, res) => {
-  const bollaId = parseInt(req.params.id);
+router.post("/bolle/:id/righe", requirePermission("bolle.manage"), async (req, res) => {
+  const bollaId = Number(req.params.id);
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
@@ -683,9 +793,9 @@ router.post("/bolle/:id/righe", async (req, res) => {
 
 // ─── RIGHE — DELETE ───────────────────────────────────────────────────────────
 
-router.delete("/bolle/:id/righe/:rigaId", async (req, res) => {
-  const bollaId = parseInt(req.params.id);
-  const rigaId = parseInt(req.params.rigaId);
+router.delete("/bolle/:id/righe/:rigaId", requirePermission("bolle.manage"), async (req, res) => {
+  const bollaId = Number(req.params.id);
+  const rigaId = Number(req.params.rigaId);
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
@@ -715,8 +825,8 @@ router.delete("/bolle/:id/righe/:rigaId", async (req, res) => {
 
 // ─── CONFERMA (bozza → confermato + prenotazione FEFO) ───────────────────────
 
-router.post("/bolle/:id/conferma", async (req, res) => {
-  const bollaId = parseInt(req.params.id);
+router.post("/bolle/:id/conferma", requirePermission("bolle.deliver"), async (req, res) => {
+  const bollaId = Number(req.params.id);
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
@@ -728,6 +838,7 @@ router.post("/bolle/:id/conferma", async (req, res) => {
   try {
     await db.transaction(async (tx) => {
       const current = await lockBolla(tx, bollaId);
+      await requireOperationalMagazzino(tx, current.magazzinoId);
       if (current.stato !== "bozza") {
         throw new BollaActionError(400, "La bolla non è in stato bozza");
       }
@@ -747,6 +858,7 @@ router.post("/bolle/:id/conferma", async (req, res) => {
     });
   } catch (err) {
     if (handleBollaActionError(err, res)) return;
+    if (err instanceof InventoryLedgerError) { res.status(err.status).json({ error: err.message }); return; }
     throw err;
   }
 
@@ -756,8 +868,8 @@ router.post("/bolle/:id/conferma", async (req, res) => {
 
 // ─── CONSEGNA (confermato → consegnato) ──────────────────────────────────────
 
-router.post("/bolle/:id/consegna", async (req, res) => {
-  const bollaId = parseInt(req.params.id);
+router.post("/bolle/:id/consegna", requirePermission("bolle.deliver"), async (req, res) => {
+  const bollaId = Number(req.params.id);
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
@@ -777,6 +889,7 @@ router.post("/bolle/:id/consegna", async (req, res) => {
     });
   } catch (err) {
     if (handleBollaActionError(err, res)) return;
+    if (err instanceof InventoryLedgerError) { res.status(err.status).json({ error: err.message }); return; }
     throw err;
   }
 
@@ -786,7 +899,7 @@ router.post("/bolle/:id/consegna", async (req, res) => {
 
 // ─── ESITO RITIRO (separato dallo stato logistico) ──────────────────────────
 
-router.post("/bolle/:id/ritiro-non-effettuato", async (req, res) => {
+router.post("/bolle/:id/ritiro-non-effettuato", requirePermission("bolle.deliver"), async (req, res) => {
   const bollaId = Number(req.params.id);
   if (!Number.isInteger(bollaId) || bollaId <= 0) {
     res.status(400).json({ error: "ID bolla non valido" }); return;
@@ -829,6 +942,7 @@ router.post("/bolle/:id/ritiro-non-effettuato", async (req, res) => {
 router.post(
   "/bolle/:id/converti-consegna",
   requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]),
+  requirePermission("bolle.deliver"),
   async (req, res) => {
   const bollaId = Number(req.params.id);
   if (!Number.isInteger(bollaId) || bollaId <= 0) {
@@ -964,8 +1078,8 @@ router.post(
 
 // ─── ANNULLA ──────────────────────────────────────────────────────────────────
 
-router.post("/bolle/:id/annulla", async (req, res) => {
-  const bollaId = parseInt(req.params.id);
+router.post("/bolle/:id/annulla", requirePermission("bolle.cancel"), async (req, res) => {
+  const bollaId = Number(req.params.id);
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
@@ -1001,7 +1115,7 @@ router.post("/bolle/:id/annulla", async (req, res) => {
         if (scarichi > 0) {
           const righe = await tx.select().from(bollaRigheTable).where(eq(bollaRigheTable.bollaId, bollaId));
           for (const riga of righe) {
-            await stornoRigaTx(tx, riga, bollaId);
+            await stornoRigaTx(tx, riga, bollaId, req.user!.id);
           }
         }
       }

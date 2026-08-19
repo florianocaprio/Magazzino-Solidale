@@ -96,6 +96,30 @@ export const MAPS_PERMISSIONS = [
   },
 ] as const;
 
+export const MAGAZZINO_PERMISSIONS = [
+  { key: "magazzino.view", label: "Magazzino: consultazione" },
+  { key: "magazzino.products.manage", label: "Magazzino: gestione prodotti" },
+  { key: "magazzino.stock.receive", label: "Magazzino: carico merce" },
+  { key: "magazzino.stock.issue", label: "Magazzino: scarico merce" },
+  { key: "magazzino.stock.adjust", label: "Magazzino: rettifiche inventariali" },
+  { key: "magazzino.transfers.create", label: "Magazzino: creazione trasferimenti" },
+  { key: "magazzino.transfers.dispatch", label: "Magazzino: spedizione trasferimenti" },
+  { key: "magazzino.transfers.receive", label: "Magazzino: ricezione trasferimenti" },
+] as const;
+
+export const BOLLE_PERMISSIONS = [
+  { key: "bolle.view", label: "Bolle: consultazione" },
+  { key: "bolle.manage", label: "Bolle: creazione e modifica bozze" },
+  { key: "bolle.deliver", label: "Bolle: conferma e consegna" },
+  { key: "bolle.cancel", label: "Bolle: annullamento e storno" },
+] as const;
+
+export const APPROVVIGIONAMENTI_PERMISSIONS = [
+  { key: "approvvigionamenti.view", label: "Approvvigionamenti: consultazione" },
+  { key: "approvvigionamenti.manage", label: "Approvvigionamenti: gestione ordini" },
+  { key: "approvvigionamenti.receive", label: "Approvvigionamenti: ricezione merce" },
+] as const;
+
 export const ALL_PERMISSIONS = [
   ...MENSA_PERMISSIONS,
   ...BENEFICIARI_PERMISSIONS,
@@ -103,6 +127,9 @@ export const ALL_PERMISSIONS = [
   ...EMPORIO_ACCESS_PERMISSIONS,
   ...SOCIALE_INTERVENTI_PERMISSIONS,
   ...MAPS_PERMISSIONS,
+  ...MAGAZZINO_PERMISSIONS,
+  ...BOLLE_PERMISSIONS,
+  ...APPROVVIGIONAMENTI_PERMISSIONS,
 ] as const;
 export const ALL_PERMISSION_KEYS = ALL_PERMISSIONS.map((item) => item.key);
 

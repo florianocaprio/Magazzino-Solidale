@@ -17,6 +17,8 @@ export const movimentiTable = pgTable("movimenti", {
   bollaId: integer("bolla_id"),
   bollaRigaId: integer("bolla_riga_id"),
   trasferimentoId: integer("trasferimento_id"),
+  movimentoOrigineId: integer("movimento_origine_id"),
+  operatoreId: integer("operatore_id"),
   documentoRiferimento: varchar("documento_riferimento", { length: 100 }),
   note: text("note"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),

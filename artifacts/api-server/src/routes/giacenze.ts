@@ -13,10 +13,11 @@ import {
   disponibilitaMagazzinoKey,
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
+import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-router.get("/giacenze", async (req, res) => {
+router.get("/giacenze", requirePermission("magazzino.view"), async (req, res) => {
   const { magazzinoId, sottoscortaOnly, fsePlusOnly } = req.query as Record<string, string>;
 
   const conditions = [gt(lottiTable.quantitaResidua, "0")];
@@ -55,6 +56,7 @@ router.get("/giacenze", async (req, res) => {
     const giacenzaFisica = parseDbNumber(r.quantitaTotale);
     const impegnato = impegnatoByKey.get(disponibilitaMagazzinoKey(r.prodottoId, r.magazzinoId)) ?? 0;
     const sm = parseDbNumber(r.scortaMinima);
+    const disponibileReale = giacenzaFisica - impegnato;
     return {
       prodottoId: r.prodottoId,
       prodottoNome: r.prodottoNome,
@@ -66,10 +68,10 @@ router.get("/giacenze", async (req, res) => {
       quantitaTotale: giacenzaFisica,
       giacenzaFisica,
       impegnato,
-      disponibileReale: giacenzaFisica - impegnato,
+      disponibileReale,
       scortaMinima: sm,
       scortaConsigliata: parseDbNumber(r.scortaConsigliata),
-      sottoscorta: giacenzaFisica <= sm,
+      sottoscorta: disponibileReale <= sm,
       lottiAttivi: Number(r.lottiAttivi),
       prossimaScadenza: r.prossimaScadenza ?? null,
     };

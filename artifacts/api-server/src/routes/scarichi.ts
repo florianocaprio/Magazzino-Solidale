@@ -7,8 +7,10 @@ import {
   centriAscoltoTable,
   prodottiTable,
   utentiTable,
+  movimentiTable,
+  lottiTable,
 } from "@workspace/db";
-import { eq, and, desc, inArray, type SQL } from "drizzle-orm";
+import { eq, and, desc, inArray, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -21,13 +23,45 @@ import {
 } from "../lib/centroScope";
 import { calcolaDisponibilitaMagazzino } from "../lib/disponibilitaMagazzino";
 import { requireModulo } from "../lib/featureFlags";
-import { creaScaricoInventariale } from "../lib/scaricoInventory";
+import { creaScaricoInventariale, InventoryError } from "../lib/scaricoInventory";
+import { requirePermission } from "../middlewares/auth";
+import { InventoryLedgerError, requireOperationalMagazzino } from "../lib/inventoryLedger";
+import { withDocumentCodeRetry } from "../lib/documentCode";
+import { isDateOnly } from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
 
 router.use("/scarichi", requireModulo("SCARICHI"));
 
 const VALID_CAUSALI = ["deteriorata", "rubata", "scaduta", "altro"] as const;
+
+async function fseBreakdown(codici: string[]) {
+  const result = new Map<string, { fse: number; nonFse: number }>();
+  if (codici.length === 0) return result;
+  const rows = await db.select({
+    codice: movimentiTable.documentoRiferimento,
+    prodottoId: movimentiTable.prodottoId,
+    fsePlus: lottiTable.fsePlus,
+    quantita: sql<string>`sum(${movimentiTable.quantita})`,
+  })
+    .from(movimentiTable)
+    .innerJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
+    .where(and(
+      inArray(movimentiTable.documentoRiferimento, codici),
+      eq(movimentiTable.tipoMovimento, "scarico"),
+    ))
+    .groupBy(movimentiTable.documentoRiferimento, movimentiTable.prodottoId, lottiTable.fsePlus);
+  for (const row of rows) {
+    if (!row.codice) continue;
+    const key = `${row.codice}:${row.prodottoId}`;
+    const current = result.get(key) ?? { fse: 0, nonFse: 0 };
+    const quantita = Number(row.quantita ?? 0);
+    if (row.fsePlus) current.fse += quantita;
+    else current.nonFse += quantita;
+    result.set(key, current);
+  }
+  return result;
+}
 
 async function getScaricoWithRighe(id: number) {
   const [s] = await db
@@ -52,11 +86,11 @@ async function getScaricoWithRighe(id: number) {
     .select({
       r: scaricoRigheTable,
       prodottoNome: prodottiTable.nome,
-      prodottoFsePlus: prodottiTable.fsePlus,
     })
     .from(scaricoRigheTable)
     .leftJoin(prodottiTable, eq(scaricoRigheTable.prodottoId, prodottiTable.id))
     .where(eq(scaricoRigheTable.scaricoId, id));
+  const provenance = await fseBreakdown([s.s.codice]);
 
   return {
     id: s.s.id,
@@ -71,15 +105,20 @@ async function getScaricoWithRighe(id: number) {
     note: s.s.note ?? null,
     operatoreId: s.s.operatoreId ?? null,
     operatoreCodice: s.operatoreMatricola ?? s.operatoreUsername ?? null,
-    righe: righe.map((r) => ({
+    righe: righe.map((r) => {
+      const split = provenance.get(`${s.s.codice}:${r.r.prodottoId}`) ?? { fse: 0, nonFse: 0 };
+      return {
       id: r.r.id,
       prodottoId: r.r.prodottoId,
       prodottoNome: r.prodottoNome ?? null,
-      fsePlus: !!r.prodottoFsePlus,
+      fsePlus: split.fse > 0 && split.nonFse === 0,
+      fsePlusQuantita: split.fse,
+      nonFsePlusQuantita: split.nonFse,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: r.r.note ?? null,
-    })),
+      };
+    }),
     dataCreazione: s.s.dataCreazione.toISOString(),
   };
 }
@@ -95,21 +134,33 @@ async function disponibileRealeProdotto(
   return Math.max(0, disponibilita.disponibileReale);
 }
 
-router.get("/scarichi", async (req, res) => {
+router.get("/scarichi", requirePermission("magazzino.view"), async (req, res) => {
+  const page = req.query.page == null ? 1 : Number(req.query.page);
+  const limit = req.query.limit == null ? 50 : Number(req.query.limit);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: "Paginazione non valida: page >= 1 e limit tra 1 e 100" });
+    return;
+  }
   // Centro is enforced via scarichi's own column; città is enforced via the
   // scarico's magazzino (scarichi carry no direct cittaId).
   const cittaMagazzini = await visibleMagazzinoIds(null, callerCittaId(req));
+  const where = andScoped(
+    centroScopeFilter(scarichiTable.centroAscoltoId, callerCentroId(req)),
+    magazzinoScopeFilter(scarichiTable.magazzinoId, cittaMagazzini),
+    callerCentroId(req) == null && req.query.centroAscoltoId != null
+      ? eq(scarichiTable.centroAscoltoId, Number(req.query.centroAscoltoId))
+      : undefined,
+  );
+  const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(scarichiTable).where(where);
   const rows = await db
     .select()
     .from(scarichiTable)
     .where(
-      andScoped(
-        centroScopeFilter(scarichiTable.centroAscoltoId, callerCentroId(req)),
-        magazzinoScopeFilter(scarichiTable.magazzinoId, cittaMagazzini),
-      ),
+      where,
     )
     .orderBy(desc(scarichiTable.dataCreazione))
-    .limit(100);
+    .limit(limit)
+    .offset((page - 1) * limit);
 
   const magazzini = await db
     .select({ id: magazziniTable.id, nome: magazziniTable.nome })
@@ -140,6 +191,8 @@ router.get("/scarichi", async (req, res) => {
   }
 
   const ids = rows.map((r) => r.id);
+  const codiceByScarico = new Map(rows.map((r) => [r.id, r.codice]));
+  const provenance = await fseBreakdown(rows.map((r) => r.codice));
   const righeByS = new Map<
     number,
     Array<{
@@ -147,6 +200,8 @@ router.get("/scarichi", async (req, res) => {
       prodottoId: number;
       prodottoNome: string | null;
       fsePlus: boolean;
+      fsePlusQuantita: number;
+      nonFsePlusQuantita: number;
       quantita: number;
       unitaMisura: string;
       note: string | null;
@@ -157,7 +212,6 @@ router.get("/scarichi", async (req, res) => {
       .select({
         r: scaricoRigheTable,
         prodottoNome: prodottiTable.nome,
-        prodottoFsePlus: prodottiTable.fsePlus,
       })
       .from(scaricoRigheTable)
       .leftJoin(
@@ -167,11 +221,14 @@ router.get("/scarichi", async (req, res) => {
       .where(inArray(scaricoRigheTable.scaricoId, ids));
     for (const x of righe) {
       const arr = righeByS.get(x.r.scaricoId) ?? [];
+      const split = provenance.get(`${codiceByScarico.get(x.r.scaricoId)}:${x.r.prodottoId}`) ?? { fse: 0, nonFse: 0 };
       arr.push({
         id: x.r.id,
         prodottoId: x.r.prodottoId,
         prodottoNome: x.prodottoNome ?? null,
-        fsePlus: !!x.prodottoFsePlus,
+        fsePlus: split.fse > 0 && split.nonFse === 0,
+        fsePlusQuantita: split.fse,
+        nonFsePlusQuantita: split.nonFse,
         quantita: parseFloat(x.r.quantita),
         unitaMisura: x.r.unitaMisura,
         note: x.r.note ?? null,
@@ -180,6 +237,9 @@ router.get("/scarichi", async (req, res) => {
     }
   }
 
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("X-Page", String(page));
+  res.setHeader("X-Page-Size", String(limit));
   res.json(
     rows.map((r) => ({
       id: r.id,
@@ -204,11 +264,35 @@ router.get("/scarichi", async (req, res) => {
   );
 });
 
-router.post("/scarichi", async (req, res) => {
-  const body = req.body;
+router.post("/scarichi", requirePermission("magazzino.stock.issue"), async (req, res) => {
+  const body = req.body ?? {};
+
+  if (!Number.isInteger(body.magazzinoId) || body.magazzinoId <= 0) {
+    res.status(400).json({ error: "Magazzino non valido" });
+    return;
+  }
+  const caller = callerCentroId(req);
+  if (!(await canAccessMagazzino(body.magazzinoId, caller, callerCittaId(req)))) {
+    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
+    return;
+  }
+  const [magazzino] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, body.magazzinoId));
+  if (!magazzino) { res.status(404).json({ error: "Magazzino non trovato" }); return; }
+  if (magazzino.stato !== "attivo") {
+    res.status(400).json({ error: "Il Magazzino selezionato non è attivo" });
+    return;
+  }
 
   if (!VALID_CAUSALI.includes(body.causale)) {
     res.status(400).json({ error: "Causale non valida" });
+    return;
+  }
+  if (!isDateOnly(body.dataScarico)) {
+    res.status(400).json({ error: "Data Scarico non valida" });
+    return;
+  }
+  if (body.causale === "altro" && (typeof body.causaleAltro !== "string" || !body.causaleAltro.trim())) {
+    res.status(400).json({ error: "Specificare la causale dello Scarico" });
     return;
   }
 
@@ -267,22 +351,14 @@ router.post("/scarichi", async (req, res) => {
     }
   }
 
-  const caller = callerCentroId(req);
-  if (
-    !(await canAccessMagazzino(body.magazzinoId, caller, callerCittaId(req)))
-  ) {
-    res
-      .status(403)
-      .json({ error: "Magazzino non accessibile per il tuo profilo" });
-    return;
-  }
   const centroAscoltoId =
     caller != null ? caller : (body.centroAscoltoId ?? null);
 
-  const codice = `SCAR-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
-
-  const newId = await db.transaction(async (tx) => {
-    return creaScaricoInventariale(tx, {
+  let newId: number;
+  try {
+    newId = await withDocumentCodeRetry("SCAR", (codice) => db.transaction(async (tx) => {
+      await requireOperationalMagazzino(tx, body.magazzinoId);
+      return creaScaricoInventariale(tx, {
       codice,
       magazzinoId: body.magazzinoId,
       centroAscoltoId,
@@ -298,15 +374,26 @@ router.post("/scarichi", async (req, res) => {
         unitaMisura: prodottoMap.get(r.prodottoId)!.unitaMisura,
         note: r.note ?? null,
       })),
-    });
-  });
+      });
+    }));
+  } catch (error) {
+    if (error instanceof InventoryError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof InventoryLedgerError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
 
   const result = await getScaricoWithRighe(newId);
   res.status(201).json(result);
 });
 
-router.get("/scarichi/:id", async (req, res) => {
-  const result = await getScaricoWithRighe(parseInt(req.params.id));
+router.get("/scarichi/:id", requirePermission("magazzino.view"), async (req, res) => {
+  const result = await getScaricoWithRighe(Number(req.params.id));
   if (!result) {
     res.status(404).json({ error: "Not found" });
     return;

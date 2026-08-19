@@ -20,6 +20,7 @@ import {
 } from "../lib/centroScope";
 import { PRENOTAZIONE_MAGAZZINO_ATTIVA, parseDbNumber } from "../lib/disponibilitaMagazzino";
 import { requireModulo } from "../lib/featureFlags";
+import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -39,7 +40,7 @@ router.use(
  * included. Città/centro HARD scoping is enforced server-side via the visible
  * warehouse set, regardless of the optional query filters.
  */
-router.get("/preparazione-consegne", async (req, res) => {
+router.get("/preparazione-consegne", requirePermission("magazzino.view"), async (req, res) => {
   const { cittaId, magazzinoId } = req.query as Record<string, string>;
 
   const cittaIdNum = cittaId ? parseInt(cittaId) : undefined;

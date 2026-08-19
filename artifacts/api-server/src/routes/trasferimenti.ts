@@ -15,6 +15,8 @@ import {
 } from "../lib/disponibilitaMagazzino";
 import { requireModulo } from "../lib/featureFlags";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
+import { requireOperationalMagazzino, InventoryLedgerError } from "../lib/inventoryLedger";
+import { withDocumentCodeRetry } from "../lib/documentCode";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -34,6 +36,38 @@ function canManageMensaTransfers(req: Request): boolean {
     !!req.user?.isAdmin ||
     (req.user?.permessi ?? []).includes("mensa.transfers.manage")
   );
+}
+
+function hasPermission(req: Request, permission: string): boolean {
+  return !!req.user?.isAdmin || (req.user?.permessi ?? []).includes(permission);
+}
+
+function requestedVersion(body: unknown): number | null {
+  const value = (body as { versione?: unknown } | null)?.versione;
+  return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : null;
+}
+
+function databaseErrorCode(error: unknown): unknown {
+  const candidate = error as { code?: unknown; cause?: { code?: unknown } } | null;
+  return candidate?.code ?? candidate?.cause?.code;
+}
+
+function requireGenericTransferPermission(
+  req: Request,
+  res: import("express").Response,
+  permission: string,
+): boolean {
+  if (isMensaOnly(req)) return true;
+  if (hasPermission(req, permission)) return true;
+  res.status(403).json({ error: "Permesso Magazzino non consentito per il ruolo" });
+  return false;
+}
+
+async function operationalMagazzino(id: number) {
+  const [row] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
+  if (!row) return { error: "Magazzino non trovato", status: 404 } as const;
+  if (row.stato !== "attivo") return { error: "Il Magazzino selezionato non è attivo", status: 400 } as const;
+  return { row } as const;
 }
 
 async function enforceMensaTransfer(
@@ -59,6 +93,35 @@ async function enforceMensaTransfer(
 async function disponibileRealeProdotto(prodottoId: number, magazzinoId: number): Promise<number> {
   const disponibilita = await calcolaDisponibilitaMagazzino(prodottoId, magazzinoId);
   return Math.max(0, disponibilita.disponibileReale);
+}
+
+async function fseBreakdownTrasferimenti(ids: number[]) {
+  const result = new Map<string, { fse: number; nonFse: number }>();
+  if (ids.length === 0) return result;
+  const rows = await db.select({
+    trasferimentoId: movimentiTable.trasferimentoId,
+    prodottoId: movimentiTable.prodottoId,
+    fsePlus: lottiTable.fsePlus,
+    quantita: sql<string>`sum(${movimentiTable.quantita})`,
+  })
+    .from(movimentiTable)
+    .innerJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
+    .where(and(
+      inArray(movimentiTable.trasferimentoId, ids),
+      eq(movimentiTable.tipoMovimento, "trasferimento"),
+      eq(movimentiTable.tipoDettaglio, "uscita"),
+    ))
+    .groupBy(movimentiTable.trasferimentoId, movimentiTable.prodottoId, lottiTable.fsePlus);
+  for (const row of rows) {
+    if (row.trasferimentoId == null) continue;
+    const key = `${row.trasferimentoId}:${row.prodottoId}`;
+    const current = result.get(key) ?? { fse: 0, nonFse: 0 };
+    const qty = Number(row.quantita ?? 0);
+    if (row.fsePlus) current.fse += qty;
+    else current.nonFse += qty;
+    result.set(key, current);
+  }
+  return result;
 }
 
 async function impegnatoAttivoLotto(tx: Tx, lottoId: number): Promise<number> {
@@ -88,6 +151,7 @@ async function trasferimentoUscitaFEFO(tx: Tx, opts: {
   dataMovimento: string;
   trasferimentoId: number;
   trasferimentoCodice: string;
+  operatoreId: number;
 }) {
   let rimanente = opts.quantita;
   const lotti = await tx
@@ -129,6 +193,7 @@ async function trasferimentoUscitaFEFO(tx: Tx, opts: {
       quantita: scala.toFixed(2),
       unitaMisura: opts.unitaMisura,
       fornitoreId: lotto.fornitoreId,
+      operatoreId: opts.operatoreId,
       trasferimentoId: opts.trasferimentoId,
       documentoRiferimento: opts.trasferimentoCodice,
       note: `Trasferimento ${opts.trasferimentoCodice} — uscita`,
@@ -195,15 +260,16 @@ async function getTrasferimentoWithRighe(id: number) {
     r: trasferimentoRigheTable,
     prodottoNome: prodottiTable.nome,
     lottoFsePlus: lottiTable.fsePlus,
-    prodottoFsePlus: prodottiTable.fsePlus,
   })
     .from(trasferimentoRigheTable)
     .leftJoin(prodottiTable, eq(trasferimentoRigheTable.prodottoId, prodottiTable.id))
     .leftJoin(lottiTable, eq(trasferimentoRigheTable.lottoId, lottiTable.id))
     .where(eq(trasferimentoRigheTable.trasferimentoId, id));
+  const provenance = await fseBreakdownTrasferimenti([id]);
 
   return {
     id: t.t.id,
+    versione: t.t.versione,
     codice: t.t.codice,
     magazzinoOrigineId: t.t.magazzinoOrigineId,
     magazzinoOrigineNome: t.origineNome ?? null,
@@ -227,22 +293,34 @@ async function getTrasferimentoWithRighe(id: number) {
     operatoreCodice: t.operatoreMatricola ?? t.operatoreUsername ?? null,
     mensaId: t.t.mensaId ?? null,
     idempotencyKey: t.t.idempotencyKey ?? null,
-    righe: righe.map(r => ({
+    righe: righe.map(r => {
+      const split = provenance.get(`${id}:${r.r.prodottoId}`) ?? { fse: 0, nonFse: 0 };
+      return {
       id: r.r.id,
       prodottoId: r.r.prodottoId,
       prodottoNome: r.prodottoNome ?? null,
       lottoId: r.r.lottoId ?? null,
-      fsePlus: r.r.lottoId ? !!r.lottoFsePlus : !!r.prodottoFsePlus,
+      fsePlus: split.fse > 0 ? split.nonFse === 0 : (r.r.lottoId ? !!r.lottoFsePlus : false),
+      fsePlusQuantita: split.fse,
+      nonFsePlusQuantita: split.nonFse,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: r.r.note ?? null,
-    })),
+      };
+    }),
     dataCreazione: t.t.dataCreazione.toISOString(),
   };
 }
 
 router.get("/trasferimenti", async (req, res) => {
+  if (!requireGenericTransferPermission(req, res, "magazzino.view")) return;
   const { stato } = req.query as Record<string, string>;
+  const page = req.query.page == null ? 1 : Number(req.query.page);
+  const limit = req.query.limit == null ? 50 : Number(req.query.limit);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: "Paginazione non valida: page >= 1 e limit tra 1 e 100" });
+    return;
+  }
   const conditions: SQL[] = [];
   if (stato) conditions.push(eq(trasferimentiTable.stato, stato));
   if (isMensaOnly(req)) {
@@ -270,12 +348,15 @@ router.get("/trasferimenti", async (req, res) => {
   );
   if (scope) conditions.push(scope);
 
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(trasferimentiTable).where(where);
   const rows = await db
     .select()
     .from(trasferimentiTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(where)
     .orderBy(desc(trasferimentiTable.dataCreazione))
-    .limit(100);
+    .limit(limit)
+    .offset((page - 1) * limit);
 
   const magazzini = await db.select({
     id: magazziniTable.id,
@@ -298,16 +379,16 @@ router.get("/trasferimenti", async (req, res) => {
   }
 
   const ids = rows.map(r => r.id);
+  const provenance = await fseBreakdownTrasferimenti(ids);
   const righeByT = new Map<number, Array<{
     id: number; prodottoId: number; prodottoNome: string | null;
-    lottoId: number | null; fsePlus: boolean; quantita: number; unitaMisura: string; note: string | null;
+    lottoId: number | null; fsePlus: boolean; fsePlusQuantita: number; nonFsePlusQuantita: number; quantita: number; unitaMisura: string; note: string | null;
   }>>();
   if (ids.length > 0) {
     const righe = await db.select({
       r: trasferimentoRigheTable,
       prodottoNome: prodottiTable.nome,
       lottoFsePlus: lottiTable.fsePlus,
-      prodottoFsePlus: prodottiTable.fsePlus,
     })
       .from(trasferimentoRigheTable)
       .leftJoin(prodottiTable, eq(trasferimentoRigheTable.prodottoId, prodottiTable.id))
@@ -315,12 +396,15 @@ router.get("/trasferimenti", async (req, res) => {
       .where(inArray(trasferimentoRigheTable.trasferimentoId, ids));
     for (const x of righe) {
       const arr = righeByT.get(x.r.trasferimentoId) ?? [];
+      const split = provenance.get(`${x.r.trasferimentoId}:${x.r.prodottoId}`) ?? { fse: 0, nonFse: 0 };
       arr.push({
         id: x.r.id,
         prodottoId: x.r.prodottoId,
         prodottoNome: x.prodottoNome ?? null,
         lottoId: x.r.lottoId ?? null,
-        fsePlus: x.r.lottoId ? !!x.lottoFsePlus : !!x.prodottoFsePlus,
+        fsePlus: split.fse > 0 ? split.nonFse === 0 : (x.r.lottoId ? !!x.lottoFsePlus : false),
+        fsePlusQuantita: split.fse,
+        nonFsePlusQuantita: split.nonFse,
         quantita: parseFloat(x.r.quantita),
         unitaMisura: x.r.unitaMisura,
         note: x.r.note ?? null,
@@ -329,11 +413,15 @@ router.get("/trasferimenti", async (req, res) => {
     }
   }
 
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("X-Page", String(page));
+  res.setHeader("X-Page-Size", String(limit));
   res.json(rows.map(r => {
     const orig = magMap.get(r.magazzinoOrigineId);
     const dest = magMap.get(r.magazzinoDestinoId);
     return {
       id: r.id,
+      versione: r.versione,
       codice: r.codice,
       magazzinoOrigineId: r.magazzinoOrigineId,
       magazzinoOrigineNome: orig?.nome ?? null,
@@ -364,9 +452,15 @@ router.get("/trasferimenti", async (req, res) => {
 });
 
 router.post("/trasferimenti", async (req, res) => {
-  const body = req.body;
+  const body = req.body ?? {};
   if (isMensaOnly(req)) {
     res.status(403).json({ error: "Usare il flusso Rifornimenti del modulo Mensa" });
+    return;
+  }
+  if (!requireGenericTransferPermission(req, res, "magazzino.transfers.create")) return;
+  if (!Number.isSafeInteger(body.magazzinoOrigineId) || body.magazzinoOrigineId <= 0
+      || !Number.isSafeInteger(body.magazzinoDestinoId) || body.magazzinoDestinoId <= 0) {
+    res.status(400).json({ error: "Origine e destinazione devono essere Magazzini validi" });
     return;
   }
   if (body.magazzinoOrigineId === body.magazzinoDestinoId) {
@@ -378,9 +472,20 @@ router.post("/trasferimenti", async (req, res) => {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
     return;
   }
-  const righeInput: Array<{ quantita: number }> = body.righe ?? [];
-  if (righeInput.some((r) => !(r.quantita > 0))) {
-    res.status(400).json({ error: "Le quantità devono essere maggiori di zero" });
+  for (const magazzinoId of [body.magazzinoOrigineId, body.magazzinoDestinoId]) {
+    const operational = await operationalMagazzino(Number(magazzinoId));
+    if ("error" in operational) { res.status(operational.status ?? 400).json({ error: operational.error }); return; }
+  }
+  const righeInput: Array<{ prodottoId: number; quantita: number; unitaMisura?: string }> = body.righe ?? [];
+  if (righeInput.length === 0 || righeInput.some((r) => !Number.isSafeInteger(r.prodottoId) || r.prodottoId <= 0
+      || !Number.isFinite(r.quantita) || r.quantita <= 0 || typeof r.unitaMisura !== "string" || !r.unitaMisura.trim())) {
+    res.status(400).json({ error: "Indicare almeno una riga con Prodotto, quantità e unità di misura validi" });
+    return;
+  }
+  const productIds = [...new Set(righeInput.map((row) => row.prodottoId))];
+  const existingProducts = await db.select({ id: prodottiTable.id }).from(prodottiTable).where(inArray(prodottiTable.id, productIds));
+  if (existingProducts.length !== productIds.length) {
+    res.status(400).json({ error: "Una o più righe indicano un Prodotto inesistente" });
     return;
   }
   const trasportatore = normalizeTrasportatore(body);
@@ -388,29 +493,37 @@ router.post("/trasferimenti", async (req, res) => {
     res.status(400).json({ error: trasportatore.error });
     return;
   }
-  const codice = `TRASM-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
-  const [t] = await db.insert(trasferimentiTable).values({
-    codice,
-    magazzinoOrigineId: body.magazzinoOrigineId,
-    magazzinoDestinoId: body.magazzinoDestinoId,
-    dataRichiesta: body.dataRichiesta,
-    trasportatoreVolontarioId: trasportatore.volontarioId,
-    trasportatoreNome: trasportatore.nome,
-    note: body.note,
-    operatoreId: req.user!.id,
-  }).returning();
-
-  if (body.righe?.length) {
-    await db.insert(trasferimentoRigheTable).values(
-      body.righe.map((r: { prodottoId: number; lottoId?: number; quantita: number; unitaMisura: string; note?: string }) => ({
-        trasferimentoId: t.id,
-        prodottoId: r.prodottoId,
-        lottoId: r.lottoId,
-        quantita: r.quantita.toString(),
-        unitaMisura: r.unitaMisura,
-        note: r.note,
-      }))
-    );
+  let t: typeof trasferimentiTable.$inferSelect;
+  try {
+    t = await withDocumentCodeRetry("TRASM", (codice) => db.transaction(async (tx) => {
+      const [created] = await tx.insert(trasferimentiTable).values({
+        codice,
+        magazzinoOrigineId: body.magazzinoOrigineId,
+        magazzinoDestinoId: body.magazzinoDestinoId,
+        dataRichiesta: body.dataRichiesta,
+        trasportatoreVolontarioId: trasportatore.volontarioId,
+        trasportatoreNome: trasportatore.nome,
+        note: body.note,
+        operatoreId: req.user!.id,
+      }).returning();
+      await tx.insert(trasferimentoRigheTable).values(
+        body.righe.map((r: { prodottoId: number; lottoId?: number; quantita: number; unitaMisura: string; note?: string }) => ({
+          trasferimentoId: created.id,
+          prodottoId: r.prodottoId,
+          lottoId: r.lottoId,
+          quantita: r.quantita.toString(),
+          unitaMisura: r.unitaMisura,
+          note: r.note,
+        })),
+      );
+      return created;
+    }));
+  } catch (error) {
+    if (databaseErrorCode(error) === "23503") {
+      res.status(400).json({ error: "Una riga indica un Lotto o una risorsa collegata inesistente" });
+      return;
+    }
+    throw error;
   }
 
   const result = await getTrasferimentoWithRighe(t.id);
@@ -418,7 +531,8 @@ router.post("/trasferimenti", async (req, res) => {
 });
 
 router.get("/trasferimenti/:id", async (req, res) => {
-  const result = await getTrasferimentoWithRighe(parseInt(req.params.id));
+  if (!requireGenericTransferPermission(req, res, "magazzino.view")) return;
+  const result = await getTrasferimentoWithRighe(Number(req.params.id));
   if (!result) { res.status(404).json({ error: "Not found" }); return; }
   const mensaError = await enforceMensaTransfer(req, result.mensaId);
   if (mensaError) { res.status(403).json({ error: mensaError }); return; }
@@ -431,7 +545,8 @@ router.get("/trasferimenti/:id", async (req, res) => {
 });
 
 router.get("/trasferimenti/:id/documento", async (req, res) => {
-  const id = parseInt(req.params.id);
+  if (!requireGenericTransferPermission(req, res, "magazzino.view")) return;
+  const id = Number(req.params.id);
   const result = await getTrasferimentoWithRighe(id);
   if (!result) {
     res.status(404).json({ error: "Not found" });
@@ -472,8 +587,14 @@ router.get("/trasferimenti/:id/documento", async (req, res) => {
 });
 
 router.patch("/trasferimenti/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+  if (!requireGenericTransferPermission(req, res, "magazzino.transfers.create")) return;
+  const id = Number(req.params.id);
   const body = req.body ?? {};
+  const versione = requestedVersion(body);
+  if (versione == null) {
+    res.status(400).json({ error: "La versione corrente del Trasferimento è obbligatoria" });
+    return;
+  }
 
   const [current] = await db.select().from(trasferimentiTable).where(eq(trasferimentiTable.id, id));
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
@@ -485,9 +606,11 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     return;
   }
 
+  if ("stato" in body || "dataEsecuzione" in body || "dataConfermaRicezione" in body) {
+    res.status(400).json({ error: "Lo stato e le date di workflow si modificano solo tramite Avvia e Conferma" });
+    return;
+  }
   const updates: Partial<typeof trasferimentiTable.$inferInsert> = {};
-  if ("stato" in body) updates.stato = body.stato;
-  if ("dataEsecuzione" in body) updates.dataEsecuzione = body.dataEsecuzione;
   if ("note" in body) updates.note = body.note;
 
   // Normalize transporter only when the request touches either field, so that
@@ -524,28 +647,44 @@ router.patch("/trasferimenti/:id", async (req, res) => {
   }
 
   if (Object.keys(updates).length === 0 && !editRighe) {
-    const cur = await getTrasferimentoWithRighe(id);
-    res.json(cur);
+    res.status(400).json({ error: "Indicare almeno un campo modificabile" });
     return;
   }
 
   // Stamp the operator who performed this mutation alongside the allow-listed updates.
   updates.operatoreId = req.user!.id;
-  await db.update(trasferimentiTable).set(updates).where(eq(trasferimentiTable.id, id));
-
-  if (editRighe) {
-    // Replace-all: the editor sends the full desired set of rows.
-    await db.delete(trasferimentoRigheTable).where(eq(trasferimentoRigheTable.trasferimentoId, id));
-    await db.insert(trasferimentoRigheTable).values(
-      righeInput.map((r) => ({
-        trasferimentoId: id,
-        prodottoId: r.prodottoId,
-        lottoId: r.lottoId,
-        quantita: r.quantita.toString(),
-        unitaMisura: r.unitaMisura,
-        note: r.note,
-      }))
-    );
+  const mutationApplied = await db.transaction(async (tx) => {
+    const [updated] = await tx.update(trasferimentiTable)
+      .set({ ...updates, versione: sql`${trasferimentiTable.versione} + 1` })
+      .where(and(eq(trasferimentiTable.id, id), eq(trasferimentiTable.versione, versione)))
+      .returning({ id: trasferimentiTable.id });
+    if (!updated) throw new Error("VERSIONE_TRASFERIMENTO_SUPERATA");
+    if (editRighe) {
+      await tx.delete(trasferimentoRigheTable).where(eq(trasferimentoRigheTable.trasferimentoId, id));
+      await tx.insert(trasferimentoRigheTable).values(
+        righeInput.map((r) => ({
+          trasferimentoId: id,
+          prodottoId: r.prodottoId,
+          lottoId: r.lottoId,
+          quantita: r.quantita.toString(),
+          unitaMisura: r.unitaMisura,
+          note: r.note,
+        })),
+      );
+    }
+    return true;
+  }).catch((error) => {
+    if (error instanceof Error && error.message === "VERSIONE_TRASFERIMENTO_SUPERATA") return false;
+    if (databaseErrorCode(error) === "23503") return "riga_non_valida" as const;
+    throw error;
+  });
+  if (mutationApplied === "riga_non_valida") {
+    res.status(400).json({ error: "Una riga indica un Prodotto, Lotto o risorsa collegata inesistente" });
+    return;
+  }
+  if (!mutationApplied) {
+    res.status(409).json({ error: "Il Trasferimento è stato modificato da un altro operatore" });
+    return;
   }
 
   const result = await getTrasferimentoWithRighe(id);
@@ -555,7 +694,12 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 // Avvia: deduce le quantità dai lotti del magazzino origine (FEFO) e mette il
 // trasferimento "in_transito". Da qui in poi le righe non sono più modificabili.
 router.post("/trasferimenti/:id/avvia", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
+  const versione = requestedVersion(req.body);
+  if (versione == null) {
+    res.status(400).json({ error: "La versione corrente del Trasferimento è obbligatoria" });
+    return;
+  }
   const [current] = await db
     .select()
     .from(trasferimentiTable)
@@ -569,20 +713,22 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     res.status(403).json({ error: mensaError });
     return;
   }
+  if (!requireGenericTransferPermission(req, res, "magazzino.transfers.dispatch")) return;
   const visIds = await visibleMagazzinoIds(
     callerCentroId(req),
     callerCittaId(req),
   );
   if (
     visIds != null &&
-    !visIds.includes(current.magazzinoOrigineId) &&
-    !visIds.includes(current.magazzinoDestinoId)
+    !visIds.includes(current.magazzinoOrigineId)
   ) {
     res
       .status(403)
       .json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  const origine = await operationalMagazzino(Number(current.magazzinoOrigineId));
+  if ("error" in origine) { res.status(origine.status ?? 400).json({ error: origine.error }); return; }
   if (current.stato !== "richiesto" && current.stato !== "preparato") {
     res.status(400).json({ error: "Il trasferimento è già stato avviato" });
     return;
@@ -632,21 +778,24 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
 
   try {
     await db.transaction(async (tx) => {
+      await requireOperationalMagazzino(tx, current.magazzinoOrigineId);
       const [claimed] = await tx
         .update(trasferimentiTable)
         .set({
           stato: "in_transito",
           dataEsecuzione,
           operatoreId: req.user!.id,
+          versione: sql`${trasferimentiTable.versione} + 1`,
         })
         .where(
           and(
             eq(trasferimentiTable.id, id),
+            eq(trasferimentiTable.versione, versione),
             inArray(trasferimentiTable.stato, ["richiesto", "preparato"]),
           ),
         )
         .returning({ id: trasferimentiTable.id });
-      if (!claimed) throw new Error("TRASFERIMENTO_GIA_AVVIATO");
+      if (!claimed) throw new Error("VERSIONE_TRASFERIMENTO_SUPERATA");
       for (const r of righe) {
         await trasferimentoUscitaFEFO(tx, {
           prodottoId: r.prodottoId,
@@ -656,6 +805,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
           dataMovimento: dataEsecuzione,
           trasferimentoId: id,
           trasferimentoCodice: current.codice,
+          operatoreId: req.user!.id,
         });
       }
       if (current.mensaId != null) {
@@ -671,12 +821,16 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    if (message.includes("TRASFERIMENTO_GIA_AVVIATO")) {
-      res.status(409).json({ error: "Il trasferimento è già stato avviato" });
+    if (message.includes("VERSIONE_TRASFERIMENTO_SUPERATA")) {
+      res.status(409).json({ error: "Il Trasferimento è stato modificato o avviato da un altro operatore" });
       return;
     }
     if (message.includes("Disponibilità FEFO insufficiente")) {
       res.status(409).json({ error: message });
+      return;
+    }
+    if (error instanceof InventoryLedgerError) {
+      res.status(error.status).json({ error: error.message });
       return;
     }
     throw error;
@@ -689,8 +843,13 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
 // Conferma: aggiunge le quantità ricevute al magazzino destinazione come nuovi
 // lotti, ricostruiti dai movimenti di uscita per preservare scadenza/provenienza.
 router.post("/trasferimenti/:id/conferma", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const body = req.body ?? {};
+  const versione = requestedVersion(body);
+  if (versione == null) {
+    res.status(400).json({ error: "La versione corrente del Trasferimento è obbligatoria" });
+    return;
+  }
   const [current] = await db
     .select()
     .from(trasferimentiTable)
@@ -704,13 +863,13 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
     res.status(403).json({ error: mensaError });
     return;
   }
+  if (!requireGenericTransferPermission(req, res, "magazzino.transfers.receive")) return;
   const visIds = await visibleMagazzinoIds(
     callerCentroId(req),
     callerCittaId(req),
   );
   if (
     visIds != null &&
-    !visIds.includes(current.magazzinoOrigineId) &&
     !visIds.includes(current.magazzinoDestinoId)
   ) {
     res
@@ -718,6 +877,8 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
       .json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
+  const destinazione = await operationalMagazzino(Number(current.magazzinoDestinoId));
+  if ("error" in destinazione) { res.status(destinazione.status ?? 400).json({ error: destinazione.error }); return; }
   if (current.stato !== "in_transito") {
     res
       .status(400)
@@ -731,6 +892,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
 
   try {
     await db.transaction(async (tx) => {
+      await requireOperationalMagazzino(tx, current.magazzinoDestinoId);
       const [claimed] = await tx
         .update(trasferimentiTable)
         .set({
@@ -738,15 +900,17 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           dataConfermaRicezione: dataConferma,
           note: body.note,
           operatoreId: req.user!.id,
+          versione: sql`${trasferimentiTable.versione} + 1`,
         })
         .where(
           and(
             eq(trasferimentiTable.id, id),
+            eq(trasferimentiTable.versione, versione),
             eq(trasferimentiTable.stato, "in_transito"),
           ),
         )
         .returning({ id: trasferimentiTable.id });
-      if (!claimed) throw new Error("TRASFERIMENTO_GIA_CONFERMATO");
+      if (!claimed) throw new Error("VERSIONE_TRASFERIMENTO_SUPERATA");
       // I movimenti di uscita portano il lotto origine: lo si rilegge per copiare
       // scadenza, codice lotto e provenienza nei lotti creati a destinazione.
       const uscite = await tx
@@ -789,6 +953,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           quantita: qty,
           unitaMisura: u.m.unitaMisura,
           fornitoreId: u.lotto?.fornitoreId ?? null,
+          operatoreId: req.user!.id,
           trasferimentoId: id,
           documentoRiferimento: current.codice,
           note: `Trasferimento ${current.codice} — entrata`,
@@ -809,11 +974,15 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message.includes("TRASFERIMENTO_GIA_CONFERMATO")
+      error.message.includes("VERSIONE_TRASFERIMENTO_SUPERATA")
     ) {
       res
         .status(409)
-        .json({ error: "Il trasferimento è già stato confermato" });
+        .json({ error: "Il Trasferimento è stato modificato o confermato da un altro operatore" });
+      return;
+    }
+    if (error instanceof InventoryLedgerError) {
+      res.status(error.status).json({ error: error.message });
       return;
     }
     throw error;

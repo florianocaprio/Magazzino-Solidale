@@ -6,9 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListApprovvigionamentiParams = {
-stato?: string;
-magazzinoId?: number;
+export type ListScarichiParams = {
 centroAscoltoId?: number;
 /**
  * @minimum 1

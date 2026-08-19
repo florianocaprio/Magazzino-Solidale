@@ -6,9 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface LottoUpdate {
-  codiceLotto?: string;
-  dataScadenza?: string;
-  documentoCarico?: string;
-  note?: string;
+export interface VersioneInput {
+  /** @minimum 1 */
+  versione: number;
 }

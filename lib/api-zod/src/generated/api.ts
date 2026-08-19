@@ -194,6 +194,34 @@ export const DeleteMagazzinoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const DeleteMagazzinoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "tipoProdotto": zod.string(),
+  "unitaMisura": zod.string(),
+  "codiceBarre": zod.string().nullish(),
+  "gestioneLotto": zod.boolean(),
+  "gestioneScadenza": zod.boolean(),
+  "fsePlus": zod.boolean(),
+  "scortaMinima": zod.number(),
+  "scortaConsigliata": zod.number(),
+  "abilitatoEmporio": zod.boolean(),
+  "creditoSolidaleValore": zod.number(),
+  "quantitaMassimaPerSpesa": zod.number().nullable(),
+  "quantitaMassimaMensile": zod.number().nullable(),
+  "conservazione": zod.string().nullish(),
+  "taglia": zod.string().nullish(),
+  "genere": zod.string().nullish(),
+  "stagione": zod.string().nullish(),
+  "condizione": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "fornitoreId": zod.number().nullish()
+})
+
 
 /**
  * @summary List products
@@ -392,6 +420,26 @@ export const DeleteProdottoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const DeleteProdottoResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "tipo": zod.string(),
+  "partitaIva": zod.string().nullish(),
+  "codiceFiscale": zod.string().nullish(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "referente": zod.string().nullish(),
+  "siteWeb": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "noteOperative": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
 
 export const ListLottiQueryParams = zod.object({
   "prodottoId": zod.coerce.number().optional(),
@@ -420,12 +468,17 @@ export const ListLottiResponseItem = zod.object({
 export const ListLottiResponse = zod.array(ListLottiResponseItem)
 
 
+export const createLottoBodyQuantitaCaricataExclusiveMin = 0;
+
+
+
 export const CreateLottoBody = zod.object({
   "prodottoId": zod.number(),
   "codiceLotto": zod.string().optional(),
   "dataScadenza": zod.string().optional(),
   "dataCarico": zod.string(),
-  "quantitaCaricata": zod.number(),
+  "quantitaCaricata": zod.number().gt(createLottoBodyQuantitaCaricataExclusiveMin),
+  "causale": zod.enum(['acquisto', 'donazione', 'fse_plus']),
   "magazzinoId": zod.number(),
   "fornitoreId": zod.number().optional(),
   "fsePlus": zod.boolean().optional(),
@@ -458,6 +511,40 @@ export const GetLottoResponse = zod.object({
 })
 
 
+/**
+ * @summary Registra una rettifica inventariale atomica e auditata
+ */
+export const RettificaLottoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RettificaLottoBody = zod.object({
+  "delta": zod.number(),
+  "causale": zod.enum(['inventario_fisico', 'errore_registrazione', 'deterioramento', 'altro']),
+  "motivazione": zod.string().optional(),
+  "note": zod.string().optional()
+})
+
+export const RettificaLottoResponse = zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "dataScadenza": zod.string().nullish(),
+  "dataCarico": zod.string(),
+  "quantitaCaricata": zod.number(),
+  "quantitaResidua": zod.number(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "fornitoreId": zod.number().nullish(),
+  "fornitoreNome": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
+  "documentoCarico": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
 export const UpdateLottoParams = zod.object({
   "id": zod.coerce.number()
 })
@@ -465,7 +552,7 @@ export const UpdateLottoParams = zod.object({
 export const UpdateLottoBody = zod.object({
   "codiceLotto": zod.string().optional(),
   "dataScadenza": zod.string().optional(),
-  "quantitaResidua": zod.number().optional(),
+  "documentoCarico": zod.string().optional(),
   "note": zod.string().optional()
 })
 
@@ -489,13 +576,22 @@ export const UpdateLottoResponse = zod.object({
 })
 
 
+export const listMovimentiQueryPageDefault = 1;
+
+export const listMovimentiQueryLimitDefault = 50;
+export const listMovimentiQueryLimitMax = 100;
+
+
+
 export const ListMovimentiQueryParams = zod.object({
   "tipo": zod.coerce.string().optional(),
   "magazzinoId": zod.coerce.number().optional(),
   "prodottoId": zod.coerce.number().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
   "da": zod.coerce.string().optional(),
-  "a": zod.coerce.string().optional()
+  "a": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).default(listMovimentiQueryPageDefault),
+  "limit": zod.coerce.number().min(1).max(listMovimentiQueryLimitMax).default(listMovimentiQueryLimitDefault)
 })
 
 export const ListMovimentiResponseItem = zod.object({
@@ -512,27 +608,13 @@ export const ListMovimentiResponseItem = zod.object({
   "unitaMisura": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "beneficiarioId": zod.number().nullish(),
+  "movimentoOrigineId": zod.number().nullish(),
+  "operatoreId": zod.number().nullish(),
   "documentoRiferimento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
 export const ListMovimentiResponse = zod.array(ListMovimentiResponseItem)
-
-
-export const CreateMovimentoBody = zod.object({
-  "tipoMovimento": zod.string(),
-  "tipoDettaglio": zod.string(),
-  "dataMovimento": zod.string(),
-  "magazzinoId": zod.number(),
-  "prodottoId": zod.number(),
-  "lottoId": zod.number().optional(),
-  "quantita": zod.number(),
-  "unitaMisura": zod.string(),
-  "fornitoreId": zod.number().optional(),
-  "beneficiarioId": zod.number().optional(),
-  "documentoRiferimento": zod.string().optional(),
-  "note": zod.string().optional()
-})
 
 
 export const ListGiacenzeQueryParams = zod.object({
@@ -594,13 +676,23 @@ export const GetPreparazioneConsegneResponse = zod.object({
 })
 
 
+export const listTrasferimentiQueryPageDefault = 1;
+
+export const listTrasferimentiQueryLimitDefault = 50;
+export const listTrasferimentiQueryLimitMax = 100;
+
+
+
 export const ListTrasferimentiQueryParams = zod.object({
-  "stato": zod.coerce.string().optional()
+  "stato": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).default(listTrasferimentiQueryPageDefault),
+  "limit": zod.coerce.number().min(1).max(listTrasferimentiQueryLimitMax).default(listTrasferimentiQueryLimitDefault)
 })
 
 export const ListTrasferimentiResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "magazzinoOrigineId": zod.number(),
   "magazzinoOrigineNome": zod.string().nullish(),
   "magazzinoOrigineIndirizzo": zod.string().nullish(),
@@ -629,6 +721,8 @@ export const ListTrasferimentiResponseItem = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -662,6 +756,7 @@ export const GetTrasferimentoParams = zod.object({
 export const GetTrasferimentoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "magazzinoOrigineId": zod.number(),
   "magazzinoOrigineNome": zod.string().nullish(),
   "magazzinoOrigineIndirizzo": zod.string().nullish(),
@@ -690,6 +785,8 @@ export const GetTrasferimentoResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -702,9 +799,11 @@ export const UpdateTrasferimentoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const UpdateTrasferimentoBody = zod.object({
-  "stato": zod.string().optional(),
-  "dataEsecuzione": zod.string().optional(),
+  "versione": zod.number().min(1),
   "trasportatoreVolontarioId": zod.number().nullish(),
   "trasportatoreNome": zod.string().nullish(),
   "note": zod.string().optional(),
@@ -720,6 +819,7 @@ export const UpdateTrasferimentoBody = zod.object({
 export const UpdateTrasferimentoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "magazzinoOrigineId": zod.number(),
   "magazzinoOrigineNome": zod.string().nullish(),
   "magazzinoOrigineIndirizzo": zod.string().nullish(),
@@ -748,6 +848,8 @@ export const UpdateTrasferimentoResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -763,9 +865,17 @@ export const AvviaTrasferimentoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+export const AvviaTrasferimentoBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
 export const AvviaTrasferimentoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "magazzinoOrigineId": zod.number(),
   "magazzinoOrigineNome": zod.string().nullish(),
   "magazzinoOrigineIndirizzo": zod.string().nullish(),
@@ -794,6 +904,8 @@ export const AvviaTrasferimentoResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -812,6 +924,7 @@ export const GetDocumentoTrasferimentoParams = zod.object({
 export const GetDocumentoTrasferimentoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "magazzinoOrigineId": zod.number(),
   "magazzinoOrigineNome": zod.string().nullish(),
   "magazzinoOrigineIndirizzo": zod.string().nullish(),
@@ -840,6 +953,8 @@ export const GetDocumentoTrasferimentoResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -855,7 +970,11 @@ export const ConfermaTrasferimentoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const ConfermaTrasferimentoBody = zod.object({
+  "versione": zod.number().min(1),
   "note": zod.string().optional(),
   "dataConferma": zod.string().optional()
 })
@@ -863,6 +982,7 @@ export const ConfermaTrasferimentoBody = zod.object({
 export const ConfermaTrasferimentoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "magazzinoOrigineId": zod.number(),
   "magazzinoOrigineNome": zod.string().nullish(),
   "magazzinoOrigineIndirizzo": zod.string().nullish(),
@@ -891,6 +1011,8 @@ export const ConfermaTrasferimentoResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -898,6 +1020,19 @@ export const ConfermaTrasferimentoResponse = zod.object({
   "dataCreazione": zod.string()
 })
 
+
+export const listScarichiQueryPageDefault = 1;
+
+export const listScarichiQueryLimitDefault = 50;
+export const listScarichiQueryLimitMax = 100;
+
+
+
+export const ListScarichiQueryParams = zod.object({
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "page": zod.coerce.number().min(1).default(listScarichiQueryPageDefault),
+  "limit": zod.coerce.number().min(1).max(listScarichiQueryLimitMax).default(listScarichiQueryLimitDefault)
+})
 
 export const ListScarichiResponseItem = zod.object({
   "id": zod.number(),
@@ -917,6 +1052,8 @@ export const ListScarichiResponseItem = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -964,6 +1101,8 @@ export const GetScaricoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -1113,16 +1252,46 @@ export const DeleteFornitoreParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const DeleteFornitoreResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "tipo": zod.string(),
+  "partitaIva": zod.string().nullish(),
+  "codiceFiscale": zod.string().nullish(),
+  "indirizzo": zod.string().nullish(),
+  "comune": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "referente": zod.string().nullish(),
+  "siteWeb": zod.string().nullish(),
+  "cittaId": zod.number().nullish(),
+  "cittaNome": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "noteOperative": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+export const listApprovvigionamentiQueryPageDefault = 1;
+
+export const listApprovvigionamentiQueryLimitDefault = 50;
+export const listApprovvigionamentiQueryLimitMax = 100;
+
+
 
 export const ListApprovvigionamentiQueryParams = zod.object({
   "stato": zod.coerce.string().optional(),
   "magazzinoId": zod.coerce.number().optional(),
-  "centroAscoltoId": zod.coerce.number().optional()
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "page": zod.coerce.number().min(1).default(listApprovvigionamentiQueryPageDefault),
+  "limit": zod.coerce.number().min(1).max(listApprovvigionamentiQueryLimitMax).default(listApprovvigionamentiQueryLimitDefault)
 })
 
 export const ListApprovvigionamentiResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fornitoreEmail": zod.string().nullish(),
@@ -1152,7 +1321,7 @@ export const ListApprovvigionamentiResponse = zod.array(ListApprovvigionamentiRe
 export const CreateApprovvigionamentoBody = zod.object({
   "fornitoreId": zod.number(),
   "cittaId": zod.number(),
-  "magazzinoId": zod.number().optional(),
+  "magazzinoId": zod.number(),
   "centroAscoltoId": zod.number().optional(),
   "dataRichiesta": zod.string(),
   "dataPrevista": zod.string().optional(),
@@ -1173,6 +1342,7 @@ export const GetApprovvigionamentoParams = zod.object({
 export const GetApprovvigionamentoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fornitoreEmail": zod.string().nullish(),
@@ -1202,7 +1372,11 @@ export const UpdateApprovvigionamentoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const UpdateApprovvigionamentoBody = zod.object({
+  "versione": zod.number().min(1),
   "stato": zod.string().optional(),
   "fornitoreId": zod.number().nullish(),
   "cittaId": zod.number().optional(),
@@ -1210,12 +1384,19 @@ export const UpdateApprovvigionamentoBody = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "dataRichiesta": zod.string().optional(),
   "dataPrevista": zod.string().optional(),
+  "note": zod.string().optional(),
+  "righe": zod.array(zod.object({
+  "prodottoId": zod.number(),
+  "quantitaRichiesta": zod.number(),
+  "unitaMisura": zod.string(),
   "note": zod.string().optional()
+})).optional()
 })
 
 export const UpdateApprovvigionamentoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fornitoreEmail": zod.string().nullish(),
@@ -1248,9 +1429,17 @@ export const SubmitApprovvigionamentoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+export const SubmitApprovvigionamentoBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
 export const SubmitApprovvigionamentoResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
+  "versione": zod.number(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fornitoreEmail": zod.string().nullish(),
@@ -4794,10 +4983,19 @@ export const InviaBollaEmailSpesaEmporioResponse = zod.object({
 })
 
 
+export const listBolleQueryPageDefault = 1;
+
+export const listBolleQueryLimitDefault = 50;
+export const listBolleQueryLimitMax = 100;
+
+
+
 export const ListBolleQueryParams = zod.object({
   "stato": zod.coerce.string().optional(),
   "magazzinoId": zod.coerce.number().optional(),
-  "centroAscoltoId": zod.coerce.number().optional()
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "page": zod.coerce.number().min(1).default(listBolleQueryPageDefault),
+  "limit": zod.coerce.number().min(1).max(listBolleQueryLimitMax).default(listBolleQueryLimitDefault)
 })
 
 export const ListBolleResponseItem = zod.object({
@@ -4886,6 +5084,8 @@ export const GetBollaResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -4898,7 +5098,6 @@ export const UpdateBollaParams = zod.object({
 })
 
 export const UpdateBollaBody = zod.object({
-  "stato": zod.string().optional(),
   "beneficiarioId": zod.number().optional(),
   "magazzinoId": zod.number().optional(),
   "volontarioConsegnaId": zod.number().nullish(),
@@ -4906,9 +5105,7 @@ export const UpdateBollaBody = zod.object({
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
   "indirizzoConsegna": zod.string().optional(),
-  "noteConsegna": zod.string().nullish(),
-  "confermaRicezione": zod.boolean().optional(),
-  "noteRicezione": zod.string().optional()
+  "noteConsegna": zod.string().nullish()
 })
 
 export const UpdateBollaResponse = zod.object({
@@ -4949,6 +5146,8 @@ export const UpdateBollaResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -4971,6 +5170,8 @@ export const ListBollaRigheResponseItem = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -5048,6 +5249,8 @@ export const ConfermaBollaResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -5100,6 +5303,8 @@ export const AnnullaBollaResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -5157,6 +5362,8 @@ export const ConsegnaBollaResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()
@@ -5217,6 +5424,8 @@ export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
   "unitaMisura": zod.string(),
   "note": zod.string().nullish()

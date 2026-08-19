@@ -8,6 +8,8 @@ export const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
 export const ADMIN_ROLE_NAME = "Amministratore";
 export const EMPORIO_ROLE_NAME = "Emporio";
 export const MENSA_ROLE_NAME = "Operatore Mensa";
+export const MAGAZZINO_ROLE_NAME = "Operatore Magazzino";
+export const LOGISTICA_ROLE_NAME = "Operatore Logistica";
 const OPERATOR_ROLE_NAME = "Operatore";
 const VOLUNTEER_ROLE_NAME = "Volontario";
 const UDS_ROLE_NAME = "Operatore UDS";
@@ -28,6 +30,10 @@ const SOCIAL_OPERATOR_PERMISSIONS = [
   "sociale.interventi.update",
   "sociale.interventi.complete",
   "sociale.interventi.cancel",
+  "bolle.view",
+  "bolle.manage",
+  "bolle.deliver",
+  "bolle.cancel",
 ] as const;
 const UDS_OPERATOR_PERMISSIONS = [
   "beneficiari.view",
@@ -38,6 +44,25 @@ const EMPORIO_OPERATOR_PERMISSIONS = [
   "credito.view",
   "emporio.access.view",
   "emporio.access.manage",
+] as const;
+const LOGISTICA_OPERATOR_PERMISSIONS = [
+  "approvvigionamenti.view",
+  "approvvigionamenti.manage",
+  "approvvigionamenti.receive",
+] as const;
+const MAGAZZINO_OPERATOR_PERMISSIONS = [
+  "magazzino.view",
+  "magazzino.products.manage",
+  "magazzino.stock.receive",
+  "magazzino.stock.issue",
+  "magazzino.stock.adjust",
+  "magazzino.transfers.create",
+  "magazzino.transfers.dispatch",
+  "magazzino.transfers.receive",
+  "bolle.view",
+  "bolle.manage",
+  "bolle.deliver",
+  "bolle.cancel",
 ] as const;
 
 function mergePermissions(
@@ -164,6 +189,46 @@ export async function seedRoles(): Promise<void> {
       isAdmin: false,
     });
     logger.info("Seeded volunteer role");
+  }
+
+  const [logisticaRole] = await db
+    .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.nome, LOGISTICA_ROLE_NAME));
+  if (!logisticaRole) {
+    await db.insert(ruoliTable).values({
+      nome: LOGISTICA_ROLE_NAME,
+      descrizione: "Operatore degli Approvvigionamenti",
+      aree: ["logistica"],
+      permessi: [...LOGISTICA_OPERATOR_PERMISSIONS],
+      isAdmin: false,
+    });
+    logger.info("Seeded Logistics operator role");
+  } else {
+    await db.update(ruoliTable).set({
+      aree: logisticaRole.aree.includes("logistica") ? logisticaRole.aree : [...logisticaRole.aree, "logistica"],
+      permessi: mergePermissions(logisticaRole.permessi, LOGISTICA_OPERATOR_PERMISSIONS),
+    }).where(eq(ruoliTable.id, logisticaRole.id));
+  }
+
+  const [magazzinoRole] = await db
+    .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
+    .from(ruoliTable)
+    .where(eq(ruoliTable.nome, MAGAZZINO_ROLE_NAME));
+  if (!magazzinoRole) {
+    await db.insert(ruoliTable).values({
+      nome: MAGAZZINO_ROLE_NAME,
+      descrizione: "Operatore del Magazzino Solidale",
+      aree: ["magazzino"],
+      permessi: [...MAGAZZINO_OPERATOR_PERMISSIONS],
+      isAdmin: false,
+    });
+    logger.info("Seeded Magazzino operator role");
+  } else {
+    await db.update(ruoliTable).set({
+      aree: magazzinoRole.aree.includes("magazzino") ? magazzinoRole.aree : [...magazzinoRole.aree, "magazzino"],
+      permessi: mergePermissions(magazzinoRole.permessi, MAGAZZINO_OPERATOR_PERMISSIONS),
+    }).where(eq(ruoliTable.id, magazzinoRole.id));
   }
 
   // Provide a ready-to-assign "Operatore UDS" role so a street-unit operator can

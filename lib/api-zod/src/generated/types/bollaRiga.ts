@@ -17,6 +17,8 @@ export interface BollaRiga {
   /** @nullable */
   codiceLotto?: string | null;
   fsePlus: boolean;
+  fsePlusQuantita?: number;
+  nonFsePlusQuantita?: number;
   quantita: number;
   unitaMisura: string;
   /** @nullable */

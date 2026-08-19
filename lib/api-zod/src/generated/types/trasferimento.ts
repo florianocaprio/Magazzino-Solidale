@@ -10,6 +10,7 @@ import type { TrasferimentoRiga } from './trasferimentoRiga';
 export interface Trasferimento {
   id: number;
   codice: string;
+  versione: number;
   magazzinoOrigineId: number;
   /** @nullable */
   magazzinoOrigineNome?: string | null;

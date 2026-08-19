@@ -191,8 +191,12 @@ paths:
           schema:
             type: integer
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Product deactivated without deleting historical data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prodotto"
         "409":
           description: >-
             The warehouse is referenced by an issued delivery note or by
@@ -310,8 +314,12 @@ paths:
           schema:
             type: integer
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Product deactivated without deleting historical data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fornitore"
 
   # ─── LOTTI ───────────────────────────────────────────────────────────────────
   /lotti:
@@ -374,6 +382,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Lotto"
+
+  /lotti/{id}/rettifica:
+    post:
+      operationId: rettificaLotto
+      tags: [lotti]
+      summary: Registra una rettifica inventariale atomica e auditata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RettificaLottoInput"
+      responses:
+        "200":
+          description: Lot adjusted and movement appended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lotto"
     patch:
       operationId: updateLotto
       tags: [lotti]
@@ -427,6 +460,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of movements
@@ -436,22 +475,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Movimento"
-    post:
-      operationId: createMovimento
-      tags: [movimenti]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/MovimentoInput"
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Movimento"
 
   # ─── GIACENZE ────────────────────────────────────────────────────────────────
   /giacenze:
@@ -514,6 +537,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of transfers
@@ -591,6 +620,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
           description: Transfer started
@@ -647,6 +682,16 @@ paths:
     get:
       operationId: listScarichi
       tags: [scarichi]
+      parameters:
+        - name: centroAscoltoId
+          in: query
+          schema: { type: integer }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of warehouse discharges
@@ -794,8 +839,12 @@ paths:
           schema:
             type: integer
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Supplier deactivated without deleting historical data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fornitore"
 
   # ─── APPROVVIGIONAMENTI ──────────────────────────────────────────────────────
   /approvvigionamenti:
@@ -815,6 +864,12 @@ paths:
           in: query
           schema:
             type: integer
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of procurements
@@ -892,6 +947,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
           description: Submitted
@@ -2904,6 +2965,12 @@ paths:
           in: query
           schema:
             type: integer
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of delivery bills
@@ -6932,6 +6999,10 @@ components:
           type: string
         quantitaCaricata:
           type: number
+          exclusiveMinimum: 0
+        causale:
+          type: string
+          enum: [acquisto, donazione, fse_plus]
         magazzinoId:
           type: integer
         fornitoreId:
@@ -6942,7 +7013,7 @@ components:
           type: string
         note:
           type: string
-      required: [prodottoId, dataCarico, quantitaCaricata, magazzinoId]
+      required: [prodottoId, dataCarico, quantitaCaricata, magazzinoId, causale]
 
     LottoUpdate:
       type: object
@@ -6951,10 +7022,25 @@ components:
           type: string
         dataScadenza:
           type: string
-        quantitaResidua:
-          type: number
+        documentoCarico:
+          type: string
         note:
           type: string
+
+    RettificaLottoInput:
+      type: object
+      properties:
+        delta:
+          type: number
+          not: { const: 0 }
+        causale:
+          type: string
+          enum: [inventario_fisico, errore_registrazione, deterioramento, altro]
+        motivazione:
+          type: string
+        note:
+          type: string
+      required: [delta, causale]
 
     # ── Movimenti ─────────────────────────────────────────────────────────
     Movimento:
@@ -6985,6 +7071,10 @@ components:
         fornitoreId:
           type: ["integer", "null"]
         beneficiarioId:
+          type: ["integer", "null"]
+        movimentoOrigineId:
+          type: ["integer", "null"]
+        operatoreId:
           type: ["integer", "null"]
         documentoRiferimento:
           type: ["string", "null"]
@@ -7177,6 +7267,8 @@ components:
           type: integer
         codice:
           type: string
+        versione:
+          type: integer
         magazzinoOrigineId:
           type: integer
         magazzinoOrigineNome:
@@ -7231,6 +7323,7 @@ components:
         [
           id,
           codice,
+          versione,
           magazzinoOrigineId,
           magazzinoDestinoId,
           dataRichiesta,
@@ -7262,10 +7355,9 @@ components:
     TrasferimentoUpdate:
       type: object
       properties:
-        stato:
-          type: string
-        dataEsecuzione:
-          type: string
+        versione:
+          type: integer
+          minimum: 1
         trasportatoreVolontarioId:
           type: ["integer", "null"]
         trasportatoreNome:
@@ -7276,6 +7368,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TrasferimentoRigaInput"
+      required: [versione]
 
     TrasferimentoRiga:
       type: object
@@ -7290,6 +7383,10 @@ components:
           type: ["integer", "null"]
         fsePlus:
           type: boolean
+        fsePlusQuantita:
+          type: number
+        nonFsePlusQuantita:
+          type: number
         quantita:
           type: number
         unitaMisura:
@@ -7382,6 +7479,10 @@ components:
           type: ["string", "null"]
         fsePlus:
           type: boolean
+        fsePlusQuantita:
+          type: number
+        nonFsePlusQuantita:
+          type: number
         quantita:
           type: number
         unitaMisura:
@@ -7406,10 +7507,22 @@ components:
     ConfermaRicezione:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         note:
           type: string
         dataConferma:
           type: string
+      required: [versione]
+
+    VersioneInput:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
 
     # ── Fornitori ─────────────────────────────────────────────────────────
     Fornitore:
@@ -7522,6 +7635,8 @@ components:
           type: integer
         codice:
           type: string
+        versione:
+          type: integer
         fornitoreId:
           type: ["integer", "null"]
         fornitoreNome:
@@ -7552,7 +7667,7 @@ components:
             $ref: "#/components/schemas/ApprovvigionamentoRiga"
         dataCreazione:
           type: string
-      required: [id, codice, dataRichiesta, stato, dataCreazione]
+      required: [id, codice, versione, dataRichiesta, stato, dataCreazione]
 
     ApprovvigionamentoInput:
       type: object
@@ -7575,11 +7690,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ApprovvigionamentoRigaInput"
-      required: [fornitoreId, cittaId, dataRichiesta, righe]
+      required: [fornitoreId, cittaId, magazzinoId, dataRichiesta, righe]
 
     ApprovvigionamentoUpdate:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         stato:
           type: string
         fornitoreId:
@@ -7596,6 +7714,11 @@ components:
           type: string
         note:
           type: string
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovvigionamentoRigaInput"
+      required: [versione]
 
     ApprovvigionamentoRiga:
       type: object
@@ -11626,6 +11749,10 @@ components:
           type: ["string", "null"]
         fsePlus:
           type: boolean
+        fsePlusQuantita:
+          type: number
+        nonFsePlusQuantita:
+          type: number
         quantita:
           type: number
         unitaMisura:
@@ -11710,8 +11837,6 @@ components:
     BollaUpdate:
       type: object
       properties:
-        stato:
-          type: string
         beneficiarioId:
           type: integer
         magazzinoId:
@@ -11728,10 +11853,6 @@ components:
           type: string
         noteConsegna:
           type: ["string", "null"]
-        confermaRicezione:
-          type: boolean
-        noteRicezione:
-          type: string
 
     # ── Volontari ─────────────────────────────────────────────────────────
     Volontario:

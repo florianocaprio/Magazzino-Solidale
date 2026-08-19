@@ -98,6 +98,7 @@ async function scaricaRigaFefo(
       quantita: prelievo.toFixed(2),
       unitaMisura: riga.unitaMisura,
       beneficiarioId: input.beneficiarioId ?? null,
+      operatoreId: input.operatoreId,
       documentoRiferimento: input.documentoRiferimento ?? null,
       note: `Scarico ${input.codice}${riga.note ? ` — ${riga.note}` : ""}`,
     });

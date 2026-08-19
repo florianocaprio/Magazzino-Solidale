@@ -724,12 +724,23 @@ export interface Lotto {
   dataCreazione: string;
 }
 
+export type LottoInputCausale = typeof LottoInputCausale[keyof typeof LottoInputCausale];
+
+
+export const LottoInputCausale = {
+  acquisto: 'acquisto',
+  donazione: 'donazione',
+  fse_plus: 'fse_plus',
+} as const;
+
 export interface LottoInput {
   prodottoId: number;
   codiceLotto?: string;
   dataScadenza?: string;
   dataCarico: string;
+  /** @exclusiveMinimum 0 */
   quantitaCaricata: number;
+  causale: LottoInputCausale;
   magazzinoId: number;
   fornitoreId?: number;
   fsePlus?: boolean;
@@ -740,7 +751,24 @@ export interface LottoInput {
 export interface LottoUpdate {
   codiceLotto?: string;
   dataScadenza?: string;
-  quantitaResidua?: number;
+  documentoCarico?: string;
+  note?: string;
+}
+
+export type RettificaLottoInputCausale = typeof RettificaLottoInputCausale[keyof typeof RettificaLottoInputCausale];
+
+
+export const RettificaLottoInputCausale = {
+  inventario_fisico: 'inventario_fisico',
+  errore_registrazione: 'errore_registrazione',
+  deterioramento: 'deterioramento',
+  altro: 'altro',
+} as const;
+
+export interface RettificaLottoInput {
+  delta: number;
+  causale: RettificaLottoInputCausale;
+  motivazione?: string;
   note?: string;
 }
 
@@ -763,6 +791,10 @@ export interface Movimento {
   fornitoreId?: number | null;
   /** @nullable */
   beneficiarioId?: number | null;
+  /** @nullable */
+  movimentoOrigineId?: number | null;
+  /** @nullable */
+  operatoreId?: number | null;
   /** @nullable */
   documentoRiferimento?: string | null;
   /** @nullable */
@@ -843,6 +875,8 @@ export interface TrasferimentoRiga {
   /** @nullable */
   lottoId?: number | null;
   fsePlus: boolean;
+  fsePlusQuantita?: number;
+  nonFsePlusQuantita?: number;
   quantita: number;
   unitaMisura: string;
   /** @nullable */
@@ -852,6 +886,7 @@ export interface TrasferimentoRiga {
 export interface Trasferimento {
   id: number;
   codice: string;
+  versione: number;
   magazzinoOrigineId: number;
   /** @nullable */
   magazzinoOrigineNome?: string | null;
@@ -917,8 +952,8 @@ export interface TrasferimentoInput {
 }
 
 export interface TrasferimentoUpdate {
-  stato?: string;
-  dataEsecuzione?: string;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   trasportatoreVolontarioId?: number | null;
   /** @nullable */
@@ -933,6 +968,8 @@ export interface ScaricoRiga {
   /** @nullable */
   prodottoNome?: string | null;
   fsePlus: boolean;
+  fsePlusQuantita?: number;
+  nonFsePlusQuantita?: number;
   quantita: number;
   unitaMisura: string;
   /** @nullable */
@@ -992,8 +1029,15 @@ export interface ScaricoInput {
 }
 
 export interface ConfermaRicezione {
+  /** @minimum 1 */
+  versione: number;
   note?: string;
   dataConferma?: string;
+}
+
+export interface VersioneInput {
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface Fornitore {
@@ -1061,6 +1105,7 @@ export interface ApprovvigionamentoRiga {
 export interface Approvvigionamento {
   id: number;
   codice: string;
+  versione: number;
   /** @nullable */
   fornitoreId?: number | null;
   /** @nullable */
@@ -1097,7 +1142,7 @@ export interface ApprovvigionamentoRigaInput {
 export interface ApprovvigionamentoInput {
   fornitoreId: number;
   cittaId: number;
-  magazzinoId?: number;
+  magazzinoId: number;
   centroAscoltoId?: number;
   dataRichiesta: string;
   dataPrevista?: string;
@@ -1106,6 +1151,8 @@ export interface ApprovvigionamentoInput {
 }
 
 export interface ApprovvigionamentoUpdate {
+  /** @minimum 1 */
+  versione: number;
   stato?: string;
   /** @nullable */
   fornitoreId?: number | null;
@@ -1117,6 +1164,7 @@ export interface ApprovvigionamentoUpdate {
   dataRichiesta?: string;
   dataPrevista?: string;
   note?: string;
+  righe?: ApprovvigionamentoRigaInput[];
 }
 
 export interface TurnoVolontario {
@@ -4158,6 +4206,8 @@ export interface BollaRiga {
   /** @nullable */
   codiceLotto?: string | null;
   fsePlus: boolean;
+  fsePlusQuantita?: number;
+  nonFsePlusQuantita?: number;
   quantita: number;
   unitaMisura: string;
   /** @nullable */
@@ -4294,7 +4344,6 @@ export interface BollaInput {
 }
 
 export interface BollaUpdate {
-  stato?: string;
   beneficiarioId?: number;
   magazzinoId?: number;
   /** @nullable */
@@ -4307,8 +4356,6 @@ export interface BollaUpdate {
   indirizzoConsegna?: string;
   /** @nullable */
   noteConsegna?: string | null;
-  confermaRicezione?: boolean;
-  noteRicezione?: string;
 }
 
 export interface Volontario {
@@ -5309,6 +5356,15 @@ prodottoId?: number;
 centroAscoltoId?: number;
 da?: string;
 a?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListGiacenzeParams = {
@@ -5324,6 +5380,28 @@ magazzinoId?: number;
 
 export type ListTrasferimentiParams = {
 stato?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListScarichiParams = {
+centroAscoltoId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListFornitoriParams = {
@@ -5334,6 +5412,15 @@ export type ListApprovvigionamentiParams = {
 stato?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListTurniParams = {
@@ -5619,6 +5706,15 @@ export type ListBolleParams = {
 stato?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type GetMapsInterventiSocialiParams = {

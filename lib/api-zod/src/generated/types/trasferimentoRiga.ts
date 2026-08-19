@@ -14,6 +14,8 @@ export interface TrasferimentoRiga {
   /** @nullable */
   lottoId?: number | null;
   fsePlus: boolean;
+  fsePlusQuantita?: number;
+  nonFsePlusQuantita?: number;
   quantita: number;
   unitaMisura: string;
   /** @nullable */

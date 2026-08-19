@@ -10,6 +10,7 @@ import type { ApprovvigionamentoRiga } from './approvvigionamentoRiga';
 export interface Approvvigionamento {
   id: number;
   codice: string;
+  versione: number;
   /** @nullable */
   fornitoreId?: number | null;
   /** @nullable */

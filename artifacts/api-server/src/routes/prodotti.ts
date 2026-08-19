@@ -1,10 +1,11 @@
 import { randomInt } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { prodottiTable } from "@workspace/db";
+import { bollaRigheTable, lottiTable, movimentiTable, prodottiTable } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
 import { eq, ilike, and, ne, or, desc, type SQL } from "drizzle-orm";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
+import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -144,7 +145,7 @@ function isUniqueViolation(error: unknown, field: "codice" | "codiceBarre"): boo
   return e.constraint === "prodotti_codice_barre_unique" || (e.detail?.includes("codice_barre") ?? false);
 }
 
-router.get("/prodotti", async (req, res) => {
+router.get("/prodotti", requirePermission("magazzino.view"), async (req, res) => {
   const { tipo, search } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (tipo) conditions.push(eq(prodottiTable.tipoProdotto, tipo));
@@ -218,13 +219,13 @@ async function createProdottoOne(
   }
 }
 
-router.post("/prodotti", async (req, res) => {
+router.post("/prodotti", requirePermission("magazzino.products.manage"), async (req, res) => {
   const r = await createProdottoOne(req.body);
   if ("error" in r) { res.status(r.status ?? 400).json({ error: r.error }); return; }
   res.status(201).json(fmtProdotto(r.row));
 });
 
-router.post("/prodotti/bulk", async (req, res) => {
+router.post("/prodotti/bulk", requirePermission("magazzino.products.manage"), async (req, res) => {
   const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
   const result = await runBulk(righe, async (row) => {
     const r = await createProdottoOne(row);
@@ -233,19 +234,46 @@ router.post("/prodotti/bulk", async (req, res) => {
   res.json(result);
 });
 
-router.get("/prodotti/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.get("/prodotti/:id", requirePermission("magazzino.view"), async (req, res) => {
+  const id = Number(req.params.id);
   const [row] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json(fmtProdotto(row));
 });
 
-router.patch("/prodotti/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.patch("/prodotti/:id", requirePermission("magazzino.products.manage"), async (req, res) => {
+  const id = Number(req.params.id);
   const [existing] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  const body = req.body;
-  const update: Record<string, unknown> = { ...body };
+  const body = req.body ?? {};
+  const allowed = new Set([
+    "codice", "nome", "descrizione", "tipoProdotto", "unitaMisura", "codiceBarre",
+    "gestioneLotto", "gestioneScadenza", "fsePlus", "scortaMinima", "scortaConsigliata",
+    "abilitatoEmporio", "creditoSolidaleValore", "quantitaMassimaPerSpesa",
+    "quantitaMassimaMensile", "conservazione", "taglia", "genere", "stagione",
+    "condizione", "attivo", "note", "fornitoreId",
+  ]);
+  const unsupported = Object.keys(body).filter((key) => !allowed.has(key));
+  if (unsupported.length > 0) {
+    res.status(400).json({ error: `Campi Prodotto non modificabili: ${unsupported.join(", ")}` });
+    return;
+  }
+  const update: Record<string, unknown> = Object.fromEntries(
+    Object.entries(body).filter(([key]) => allowed.has(key)),
+  );
+  const sensitive = ["tipoProdotto", "unitaMisura", "gestioneLotto", "gestioneScadenza", "fsePlus"];
+  const changesSensitive = sensitive.some((key) => key in body && body[key] !== existing[key as keyof typeof existing]);
+  if (changesSensitive) {
+    const [[lotto], [movimento], [rigaBolla]] = await Promise.all([
+      db.select({ id: lottiTable.id }).from(lottiTable).where(eq(lottiTable.prodottoId, id)).limit(1),
+      db.select({ id: movimentiTable.id }).from(movimentiTable).where(eq(movimentiTable.prodottoId, id)).limit(1),
+      db.select({ id: bollaRigheTable.id }).from(bollaRigheTable).where(eq(bollaRigheTable.prodottoId, id)).limit(1),
+    ]);
+    if (lotto || movimento || rigaBolla) {
+      res.status(409).json({ error: "I campi inventariali del Prodotto non sono modificabili dopo la creazione dello storico" });
+      return;
+    }
+  }
   if ("codice" in update) {
     const codice = trimOrUndefined(update.codice);
     if (!codice) { res.status(400).json({ error: "Codice prodotto obbligatorio" }); return; }
@@ -301,10 +329,11 @@ router.patch("/prodotti/:id", async (req, res) => {
   }
 });
 
-router.delete("/prodotti/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  await db.delete(prodottiTable).where(eq(prodottiTable.id, id));
-  res.status(204).send();
+router.delete("/prodotti/:id", requirePermission("magazzino.products.manage"), async (req, res) => {
+  const id = Number(req.params.id);
+  const [row] = await db.update(prodottiTable).set({ attivo: false }).where(eq(prodottiTable.id, id)).returning();
+  if (!row) { res.status(404).json({ error: "Prodotto non trovato" }); return; }
+  res.json(fmtProdotto(row));
 });
 
 export default router;
