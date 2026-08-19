@@ -741,6 +741,12 @@ function inputArray<T>(
   return body[key] as T[];
 }
 
+function containsOperationalChanges(body: Record<string, unknown>): boolean {
+  return ["attivita", "materiali", "documenti"].some((key) =>
+    hasOwn(body, key),
+  );
+}
+
 function formatAttivita(row: InterventoAttivita) {
   return {
     ...row,
@@ -3197,6 +3203,12 @@ router.post("/interventi/:id/concludi", async (req, res) => {
       "sociale",
       "sociale.interventi.complete",
     );
+    if (
+      containsOperationalChanges(body) ||
+      (successivoInput != null && containsOperationalChanges(successivoInput))
+    ) {
+      requireSocialInterventoPermission(req, "sociale.interventi.update");
+    }
     if (successivoInput) {
       requireSocialInterventoPermission(req, "sociale.interventi.create");
       successivoWorkflow = workflowCreateValues(
@@ -3340,8 +3352,15 @@ router.post("/interventi/:id/concludi", async (req, res) => {
           tx,
           successivo,
           {
-            materiali: successivoInput.materiali ?? [],
-            documenti: successivoInput.documenti ?? [],
+            ...(hasOwn(successivoInput, "attivita")
+              ? { attivita: successivoInput.attivita }
+              : {}),
+            ...(hasOwn(successivoInput, "materiali")
+              ? { materiali: successivoInput.materiali }
+              : {}),
+            ...(hasOwn(successivoInput, "documenti")
+              ? { documenti: successivoInput.documenti }
+              : {}),
           },
           req,
           conclusionDate,
@@ -3780,13 +3799,12 @@ router.post("/interventi/:id/transizioni", async (req, res) => {
   }
 
   try {
-    const targetPermission: SocialInterventoPermission =
-      body.stato === "annullato" || body.stato === "mancata_presentazione"
-        ? "sociale.interventi.cancel"
-        : body.stato === "in_corso" || body.stato === "concluso"
-          ? "sociale.interventi.complete"
-          : "sociale.interventi.update";
-    await requireAccessibleIntervento(id, req, null, targetPermission);
+    await requireAccessibleIntervento(
+      id,
+      req,
+      null,
+      "sociale.interventi.update",
+    );
     const updated = await db.transaction(async (tx) => {
       const [current] = await tx
         .select()
@@ -3799,6 +3817,33 @@ router.post("/interventi/:id/transizioni", async (req, res) => {
         throw new RouteError(409, "Stato corrente non riconosciuto");
       }
       const target = body.stato as InterventoStato;
+      const [beneficiario] = await tx
+        .select({
+          uds: beneficiariTable.uds,
+          cittaId: beneficiariTable.cittaId,
+        })
+        .from(beneficiariTable)
+        .where(eq(beneficiariTable.id, current.beneficiarioId))
+        .limit(1);
+      const usesLegacyUdsWorkflow =
+        current.ambito == null &&
+        beneficiario?.uds === true &&
+        beneficiario.cittaId != null &&
+        canUseInterventoArea(req, "uds") &&
+        (callerCittaId(req) == null ||
+          callerCittaId(req) === beneficiario.cittaId);
+      const isSocialWorkflow =
+        current.ambito !== "uds" && !usesLegacyUdsWorkflow;
+      if (
+        isSocialWorkflow &&
+        target !== "da_pianificare" &&
+        target !== "pianificato"
+      ) {
+        throw new RouteError(
+          409,
+          "Per avviare, concludere, annullare o registrare una mancata presentazione usa il comando dedicato",
+        );
+      }
       if (!canTransitionIntervento(current.stato, target)) {
         throw new RouteError(
           409,

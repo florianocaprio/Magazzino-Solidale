@@ -659,4 +659,118 @@ describe("audit hardening Centro di Ascolto", () => {
     expect(response.status).toBe(200);
     expect(await totaleMovimenti(row.id)).toBe(0);
   });
+
+  it("richiede update per l'operatività allegata alla conclusione", async () => {
+    const completeWithoutUpdate = app({
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.complete",
+        "sociale.interventi.create",
+      ],
+    });
+    const onlyResult = await createIntervento({ stato: "in_corso" });
+    const concluded = await request(completeWithoutUpdate)
+      .post(`/interventi/${onlyResult.id}/concludi`)
+      .send({
+        versione: await versione(onlyResult.id),
+        conferma: true,
+        risultato: "Conclusione autorizzata",
+      });
+    expect(concluded.status).toBe(200);
+
+    const operationalPayloads = [
+      {
+        attivita: [
+          {
+            tipologiaSnapshot: "Colloquio",
+            descrizione: "Attività conclusiva",
+          },
+        ],
+      },
+      {
+        documenti: [{ tipoDescrizione: "Verbale", stato: "da_acquisire" }],
+      },
+      {
+        materiali: [
+          {
+            prodottoId,
+            quantitaPrevista: 1,
+            quantitaConsegnata: 1,
+            statoPreparazione: "consegnato",
+            magazzinoId: magazzinoA,
+          },
+        ],
+      },
+    ];
+    for (const operationalPayload of operationalPayloads) {
+      const row = await createIntervento({ stato: "in_corso" });
+      const before = await totaleMovimenti(row.id);
+      const response = await request(completeWithoutUpdate)
+        .post(`/interventi/${row.id}/concludi`)
+        .send({
+          versione: await versione(row.id),
+          conferma: true,
+          risultato: "Tentativo non autorizzato",
+          ...operationalPayload,
+        });
+      expect(response.status).toBe(403);
+      expect(await totaleMovimenti(row.id)).toBe(before);
+    }
+
+    const withOperationalSuccessor = await createIntervento({
+      stato: "in_corso",
+    });
+    const successorDenied = await request(completeWithoutUpdate)
+      .post(`/interventi/${withOperationalSuccessor.id}/concludi`)
+      .send({
+        versione: await versione(withOperationalSuccessor.id),
+        conferma: true,
+        risultato: "Conclusione con successivo",
+        successivo: {
+          tipoIntervento: "Follow-up operativo",
+          stato: "da_pianificare",
+          ambito: "sociale",
+          attivita: [
+            {
+              tipologiaSnapshot: "Follow-up",
+              descrizione: "Attività successiva",
+            },
+          ],
+          documenti: [
+            { tipoDescrizione: "Documento successivo", stato: "da_acquisire" },
+          ],
+        },
+      });
+    expect(successorDenied.status).toBe(403);
+    expect(await totaleMovimenti(withOperationalSuccessor.id)).toBe(0);
+
+    const withUpdate = await createIntervento({ stato: "in_corso" });
+    const allowed = await request(app())
+      .post(`/interventi/${withUpdate.id}/concludi`)
+      .send({
+        versione: await versione(withUpdate.id),
+        conferma: true,
+        risultato: "Conclusione operativa autorizzata",
+        attivita: [
+          {
+            tipologiaSnapshot: "Colloquio finale",
+            descrizione: "Attività autorizzata",
+          },
+        ],
+        documenti: [{ tipoDescrizione: "Verbale finale", stato: "verificato" }],
+        materiali: [
+          {
+            prodottoId,
+            quantitaPrevista: 1,
+            quantitaConsegnata: 1,
+            statoPreparazione: "consegnato",
+            magazzinoId: magazzinoA,
+          },
+        ],
+      });
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.operativita.attivita).toHaveLength(1);
+    expect(allowed.body.operativita.documenti).toHaveLength(1);
+    expect(await totaleMovimenti(withUpdate.id)).toBe(1);
+  });
 });

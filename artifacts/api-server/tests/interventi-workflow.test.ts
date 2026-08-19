@@ -293,11 +293,10 @@ describe("workflow degli interventi", () => {
     expect(created.body.dataOraPianificata).toBe("2026-08-20T08:00:00.000Z");
 
     const started = await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
+      .post(`/interventi/${created.body.id}/avvia`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        stato: "in_corso",
-        dataOraTransizione: "2026-08-20T10:05:00+02:00",
+        dataOraAvvio: "2026-08-20T10:05:00+02:00",
         operatoreId: -1,
       });
     expect(started.status).toBe(200);
@@ -308,24 +307,25 @@ describe("workflow degli interventi", () => {
     });
 
     const incoherent = await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
+      .post(`/interventi/${created.body.id}/concludi`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        stato: "concluso",
-        dataOraTransizione: "2026-08-20T10:04:00+02:00",
+        conferma: true,
+        risultato: "Attività completata",
+        dataOraConclusione: "2026-08-20T10:04:00+02:00",
       });
     expect(incoherent.status).toBe(400);
 
     const concluded = await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
+      .post(`/interventi/${created.body.id}/concludi`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        stato: "concluso",
-        dataOraTransizione: "2026-08-20T10:30:00+02:00",
-        motivo: "Attività completata",
+        conferma: true,
+        risultato: "Attività completata",
+        dataOraConclusione: "2026-08-20T10:30:00+02:00",
       });
     expect(concluded.status).toBe(200);
-    expect(concluded.body).toMatchObject({
+    expect(concluded.body.intervento).toMatchObject({
       stato: "concluso",
       dataOraConclusione: "2026-08-20T08:30:00.000Z",
     });
@@ -346,11 +346,10 @@ describe("workflow degli interventi", () => {
   it("avvia senza pianificazione e usa la data civile Europe/Rome", async () => {
     const created = await createWorkflow();
     const started = await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
+      .post(`/interventi/${created.body.id}/avvia`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        stato: "in_corso",
-        dataOraTransizione: "2026-08-14T22:30:00Z",
+        dataOraAvvio: "2026-08-14T22:30:00Z",
       });
     expect(started.status).toBe(200);
     expect(started.body.dataIntervento).toBe("2026-08-15");
@@ -360,20 +359,18 @@ describe("workflow degli interventi", () => {
   it("annulla soltanto con motivo e traccia autore e timestamp", async () => {
     const created = await createWorkflow();
     const missingReason = await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
+      .post(`/interventi/${created.body.id}/annulla`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        stato: "annullato",
       });
     expect(missingReason.status).toBe(400);
 
     const cancelled = await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
+      .post(`/interventi/${created.body.id}/annulla`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        stato: "annullato",
         motivo: "Richiesta del beneficiario",
-        dataOraTransizione: "2026-08-21T09:00:00+02:00",
+        dataOraAnnullamento: "2026-08-21T09:00:00+02:00",
       });
     expect(cancelled.status).toBe(200);
     expect(cancelled.body).toMatchObject({
@@ -396,11 +393,10 @@ describe("workflow degli interventi", () => {
       dataOraPianificata: "2026-08-22T10:00:00+02:00",
     });
     const noShow = await request(makeApp())
-      .post(`/interventi/${planned.body.id}/transizioni`)
+      .post(`/interventi/${planned.body.id}/mancata-presentazione`)
       .send({
         versione: await versioneIntervento(planned.body.id),
-        stato: "mancata_presentazione",
-        motivo: "Non si è presentato",
+        nota: "Non si è presentato",
       });
     expect(noShow.status).toBe(200);
     expect(noShow.body).toMatchObject({
@@ -411,21 +407,123 @@ describe("workflow degli interventi", () => {
 
     const unplanned = await createWorkflow();
     const rejected = await request(makeApp())
-      .post(`/interventi/${unplanned.body.id}/transizioni`)
+      .post(`/interventi/${unplanned.body.id}/mancata-presentazione`)
       .send({
         versione: await versioneIntervento(unplanned.body.id),
-        stato: "mancata_presentazione",
       });
     expect(rejected.status).toBe(409);
+  });
+
+  it("riserva i comandi di dominio Sociali agli endpoint specialistici e preserva UDS", async () => {
+    const socialPlanned = await createWorkflow({
+      stato: "pianificato",
+      dataOraPianificata: "2026-08-23T10:00:00+02:00",
+    });
+    const bypassStart = await request(makeApp())
+      .post(`/interventi/${socialPlanned.body.id}/transizioni`)
+      .send({
+        versione: await versioneIntervento(socialPlanned.body.id),
+        stato: "in_corso",
+      });
+    expect(bypassStart.status).toBe(409);
+
+    const socialRunning = await createWorkflow({ stato: "da_pianificare" });
+    const started = await request(makeApp())
+      .post(`/interventi/${socialRunning.body.id}/avvia`)
+      .send({ versione: await versioneIntervento(socialRunning.body.id) });
+    expect(started.status).toBe(200);
+    const bypassConclusion = await request(makeApp())
+      .post(`/interventi/${socialRunning.body.id}/transizioni`)
+      .send({
+        versione: await versioneIntervento(socialRunning.body.id),
+        stato: "concluso",
+      });
+    expect(bypassConclusion.status).toBe(409);
+    const properConclusion = await request(makeApp())
+      .post(`/interventi/${socialRunning.body.id}/concludi`)
+      .send({
+        versione: await versioneIntervento(socialRunning.body.id),
+        conferma: true,
+        risultato: "Conclusione verificata",
+      });
+    expect(properConclusion.status).toBe(200);
+
+    const socialCancellable = await createWorkflow();
+    expect(
+      (
+        await request(makeApp())
+          .post(`/interventi/${socialCancellable.body.id}/transizioni`)
+          .send({
+            versione: await versioneIntervento(socialCancellable.body.id),
+            stato: "annullato",
+            motivo: "Tentativo generico",
+          })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await request(makeApp())
+          .post(`/interventi/${socialCancellable.body.id}/annulla`)
+          .send({
+            versione: await versioneIntervento(socialCancellable.body.id),
+            motivo: "Comando dedicato",
+          })
+      ).status,
+    ).toBe(200);
+
+    const socialNoShow = await createWorkflow({
+      stato: "pianificato",
+      dataOraPianificata: "2026-08-24T10:00:00+02:00",
+    });
+    expect(
+      (
+        await request(makeApp())
+          .post(`/interventi/${socialNoShow.body.id}/transizioni`)
+          .send({
+            versione: await versioneIntervento(socialNoShow.body.id),
+            stato: "mancata_presentazione",
+          })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await request(makeApp())
+          .post(`/interventi/${socialNoShow.body.id}/mancata-presentazione`)
+          .send({
+            versione: await versioneIntervento(socialNoShow.body.id),
+            nota: "Comando dedicato",
+          })
+      ).status,
+    ).toBe(200);
+
+    const uds = await createWorkflow({
+      beneficiarioId: udsRomaAltraZona,
+      ambito: "uds",
+      stato: "pianificato",
+      dataOraPianificata: "2026-08-25T10:00:00+02:00",
+    });
+    const udsStarted = await request(makeApp())
+      .post(`/interventi/${uds.body.id}/transizioni`)
+      .send({
+        versione: await versioneIntervento(uds.body.id),
+        stato: "in_corso",
+      });
+    expect(udsStarted.status).toBe(200);
+    const udsConcluded = await request(makeApp())
+      .post(`/interventi/${uds.body.id}/transizioni`)
+      .send({
+        versione: await versioneIntervento(uds.body.id),
+        stato: "concluso",
+      });
+    expect(udsConcluded.status).toBe(200);
   });
 
   it("blocca transizioni terminali e modifiche dirette dello stato", async () => {
     const created = await createWorkflow();
     await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
+      .post(`/interventi/${created.body.id}/annulla`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        stato: "annullato",
         motivo: "Test",
       });
 
@@ -454,11 +552,10 @@ describe("workflow degli interventi", () => {
         dataOraTransizione: "2026-08-20T10:00:00+02:00",
       });
     await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
+      .post(`/interventi/${created.body.id}/avvia`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        stato: "in_corso",
-        dataOraTransizione: "2026-09-01T10:05:00+02:00",
+        dataOraAvvio: "2026-09-01T10:05:00+02:00",
       });
     const history = await request(makeApp()).get(
       `/interventi/${created.body.id}/storico-stati`,

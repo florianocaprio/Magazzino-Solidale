@@ -5741,7 +5741,7 @@ export const getConcludiInterventoUrl = (id: number,) => {
 }
 
 /**
- * Salva i dati operativi, conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato.
+ * Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Il permesso complete consente risultato, esito e note finali; attività, materiali o documenti richiedono anche il permesso update.
  */
 export const concludiIntervento = async (id: number,
     interventoConclusioneInput: InterventoConclusioneInput, options?: RequestInit): Promise<InterventoConclusioneResult> => {
@@ -5948,7 +5948,7 @@ export const getTransitionInterventoUrl = (id: number,) => {
 }
 
 /**
- * Esegue atomicamente una transizione di stato consentita e la registra nello storico append-only.
+ * Esegue atomicamente una transizione di pianificazione Sociale (da_pianificare ↔ pianificato) e la registra nello storico append-only. Avvio, conclusione, annullamento e mancata presentazione Sociali richiedono i rispettivi comandi dedicati; il comportamento UDS resta compatibile con il workflow esistente.
  */
 export const transitionIntervento = async (id: number,
     interventoTransizioneInput: InterventoTransizioneInput, options?: RequestInit): Promise<Intervento> => {
