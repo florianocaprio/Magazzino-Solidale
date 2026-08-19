@@ -242,8 +242,8 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       ]).returning({ id: lottiTable.id, prodottoId: lottiTable.prodottoId, fsePlus: lottiTable.fsePlus });
       ids.lotti.push(...lots.map((row) => row.id));
       const createdMovements = await db.insert(movimentiTable).values([
-        { tipoMovimento: "scarico", tipoDettaglio: "bolla", dataMovimento: "2026-06-01", magazzinoId: warehouse.id, prodottoId: productKg.id, lottoId: lots.find((row) => row.fsePlus)!.id, quantita: "-2", unitaMisura: "kg", beneficiarioId: beneficiary.id, bollaId: finalBolla.id, bollaRigaId: createdRows[0].id },
-        { tipoMovimento: "scarico", tipoDettaglio: "bolla", dataMovimento: "2026-06-01", magazzinoId: warehouse.id, prodottoId: productKg.id, lottoId: lots.find((row) => !row.fsePlus && row.prodottoId === productKg.id)!.id, quantita: "-3", unitaMisura: "kg", beneficiarioId: beneficiary.id, bollaId: finalBolla.id, bollaRigaId: createdRows[1].id },
+        { tipoMovimento: "scarico", tipoDettaglio: "bolla", dataMovimento: "2026-06-01", magazzinoId: warehouse.id, prodottoId: productKg.id, lottoId: lots.find((row) => row.fsePlus)!.id, quantita: "2", unitaMisura: "kg", beneficiarioId: beneficiary.id, bollaId: finalBolla.id, bollaRigaId: createdRows[0].id },
+        { tipoMovimento: "scarico", tipoDettaglio: "bolla", dataMovimento: "2026-06-01", magazzinoId: warehouse.id, prodottoId: productKg.id, lottoId: lots.find((row) => !row.fsePlus && row.prodottoId === productKg.id)!.id, quantita: "3", unitaMisura: "kg", beneficiarioId: beneficiary.id, bollaId: finalBolla.id, bollaRigaId: createdRows[1].id },
       ]).returning({ id: movimentiTable.id });
       ids.movimenti.push(...createdMovements.map((row) => row.id));
 

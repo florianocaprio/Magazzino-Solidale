@@ -104,6 +104,30 @@ afterAll(async () => {
 });
 
 describe("Bolle — prenotazione merce su conferma", () => {
+  it("crea sempre in bozza, rifiuta campi server-managed e rende immutabile una Bolla consegnata", async () => {
+    const rejected = await request(appAs(centroA)).post("/bolle").send({
+      beneficiarioId: benA,
+      magazzinoId: magA,
+      stato: "consegnato",
+    });
+    expect(rejected.status).toBe(400);
+
+    const created = await request(appAs(centroA)).post("/bolle").send({ beneficiarioId: benA, magazzinoId: magA });
+    expect(created.status).toBe(201);
+    expect(created.body.stato).toBe("bozza");
+    scope.bollaIds.push(created.body.id);
+
+    const altroBeneficiario = await createBeneficiario(scope, centroA);
+    const delivered = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "consegnato" });
+    const patch = await request(appAs(centroA))
+      .patch(`/bolle/${delivered}`)
+      .send({ beneficiarioId: altroBeneficiario });
+    expect([400, 409]).toContain(patch.status);
+    const [unchanged] = await db.select().from(bolleTable).where(eq(bolleTable.id, delivered));
+    expect(unchanged.beneficiarioId).toBe(benA);
+    expect(await movimentiBolla(delivered)).toHaveLength(0);
+  });
+
   it("conferma una bolla con disponibilita reale sufficiente creando prenotazioni senza scalare lotti o creare movimenti", async () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
     const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
@@ -264,6 +288,32 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
     expect(await lottoResidua(lottoId)).toBe(10);
     expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["rilasciata"]);
     expect(await movimentiBolla(bollaId)).toHaveLength(0);
+  });
+
+  it("storna una Bolla consegnata in modo append-only e impedisce il doppio ripristino", async () => {
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({ confermaRicezione: true })).status).toBe(200);
+    expect(await lottoResidua(lottoId)).toBe(6);
+
+    const cancelled = await request(appAs(centroA)).post(`/bolle/${bollaId}/annulla`).send({});
+    expect(cancelled.status).toBe(200);
+    expect(await lottoResidua(lottoId)).toBe(10);
+    const movements = await movimentiBolla(bollaId);
+    expect(movements).toHaveLength(2);
+    expect(movements[0].tipoMovimento).toBe("scarico");
+    expect(movements[1]).toMatchObject({
+      tipoMovimento: "storno",
+      movimentoOrigineId: movements[0].id,
+      operatoreId,
+    });
+
+    const duplicate = await request(appAs(centroA)).post(`/bolle/${bollaId}/annulla`).send({});
+    expect(duplicate.status).toBe(400);
+    expect(await lottoResidua(lottoId)).toBe(10);
+    expect(await movimentiBolla(bollaId)).toHaveLength(2);
   });
 
   it("tratta una bolla legacy confermata con movimenti scarico come gia scaricata e non scala di nuovo alla consegna", async () => {

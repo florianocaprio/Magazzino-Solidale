@@ -21,12 +21,26 @@ import scarichiRouter from "../src/routes/scarichi";
  * auth middleware injecting `req.user`. This bypasses sessions/RBAC (covered
  * elsewhere) so the tests can focus on the transfer stock-movement logic.
  */
-export function makeApp(userId: number): Express {
+type TestSessionUser = NonNullable<Express.Request["user"]>;
+
+function testSessionUser(userId: number, overrides: Partial<TestSessionUser> = {}): TestSessionUser {
+  return {
+    id: userId,
+    isAdmin: true,
+    aree: ["magazzino"],
+    permessi: [],
+    cittaId: null,
+    centroAscoltoId: null,
+    zonaUdsId: null,
+    ...overrides,
+  } as TestSessionUser;
+}
+
+export function makeApp(userId: number, user: Partial<TestSessionUser> = {}): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    // Only `id` is read by the trasferimenti handlers (operatore stamping).
-    req.user = { id: userId } as NonNullable<typeof req.user>;
+    req.user = testSessionUser(userId, user);
     next();
   });
   app.use(trasferimentiRouter);
@@ -37,11 +51,11 @@ export function makeApp(userId: number): Express {
  * Same as {@link makeApp} but mounts the scarichi router instead, so the
  * discharge tests can exercise the FEFO/transaction handler in isolation.
  */
-export function makeScarichiApp(userId: number): Express {
+export function makeScarichiApp(userId: number, user: Partial<TestSessionUser> = {}): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    req.user = { id: userId } as NonNullable<typeof req.user>;
+    req.user = testSessionUser(userId, user);
     next();
   });
   app.use(scarichiRouter);

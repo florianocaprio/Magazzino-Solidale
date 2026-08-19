@@ -211,18 +211,20 @@ async function createProdotto(opts: {
     })
     .returning({ id: prodottiTable.id });
   prodottoIds.push(prodotto.id);
-  const [lotto] = await db
-    .insert(lottiTable)
-    .values({
-      prodottoId: prodotto.id,
-      codiceLotto: `L-${rnd()}`,
-      dataCarico: "2026-07-01",
-      quantitaCaricata: opts.quantitaResidua ?? "10",
-      quantitaResidua: opts.quantitaResidua ?? "10",
-      magazzinoId: opts.magazzinoId,
-    })
-    .returning({ id: lottiTable.id });
-  lottoIds.push(lotto.id);
+  if (Number(opts.quantitaResidua ?? "10") > 0) {
+    const [lotto] = await db
+      .insert(lottiTable)
+      .values({
+        prodottoId: prodotto.id,
+        codiceLotto: `L-${rnd()}`,
+        dataCarico: "2026-07-01",
+        quantitaCaricata: opts.quantitaResidua ?? "10",
+        quantitaResidua: opts.quantitaResidua ?? "10",
+        magazzinoId: opts.magazzinoId,
+      })
+      .returning({ id: lottiTable.id });
+    lottoIds.push(lotto.id);
+  }
   return prodotto.id;
 }
 
@@ -773,12 +775,14 @@ describe("Cassa Emporio", () => {
       .update(speseEmporioRigheTable)
       .set({ bollaRigaId: null })
       .where(eq(speseEmporioRigheTable.spesaEmporioId, spesa.id));
-    await db.delete(bollaRigheTable).where(eq(bollaRigheTable.bollaId, spesa.bollaId!));
-    const dettaglioBollaFallback = await request(makeApp()).get(`/bolle/${spesa.bollaId}`);
-    expect(dettaglioBollaFallback.status).toBe(200);
-    expect(dettaglioBollaFallback.body.righe).toHaveLength(1);
-    expect(dettaglioBollaFallback.body.righe[0].prodottoId).toBe(prodottoId);
-    expect(dettaglioBollaFallback.body.righe[0].quantita).toBe(2);
+    await expect(
+      db.delete(bollaRigheTable).where(eq(bollaRigheTable.bollaId, spesa.bollaId!)),
+    ).rejects.toMatchObject({ cause: { code: "23503" } });
+    const dettaglioBollaPreservato = await request(makeApp()).get(`/bolle/${spesa.bollaId}`);
+    expect(dettaglioBollaPreservato.status).toBe(200);
+    expect(dettaglioBollaPreservato.body.righe).toHaveLength(1);
+    expect(dettaglioBollaPreservato.body.righe[0].prodottoId).toBe(prodottoId);
+    expect(dettaglioBollaPreservato.body.righe[0].quantita).toBe(2);
     expect(scarico.causaleAltro).toBe("Spesa Emporio");
     expect(righeScarico).toHaveLength(1);
     expect(accesso.statoAccessoEmporio).toBe("effettuato");

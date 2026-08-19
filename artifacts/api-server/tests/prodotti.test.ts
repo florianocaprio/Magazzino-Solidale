@@ -11,6 +11,10 @@ const rnd = () => Math.random().toString(36).slice(2, 8);
 function makeApp(): Express {
   const app = express();
   app.use(express.json());
+  app.use((req, _res, next) => {
+    req.user = { id: 1, isAdmin: true } as NonNullable<typeof req.user>;
+    next();
+  });
   app.use(prodottiRouter);
   return app;
 }

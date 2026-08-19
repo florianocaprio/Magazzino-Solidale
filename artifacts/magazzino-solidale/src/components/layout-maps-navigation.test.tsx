@@ -137,6 +137,7 @@ describe("Sidebar - Mappa Operativa", () => {
   };
 
   it("mostra al SuperAdmin Mappa Operativa come ultima voce di Logistica", async () => {
+    mocks.isAdmin = true;
     mocks.isSuperAdmin = true;
     mocks.areas = new Set(["logistica"]);
     mocks.mapsLayerCount = 1;

@@ -1,12 +1,22 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import express from "express";
 import request from "supertest";
-import { db, pool, approvvigionamentiTable, cittaTable, fornitoriTable } from "@workspace/db";
+import {
+  db,
+  pool,
+  approvvigionamentiTable,
+  approvvigionamentoRigheTable,
+  cittaTable,
+  fornitoriTable,
+  magazziniTable,
+  prodottiTable,
+} from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import approvvigionamentiRouter from "../src/routes/approvvigionamenti";
 
-const ids = { ordini: [] as number[], fornitori: [] as number[], citta: [] as number[] };
+const ids = { ordini: [] as number[], fornitori: [] as number[], magazzini: [] as number[], prodotti: [] as number[], citta: [] as number[] };
 let areaA: number; let areaB: number; let fornitoreA: number; let fornitoreB: number; let inattivoA: number;
+let magazzinoA: number; let magazzinoB: number; let prodottoId: number;
 
 const app = express();
 app.use(express.json());
@@ -26,22 +36,69 @@ beforeEach(async () => {
     { nome: `Fornitore inattivo ${suffix}`, tipo: "azienda", cittaId: areaA, attivo: false },
   ]).returning({ id: fornitoriTable.id });
   fornitoreA = fa.id; fornitoreB = fb.id; inattivoA = fi.id; ids.fornitori.push(fornitoreA, fornitoreB, inattivoA);
+  const [ma, mb] = await db.insert(magazziniTable).values([
+    { codice: `MAG-A-${suffix}`, nome: `Magazzino A ${suffix}`, cittaId: areaA, stato: "attivo" },
+    { codice: `MAG-B-${suffix}`, nome: `Magazzino B ${suffix}`, cittaId: areaB, stato: "attivo" },
+  ]).returning({ id: magazziniTable.id });
+  magazzinoA = ma.id; magazzinoB = mb.id; ids.magazzini.push(magazzinoA, magazzinoB);
+  const [prodotto] = await db.insert(prodottiTable).values({
+    codice: `PROD-${suffix}`,
+    nome: `Prodotto ${suffix}`,
+    tipoProdotto: "alimentare",
+    unitaMisura: "pz",
+    attivo: true,
+  }).returning({ id: prodottiTable.id });
+  prodottoId = prodotto.id; ids.prodotti.push(prodottoId);
 });
 
 afterEach(async () => {
+  if (ids.ordini.length) await db.delete(approvvigionamentoRigheTable).where(inArray(approvvigionamentoRigheTable.approvvigionamentoId, ids.ordini));
   if (ids.ordini.length) await db.delete(approvvigionamentiTable).where(inArray(approvvigionamentiTable.id, ids.ordini.splice(0)));
+  if (ids.prodotti.length) await db.delete(prodottiTable).where(inArray(prodottiTable.id, ids.prodotti.splice(0)));
+  if (ids.magazzini.length) await db.delete(magazziniTable).where(inArray(magazziniTable.id, ids.magazzini.splice(0)));
   if (ids.fornitori.length) await db.delete(fornitoriTable).where(inArray(fornitoriTable.id, ids.fornitori.splice(0)));
   if (ids.citta.length) await db.delete(cittaTable).where(inArray(cittaTable.id, ids.citta.splice(0)));
 });
 afterAll(async () => { await pool.end(); });
 
 async function create(cittaId: number, fornitoreId: number) {
-  const response = await request(app).post("/approvvigionamenti").send({ cittaId, fornitoreId, dataRichiesta: "2026-07-16", righe: [] });
+  const response = await request(app).post("/approvvigionamenti").send({
+    cittaId,
+    fornitoreId,
+    magazzinoId: cittaId === areaA ? magazzinoA : magazzinoB,
+    dataRichiesta: "2026-07-16",
+    righe: [{ prodottoId, quantitaRichiesta: 1, unitaMisura: "pz" }],
+  });
   if (response.body.id) ids.ordini.push(response.body.id);
   return response;
 }
 
 describe("Area territoriale e fornitori negli ordini", () => {
+  it("esegue rollback di testata e righe quando una FK Prodotto fallisce", async () => {
+    const before = await db.select({ id: approvvigionamentiTable.id }).from(approvvigionamentiTable);
+    const failed = await request(app).post("/approvvigionamenti").send({
+      cittaId: areaA,
+      fornitoreId: fornitoreA,
+      magazzinoId: magazzinoA,
+      dataRichiesta: "2026-07-16",
+      righe: [{ prodottoId: 2_000_000_000, quantitaRichiesta: 1, unitaMisura: "pz" }],
+    });
+    expect(failed.status).toBe(400);
+    expect(await db.select({ id: approvvigionamentiTable.id }).from(approvvigionamentiTable)).toEqual(before);
+
+    const created = await create(areaA, fornitoreA);
+    const replaceFailed = await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({
+      versione: created.body.versione,
+      note: "non deve restare",
+      righe: [{ prodottoId: 2_000_000_000, quantitaRichiesta: 2, unitaMisura: "pz" }],
+    });
+    expect(replaceFailed.status).toBe(400);
+    const unchanged = await request(app).get(`/approvvigionamenti/${created.body.id}`);
+    expect(unchanged.body.versione).toBe(created.body.versione);
+    expect(unchanged.body.note).toBe(created.body.note);
+    expect(unchanged.body.righe).toMatchObject([{ prodottoId, quantitaRichiesta: 1 }]);
+  });
+
   it("accetta Area A con fornitore A e Area B con fornitore B", async () => {
     expect((await create(areaA, fornitoreA)).status).toBe(201);
     expect((await create(areaB, fornitoreB)).status).toBe(201);
@@ -54,8 +111,8 @@ describe("Area territoriale e fornitori negli ordini", () => {
 
   it("consente il cambio Area soltanto insieme a un fornitore coerente", async () => {
     const created = await create(areaA, fornitoreA);
-    expect((await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({ cittaId: areaB, fornitoreId: fornitoreA })).status).toBe(400);
-    const valid = await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({ cittaId: areaB, fornitoreId: fornitoreB });
+    expect((await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({ versione: 1, cittaId: areaB, fornitoreId: fornitoreA, magazzinoId: magazzinoB })).status).toBe(400);
+    const valid = await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({ versione: 1, cittaId: areaB, fornitoreId: fornitoreB, magazzinoId: magazzinoB });
     expect(valid.status).toBe(200);
     expect(valid.body.cittaId).toBe(areaB);
   });

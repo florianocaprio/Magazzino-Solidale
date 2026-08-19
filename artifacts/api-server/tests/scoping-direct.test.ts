@@ -604,7 +604,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
   });
 
   it("POST auto-assegna il centro del caller", async () => {
-    const mag = await createMagazzino(scope, null);
+    const mag = await createMagazzino(scope, null, { cittaId: cittaA });
     const prod = await createProdotto(scope);
     const fornitore = await createFornitore(scope, cittaA);
     const res = await request(
@@ -621,7 +621,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
         magazzinoId: mag,
         righe: [{ prodottoId: prod, quantitaRichiesta: 10, unitaMisura: "kg" }],
       });
-    expect(res.status).toBe(201);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
     scope.approvvigionamentoIds.push(res.body.id);
     expect(res.body.centroAscoltoId).toBe(centroA);
   });
@@ -640,7 +640,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
       }),
     )
       .patch(`/approvvigionamenti/${ordA}`)
-      .send({ magazzinoId: magB });
+      .send({ versione: 1, magazzinoId: magB });
     expect(res.status).toBe(403);
   });
 
@@ -655,7 +655,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
         id: operatoreId,
         centroAscoltoId: centroA,
       }),
-    ).post(`/approvvigionamenti/${aB}/sottometti`);
+    ).post(`/approvvigionamenti/${aB}/sottometti`).send({ versione: 1 });
     expect(res.status).toBe(403);
   });
 });

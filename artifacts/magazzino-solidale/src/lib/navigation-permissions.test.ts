@@ -8,6 +8,15 @@ describe("permission gate della navigazione operativa", () => {
     ["interventi", "sociale.interventi.view"],
     ["emporioCreditiSaldo", "credito.view"],
     ["emporioAccessi", "emporio.access.view"],
+    ["prodotti", "magazzino.view"],
+    ["lotti", "magazzino.view"],
+    ["movimenti", "magazzino.view"],
+    ["giacenze", "magazzino.view"],
+    ["trasferimenti", "magazzino.view"],
+    ["preparazioneConsegne", "magazzino.view"],
+    ["scarichi", "magazzino.view"],
+    ["bolle", "bolle.view"],
+    ["approvvigionamenti", "approvvigionamenti.view"],
   ])("protegge %s con %s", (key, permission) => {
     expect(NAV_ITEMS.find((item) => item.key === key)?.permission).toBe(
       permission,
