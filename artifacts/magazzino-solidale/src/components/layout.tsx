@@ -178,6 +178,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "sociale",
     area: "sociale",
     moduloCodice: "CENTRO_ASCOLTO",
+    permission: "beneficiari.view",
   },
   {
     key: "interventi",
@@ -235,6 +236,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodiciAll: ["EMPORIO_SOLIDALE", "CREDITO_SOLIDALE"],
+    permission: "credito.view",
   },
   {
     key: "politicheCreditoSolidale",
@@ -251,6 +253,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
+    permission: "emporio.access.view",
   },
   {
     key: "emporioSpese",
@@ -323,6 +326,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "uds",
     area: "uds",
     moduloCodice: "UDS",
+    permission: "beneficiari.view",
   },
   {
     key: "udsInterventi",

@@ -30,7 +30,6 @@ const UDS_OPERATOR_PERMISSIONS = [
   "beneficiari.duplicates.search",
 ] as const;
 const EMPORIO_OPERATOR_PERMISSIONS = [
-  "beneficiari.view",
   "credito.view",
   "emporio.access.view",
   "emporio.access.manage",
@@ -38,6 +37,13 @@ const EMPORIO_OPERATOR_PERMISSIONS = [
 
 function mergePermissions(current: string[] | null | undefined, required: readonly string[]): string[] {
   return [...new Set([...(current ?? []), ...required])];
+}
+
+export function defaultEmporioPermissions(current: string[] | null | undefined): string[] {
+  return mergePermissions(
+    (current ?? []).filter((permission) => permission !== "beneficiari.view"),
+    EMPORIO_OPERATOR_PERMISSIONS,
+  );
 }
 
 export async function ensureSuperAdminRole(): Promise<number> {
@@ -175,7 +181,9 @@ export async function seedRoles(): Promise<void> {
         aree: emporioRole.aree.includes(EMPORIO_AREA_KEY)
           ? emporioRole.aree
           : [...emporioRole.aree, EMPORIO_AREA_KEY],
-        permessi: mergePermissions(emporioRole.permessi, EMPORIO_OPERATOR_PERMISSIONS),
+        // Il ruolo standard usa le API Emporio minimizzate. I ruoli custom non
+        // vengono toccati e possono ricevere beneficiari.view esplicitamente.
+        permessi: defaultEmporioPermissions(emporioRole.permessi),
       })
       .where(eq(ruoliTable.id, emporioRole.id));
   }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiarioStato, useAuthorizeBeneficiariExport, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type BeneficiarioDirectory, type MensaAbilitazioneRiepilogoBeneficiario } from "@workspace/api-client-react";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiarioStato, useAuthorizeBeneficiariExport, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type BeneficiarioDirectory, type MensaAbilitazioneRiepilogoBeneficiario, type ListBeneficiariParams } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -33,8 +33,10 @@ import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
 import { createBeneficiarioWithOptionalMensa } from "@/lib/beneficiario-mensa-workflow";
+import { BENEFICIARI_PAGE_SIZE, fetchAllBeneficiariPages } from "@/lib/beneficiari-pagination";
+import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requireGlobalBeneficiarioArea } from "@/lib/beneficiario-create-ui";
 
-const makeFormSchema = (t: (k: string) => string) => z.object({
+const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.object({
   cognome: z.string().min(2),
   nome: z.string().min(2),
   soprannome: z.string().optional(),
@@ -64,7 +66,7 @@ const makeFormSchema = (t: (k: string) => string) => z.object({
   motivoConsegnaDomicilio: z.string().optional(),
   restrizioniAlimentari: z.string().optional(),
   uds: z.boolean().default(false),
-  cittaId: z.string().optional(),
+  cittaId: areaRequired ? z.string().min(1, t("common.requiredField")) : z.string().optional(),
   zonaUdsId: z.string().optional(),
 });
 type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
@@ -114,18 +116,25 @@ export default function Beneficiari() {
   const [prioritaFilter, setPrioritaFilter] = useState<string>(PRIORITA_ALL);
   const [cittaFilter, setCittaFilter] = useState<string>(CITTA_ALL);
   const [statoAnagraficaFilter, setStatoAnagraficaFilter] = useState<string>(STATO_ANAGRAFICA_ALL);
+  const [page, setPage] = useState(1);
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setCentroFilter(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
   const isCittaGlobal = user?.cittaId == null;
-  const { data: beneficiari, isLoading } = useListBeneficiari({
+  const beneficiariFilters = useMemo<ListBeneficiariParams>(() => ({
     search: search || undefined,
     centroAscoltoId: centroFilter !== CENTRO_ALL ? parseInt(centroFilter) : undefined,
     priorita: prioritaFilter !== PRIORITA_ALL ? prioritaFilter : undefined,
     cittaId: isCittaGlobal && cittaFilter !== CITTA_ALL ? parseInt(cittaFilter) : undefined,
     statoAnagrafica: statoAnagraficaFilter !== STATO_ANAGRAFICA_ALL ? statoAnagraficaFilter as "provvisoria" | "completa" : undefined,
+  }), [cittaFilter, centroFilter, isCittaGlobal, prioritaFilter, search, statoAnagraficaFilter]);
+  useEffect(() => setPage(1), [beneficiariFilters]);
+  const { data: beneficiari, isLoading } = useListBeneficiari({
+    ...beneficiariFilters,
+    page,
+    limit: BENEFICIARI_PAGE_SIZE,
   });
   const { data: centri } = useListCentriAscolto();
   const { data: magazzini } = useListMagazzini();
@@ -177,7 +186,7 @@ export default function Beneficiari() {
     });
   };
 
-  const formSchema = useMemo(() => makeFormSchema(t), [t]);
+  const formSchema = useMemo(() => makeFormSchema(t, isCittaGlobal), [isCittaGlobal, t]);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -198,6 +207,10 @@ export default function Beneficiari() {
   const formCitta = isCittaGlobal
     ? (form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined)
     : (user?.cittaId ?? undefined);
+  const formCentriDisponibili = useMemo(
+    () => (centri ?? []).filter((centro) => formCitta != null && centro.cittaId === formCitta),
+    [centri, formCitta],
+  );
   const { data: udsZone } = useListZoneUds(
     formCitta ? { cittaId: formCitta } : undefined,
     { query: { queryKey: ["zoneUds", "benefForm", formCitta], enabled: watchUds && formCitta != null } },
@@ -205,21 +218,30 @@ export default function Beneficiari() {
 
   // Anti-duplicate fuzzy suggestions (città-scoped) while the create form is open.
   const [dupDismissed, setDupDismissed] = useState(false);
-  const [dupParams, setDupParams] = useState<{ nome?: string; cognome?: string }>({});
+  const [dupParams, setDupParams] = useState<{ nome?: string; cognome?: string; cittaId?: number }>({});
   const wNome = form.watch("nome");
   const wCognome = form.watch("cognome");
   useEffect(() => {
-    if (!isFormOpen) return;
+    if (!isFormOpen || (isCittaGlobal && formCitta == null)) {
+      setDupParams({});
+      return;
+    }
     const handle = setTimeout(() => {
-      setDupParams({ nome: (wNome ?? "").trim(), cognome: (wCognome ?? "").trim() });
+      setDupParams(buildBeneficiarioDuplicateParams(wNome, wCognome, isCittaGlobal, formCitta));
     }, 300);
     return () => clearTimeout(handle);
-  }, [isFormOpen, wNome, wCognome]);
+  }, [formCitta, isCittaGlobal, isFormOpen, wNome, wCognome]);
   const dupHasInput = (dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 3;
   const { data: dupMatches } = useCercaBeneficiariSimili(dupParams, {
     query: {
       queryKey: getCercaBeneficiariSimiliQueryKey(dupParams),
-      enabled: isFormOpen && !dupDismissed && dupHasInput,
+      enabled: canSearchBeneficiarioDuplicates({
+        open: isFormOpen,
+        dismissed: dupDismissed,
+        hasInput: dupHasInput,
+        isGlobal: isCittaGlobal,
+        areaId: formCitta,
+      }),
     },
   });
   const suggestions = dupMatches ?? [];
@@ -243,9 +265,11 @@ export default function Beneficiari() {
       mensaDataFine,
       ...rest
     } = data;
-    // A città-global admin must pin a città when flagging a person as UDS,
-    // mirroring the server-side hard-boundary guard.
-    if (uds && isCittaGlobal && !cittaId) {
+    // Un amministratore globale deve scegliere sempre l'Area del nuovo Beneficiario.
+    let selectedAreaId: number | undefined;
+    try {
+      selectedAreaId = requireGlobalBeneficiarioArea(isCittaGlobal, cittaId);
+    } catch {
       form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
       return;
     }
@@ -279,9 +303,7 @@ export default function Beneficiari() {
           ? parseInt(magazzinoEmporioPreferitoId)
           : null,
     };
-    if ((uds || shouldEnableMensa) && isCittaGlobal && cittaId) {
-      payload.cittaId = parseInt(cittaId);
-    }
+    if (selectedAreaId != null) payload.cittaId = selectedAreaId;
     if (uds) {
       if (zonaUdsId && zonaUdsId !== NO_ZONE) payload.zonaUdsId = parseInt(zonaUdsId);
     }
@@ -358,10 +380,11 @@ export default function Beneficiari() {
                   ? "IN CARICAMENTO"
                   : mensaSummary.isError
                     ? "NON DISPONIBILE"
-                    : (mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato").toUpperCase(),
+                    : (mensaSummaryByBeneficiario.get(b.id)?.stato ?? "").toUpperCase(),
               }] : []),
             ]}
-            beforeExport={() => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: beneficiari?.length ?? 0, beneficiarioId: null } }).then(() => undefined)}
+            loadRows={() => fetchAllBeneficiariPages(beneficiariFilters)}
+            beforeExport={(_format, exportRows) => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: exportRows.length, beneficiarioId: null } }).then(() => undefined)}
             filename="beneficiari"
             title={t("beneficiari.exportTitle")}
             orientation="landscape"
@@ -375,6 +398,9 @@ export default function Beneficiari() {
             form.setValue("mensaId", "");
             form.setValue("mensaDataInizio", todayEuropeRome());
             form.setValue("mensaDataFine", "");
+            form.setValue("cittaId", "");
+            form.setValue("zonaUdsId", NO_ZONE);
+            form.setValue("magazzinoEmporioPreferitoId", NO_EMPORIO);
             setDupDismissed(false); setDupParams({}); setIsFormOpen(true);
           }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>}
         </div>
@@ -613,6 +639,17 @@ export default function Beneficiari() {
               ))}
             </TableBody>
           </Table>
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <span className="text-sm text-muted-foreground">Pagina {page}</span>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+                Precedente
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={isLoading || (beneficiari?.length ?? 0) < BENEFICIARI_PAGE_SIZE} onClick={() => setPage((current) => current + 1)}>
+                Successiva
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -759,24 +796,27 @@ export default function Beneficiari() {
                 <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("beneficiari.centroRiferimento")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined} disabled={isCentroLocked}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined} disabled={isCentroLocked || formCitta == null}>
                       <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                        {formCentriDisponibili.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
 
-                {isCittaGlobal && (watchUds || abilitaMensa) && (
+                {isCittaGlobal && (
                   <FormField control={form.control} name="cittaId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Area</FormLabel>
+                      <FormLabel>Area *</FormLabel>
                       <Select value={field.value || ""} onValueChange={(value) => {
                         field.onChange(value);
+                        form.setValue("centroAscoltoId", "");
                         form.setValue("zonaUdsId", NO_ZONE);
+                        form.setValue("magazzinoEmporioPreferitoId", NO_EMPORIO);
                         form.setValue("mensaId", "");
+                        resetDup();
                       }}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Seleziona un'Area" /></SelectTrigger></FormControl>
                         <SelectContent>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   getListBeneficiariQueryKey,
@@ -32,6 +32,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useModuloFlags } from "@/lib/use-moduli";
+import { useAuth } from "@/lib/auth";
 
 const ALL = "__all__";
 const NONE = "__none__";
@@ -92,6 +93,10 @@ export default function EmporioCreditiSaldo() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { emporioAbilitato } = useModuloFlags();
+  const { hasPermission } = useAuth();
+  const canViewBeneficiario = hasPermission("beneficiari.view");
+  const canAdjust = hasPermission("credito.adjust");
+  const canExecuteMonthly = hasPermission("credito.monthly.execute");
   const initialBeneficiarioId = useMemo(() => {
     const raw = new URLSearchParams(window.location.search).get("beneficiarioId");
     const id = raw ? Number(raw) : NaN;
@@ -112,7 +117,7 @@ export default function EmporioCreditiSaldo() {
   const [note, setNote] = useState("");
   const [stornoMovimento, setStornoMovimento] = useState<CreditoSolidaleMovimento | null>(null);
   const [stornoMotivo, setStornoMotivo] = useState("");
-  const autoRicaricaMensileStarted = useRef(false);
+  const [monthlyConfirmOpen, setMonthlyConfirmOpen] = useState(false);
   const normalizedSearch = search.trim();
 
   const beneficiariParams = {
@@ -190,9 +195,9 @@ export default function EmporioCreditiSaldo() {
     });
   };
 
-  useEffect(() => {
-    if (!emporioAbilitato || autoRicaricaMensileStarted.current) return;
-    autoRicaricaMensileStarted.current = true;
+  const executeMonthly = () => {
+    if (!canExecuteMonthly || !emporioAbilitato) return;
+    setMonthlyConfirmOpen(false);
     executeRicarica.mutate({
       data: {
         periodoRiferimento: currentPeriodo(),
@@ -213,7 +218,7 @@ export default function EmporioCreditiSaldo() {
         variant: "destructive",
       }),
     });
-  }, [emporioAbilitato]);
+  };
 
   const openAction = (tipo: "ricarica" | "rettifica", beneficiario: CreditoSolidaleBeneficiario) => {
     setAction({ tipo, beneficiario });
@@ -286,7 +291,7 @@ export default function EmporioCreditiSaldo() {
     });
   };
 
-  const actionDisabled = !emporioAbilitato || createRicarica.isPending || createRettifica.isPending;
+  const actionDisabled = !canAdjust || !emporioAbilitato || createRicarica.isPending || createRettifica.isPending;
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -299,6 +304,11 @@ export default function EmporioCreditiSaldo() {
           <p className="text-muted-foreground">{t("creditoSolidale.saldoPageSubtitle")}</p>
           {!emporioAbilitato && <p className="text-sm text-muted-foreground mt-1">{t("creditoSolidale.readOnlyDisabled")}</p>}
         </div>
+        {canExecuteMonthly && (
+          <Button type="button" onClick={() => setMonthlyConfirmOpen(true)} disabled={!emporioAbilitato || executeRicarica.isPending}>
+            <RefreshCw className="mr-2 h-4 w-4" /> {t("creditoSolidale.eseguiRicaricaMensile")}
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -434,12 +444,12 @@ export default function EmporioCreditiSaldo() {
                         <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedBeneficiarioId(String(b.id))} title={t("creditoSolidale.apriMovimenti")}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => openAction("ricarica", b)} disabled={!canOperate}>
+                        {canAdjust && <Button type="button" variant="outline" size="sm" onClick={() => openAction("ricarica", b)} disabled={!canOperate}>
                           <RefreshCw className="h-4 w-4 mr-1" /> {t("creditoSolidale.ricaricaCreditoSolidale")}
-                        </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => openAction("rettifica", b)} disabled={!canOperate}>
+                        </Button>}
+                        {canAdjust && <Button type="button" variant="outline" size="sm" onClick={() => openAction("rettifica", b)} disabled={!canOperate}>
                           {t("creditoSolidale.rettificaCreditoSolidale")}
-                        </Button>
+                        </Button>}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -458,7 +468,7 @@ export default function EmporioCreditiSaldo() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {selectedBeneficiario && (
+          {selectedBeneficiario && canViewBeneficiario && (
             <Button asChild variant="outline" size="sm">
               <Link href={`/beneficiari/${selectedBeneficiario.id}`}>{t("creditoSolidale.apriScheda")}</Link>
             </Button>
@@ -488,7 +498,7 @@ export default function EmporioCreditiSaldo() {
                       <TableCell className={m.variazioneCredito < 0 ? "text-red-700" : "text-emerald-700"}>{formatCredito(m.variazioneCredito)}</TableCell>
                       <TableCell>{formatCredito(m.saldoDopo)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
+                        {canAdjust && <Button
                           type="button"
                           variant="ghost"
                           size="icon"
@@ -497,7 +507,7 @@ export default function EmporioCreditiSaldo() {
                           onClick={() => setStornoMovimento(m)}
                         >
                           <RotateCcw className="h-4 w-4" />
-                        </Button>
+                        </Button>}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -550,6 +560,21 @@ export default function EmporioCreditiSaldo() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t("creditoSolidale.annulla")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleStorno}>{t("creditoSolidale.conferma")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={monthlyConfirmOpen} onOpenChange={setMonthlyConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("creditoSolidale.confermaEsecuzioneTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("creditoSolidale.confermaEsecuzioneDescription")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("creditoSolidale.annulla")}</AlertDialogCancel>
+            <AlertDialogAction onClick={executeMonthly} disabled={executeRicarica.isPending}>
+              {t("creditoSolidale.conferma")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

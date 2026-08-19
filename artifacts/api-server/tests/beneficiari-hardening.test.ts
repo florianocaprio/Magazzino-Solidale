@@ -172,6 +172,27 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
     expect((await request(app).post("/beneficiari").send({ nome: "No", cognome: "Permesso", sesso: "M", cittaId: areaA })).status).toBe(403);
   });
 
+  it("nega il dossier generico all'Emporio standard ma rispetta un grant esplicito", async () => {
+    const person = await insertBeneficiary({ centroAscoltoId: centerA });
+    const emporioStandard = makeApp({
+      cittaId: areaA,
+      centroAscoltoId: centerA,
+      zonaUdsId: null,
+      aree: ["sociale", "emporio"],
+      permessi: ["credito.view", "emporio.access.view", "emporio.access.manage"],
+    });
+    expect((await request(emporioStandard).get(`/beneficiari/${person.id}`)).status).toBe(403);
+
+    const customRole = makeApp({
+      cittaId: areaA,
+      centroAscoltoId: centerA,
+      zonaUdsId: null,
+      aree: ["sociale", "emporio"],
+      permessi: ["beneficiari.view"],
+    });
+    expect((await request(customRole).get(`/beneficiari/${person.id}`)).status).toBe(200);
+  });
+
   it("rifiuta mass assignment tecnico/economico in create e patch", async () => {
     const create = await request(socialAreaA()).post("/beneficiari").send({
       nome: "Mass", cognome: "Assignment", sesso: "M", cittaId: areaA, creditoSolidaleSaldo: 999,
@@ -192,6 +213,38 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
     expect((await request(socialAreaA()).post("/beneficiari").send({ ...base, magazzinoEmporioPreferitoId: emporioB })).status).toBe(400);
     expect((await request(socialAreaA()).post("/beneficiari").send({ ...base, centroAscoltoId: inactiveCenter })).status).toBe(400);
     expect((await request(makeApp({ cittaId: null, centroAscoltoId: null, zonaUdsId: null, aree: ["sociale"], permessi: SOCIAL_PERMISSIONS })).post("/beneficiari").send({ ...base, cittaId: inactiveArea })).status).toBe(400);
+  });
+
+  it("consente all'Admin globale di creare un Beneficiario Sociale nell'Area scelta", async () => {
+    const globalAdmin = makeApp({
+      cittaId: null,
+      centroAscoltoId: null,
+      zonaUdsId: null,
+      aree: ["sociale"],
+      permessi: SOCIAL_PERMISSIONS,
+      isAdmin: true,
+    });
+    const created = await request(globalAdmin).post("/beneficiari").send({
+      nome: "Sociale",
+      cognome: "Globale",
+      sesso: "F",
+      cittaId: areaA,
+      centroAscoltoId: centerA,
+      uds: false,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.cittaId).toBe(areaA);
+    expect(created.body.centroAscoltoId).toBe(centerA);
+    beneficiaryIds.push(created.body.id);
+
+    const wrongCenter = await request(globalAdmin).post("/beneficiari").send({
+      nome: "Sociale",
+      cognome: "Incoerente",
+      sesso: "F",
+      cittaId: areaA,
+      centroAscoltoId: centerB,
+    });
+    expect(wrongCenter.status).toBe(400);
   });
 
   it("accetta Area/Centro/Zona/Emporio coerenti e normalizza il codice fiscale", async () => {

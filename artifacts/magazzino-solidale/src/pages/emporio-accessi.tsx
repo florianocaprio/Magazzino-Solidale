@@ -29,6 +29,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
+import { useAuth } from "@/lib/auth";
 
 const ALL = "__all__";
 const STATI_ACCESSO: AccessoEmporioStato[] = ["pianificato", "confermato", "effettuato", "annullato", "non_presentato"];
@@ -91,6 +92,9 @@ export default function EmporioAccessi() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { emporioAbilitato } = useModuloFlags();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("emporio.access.manage");
+  const canViewBeneficiario = hasPermission("beneficiari.view");
   const initialBeneficiarioId = useMemo(() => {
     const raw = new URLSearchParams(window.location.search).get("beneficiarioId");
     const id = raw ? Number(raw) : NaN;
@@ -198,6 +202,7 @@ export default function EmporioAccessi() {
   };
 
   const submit = () => {
+    if (!canManage) return;
     if (!emporioAbilitato) {
       toast({ title: t("accessiEmporio.titolo"), description: t("accessiEmporio.emporioDisabilitato"), variant: "destructive" });
       return;
@@ -234,6 +239,7 @@ export default function EmporioAccessi() {
   };
 
   const changeStatus = (accesso: AccessoEmporio, statoAccessoEmporio: AccessoEmporioStato, motivo?: string) => {
+    if (!canManage) return;
     updateStato.mutate(
       { id: accesso.id, data: { statoAccessoEmporio, motivoAnnullamento: motivo ?? null } },
       {
@@ -255,7 +261,7 @@ export default function EmporioAccessi() {
           <h1 className="text-2xl font-semibold tracking-normal">{t("accessiEmporio.titolo")}</h1>
           <p className="text-sm text-muted-foreground">{t("accessiEmporio.sottotitolo")}</p>
         </div>
-        <Button onClick={openCreate} disabled={!emporioAbilitato}>{t("accessiEmporio.nuovoAccesso")}</Button>
+        {canManage && <Button onClick={openCreate} disabled={!emporioAbilitato}>{t("accessiEmporio.nuovoAccesso")}</Button>}
       </div>
 
       {!emporioAbilitato && (
@@ -349,11 +355,13 @@ export default function EmporioAccessi() {
                   <TableCell className="max-w-48 truncate">{accesso.noteAccessoEmporio ?? "-"}</TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
+                      {canManage && <>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(accesso)} disabled={!emporioAbilitato || pending} title={t("accessiEmporio.modificaAccesso")}><Edit className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => changeStatus(accesso, "confermato")} disabled={!emporioAbilitato || pending || accesso.statoAccessoEmporio === "confermato"} title={t("accessiEmporio.confermaAccesso")}><UserCheck className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => changeStatus(accesso, "effettuato")} disabled={!emporioAbilitato || pending || accesso.statoAccessoEmporio === "effettuato"} title={t("accessiEmporio.segnoEffettuato")}><CheckCircle2 className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => changeStatus(accesso, "non_presentato")} disabled={!emporioAbilitato || pending || accesso.statoAccessoEmporio === "non_presentato"} title={t("accessiEmporio.segnoNonPresentato")}><UserX className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setAnnullando(accesso)} disabled={!emporioAbilitato || pending || accesso.statoAccessoEmporio === "annullato"} title={t("accessiEmporio.annullaAccesso")}><XCircle className="h-4 w-4" /></Button>
+                      </>}
                       <Button variant="outline" size="icon" asChild title={t("accessiEmporio.apriCassa")}>
                         <Link href={`/emporio/cassa?accessoEmporioId=${accesso.id}`}><Play className="h-4 w-4" /></Link>
                       </Button>
@@ -439,7 +447,7 @@ export default function EmporioAccessi() {
         </DialogContent>
       </Dialog>
 
-      {initialBeneficiarioId && (
+      {initialBeneficiarioId && canViewBeneficiario && (
         <Button variant="link" asChild className="px-0">
           <Link href={`/beneficiari/${initialBeneficiarioId}`}>{t("accessiEmporio.tornaBeneficiario")}</Link>
         </Button>

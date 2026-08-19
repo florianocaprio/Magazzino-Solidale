@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getGetBeneficiarioQueryKey,
   getListBeneficiariQueryKey,
   getListCittaQueryKey,
   type BeneficiarioDirectory,
+  type ListBeneficiariParams,
   useListBeneficiari,
   useListCitta,
   useListZoneUds,
@@ -40,6 +41,7 @@ import { UdsPersonaSheet } from "@/components/uds-persona-sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
+import { BENEFICIARI_PAGE_SIZE, fetchAllBeneficiariPages } from "@/lib/beneficiari-pagination";
 
 const ALL_ZONE = "__all__";
 
@@ -54,6 +56,7 @@ export default function UdsAnagrafica() {
     user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
   );
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const { data: cittaList } = useListCitta({
@@ -69,13 +72,18 @@ export default function UdsAnagrafica() {
     { query: { queryKey: ["zoneUds", effectiveCitta], enabled: effectiveCitta != null } },
   );
 
-  const listParams = {
+  const listFilters = useMemo<ListBeneficiariParams>(() => ({
     uds: true,
     ...(search.trim() ? { search: search.trim() } : {}),
     ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
-  };
-  const { data: beneficiari, isLoading } = useListBeneficiari(listParams);
+  }), [effectiveCitta, filterZona, isGlobal, search]);
+  useEffect(() => setPage(1), [listFilters]);
+  const { data: beneficiari, isLoading } = useListBeneficiari({
+    ...listFilters,
+    page,
+    limit: BENEFICIARI_PAGE_SIZE,
+  });
   const updateBenef = useUpdateBeneficiarioStato();
   const authorizeExport = useAuthorizeBeneficiariExport();
 
@@ -155,7 +163,8 @@ export default function UdsAnagrafica() {
             columns={exportColumns}
             filename="uds-anagrafica"
             title={t("udsAnagrafica.exportTitle")}
-            beforeExport={() => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: rows.length, beneficiarioId: null } }).then(() => undefined)}
+            loadRows={() => fetchAllBeneficiariPages(listFilters)}
+            beforeExport={(_format, exportRows) => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: exportRows.length, beneficiarioId: null } }).then(() => undefined)}
           />}
           {hasPermission("beneficiari.manage") && <Button onClick={() => setIsFormOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> {t("udsAnagrafica.newPerson")}
@@ -304,6 +313,17 @@ export default function UdsAnagrafica() {
               )}
             </TableBody>
           </Table>
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <span className="text-sm text-muted-foreground">Pagina {page}</span>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+                Precedente
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={isLoading || rows.length < BENEFICIARI_PAGE_SIZE} onClick={() => setPage((current) => current + 1)}>
+                Successiva
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

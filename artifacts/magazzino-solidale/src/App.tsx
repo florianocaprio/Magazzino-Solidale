@@ -322,7 +322,9 @@ function AppRoutes() {
             <Guard area="emporio">
               <RequireModulo codice="EMPORIO_SOLIDALE">
                 <RequireModulo codice="CREDITO_SOLIDALE">
-                  <EmporioCreditiSaldo />
+                  <RequirePermission permission="credito.view">
+                    <EmporioCreditiSaldo />
+                  </RequirePermission>
                 </RequireModulo>
               </RequireModulo>
             </Guard>
@@ -332,7 +334,9 @@ function AppRoutes() {
           {() => (
             <Guard area="emporio">
               <RequireModulo codice="EMPORIO_SOLIDALE">
-                <EmporioAccessi />
+                <RequirePermission permission="emporio.access.view">
+                  <EmporioAccessi />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -367,7 +371,9 @@ function AppRoutes() {
           {() => (
             <Guard area="sociale">
               <RequireModulo codice="CENTRO_ASCOLTO">
-                <Beneficiari />
+                <RequirePermission permission="beneficiari.view">
+                  <Beneficiari />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -381,7 +387,9 @@ function AppRoutes() {
                   { area: "uds", moduloCodice: "UDS" },
                 ]}
               >
-                <BeneficiarioDettaglio />
+                <RequirePermission permission="beneficiari.view">
+                  <BeneficiarioDettaglio />
+                </RequirePermission>
               </RequireAreaModulo>
             </Guard>
           )}
@@ -431,7 +439,9 @@ function AppRoutes() {
           {() => (
             <Guard area="uds">
               <RequireModulo codice="UDS">
-                <UdsAnagrafica />
+                <RequirePermission permission="beneficiari.view">
+                  <UdsAnagrafica />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
