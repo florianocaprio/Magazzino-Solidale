@@ -239,6 +239,36 @@ siano valorizzate e lanciare le query diagnostiche Area legacy/nucleo orfano
 documentate nel README. Non aggiungere la FK del nucleo finché gli eventuali
 orfani non sono stati classificati e bonificati esplicitamente.
 
+Per l'hardening Centro di Ascolto,
+`20260819_audit_centro_ascolto_hardening.sql` aggiunge soltanto Foreign Key e
+indici univoci a Interventi e Turni. Lo script esegue prima una preflight e si
+interrompe senza modificare lo schema se rileva riferimenti orfani o slot
+duplicati. Prima dell'update, dopo il backup, eseguire almeno:
+
+```sql
+SELECT i.id, i.beneficiario_id
+FROM interventi i LEFT JOIN beneficiari b ON b.id = i.beneficiario_id
+WHERE b.id IS NULL;
+
+SELECT i.id, i.bolla_id
+FROM interventi i LEFT JOIN bolle b ON b.id = i.bolla_id
+WHERE i.bolla_id IS NOT NULL AND b.id IS NULL;
+
+SELECT turno_id, volontario_id
+FROM turni_volontari tv
+WHERE NOT EXISTS (SELECT 1 FROM turni t WHERE t.id = tv.turno_id)
+   OR NOT EXISTS (SELECT 1 FROM volontari v WHERE v.id = tv.volontario_id);
+
+SELECT centro_ascolto_id, data, fascia, count(*)
+FROM turni GROUP BY centro_ascolto_id, data, fascia HAVING count(*) > 1;
+```
+
+Eventuali righe devono essere classificate con il responsabile funzionale e
+ricollegate al record storico corretto oppure archiviate con una procedura
+auditata. La migration non inventa destinazioni, non cancella orfani e non
+deduplica turni. Dopo la bonifica approvata, eseguire `update` due volte e
+verificare che la seconda esecuzione sia idempotente.
+
 ## Super Admin, ambiente e moduli
 
 Per ogni piattaforma il primo utente operativo deve essere un Super Admin. La
