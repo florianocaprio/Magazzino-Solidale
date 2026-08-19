@@ -28,6 +28,7 @@ import { requirePermission } from "../middlewares/auth";
 import { InventoryLedgerError, requireOperationalMagazzino } from "../lib/inventoryLedger";
 import { withDocumentCodeRetry } from "../lib/documentCode";
 import { isDateOnly } from "../lib/interventiWorkflow";
+import type { LottoSelectionPolicy } from "../lib/lottoPolicy";
 
 const router: IRouter = Router();
 
@@ -123,14 +124,21 @@ async function getScaricoWithRighe(id: number) {
   };
 }
 
-async function disponibileRealeProdotto(
+async function disponibilitaPerScarico(
   prodottoId: number,
   magazzinoId: number,
+  dataScarico: string,
+  policy: LottoSelectionPolicy,
 ): Promise<number> {
   const disponibilita = await calcolaDisponibilitaMagazzino(
     prodottoId,
     magazzinoId,
+    dataScarico,
   );
+  if (policy === "scaduto") return Math.max(0, disponibilita.giacenzaScaduta);
+  if (policy === "qualsiasi") {
+    return Math.max(0, disponibilita.giacenzaFisica - disponibilita.impegnato);
+  }
   return Math.max(0, disponibilita.disponibileReale);
 }
 
@@ -341,8 +349,15 @@ router.post("/scarichi", requirePermission("magazzino.stock.issue"), async (req,
       (richiestaPerProdotto.get(r.prodottoId) ?? 0) + r.quantita,
     );
   }
+    const lottoPolicy: LottoSelectionPolicy =
+      body.causale === "scaduta" ? "scaduto" : "qualsiasi";
   for (const [prodottoId, richiesta] of richiestaPerProdotto) {
-    const disp = await disponibileRealeProdotto(prodottoId, body.magazzinoId);
+      const disp = await disponibilitaPerScarico(
+        prodottoId,
+        body.magazzinoId,
+        body.dataScarico,
+        lottoPolicy,
+      );
     if (richiesta > disp) {
       res.status(400).json({
         error: `Disponibilità insufficiente per ${prodottoMap.get(prodottoId)?.nome ?? `prodotto #${prodottoId}`}: ${disp} disponibili, richiesti ${richiesta}`,
@@ -368,6 +383,7 @@ router.post("/scarichi", requirePermission("magazzino.stock.issue"), async (req,
         body.causale === "altro" ? (body.causaleAltro ?? null) : null,
       note: body.note ?? null,
       operatoreId: req.user!.id,
+            lottoPolicy,
       righe: righeInput.map((r) => ({
         prodottoId: r.prodottoId,
         quantita: r.quantita,

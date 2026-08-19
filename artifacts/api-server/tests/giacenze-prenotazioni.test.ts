@@ -24,6 +24,8 @@ type GiacenzaBody = {
   magazzinoId: number;
   quantitaTotale: number;
   giacenzaFisica: number;
+  giacenzaScaduta: number;
+  giacenzaDistribuibile: number;
   impegnato: number;
   disponibileReale: number;
   sottoscorta: boolean;
@@ -117,6 +119,45 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
       giacenzaFisica: 12.5,
       impegnato: 0,
       disponibileReale: 12.5,
+    });
+  });
+
+  it("separa giacenza fisica, scaduta e distribuibile ed esclude gli impegni su lotti scaduti", async () => {
+    const scaduto = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 5,
+      dataScadenza: "2000-01-01",
+    });
+    const valido = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 9,
+      dataScadenza: "2099-12-31",
+    });
+    await prenota({
+      beneficiarioId: beneficiarioA,
+      magazzinoId: magA,
+      lottoId: scaduto,
+      quantita: 4,
+    });
+    await prenota({
+      beneficiarioId: beneficiarioA,
+      magazzinoId: magA,
+      lottoId: valido,
+      quantita: 3,
+    });
+
+    const res = await request(appAs(centroA)).get("/giacenze");
+
+    expect(res.status).toBe(200);
+    expect(rowFor(res.body, magA)).toMatchObject({
+      quantitaTotale: 14,
+      giacenzaFisica: 14,
+      giacenzaScaduta: 5,
+      giacenzaDistribuibile: 9,
+      impegnato: 3,
+      disponibileReale: 6,
     });
   });
 

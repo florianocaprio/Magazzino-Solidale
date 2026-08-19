@@ -532,7 +532,7 @@ describe("Scarichi — scoping per centro", () => {
       .send({
         magazzinoId: mag,
         dataScarico: "2026-06-24",
-        causale: "scaduta",
+        causale: "deteriorata",
         righe: [{ prodottoId: prod, quantita: 2, unitaMisura: "kg" }],
       });
     expect(res.status).toBe(201);

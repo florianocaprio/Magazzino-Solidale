@@ -7155,6 +7155,13 @@ components:
           type: number
         giacenzaFisica:
           type: number
+          description: Quantità fisicamente presente, inclusi i lotti scaduti.
+        giacenzaScaduta:
+          type: number
+          description: Quantità fisicamente presente su lotti scaduti alla data civile Europe/Rome.
+        giacenzaDistribuibile:
+          type: number
+          description: Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome.
         impegnato:
           type: number
         disponibileReale:
@@ -7180,6 +7187,8 @@ components:
           magazzinoNome,
           quantitaTotale,
           giacenzaFisica,
+          giacenzaScaduta,
+          giacenzaDistribuibile,
           impegnato,
           disponibileReale,
           scortaMinima,

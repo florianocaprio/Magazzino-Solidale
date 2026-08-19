@@ -33,6 +33,7 @@ import {
   getSpesaEmporio,
   SpesaEmporioError,
 } from "../lib/speseEmporio";
+import { lottoDistribuibileCondition } from "../lib/lottoPolicy";
 
 const router: IRouter = Router();
 router.use(
@@ -288,7 +289,7 @@ async function firstLottoId(prodottoId: number, magazzinoId: number): Promise<nu
   const [lotto] = await db
     .select({ id: lottiTable.id })
     .from(lottiTable)
-    .where(and(eq(lottiTable.prodottoId, prodottoId), eq(lottiTable.magazzinoId, magazzinoId), gt(lottiTable.quantitaResidua, "0")))
+    .where(and(eq(lottiTable.prodottoId, prodottoId), eq(lottiTable.magazzinoId, magazzinoId), gt(lottiTable.quantitaResidua, "0"), lottoDistribuibileCondition()))
     .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.id))
     .limit(1);
   return lotto?.id ?? null;
@@ -501,6 +502,7 @@ router.get("/cassa-emporio/prodotti/ricerca", async (req, res) => {
   const conditions: SQL[] = [
     eq(lottiTable.magazzinoId, magazzinoEmporioId),
     gt(lottiTable.quantitaResidua, "0"),
+    lottoDistribuibileCondition(),
     eq(prodottiTable.attivo, true),
     eq(prodottiTable.abilitatoEmporio, true),
     gt(prodottiTable.creditoSolidaleValore, "0"),

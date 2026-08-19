@@ -1,5 +1,9 @@
 import { db, lottiTable, prenotazioniMagazzinoTable } from "@workspace/db";
-import { and, eq, inArray, sum } from "drizzle-orm";
+import { and, eq, inArray, sql, sum } from "drizzle-orm";
+import {
+  dataOperativaEuropeRome,
+  lottoDistribuibileCondition,
+} from "./lottoPolicy";
 
 export const PRENOTAZIONE_MAGAZZINO_ATTIVA = "attiva";
 
@@ -7,6 +11,8 @@ export type DisponibilitaMagazzino = {
   prodottoId: number;
   magazzinoId: number;
   giacenzaFisica: number;
+  giacenzaScaduta: number;
+  giacenzaDistribuibile: number;
   impegnato: number;
   disponibileReale: number;
 };
@@ -24,31 +30,45 @@ export function parseDbNumber(value: string | number | null | undefined): number
 export async function calcolaDisponibilitaMagazzino(
   prodottoId: number,
   magazzinoId: number,
+  dataOperativa = dataOperativaEuropeRome(),
 ): Promise<DisponibilitaMagazzino> {
-  const [fisico] = await db
-    .select({ totale: sum(lottiTable.quantitaResidua) })
+  const [giacenze] = await db
+    .select({
+      fisica: sum(lottiTable.quantitaResidua),
+      scaduta: sql<string>`coalesce(sum(${lottiTable.quantitaResidua}) filter (where ${lottiTable.dataScadenza} < ${dataOperativa}), 0)`,
+      distribuibile: sql<string>`coalesce(sum(${lottiTable.quantitaResidua}) filter (where ${lottiTable.dataScadenza} is null or ${lottiTable.dataScadenza} >= ${dataOperativa}), 0)`,
+    })
     .from(lottiTable)
     .where(and(eq(lottiTable.prodottoId, prodottoId), eq(lottiTable.magazzinoId, magazzinoId)));
 
   const [prenotato] = await db
     .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
     .from(prenotazioniMagazzinoTable)
+    .innerJoin(
+      lottiTable,
+      eq(prenotazioniMagazzinoTable.lottoId, lottiTable.id),
+    )
     .where(
       and(
         eq(prenotazioniMagazzinoTable.prodottoId, prodottoId),
         eq(prenotazioniMagazzinoTable.magazzinoId, magazzinoId),
         eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
+        lottoDistribuibileCondition(dataOperativa),
       ),
     );
 
-  const giacenzaFisica = parseDbNumber(fisico?.totale);
+  const giacenzaFisica = parseDbNumber(giacenze?.fisica);
+  const giacenzaScaduta = parseDbNumber(giacenze?.scaduta);
+  const giacenzaDistribuibile = parseDbNumber(giacenze?.distribuibile);
   const impegnato = parseDbNumber(prenotato?.totale);
   return {
     prodottoId,
     magazzinoId,
     giacenzaFisica,
+    giacenzaScaduta,
+    giacenzaDistribuibile,
     impegnato,
-    disponibileReale: giacenzaFisica - impegnato,
+    disponibileReale: giacenzaDistribuibile - impegnato,
   };
 }
 
@@ -60,6 +80,7 @@ export async function calcolaImpegnatoAttivoPerGiacenze(
   const prodottoIds = [...new Set(pairs.map((pair) => pair.prodottoId))];
   const magazzinoIds = [...new Set(pairs.map((pair) => pair.magazzinoId))];
   const requestedKeys = new Set(pairs.map((pair) => disponibilitaMagazzinoKey(pair.prodottoId, pair.magazzinoId)));
+  const dataOperativa = dataOperativaEuropeRome();
 
   const rows = await db
     .select({
@@ -68,11 +89,16 @@ export async function calcolaImpegnatoAttivoPerGiacenze(
       totale: sum(prenotazioniMagazzinoTable.quantita),
     })
     .from(prenotazioniMagazzinoTable)
+    .innerJoin(
+      lottiTable,
+      eq(prenotazioniMagazzinoTable.lottoId, lottiTable.id),
+    )
     .where(
       and(
         eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
         inArray(prenotazioniMagazzinoTable.prodottoId, prodottoIds),
         inArray(prenotazioniMagazzinoTable.magazzinoId, magazzinoIds),
+        lottoDistribuibileCondition(dataOperativa),
       ),
     )
     .groupBy(prenotazioniMagazzinoTable.prodottoId, prenotazioniMagazzinoTable.magazzinoId);

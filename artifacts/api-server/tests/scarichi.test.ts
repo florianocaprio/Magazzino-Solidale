@@ -41,7 +41,7 @@ async function creaScarico(opts: {
     .send({
       magazzinoId,
       dataScarico: "2026-06-24",
-      causale: opts.causale ?? "scaduta",
+      causale: opts.causale ?? "deteriorata",
       causaleAltro: opts.causaleAltro,
       note: opts.note,
       righe: [
@@ -143,7 +143,7 @@ describe("POST /scarichi — scarico FEFO", () => {
     expect(perLotto.get(lottoB)).toBe(5);
     for (const m of movimenti) {
       expect(m.tipoMovimento).toBe("scarico");
-      expect(m.tipoDettaglio).toBe("scaduta");
+      expect(m.tipoDettaglio).toBe("deteriorata");
       expect(m.magazzinoId).toBe(magazzinoId);
       expect(m.prodottoId).toBe(prodottoId);
     }
@@ -187,6 +187,61 @@ describe("POST /scarichi — scarico FEFO", () => {
     expect(movimenti).toHaveLength(1);
     expect(movimenti[0].tipoDettaglio).toBe("rubata");
     expect(parseFloat(movimenti[0].quantita)).toBe(3);
+  });
+
+  it("la causale scaduta usa esclusivamente lotti già scaduti e conserva il ledger append-only", async () => {
+    const prodottoId = await createProdotto(scope);
+    const scaduto = await createLotto({
+      prodottoId,
+      magazzinoId,
+      quantita: 4,
+      dataScadenza: "2026-06-23",
+    });
+    const valido = await createLotto({
+      prodottoId,
+      magazzinoId,
+      quantita: 7,
+      dataScadenza: "2026-06-24",
+    });
+
+    const res = await creaScarico({
+      prodottoId,
+      quantita: 3,
+      causale: "scaduta",
+    });
+
+    expect(res.status).toBe(201);
+    scope.scaricoIds.push(res.body.id);
+    expect(parseFloat((await getLotto(scaduto)).quantitaResidua)).toBe(1);
+    expect(parseFloat((await getLotto(valido)).quantitaResidua)).toBe(7);
+    const movimenti = await getScaricoMovimentiForMagazzino(magazzinoId);
+    expect(movimenti).toHaveLength(1);
+    expect(movimenti[0]).toMatchObject({
+      tipoMovimento: "scarico",
+      tipoDettaglio: "scaduta",
+      lottoId: scaduto,
+      quantita: "3.00",
+    });
+  });
+
+  it("la causale scaduta non consuma un lotto che scade nella data operativa", async () => {
+    const prodottoId = await createProdotto(scope);
+    const lottoId = await createLotto({
+      prodottoId,
+      magazzinoId,
+      quantita: 5,
+      dataScadenza: "2026-06-24",
+    });
+
+    const res = await creaScarico({
+      prodottoId,
+      quantita: 1,
+      causale: "scaduta",
+    });
+
+    expect(res.status).toBe(400);
+    expect(parseFloat((await getLotto(lottoId)).quantitaResidua)).toBe(5);
+    expect(await getScaricoMovimentiForMagazzino(magazzinoId)).toHaveLength(0);
   });
 
   it("deriva l'unità di misura dal prodotto (ignora quella inviata dal client)", async () => {

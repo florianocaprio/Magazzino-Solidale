@@ -4,6 +4,7 @@ import {
   bolleTable,
   bollaRigheTable,
   consegneTable,
+  interventiStoricoStatiTable,
   interventiTable,
   lottiTable,
   movimentiTable,
@@ -14,6 +15,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
 import { requireOperationalMagazzino } from "./inventoryLedger";
 import { parseDbNumber } from "./disponibilitaMagazzino";
+import { isLottoDistribuibile } from "./lottoPolicy";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -77,7 +79,6 @@ async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
   const [esistente] = await tx.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
 
   if (righe.length === 0) {
-    if (esistente) await tx.delete(interventiTable).where(eq(interventiTable.id, esistente.id));
     return;
   }
 
@@ -117,8 +118,37 @@ export async function syncInterventoBolla(bollaId: number) {
   await db.transaction((tx) => syncInterventoBollaTx(tx, bollaId));
 }
 
-export async function removeInterventoBolla(bollaId: number) {
-  await db.delete(interventiTable).where(eq(interventiTable.bollaId, bollaId));
+export async function annullaInterventoDaBollaTx(
+  tx: Tx,
+  bollaId: number,
+  operatoreId: number,
+  motivo: string,
+): Promise<void> {
+  const [intervento] = await tx
+    .select()
+    .from(interventiTable)
+    .where(eq(interventiTable.bollaId, bollaId))
+    .for("update");
+  if (!intervento || intervento.stato === "annullato") return;
+
+  const now = new Date();
+  await tx
+    .update(interventiTable)
+    .set({
+      stato: "annullato",
+      motivoAnnullamento: motivo,
+      operatoreId,
+      dataAggiornamento: now,
+    })
+    .where(eq(interventiTable.id, intervento.id));
+  await tx.insert(interventiStoricoStatiTable).values({
+    interventoId: intervento.id,
+    statoPrecedente: intervento.stato,
+    statoNuovo: "annullato",
+    operatoreId,
+    dataTransizione: now,
+    motivo,
+  });
 }
 
 export async function stornoRigaTx(
@@ -197,6 +227,12 @@ async function convertiPrenotazioniAttiveInScarico(
     const prenotazione = row.p;
     const qta = parseDbNumber(prenotazione.quantita);
     const lotto = await lockLotto(tx, prenotazione.lottoId);
+    if (!isLottoDistribuibile(lotto.dataScadenza, opts.dataMovimento)) {
+      throw new BollaActionError(
+        409,
+        `Impossibile consegnare la bolla: il lotto ${lotto.codiceLotto ?? `#${lotto.id}`} è scaduto`,
+      );
+    }
     const residua = parseDbNumber(lotto.quantitaResidua);
     if (residua < qta) {
       throw new BollaActionError(

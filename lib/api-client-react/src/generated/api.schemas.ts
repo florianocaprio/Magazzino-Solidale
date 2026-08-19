@@ -826,7 +826,12 @@ export interface Giacenza {
   magazzinoId: number;
   magazzinoNome: string;
   quantitaTotale: number;
+  /** Quantità fisicamente presente, inclusi i lotti scaduti. */
   giacenzaFisica: number;
+  /** Quantità fisicamente presente su lotti scaduti alla data civile Europe/Rome. */
+  giacenzaScaduta: number;
+  /** Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome. */
+  giacenzaDistribuibile: number;
   impegnato: number;
   disponibileReale: number;
   scortaMinima: number;

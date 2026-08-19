@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { lottiTable, prodottiTable, magazziniTable } from "@workspace/db";
-import { eq, and, gt, sum, count, min } from "drizzle-orm";
+import { eq, and, gt, sum, min, sql } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -14,6 +14,7 @@ import {
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
 import { requirePermission } from "../middlewares/auth";
+import { dataOperativaEuropeRome } from "../lib/lottoPolicy";
 
 const router: IRouter = Router();
 
@@ -26,6 +27,7 @@ router.get("/giacenze", requirePermission("magazzino.view"), async (req, res) =>
   const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
   if (scope) conditions.push(scope);
 
+    const dataOperativa = dataOperativaEuropeRome();
   const rows = await db
     .select({
       prodottoId: prodottiTable.id,
@@ -38,8 +40,12 @@ router.get("/giacenze", requirePermission("magazzino.view"), async (req, res) =>
       magazzinoId: magazziniTable.id,
       magazzinoNome: magazziniTable.nome,
       quantitaTotale: sum(lottiTable.quantitaResidua),
-      lottiAttivi: count(lottiTable.id),
-      prossimaScadenza: min(lottiTable.dataScadenza),
+        giacenzaScaduta: sql<string>`coalesce(sum(${lottiTable.quantitaResidua}) filter (where ${lottiTable.dataScadenza} < ${dataOperativa}), 0)`,
+        giacenzaDistribuibile: sql<string>`coalesce(sum(${lottiTable.quantitaResidua}) filter (where ${lottiTable.dataScadenza} is null or ${lottiTable.dataScadenza} >= ${dataOperativa}), 0)`,
+        lottiAttivi: sql<number>`count(${lottiTable.id}) filter (where ${lottiTable.dataScadenza} is null or ${lottiTable.dataScadenza} >= ${dataOperativa})`,
+        prossimaScadenza: min(
+          sql<string>`case when ${lottiTable.dataScadenza} >= ${dataOperativa} then ${lottiTable.dataScadenza} end`,
+        ),
     })
     .from(lottiTable)
     .innerJoin(prodottiTable, eq(lottiTable.prodottoId, prodottiTable.id))
@@ -54,9 +60,11 @@ router.get("/giacenze", requirePermission("magazzino.view"), async (req, res) =>
 
   const result = rows.map(r => {
     const giacenzaFisica = parseDbNumber(r.quantitaTotale);
+    const giacenzaScaduta = parseDbNumber(r.giacenzaScaduta);
+    const giacenzaDistribuibile = parseDbNumber(r.giacenzaDistribuibile);
     const impegnato = impegnatoByKey.get(disponibilitaMagazzinoKey(r.prodottoId, r.magazzinoId)) ?? 0;
     const sm = parseDbNumber(r.scortaMinima);
-    const disponibileReale = giacenzaFisica - impegnato;
+    const disponibileReale = giacenzaDistribuibile - impegnato;
     return {
       prodottoId: r.prodottoId,
       prodottoNome: r.prodottoNome,
@@ -67,6 +75,8 @@ router.get("/giacenze", requirePermission("magazzino.view"), async (req, res) =>
       magazzinoNome: r.magazzinoNome,
       quantitaTotale: giacenzaFisica,
       giacenzaFisica,
+        giacenzaScaduta,
+        giacenzaDistribuibile,
       impegnato,
       disponibileReale,
       scortaMinima: sm,

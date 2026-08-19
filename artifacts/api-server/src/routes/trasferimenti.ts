@@ -762,11 +762,22 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     );
   }
   for (const [prodottoId, richiesta] of richiestaPerProdotto) {
-    const disp = await disponibileRealeProdotto(
+    const disponibilita = await calcolaDisponibilitaMagazzino(
       prodottoId,
       current.magazzinoOrigineId,
     );
+    const disp = Math.max(0, disponibilita.disponibileReale);
     if (richiesta > disp) {
+      if (
+        richiesta <= disponibilita.giacenzaFisica &&
+        disponibilita.giacenzaScaduta > 0
+      ) {
+        res.status(409).json({
+          error:
+            "Disponibilità FEFO insufficiente o composta solo da lotti scaduti",
+        });
+        return;
+      }
       res.status(400).json({
         error: `Disponibilità insufficiente all'origine per ${prodottoMap.get(prodottoId) ?? `prodotto #${prodottoId}`}: ${disp} disponibili, richiesti ${richiesta}`,
       });

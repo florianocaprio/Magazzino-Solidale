@@ -24,14 +24,17 @@ import {
   canUseBeneficiario,
   visibleMagazzinoIds,
 } from "../lib/centroScope";
-import { parseDbNumber } from "../lib/disponibilitaMagazzino";
+import {
+  calcolaDisponibilitaMagazzino,
+  parseDbNumber,
+} from "../lib/disponibilitaMagazzino";
 import {
   BollaActionError,
   completeBollaDelivery,
   handleBollaActionError,
   lockBolla,
   lockLotto,
-  removeInterventoBolla,
+  annullaInterventoDaBollaTx,
   scarichiFisiciBolla,
   stornoRigaTx,
 } from "../lib/bollaDelivery";
@@ -47,6 +50,11 @@ import { logger } from "../lib/logger";
 import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 import { requirePermission } from "../middlewares/auth";
 import { InventoryLedgerError, requireOperationalMagazzino } from "../lib/inventoryLedger";
+import {
+  dataOperativaEuropeRome,
+  isLottoDistribuibile,
+  lottoDistribuibileCondition,
+} from "../lib/lottoPolicy";
 
 const router: IRouter = Router();
 
@@ -218,15 +226,7 @@ async function buildDettaglio(id: number) {
 
 /** Calcola giacenza disponibile per un prodotto in un magazzino */
 async function giacenzaDisponibile(prodottoId: number, magazzinoId: number): Promise<number> {
-  const [res] = await db
-    .select({ totale: sum(lottiTable.quantitaResidua) })
-    .from(lottiTable)
-    .where(and(
-      eq(lottiTable.prodottoId, prodottoId),
-      eq(lottiTable.magazzinoId, magazzinoId),
-      gt(lottiTable.quantitaResidua, "0"),
-    ));
-  return parseFloat(res?.totale ?? "0");
+  return (await calcolaDisponibilitaMagazzino(prodottoId, magazzinoId)).disponibileReale;
 }
 
 /** Calcola quanto è già in bolla (bozza) per un prodotto */
@@ -250,7 +250,7 @@ async function quantitaGiaInBollaLotto(bollaId: number, lottoId: number): Promis
 }
 
 async function canAccessBollaOperativa(
-  bolla: typeof bolleTable.$inferSelect,
+  bolla: Pick<typeof bolleTable.$inferSelect, "beneficiarioId" | "magazzinoId">,
   caller: number | null,
   cittaId: number | null,
   zonaUdsId: number | null,
@@ -275,12 +275,14 @@ async function lockLottiFEFO(
   prodottoId: number,
   magazzinoId: number,
 ): Promise<Array<typeof lottiTable.$inferSelect>> {
+  const dataOperativa = dataOperativaEuropeRome();
   await tx.execute(sql`
     SELECT id
     FROM ${lottiTable}
     WHERE ${lottiTable.prodottoId} = ${prodottoId}
       AND ${lottiTable.magazzinoId} = ${magazzinoId}
       AND ${lottiTable.quantitaResidua} > 0
+      AND (${lottiTable.dataScadenza} IS NULL OR ${lottiTable.dataScadenza} >= ${dataOperativa})
     ORDER BY ${lottiTable.dataScadenza} ASC, ${lottiTable.dataCarico} ASC, ${lottiTable.id} ASC
     FOR UPDATE
   `);
@@ -292,6 +294,7 @@ async function lockLottiFEFO(
       eq(lottiTable.prodottoId, prodottoId),
       eq(lottiTable.magazzinoId, magazzinoId),
       gt(lottiTable.quantitaResidua, "0"),
+      lottoDistribuibileCondition(dataOperativa),
     ))
     .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.dataCarico), asc(lottiTable.id));
 }
@@ -342,6 +345,9 @@ async function prenotaRigaFEFO(
     const lotto = await lockLotto(tx, riga.lottoId);
     if (lotto.prodottoId !== riga.prodottoId || lotto.magazzinoId !== bolla.magazzinoId) {
       throw new BollaActionError(400, "Il lotto selezionato non appartiene al prodotto o al magazzino della bolla");
+    }
+    if (!isLottoDistribuibile(lotto.dataScadenza)) {
+      throw new BollaActionError(409, "Il lotto selezionato è scaduto e non può essere distribuito");
     }
     const disponibileReale = parseDbNumber(lotto.quantitaResidua) - await impegnatoAttivoLotto(tx, lotto.id);
     if (disponibileReale < richiesta) {
@@ -724,10 +730,21 @@ router.post("/bolle/:id/righe", requirePermission("bolle.manage"), async (req, r
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(bolla.beneficiarioId), callerCittaId(req))
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(bolla.beneficiarioId), callerZonaUdsId(req))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  const { prodottoId, lottoId, quantita, unitaMisura, note } = req.body ?? {};
+  if (!Number.isInteger(prodottoId) || prodottoId <= 0) {
+    res.status(400).json({ error: "Prodotto non valido" });
+    return;
+  }
+  if (lottoId != null && (!Number.isInteger(lottoId) || lottoId <= 0)) {
+    res.status(400).json({ error: "Lotto non valido" });
+    return;
+  }
+  if (typeof quantita !== "number" || !Number.isFinite(quantita) || quantita <= 0) {
+    res.status(400).json({ error: "Quantità non valida" });
     return;
   }
   if (!STATI_MODIFICABILI.includes(bolla.stato)) {
@@ -735,15 +752,35 @@ router.post("/bolle/:id/righe", requirePermission("bolle.manage"), async (req, r
     return;
   }
 
-  const { prodottoId, lottoId, quantita, unitaMisura, note } = req.body;
-
   const [prod] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, prodottoId));
+  if (!prod || !prod.attivo) {
+    res.status(400).json({ error: "Prodotto non trovato o non attivo" });
+    return;
+  }
 
-  if (lottoId) {
-    const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId));
-    if (!lotto) { res.status(404).json({ error: "Lotto non trovato" }); return; }
+  if (lottoId != null) {
+    const [lotto] = await db.select().from(lottiTable).where(and(
+      eq(lottiTable.id, lottoId),
+      eq(lottiTable.magazzinoId, bolla.magazzinoId),
+    ));
+    if (!lotto) { res.status(404).json({ error: "Lotto non trovato per il Magazzino della Bolla" }); return; }
+    if (lotto.prodottoId !== prodottoId) {
+      res.status(400).json({ error: "Il lotto selezionato non appartiene al prodotto richiesto" });
+      return;
+    }
+    if (!isLottoDistribuibile(lotto.dataScadenza)) {
+      res.status(409).json({ error: "Il lotto selezionato è scaduto e non può essere distribuito" });
+      return;
+    }
     const giaInBollaLotto = bolla.stato === "bozza" ? await quantitaGiaInBollaLotto(bollaId, lottoId) : 0;
-    const nettaLotto = parseFloat(lotto.quantitaResidua) - giaInBollaLotto;
+    const [impegno] = await db
+      .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
+      .from(prenotazioniMagazzinoTable)
+      .where(and(
+        eq(prenotazioniMagazzinoTable.lottoId, lottoId),
+        eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
+      ));
+    const nettaLotto = parseFloat(lotto.quantitaResidua) - parseDbNumber(impegno?.totale) - giaInBollaLotto;
     if (nettaLotto < quantita) {
       res.status(400).json({
         error: `Disponibilità insufficiente nel lotto: ${Math.max(0, nettaLotto).toFixed(2)} disponibili, richiesti ${quantita}`,
@@ -799,9 +836,7 @@ router.delete("/bolle/:id/righe/:rigaId", requirePermission("bolle.manage"), asy
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(bolla.beneficiarioId), callerCittaId(req))
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(bolla.beneficiarioId), callerZonaUdsId(req))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -1128,6 +1163,16 @@ router.post("/bolle/:id/annulla", requirePermission("bolle.cancel"), async (req,
           .where(and(eq(consegneTable.id, current.consegnaId), eq(consegneTable.stato, "effettuata")));
       }
 
+      const motivoIntervento =
+        typeof req.body?.motivo === "string" && req.body.motivo.trim()
+          ? `Annullamento Bolla ${current.numeroBolla}: ${req.body.motivo.trim()}`
+          : `Annullamento Bolla ${current.numeroBolla}`;
+      await annullaInterventoDaBollaTx(
+        tx,
+        bollaId,
+        req.user!.id,
+        motivoIntervento,
+      );
       await tx.update(bolleTable).set({ stato: "annullato", operatoreId: req.user!.id }).where(eq(bolleTable.id, bollaId));
     });
   } catch (err) {
@@ -1135,7 +1180,6 @@ router.post("/bolle/:id/annulla", requirePermission("bolle.cancel"), async (req,
     throw err;
   }
 
-  await removeInterventoBolla(bollaId);
   const det = await buildDettaglio(bollaId);
   res.json(det);
 });

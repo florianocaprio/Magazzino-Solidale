@@ -21,6 +21,7 @@ import {
 import { PRENOTAZIONE_MAGAZZINO_ATTIVA, parseDbNumber } from "../lib/disponibilitaMagazzino";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
+import { lottoDistribuibileCondition } from "../lib/lottoPolicy";
 
 const router: IRouter = Router();
 
@@ -121,6 +122,7 @@ router.get("/preparazione-consegne", requirePermission("magazzino.view"), async 
       and(
         inArray(lottiTable.magazzinoId, magIds),
         gt(lottiTable.quantitaResidua, "0"),
+          lottoDistribuibileCondition(),
       ),
     )
     .groupBy(lottiTable.prodottoId);
@@ -134,10 +136,15 @@ router.get("/preparazione-consegne", requirePermission("magazzino.view"), async 
       impegnato: sum(prenotazioniMagazzinoTable.quantita),
     })
     .from(prenotazioniMagazzinoTable)
+      .innerJoin(
+        lottiTable,
+        eq(prenotazioniMagazzinoTable.lottoId, lottiTable.id),
+      )
     .where(
       and(
         inArray(prenotazioniMagazzinoTable.magazzinoId, magIds),
         eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
+          lottoDistribuibileCondition(),
       ),
     )
     .groupBy(prenotazioniMagazzinoTable.prodottoId);

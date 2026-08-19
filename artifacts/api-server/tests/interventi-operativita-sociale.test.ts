@@ -489,6 +489,67 @@ describe("gestione operativa degli interventi Sociali", () => {
     expect(materials).toHaveLength(2);
   });
 
+  it("non distribuisce materiali Sociali quando il prodotto ha soltanto lotti scaduti", async () => {
+    const [prodottoScaduto] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `P53CD-SCAD-${rnd()}`,
+        nome: "Prodotto scaduto",
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+      })
+      .returning({ id: prodottiTable.id });
+    ids.prodotti.push(prodottoScaduto.id);
+    const [lottoScaduto] = await db
+      .insert(lottiTable)
+      .values({
+        prodottoId: prodottoScaduto.id,
+        dataCarico: "2000-01-01",
+        dataScadenza: "2000-01-02",
+        quantitaCaricata: "5",
+        quantitaResidua: "5",
+        magazzinoId,
+      })
+      .returning({ id: lottiTable.id });
+    ids.lotti.push(lottoScaduto.id);
+    const id = await createIntervento({ stato: "in_corso", avvio: new Date() });
+
+    const response = await request(makeApp())
+      .post(`/interventi/${id}/salva-operativita`)
+      .send({
+        versione: await versioneIntervento(id),
+        materiali: [
+          {
+            prodottoId: prodottoScaduto.id,
+            quantitaPrevista: 1,
+            quantitaConsegnata: 1,
+            statoPreparazione: "consegnato",
+            magazzinoId,
+          },
+        ],
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/disponibilità insufficiente/i);
+    const [lottoDopo] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lottoScaduto.id));
+    expect(lottoDopo.quantitaResidua).toBe("5.00");
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.prodottoId, prodottoScaduto.id)),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(interventiMaterialiTable)
+        .where(eq(interventiMaterialiTable.interventoId, id)),
+    ).toHaveLength(0);
+  });
+
   it("conclude una sola volta e crea il successivo nella stessa transazione", async () => {
     const id = await createIntervento({
       stato: "in_corso",
