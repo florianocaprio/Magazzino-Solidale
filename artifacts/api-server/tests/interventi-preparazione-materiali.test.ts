@@ -79,6 +79,7 @@ function makeApp(
           centroAscoltoId: number;
           zonaUdsId: null;
           aree: string[];
+          permessi: string[];
           isAdmin: boolean;
           isSuperAdmin: boolean;
         };
@@ -89,6 +90,7 @@ function makeApp(
       centroAscoltoId: options.centroId ?? centroRoma,
       zonaUdsId: null,
       aree: ["sociale"],
+      permessi: ["sociale.interventi.view", "sociale.interventi.update"],
       isAdmin: false,
       isSuperAdmin: false,
     };

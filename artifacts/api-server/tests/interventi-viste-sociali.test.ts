@@ -73,6 +73,7 @@ function makeApp(
           centroAscoltoId: number | null;
           zonaUdsId: null;
           aree: string[];
+          permessi: string[];
           isAdmin: boolean;
           isSuperAdmin: boolean;
         };
@@ -84,6 +85,13 @@ function makeApp(
         options.centroId === undefined ? centroRoma : options.centroId,
       zonaUdsId: null,
       aree: options.aree ?? ["sociale"],
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+        "sociale.interventi.complete",
+        "sociale.interventi.cancel",
+      ],
       isAdmin: false,
       isSuperAdmin: false,
     };

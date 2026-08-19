@@ -9,9 +9,13 @@ import {
   interventiMaterialiTable,
   interventiStoricoStatiTable,
   interventiTable,
+  lottiTable,
   magazziniTable,
+  movimentiTable,
   pool,
   prodottiTable,
+  scarichiTable,
+  scaricoRigheTable,
   tipiInterventoTable,
   utentiTable,
 } from "@workspace/db";
@@ -27,6 +31,7 @@ const ids = {
   interventi: [] as number[],
   prodotti: [] as number[],
   magazzini: [] as number[],
+  lotti: [] as number[],
   tipi: [] as number[],
 };
 
@@ -62,6 +67,7 @@ function makeApp(
           centroAscoltoId: number;
           zonaUdsId: null;
           aree: string[];
+          permessi: string[];
           isAdmin: boolean;
           isSuperAdmin: boolean;
         };
@@ -72,6 +78,13 @@ function makeApp(
       centroAscoltoId: options.centroId ?? centroRoma,
       zonaUdsId: null,
       aree: options.aree ?? ["sociale"],
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+        "sociale.interventi.complete",
+        "sociale.interventi.cancel",
+      ],
       isAdmin: false,
       isSuperAdmin: false,
     };
@@ -209,6 +222,17 @@ beforeAll(async () => {
     .returning({ id: magazziniTable.id });
   magazzinoId = warehouse.id;
   ids.magazzini.push(warehouse.id);
+  const [lotto] = await db
+    .insert(lottiTable)
+    .values({
+      prodottoId,
+      dataCarico: "2026-08-01",
+      quantitaCaricata: "20",
+      quantitaResidua: "20",
+      magazzinoId,
+    })
+    .returning({ id: lottiTable.id });
+  ids.lotti.push(lotto.id);
   const [type] = await db
     .insert(tipiInterventoTable)
     .values({ nome: `Colloquio 53CD ${rnd()}` })
@@ -223,6 +247,33 @@ afterAll(async () => {
       .delete(interventiTable)
       .where(inArray(interventiTable.id, ids.interventi));
   }
+  if (ids.prodotti.length > 0) {
+    await db
+      .delete(movimentiTable)
+      .where(inArray(movimentiTable.prodottoId, ids.prodotti));
+  }
+  if (ids.magazzini.length > 0) {
+    const scarichi = await db
+      .select({ id: scarichiTable.id })
+      .from(scarichiTable)
+      .where(inArray(scarichiTable.magazzinoId, ids.magazzini));
+    if (scarichi.length > 0) {
+      await db.delete(scaricoRigheTable).where(
+        inArray(
+          scaricoRigheTable.scaricoId,
+          scarichi.map((row) => row.id),
+        ),
+      );
+      await db.delete(scarichiTable).where(
+        inArray(
+          scarichiTable.id,
+          scarichi.map((row) => row.id),
+        ),
+      );
+    }
+  }
+  if (ids.lotti.length > 0)
+    await db.delete(lottiTable).where(inArray(lottiTable.id, ids.lotti));
   if (ids.prodotti.length > 0)
     await db
       .delete(prodottiTable)

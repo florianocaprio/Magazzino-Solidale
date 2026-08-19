@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import { pool } from "@workspace/db";
 import turniRouter from "../src/routes/turni";
@@ -24,7 +24,8 @@ import {
 
 let scope: SeedScope;
 
-const appGlobal = () => makeScopedApp(turniRouter, { id: 0, centroAscoltoId: null, cittaId: null });
+const appGlobal = () =>
+  makeScopedApp(turniRouter, { id: 0, centroAscoltoId: null, cittaId: null });
 
 const DATA = "2026-07-15";
 const FASCIA = "09-13";
@@ -105,5 +106,33 @@ describe("PUT /turni — anti-doppia-prenotazione mezzo", () => {
     expect(second.status).toBe(200);
     if (second.body?.id) scope.turnoIds.push(second.body.id);
     expect(second.body.volontari).toHaveLength(2);
+  });
+
+  it("serializza due creazioni concorrenti dello stesso slot", async () => {
+    const citta = await createCitta(scope);
+    const centro = await createCentroRec(scope, { cittaId: citta });
+    const vol1 = await createVolontario(scope, null);
+    const vol2 = await createVolontario(scope, null);
+    const payload = (volontarioId: number) => ({
+      centroAscoltoId: centro.id,
+      data: "2026-07-16",
+      fascia: FASCIA,
+      volontari: [{ volontarioId }],
+    });
+
+    const responses = await Promise.all([
+      request(appGlobal()).put("/turni").send(payload(vol1)),
+      request(appGlobal()).put("/turni").send(payload(vol2)),
+    ]);
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+    const turnoIds = [
+      ...new Set(
+        responses
+          .map((response) => response.body?.id as number | undefined)
+          .filter((id): id is number => id != null),
+      ),
+    ];
+    expect(turnoIds).toHaveLength(1);
+    scope.turnoIds.push(...turnoIds);
   });
 });

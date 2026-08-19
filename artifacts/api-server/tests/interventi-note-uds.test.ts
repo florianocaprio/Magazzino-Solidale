@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, interventiTable, utentiTable } from "@workspace/db";
+import {
+  db,
+  pool,
+  beneficiariTable,
+  cittaTable,
+  interventiTable,
+  utentiTable,
+} from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
 
@@ -14,15 +21,25 @@ import interventiRouter from "../src/routes/interventi";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 let operatorUserId: number;
+let cittaId: number;
 
 function makeApp(): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as unknown as { user: { id: number; centroAscoltoId: number | null; cittaId: number | null; aree: string[] } }).user = {
+    (
+      req as unknown as {
+        user: {
+          id: number;
+          centroAscoltoId: number | null;
+          cittaId: number | null;
+          aree: string[];
+        };
+      }
+    ).user = {
       id: operatorUserId,
       centroAscoltoId: null,
-      cittaId: null,
+      cittaId,
       aree: ["sociale", "uds"],
     };
     next();
@@ -36,12 +53,18 @@ const beneficiarioIds: number[] = [];
 let beneficiarioId: number;
 
 beforeAll(async () => {
+  const [citta] = await db
+    .insert(cittaTable)
+    .values({ nome: `Area Note UDS ${rnd()}` })
+    .returning({ id: cittaTable.id });
+  cittaId = citta.id;
   const [operator] = await db
     .insert(utentiTable)
     .values({
       username: `interventi_test_${rnd()}`,
       passwordHash: "test-only",
       nome: "Operatore Interventi Test",
+      cittaId,
       attivo: true,
     })
     .returning({ id: utentiTable.id });
@@ -49,7 +72,14 @@ beforeAll(async () => {
 
   const [b] = await db
     .insert(beneficiariTable)
-    .values({ codice: `BEN-${rnd()}`, nome: "NoteUds", cognome: rnd(), sesso: "M", uds: true, cittaId: null })
+    .values({
+      codice: `BEN-${rnd()}`,
+      nome: "NoteUds",
+      cognome: rnd(),
+      sesso: "M",
+      uds: true,
+      cittaId,
+    })
     .returning({ id: beneficiariTable.id });
   beneficiarioId = b.id;
   beneficiarioIds.push(b.id);
@@ -57,47 +87,75 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (interventoIds.length > 0) {
-    await db.delete(interventiTable).where(inArray(interventiTable.id, interventoIds));
+    await db
+      .delete(interventiTable)
+      .where(inArray(interventiTable.id, interventoIds));
   }
   if (beneficiarioIds.length > 0) {
-    await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiarioIds));
+    await db
+      .delete(beneficiariTable)
+      .where(inArray(beneficiariTable.id, beneficiarioIds));
   }
   await db.delete(utentiTable).where(eq(utentiTable.id, operatorUserId));
+  await db.delete(cittaTable).where(eq(cittaTable.id, cittaId));
   await pool.end();
 });
 
 describe("noteUds su /interventi", () => {
   it("persiste noteUds in PATCH e lo ritorna nella LIST", async () => {
     const app = makeApp();
-    const created = await request(app)
-      .post("/interventi")
-      .send({ beneficiarioId, dataIntervento: "2026-06-25", tipoIntervento: "ascolto" });
+    const created = await request(app).post("/interventi").send({
+      beneficiarioId,
+      tipoIntervento: "ascolto",
+      ambito: "uds",
+      stato: "da_pianificare",
+    });
     expect(created.status).toBe(201);
     const id = created.body.id as number;
     interventoIds.push(id);
     expect(created.body.noteUds ?? null).toBeNull();
 
-    const patched = await request(app).patch(`/interventi/${id}`).send({ noteUds: "Nota gialla" });
+    const patched = await request(app).patch(`/interventi/${id}`).send({
+      versione: created.body.dataAggiornamento,
+      noteUds: "Nota gialla",
+    });
     expect(patched.status).toBe(200);
     expect(patched.body.noteUds).toBe("Nota gialla");
 
-    const list = await request(app).get("/interventi").query({ beneficiarioId: String(beneficiarioId) });
+    const list = await request(app)
+      .get("/interventi")
+      .query({ beneficiarioId: String(beneficiarioId), ambito: "uds" });
     expect(list.status).toBe(200);
-    const found = (list.body as Array<{ id: number; noteUds: string | null }>).find((r) => r.id === id);
+    const found = (
+      list.body as Array<{ id: number; noteUds: string | null }>
+    ).find((r) => r.id === id);
     expect(found?.noteUds).toBe("Nota gialla");
   });
 
   it("mantiene note (materiale) e noteUds come campi distinti", async () => {
     const app = makeApp();
-    const created = await request(app)
-      .post("/interventi")
-      .send({ beneficiarioId, dataIntervento: "2026-06-25", tipoIntervento: "distribuzione", note: "Coperta", noteUds: "Da ricontattare" });
+    const created = await request(app).post("/interventi").send({
+      beneficiarioId,
+      tipoIntervento: "distribuzione",
+      ambito: "uds",
+      stato: "da_pianificare",
+      note: "Coperta",
+      noteUds: "Da ricontattare",
+    });
     expect(created.status).toBe(201);
     const id = created.body.id as number;
     interventoIds.push(id);
 
-    const list = await request(app).get("/interventi").query({ beneficiarioId: String(beneficiarioId) });
-    const found = (list.body as Array<{ id: number; note: string | null; noteUds: string | null }>).find((r) => r.id === id);
+    const list = await request(app)
+      .get("/interventi")
+      .query({ beneficiarioId: String(beneficiarioId), ambito: "uds" });
+    const found = (
+      list.body as Array<{
+        id: number;
+        note: string | null;
+        noteUds: string | null;
+      }>
+    ).find((r) => r.id === id);
     expect(found?.note).toBe("Coperta");
     expect(found?.noteUds).toBe("Da ricontattare");
   });

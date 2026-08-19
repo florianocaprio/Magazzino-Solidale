@@ -60,9 +60,23 @@ function makeApp(
           centroAscoltoId: number | null;
           zonaUdsId: number | null;
           aree: string[];
+          permessi: string[];
         };
       }
-    ).user = { id: operatoreId, cittaId, centroAscoltoId, zonaUdsId, aree };
+    ).user = {
+      id: operatoreId,
+      cittaId,
+      centroAscoltoId,
+      zonaUdsId,
+      aree,
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+        "sociale.interventi.complete",
+        "sociale.interventi.cancel",
+      ],
+    };
     next();
   });
   app.use(interventiRouter);
@@ -134,6 +148,15 @@ async function createWorkflow(
     });
   if (response.body?.id) interventoIds.push(response.body.id);
   return response;
+}
+
+async function versioneIntervento(id: number): Promise<string> {
+  const [row] = await db
+    .select({ versione: interventiTable.dataAggiornamento })
+    .from(interventiTable)
+    .where(eq(interventiTable.id, id));
+  if (!row?.versione) throw new Error("Versione intervento non disponibile");
+  return row.versione.toISOString();
 }
 
 beforeAll(async () => {
@@ -272,6 +295,7 @@ describe("workflow degli interventi", () => {
     const started = await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
       .send({
+        versione: await versioneIntervento(created.body.id),
         stato: "in_corso",
         dataOraTransizione: "2026-08-20T10:05:00+02:00",
         operatoreId: -1,
@@ -286,6 +310,7 @@ describe("workflow degli interventi", () => {
     const incoherent = await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
       .send({
+        versione: await versioneIntervento(created.body.id),
         stato: "concluso",
         dataOraTransizione: "2026-08-20T10:04:00+02:00",
       });
@@ -294,6 +319,7 @@ describe("workflow degli interventi", () => {
     const concluded = await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
       .send({
+        versione: await versioneIntervento(created.body.id),
         stato: "concluso",
         dataOraTransizione: "2026-08-20T10:30:00+02:00",
         motivo: "Attività completata",
@@ -322,6 +348,7 @@ describe("workflow degli interventi", () => {
     const started = await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
       .send({
+        versione: await versioneIntervento(created.body.id),
         stato: "in_corso",
         dataOraTransizione: "2026-08-14T22:30:00Z",
       });
@@ -334,12 +361,16 @@ describe("workflow degli interventi", () => {
     const created = await createWorkflow();
     const missingReason = await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
-      .send({ stato: "annullato" });
+      .send({
+        versione: await versioneIntervento(created.body.id),
+        stato: "annullato",
+      });
     expect(missingReason.status).toBe(400);
 
     const cancelled = await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
       .send({
+        versione: await versioneIntervento(created.body.id),
         stato: "annullato",
         motivo: "Richiesta del beneficiario",
         dataOraTransizione: "2026-08-21T09:00:00+02:00",
@@ -366,7 +397,11 @@ describe("workflow degli interventi", () => {
     });
     const noShow = await request(makeApp())
       .post(`/interventi/${planned.body.id}/transizioni`)
-      .send({ stato: "mancata_presentazione", motivo: "Non si è presentato" });
+      .send({
+        versione: await versioneIntervento(planned.body.id),
+        stato: "mancata_presentazione",
+        motivo: "Non si è presentato",
+      });
     expect(noShow.status).toBe(200);
     expect(noShow.body).toMatchObject({
       stato: "mancata_presentazione",
@@ -377,7 +412,10 @@ describe("workflow degli interventi", () => {
     const unplanned = await createWorkflow();
     const rejected = await request(makeApp())
       .post(`/interventi/${unplanned.body.id}/transizioni`)
-      .send({ stato: "mancata_presentazione" });
+      .send({
+        versione: await versioneIntervento(unplanned.body.id),
+        stato: "mancata_presentazione",
+      });
     expect(rejected.status).toBe(409);
   });
 
@@ -385,11 +423,18 @@ describe("workflow degli interventi", () => {
     const created = await createWorkflow();
     await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
-      .send({ stato: "annullato", motivo: "Test" });
+      .send({
+        versione: await versioneIntervento(created.body.id),
+        stato: "annullato",
+        motivo: "Test",
+      });
 
     const reopen = await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
-      .send({ stato: "da_pianificare" });
+      .send({
+        versione: await versioneIntervento(created.body.id),
+        stato: "da_pianificare",
+      });
     expect(reopen.status).toBe(409);
 
     const patched = await request(makeApp())
@@ -403,6 +448,7 @@ describe("workflow degli interventi", () => {
     await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
       .send({
+        versione: await versioneIntervento(created.body.id),
         stato: "pianificato",
         dataOraPianificata: "2026-09-01T10:00:00+02:00",
         dataOraTransizione: "2026-08-20T10:00:00+02:00",
@@ -410,6 +456,7 @@ describe("workflow degli interventi", () => {
     await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
       .send({
+        versione: await versioneIntervento(created.body.id),
         stato: "in_corso",
         dataOraTransizione: "2026-09-01T10:05:00+02:00",
       });
@@ -652,11 +699,13 @@ describe("visibilità territoriale del workflow", () => {
       ).status,
     ).toBe(201);
 
-    const legacy = await request(makeApp()).post("/interventi").send({
-      beneficiarioId: udsRomaAltraZona,
-      tipoIntervento: `legacy-area-${rnd()}`,
-      dataIntervento: "2025-01-17",
-    });
+    const legacy = await request(makeApp())
+      .post("/interventi")
+      .send({
+        beneficiarioId: udsRomaAltraZona,
+        tipoIntervento: `legacy-area-${rnd()}`,
+        dataIntervento: "2025-01-17",
+      });
     expect(legacy.status).toBe(201);
     interventoIds.push(legacy.body.id);
     expect(

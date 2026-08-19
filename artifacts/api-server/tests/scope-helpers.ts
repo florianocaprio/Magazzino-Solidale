@@ -78,7 +78,17 @@ export function makeScopedApp(
       zonaUdsId: user.zonaUdsId ?? null,
       aree: user.aree ?? ["sociale", "uds"],
       // Questi test isolano lo scoping territoriale, non l'RBAC.
-      permessi: user.permessi ?? ["beneficiari.view", "beneficiari.manage", "beneficiari.sensitive.view", "beneficiari.deactivate"],
+      permessi: user.permessi ?? [
+        "beneficiari.view",
+        "beneficiari.manage",
+        "beneficiari.sensitive.view",
+        "beneficiari.deactivate",
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+        "sociale.interventi.complete",
+        "sociale.interventi.cancel",
+      ],
       isAdmin: user.isAdmin ?? false,
       isSuperAdmin: user.isSuperAdmin ?? false,
     };
