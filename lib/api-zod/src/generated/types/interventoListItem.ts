@@ -10,21 +10,22 @@ import type { InterventoAvviso } from './interventoAvviso';
 import type { InterventoPriorita } from './interventoPriorita';
 import type { InterventoStato } from './interventoStato';
 
-export interface Intervento {
+/**
+ * Proiezione minimale per liste, calendario e dashboard; non include note o contenuti sociali estesi.
+ */
+export interface InterventoListItem {
   id: number;
   beneficiarioId: number;
   /** @nullable */
-  beneficiarioNome?: string | null;
+  beneficiarioNome: string | null;
   /** @nullable */
   beneficiarioCodice: string | null;
   /** @nullable */
   nucleoFamiliareSintesi: string | null;
   /** @nullable */
-  bollaId?: number | null;
+  operatoreId: number | null;
   /** @nullable */
-  operatoreId?: number | null;
-  /** @nullable */
-  operatoreCodice?: string | null;
+  operatoreCodice: string | null;
   /** @nullable */
   operatoreNome: string | null;
   /** @nullable */
@@ -36,26 +37,6 @@ export interface Intervento {
   /** @nullable */
   dataIntervento: Date | null;
   tipoIntervento: string;
-  /** @nullable */
-  descrizione?: string | null;
-  /** @nullable */
-  risultato?: string | null;
-  /** @nullable */
-  esito?: string | null;
-  /** @nullable */
-  prossimAzione?: string | null;
-  /** @nullable */
-  note?: string | null;
-  /** @nullable */
-  noteUds?: string | null;
-  /** @nullable */
-  dataFollowup?: string | null;
-  /** @nullable */
-  scadenzaIsee?: string | null;
-  /** @nullable */
-  scadenzaRinnovo?: string | null;
-  /** @nullable */
-  scadenzaAutodichiarazioneIndigenza?: string | null;
   stato: InterventoStato;
   ambito: InterventoAmbito | null;
   ambitoLegacy: boolean;
@@ -69,12 +50,9 @@ export interface Intervento {
   avviso: InterventoAvviso | null;
   /** @nullable */
   interventoPrecedenteId: number | null;
-  successoriIds?: number[];
   numeroSuccessori: number;
   /** @nullable */
   sede: string | null;
-  /** @nullable */
-  motivoAnnullamento?: string | null;
   dataCreazione: Date;
   /** @nullable */
   dataAggiornamento: Date | null;

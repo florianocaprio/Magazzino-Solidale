@@ -207,6 +207,7 @@ export * from './interventoDocumento';
 export * from './interventoDocumentoInput';
 export * from './interventoDocumentoStato';
 export * from './interventoInput';
+export * from './interventoListItem';
 export * from './interventoMancataPresentazioneInput';
 export * from './interventoMateriale';
 export * from './interventoMaterialeInput';

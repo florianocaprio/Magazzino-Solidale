@@ -204,7 +204,7 @@ export function InterventiSocialiWorkspace({
                 <TableHead>{t("interventi.detail.priority")}</TableHead>
                 <TableHead>{t("interventi.detail.center")}</TableHead>
                 <TableHead>{t("interventi.operatore")}</TableHead>
-                <TableHead>{t("common.description")}</TableHead>
+                <TableHead>{t("interventi.detail.history")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -258,12 +258,6 @@ export function InterventiSocialiWorkspace({
                       "–"}
                   </TableCell>
                   <TableCell className="max-w-64">
-                    <p
-                      className="truncate"
-                      title={intervento.descrizione ?? undefined}
-                    >
-                      {intervento.descrizione || "–"}
-                    </p>
                     {(intervento.interventoPrecedenteId ||
                       intervento.numeroSuccessori > 0) && (
                       <p className="text-xs text-muted-foreground">
@@ -341,11 +335,6 @@ export function InterventiSocialiWorkspace({
                 </dt>
                 <dd>{intervento.centroAscoltoNome || "–"}</dd>
               </dl>
-              {intervento.descrizione && (
-                <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">
-                  {intervento.descrizione}
-                </p>
-              )}
               {(intervento.interventoPrecedenteId ||
                 intervento.numeroSuccessori > 0) && (
                 <p className="mt-2 text-xs text-muted-foreground">

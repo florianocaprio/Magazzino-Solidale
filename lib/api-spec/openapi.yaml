@@ -1535,7 +1535,7 @@ paths:
             default: 200
       responses:
         "200":
-          description: List of interventions
+          description: Per l'ambito Sociale restituisce una proiezione minimale senza note, descrizione, risultato o altri contenuti estesi; il dettaglio completo è disponibile su GET /interventi/{id}. L'ambito UDS conserva il DTO storico completo.
           content:
             application/json:
               schema:
@@ -3174,7 +3174,11 @@ paths:
           description: Interventi pianificati con sede esplicita, minimizzati e scoped
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MapsMarker" },
+                }
 
   /maps/layers/pacchi/consegne:
     get:
@@ -3188,7 +3192,11 @@ paths:
           description: Consegne domiciliari scoped con snapshot di indirizzo
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MapsMarker" },
+                }
 
   /maps/layers/pacchi/ritiri-non-effettuati:
     get:
@@ -3202,7 +3210,11 @@ paths:
           description: Ritiri non effettuati ancora da convertire e dotati di domicilio utilizzabile, scoped sul dominio Bolla
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MapsMarker" },
+                }
 
   /maps/layers/centro/punti-operativi:
     get:
@@ -3213,7 +3225,11 @@ paths:
           description: Magazzini e Centri di Ascolto attivi con indirizzo e accessibili al caller
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MapsMarker" },
+                }
 
   /maps/routes/consegne/{id}:
     get:
@@ -4136,9 +4152,22 @@ paths:
       parameters:
         - { name: search, in: query, schema: { type: string } }
         - { name: centroAscoltoId, in: query, schema: { type: integer } }
-        - { name: cittaId, in: query, description: Identificativo tecnico legacy dell'Area, schema: { type: integer } }
-        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - {
+            name: cittaId,
+            in: query,
+            description: Identificativo tecnico legacy dell'Area,
+            schema: { type: integer },
+          }
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
       responses:
         "200":
           description: Proiezione dedicata Credito Solidale
@@ -4146,7 +4175,8 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/CreditoSolidaleBeneficiario" }
+                items:
+                  { $ref: "#/components/schemas/CreditoSolidaleBeneficiario" }
 
   /credito-solidale/beneficiari/{beneficiarioId}/saldo:
     get:
@@ -4992,7 +5022,17 @@ paths:
           required: true
           schema:
             type: string
-            enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+            enum:
+              [
+                generale,
+                pacchi,
+                centro-ascolto,
+                emporio,
+                mensa,
+                uds,
+                magazzino-logistica,
+                fse-plus,
+              ]
         - name: metric
           in: query
           required: true
@@ -5032,7 +5072,17 @@ paths:
           required: true
           schema:
             type: string
-            enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+            enum:
+              [
+                generale,
+                pacchi,
+                centro-ascolto,
+                emporio,
+                mensa,
+                uds,
+                magazzino-logistica,
+                fse-plus,
+              ]
         - $ref: "#/components/parameters/ReportCittaId"
       responses:
         "200":
@@ -6055,7 +6105,13 @@ components:
   schemas:
     MapsLayerCode:
       type: string
-      enum: [sociale.interventi_pianificati, pacchi.consegne, pacchi.ritiri_non_effettuati, centro.punti_operativi]
+      enum:
+        [
+          sociale.interventi_pianificati,
+          pacchi.consegne,
+          pacchi.ritiri_non_effettuati,
+          centro.punti_operativi,
+        ]
     MapsLayerCapability:
       type: object
       required: [code, domain, label, routeSupported]
@@ -6075,11 +6131,27 @@ components:
     MapsMarker:
       type: object
       description: DTO geografico minimizzato; non contiene dati sociali o anagrafici
-      required: [id, layer, entityType, entityId, title, subtitle, status, address, date, actions]
+      required:
+        [
+          id,
+          layer,
+          entityType,
+          entityId,
+          title,
+          subtitle,
+          status,
+          address,
+          date,
+          actions,
+        ]
       properties:
         id: { type: string }
         layer: { $ref: "#/components/schemas/MapsLayerCode" }
-        entityType: { type: string, enum: [intervento, consegna, bolla, magazzino, centro_ascolto] }
+        entityType:
+          {
+            type: string,
+            enum: [intervento, consegna, bolla, magazzino, centro_ascolto],
+          }
         entityId: { type: integer }
         title: { type: string }
         subtitle: { type: [string, "null"] }
@@ -6100,11 +6172,32 @@ components:
 
     ReportingDashboard:
       type: object
-      required: [section, filters, kpi, series, tables, quality, definitions, generatedAt, timezone]
+      required:
+        [
+          section,
+          filters,
+          kpi,
+          series,
+          tables,
+          quality,
+          definitions,
+          generatedAt,
+          timezone,
+        ]
       properties:
         section:
           type: string
-          enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+          enum:
+            [
+              generale,
+              pacchi,
+              centro-ascolto,
+              emporio,
+              mensa,
+              uds,
+              magazzino-logistica,
+              fse-plus,
+            ]
         filters:
           $ref: "#/components/schemas/ReportAppliedFilters"
         kpi:
@@ -6127,7 +6220,20 @@ components:
 
     ReportAppliedFilters:
       type: object
-      required: [da, a, anno, cittaId, centroAscoltoId, magazzinoId, mensaId, zonaUdsId, operatoreId, tipoIntervento, tipoServizio]
+      required:
+        [
+          da,
+          a,
+          anno,
+          cittaId,
+          centroAscoltoId,
+          magazzinoId,
+          mensaId,
+          zonaUdsId,
+          operatoreId,
+          tipoIntervento,
+          tipoServizio,
+        ]
       properties:
         da: { type: string, format: date }
         a: { type: string, format: date }
@@ -6147,7 +6253,8 @@ components:
       properties:
         key: { type: string }
         value: { type: [number, "null"] }
-        unit: { type: string, enum: [count, quantity, kg, credit, days, average] }
+        unit:
+          { type: string, enum: [count, quantity, kg, credit, days, average] }
         availability: { type: string, enum: [ok, derivable, missing] }
         drilldownMetric: { type: [string, "null"] }
 
@@ -6222,7 +6329,17 @@ components:
       properties:
         section:
           type: string
-          enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+          enum:
+            [
+              generale,
+              pacchi,
+              centro-ascolto,
+              emporio,
+              mensa,
+              uds,
+              magazzino-logistica,
+              fse-plus,
+            ]
         cities:
           type: array
           items: { $ref: "#/components/schemas/ReportFilterOption" }
@@ -7684,11 +7801,16 @@ components:
         fasciaEtaCorrente:
           type: string
           enum: ["0_17", "18_29", "30_64", "65_plus", "non_determinata"]
-        fasciaEtaOrigine: { type: string, enum: [calcolata, presunta, non_determinata] }
+        fasciaEtaOrigine:
+          { type: string, enum: [calcolata, presunta, non_determinata] }
         telefono: { type: ["string", "null"] }
         centroAscoltoId: { type: ["integer", "null"] }
         centroAscoltoNome: { type: ["string", "null"] }
-        cittaId: { type: ["integer", "null"], description: Identificativo tecnico legacy dell'Area. }
+        cittaId:
+          {
+            type: ["integer", "null"],
+            description: Identificativo tecnico legacy dell'Area.,
+          }
         cittaNome: { type: ["string", "null"] }
         zonaUdsId: { type: ["integer", "null"] }
         zonaUdsNome: { type: ["string", "null"] }
@@ -7697,7 +7819,22 @@ components:
         priorita: { type: string, enum: [bassa, media, alta, urgente] }
         consegnaDomicilio: { type: boolean }
         versione: { type: integer, minimum: 1 }
-      required: [id, codice, statoAnagrafica, cognome, nome, fasciaEtaPresunta, fasciaEtaCorrente, fasciaEtaOrigine, uds, attivo, priorita, consegnaDomicilio, versione]
+      required:
+        [
+          id,
+          codice,
+          statoAnagrafica,
+          cognome,
+          nome,
+          fasciaEtaPresunta,
+          fasciaEtaCorrente,
+          fasciaEtaOrigine,
+          uds,
+          attivo,
+          priorita,
+          consegnaDomicilio,
+          versione,
+        ]
 
     Beneficiario:
       type: object
@@ -8521,17 +8658,33 @@ components:
         nome: { type: string }
         centroAscoltoId: { type: ["integer", "null"] }
         centroAscoltoNome: { type: ["string", "null"] }
-        cittaId: { type: ["integer", "null"], description: Identificativo tecnico legacy dell'Area. }
+        cittaId:
+          {
+            type: ["integer", "null"],
+            description: Identificativo tecnico legacy dell'Area.,
+          }
         cittaNome: { type: ["string", "null"] }
         attivo: { type: boolean }
         creditoSolidaleAbilitato: { type: boolean }
-        creditoSolidaleStato: { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleStato:
+          { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
         creditoSolidaleSaldo: { type: number }
         creditoSolidaleMensileAssegnato: { type: ["number", "null"] }
-        creditoSolidaleDataUltimoMovimento: { type: ["string", "null"], format: date-time }
+        creditoSolidaleDataUltimoMovimento:
+          { type: ["string", "null"], format: date-time }
         magazzinoEmporioPreferitoId: { type: ["integer", "null"] }
         magazzinoEmporioPreferitoNome: { type: ["string", "null"] }
-      required: [id, codice, cognome, nome, attivo, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleSaldo]
+      required:
+        [
+          id,
+          codice,
+          cognome,
+          nome,
+          attivo,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          creditoSolidaleSaldo,
+        ]
 
     CreditoSolidaleSaldo:
       type: object
@@ -8568,10 +8721,13 @@ components:
       additionalProperties: false
       properties:
         creditoSolidaleAbilitato: { type: boolean }
-        creditoSolidaleStato: { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleStato:
+          { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
         creditoSolidaleNote: { type: ["string", "null"] }
-        creditoSolidaleMensileAssegnato: { type: ["number", "null"], minimum: 0 }
-        creditoSolidaleMensileSuggerito: { type: ["number", "null"], minimum: 0 }
+        creditoSolidaleMensileAssegnato:
+          { type: ["number", "null"], minimum: 0 }
+        creditoSolidaleMensileSuggerito:
+          { type: ["number", "null"], minimum: 0 }
         creditoSolidaleMotivoModifica: { type: ["string", "null"] }
 
     CreditoSolidaleConfigurazione:
@@ -8579,13 +8735,25 @@ components:
       properties:
         beneficiarioId: { type: integer }
         creditoSolidaleAbilitato: { type: boolean }
-        creditoSolidaleStato: { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleStato:
+          { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
         creditoSolidaleNote: { type: ["string", "null"] }
         creditoSolidaleMensileAssegnato: { type: ["number", "null"] }
         creditoSolidaleMensileManuale: { type: boolean }
         creditoSolidaleMotivoModifica: { type: ["string", "null"] }
-        creditoSolidaleDataUltimaModificaQuota: { type: ["string", "null"], format: date-time }
-      required: [beneficiarioId, creditoSolidaleAbilitato, creditoSolidaleStato, creditoSolidaleNote, creditoSolidaleMensileAssegnato, creditoSolidaleMensileManuale, creditoSolidaleMotivoModifica, creditoSolidaleDataUltimaModificaQuota]
+        creditoSolidaleDataUltimaModificaQuota:
+          { type: ["string", "null"], format: date-time }
+      required:
+        [
+          beneficiarioId,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          creditoSolidaleNote,
+          creditoSolidaleMensileAssegnato,
+          creditoSolidaleMensileManuale,
+          creditoSolidaleMotivoModifica,
+          creditoSolidaleDataUltimaModificaQuota,
+        ]
 
     CreditoSolidaleRefreshInput:
       type: object
@@ -9683,10 +9851,79 @@ components:
           dataOraConclusione,
           avviso,
           interventoPrecedenteId,
-          successoriIds,
           numeroSuccessori,
           sede,
-          motivoAnnullamento,
+          dataCreazione,
+          dataAggiornamento,
+          bisogniPianificatiTotale,
+          bisogniPianificatiAperti,
+          bisogniPianificatiScaduti,
+          bisogniPianificatiProssimaScadenza,
+        ]
+
+    InterventoListItem:
+      type: object
+      description: Proiezione minimale per liste, calendario e dashboard; non include note o contenuti sociali estesi.
+      properties:
+        id: { type: integer }
+        beneficiarioId: { type: integer }
+        beneficiarioNome: { type: [string, "null"] }
+        beneficiarioCodice: { type: [string, "null"] }
+        nucleoFamiliareSintesi: { type: [string, "null"] }
+        operatoreId: { type: [integer, "null"] }
+        operatoreCodice: { type: [string, "null"] }
+        operatoreNome: { type: [string, "null"] }
+        centroAscoltoId: { type: [integer, "null"] }
+        centroAscoltoNome: { type: [string, "null"] }
+        cittaId: { type: [integer, "null"] }
+        dataIntervento: { type: [string, "null"], format: date }
+        tipoIntervento: { type: string }
+        stato: { $ref: "#/components/schemas/InterventoStato" }
+        ambito:
+          anyOf:
+            - $ref: "#/components/schemas/InterventoAmbito"
+            - type: "null"
+        ambitoLegacy: { type: boolean }
+        priorita: { $ref: "#/components/schemas/InterventoPriorita" }
+        dataOraPianificata: { type: [string, "null"], format: date-time }
+        dataOraAvvio: { type: [string, "null"], format: date-time }
+        dataOraConclusione: { type: [string, "null"], format: date-time }
+        avviso: { $ref: "#/components/schemas/InterventoAvviso" }
+        interventoPrecedenteId: { type: [integer, "null"] }
+        numeroSuccessori: { type: integer }
+        sede: { type: [string, "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: [string, "null"], format: date-time }
+        bisogniPianificatiTotale: { type: integer }
+        bisogniPianificatiAperti: { type: integer }
+        bisogniPianificatiScaduti: { type: integer }
+        bisogniPianificatiProssimaScadenza: { type: [string, "null"] }
+      required:
+        [
+          id,
+          beneficiarioId,
+          beneficiarioNome,
+          beneficiarioCodice,
+          nucleoFamiliareSintesi,
+          operatoreId,
+          operatoreCodice,
+          operatoreNome,
+          centroAscoltoId,
+          centroAscoltoNome,
+          cittaId,
+          dataIntervento,
+          tipoIntervento,
+          stato,
+          ambito,
+          ambitoLegacy,
+          priorita,
+          dataOraPianificata,
+          dataOraAvvio,
+          dataOraConclusione,
+          avviso,
+          interventoPrecedenteId,
+          numeroSuccessori,
+          sede,
           dataCreazione,
           dataAggiornamento,
           bisogniPianificatiTotale,
@@ -9765,6 +10002,10 @@ components:
     InterventoUpdate:
       type: object
       properties:
+        versione:
+          type: string
+          format: date-time
+          description: Versione letta dal client; obbligatoria per optimistic locking.
         operatoreId:
           type: integer
           description: Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato.
@@ -9807,10 +10048,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BisognoPianificatoUpsert"
+      required: [versione]
 
     InterventoTransizioneInput:
       type: object
       properties:
+        versione:
+          type: string
+          format: date-time
         stato:
           $ref: "#/components/schemas/InterventoStato"
         motivo:
@@ -9824,7 +10069,7 @@ components:
           type: string
           format: date-time
           description: Obbligatorio quando la destinazione è pianificato e non esiste già una pianificazione.
-      required: [stato]
+      required: [stato, versione]
 
     InterventoStoricoStato:
       type: object
@@ -11423,7 +11668,8 @@ components:
       properties:
         indirizzoConsegna: { type: string, minLength: 1, maxLength: 200 }
         dataPrevista: { type: string, format: date }
-        fasciaOraria: { type: ["string", "null"], enum: [Mattina, Pomeriggio, Sera, null] }
+        fasciaOraria:
+          { type: ["string", "null"], enum: [Mattina, Pomeriggio, Sera, null] }
         volontarioId: { type: ["integer", "null"], minimum: 1 }
         volontarioAltro: { type: ["string", "null"] }
         mezzoId: { type: ["integer", "null"], minimum: 1 }

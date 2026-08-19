@@ -1646,12 +1646,12 @@ export interface Intervento {
   avviso: InterventoAvviso | null;
   /** @nullable */
   interventoPrecedenteId: number | null;
-  successoriIds: number[];
+  successoriIds?: number[];
   numeroSuccessori: number;
   /** @nullable */
   sede: string | null;
   /** @nullable */
-  motivoAnnullamento: string | null;
+  motivoAnnullamento?: string | null;
   dataCreazione: string;
   /** @nullable */
   dataAggiornamento: string | null;
@@ -2936,6 +2936,59 @@ export interface InterventoOperatore {
   codice: string;
 }
 
+/**
+ * Proiezione minimale per liste, calendario e dashboard; non include note o contenuti sociali estesi.
+ */
+export interface InterventoListItem {
+  id: number;
+  beneficiarioId: number;
+  /** @nullable */
+  beneficiarioNome: string | null;
+  /** @nullable */
+  beneficiarioCodice: string | null;
+  /** @nullable */
+  nucleoFamiliareSintesi: string | null;
+  /** @nullable */
+  operatoreId: number | null;
+  /** @nullable */
+  operatoreCodice: string | null;
+  /** @nullable */
+  operatoreNome: string | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  centroAscoltoNome: string | null;
+  /** @nullable */
+  cittaId: number | null;
+  /** @nullable */
+  dataIntervento: string | null;
+  tipoIntervento: string;
+  stato: InterventoStato;
+  ambito: InterventoAmbito | null;
+  ambitoLegacy: boolean;
+  priorita: InterventoPriorita;
+  /** @nullable */
+  dataOraPianificata: string | null;
+  /** @nullable */
+  dataOraAvvio: string | null;
+  /** @nullable */
+  dataOraConclusione: string | null;
+  avviso: InterventoAvviso | null;
+  /** @nullable */
+  interventoPrecedenteId: number | null;
+  numeroSuccessori: number;
+  /** @nullable */
+  sede: string | null;
+  dataCreazione: string;
+  /** @nullable */
+  dataAggiornamento: string | null;
+  bisogniPianificatiTotale: number;
+  bisogniPianificatiAperti: number;
+  bisogniPianificatiScaduti: number;
+  /** @nullable */
+  bisogniPianificatiProssimaScadenza: string | null;
+}
+
 export type BisognoPianificatoUpsertTipo = typeof BisognoPianificatoUpsertTipo[keyof typeof BisognoPianificatoUpsertTipo];
 
 
@@ -3028,6 +3081,8 @@ export interface InterventoInput {
 }
 
 export interface InterventoUpdate {
+  /** Versione letta dal client; obbligatoria per optimistic locking. */
+  versione: string;
   /** Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato. */
   operatoreId?: number;
   /** @nullable */
@@ -3057,6 +3112,7 @@ export interface InterventoUpdate {
 }
 
 export interface InterventoTransizioneInput {
+  versione: string;
   stato: InterventoStato;
   /**
      * @maxLength 2000

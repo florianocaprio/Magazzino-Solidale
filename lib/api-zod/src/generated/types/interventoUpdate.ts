@@ -9,6 +9,8 @@ import type { BisognoPianificatoUpsert } from './bisognoPianificatoUpsert';
 import type { InterventoPriorita } from './interventoPriorita';
 
 export interface InterventoUpdate {
+  /** Versione letta dal client; obbligatoria per optimistic locking. */
+  versione: Date;
   /** Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato. */
   operatoreId?: number;
   /** @nullable */

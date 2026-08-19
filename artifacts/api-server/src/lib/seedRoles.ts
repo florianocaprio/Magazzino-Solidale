@@ -23,6 +23,11 @@ const SOCIAL_OPERATOR_PERMISSIONS = [
   "credito.quota.manage",
   "emporio.access.view",
   "emporio.access.manage",
+  "sociale.interventi.view",
+  "sociale.interventi.create",
+  "sociale.interventi.update",
+  "sociale.interventi.complete",
+  "sociale.interventi.cancel",
 ] as const;
 const UDS_OPERATOR_PERMISSIONS = [
   "beneficiari.view",
@@ -35,11 +40,16 @@ const EMPORIO_OPERATOR_PERMISSIONS = [
   "emporio.access.manage",
 ] as const;
 
-function mergePermissions(current: string[] | null | undefined, required: readonly string[]): string[] {
+function mergePermissions(
+  current: string[] | null | undefined,
+  required: readonly string[],
+): string[] {
   return [...new Set([...(current ?? []), ...required])];
 }
 
-export function defaultEmporioPermissions(current: string[] | null | undefined): string[] {
+export function defaultEmporioPermissions(
+  current: string[] | null | undefined,
+): string[] {
   return mergePermissions(
     (current ?? []).filter((permission) => permission !== "beneficiari.view"),
     EMPORIO_OPERATOR_PERMISSIONS,
@@ -51,10 +61,12 @@ export function roleAreasAfterEmporioSeed(
   current: string[] | null | undefined,
 ): string[] {
   if (roleName !== EMPORIO_ROLE_NAME) return [...(current ?? [])];
-  return [...new Set([
-    ...(current ?? []).filter((area) => area !== "sociale"),
-    EMPORIO_AREA_KEY,
-  ])];
+  return [
+    ...new Set([
+      ...(current ?? []).filter((area) => area !== "sociale"),
+      EMPORIO_AREA_KEY,
+    ]),
+  ];
 }
 
 export async function ensureSuperAdminRole(): Promise<number> {
@@ -129,9 +141,15 @@ export async function seedRoles(): Promise<void> {
     });
     logger.info("Seeded operator role");
   } else {
-    await db.update(ruoliTable).set({
-      permessi: mergePermissions(operatorRole.permessi, SOCIAL_OPERATOR_PERMISSIONS),
-    }).where(eq(ruoliTable.id, operatorRole.id));
+    await db
+      .update(ruoliTable)
+      .set({
+        permessi: mergePermissions(
+          operatorRole.permessi,
+          SOCIAL_OPERATOR_PERMISSIONS,
+        ),
+      })
+      .where(eq(ruoliTable.id, operatorRole.id));
   }
 
   const [volunteerRole] = await db
@@ -164,16 +182,23 @@ export async function seedRoles(): Promise<void> {
     });
     logger.info("Seeded UDS operator role");
   } else {
-    await db.update(ruoliTable).set({
-      permessi: mergePermissions(udsRole.permessi, UDS_OPERATOR_PERMISSIONS),
-    }).where(eq(ruoliTable.id, udsRole.id));
+    await db
+      .update(ruoliTable)
+      .set({
+        permessi: mergePermissions(udsRole.permessi, UDS_OPERATOR_PERMISSIONS),
+      })
+      .where(eq(ruoliTable.id, udsRole.id));
   }
 
   // Operational Emporio role. Keep it non-admin and grant only the areas used
   // by the current Emporio UI/API flows. The generic Sociale area is removed
   // only from this standard role; differently named custom roles are untouched.
   const [emporioRole] = await db
-    .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
+    .select({
+      id: ruoliTable.id,
+      aree: ruoliTable.aree,
+      permessi: ruoliTable.permessi,
+    })
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, EMPORIO_ROLE_NAME));
   if (!emporioRole) {

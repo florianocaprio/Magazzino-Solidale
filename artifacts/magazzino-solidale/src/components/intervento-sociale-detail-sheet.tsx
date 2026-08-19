@@ -74,6 +74,10 @@ interface Props {
   magazzini?: Magazzino[];
   isLoading?: boolean;
   isPending?: boolean;
+  canUpdate?: boolean;
+  canComplete?: boolean;
+  canCancel?: boolean;
+  canCreate?: boolean;
   onOpenChange: (open: boolean) => void;
   onPianifica: (input: PianificazioneInterventoInput) => void;
   onAvvia: (versione: string) => void;
@@ -140,6 +144,10 @@ export function InterventoSocialeDetailSheet({
   magazzini = [],
   isLoading = false,
   isPending = false,
+  canUpdate = true,
+  canComplete = true,
+  canCancel = true,
+  canCreate = true,
   onOpenChange,
   onPianifica,
   onAvvia,
@@ -372,98 +380,101 @@ export function InterventoSocialeDetailSheet({
               />
             </dl>
 
-            {(intervento.stato === "da_pianificare" ||
-              intervento.stato === "pianificato") && (
-              <section className="space-y-3 rounded-lg border p-4">
-                <h3 className="font-semibold">
-                  {t("interventi.operational.appointment")}
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    type="date"
-                    value={pianificazioneData}
-                    onChange={(event) =>
-                      setPianificazioneData(event.target.value)
-                    }
-                    aria-label={t("interventi.form.date")}
-                  />
-                  <Input
-                    type="time"
-                    value={pianificazioneOra}
-                    onChange={(event) =>
-                      setPianificazioneOra(event.target.value)
-                    }
-                    aria-label={t("interventi.form.time")}
-                  />
-                  <Select
-                    value={pianificazionePriorita}
-                    onValueChange={(value) =>
-                      setPianificazionePriorita(value as InterventoPriorita)
-                    }
-                  >
-                    <SelectTrigger aria-label={t("interventi.detail.priority")}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(["bassa", "normale", "alta", "urgente"] as const).map(
-                        (value) => (
-                          <SelectItem key={value} value={value}>
-                            {t(`interventi.priorita.${value}`)}
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={pianificazioneSede}
-                    onChange={(event) =>
-                      setPianificazioneSede(event.target.value)
-                    }
-                    placeholder={t("interventi.detail.site")}
-                  />
-                  <Select
-                    value={pianificazioneOperatoreId}
-                    onValueChange={setPianificazioneOperatoreId}
-                  >
-                    <SelectTrigger
-                      aria-label={t("interventi.form.assignedOperator")}
+            {canUpdate &&
+              (intervento.stato === "da_pianificare" ||
+                intervento.stato === "pianificato") && (
+                <section className="space-y-3 rounded-lg border p-4">
+                  <h3 className="font-semibold">
+                    {t("interventi.operational.appointment")}
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input
+                      type="date"
+                      value={pianificazioneData}
+                      onChange={(event) =>
+                        setPianificazioneData(event.target.value)
+                      }
+                      aria-label={t("interventi.form.date")}
+                    />
+                    <Input
+                      type="time"
+                      value={pianificazioneOra}
+                      onChange={(event) =>
+                        setPianificazioneOra(event.target.value)
+                      }
+                      aria-label={t("interventi.form.time")}
+                    />
+                    <Select
+                      value={pianificazionePriorita}
+                      onValueChange={(value) =>
+                        setPianificazionePriorita(value as InterventoPriorita)
+                      }
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {operatori.map((operatore) => (
-                        <SelectItem
-                          key={operatore.id}
-                          value={String(operatore.id)}
-                        >
-                          {operatore.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isPending || !pianificazioneOperatoreId}
-                  onClick={() =>
-                    onPianifica({
-                      dataOraPianificata: dateTimeEuropeRomeToIso(
-                        pianificazioneData,
-                        pianificazioneOra,
-                      ),
-                      priorita: pianificazionePriorita,
-                      sede: pianificazioneSede || null,
-                      operatoreId: Number(pianificazioneOperatoreId),
-                    })
-                  }
-                >
-                  {intervento.stato === "da_pianificare"
-                    ? t("interventi.operational.plan")
-                    : t("interventi.operational.updateAppointment")}
-                </Button>
-              </section>
-            )}
+                      <SelectTrigger
+                        aria-label={t("interventi.detail.priority")}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(["bassa", "normale", "alta", "urgente"] as const).map(
+                          (value) => (
+                            <SelectItem key={value} value={value}>
+                              {t(`interventi.priorita.${value}`)}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={pianificazioneSede}
+                      onChange={(event) =>
+                        setPianificazioneSede(event.target.value)
+                      }
+                      placeholder={t("interventi.detail.site")}
+                    />
+                    <Select
+                      value={pianificazioneOperatoreId}
+                      onValueChange={setPianificazioneOperatoreId}
+                    >
+                      <SelectTrigger
+                        aria-label={t("interventi.form.assignedOperator")}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {operatori.map((operatore) => (
+                          <SelectItem
+                            key={operatore.id}
+                            value={String(operatore.id)}
+                          >
+                            {operatore.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isPending || !pianificazioneOperatoreId}
+                    onClick={() =>
+                      onPianifica({
+                        dataOraPianificata: dateTimeEuropeRomeToIso(
+                          pianificazioneData,
+                          pianificazioneOra,
+                        ),
+                        priorita: pianificazionePriorita,
+                        sede: pianificazioneSede || null,
+                        operatoreId: Number(pianificazioneOperatoreId),
+                      })
+                    }
+                  >
+                    {intervento.stato === "da_pianificare"
+                      ? t("interventi.operational.plan")
+                      : t("interventi.operational.updateAppointment")}
+                  </Button>
+                </section>
+              )}
 
             <InterventoSocialeOperativitaEditor
               attivita={attivita}
@@ -472,7 +483,7 @@ export function InterventoSocialeDetailSheet({
               tipi={tipi}
               prodotti={prodotti}
               magazzini={magazzini}
-              readOnly={terminal}
+              readOnly={terminal || !canUpdate}
               showActivities={intervento.stato === "in_corso" || terminal}
               onAttivitaChange={setAttivita}
               onMaterialiChange={setMateriali}
@@ -485,19 +496,19 @@ export function InterventoSocialeDetailSheet({
               </h3>
               <Textarea
                 value={risultato}
-                readOnly={terminal}
+                readOnly={terminal || !canUpdate}
                 onChange={(event) => setRisultato(event.target.value)}
                 placeholder={t("interventi.operational.result")}
               />
               <Textarea
                 value={esito}
-                readOnly={terminal}
+                readOnly={terminal || !canUpdate}
                 onChange={(event) => setEsito(event.target.value)}
                 placeholder={t("interventi.esito")}
               />
               <Textarea
                 value={note}
-                readOnly={terminal}
+                readOnly={terminal || !canUpdate}
                 onChange={(event) => setNote(event.target.value)}
                 placeholder={t("interventi.note")}
               />
@@ -527,11 +538,12 @@ export function InterventoSocialeDetailSheet({
               )}
             </section>
 
-            {intervento.stato === "in_corso" && (
+            {canComplete && intervento.stato === "in_corso" && (
               <section className="space-y-4 rounded-lg border p-4">
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <Checkbox
                     checked={creaSuccessivo}
+                    disabled={!canCreate}
                     onCheckedChange={(checked) =>
                       setCreaSuccessivo(checked === true)
                     }
@@ -667,36 +679,40 @@ export function InterventoSocialeDetailSheet({
               </section>
             )}
 
-            {!terminal && (
+            {!terminal && (canUpdate || canComplete || canCancel) && (
               <section className="space-y-3 rounded-lg border p-4">
                 <h3 className="font-semibold">
                   {t("interventi.operational.actions")}
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {(intervento.stato === "da_pianificare" ||
-                    intervento.stato === "pianificato") && (
+                  {canComplete &&
+                    (intervento.stato === "da_pianificare" ||
+                      intervento.stato === "pianificato") && (
+                      <Button
+                        type="button"
+                        disabled={isPending || !operativita.versione}
+                        onClick={() => {
+                          if (operativita.versione)
+                            onAvvia(operativita.versione);
+                        }}
+                      >
+                        {t("interventi.operational.start")}
+                      </Button>
+                    )}
+                  {canUpdate && (
                     <Button
                       type="button"
+                      variant="outline"
                       disabled={isPending || !operativita.versione}
                       onClick={() => {
-                        if (operativita.versione) onAvvia(operativita.versione);
+                        const payload = operationalPayload();
+                        if (payload) onSalva(payload);
                       }}
                     >
-                      {t("interventi.operational.start")}
+                      {t("interventi.operational.saveWithoutClosing")}
                     </Button>
                   )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isPending || !operativita.versione}
-                    onClick={() => {
-                      const payload = operationalPayload();
-                      if (payload) onSalva(payload);
-                    }}
-                  >
-                    {t("interventi.operational.saveWithoutClosing")}
-                  </Button>
-                  {intervento.stato === "in_corso" && (
+                  {canComplete && intervento.stato === "in_corso" && (
                     <Button
                       type="button"
                       disabled={
@@ -713,36 +729,42 @@ export function InterventoSocialeDetailSheet({
                     </Button>
                   )}
                 </div>
-                <Separator />
-                <Textarea
-                  value={motivoAnnullamento}
-                  onChange={(event) =>
-                    setMotivoAnnullamento(event.target.value)
-                  }
-                  placeholder={t("interventi.operational.cancellationReason")}
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={
-                    isPending ||
-                    !operativita.versione ||
-                    !motivoAnnullamento.trim()
-                  }
-                  onClick={() => {
-                    if (
-                      operativita.versione &&
-                      window.confirm(
-                        t("interventi.operational.confirmCancellation"),
-                      )
-                    ) {
-                      onAnnulla(operativita.versione, motivoAnnullamento);
-                    }
-                  }}
-                >
-                  {t("interventi.operational.cancel")}
-                </Button>
-                {intervento.stato === "pianificato" && (
+                {canCancel && <Separator />}
+                {canCancel && (
+                  <>
+                    <Textarea
+                      value={motivoAnnullamento}
+                      onChange={(event) =>
+                        setMotivoAnnullamento(event.target.value)
+                      }
+                      placeholder={t(
+                        "interventi.operational.cancellationReason",
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={
+                        isPending ||
+                        !operativita.versione ||
+                        !motivoAnnullamento.trim()
+                      }
+                      onClick={() => {
+                        if (
+                          operativita.versione &&
+                          window.confirm(
+                            t("interventi.operational.confirmCancellation"),
+                          )
+                        ) {
+                          onAnnulla(operativita.versione, motivoAnnullamento);
+                        }
+                      }}
+                    >
+                      {t("interventi.operational.cancel")}
+                    </Button>
+                  </>
+                )}
+                {canCancel && intervento.stato === "pianificato" && (
                   <div className="space-y-2 border-t pt-3">
                     <Textarea
                       value={notaMancataPresentazione}
@@ -800,8 +822,8 @@ export function InterventoSocialeDetailSheet({
             <DetailRow
               label={t("interventi.detail.following")}
               value={
-                intervento.successoriIds.length > 0
-                  ? intervento.successoriIds.join(", ")
+                (intervento.successoriIds?.length ?? 0) > 0
+                  ? intervento.successoriIds?.join(", ")
                   : undefined
               }
             />

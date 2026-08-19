@@ -6,12 +6,9 @@ import {
   magazziniTable,
   centriAscoltoTable,
   prodottiTable,
-  lottiTable,
-  movimentiTable,
   utentiTable,
-  prenotazioniMagazzinoTable,
 } from "@workspace/db";
-import { eq, and, desc, inArray, gt, sum, asc, type SQL } from "drizzle-orm";
+import { eq, and, desc, inArray, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -22,20 +19,15 @@ import {
   magazzinoScopeFilter,
   andScoped,
 } from "../lib/centroScope";
-import {
-  PRENOTAZIONE_MAGAZZINO_ATTIVA,
-  calcolaDisponibilitaMagazzino,
-  parseDbNumber,
-} from "../lib/disponibilitaMagazzino";
+import { calcolaDisponibilitaMagazzino } from "../lib/disponibilitaMagazzino";
 import { requireModulo } from "../lib/featureFlags";
+import { creaScaricoInventariale } from "../lib/scaricoInventory";
 
 const router: IRouter = Router();
 
 router.use("/scarichi", requireModulo("SCARICHI"));
 
 const VALID_CAUSALI = ["deteriorata", "rubata", "scaduta", "altro"] as const;
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function getScaricoWithRighe(id: number) {
   const [s] = await db
@@ -48,13 +40,20 @@ async function getScaricoWithRighe(id: number) {
     })
     .from(scarichiTable)
     .leftJoin(magazziniTable, eq(scarichiTable.magazzinoId, magazziniTable.id))
-    .leftJoin(centriAscoltoTable, eq(scarichiTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(
+      centriAscoltoTable,
+      eq(scarichiTable.centroAscoltoId, centriAscoltoTable.id),
+    )
     .leftJoin(utentiTable, eq(scarichiTable.operatoreId, utentiTable.id))
     .where(eq(scarichiTable.id, id));
   if (!s) return null;
 
   const righe = await db
-    .select({ r: scaricoRigheTable, prodottoNome: prodottiTable.nome, prodottoFsePlus: prodottiTable.fsePlus })
+    .select({
+      r: scaricoRigheTable,
+      prodottoNome: prodottiTable.nome,
+      prodottoFsePlus: prodottiTable.fsePlus,
+    })
     .from(scaricoRigheTable)
     .leftJoin(prodottiTable, eq(scaricoRigheTable.prodottoId, prodottiTable.id))
     .where(eq(scaricoRigheTable.scaricoId, id));
@@ -85,74 +84,15 @@ async function getScaricoWithRighe(id: number) {
   };
 }
 
-async function disponibileRealeProdotto(prodottoId: number, magazzinoId: number): Promise<number> {
-  const disponibilita = await calcolaDisponibilitaMagazzino(prodottoId, magazzinoId);
+async function disponibileRealeProdotto(
+  prodottoId: number,
+  magazzinoId: number,
+): Promise<number> {
+  const disponibilita = await calcolaDisponibilitaMagazzino(
+    prodottoId,
+    magazzinoId,
+  );
   return Math.max(0, disponibilita.disponibileReale);
-}
-
-async function impegnatoAttivoLotto(tx: Tx, lottoId: number): Promise<number> {
-  const [res] = await tx
-    .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
-    .from(prenotazioniMagazzinoTable)
-    .where(
-      and(
-        eq(prenotazioniMagazzinoTable.lottoId, lottoId),
-        eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
-      ),
-    );
-  return parseDbNumber(res?.totale);
-}
-
-/** Scarico FEFO: scala quantità dai lotti per scadenza crescente e registra i movimenti */
-async function scaricoFEFO(tx: Tx, opts: {
-  prodottoId: number;
-  magazzinoId: number;
-  quantita: number;
-  unitaMisura: string;
-  causale: string;
-  dataScarico: string;
-  scaricoCodice: string;
-  note: string | null;
-}) {
-  let rimanente = opts.quantita;
-  const lotti = await tx
-    .select()
-    .from(lottiTable)
-    .where(
-      and(
-        eq(lottiTable.prodottoId, opts.prodottoId),
-        eq(lottiTable.magazzinoId, opts.magazzinoId),
-        gt(lottiTable.quantitaResidua, "0"),
-      ),
-    )
-    .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.dataCarico));
-
-  for (const lotto of lotti) {
-    if (rimanente <= 0) break;
-    const disp = parseDbNumber(lotto.quantitaResidua);
-    const disponibileReale = Math.max(0, disp - await impegnatoAttivoLotto(tx, lotto.id));
-    const scala = Math.min(disponibileReale, rimanente);
-    if (scala <= 0) continue;
-
-    await tx
-      .update(lottiTable)
-      .set({ quantitaResidua: (disp - scala).toFixed(2) })
-      .where(eq(lottiTable.id, lotto.id));
-
-    await tx.insert(movimentiTable).values({
-      tipoMovimento: "scarico",
-      tipoDettaglio: opts.causale,
-      dataMovimento: opts.dataScarico,
-      magazzinoId: opts.magazzinoId,
-      prodottoId: opts.prodottoId,
-      lottoId: lotto.id,
-      quantita: scala.toFixed(2),
-      unitaMisura: opts.unitaMisura,
-      note: `Scarico ${opts.scaricoCodice}${opts.note ? ` — ${opts.note}` : ""}`,
-    });
-
-    rimanente = Math.round((rimanente - scala) * 100) / 100;
-  }
 }
 
 router.get("/scarichi", async (req, res) => {
@@ -181,11 +121,19 @@ router.get("/scarichi", async (req, res) => {
     .from(centriAscoltoTable);
   const centroMap = new Map(centri.map((c) => [c.id, c.nome]));
 
-  const operatoreIds = [...new Set(rows.map((r) => r.operatoreId).filter((x): x is number => x != null))];
+  const operatoreIds = [
+    ...new Set(
+      rows.map((r) => r.operatoreId).filter((x): x is number => x != null),
+    ),
+  ];
   const opMap = new Map<number, string | null>();
   if (operatoreIds.length > 0) {
     const utenti = await db
-      .select({ id: utentiTable.id, matricola: utentiTable.matricola, username: utentiTable.username })
+      .select({
+        id: utentiTable.id,
+        matricola: utentiTable.matricola,
+        username: utentiTable.username,
+      })
       .from(utentiTable)
       .where(inArray(utentiTable.id, operatoreIds));
     for (const u of utenti) opMap.set(u.id, u.matricola ?? u.username ?? null);
@@ -206,9 +154,16 @@ router.get("/scarichi", async (req, res) => {
   >();
   if (ids.length > 0) {
     const righe = await db
-      .select({ r: scaricoRigheTable, prodottoNome: prodottiTable.nome, prodottoFsePlus: prodottiTable.fsePlus })
+      .select({
+        r: scaricoRigheTable,
+        prodottoNome: prodottiTable.nome,
+        prodottoFsePlus: prodottiTable.fsePlus,
+      })
       .from(scaricoRigheTable)
-      .leftJoin(prodottiTable, eq(scaricoRigheTable.prodottoId, prodottiTable.id))
+      .leftJoin(
+        prodottiTable,
+        eq(scaricoRigheTable.prodottoId, prodottiTable.id),
+      )
       .where(inArray(scaricoRigheTable.scaricoId, ids));
     for (const x of righe) {
       const arr = righeByS.get(x.r.scaricoId) ?? [];
@@ -232,13 +187,17 @@ router.get("/scarichi", async (req, res) => {
       magazzinoId: r.magazzinoId,
       magazzinoNome: magMap.get(r.magazzinoId) ?? null,
       centroAscoltoId: r.centroAscoltoId ?? null,
-      centroAscoltoNome: r.centroAscoltoId != null ? (centroMap.get(r.centroAscoltoId) ?? null) : null,
+      centroAscoltoNome:
+        r.centroAscoltoId != null
+          ? (centroMap.get(r.centroAscoltoId) ?? null)
+          : null,
       dataScarico: r.dataScarico,
       causale: r.causale,
       causaleAltro: r.causaleAltro ?? null,
       note: r.note ?? null,
       operatoreId: r.operatoreId ?? null,
-      operatoreCodice: r.operatoreId != null ? (opMap.get(r.operatoreId) ?? null) : null,
+      operatoreCodice:
+        r.operatoreId != null ? (opMap.get(r.operatoreId) ?? null) : null,
       righe: righeByS.get(r.id) ?? [],
       dataCreazione: r.dataCreazione.toISOString(),
     })),
@@ -253,35 +212,50 @@ router.post("/scarichi", async (req, res) => {
     return;
   }
 
-  const righeInput: Array<{ prodottoId: number; quantita: number; unitaMisura: string; note?: string }> =
-    body.righe ?? [];
+  const righeInput: Array<{
+    prodottoId: number;
+    quantita: number;
+    unitaMisura: string;
+    note?: string;
+  }> = body.righe ?? [];
   if (righeInput.length === 0) {
     res.status(400).json({ error: "Aggiungi almeno un prodotto da scaricare" });
     return;
   }
   if (righeInput.some((r) => !(r.quantita > 0))) {
-    res.status(400).json({ error: "Le quantità devono essere maggiori di zero" });
+    res
+      .status(400)
+      .json({ error: "Le quantità devono essere maggiori di zero" });
     return;
   }
 
   // Carica unità canonica + nome per i prodotti coinvolti (audit consistente)
   const prodottoIds = [...new Set(righeInput.map((r) => r.prodottoId))];
   const prodotti = await db
-    .select({ id: prodottiTable.id, nome: prodottiTable.nome, unitaMisura: prodottiTable.unitaMisura })
+    .select({
+      id: prodottiTable.id,
+      nome: prodottiTable.nome,
+      unitaMisura: prodottiTable.unitaMisura,
+    })
     .from(prodottiTable)
     .where(inArray(prodottiTable.id, prodottoIds));
   const prodottoMap = new Map(prodotti.map((p) => [p.id, p]));
 
   const prodottoMancante = prodottoIds.find((id) => !prodottoMap.has(id));
   if (prodottoMancante !== undefined) {
-    res.status(400).json({ error: `Prodotto #${prodottoMancante} non trovato` });
+    res
+      .status(400)
+      .json({ error: `Prodotto #${prodottoMancante} non trovato` });
     return;
   }
 
   // Valida disponibilità per ogni prodotto (somma quantità per prodotto)
   const richiestaPerProdotto = new Map<number, number>();
   for (const r of righeInput) {
-    richiestaPerProdotto.set(r.prodottoId, (richiestaPerProdotto.get(r.prodottoId) ?? 0) + r.quantita);
+    richiestaPerProdotto.set(
+      r.prodottoId,
+      (richiestaPerProdotto.get(r.prodottoId) ?? 0) + r.quantita,
+    );
   }
   for (const [prodottoId, richiesta] of richiestaPerProdotto) {
     const disp = await disponibileRealeProdotto(prodottoId, body.magazzinoId);
@@ -294,54 +268,37 @@ router.post("/scarichi", async (req, res) => {
   }
 
   const caller = callerCentroId(req);
-  if (!(await canAccessMagazzino(body.magazzinoId, caller, callerCittaId(req)))) {
-    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
+  if (
+    !(await canAccessMagazzino(body.magazzinoId, caller, callerCittaId(req)))
+  ) {
+    res
+      .status(403)
+      .json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
-  const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
+  const centroAscoltoId =
+    caller != null ? caller : (body.centroAscoltoId ?? null);
 
   const codice = `SCAR-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
 
   const newId = await db.transaction(async (tx) => {
-    const [s] = await tx
-      .insert(scarichiTable)
-      .values({
-        codice,
-        magazzinoId: body.magazzinoId,
-        centroAscoltoId,
-        dataScarico: body.dataScarico,
-        causale: body.causale,
-        causaleAltro: body.causale === "altro" ? body.causaleAltro ?? null : null,
-        note: body.note ?? null,
-        operatoreId: req.user!.id,
-      })
-      .returning();
-
-    await tx.insert(scaricoRigheTable).values(
-      righeInput.map((r) => ({
-        scaricoId: s.id,
+    return creaScaricoInventariale(tx, {
+      codice,
+      magazzinoId: body.magazzinoId,
+      centroAscoltoId,
+      dataScarico: body.dataScarico,
+      causale: body.causale,
+      causaleAltro:
+        body.causale === "altro" ? (body.causaleAltro ?? null) : null,
+      note: body.note ?? null,
+      operatoreId: req.user!.id,
+      righe: righeInput.map((r) => ({
         prodottoId: r.prodottoId,
-        quantita: r.quantita.toString(),
+        quantita: r.quantita,
         unitaMisura: prodottoMap.get(r.prodottoId)!.unitaMisura,
         note: r.note ?? null,
       })),
-    );
-
-    // Scala lo stock (FEFO) e registra i movimenti di scarico
-    for (const r of righeInput) {
-      await scaricoFEFO(tx, {
-        prodottoId: r.prodottoId,
-        magazzinoId: body.magazzinoId,
-        quantita: r.quantita,
-        unitaMisura: prodottoMap.get(r.prodottoId)!.unitaMisura,
-        causale: body.causale,
-        dataScarico: body.dataScarico,
-        scaricoCodice: codice,
-        note: r.note ?? null,
-      });
-    }
-
-    return s.id;
+    });
   });
 
   const result = await getScaricoWithRighe(newId);
@@ -355,10 +312,18 @@ router.get("/scarichi/:id", async (req, res) => {
     return;
   }
   if (!canAccessCentro(result.centroAscoltoId, callerCentroId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    res
+      .status(403)
+      .json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!(await canAccessMagazzino(result.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+  if (
+    !(await canAccessMagazzino(
+      result.magazzinoId,
+      callerCentroId(req),
+      callerCittaId(req),
+    ))
+  ) {
     res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
     return;
   }
