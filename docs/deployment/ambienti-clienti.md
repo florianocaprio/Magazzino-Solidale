@@ -241,9 +241,13 @@ orfani non sono stati classificati e bonificati esplicitamente.
 
 Per l'hardening Centro di Ascolto,
 `20260819_audit_centro_ascolto_hardening.sql` aggiunge soltanto Foreign Key e
-indici univoci a Interventi e Turni. Lo script esegue prima una preflight e si
-interrompe senza modificare lo schema se rileva riferimenti orfani o slot
-duplicati. Prima dell'update, dopo il backup, eseguire almeno:
+indici univoci a Interventi e Turni. Le Foreign Key vengono create `NOT VALID`:
+proteggono immediatamente ogni nuova `INSERT`/`UPDATE`, mentre gli eventuali
+riferimenti orfani storici restano disponibili per audit. Ogni FK pulita viene
+validata nello stesso aggiornamento; una FK con dati legacy incoerenti resta
+non validata e produce un `NOTICE`. Il preflight resta invece bloccante per i
+duplicati incompatibili con gli indici univoci. Prima dell'update, dopo il
+backup, eseguire almeno:
 
 ```sql
 SELECT i.id, i.beneficiario_id
@@ -266,8 +270,19 @@ FROM turni GROUP BY centro_ascolto_id, data, fascia HAVING count(*) > 1;
 Eventuali righe devono essere classificate con il responsabile funzionale e
 ricollegate al record storico corretto oppure archiviate con una procedura
 auditata. La migration non inventa destinazioni, non cancella orfani e non
-deduplica turni. Dopo la bonifica approvata, eseguire `update` due volte e
-verificare che la seconda esecuzione sia idempotente.
+deduplica turni. Dopo la bonifica approvata, validare esplicitamente ogni FK
+rimasta sospesa, per esempio:
+
+```sql
+ALTER TABLE interventi VALIDATE CONSTRAINT interventi_beneficiario_fk;
+ALTER TABLE interventi VALIDATE CONSTRAINT interventi_bolla_fk;
+ALTER TABLE turni_volontari VALIDATE CONSTRAINT turni_volontari_turno_fk;
+ALTER TABLE turni_volontari VALIDATE CONSTRAINT turni_volontari_volontario_fk;
+```
+
+Verificare lo stato con `pg_constraint.convalidated`. Una successiva esecuzione
+di `pnpm --filter @workspace/db run update` tenta automaticamente la validazione
+quando non rileva più orfani ed è idempotente anche prima della bonifica.
 
 ## Super Admin, ambiente e moduli
 
