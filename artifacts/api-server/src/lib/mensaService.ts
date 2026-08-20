@@ -22,6 +22,61 @@ export function sessoSnapshotMensa(value: string | null | undefined) {
   return "ND" as const;
 }
 
+export function aggregatiConsumiMensa(
+  rows: Array<{
+    causale: string;
+    prodottoId: number;
+    prodottoNome: string;
+    unitaMisura: string;
+    quantita: string | number;
+  }>,
+) {
+  const aggregate = (causale: "consumo" | "scarto") => {
+    const matching = rows.filter((row) => row.causale === causale);
+    const perProduct = new Map<
+      number,
+      {
+        prodottoId: number;
+        prodottoNome: string;
+        unitaMisura: string;
+        quantita: number;
+      }
+    >();
+    const perUnit = new Map<string, number>();
+    for (const row of matching) {
+      const quantity = Number(row.quantita);
+      const product = perProduct.get(row.prodottoId) ?? {
+        prodottoId: row.prodottoId,
+        prodottoNome: row.prodottoNome,
+        unitaMisura: row.unitaMisura,
+        quantita: 0,
+      };
+      product.quantita += quantity;
+      perProduct.set(row.prodottoId, product);
+      perUnit.set(
+        row.unitaMisura,
+        (perUnit.get(row.unitaMisura) ?? 0) + quantity,
+      );
+    }
+    return {
+      perProdotto: [...perProduct.values()].sort((a, b) =>
+        a.prodottoNome.localeCompare(b.prodottoNome, "it"),
+      ),
+      perUnitaMisura: [...perUnit.entries()]
+        .map(([unitaMisura, quantita]) => ({ unitaMisura, quantita }))
+        .sort((a, b) => a.unitaMisura.localeCompare(b.unitaMisura, "it")),
+    };
+  };
+  const consumi = aggregate("consumo");
+  const scarti = aggregate("scarto");
+  return {
+    consumiPerProdotto: consumi.perProdotto,
+    scartiPerProdotto: scarti.perProdotto,
+    consumiPerUnitaMisura: consumi.perUnitaMisura,
+    scartiPerUnitaMisura: scarti.perUnitaMisura,
+  };
+}
+
 export function riferimentoDataServizio(dataServizio: string): Date {
   // Mezzogiorno UTC cade sempre nella stessa data civile Europe/Rome, anche ai
   // cambi d'ora, e rende il calcolo indipendente dal TZ del container.

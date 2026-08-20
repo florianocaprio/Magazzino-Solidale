@@ -8,12 +8,21 @@ const migrationUrl = new URL(
   "../../../lib/db/updates/20260820_audit_mensa_operational_hardening.sql",
   import.meta.url,
 );
+const schemaUrl = new URL(
+  "../../../lib/db/src/schema/mensa.ts",
+  import.meta.url,
+);
 
 afterAll(async () => {
   await pool.end();
 });
 
 describe("migrazione hardening operativo Mensa", () => {
+  it("non reintroduce nello schema Drizzle l'unicità principale obsoleta", async () => {
+    const schema = await readFile(schemaUrl, "utf8");
+    expect(schema).not.toContain("mensa_abilitazioni_principale_attiva_unique");
+  });
+
   it("è idempotente e non modifica i conteggi storici", async () => {
     const client = await pool.connect();
     const migrationSql = await readFile(migrationUrl, "utf8");
@@ -33,6 +42,28 @@ describe("migrazione hardening operativo Mensa", () => {
           (SELECT count(*)::int FROM mensa_accessi) AS accessi,
           (SELECT count(*)::int FROM movimenti) AS movimenti
       `);
+
+      const legacyReference = await client.query<{
+        beneficiario_id: number;
+        mensa_id: number;
+        user_id: number;
+      }>(`
+        SELECT b.id AS beneficiario_id, m.id AS mensa_id, u.id AS user_id
+        FROM beneficiari b
+        JOIN mense m ON m.citta_id = b.citta_id
+        CROSS JOIN utenti u
+        ORDER BY b.id, m.id, u.id
+        LIMIT 1
+      `);
+      expect(legacyReference.rowCount).toBe(1);
+      const legacy = legacyReference.rows[0];
+      const legacyAuthorization = await client.query<{ id: number }>(
+        `INSERT INTO mensa_autorizzazioni_temporanee
+          (beneficiario_id, mensa_id, data_servizio, tipo_servizio, motivo, operatore_id)
+         VALUES ($1, $2, '2099-12-31', NULL, 'Record legacy test', $3)
+         RETURNING id`,
+        [legacy.beneficiario_id, legacy.mensa_id, legacy.user_id],
+      );
 
       await client.query(migrationSql);
       await client.query(migrationSql);
@@ -104,6 +135,39 @@ describe("migrazione hardening operativo Mensa", () => {
         accessi_eccezione_validi: 1,
         pasti_giornata_validi: 1,
       });
+
+      const temporaryAuthorizationSchema = await client.query<{
+        nullable: string;
+        old_index: number;
+        service_index: number;
+      }>(`
+        SELECT
+          (SELECT is_nullable
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'mensa_autorizzazioni_temporanee'
+             AND column_name = 'tipo_servizio') AS nullable,
+          (SELECT count(*)::int FROM pg_indexes
+           WHERE schemaname = 'public'
+             AND indexname = 'mensa_autorizzazioni_temporanee_giorno_unique') AS old_index,
+          (SELECT count(*)::int FROM pg_indexes
+           WHERE schemaname = 'public'
+             AND indexname = 'mensa_autorizzazioni_temporanee_servizio_unique') AS service_index
+      `);
+      expect(temporaryAuthorizationSchema.rows[0]).toEqual({
+        nullable: "YES",
+        old_index: 0,
+        service_index: 1,
+      });
+      const preservedLegacy = await client.query<{
+        tipo_servizio: string | null;
+      }>(
+        `SELECT tipo_servizio
+         FROM mensa_autorizzazioni_temporanee
+         WHERE id = $1`,
+        [legacyAuthorization.rows[0].id],
+      );
+      expect(preservedLegacy.rows).toEqual([{ tipo_servizio: null }]);
       await client.query("ROLLBACK");
     } catch (error) {
       await client.query("ROLLBACK");

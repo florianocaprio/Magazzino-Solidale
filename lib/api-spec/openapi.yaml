@@ -7552,9 +7552,12 @@ components:
           type: number
         unitaMisura:
           type: string
+          description: >-
+            Campo legacy opzionale. Se valorizzato deve coincidere con l'unità
+            canonica del Prodotto; il server persiste sempre prodotti.unita_misura.
         note:
           type: string
-      required: [prodottoId, quantita, unitaMisura]
+      required: [prodottoId, quantita]
 
     # ── Scarichi ──────────────────────────────────────────────────────────
     Scarico:
@@ -13024,12 +13027,33 @@ components:
           minItems: 1
           items:
             type: object
-            required: [prodottoId, quantita, unitaMisura]
+            required: [prodottoId, quantita]
             properties:
               prodottoId: { type: integer }
               quantita: { type: number, exclusiveMinimum: 0 }
-              unitaMisura: { type: string }
+              unitaMisura:
+                type: string
+                description: >-
+                  Campo legacy opzionale. Se valorizzato deve coincidere con
+                  l'unità canonica del Prodotto; il server persiste sempre
+                  prodotti.unita_misura.
               note: { type: ["string", "null"] }
+
+    MensaQuantitaPerProdotto:
+      type: object
+      required: [prodottoId, prodottoNome, unitaMisura, quantita]
+      properties:
+        prodottoId: { type: integer }
+        prodottoNome: { type: string }
+        unitaMisura: { type: string }
+        quantita: { type: number }
+
+    MensaQuantitaPerUnitaMisura:
+      type: object
+      required: [unitaMisura, quantita]
+      properties:
+        unitaMisura: { type: string }
+        quantita: { type: number }
 
     MensaReport:
       type: object
@@ -13041,8 +13065,17 @@ components:
           totalePasti,
           beneficiariDistinti,
           accessiOrdinari,
+          accessiTemporanei,
           accessiEccezione,
           accessiNegati,
+          pastiOrdinari,
+          pastiTemporanei,
+          pastiEccezione,
+          pastiOverride,
+          consumiPerProdotto,
+          scartiPerProdotto,
+          consumiPerUnitaMisura,
+          scartiPerUnitaMisura,
           mediaPastiGiorno,
           distribuzione,
         ]
@@ -13052,14 +13085,27 @@ components:
         totalePasti: { type: integer }
         beneficiariDistinti: { type: integer }
         accessiOrdinari: { type: integer }
+        accessiTemporanei: { type: integer }
         accessiEccezione: { type: integer }
         accessiNegati: { type: integer }
         pastiTemporanei: { type: integer }
         pastiOrdinari: { type: integer }
+        pastiEccezione: { type: integer }
+        pastiOverride: { type: integer }
         pastiTemporaneitaNonDeterminata: { type: integer }
         pastiAnagraficaProvvisoria: { type: integer }
-        consumoTotale: { type: number }
-        scartoTotale: { type: number }
+        consumiPerProdotto:
+          type: array
+          items: { $ref: "#/components/schemas/MensaQuantitaPerProdotto" }
+        scartiPerProdotto:
+          type: array
+          items: { $ref: "#/components/schemas/MensaQuantitaPerProdotto" }
+        consumiPerUnitaMisura:
+          type: array
+          items: { $ref: "#/components/schemas/MensaQuantitaPerUnitaMisura" }
+        scartiPerUnitaMisura:
+          type: array
+          items: { $ref: "#/components/schemas/MensaQuantitaPerUnitaMisura" }
         distribuzioneSesso:
           type: array
           items:

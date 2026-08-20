@@ -10,7 +10,8 @@ export type MensaTrasferimentoInputRigheItem = {
   prodottoId: number;
   /** @exclusiveMinimum 0 */
   quantita: number;
-  unitaMisura: string;
+  /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
+  unitaMisura?: string;
   /** @nullable */
   note?: string | null;
 };

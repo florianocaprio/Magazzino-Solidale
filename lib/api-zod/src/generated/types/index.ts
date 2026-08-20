@@ -339,6 +339,8 @@ export * from './mensaPastoInput';
 export * from './mensaPastoInputTipoServizio';
 export * from './mensaPastoSessoSnapshot';
 export * from './mensaPastoTipoServizio';
+export * from './mensaQuantitaPerProdotto';
+export * from './mensaQuantitaPerUnitaMisura';
 export * from './mensaReport';
 export * from './mensaReportBeneficiariDistintiPerFasciaEtaItem';
 export * from './mensaReportBeneficiariDistintiPerFasciaEtaItemChiave';

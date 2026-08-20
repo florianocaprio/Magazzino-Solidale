@@ -73,6 +73,7 @@ import {
 } from "../lib/tesseraBeneficiarioService";
 import { nextMagazzinoCodice } from "../lib/magazzinoCodice";
 import {
+  aggregatiConsumiMensa,
   getOrCreateGiornataMensa,
   snapshotBeneficiarioMensa,
   tipoServizioMensa,
@@ -87,7 +88,10 @@ import {
   disponibilitaMagazzinoKey,
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
-import { createTransferRequest } from "../lib/transferWorkflow";
+import {
+  createTransferRequest,
+  TransferRequestError,
+} from "../lib/transferWorkflow";
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
@@ -116,6 +120,7 @@ const ACCESSO_MOTIVI = {
   MENSA_NON_ATTIVA: "MENSA_NON_ATTIVA",
   ECCEZIONE_STESSA_AREA: "ECCEZIONE_STESSA_AREA",
   ACCESSO_TEMPORANEO: "ACCESSO_TEMPORANEO",
+  SERVIZIO_CHIUSO: "SERVIZIO_CHIUSO",
 } as const;
 
 type AbilitazioneStato = (typeof ABILITAZIONE_STATI)[number];
@@ -760,6 +765,32 @@ async function loadAccessoDto(id: number) {
   };
 }
 
+async function requireReplayMensaScope(
+  req: Request,
+  resourceMensaId: number,
+  requestedMensaId?: number,
+) {
+  if (requestedMensaId != null && resourceMensaId !== requestedMensaId) {
+    throw new MensaError(403, "Replay idempotente non accessibile");
+  }
+  await requireMensa(resourceMensaId, req);
+}
+
+async function sendReplayMensaScope(
+  req: Request,
+  res: Response,
+  resourceMensaId: number,
+  requestedMensaId?: number,
+) {
+  try {
+    await requireReplayMensaScope(req, resourceMensaId, requestedMensaId);
+    return true;
+  } catch (error) {
+    if (sendMensaError(error, res)) return false;
+    throw error;
+  }
+}
+
 router.get(
   "/mensa/mense",
   requirePermission("mensa.view"),
@@ -1189,11 +1220,15 @@ router.post(
         throw new MensaError(400, "Modalità di accesso non valida");
       if (modalita === "manuale") assertPermission(req, "mensa.access.manual");
       const existing = await db
-        .select({ id: mensaAccessiTable.id })
+        .select({
+          id: mensaAccessiTable.id,
+          mensaId: mensaAccessiTable.mensaId,
+        })
         .from(mensaAccessiTable)
         .where(eq(mensaAccessiTable.idempotencyKey, idempotencyKey))
         .limit(1);
       if (existing[0]) {
+        await requireReplayMensaScope(req, existing[0].mensaId, mensaId);
         const dto = await loadAccessoDto(existing[0].id);
         res.json({ ...dto, idempotentReplay: true });
         return;
@@ -1275,6 +1310,25 @@ router.post(
       }
 
       const created = await db.transaction(async (tx) => {
+        let persistedEsito = esito;
+        let persistedMotivoEsito = motivoEsito;
+        if (persistedEsito === "consentito") {
+          const [serviceDay] = await tx
+            .select({ stato: mensaGiornateServizioTable.stato })
+            .from(mensaGiornateServizioTable)
+            .where(
+              and(
+                eq(mensaGiornateServizioTable.mensaId, mensaId),
+                eq(mensaGiornateServizioTable.dataServizio, today),
+                eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
+              ),
+            )
+            .for("update");
+          if (serviceDay?.stato === "chiusa") {
+            persistedEsito = "negato";
+            persistedMotivoEsito = ACCESSO_MOTIVI.SERVIZIO_CHIUSO;
+          }
+        }
         const [row] = await tx
           .insert(mensaAccessiTable)
           .values({
@@ -1282,8 +1336,8 @@ router.post(
             beneficiarioId: beneficiario?.id ?? null,
             tesseraId: tessera?.id ?? null,
             dataOra: now,
-            esito,
-            motivoEsito,
+            esito: persistedEsito,
+            motivoEsito: persistedMotivoEsito,
             operatoreId: req.user!.id,
             modalitaAccesso: modalita,
             tipoServizio,
@@ -1294,8 +1348,8 @@ router.post(
           auditValues(req, `mensa-accesso:${row.id}`, "verifica", null, {
             mensaId,
             beneficiarioId: beneficiario?.id ?? null,
-            esito,
-            motivoEsito,
+            esito: persistedEsito,
+            motivoEsito: persistedMotivoEsito,
             modalita,
             tipoServizio,
           }),
@@ -1310,10 +1364,22 @@ router.post(
             ? req.body.idempotencyKey
             : "";
         const [existing] = await db
-          .select({ id: mensaAccessiTable.id })
+          .select({
+            id: mensaAccessiTable.id,
+            mensaId: mensaAccessiTable.mensaId,
+          })
           .from(mensaAccessiTable)
           .where(eq(mensaAccessiTable.idempotencyKey, key));
         if (existing) {
+          if (
+            !(await sendReplayMensaScope(
+              req,
+              res,
+              existing.mensaId,
+              positiveInt(req.body?.mensaId, "mensaId"),
+            ))
+          )
+            return;
           res.json({
             ...(await loadAccessoDto(existing.id)),
             idempotentReplay: true,
@@ -1342,10 +1408,14 @@ router.post(
         req.body?.tipoServizio ?? "pranzo",
       );
       const [replay] = await db
-        .select({ id: mensaAccessiTable.id })
+        .select({
+          id: mensaAccessiTable.id,
+          mensaId: mensaAccessiTable.mensaId,
+        })
         .from(mensaAccessiTable)
         .where(eq(mensaAccessiTable.idempotencyKey, idempotencyKey));
       if (replay) {
+        await requireReplayMensaScope(req, replay.mensaId, mensaId);
         res.json({
           ...(await loadAccessoDto(replay.id)),
           idempotentReplay: true,
@@ -1427,6 +1497,44 @@ router.post(
       }
 
       const createdAccessId = await db.transaction(async (tx) => {
+        const [serviceDay] = await tx
+          .select({ stato: mensaGiornateServizioTable.stato })
+          .from(mensaGiornateServizioTable)
+          .where(
+            and(
+              eq(mensaGiornateServizioTable.mensaId, mensaId),
+              eq(mensaGiornateServizioTable.dataServizio, today),
+              eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
+            ),
+          )
+          .for("update");
+        if (serviceDay?.stato === "chiusa") {
+          const [denied] = await tx
+            .insert(mensaAccessiTable)
+            .values({
+              mensaId,
+              beneficiarioId: null,
+              tesseraId: null,
+              autorizzazioneTemporaneaId: null,
+              esito: "negato",
+              motivoEsito: ACCESSO_MOTIVI.SERVIZIO_CHIUSO,
+              operatoreId: req.user!.id,
+              modalitaAccesso: "temporaneo",
+              tipoServizio,
+              idempotencyKey,
+            })
+            .returning();
+          await tx.insert(auditConfigurazioniTable).values(
+            auditValues(req, `mensa-accesso:${denied.id}`, "verifica", null, {
+              mensaId,
+              esito: "negato",
+              motivoEsito: ACCESSO_MOTIVI.SERVIZIO_CHIUSO,
+              modalita: "temporaneo",
+              tipoServizio,
+            }),
+          );
+          return denied.id;
+        }
         let beneficiario: typeof beneficiariTable.$inferSelect;
         if (newPersonValues) {
           const created = await createBeneficiarioOne(newPersonValues, req, {
@@ -1508,6 +1616,7 @@ router.post(
             beneficiarioId: beneficiario.id,
             mensaId,
             dataServizio: today,
+            tipoServizio,
             motivo,
             operatoreId: req.user!.id,
           })
@@ -1553,10 +1662,22 @@ router.post(
             ? req.body.idempotencyKey
             : "";
         const [existing] = await db
-          .select({ id: mensaAccessiTable.id })
+          .select({
+            id: mensaAccessiTable.id,
+            mensaId: mensaAccessiTable.mensaId,
+          })
           .from(mensaAccessiTable)
           .where(eq(mensaAccessiTable.idempotencyKey, key));
         if (existing) {
+          if (
+            !(await sendReplayMensaScope(
+              req,
+              res,
+              existing.mensaId,
+              positiveInt(req.body?.mensaId, "mensaId"),
+            ))
+          )
+            return;
           res.json({
             ...(await loadAccessoDto(existing.id)),
             idempotentReplay: true,
@@ -1762,6 +1883,13 @@ router.post(
         .from(mensaPastiTable)
         .where(eq(mensaPastiTable.idempotencyKey, idempotencyKey));
       if (replay) {
+        if (
+          replay.accessoMensaId !== accessoId ||
+          replay.tipoServizio !== tipoServizio
+        ) {
+          throw new MensaError(403, "Replay idempotente non accessibile");
+        }
+        await requireReplayMensaScope(req, replay.mensaId);
         res.json({ ...replay, idempotentReplay: true });
         return;
       }
@@ -1813,11 +1941,12 @@ router.post(
       if (
         access.accesso.modalitaAccesso === "temporaneo" &&
         (!access.autorizzazioneTemporanea ||
-          access.autorizzazioneTemporanea.dataServizio !== serviceDate)
+          access.autorizzazioneTemporanea.dataServizio !== serviceDate ||
+          access.autorizzazioneTemporanea.tipoServizio !== tipoServizio)
       ) {
         throw new MensaError(
           409,
-          "L'autorizzazione temporanea non è valida per la data di servizio corrente",
+          "L'autorizzazione temporanea non è valida per data e tipo servizio correnti",
         );
       }
       const [sameService] = await db
@@ -1897,6 +2026,18 @@ router.post(
           .from(mensaPastiTable)
           .where(eq(mensaPastiTable.idempotencyKey, key));
         if (existing) {
+          if (
+            existing.accessoMensaId !==
+              positiveInt(req.body?.accessoMensaId, "accessoMensaId") ||
+            existing.tipoServizio !==
+              canonicalTipoServizio(req.body?.tipoServizio)
+          ) {
+            res
+              .status(403)
+              .json({ error: "Replay idempotente non accessibile" });
+            return;
+          }
+          if (!(await sendReplayMensaScope(req, res, existing.mensaId))) return;
           res.json({ ...existing, idempotentReplay: true });
           return;
         }
@@ -2167,7 +2308,10 @@ router.post(
       const normalized = righe.map((row: Record<string, unknown>) => ({
         prodottoId: positiveInt(row.prodottoId, "prodottoId"),
         quantita: Number(row.quantita),
-        unitaMisura: text(row.unitaMisura, "L'unità di misura", 20),
+        unitaMisura:
+          row.unitaMisura == null
+            ? null
+            : text(row.unitaMisura, "L'unità di misura", 20),
         note: optionalText(row.note, "Le note", 1000),
       }));
       if (
@@ -2177,10 +2321,17 @@ router.post(
       )
         throw new MensaError(400, "Le quantità devono essere maggiori di zero");
       const [replay] = await db
-        .select({ id: trasferimentiTable.id })
+        .select({
+          id: trasferimentiTable.id,
+          mensaId: trasferimentiTable.mensaId,
+        })
         .from(trasferimentiTable)
         .where(eq(trasferimentiTable.idempotencyKey, idempotencyKey));
       if (replay) {
+        if (replay.mensaId == null) {
+          throw new MensaError(403, "Replay idempotente non accessibile");
+        }
+        await requireReplayMensaScope(req, replay.mensaId, mensaId);
         res.json({ id: replay.id, idempotentReplay: true });
         return;
       }
@@ -2219,16 +2370,38 @@ router.post(
         .status(201)
         .json({ id: created.id, codice: created.codice, stato: created.stato });
     } catch (error) {
+      if (error instanceof TransferRequestError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       if (isUniqueViolation(error)) {
         const key =
           typeof req.body?.idempotencyKey === "string"
             ? req.body.idempotencyKey
             : "";
         const [existing] = await db
-          .select({ id: trasferimentiTable.id })
+          .select({
+            id: trasferimentiTable.id,
+            mensaId: trasferimentiTable.mensaId,
+          })
           .from(trasferimentiTable)
           .where(eq(trasferimentiTable.idempotencyKey, key));
         if (existing) {
+          if (existing.mensaId == null) {
+            res
+              .status(403)
+              .json({ error: "Replay idempotente non accessibile" });
+            return;
+          }
+          if (
+            !(await sendReplayMensaScope(
+              req,
+              res,
+              existing.mensaId,
+              positiveInt(req.body?.mensaId, "mensaId"),
+            ))
+          )
+            return;
           res.json({ id: existing.id, idempotentReplay: true });
           return;
         }
@@ -2372,11 +2545,13 @@ router.post(
       80,
     );
     try {
+      const mensaId = positiveInt(req.body?.mensaId, "mensaId");
       const [replay] = await db
         .select()
         .from(mensaConsumiTable)
         .where(eq(mensaConsumiTable.idempotencyKey, idempotencyKey));
       if (replay) {
+        await requireReplayMensaScope(req, replay.mensaId, mensaId);
         res.json({
           ...replay,
           quantita: Number(replay.quantita),
@@ -2384,13 +2559,18 @@ router.post(
         });
         return;
       }
-      const mensaId = positiveInt(req.body?.mensaId, "mensaId");
       const prodottoId = positiveInt(req.body?.prodottoId, "prodottoId");
       const dataServizio = dateOnly(
         req.body?.dataServizio,
         "La data servizio",
         true,
       )!;
+      if (dataServizio > dataServizioMensa(new Date())) {
+        throw new MensaError(
+          400,
+          "La data servizio di un consumo o scarto non può essere futura",
+        );
+      }
       const tipoServizio = canonicalTipoServizio(req.body?.tipoServizio);
       const quantita = Number(req.body?.quantita);
       if (!Number.isFinite(quantita) || quantita <= 0) {
@@ -2481,6 +2661,15 @@ router.post(
           .from(mensaConsumiTable)
           .where(eq(mensaConsumiTable.idempotencyKey, idempotencyKey));
         if (replay) {
+          if (
+            !(await sendReplayMensaScope(
+              req,
+              res,
+              replay.mensaId,
+              positiveInt(req.body?.mensaId, "mensaId"),
+            ))
+          )
+            return;
           res.json({
             ...replay,
             quantita: Number(replay.quantita),
@@ -2640,9 +2829,16 @@ router.post(
         const consumi = await tx
           .select({
             causale: mensaConsumiTable.causale,
+            prodottoId: mensaConsumiTable.prodottoId,
+            prodottoNome: prodottiTable.nome,
+            unitaMisura: prodottiTable.unitaMisura,
             quantita: mensaConsumiTable.quantita,
           })
           .from(mensaConsumiTable)
+          .innerJoin(
+            prodottiTable,
+            eq(mensaConsumiTable.prodottoId, prodottiTable.id),
+          )
           .leftJoin(
             mensaConsumiStorniTable,
             eq(mensaConsumiStorniTable.consumoId, mensaConsumiTable.id),
@@ -2676,12 +2872,16 @@ router.post(
             acc[key] = (acc[key] ?? 0) + 1;
             return acc;
           }, {});
+        const consumptionBreakdown = aggregatiConsumiMensa(consumi);
         const snapshot = {
           pasti: meals.length,
           beneficiariDistinti: new Set(meals.map((meal) => meal.beneficiarioId))
             .size,
           pastiOrdinari: meals.filter(
-            (meal) => !meal.override && meal.eccezioneId == null,
+            (meal) =>
+              meal.temporaneo === false &&
+              !meal.override &&
+              meal.eccezioneId == null,
           ).length,
           pastiOverride: meals.filter((meal) => meal.override).length,
           pastiTemporanei: meals.filter((meal) => meal.temporaneo === true)
@@ -2694,12 +2894,7 @@ router.post(
           accessiNegati: accessi?.negati ?? 0,
           perSesso: countBy(meals.map((meal) => meal.sesso)),
           perFasciaEta: countBy(meals.map((meal) => meal.fasciaEta)),
-          consumo: consumi
-            .filter((row) => row.causale === "consumo")
-            .reduce((sum, row) => sum + Number(row.quantita), 0),
-          scarto: consumi
-            .filter((row) => row.causale === "scarto")
-            .reduce((sum, row) => sum + Number(row.quantita), 0),
+          ...consumptionBreakdown,
         };
         const [updated] = await tx
           .update(mensaGiornateServizioTable)
@@ -2866,6 +3061,8 @@ router.get(
           fasciaEta: mensaPastiTable.fasciaEtaSnapshot,
           provvisoria: mensaPastiTable.anagraficaProvvisoriaSnapshot,
           temporaneo: mensaPastiTable.temporaneoSnapshot,
+          eccezioneId: mensaPastiTable.eccezioneId,
+          override: mensaPastiTable.override,
         })
         .from(mensaPastiTable)
         .innerJoin(menseTable, eq(mensaPastiTable.mensaId, menseTable.id))
@@ -2882,7 +3079,8 @@ router.get(
         accessConditions.push(eq(menseTable.cittaId, ownCity));
       const [accesses] = await db
         .select({
-          ordinari: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito')::int`,
+          ordinari: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito' and ${mensaAccessiTable.autorizzazioneTemporaneaId} is null)::int`,
+          temporanei: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito' and ${mensaAccessiTable.autorizzazioneTemporaneaId} is not null)::int`,
           eccezioni: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito_eccezione')::int`,
           negati: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'negato')::int`,
         })
@@ -2929,21 +3127,30 @@ router.get(
       const consumption = await db
         .select({
           causale: mensaConsumiTable.causale,
+          prodottoId: mensaConsumiTable.prodottoId,
+          prodottoNome: prodottiTable.nome,
+          unitaMisura: prodottiTable.unitaMisura,
           quantita: mensaConsumiTable.quantita,
         })
         .from(mensaConsumiTable)
         .innerJoin(menseTable, eq(mensaConsumiTable.mensaId, menseTable.id))
+        .innerJoin(
+          prodottiTable,
+          eq(mensaConsumiTable.prodottoId, prodottiTable.id),
+        )
         .leftJoin(
           mensaConsumiStorniTable,
           eq(mensaConsumiStorniTable.consumoId, mensaConsumiTable.id),
         )
         .where(and(...consumptionConditions));
+      const consumptionBreakdown = aggregatiConsumiMensa(consumption);
       res.json({
         dal,
         al,
         totalePasti: total,
         beneficiariDistinti: mealTotals?.beneficiariDistinti ?? 0,
         accessiOrdinari: accesses?.ordinari ?? 0,
+        accessiTemporanei: accesses?.temporanei ?? 0,
         accessiEccezione: accesses?.eccezioni ?? 0,
         accessiNegati: accesses?.negati ?? 0,
         pastiAnagraficaProvvisoria: dimensions.filter(
@@ -2951,8 +3158,15 @@ router.get(
         ).length,
         pastiTemporanei: dimensions.filter((row) => row.temporaneo === true)
           .length,
-        pastiOrdinari: dimensions.filter((row) => row.temporaneo === false)
+        pastiOrdinari: dimensions.filter(
+          (row) =>
+            row.temporaneo === false &&
+            row.eccezioneId == null &&
+            !row.override,
+        ).length,
+        pastiEccezione: dimensions.filter((row) => row.eccezioneId != null)
           .length,
+        pastiOverride: dimensions.filter((row) => row.override).length,
         pastiTemporaneitaNonDeterminata: dimensions.filter(
           (row) => row.temporaneo == null,
         ).length,
@@ -2975,12 +3189,7 @@ router.get(
             beneficiarioId: row.beneficiarioId,
           })),
         ),
-        consumoTotale: consumption
-          .filter((row) => row.causale === "consumo")
-          .reduce((sum, row) => sum + Number(row.quantita), 0),
-        scartoTotale: consumption
-          .filter((row) => row.causale === "scarto")
-          .reduce((sum, row) => sum + Number(row.quantita), 0),
+        ...consumptionBreakdown,
         mediaPastiGiorno: Number((total / days).toFixed(2)),
         distribuzione: distribution,
       });

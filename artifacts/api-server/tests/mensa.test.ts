@@ -45,6 +45,7 @@ import {
   dataServizioMensa,
   stessoGiornoServizioMensa,
 } from "../src/lib/mensaWorkflow";
+import { aggregatiConsumiMensa } from "../src/lib/mensaService";
 import { areaGuard } from "../src/middlewares/auth";
 
 const ids = {
@@ -381,6 +382,38 @@ afterAll(async () => {
 });
 
 describe("Modulo Mensa", () => {
+  it("non somma quantità appartenenti a unità di misura eterogenee", () => {
+    const result = aggregatiConsumiMensa([
+      {
+        causale: "consumo",
+        prodottoId: 1,
+        prodottoNome: "Farina",
+        unitaMisura: "kg",
+        quantita: 10,
+      },
+      {
+        causale: "consumo",
+        prodottoId: 2,
+        prodottoNome: "Piatti",
+        unitaMisura: "pz",
+        quantita: 20,
+      },
+      {
+        causale: "consumo",
+        prodottoId: 3,
+        prodottoNome: "Pasta",
+        unitaMisura: "kg",
+        quantita: 5,
+      },
+    ]);
+    expect(result.consumiPerUnitaMisura).toEqual([
+      { unitaMisura: "kg", quantita: 15 },
+      { unitaMisura: "pz", quantita: 20 },
+    ]);
+    expect(result.consumiPerProdotto).toHaveLength(3);
+    expect(result).not.toHaveProperty("consumoTotale");
+  });
+
   it.each([
     ["2026-01-14T22:59:59Z", "2026-01-14"],
     ["2026-01-14T23:00:00Z", "2026-01-15"],
@@ -785,6 +818,163 @@ describe("Modulo Mensa", () => {
     );
   });
 
+  it("non usa le chiavi idempotenti come capability di lettura cross-Area", async () => {
+    const fixture = await createFixture();
+    const appRome = makeApp(fixture);
+    const appMilan = makeApp(fixture, undefined, { cittaId: fixture.milanId });
+
+    const accessKey = `scope-access-${rnd()}`;
+    const access = await verify(appRome, fixture, {
+      idempotencyKey: accessKey,
+    });
+    expect(access.status).toBe(201);
+    const crossAccess = await request(appMilan)
+      .post("/mensa/accessi/verifica")
+      .send({
+        mensaId: fixture.mensaMilan,
+        modalitaAccesso: "tessera",
+        codiceTessera: fixture.milanCardCode,
+        tipoServizio: "pranzo",
+        idempotencyKey: accessKey,
+      });
+    expect(crossAccess.status).toBe(403);
+    expect(crossAccess.body).not.toHaveProperty("beneficiario");
+    expect(crossAccess.body).not.toHaveProperty("allergie");
+
+    const mealKey = `scope-meal-${rnd()}`;
+    const meal = await request(appRome).post("/mensa/pasti").send({
+      accessoMensaId: access.body.id,
+      tipoServizio: "pranzo",
+      idempotencyKey: mealKey,
+    });
+    expect(meal.status).toBe(201);
+    const crossMeal = await request(appMilan).post("/mensa/pasti").send({
+      accessoMensaId: access.body.id,
+      tipoServizio: "pranzo",
+      idempotencyKey: mealKey,
+    });
+    expect(crossMeal.status).toBe(403);
+    expect(crossMeal.body).not.toHaveProperty("beneficiarioId");
+
+    const [temporaryBeneficiary] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-SCOPE-${rnd()}`,
+        nome: "Persona",
+        cognome: "Temporanea",
+        cittaId: fixture.romeId,
+      })
+      .returning({ id: beneficiariTable.id });
+    ids.beneficiaries.push(temporaryBeneficiary.id);
+    const temporaryKey = `scope-temp-${rnd()}`;
+    expect(
+      (
+        await request(appRome).post("/mensa/accessi/temporaneo").send({
+          mensaId: fixture.mensaA,
+          beneficiarioId: temporaryBeneficiary.id,
+          tipoServizio: "cena",
+          motivo: "Test scope",
+          idempotencyKey: temporaryKey,
+        })
+      ).status,
+    ).toBe(201);
+    const crossTemporary = await request(appMilan)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaMilan,
+        beneficiarioId: fixture.milanBeneficiaryId,
+        tipoServizio: "cena",
+        motivo: "Replay fuori Area",
+        idempotencyKey: temporaryKey,
+      });
+    expect(crossTemporary.status).toBe(403);
+    expect(crossTemporary.body).not.toHaveProperty("beneficiario");
+
+    const [product] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `PSCOPE-${rnd()}`,
+        nome: "Prodotto scope",
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+      })
+      .returning({ id: prodottiTable.id });
+    ids.products.push(product.id);
+    const [lot] = await db
+      .insert(lottiTable)
+      .values({
+        prodottoId: product.id,
+        codiceLotto: `LS-${rnd()}`,
+        dataScadenza: "2027-12-31",
+        dataCarico: dataServizioMensa(),
+        quantitaCaricata: "4.00",
+        quantitaResidua: "4.00",
+        magazzinoId: fixture.warehouseIds[0],
+      })
+      .returning({ id: lottiTable.id });
+    ids.lots.push(lot.id);
+    const consumptionKey = `scope-consumption-${rnd()}`;
+    const consumption = await request(appRome).post("/mensa/consumi").send({
+      mensaId: fixture.mensaA,
+      dataServizio: dataServizioMensa(),
+      tipoServizio: "cena",
+      prodottoId: product.id,
+      quantita: 1,
+      causale: "consumo",
+      idempotencyKey: consumptionKey,
+    });
+    expect(consumption.status).toBe(201);
+    ids.consumptions.push(consumption.body.id);
+    ids.issues.push(consumption.body.scaricoId);
+    const crossConsumption = await request(appMilan)
+      .post("/mensa/consumi")
+      .send({
+        mensaId: fixture.mensaMilan,
+        dataServizio: dataServizioMensa(),
+        tipoServizio: "cena",
+        prodottoId: product.id,
+        quantita: 1,
+        causale: "consumo",
+        idempotencyKey: consumptionKey,
+      });
+    expect(crossConsumption.status).toBe(403);
+    expect(crossConsumption.body).not.toHaveProperty("prodottoId");
+
+    const transferKey = `scope-transfer-${rnd()}`;
+    const transfer = await request(appRome)
+      .post("/mensa/trasferimenti")
+      .send({
+        mensaId: fixture.mensaA,
+        magazzinoOrigineId: fixture.warehouseIds[1],
+        dataRichiesta: dataServizioMensa(),
+        idempotencyKey: transferKey,
+        righe: [{ prodottoId: product.id, quantita: 1 }],
+      });
+    expect(transfer.status).toBe(201);
+    ids.transfers.push(transfer.body.id);
+    const [milanOrigin] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `MI-OR-${rnd()}`,
+        nome: "Origine Milano",
+        cittaId: fixture.milanId,
+        tipoMagazzino: "logistico",
+      })
+      .returning({ id: magazziniTable.id });
+    ids.warehouses.push(milanOrigin.id);
+    const crossTransfer = await request(appMilan)
+      .post("/mensa/trasferimenti")
+      .send({
+        mensaId: fixture.mensaMilan,
+        magazzinoOrigineId: milanOrigin.id,
+        dataRichiesta: dataServizioMensa(),
+        idempotencyKey: transferKey,
+        righe: [{ prodottoId: product.id, quantita: 1 }],
+      });
+    expect(crossTransfer.status).toBe(403);
+    expect(crossTransfer.body).not.toHaveProperty("id");
+  });
+
   it("separa richiesta, spedizione e ricezione dei rifornimenti Mensa", async () => {
     const fixture = await createFixture();
     const [product] = await db
@@ -802,6 +992,17 @@ describe("Modulo Mensa", () => {
       "mensa.transfers.request",
       "mensa.transfers.receive",
     ];
+    const mismatched = await request(makeApp(fixture, permissions))
+      .post("/mensa/trasferimenti")
+      .send({
+        mensaId: fixture.mensaA,
+        magazzinoOrigineId: fixture.warehouseIds[1],
+        dataRichiesta: dataServizioMensa(),
+        idempotencyKey: `transfer-mismatch-${rnd()}`,
+        righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: "kg" }],
+      });
+    expect(mismatched.status).toBe(400);
+    expect(mismatched.body.error).toMatch(/deve essere pz/i);
     const requested = await request(makeApp(fixture, permissions))
       .post("/mensa/trasferimenti")
       .send({
@@ -809,10 +1010,15 @@ describe("Modulo Mensa", () => {
         magazzinoOrigineId: fixture.warehouseIds[1],
         dataRichiesta: dataServizioMensa(),
         idempotencyKey: `transfer-request-${rnd()}`,
-        righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: "pz" }],
+        righe: [{ prodottoId: product.id, quantita: 1 }],
       });
     expect(requested.status).toBe(201);
     ids.transfers.push(requested.body.id);
+    const [savedRow] = await db
+      .select({ unitaMisura: trasferimentoRigheTable.unitaMisura })
+      .from(trasferimentoRigheTable)
+      .where(eq(trasferimentoRigheTable.trasferimentoId, requested.body.id));
+    expect(savedRow.unitaMisura).toBe("pz");
     const deniedDispatch = await request(makeApp(fixture, permissions))
       .post(`/trasferimenti/${requested.body.id}/avvia`)
       .send({ versione: 1 });
@@ -1487,6 +1693,203 @@ describe("Modulo Mensa", () => {
     expect(replay.status).toBe(200);
     expect(replay.body.id).toBe(first.body.id);
     expect(replay.body.idempotentReplay).toBe(true);
+  });
+
+  it("autorizza separatamente pranzo e cena temporanei nella stessa data", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const [beneficiary] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-2S-${rnd()}`,
+        nome: "Doppio",
+        cognome: "Servizio",
+        cittaId: fixture.romeId,
+        attivo: true,
+      })
+      .returning({ id: beneficiariTable.id });
+    ids.beneficiaries.push(beneficiary.id);
+
+    const lunchKey = `temp-lunch-${rnd()}`;
+    const lunch = await request(app).post("/mensa/accessi/temporaneo").send({
+      mensaId: fixture.mensaA,
+      beneficiarioId: beneficiary.id,
+      tipoServizio: "pranzo",
+      motivo: "Autorizzazione pranzo",
+      idempotencyKey: lunchKey,
+    });
+    expect(lunch.status).toBe(201);
+    const lunchReplay = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        beneficiarioId: beneficiary.id,
+        tipoServizio: "pranzo",
+        motivo: "Non duplica",
+        idempotencyKey: lunchKey,
+      });
+    expect(lunchReplay.status).toBe(200);
+    expect(lunchReplay.body.id).toBe(lunch.body.id);
+
+    const duplicateLunch = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        beneficiarioId: beneficiary.id,
+        tipoServizio: "pranzo",
+        motivo: "Seconda autorizzazione pranzo",
+        idempotencyKey: `temp-lunch-duplicate-${rnd()}`,
+      });
+    expect(duplicateLunch.status).toBe(409);
+
+    const dinner = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        beneficiarioId: beneficiary.id,
+        tipoServizio: "cena",
+        motivo: "Autorizzazione cena",
+        idempotencyKey: `temp-dinner-${rnd()}`,
+      });
+    expect(dinner.status).toBe(201);
+    expect(
+      (
+        await request(app)
+          .post("/mensa/pasti")
+          .send({
+            accessoMensaId: lunch.body.id,
+            tipoServizio: "cena",
+            idempotencyKey: `wrong-service-${rnd()}`,
+          })
+      ).status,
+    ).toBe(409);
+
+    for (const [accessoMensaId, tipoServizio] of [
+      [lunch.body.id, "pranzo"],
+      [dinner.body.id, "cena"],
+    ] as const) {
+      expect(
+        (
+          await request(app)
+            .post("/mensa/pasti")
+            .send({
+              accessoMensaId,
+              tipoServizio,
+              idempotencyKey: `meal-${tipoServizio}-${rnd()}`,
+            })
+        ).status,
+      ).toBe(201);
+    }
+    const authorizations = await db
+      .select({ tipoServizio: mensaAutorizzazioniTemporaneeTable.tipoServizio })
+      .from(mensaAutorizzazioniTemporaneeTable)
+      .where(
+        eq(mensaAutorizzazioniTemporaneeTable.beneficiarioId, beneficiary.id),
+      );
+    expect(authorizations.map((row) => row.tipoServizio).sort()).toEqual([
+      "cena",
+      "pranzo",
+    ]);
+
+    const report = await request(app).get(
+      `/mensa/report?dal=${dataServizioMensa()}&al=${dataServizioMensa()}&mensaId=${fixture.mensaA}`,
+    );
+    expect(report.status).toBe(200);
+    expect(report.body.accessiOrdinari).toBe(0);
+    expect(report.body.accessiTemporanei).toBe(2);
+    expect(report.body.pastiOrdinari).toBe(0);
+    expect(report.body.pastiTemporanei).toBe(2);
+  });
+
+  it("nega gli accessi dopo la chiusura del solo servizio interessato", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const lunch = await verify(app, fixture, { tipoServizio: "pranzo" });
+    expect(lunch.status).toBe(201);
+    expect(
+      (
+        await request(app)
+          .post("/mensa/pasti")
+          .send({
+            accessoMensaId: lunch.body.id,
+            tipoServizio: "pranzo",
+            idempotencyKey: `meal-close-${rnd()}`,
+          })
+      ).status,
+    ).toBe(201);
+    const days = await request(app).get(
+      `/mensa/giornate?mensaId=${fixture.mensaA}&data=${dataServizioMensa()}`,
+    );
+    const lunchDay = days.body.find(
+      (day: { tipoServizio: string }) => day.tipoServizio === "pranzo",
+    );
+    expect(
+      (
+        await request(app)
+          .post(`/mensa/giornate/${lunchDay.id}/chiudi`)
+          .send({ note: "Chiusura pranzo" })
+      ).status,
+    ).toBe(200);
+
+    const deniedNormal = await verify(app, fixture, {
+      tipoServizio: "pranzo",
+    });
+    expect(deniedNormal.status).toBe(201);
+    expect(deniedNormal.body).toMatchObject({
+      esito: "negato",
+      motivoEsito: "SERVIZIO_CHIUSO",
+    });
+
+    const [temporaryBeneficiary] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-CLOSED-${rnd()}`,
+        nome: "Arrivo",
+        cognome: "Tardivo",
+        cittaId: fixture.romeId,
+      })
+      .returning({ id: beneficiariTable.id });
+    ids.beneficiaries.push(temporaryBeneficiary.id);
+    const deniedTemporary = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        beneficiarioId: temporaryBeneficiary.id,
+        tipoServizio: "pranzo",
+        motivo: "Arrivo dopo chiusura",
+        idempotencyKey: `closed-temp-${rnd()}`,
+      });
+    expect(deniedTemporary.status).toBe(201);
+    expect(deniedTemporary.body).toMatchObject({
+      esito: "negato",
+      motivoEsito: "SERVIZIO_CHIUSO",
+    });
+    expect(
+      await db
+        .select()
+        .from(mensaAutorizzazioniTemporaneeTable)
+        .where(
+          eq(
+            mensaAutorizzazioniTemporaneeTable.beneficiarioId,
+            temporaryBeneficiary.id,
+          ),
+        ),
+    ).toHaveLength(0);
+
+    const dinner = await verify(app, fixture, { tipoServizio: "cena" });
+    expect(dinner.status).toBe(201);
+    expect(dinner.body.esito).toBe("consentito");
+    expect(
+      (
+        await request(app)
+          .post("/mensa/pasti")
+          .send({
+            accessoMensaId: deniedNormal.body.id,
+            tipoServizio: "pranzo",
+            idempotencyKey: `closed-denied-meal-${rnd()}`,
+          })
+      ).status,
+    ).toBe(409);
   });
 
   it("crea una persona provvisoria anche con il servizio Centro di Ascolto disabilitato", async () => {
@@ -2209,6 +2612,143 @@ describe("Modulo Mensa", () => {
       });
     expect(dinner.status).toBe(201);
     expect(dinner.body.tipoServizio).toBe("cena");
+  });
+
+  it("rifiuta un consumo futuro senza modificare Lotto, Giornata o Movimenti", async () => {
+    const fixture = await createFixture();
+    const [product] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `PFUT-${rnd()}`,
+        nome: "Prodotto consumo futuro",
+        tipoProdotto: "alimentare",
+        unitaMisura: "kg",
+        attivo: true,
+      })
+      .returning({ id: prodottiTable.id });
+    ids.products.push(product.id);
+    const [lot] = await db
+      .insert(lottiTable)
+      .values({
+        prodottoId: product.id,
+        codiceLotto: `LF-${rnd()}`,
+        dataScadenza: "2027-12-31",
+        dataCarico: dataServizioMensa(),
+        quantitaCaricata: "8.00",
+        quantitaResidua: "8.00",
+        magazzinoId: fixture.warehouseIds[0],
+      })
+      .returning({ id: lottiTable.id });
+    ids.lots.push(lot.id);
+    const futureDate = shiftDate(dataServizioMensa(), 1);
+    const response = await request(makeApp(fixture))
+      .post("/mensa/consumi")
+      .send({
+        mensaId: fixture.mensaA,
+        dataServizio: futureDate,
+        tipoServizio: "pranzo",
+        prodottoId: product.id,
+        quantita: 2,
+        causale: "consumo",
+        idempotencyKey: `future-${rnd()}`,
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/non può essere futura/i);
+    const [unchangedLot] = await db
+      .select({ quantita: lottiTable.quantitaResidua })
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lot.id));
+    expect(Number(unchangedLot.quantita)).toBe(8);
+    expect(
+      await db
+        .select()
+        .from(mensaGiornateServizioTable)
+        .where(eq(mensaGiornateServizioTable.dataServizio, futureDate)),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.prodottoId, product.id)),
+    ).toHaveLength(0);
+  });
+
+  it("espone e fotografa consumi multi-unit senza un totale cross-unit", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const today = dataServizioMensa();
+    const inputs = [
+      { nome: "Farina", unitaMisura: "kg", quantita: 10 },
+      { nome: "Piatti", unitaMisura: "pz", quantita: 20 },
+      { nome: "Pasta", unitaMisura: "kg", quantita: 5 },
+    ];
+    for (const input of inputs) {
+      const [product] = await db
+        .insert(prodottiTable)
+        .values({
+          codice: `PMU-${rnd()}`,
+          nome: `${input.nome} ${rnd()}`,
+          tipoProdotto: "alimentare",
+          unitaMisura: input.unitaMisura,
+          attivo: true,
+        })
+        .returning({ id: prodottiTable.id });
+      ids.products.push(product.id);
+      const [lot] = await db
+        .insert(lottiTable)
+        .values({
+          prodottoId: product.id,
+          codiceLotto: `LMU-${rnd()}`,
+          dataScadenza: "2027-12-31",
+          dataCarico: today,
+          quantitaCaricata: input.quantita.toFixed(2),
+          quantitaResidua: input.quantita.toFixed(2),
+          magazzinoId: fixture.warehouseIds[0],
+        })
+        .returning({ id: lottiTable.id });
+      ids.lots.push(lot.id);
+      const response = await request(app)
+        .post("/mensa/consumi")
+        .send({
+          mensaId: fixture.mensaA,
+          dataServizio: today,
+          tipoServizio: "pranzo",
+          prodottoId: product.id,
+          quantita: input.quantita,
+          causale: "consumo",
+          idempotencyKey: `multi-unit-${rnd()}`,
+        });
+      expect(response.status).toBe(201);
+      ids.consumptions.push(response.body.id);
+      ids.issues.push(response.body.scaricoId);
+    }
+
+    const report = await request(app).get(
+      `/mensa/report?dal=${today}&al=${today}&mensaId=${fixture.mensaA}&tipoServizio=pranzo`,
+    );
+    expect(report.status).toBe(200);
+    expect(report.body.consumiPerUnitaMisura).toEqual([
+      { unitaMisura: "kg", quantita: 15 },
+      { unitaMisura: "pz", quantita: 20 },
+    ]);
+    expect(report.body.consumiPerProdotto).toHaveLength(3);
+    expect(report.body).not.toHaveProperty("consumoTotale");
+
+    const days = await request(app).get(
+      `/mensa/giornate?mensaId=${fixture.mensaA}&data=${today}`,
+    );
+    const lunchDay = days.body.find(
+      (day: { tipoServizio: string }) => day.tipoServizio === "pranzo",
+    );
+    const closed = await request(app)
+      .post(`/mensa/giornate/${lunchDay.id}/chiudi`)
+      .send({ note: "Snapshot multi-unit" });
+    expect(closed.status).toBe(200);
+    expect(closed.body.snapshot.consumiPerUnitaMisura).toEqual([
+      { unitaMisura: "kg", quantita: 15 },
+      { unitaMisura: "pz", quantita: 20 },
+    ]);
+    expect(closed.body.snapshot).not.toHaveProperty("consumoTotale");
   });
 
   it("registra consumo FEFO idempotente, rollback insufficiente, chiusura, riapertura e storno compensativo", async () => {

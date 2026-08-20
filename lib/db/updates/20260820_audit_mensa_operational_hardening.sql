@@ -74,6 +74,15 @@ ALTER TABLE public.mensa_pasti
 ALTER TABLE public.mensa_accessi
   ADD COLUMN IF NOT EXISTS tipo_servizio varchar(40);
 
+ALTER TABLE public.mensa_autorizzazioni_temporanee
+  ADD COLUMN IF NOT EXISTS tipo_servizio varchar(40);
+
+DROP INDEX IF EXISTS public.mensa_autorizzazioni_temporanee_giorno_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS mensa_autorizzazioni_temporanee_servizio_unique
+  ON public.mensa_autorizzazioni_temporanee
+    (beneficiario_id, mensa_id, data_servizio, tipo_servizio)
+  WHERE tipo_servizio IS NOT NULL;
+
 DO $audit$
 BEGIN
   IF NOT EXISTS (
@@ -93,6 +102,29 @@ BEGIN
   ) THEN
     ALTER TABLE public.mensa_accessi
       VALIDATE CONSTRAINT mensa_accessi_tipo_servizio_check;
+  END IF;
+END
+$audit$;
+
+DO $audit$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.mensa_autorizzazioni_temporanee'::regclass
+      AND conname = 'mensa_autorizzazioni_temporanee_tipo_servizio_check'
+  ) THEN
+    ALTER TABLE public.mensa_autorizzazioni_temporanee
+      ADD CONSTRAINT mensa_autorizzazioni_temporanee_tipo_servizio_check
+      CHECK (tipo_servizio IS NULL OR tipo_servizio IN ('pranzo', 'cena'))
+      NOT VALID;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.mensa_autorizzazioni_temporanee
+    WHERE tipo_servizio IS NOT NULL
+      AND tipo_servizio NOT IN ('pranzo', 'cena')
+  ) THEN
+    ALTER TABLE public.mensa_autorizzazioni_temporanee
+      VALIDATE CONSTRAINT mensa_autorizzazioni_temporanee_tipo_servizio_check;
   END IF;
 END
 $audit$;

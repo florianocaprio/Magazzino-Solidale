@@ -1574,6 +1574,7 @@ function ConsumiView() {
           <Input
             type="date"
             value={date}
+            max={todayEuropeRome()}
             onChange={(event) => setDate(event.target.value)}
           />
           <Select
@@ -1791,12 +1792,13 @@ function ReportView() {
         ["Totale pasti", report.data.totalePasti],
         ["Beneficiari distinti", report.data.beneficiariDistinti],
         ["Accessi ordinari", report.data.accessiOrdinari],
+        ["Accessi temporanei", report.data.accessiTemporanei],
         ["Accessi in eccezione", report.data.accessiEccezione],
         ["Accessi negati", report.data.accessiNegati],
         ["Pasti ordinari", report.data.pastiOrdinari ?? 0],
         ["Pasti temporanei", report.data.pastiTemporanei ?? 0],
-        ["Consumi dichiarati", report.data.consumoTotale ?? 0],
-        ["Scarti dichiarati", report.data.scartoTotale ?? 0],
+        ["Pasti in eccezione", report.data.pastiEccezione ?? 0],
+        ["Pasti con override", report.data.pastiOverride ?? 0],
         ["Media pasti/giorno", report.data.mediaPastiGiorno],
       ]
     : [];
@@ -1873,6 +1875,76 @@ function ReportView() {
             </CardContent>
           </Card>
         ))}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {report.data &&
+          [
+            {
+              title: "Consumi per prodotto",
+              rows: report.data.consumiPerProdotto,
+            },
+            {
+              title: "Scarti per prodotto",
+              rows: report.data.scartiPerProdotto,
+            },
+          ].map((breakdown) => (
+            <Card key={breakdown.title}>
+              <CardHeader>
+                <CardTitle className="text-base">{breakdown.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {breakdown.rows.length === 0 ? (
+                  <span className="text-muted-foreground">Nessun dato</span>
+                ) : (
+                  breakdown.rows.map((row) => (
+                    <div
+                      key={row.prodottoId}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <span>{row.prodottoNome}</span>
+                      <span className="font-medium">
+                        {row.quantita} {row.unitaMisura}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          ))}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {report.data &&
+          [
+            {
+              title: "Consumi per unità di misura",
+              rows: report.data.consumiPerUnitaMisura,
+            },
+            {
+              title: "Scarti per unità di misura",
+              rows: report.data.scartiPerUnitaMisura,
+            },
+          ].map((breakdown) => (
+            <Card key={breakdown.title}>
+              <CardHeader>
+                <CardTitle className="text-base">{breakdown.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {breakdown.rows.length === 0 ? (
+                  <span className="text-muted-foreground">Nessun dato</span>
+                ) : (
+                  breakdown.rows.map((row) => (
+                    <div
+                      key={row.unitaMisura}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <span>{row.unitaMisura}</span>
+                      <span className="font-medium">{row.quantita}</span>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          ))}
       </div>
       <Card>
         <CardContent className="p-4">

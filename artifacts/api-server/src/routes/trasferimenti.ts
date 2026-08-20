@@ -44,7 +44,10 @@ import {
   requireOperationalMagazzino,
   InventoryLedgerError,
 } from "../lib/inventoryLedger";
-import { createTransferRequest } from "../lib/transferWorkflow";
+import {
+  createTransferRequest,
+  TransferRequestError,
+} from "../lib/transferWorkflow";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -704,28 +707,12 @@ router.post("/trasferimenti", async (req, res) => {
         !Number.isSafeInteger(r.prodottoId) ||
         r.prodottoId <= 0 ||
         !Number.isFinite(r.quantita) ||
-        r.quantita <= 0 ||
-        typeof r.unitaMisura !== "string" ||
-        !r.unitaMisura.trim(),
+        r.quantita <= 0,
     )
   ) {
-    res
-      .status(400)
-      .json({
-        error:
-          "Indicare almeno una riga con Prodotto, quantità e unità di misura validi",
-      });
-    return;
-  }
-  const productIds = [...new Set(righeInput.map((row) => row.prodottoId))];
-  const existingProducts = await db
-    .select({ id: prodottiTable.id })
-    .from(prodottiTable)
-    .where(inArray(prodottiTable.id, productIds));
-  if (existingProducts.length !== productIds.length) {
-    res
-      .status(400)
-      .json({ error: "Una o più righe indicano un Prodotto inesistente" });
+    res.status(400).json({
+      error: "Indicare almeno una riga con Prodotto e quantità validi",
+    });
     return;
   }
   const trasportatore = normalizeTrasportatore(body);
@@ -746,12 +733,14 @@ router.post("/trasferimenti", async (req, res) => {
       righe: body.righe,
     });
   } catch (error) {
+    if (error instanceof TransferRequestError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
     if (databaseErrorCode(error) === "23503") {
-      res
-        .status(400)
-        .json({
-          error: "Una riga indica un Lotto o una risorsa collegata inesistente",
-        });
+      res.status(400).json({
+        error: "Una riga indica un Lotto o una risorsa collegata inesistente",
+      });
       return;
     }
     throw error;
@@ -878,12 +867,10 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     "dataEsecuzione" in body ||
     "dataConfermaRicezione" in body
   ) {
-    res
-      .status(400)
-      .json({
-        error:
-          "Lo stato e le date di workflow si modificano solo tramite Avvia e Conferma",
-      });
+    res.status(400).json({
+      error:
+        "Lo stato e le date di workflow si modificano solo tramite Avvia e Conferma",
+    });
     return;
   }
   const updates: Partial<typeof trasferimentiTable.$inferInsert> = {};
@@ -914,12 +901,10 @@ router.patch("/trasferimenti/:id", async (req, res) => {
   }> = [];
   if (editRighe) {
     if (current.stato !== "richiesto" && current.stato !== "preparato") {
-      res
-        .status(400)
-        .json({
-          error:
-            "Le righe possono essere modificate solo prima dell'avvio del trasferimento",
-        });
+      res.status(400).json({
+        error:
+          "Le righe possono essere modificate solo prima dell'avvio del trasferimento",
+      });
       return;
     }
     righeInput = body.righe ?? [];
@@ -985,20 +970,16 @@ router.patch("/trasferimenti/:id", async (req, res) => {
       throw error;
     });
   if (mutationApplied === "riga_non_valida") {
-    res
-      .status(400)
-      .json({
-        error:
-          "Una riga indica un Prodotto, Lotto o risorsa collegata inesistente",
-      });
+    res.status(400).json({
+      error:
+        "Una riga indica un Prodotto, Lotto o risorsa collegata inesistente",
+    });
     return;
   }
   if (!mutationApplied) {
-    res
-      .status(409)
-      .json({
-        error: "Il Trasferimento è stato modificato da un altro operatore",
-      });
+    res.status(409).json({
+      error: "Il Trasferimento è stato modificato da un altro operatore",
+    });
     return;
   }
 
@@ -1155,12 +1136,10 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message.includes("VERSIONE_TRASFERIMENTO_SUPERATA")) {
-      res
-        .status(409)
-        .json({
-          error:
-            "Il Trasferimento è stato modificato o avviato da un altro operatore",
-        });
+      res.status(409).json({
+        error:
+          "Il Trasferimento è stato modificato o avviato da un altro operatore",
+      });
       return;
     }
     if (message.includes("Disponibilità FEFO insufficiente")) {
@@ -1319,12 +1298,10 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
       error instanceof Error &&
       error.message.includes("VERSIONE_TRASFERIMENTO_SUPERATA")
     ) {
-      res
-        .status(409)
-        .json({
-          error:
-            "Il Trasferimento è stato modificato o confermato da un altro operatore",
-        });
+      res.status(409).json({
+        error:
+          "Il Trasferimento è stato modificato o confermato da un altro operatore",
+      });
       return;
     }
     if (error instanceof InventoryLedgerError) {

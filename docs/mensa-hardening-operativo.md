@@ -41,12 +41,21 @@ funzionale, senza cancellazioni automatiche. Valori servizio legacy diversi da
 segnalati; i relativi vincoli restano `NOT VALID` finché i dati non sono
 bonificati.
 
+L'aggiornamento aggiunge inoltre `tipo_servizio` alle autorizzazioni temporanee.
+Per i nuovi record il servizio applicativo valorizza sempre `pranzo` o `cena` e
+l'unicità è verificata per Beneficiario, Mensa, data e servizio. I record legacy
+restano intenzionalmente `NULL`: non vengono attribuiti a un servizio senza una
+decisione documentata.
+
 ## Controlli dopo l'aggiornamento
 
 - rieseguire gli stessi conteggi e verificare che non siano diminuiti;
 - verificare la presenza di `mensa_giornate_servizio`, `mensa_consumi` e
   `mensa_consumi_storni`;
 - verificare il trigger `mensa_abilitazioni_principale_overlap_trg`;
+- verificare la colonna nullable
+  `mensa_autorizzazioni_temporanee.tipo_servizio`, l'assenza dell'indice legacy
+  giornaliero e la presenza dell'indice parziale per servizio;
 - verificare che i vincoli FK accesso/eccezione e pasto/giornata risultino
   validi quando non esistono record orfani;
 - eseguire l'aggiornamento una seconda volta per confermarne l'idempotenza;
@@ -67,8 +76,20 @@ Le giornate sono identificate da Mensa, data civile Europe/Rome e tipo servizio
 (`pranzo` o `cena`). I nuovi accessi memorizzano lo stesso codice servizio, così
 i conteggi di chiusura del pranzo e della cena restano separati; gli accessi
 legacy senza codice non vengono attribuiti arbitrariamente. Dopo la chiusura non
-sono ammessi nuovi pasti, consumi o storni. La riapertura richiede permesso
-dedicato, motivo obbligatorio e audit.
+sono ammessi nuovi pasti, consumi o storni. Un tentativo di accesso successivo
+alla chiusura viene registrato come negato con motivo `SERVIZIO_CHIUSO`, senza
+creare autorizzazioni temporanee o pasti; la chiusura del pranzo non chiude la
+cena. La riapertura richiede permesso dedicato, motivo obbligatorio e audit.
+
+Consumi e scarti non accettano date future rispetto alla data civile
+Europe/Rome. I report e lo snapshot di chiusura non sommano unità eterogenee:
+espongono breakdown per Prodotto e per unità di misura, senza conversioni.
+
+Nei trasferimenti l'unità di misura è sempre derivata server-side dal Prodotto.
+Il campo del payload resta opzionale soltanto per compatibilità con client
+legacy; se valorizzato con un'unità differente la richiesta viene rifiutata con
+HTTP 400. I replay idempotenti sono restituiti soltanto dopo il controllo di
+permesso e scope Area/Mensa.
 
 ## Collaudo minimo
 

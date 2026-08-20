@@ -745,7 +745,7 @@ export const CreateTrasferimentoBody = zod.object({
   "prodottoId": zod.number(),
   "lottoId": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().optional().describe('Campo legacy opzionale. Se valorizzato deve coincidere con l\'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura.'),
   "note": zod.string().optional()
 }))
 })
@@ -813,7 +813,7 @@ export const UpdateTrasferimentoBody = zod.object({
   "prodottoId": zod.number(),
   "lottoId": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().optional().describe('Campo legacy opzionale. Se valorizzato deve coincidere con l\'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura.'),
   "note": zod.string().optional()
 })).optional()
 })
@@ -8719,7 +8719,7 @@ export const CreateTrasferimentoMensaBody = zod.object({
   "righe": zod.array(zod.object({
   "prodottoId": zod.number(),
   "quantita": zod.number().gt(createTrasferimentoMensaBodyRigheItemQuantitaExclusiveMin),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().optional().describe('Campo legacy opzionale. Se valorizzato deve coincidere con l\'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura.'),
   "note": zod.string().nullish()
 })).min(1)
 })
@@ -8945,14 +8945,35 @@ export const GetMensaReportResponse = zod.object({
   "totalePasti": zod.number(),
   "beneficiariDistinti": zod.number(),
   "accessiOrdinari": zod.number(),
+  "accessiTemporanei": zod.number(),
   "accessiEccezione": zod.number(),
   "accessiNegati": zod.number(),
-  "pastiTemporanei": zod.number().optional(),
-  "pastiOrdinari": zod.number().optional(),
+  "pastiTemporanei": zod.number(),
+  "pastiOrdinari": zod.number(),
+  "pastiEccezione": zod.number(),
+  "pastiOverride": zod.number(),
   "pastiTemporaneitaNonDeterminata": zod.number().optional(),
   "pastiAnagraficaProvvisoria": zod.number().optional(),
-  "consumoTotale": zod.number().optional(),
-  "scartoTotale": zod.number().optional(),
+  "consumiPerProdotto": zod.array(zod.object({
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string(),
+  "unitaMisura": zod.string(),
+  "quantita": zod.number()
+})),
+  "scartiPerProdotto": zod.array(zod.object({
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string(),
+  "unitaMisura": zod.string(),
+  "quantita": zod.number()
+})),
+  "consumiPerUnitaMisura": zod.array(zod.object({
+  "unitaMisura": zod.string(),
+  "quantita": zod.number()
+})),
+  "scartiPerUnitaMisura": zod.array(zod.object({
+  "unitaMisura": zod.string(),
+  "quantita": zod.number()
+})),
   "distribuzioneSesso": zod.array(zod.object({
   "chiave": zod.enum(['M', 'F', 'ALTRO', 'ND']),
   "totale": zod.number()

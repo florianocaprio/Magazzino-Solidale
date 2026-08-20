@@ -79,11 +79,6 @@ export const mensaAbilitazioniTable = pgTable(
     index("mensa_abilitazioni_beneficiario_idx").on(table.beneficiarioId),
     index("mensa_abilitazioni_mensa_idx").on(table.mensaId),
     index("mensa_abilitazioni_stato_idx").on(table.stato),
-    uniqueIndex("mensa_abilitazioni_principale_attiva_unique")
-      .on(table.beneficiarioId)
-      .where(
-        sql`${table.stato} = 'attiva' and ${table.mensaPrincipale} = true`,
-      ),
     check(
       "mensa_abilitazioni_stato_check",
       sql`${table.stato} in ('attiva', 'sospesa', 'revocata', 'scaduta')`,
@@ -143,6 +138,7 @@ export const mensaAutorizzazioniTemporaneeTable = pgTable(
       .notNull()
       .references(() => menseTable.id),
     dataServizio: date("data_servizio").notNull(),
+    tipoServizio: varchar("tipo_servizio", { length: 40 }),
     motivo: text("motivo").notNull(),
     operatoreId: integer("operatore_id")
       .notNull()
@@ -152,14 +148,21 @@ export const mensaAutorizzazioniTemporaneeTable = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("mensa_autorizzazioni_temporanee_giorno_unique").on(
-      table.beneficiarioId,
-      table.mensaId,
-      table.dataServizio,
-    ),
+    uniqueIndex("mensa_autorizzazioni_temporanee_servizio_unique")
+      .on(
+        table.beneficiarioId,
+        table.mensaId,
+        table.dataServizio,
+        table.tipoServizio,
+      )
+      .where(sql`${table.tipoServizio} is not null`),
     index("mensa_autorizzazioni_temporanee_mensa_data_idx").on(
       table.mensaId,
       table.dataServizio,
+    ),
+    check(
+      "mensa_autorizzazioni_temporanee_tipo_servizio_check",
+      sql`${table.tipoServizio} is null or ${table.tipoServizio} in ('pranzo', 'cena')`,
     ),
   ],
 );

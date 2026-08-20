@@ -940,7 +940,8 @@ export interface TrasferimentoRigaInput {
   prodottoId: number;
   lottoId?: number;
   quantita: number;
-  unitaMisura: string;
+  /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
+  unitaMisura?: string;
   note?: string;
 }
 
@@ -5364,7 +5365,8 @@ export type MensaTrasferimentoInputRigheItem = {
   prodottoId: number;
   /** @exclusiveMinimum 0 */
   quantita: number;
-  unitaMisura: string;
+  /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
+  unitaMisura?: string;
   /** @nullable */
   note?: string | null;
 };
@@ -5384,6 +5386,18 @@ export interface MensaTrasferimentoInput {
   note?: string | null;
   /** @minItems 1 */
   righe: MensaTrasferimentoInputRigheItem[];
+}
+
+export interface MensaQuantitaPerProdotto {
+  prodottoId: number;
+  prodottoNome: string;
+  unitaMisura: string;
+  quantita: number;
+}
+
+export interface MensaQuantitaPerUnitaMisura {
+  unitaMisura: string;
+  quantita: number;
 }
 
 export type MensaReportDistribuzioneSessoItemChiave = typeof MensaReportDistribuzioneSessoItemChiave[keyof typeof MensaReportDistribuzioneSessoItemChiave];
@@ -5477,14 +5491,19 @@ export interface MensaReport {
   totalePasti: number;
   beneficiariDistinti: number;
   accessiOrdinari: number;
+  accessiTemporanei: number;
   accessiEccezione: number;
   accessiNegati: number;
-  pastiTemporanei?: number;
-  pastiOrdinari?: number;
+  pastiTemporanei: number;
+  pastiOrdinari: number;
+  pastiEccezione: number;
+  pastiOverride: number;
   pastiTemporaneitaNonDeterminata?: number;
   pastiAnagraficaProvvisoria?: number;
-  consumoTotale?: number;
-  scartoTotale?: number;
+  consumiPerProdotto: MensaQuantitaPerProdotto[];
+  scartiPerProdotto: MensaQuantitaPerProdotto[];
+  consumiPerUnitaMisura: MensaQuantitaPerUnitaMisura[];
+  scartiPerUnitaMisura: MensaQuantitaPerUnitaMisura[];
   distribuzioneSesso?: MensaReportDistribuzioneSessoItem[];
   distribuzioneFasciaEta?: MensaReportDistribuzioneFasciaEtaItem[];
   distribuzioneTipoServizio?: MensaReportDistribuzioneTipoServizioItem[];
