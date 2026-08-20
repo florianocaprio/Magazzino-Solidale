@@ -266,7 +266,9 @@ function AppRoutes() {
         <Route path="/prodotti">
           {() => (
             <Guard area="magazzino">
-              <RequirePermission permission="magazzino.view"><Prodotti /></RequirePermission>
+              <RequirePermission permission="magazzino.view">
+                <Prodotti />
+              </RequirePermission>
             </Guard>
           )}
         </Route>
@@ -274,7 +276,9 @@ function AppRoutes() {
           {() => (
             <Guard area="magazzino">
               <RequireModulo codice="LOTTI">
-                <RequirePermission permission="magazzino.view"><Lotti /></RequirePermission>
+                <RequirePermission permission="magazzino.view">
+                  <Lotti />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -282,14 +286,18 @@ function AppRoutes() {
         <Route path="/movimenti">
           {() => (
             <Guard area="magazzino">
-              <RequirePermission permission="magazzino.view"><Movimenti /></RequirePermission>
+              <RequirePermission permission="magazzino.view">
+                <Movimenti />
+              </RequirePermission>
             </Guard>
           )}
         </Route>
         <Route path="/giacenze">
           {() => (
             <Guard area="magazzino">
-              <RequirePermission permission="magazzino.view"><Giacenze /></RequirePermission>
+              <RequirePermission permission="magazzino.view">
+                <Giacenze />
+              </RequirePermission>
             </Guard>
           )}
         </Route>
@@ -297,7 +305,9 @@ function AppRoutes() {
           {() => (
             <Guard area="magazzino">
               <RequireModulo codice="TRASFERIMENTI">
-                <RequirePermission permission="magazzino.view"><Trasferimenti /></RequirePermission>
+                <RequirePermission permission="magazzino.view">
+                  <Trasferimenti />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -306,7 +316,9 @@ function AppRoutes() {
           {() => (
             <Guard area="magazzino">
               <RequireModulo codice="MAGAZZINO_SOLIDALE">
-                <RequirePermission permission="magazzino.view"><PreparazioneConsegne /></RequirePermission>
+                <RequirePermission permission="magazzino.view">
+                  <PreparazioneConsegne />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -315,7 +327,9 @@ function AppRoutes() {
           {() => (
             <Guard area="magazzino">
               <RequireModulo codice="SCARICHI">
-                <RequirePermission permission="magazzino.view"><Scarichi /></RequirePermission>
+                <RequirePermission permission="magazzino.view">
+                  <Scarichi />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -434,7 +448,9 @@ function AppRoutes() {
             <Guard area={["sociale", "magazzino"]}>
               <RequireModulo codice="MAGAZZINO_SOLIDALE">
                 <RequireModulo codice="BOLLE">
-                  <RequirePermission permission="bolle.view"><Bolle /></RequirePermission>
+                  <RequirePermission permission="bolle.view">
+                    <Bolle />
+                  </RequirePermission>
                 </RequireModulo>
               </RequireModulo>
             </Guard>
@@ -482,8 +498,13 @@ function AppRoutes() {
           {() => (
             <MensaRoute
               view="trasferimenti"
-              permission="mensa.transfers.manage"
+              permission="mensa.transfers.request"
             />
+          )}
+        </Route>
+        <Route path="/mensa/consumi">
+          {() => (
+            <MensaRoute view="consumi" permission="mensa.consumption.manage" />
           )}
         </Route>
         <Route path="/mensa/eccezioni">
@@ -551,7 +572,9 @@ function AppRoutes() {
           {() => (
             <Guard area="logistica">
               <RequireModulo codice="APPROVVIGIONAMENTI">
-                <RequirePermission permission="approvvigionamenti.view"><Approvvigionamenti /></RequirePermission>
+                <RequirePermission permission="approvvigionamenti.view">
+                  <Approvvigionamenti />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}

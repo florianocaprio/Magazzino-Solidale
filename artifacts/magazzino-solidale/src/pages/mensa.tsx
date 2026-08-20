@@ -5,16 +5,20 @@ import {
   getSearchMensaBeneficiariQueryKey,
   getListMensaAbilitazioniQueryKey,
   getListGiacenzeMensaQueryKey,
+  getListConsumiMensaQueryKey,
   useAutorizzaEccezioneMensa,
   useAvviaTrasferimento,
   useConfermaTrasferimento,
   useCreateAccessoTemporaneoMensa,
   useCreateMensaAbilitazione,
   useCreatePastoMensa,
+  useCreateConsumoMensa,
   useCreateTesseraBeneficiario,
   useCreateTrasferimentoMensa,
   useGetMensaReport,
   useListEccezioniMensa,
+  useListConsumiMensa,
+  useListGiornateMensa,
   useListGiacenzeMensa,
   useListMagazziniMensa,
   useListMensaAbilitazioni,
@@ -22,11 +26,15 @@ import {
   useListPastiMensa,
   useListTrasferimentiMensa,
   useSearchMensaBeneficiari,
+  useStornaConsumoMensa,
+  useChiudiGiornataMensa,
+  useRiapriGiornataMensa,
   useUpdateMensaAbilitazioneStato,
   useVerificaAccessoMensa,
   type MensaAccesso,
   type MensaBeneficiarioSummary,
   type BeneficiarioSimile,
+  type MensaConsumo,
 } from "@workspace/api-client-react";
 import {
   AlertTriangle,
@@ -68,6 +76,7 @@ export type MensaView =
   | "pasti"
   | "abilitazioni"
   | "trasferimenti"
+  | "consumi"
   | "eccezioni"
   | "report";
 
@@ -75,6 +84,15 @@ function requestKey(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto)
     return `${prefix}-${crypto.randomUUID()}`;
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function pageItems<T>(data: T[] | { items: T[] } | undefined): T[] {
+  if (Array.isArray(data)) return data;
+  return data?.items ?? [];
+}
+
+function pageTotal<T>(data: T[] | { items: T[]; total: number } | undefined) {
+  return Array.isArray(data) ? data.length : (data?.total ?? 0);
 }
 
 function errorMessage(error: unknown): string {
@@ -192,6 +210,7 @@ export function MensaPostazione() {
   const inputRef = useRef<HTMLInputElement>(null);
   const scanLockedRef = useRef(false);
   const [mensaId, setMensaId] = useState<number | null>(null);
+  const [tipoServizio, setTipoServizio] = useState<"pranzo" | "cena">("pranzo");
   const [code, setCode] = useState("");
   const [access, setAccess] = useState<MensaAccesso | null>(null);
   const [reason, setReason] = useState("");
@@ -331,27 +350,49 @@ export function MensaPostazione() {
 
   const registerMeal = () => {
     if (!access || meal.isPending) return;
-    meal.mutate(
-      {
-        data: {
-          accessoMensaId: access.id,
-          tipoServizio: "pranzo",
-          idempotencyKey: `meal-access-${access.id}`,
+    const submit = (override = false, motivoOverride?: string) =>
+      meal.mutate(
+        {
+          data: {
+            accessoMensaId: access.id,
+            tipoServizio,
+            idempotencyKey: override
+              ? requestKey(`meal-override-access-${access.id}`)
+              : `meal-access-${access.id}`,
+            override,
+            motivoOverride,
+          },
         },
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "Pasto registrato" });
-          readyForNextPerson();
+        {
+          onSuccess: () => {
+            toast({ title: "Pasto registrato" });
+            readyForNextPerson();
+          },
+          onError: (error) => {
+            const message = errorMessage(error);
+            if (
+              !override &&
+              hasPermission("mensa.meals.override") &&
+              message.includes("override autorizzato") &&
+              window.confirm(
+                "Il pasto risulta già registrato. Vuoi autorizzare un secondo pasto?",
+              )
+            ) {
+              const reason = window.prompt(
+                "Motivo obbligatorio del secondo pasto",
+              );
+              if (reason?.trim()) submit(true, reason.trim());
+              return;
+            }
+            toast({
+              title: "Pasto non registrato",
+              description: message,
+              variant: "destructive",
+            });
+          },
         },
-        onError: (error) =>
-          toast({
-            title: "Pasto non registrato",
-            description: errorMessage(error),
-            variant: "destructive",
-          }),
-      },
-    );
+      );
+    submit();
   };
 
   const onTemporarySuccess = (result: MensaAccesso) => {
@@ -440,6 +481,20 @@ export function MensaPostazione() {
       <Card>
         <CardContent className="space-y-5 p-6">
           <MensaSelect value={mensaId} onChange={setMensaId} />
+          <Select
+            value={tipoServizio}
+            onValueChange={(value) =>
+              setTipoServizio(value as "pranzo" | "cena")
+            }
+          >
+            <SelectTrigger aria-label="Tipo servizio">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pranzo">Pranzo</SelectItem>
+              <SelectItem value="cena">Cena</SelectItem>
+            </SelectContent>
+          </Select>
           <form onSubmit={scan} className="space-y-3 text-center">
             <Label htmlFor="mensa-scan" className="text-xl">
               {t("mensa.scanPrompt")}
@@ -749,29 +804,115 @@ export function MensaPostazione() {
 }
 
 function PastiView() {
+  const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
   const [mensaId, setMensaId] = useState<number | null>(null);
   const [date, setDate] = useState(todayEuropeRome());
-  const { data = [], isLoading } = useListPastiMensa({
+  const [tipoServizio, setTipoServizio] = useState<"pranzo" | "cena">("pranzo");
+  const [page, setPage] = useState(1);
+  const mealsQuery = useListPastiMensa({
+    mensaId: mensaId ?? undefined,
+    data: date,
+    tipoServizio,
+    page,
+    pageSize: 50,
+  });
+  const days = useListGiornateMensa({
     mensaId: mensaId ?? undefined,
     data: date,
   });
+  const close = useChiudiGiornataMensa();
+  const reopen = useRiapriGiornataMensa();
+  const data = pageItems(mealsQuery.data);
+  const total = pageTotal(mealsQuery.data);
+  const serviceDay = days.data?.find(
+    (day) => day.mensaId === mensaId && day.tipoServizio === tipoServizio,
+  );
+  const refreshDays = () =>
+    queryClient.invalidateQueries({ queryKey: ["/api/mensa/giornate"] });
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="pasti" />
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-3">
         <MensaSelect value={mensaId} onChange={setMensaId} />
         <Input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
+        <Select
+          value={tipoServizio}
+          onValueChange={(value) => setTipoServizio(value as "pranzo" | "cena")}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pranzo">Pranzo</SelectItem>
+            <SelectItem value="cena">Cena</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+      {serviceDay && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div>
+              <Badge
+                variant={
+                  serviceDay.stato === "chiusa" ? "secondary" : "default"
+                }
+              >
+                Giornata {serviceDay.stato}
+              </Badge>
+              {serviceDay.stato === "chiusa" && serviceDay.snapshot && (
+                <span className="ml-3 text-sm text-muted-foreground">
+                  Snapshot preservato alla chiusura
+                </span>
+              )}
+            </div>
+            {serviceDay.stato === "aperta" &&
+              hasPermission("mensa.service.close") && (
+                <Button
+                  variant="outline"
+                  disabled={close.isPending}
+                  onClick={() =>
+                    close.mutate(
+                      { id: serviceDay.id, data: {} },
+                      { onSuccess: refreshDays },
+                    )
+                  }
+                >
+                  Chiudi giornata
+                </Button>
+              )}
+            {serviceDay.stato === "chiusa" &&
+              hasPermission("mensa.service.reopen") && (
+                <Button
+                  variant="outline"
+                  disabled={reopen.isPending}
+                  onClick={() => {
+                    const motivo = window.prompt(
+                      "Motivo obbligatorio della riapertura",
+                    );
+                    if (motivo?.trim())
+                      reopen.mutate(
+                        { id: serviceDay.id, data: { motivo: motivo.trim() } },
+                        { onSuccess: refreshDays },
+                      );
+                  }}
+                >
+                  Riapri giornata
+                </Button>
+              )}
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader>
-          <CardTitle>{data.length} pasti</CardTitle>
+          <CardTitle>{total} pasti</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {mealsQuery.isLoading ? (
             <Loader2 className="animate-spin" />
           ) : (
             <Table>
@@ -814,6 +955,22 @@ function PastiView() {
               </TableBody>
             </Table>
           )}
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage((value) => value - 1)}
+            >
+              Precedente
+            </Button>
+            <Button
+              variant="outline"
+              disabled={page * 50 >= total}
+              onClick={() => setPage((value) => value + 1)}
+            >
+              Successiva
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -829,6 +986,7 @@ function AbilitazioniView() {
   );
   const [mensaId, setMensaId] = useState<number | null>(null);
   const [start, setStart] = useState(todayEuropeRome());
+  const [end, setEnd] = useState("");
   const search = useSearchMensaBeneficiari(
     { search: searchText },
     {
@@ -880,12 +1038,19 @@ function AbilitazioniView() {
                 Abilita {selected.nome} {selected.cognome}
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-3">
+            <CardContent className="grid gap-3 md:grid-cols-4">
               <MensaSelect value={mensaId} onChange={setMensaId} />
               <Input
                 type="date"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
+              />
+              <Input
+                type="date"
+                value={end}
+                min={start}
+                onChange={(e) => setEnd(e.target.value)}
+                aria-label="Data fine abilitazione"
               />
               <Button
                 disabled={!mensaId || create.isPending || !selected.attivo}
@@ -896,6 +1061,7 @@ function AbilitazioniView() {
                         beneficiarioId: selected.id,
                         mensaId: mensaId!,
                         dataInizio: start,
+                        dataFine: end || null,
                         mensaPrincipale: true,
                       },
                     },
@@ -939,30 +1105,91 @@ function AbilitazioniView() {
                         {item.dataInizio} — {item.dataFine ?? "senza scadenza"}
                       </TableCell>
                       <TableCell>
-                        <Badge>{item.stato}</Badge>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge>
+                            {item.stato === "attiva" &&
+                            item.dataInizio > todayEuropeRome()
+                              ? "programmata"
+                              : item.stato}
+                          </Badge>
+                          {item.mensaPrincipale && (
+                            <Badge variant="secondary">Mensa principale</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        {item.stato === "attiva" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              status.mutate(
-                                {
-                                  id: item.id,
-                                  data: {
-                                    stato: "sospesa",
-                                    motivo: "Sospensione operativa",
-                                    versione: item.versione,
+                        <div className="flex flex-wrap gap-2">
+                          {item.stato === "attiva" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const motivo = window.prompt(
+                                  "Motivo obbligatorio della sospensione",
+                                );
+                                if (motivo?.trim())
+                                  status.mutate(
+                                    {
+                                      id: item.id,
+                                      data: {
+                                        stato: "sospesa",
+                                        motivo: motivo.trim(),
+                                        versione: item.versione,
+                                      },
+                                    },
+                                    { onSuccess: refresh },
+                                  );
+                              }}
+                            >
+                              Sospendi
+                            </Button>
+                          )}
+                          {item.stato === "sospesa" && (
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                status.mutate(
+                                  {
+                                    id: item.id,
+                                    data: {
+                                      stato: "attiva",
+                                      versione: item.versione,
+                                    },
                                   },
-                                },
-                                { onSuccess: refresh },
-                              )
-                            }
-                          >
-                            Sospendi
-                          </Button>
-                        )}
+                                  { onSuccess: refresh },
+                                )
+                              }
+                            >
+                              Riattiva
+                            </Button>
+                          )}
+                          {(item.stato === "attiva" ||
+                            item.stato === "sospesa") && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                const motivo = window.prompt(
+                                  "Motivo obbligatorio della revoca",
+                                );
+                                if (motivo?.trim())
+                                  status.mutate(
+                                    {
+                                      id: item.id,
+                                      data: {
+                                        stato: "revocata",
+                                        motivo: motivo.trim(),
+                                        versione: item.versione,
+                                      },
+                                    },
+                                    { onSuccess: refresh },
+                                  );
+                              }}
+                            >
+                              Revoca
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -989,9 +1216,11 @@ type TransferRow = {
 function TrasferimentiView() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { hasPermission } = useAuth();
+  const [page, setPage] = useState(1);
   const { data: mense = [] } = useListMense({ attiva: true });
   const { data: warehouses = [] } = useListMagazziniMensa();
-  const list = useListTrasferimentiMensa();
+  const list = useListTrasferimentiMensa({ page, pageSize: 50 });
   const [mensaId, setMensaId] = useState("");
   const [originId, setOriginId] = useState("");
   const [productId, setProductId] = useState("");
@@ -1003,16 +1232,30 @@ function TrasferimentiView() {
       enabled: Number(originId) > 0,
     },
   });
+  const selectedProduct = stock.data?.find(
+    (item) => item.prodottoId === Number(productId),
+  );
   const create = useCreateTrasferimentoMensa();
   const start = useAvviaTrasferimento();
   const confirm = useConfermaTrasferimento();
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["/api/mensa/trasferimenti"] });
   const submit = () => {
-    const product = stock.data?.find(
-      (item) => item.prodottoId === Number(productId),
-    );
+    const product = selectedProduct;
     if (!product) return;
+    const requestedQuantity = Number(quantity);
+    if (
+      !Number.isFinite(requestedQuantity) ||
+      requestedQuantity <= 0 ||
+      requestedQuantity > product.disponibileReale
+    ) {
+      toast({
+        title: "Quantità non disponibile",
+        description: `Il disponibile reale è ${product.disponibileReale} ${product.unitaMisura}`,
+        variant: "destructive",
+      });
+      return;
+    }
     create.mutate(
       {
         data: {
@@ -1024,7 +1267,7 @@ function TrasferimentiView() {
           righe: [
             {
               prodottoId: product.prodottoId,
-              quantita: Number(quantity),
+              quantita: requestedQuantity,
               unitaMisura: product.unitaMisura,
             },
           ],
@@ -1041,7 +1284,15 @@ function TrasferimentiView() {
       },
     );
   };
-  const rows = (list.data ?? []) as unknown as TransferRow[];
+  const rows = pageItems(
+    list.data as TransferRow[] | { items: TransferRow[] } | undefined,
+  );
+  const total = pageTotal(
+    list.data as
+      | TransferRow[]
+      | { items: TransferRow[]; total: number }
+      | undefined,
+  );
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="trasferimenti" />
@@ -1096,7 +1347,9 @@ function TrasferimentiView() {
                   key={item.prodottoId}
                   value={String(item.prodottoId)}
                 >
-                  {item.nome} · {item.quantita} {item.unitaMisura}
+                  {item.nome} · fisica {item.giacenzaFisica} · impegnata{" "}
+                  {item.impegnato} · disponibile {item.disponibileReale}{" "}
+                  {item.unitaMisura}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1105,11 +1358,20 @@ function TrasferimentiView() {
             type="number"
             min="0.01"
             step="0.01"
+            max={selectedProduct?.disponibileReale}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
           />
           <Button
-            disabled={!mensaId || !originId || !productId || create.isPending}
+            disabled={
+              !mensaId ||
+              !originId ||
+              !productId ||
+              !selectedProduct ||
+              Number(quantity) <= 0 ||
+              Number(quantity) > selectedProduct.disponibileReale ||
+              create.isPending
+            }
             onClick={submit}
           >
             Crea trasferimento
@@ -1138,29 +1400,35 @@ function TrasferimentiView() {
                     <Badge>{row.stato}</Badge>
                   </TableCell>
                   <TableCell className="space-x-2">
-                    {row.stato === "richiesto" && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          start.mutate({ id: row.id, data: { versione: row.versione } }, { onSuccess: refresh })
-                        }
-                      >
-                        Avvia
-                      </Button>
-                    )}
-                    {row.stato === "in_transito" && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          confirm.mutate(
-                            { id: row.id, data: { versione: row.versione } },
-                            { onSuccess: refresh },
-                          )
-                        }
-                      >
-                        Conferma
-                      </Button>
-                    )}
+                    {row.stato === "richiesto" &&
+                      hasPermission("magazzino.transfers.dispatch") && (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            start.mutate(
+                              { id: row.id, data: { versione: row.versione } },
+                              { onSuccess: refresh },
+                            )
+                          }
+                        >
+                          Avvia
+                        </Button>
+                      )}
+                    {row.stato === "in_transito" &&
+                      (hasPermission("mensa.transfers.receive") ||
+                        hasPermission("mensa.transfers.manage")) && (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            confirm.mutate(
+                              { id: row.id, data: { versione: row.versione } },
+                              { onSuccess: refresh },
+                            )
+                          }
+                        >
+                          Conferma
+                        </Button>
+                      )}
                     <Button
                       size="sm"
                       variant="outline"
@@ -1179,6 +1447,272 @@ function TrasferimentiView() {
               ))}
             </TableBody>
           </Table>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage((value) => value - 1)}
+            >
+              Precedente
+            </Button>
+            <Button
+              variant="outline"
+              disabled={page * 50 >= total}
+              onClick={() => setPage((value) => value + 1)}
+            >
+              Successiva
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ConsumiView() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: mense = [] } = useListMense({ attiva: true });
+  const [mensaId, setMensaId] = useState<number | null>(null);
+  const [date, setDate] = useState(todayEuropeRome());
+  const [tipoServizio, setTipoServizio] = useState<"pranzo" | "cena">("pranzo");
+  const [causale, setCausale] = useState<"consumo" | "scarto">("consumo");
+  const [productId, setProductId] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [notes, setNotes] = useState("");
+  const [page, setPage] = useState(1);
+  const warehouseId = mense.find((mensa) => mensa.id === mensaId)?.magazzinoId;
+  const stock = useListGiacenzeMensa(
+    { magazzinoId: warehouseId ?? 0 },
+    {
+      query: {
+        queryKey: getListGiacenzeMensaQueryKey({
+          magazzinoId: warehouseId ?? 0,
+        }),
+        enabled: warehouseId != null,
+      },
+    },
+  );
+  const listParams = {
+    mensaId: mensaId ?? undefined,
+    data: date,
+    page,
+    pageSize: 50,
+  };
+  const list = useListConsumiMensa(listParams);
+  const create = useCreateConsumoMensa();
+  const reverse = useStornaConsumoMensa();
+  const rows = pageItems(list.data);
+  const total = pageTotal(list.data);
+  const selectedProduct = stock.data?.find(
+    (item) => item.prodottoId === Number(productId),
+  );
+  const refresh = () => {
+    queryClient.invalidateQueries({
+      queryKey: getListConsumiMensaQueryKey(listParams),
+    });
+    if (warehouseId)
+      queryClient.invalidateQueries({
+        queryKey: getListGiacenzeMensaQueryKey({ magazzinoId: warehouseId }),
+      });
+  };
+  const submit = () => {
+    if (!mensaId || !selectedProduct) return;
+    create.mutate(
+      {
+        data: {
+          mensaId,
+          dataServizio: date,
+          tipoServizio,
+          prodottoId: selectedProduct.prodottoId,
+          quantita: Number(quantity),
+          causale,
+          note: notes.trim() || null,
+          idempotencyKey: requestKey("mensa-consumo"),
+        },
+      },
+      {
+        onSuccess: () => {
+          setQuantity("1");
+          setNotes("");
+          refresh();
+          toast({
+            title:
+              causale === "consumo"
+                ? "Consumo registrato"
+                : "Scarto registrato",
+          });
+        },
+        onError: (error) =>
+          toast({
+            title: "Registrazione non riuscita",
+            description: errorMessage(error),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+  return (
+    <div className="space-y-6 p-6">
+      <PageTitle view="consumi" />
+      <Card>
+        <CardHeader>
+          <CardTitle>Nuova registrazione</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <MensaSelect
+            value={mensaId}
+            onChange={(value) => {
+              setMensaId(value);
+              setProductId("");
+            }}
+          />
+          <Input
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
+          <Select
+            value={tipoServizio}
+            onValueChange={(value) =>
+              setTipoServizio(value as "pranzo" | "cena")
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pranzo">Pranzo</SelectItem>
+              <SelectItem value="cena">Cena</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={causale}
+            onValueChange={(value) => setCausale(value as "consumo" | "scarto")}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="consumo">Consumo</SelectItem>
+              <SelectItem value="scarto">Scarto</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={productId} onValueChange={setProductId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Prodotto" />
+            </SelectTrigger>
+            <SelectContent>
+              {stock.data?.map((item) => (
+                <SelectItem
+                  key={item.prodottoId}
+                  value={String(item.prodottoId)}
+                >
+                  {item.nome} · {item.disponibileReale} {item.unitaMisura}{" "}
+                  disponibili
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            type="number"
+            min="0.01"
+            step="0.01"
+            max={selectedProduct?.disponibileReale}
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+          />
+          <Textarea
+            className="md:col-span-2"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Note operative"
+          />
+          <Button
+            disabled={
+              !mensaId ||
+              !selectedProduct ||
+              Number(quantity) <= 0 ||
+              Number(quantity) > (selectedProduct?.disponibileReale ?? 0) ||
+              create.isPending
+            }
+            onClick={submit}
+          >
+            Registra {causale}
+          </Button>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Servizio</TableHead>
+                <TableHead>Prodotto</TableHead>
+                <TableHead>Quantità</TableHead>
+                <TableHead>Causale</TableHead>
+                <TableHead>Stato</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row: MensaConsumo) => (
+                <TableRow key={row.id}>
+                  <TableCell>
+                    {row.dataServizio} · {row.tipoServizio}
+                  </TableCell>
+                  <TableCell>
+                    {row.prodottoNome ?? `#${row.prodottoId}`}
+                  </TableCell>
+                  <TableCell>
+                    {row.quantita} {row.unitaMisura}
+                  </TableCell>
+                  <TableCell>{row.causale}</TableCell>
+                  <TableCell>
+                    <Badge variant={row.stornato ? "secondary" : "default"}>
+                      {row.stornato ? "Stornato" : "Registrato"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {!row.stornato && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const motivo = window.prompt(
+                            "Motivo obbligatorio dello storno",
+                          );
+                          if (motivo?.trim())
+                            reverse.mutate(
+                              { id: row.id, data: { motivo: motivo.trim() } },
+                              { onSuccess: refresh },
+                            );
+                        }}
+                      >
+                        Storna
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage((value) => value - 1)}
+            >
+              Precedente
+            </Button>
+            <Button
+              variant="outline"
+              disabled={page * 50 >= total}
+              onClick={() => setPage((value) => value + 1)}
+            >
+              Successiva
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -1186,7 +1720,10 @@ function TrasferimentiView() {
 }
 
 function EccezioniView() {
-  const { data = [] } = useListEccezioniMensa();
+  const [page, setPage] = useState(1);
+  const query = useListEccezioniMensa({ page, pageSize: 50 });
+  const data = pageItems(query.data);
+  const total = pageTotal(query.data);
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="eccezioni" />
@@ -1218,6 +1755,22 @@ function EccezioniView() {
               ))}
             </TableBody>
           </Table>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage((value) => value - 1)}
+            >
+              Precedente
+            </Button>
+            <Button
+              variant="outline"
+              disabled={page * 50 >= total}
+              onClick={() => setPage((value) => value + 1)}
+            >
+              Successiva
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -1236,7 +1789,33 @@ function ReportView() {
         ["Accessi ordinari", report.data.accessiOrdinari],
         ["Accessi in eccezione", report.data.accessiEccezione],
         ["Accessi negati", report.data.accessiNegati],
+        ["Pasti ordinari", report.data.pastiOrdinari ?? 0],
+        ["Pasti temporanei", report.data.pastiTemporanei ?? 0],
+        ["Consumi dichiarati", report.data.consumoTotale ?? 0],
+        ["Scarti dichiarati", report.data.scartoTotale ?? 0],
         ["Media pasti/giorno", report.data.mediaPastiGiorno],
+      ]
+    : [];
+  const breakdowns: Array<{
+    title: string;
+    rows: Array<{ chiave: string; totale: number }>;
+    distinct?: Array<{ chiave: string; totale: number }>;
+  }> = report.data
+    ? [
+        {
+          title: "Pasti per sesso",
+          rows: report.data.distribuzioneSesso ?? [],
+          distinct: report.data.beneficiariDistintiPerSesso ?? [],
+        },
+        {
+          title: "Pasti per fascia d'età",
+          rows: report.data.distribuzioneFasciaEta ?? [],
+          distinct: report.data.beneficiariDistintiPerFasciaEta ?? [],
+        },
+        {
+          title: "Pasti per tipo servizio",
+          rows: report.data.distribuzioneTipoServizio ?? [],
+        },
       ]
     : [];
   return (
@@ -1260,6 +1839,34 @@ function ReportView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="text-3xl font-bold">{value}</CardContent>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {breakdowns.map((breakdown) => (
+          <Card key={breakdown.title}>
+            <CardHeader>
+              <CardTitle className="text-base">{breakdown.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {breakdown.rows.map((row) => {
+                const distinct = breakdown.distinct?.find(
+                  (item) => item.chiave === row.chiave,
+                );
+                return (
+                  <div
+                    key={row.chiave}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <span>{row.chiave.replaceAll("_", " ")}</span>
+                    <span className="font-medium">
+                      {row.totale} pasti
+                      {distinct ? ` · ${distinct.totale} persone` : ""}
+                    </span>
+                  </div>
+                );
+              })}
+            </CardContent>
           </Card>
         ))}
       </div>
@@ -1302,6 +1909,8 @@ export default function MensaPage({ view }: { view: MensaView }) {
         return <AbilitazioniView />;
       case "trasferimenti":
         return <TrasferimentiView />;
+      case "consumi":
+        return <ConsumiView />;
       case "eccezioni":
         return <EccezioniView />;
       case "report":

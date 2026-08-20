@@ -6,10 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListPastiMensaParams = {
-mensaId?: number;
-data?: Date;
-tipoServizio?: string;
+export type ListTrasferimentiMensaParams = {
 /**
  * @minimum 1
  */

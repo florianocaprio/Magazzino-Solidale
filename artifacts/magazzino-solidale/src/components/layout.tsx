@@ -310,7 +310,16 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "mensa",
     area: "mensa",
     moduloCodice: "MENSA",
-    permission: "mensa.transfers.manage",
+    permission: "mensa.transfers.request",
+  },
+  {
+    key: "mensaConsumi",
+    url: "/mensa/consumi",
+    icon: PackageMinus,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.consumption.manage",
   },
   {
     key: "mensaEccezioni",

@@ -4611,6 +4611,25 @@ export const MensaStato = {
   inattivo: 'inattivo',
 } as const;
 
+export type MensaStatoServizio = typeof MensaStatoServizio[keyof typeof MensaStatoServizio];
+
+
+export const MensaStatoServizio = {
+  attivo: 'attivo',
+  inattivo: 'inattivo',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaStatoMagazzino = typeof MensaStatoMagazzino[keyof typeof MensaStatoMagazzino] | null;
+
+
+export const MensaStatoMagazzino = {
+  attivo: 'attivo',
+  inattivo: 'inattivo',
+} as const;
+
 export interface Mensa {
   id: number;
   codice: string;
@@ -4640,6 +4659,9 @@ export interface Mensa {
   /** @nullable */
   email?: string | null;
   stato?: MensaStato;
+  statoServizio?: MensaStatoServizio;
+  /** @nullable */
+  statoMagazzino?: MensaStatoMagazzino;
   attiva: boolean;
   /** @nullable */
   note?: string | null;
@@ -4978,13 +5000,17 @@ export interface MensaAccesso {
   idempotentReplay?: boolean;
 }
 
+export type MensaPastoInputTipoServizio = typeof MensaPastoInputTipoServizio[keyof typeof MensaPastoInputTipoServizio];
+
+
+export const MensaPastoInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
 export interface MensaPastoInput {
   accessoMensaId: number;
-  /**
-     * @minLength 1
-     * @maxLength 40
-     */
-  tipoServizio: string;
+  tipoServizio: MensaPastoInputTipoServizio;
   /** @nullable */
   note?: string | null;
   override?: boolean;
@@ -4997,6 +5023,53 @@ export interface MensaPastoInput {
   idempotencyKey: string;
 }
 
+export type MensaPastoTipoServizio = typeof MensaPastoTipoServizio[keyof typeof MensaPastoTipoServizio];
+
+
+export const MensaPastoTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaPastoSessoSnapshot = typeof MensaPastoSessoSnapshot[keyof typeof MensaPastoSessoSnapshot] | null;
+
+
+export const MensaPastoSessoSnapshot = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+  ND: 'ND',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaPastoFasciaEtaSnapshot = typeof MensaPastoFasciaEtaSnapshot[keyof typeof MensaPastoFasciaEtaSnapshot] | null;
+
+
+export const MensaPastoFasciaEtaSnapshot = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaPastoFasciaEtaOrigineSnapshot = typeof MensaPastoFasciaEtaOrigineSnapshot[keyof typeof MensaPastoFasciaEtaOrigineSnapshot] | null;
+
+
+export const MensaPastoFasciaEtaOrigineSnapshot = {
+  calcolata: 'calcolata',
+  presunta: 'presunta',
+  non_determinata: 'non_determinata',
+} as const;
+
 export interface MensaPasto {
   id: number;
   mensaId: number;
@@ -5007,7 +5080,19 @@ export interface MensaPasto {
   accessoMensaId: number;
   dataOra: string;
   dataServizio: string;
-  tipoServizio: string;
+  tipoServizio: MensaPastoTipoServizio;
+  /** @nullable */
+  giornataServizioId?: number | null;
+  /** @nullable */
+  sessoSnapshot?: MensaPastoSessoSnapshot;
+  /** @nullable */
+  fasciaEtaSnapshot?: MensaPastoFasciaEtaSnapshot;
+  /** @nullable */
+  fasciaEtaOrigineSnapshot?: MensaPastoFasciaEtaOrigineSnapshot;
+  /** @nullable */
+  anagraficaProvvisoriaSnapshot?: boolean | null;
+  /** @nullable */
+  temporaneoSnapshot?: boolean | null;
   eccezione?: boolean;
   override?: boolean;
   operatore?: string;
@@ -5050,6 +5135,198 @@ export interface MensaGiacenza {
   nome: string;
   unitaMisura: string;
   quantita: number;
+  giacenzaFisica: number;
+  giacenzaDistribuibile: number;
+  impegnato: number;
+  disponibileReale: number;
+}
+
+export type MensaConsumoInputTipoServizio = typeof MensaConsumoInputTipoServizio[keyof typeof MensaConsumoInputTipoServizio];
+
+
+export const MensaConsumoInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export type MensaConsumoInputCausale = typeof MensaConsumoInputCausale[keyof typeof MensaConsumoInputCausale];
+
+
+export const MensaConsumoInputCausale = {
+  consumo: 'consumo',
+  scarto: 'scarto',
+} as const;
+
+export interface MensaConsumoInput {
+  mensaId: number;
+  dataServizio: string;
+  tipoServizio: MensaConsumoInputTipoServizio;
+  prodottoId: number;
+  /** @exclusiveMinimum 0 */
+  quantita: number;
+  causale: MensaConsumoInputCausale;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+}
+
+export interface MensaStornoInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+}
+
+export interface MensaChiusuraInput {
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  note?: string | null;
+}
+
+export interface MensaRiaperturaInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+}
+
+export type MensaConsumoTipoServizio = typeof MensaConsumoTipoServizio[keyof typeof MensaConsumoTipoServizio];
+
+
+export const MensaConsumoTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export type MensaConsumoCausale = typeof MensaConsumoCausale[keyof typeof MensaConsumoCausale];
+
+
+export const MensaConsumoCausale = {
+  consumo: 'consumo',
+  scarto: 'scarto',
+} as const;
+
+export interface MensaConsumo {
+  id: number;
+  giornataServizioId: number;
+  mensaId: number;
+  mensaNome?: string;
+  scaricoId: number;
+  dataServizio: string;
+  tipoServizio: MensaConsumoTipoServizio;
+  prodottoId: number;
+  prodottoNome?: string;
+  quantita: number;
+  unitaMisura: string;
+  causale: MensaConsumoCausale;
+  /** @nullable */
+  note?: string | null;
+  operatoreId: number;
+  idempotencyKey: string;
+  stornato?: boolean;
+  /** @nullable */
+  stornatoAt?: string | null;
+  /** @nullable */
+  motivoStorno?: string | null;
+  createdAt?: string;
+  idempotentReplay?: boolean;
+  [key: string]: unknown;
+ }
+
+export type MensaGiornataTipoServizio = typeof MensaGiornataTipoServizio[keyof typeof MensaGiornataTipoServizio];
+
+
+export const MensaGiornataTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export type MensaGiornataStato = typeof MensaGiornataStato[keyof typeof MensaGiornataStato];
+
+
+export const MensaGiornataStato = {
+  aperta: 'aperta',
+  chiusa: 'chiusa',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaGiornataSnapshot = { [key: string]: unknown } | null;
+
+export interface MensaGiornata {
+  id: number;
+  mensaId: number;
+  mensaNome?: string;
+  dataServizio: string;
+  tipoServizio: MensaGiornataTipoServizio;
+  stato: MensaGiornataStato;
+  /** @nullable */
+  apertaDa?: number | null;
+  apertaAt?: string;
+  /** @nullable */
+  chiusaDa?: number | null;
+  /** @nullable */
+  chiusaAt?: string | null;
+  /** @nullable */
+  riapertaDa?: number | null;
+  /** @nullable */
+  riapertaAt?: string | null;
+  /** @nullable */
+  motivoRiapertura?: string | null;
+  /** @nullable */
+  noteChiusura?: string | null;
+  /** @nullable */
+  snapshot?: MensaGiornataSnapshot;
+  [key: string]: unknown;
+ }
+
+export interface MensaAccessiPage {
+  items: MensaAccesso[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface MensaPastiPage {
+  items: MensaPasto[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface MensaEccezioniPage {
+  items: MensaEccezione[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface MensaConsumiPage {
+  items: MensaConsumo[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export type MensaTrasferimentiPageItemsItem = { [key: string]: unknown };
+
+export interface MensaTrasferimentiPage {
+  items: MensaTrasferimentiPageItemsItem[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 export type MensaTrasferimentoInputRigheItem = {
@@ -5078,6 +5355,83 @@ export interface MensaTrasferimentoInput {
   righe: MensaTrasferimentoInputRigheItem[];
 }
 
+export type MensaReportDistribuzioneSessoItemChiave = typeof MensaReportDistribuzioneSessoItemChiave[keyof typeof MensaReportDistribuzioneSessoItemChiave];
+
+
+export const MensaReportDistribuzioneSessoItemChiave = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+  ND: 'ND',
+} as const;
+
+export type MensaReportDistribuzioneSessoItem = {
+  chiave: MensaReportDistribuzioneSessoItemChiave;
+  totale: number;
+};
+
+export type MensaReportDistribuzioneFasciaEtaItemChiave = typeof MensaReportDistribuzioneFasciaEtaItemChiave[keyof typeof MensaReportDistribuzioneFasciaEtaItemChiave];
+
+
+export const MensaReportDistribuzioneFasciaEtaItemChiave = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+  ND: 'ND',
+} as const;
+
+export type MensaReportDistribuzioneFasciaEtaItem = {
+  chiave: MensaReportDistribuzioneFasciaEtaItemChiave;
+  totale: number;
+};
+
+export type MensaReportDistribuzioneTipoServizioItemChiave = typeof MensaReportDistribuzioneTipoServizioItemChiave[keyof typeof MensaReportDistribuzioneTipoServizioItemChiave];
+
+
+export const MensaReportDistribuzioneTipoServizioItemChiave = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export type MensaReportDistribuzioneTipoServizioItem = {
+  chiave: MensaReportDistribuzioneTipoServizioItemChiave;
+  totale: number;
+};
+
+export type MensaReportBeneficiariDistintiPerSessoItemChiave = typeof MensaReportBeneficiariDistintiPerSessoItemChiave[keyof typeof MensaReportBeneficiariDistintiPerSessoItemChiave];
+
+
+export const MensaReportBeneficiariDistintiPerSessoItemChiave = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+  ND: 'ND',
+} as const;
+
+export type MensaReportBeneficiariDistintiPerSessoItem = {
+  chiave: MensaReportBeneficiariDistintiPerSessoItemChiave;
+  totale: number;
+};
+
+export type MensaReportBeneficiariDistintiPerFasciaEtaItemChiave = typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave[keyof typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave];
+
+
+export const MensaReportBeneficiariDistintiPerFasciaEtaItemChiave = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+  ND: 'ND',
+} as const;
+
+export type MensaReportBeneficiariDistintiPerFasciaEtaItem = {
+  chiave: MensaReportBeneficiariDistintiPerFasciaEtaItemChiave;
+  totale: number;
+};
+
 export type MensaReportDistribuzioneItem = {
   mensaId: number;
   mensaNome: string;
@@ -5094,6 +5448,17 @@ export interface MensaReport {
   accessiOrdinari: number;
   accessiEccezione: number;
   accessiNegati: number;
+  pastiTemporanei?: number;
+  pastiOrdinari?: number;
+  pastiTemporaneitaNonDeterminata?: number;
+  pastiAnagraficaProvvisoria?: number;
+  consumoTotale?: number;
+  scartoTotale?: number;
+  distribuzioneSesso?: MensaReportDistribuzioneSessoItem[];
+  distribuzioneFasciaEta?: MensaReportDistribuzioneFasciaEtaItem[];
+  distribuzioneTipoServizio?: MensaReportDistribuzioneTipoServizioItem[];
+  beneficiariDistintiPerSesso?: MensaReportBeneficiariDistintiPerSessoItem[];
+  beneficiariDistintiPerFasciaEta?: MensaReportBeneficiariDistintiPerFasciaEtaItem[];
   mediaPastiGiorno: number;
   distribuzione: MensaReportDistribuzioneItem[];
   [key: string]: unknown;
@@ -6217,23 +6582,84 @@ beneficiarioId: number;
 
 export type ListAccessiMensaParams = {
 mensaId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
 };
 
 export type ListPastiMensaParams = {
 mensaId?: number;
 data?: string;
 tipoServizio?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+};
+
+export type ListEccezioniMensaParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
 };
 
 export type ListGiacenzeMensaParams = {
 magazzinoId: number;
 };
 
-export type ListTrasferimentiMensa200Item = { [key: string]: unknown };
+export type ListTrasferimentiMensaParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+};
+
+export type ListTrasferimentiMensa200 = { [key: string]: unknown }[] | MensaTrasferimentiPage;
 
 export type CreateTrasferimentoMensa200 = { [key: string]: unknown };
 
 export type CreateTrasferimentoMensa201 = { [key: string]: unknown };
+
+export type ListConsumiMensaParams = {
+mensaId?: number;
+data?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+};
+
+export type ListGiornateMensaParams = {
+mensaId?: number;
+data?: string;
+};
 
 export type GetMensaReportParams = {
 dal: string;

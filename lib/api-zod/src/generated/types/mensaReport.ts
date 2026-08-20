@@ -5,7 +5,12 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { MensaReportBeneficiariDistintiPerFasciaEtaItem } from './mensaReportBeneficiariDistintiPerFasciaEtaItem';
+import type { MensaReportBeneficiariDistintiPerSessoItem } from './mensaReportBeneficiariDistintiPerSessoItem';
+import type { MensaReportDistribuzioneFasciaEtaItem } from './mensaReportDistribuzioneFasciaEtaItem';
 import type { MensaReportDistribuzioneItem } from './mensaReportDistribuzioneItem';
+import type { MensaReportDistribuzioneSessoItem } from './mensaReportDistribuzioneSessoItem';
+import type { MensaReportDistribuzioneTipoServizioItem } from './mensaReportDistribuzioneTipoServizioItem';
 
 export interface MensaReport {
   dal: Date;
@@ -15,6 +20,17 @@ export interface MensaReport {
   accessiOrdinari: number;
   accessiEccezione: number;
   accessiNegati: number;
+  pastiTemporanei?: number;
+  pastiOrdinari?: number;
+  pastiTemporaneitaNonDeterminata?: number;
+  pastiAnagraficaProvvisoria?: number;
+  consumoTotale?: number;
+  scartoTotale?: number;
+  distribuzioneSesso?: MensaReportDistribuzioneSessoItem[];
+  distribuzioneFasciaEta?: MensaReportDistribuzioneFasciaEtaItem[];
+  distribuzioneTipoServizio?: MensaReportDistribuzioneTipoServizioItem[];
+  beneficiariDistintiPerSesso?: MensaReportBeneficiariDistintiPerSessoItem[];
+  beneficiariDistintiPerFasciaEta?: MensaReportBeneficiariDistintiPerFasciaEtaItem[];
   mediaPastiGiorno: number;
   distribuzione: MensaReportDistribuzioneItem[];
   [key: string]: unknown;

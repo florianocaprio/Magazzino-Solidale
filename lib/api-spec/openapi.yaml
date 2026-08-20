@@ -5693,16 +5693,22 @@ paths:
       tags: [mensa]
       parameters:
         - { name: mensaId, in: query, schema: { type: integer } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
       responses:
         "200":
           description: Accessi recenti
           content:
             application/json:
               schema:
-                {
-                  type: array,
-                  items: { $ref: "#/components/schemas/MensaAccesso" },
-                }
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/MensaAccesso" }
+                  - $ref: "#/components/schemas/MensaAccessiPage"
 
   /mensa/accessi/{id}/eccezione:
     post:
@@ -5717,7 +5723,7 @@ paths:
             schema: { $ref: "#/components/schemas/MensaEccezioneInput" }
       responses:
         "200":
-          description: Eccezione autorizzata nella stessa città
+          description: Eccezione autorizzata nella stessa Area
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MensaAccesso" }
@@ -5730,16 +5736,22 @@ paths:
         - { name: mensaId, in: query, schema: { type: integer } }
         - { name: data, in: query, schema: { type: string, format: date } }
         - { name: tipoServizio, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
       responses:
         "200":
           description: Pasti operativi
           content:
             application/json:
               schema:
-                {
-                  type: array,
-                  items: { $ref: "#/components/schemas/MensaPasto" },
-                }
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/MensaPasto" }
+                  - $ref: "#/components/schemas/MensaPastiPage"
     post:
       operationId: createPastoMensa
       tags: [mensa]
@@ -5765,16 +5777,23 @@ paths:
     get:
       operationId: listEccezioniMensa
       tags: [mensa]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
       responses:
         "200":
           description: Eccezioni auditate
           content:
             application/json:
               schema:
-                {
-                  type: array,
-                  items: { $ref: "#/components/schemas/MensaEccezione" },
-                }
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/MensaEccezione" }
+                  - $ref: "#/components/schemas/MensaEccezioniPage"
 
   /mensa/logistica/magazzini:
     get:
@@ -5804,7 +5823,7 @@ paths:
           }
       responses:
         "200":
-          description: Disponibilità FEFO non scaduta
+          description: Giacenza fisica, impegnata e reale secondo il calcolo canonico di Magazzino
           content:
             application/json:
               schema:
@@ -5817,16 +5836,24 @@ paths:
     get:
       operationId: listTrasferimentiMensa
       tags: [mensa]
+      description: Richiede mensa.transfers.request (oppure il permesso legacy mensa.transfers.manage). La spedizione resta riservata a magazzino.transfers.dispatch; la ricezione richiede mensa.transfers.receive.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
       responses:
         "200":
           description: Trasferimenti associati alle Mense
           content:
             application/json:
               schema:
-                {
-                  type: array,
-                  items: { type: object, additionalProperties: true },
-                }
+                oneOf:
+                  - type: array
+                    items: { type: object, additionalProperties: true }
+                  - $ref: "#/components/schemas/MensaTrasferimentiPage"
     post:
       operationId: createTrasferimentoMensa
       tags: [mensa]
@@ -5846,6 +5873,116 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+
+  /mensa/consumi:
+    get:
+      operationId: listConsumiMensa
+      tags: [mensa]
+      parameters:
+        - { name: mensaId, in: query, schema: { type: integer } }
+        - { name: data, in: query, schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
+      responses:
+        "200":
+          description: Consumi e scarti dichiarati, inclusi gli eventuali storni
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/MensaConsumo" }
+                  - $ref: "#/components/schemas/MensaConsumiPage"
+    post:
+      operationId: createConsumoMensa
+      tags: [mensa]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaConsumoInput" }
+      responses:
+        "200":
+          description: Replay idempotente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaConsumo" }
+        "201":
+          description: Consumo o scarto registrato sul ledger di Magazzino
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaConsumo" }
+        "409": { description: Giacenza insufficiente o giornata chiusa }
+
+  /mensa/consumi/{id}/storno:
+    post:
+      operationId: stornaConsumoMensa
+      tags: [mensa]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaStornoInput" }
+      responses:
+        "200": { description: Storno compensativo registrato }
+        "409": { description: Consumo già stornato o giornata chiusa }
+
+  /mensa/giornate:
+    get:
+      operationId: listGiornateMensa
+      tags: [mensa]
+      parameters:
+        - { name: mensaId, in: query, schema: { type: integer } }
+        - { name: data, in: query, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: Giornate di servizio visibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MensaGiornata" }
+
+  /mensa/giornate/{id}/chiudi:
+    post:
+      operationId: chiudiGiornataMensa
+      tags: [mensa]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaChiusuraInput" }
+      responses:
+        "200":
+          description: Giornata chiusa con snapshot riepilogativo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaGiornata" }
+
+  /mensa/giornate/{id}/riapri:
+    post:
+      operationId: riapriGiornataMensa
+      tags: [mensa]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaRiaperturaInput" }
+      responses:
+        "200":
+          description: Giornata riaperta con audit obbligatorio
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaGiornata" }
 
   /mensa/report:
     get:
@@ -12370,6 +12507,9 @@ components:
         telefono: { type: ["string", "null"] }
         email: { type: ["string", "null"] }
         stato: { type: string, enum: [attivo, inattivo] }
+        statoServizio: { type: string, enum: [attivo, inattivo] }
+        statoMagazzino:
+          { type: [string, "null"], enum: [attivo, inattivo, null] }
         attiva: { type: boolean }
         note: { type: ["string", "null"] }
         createdBy: { type: ["integer", "null"] }
@@ -12593,7 +12733,7 @@ components:
       required: [accessoMensaId, tipoServizio, idempotencyKey]
       properties:
         accessoMensaId: { type: integer }
-        tipoServizio: { type: string, minLength: 1, maxLength: 40 }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
         note: { type: ["string", "null"] }
         override: { type: boolean }
         motivoOverride: { type: ["string", "null"] }
@@ -12622,7 +12762,21 @@ components:
         accessoMensaId: { type: integer }
         dataOra: { type: string, format: date-time }
         dataServizio: { type: string, format: date }
-        tipoServizio: { type: string }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
+        giornataServizioId: { type: [integer, "null"] }
+        sessoSnapshot: { type: [string, "null"], enum: [M, F, ALTRO, ND, null] }
+        fasciaEtaSnapshot:
+          {
+            type: [string, "null"],
+            enum: ["0_17", "18_29", "30_64", "65_plus", non_determinata, null],
+          }
+        fasciaEtaOrigineSnapshot:
+          {
+            type: [string, "null"],
+            enum: [calcolata, presunta, non_determinata, null],
+          }
+        anagraficaProvvisoriaSnapshot: { type: [boolean, "null"] }
+        temporaneoSnapshot: { type: [boolean, "null"] }
         eccezione: { type: boolean }
         override: { type: boolean }
         operatore: { type: string }
@@ -12669,13 +12823,181 @@ components:
 
     MensaGiacenza:
       type: object
-      required: [prodottoId, codice, nome, unitaMisura, quantita]
+      required:
+        [
+          prodottoId,
+          codice,
+          nome,
+          unitaMisura,
+          quantita,
+          giacenzaFisica,
+          giacenzaDistribuibile,
+          impegnato,
+          disponibileReale,
+        ]
       properties:
         prodottoId: { type: integer }
         codice: { type: string }
         nome: { type: string }
         unitaMisura: { type: string }
         quantita: { type: number }
+        giacenzaFisica: { type: number }
+        giacenzaDistribuibile: { type: number }
+        impegnato: { type: number }
+        disponibileReale: { type: number }
+
+    MensaConsumoInput:
+      type: object
+      required:
+        [
+          mensaId,
+          dataServizio,
+          tipoServizio,
+          prodottoId,
+          quantita,
+          causale,
+          idempotencyKey,
+        ]
+      properties:
+        mensaId: { type: integer }
+        dataServizio: { type: string, format: date }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
+        prodottoId: { type: integer }
+        quantita: { type: number, exclusiveMinimum: 0 }
+        causale: { type: string, enum: [consumo, scarto] }
+        note: { type: [string, "null"], maxLength: 2000 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
+
+    MensaStornoInput:
+      type: object
+      required: [motivo]
+      properties:
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
+
+    MensaChiusuraInput:
+      type: object
+      properties:
+        note: { type: [string, "null"], maxLength: 4000 }
+
+    MensaRiaperturaInput:
+      type: object
+      required: [motivo]
+      properties:
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
+
+    MensaConsumo:
+      type: object
+      additionalProperties: true
+      required:
+        [
+          id,
+          giornataServizioId,
+          mensaId,
+          scaricoId,
+          dataServizio,
+          tipoServizio,
+          prodottoId,
+          quantita,
+          unitaMisura,
+          causale,
+          operatoreId,
+          idempotencyKey,
+        ]
+      properties:
+        id: { type: integer }
+        giornataServizioId: { type: integer }
+        mensaId: { type: integer }
+        mensaNome: { type: string }
+        scaricoId: { type: integer }
+        dataServizio: { type: string, format: date }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
+        prodottoId: { type: integer }
+        prodottoNome: { type: string }
+        quantita: { type: number }
+        unitaMisura: { type: string }
+        causale: { type: string, enum: [consumo, scarto] }
+        note: { type: [string, "null"] }
+        operatoreId: { type: integer }
+        idempotencyKey: { type: string }
+        stornato: { type: boolean }
+        stornatoAt: { type: [string, "null"], format: date-time }
+        motivoStorno: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        idempotentReplay: { type: boolean }
+
+    MensaGiornata:
+      type: object
+      additionalProperties: true
+      required: [id, mensaId, dataServizio, tipoServizio, stato]
+      properties:
+        id: { type: integer }
+        mensaId: { type: integer }
+        mensaNome: { type: string }
+        dataServizio: { type: string, format: date }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
+        stato: { type: string, enum: [aperta, chiusa] }
+        apertaDa: { type: [integer, "null"] }
+        apertaAt: { type: string, format: date-time }
+        chiusaDa: { type: [integer, "null"] }
+        chiusaAt: { type: [string, "null"], format: date-time }
+        riapertaDa: { type: [integer, "null"] }
+        riapertaAt: { type: [string, "null"], format: date-time }
+        motivoRiapertura: { type: [string, "null"] }
+        noteChiusura: { type: [string, "null"] }
+        snapshot: { type: [object, "null"], additionalProperties: true }
+
+    MensaAccessiPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          { type: array, items: { $ref: "#/components/schemas/MensaAccesso" } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    MensaPastiPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          { type: array, items: { $ref: "#/components/schemas/MensaPasto" } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    MensaEccezioniPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/MensaEccezione" },
+          }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    MensaConsumiPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          { type: array, items: { $ref: "#/components/schemas/MensaConsumo" } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    MensaTrasferimentiPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          { type: array, items: { type: object, additionalProperties: true } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
 
     MensaTrasferimentoInput:
       type: object
@@ -12723,6 +13045,62 @@ components:
         accessiOrdinari: { type: integer }
         accessiEccezione: { type: integer }
         accessiNegati: { type: integer }
+        pastiTemporanei: { type: integer }
+        pastiOrdinari: { type: integer }
+        pastiTemporaneitaNonDeterminata: { type: integer }
+        pastiAnagraficaProvvisoria: { type: integer }
+        consumoTotale: { type: number }
+        scartoTotale: { type: number }
+        distribuzioneSesso:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave: { type: string, enum: [M, F, ALTRO, ND] }
+              totale: { type: integer }
+        distribuzioneFasciaEta:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave:
+                {
+                  type: string,
+                  enum:
+                    ["0_17", "18_29", "30_64", "65_plus", non_determinata, ND],
+                }
+              totale: { type: integer }
+        distribuzioneTipoServizio:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave: { type: string, enum: [pranzo, cena] }
+              totale: { type: integer }
+        beneficiariDistintiPerSesso:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave: { type: string, enum: [M, F, ALTRO, ND] }
+              totale: { type: integer }
+        beneficiariDistintiPerFasciaEta:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave:
+                {
+                  type: string,
+                  enum:
+                    ["0_17", "18_29", "30_64", "65_plus", non_determinata, ND],
+                }
+              totale: { type: integer }
         mediaPastiGiorno: { type: number }
         distribuzione:
           type: array
