@@ -13,6 +13,41 @@ const schemaUrl = new URL(
   import.meta.url,
 );
 
+type Client = Awaited<ReturnType<typeof pool.connect>>;
+
+async function createMensaFixture(client: Client) {
+  const suffix = `${Date.now().toString(36).slice(-6)}${Math.random().toString(36).slice(2, 6)}`;
+  const area = await client.query<{ id: number }>(
+    `INSERT INTO aree_operative (nome) VALUES ($1) RETURNING id`,
+    [`Mensa migration ${suffix}`],
+  );
+  const user = await client.query<{ id: number }>(
+    `INSERT INTO utenti (username, password_hash, nome)
+     VALUES ($1, 'x', 'Test migration Mensa') RETURNING id`,
+    [`mensa-migration-${suffix}`],
+  );
+  const warehouse = await client.query<{ id: number }>(
+    `INSERT INTO magazzini (codice, nome, tipo_magazzino, area_operativa_id)
+     VALUES ($1, 'Magazzino migration Mensa', 'mensa', $2) RETURNING id`,
+    [`MIG-${suffix}`, area.rows[0].id],
+  );
+  const canteen = await client.query<{ id: number }>(
+    `INSERT INTO mense (codice, nome, area_operativa_id, magazzino_id, created_by)
+     VALUES ($1, 'Mensa migration', $2, $3, $4) RETURNING id`,
+    [`MENSA-${suffix}`, area.rows[0].id, warehouse.rows[0].id, user.rows[0].id],
+  );
+  const beneficiary = await client.query<{ id: number }>(
+    `INSERT INTO beneficiari (codice, nome, cognome, area_operativa_id)
+     VALUES ($1, 'Test', 'Migration Mensa', $2) RETURNING id`,
+    [`BEN-${suffix}`, area.rows[0].id],
+  );
+  return {
+    userId: user.rows[0].id,
+    mensaId: canteen.rows[0].id,
+    beneficiarioId: beneficiary.rows[0].id,
+  };
+}
+
 afterAll(async () => {
   await pool.end();
 });
@@ -28,6 +63,7 @@ describe("migrazione hardening operativo Mensa", () => {
     const migrationSql = await readFile(migrationUrl, "utf8");
     try {
       await client.query("BEGIN");
+      const fixture = await createMensaFixture(client);
       const before = await client.query<{
         beneficiari: number;
         mense: number;
@@ -43,26 +79,12 @@ describe("migrazione hardening operativo Mensa", () => {
           (SELECT count(*)::int FROM movimenti) AS movimenti
       `);
 
-      const legacyReference = await client.query<{
-        beneficiario_id: number;
-        mensa_id: number;
-        user_id: number;
-      }>(`
-        SELECT b.id AS beneficiario_id, m.id AS mensa_id, u.id AS user_id
-        FROM beneficiari b
-        JOIN mense m ON m.area_operativa_id = b.area_operativa_id
-        CROSS JOIN utenti u
-        ORDER BY b.id, m.id, u.id
-        LIMIT 1
-      `);
-      expect(legacyReference.rowCount).toBe(1);
-      const legacy = legacyReference.rows[0];
       const legacyAuthorization = await client.query<{ id: number }>(
         `INSERT INTO mensa_autorizzazioni_temporanee
           (beneficiario_id, mensa_id, data_servizio, tipo_servizio, motivo, operatore_id)
          VALUES ($1, $2, '2099-12-31', NULL, 'Record legacy test', $3)
          RETURNING id`,
-        [legacy.beneficiario_id, legacy.mensa_id, legacy.user_id],
+        [fixture.beneficiarioId, fixture.mensaId, fixture.userId],
       );
 
       await client.query(migrationSql);
@@ -182,6 +204,7 @@ describe("migrazione hardening operativo Mensa", () => {
     const migrationSql = await readFile(migrationUrl, "utf8");
     try {
       await client.query("BEGIN");
+      const fixture = await createMensaFixture(client);
       const existingConstraints = await client.query<{ conname: string }>(`
         SELECT c.conname
         FROM pg_constraint c
@@ -194,24 +217,13 @@ describe("migrazione hardening operativo Mensa", () => {
           `ALTER TABLE mensa_accessi DROP CONSTRAINT "${conname.replaceAll('"', '""')}"`,
         );
       }
-      const reference = await client.query<{
-        mensa_id: number;
-        user_id: number;
-      }>(`
-        SELECT m.id AS mensa_id, u.id AS user_id
-        FROM mense m CROSS JOIN utenti u
-        ORDER BY m.id, u.id
-        LIMIT 1
-      `);
-      expect(reference.rowCount).toBe(1);
-      const { mensa_id: mensaId, user_id: userId } = reference.rows[0];
       const firstKey = `migration-orphan-${Date.now()}`;
       await client.query(
         `INSERT INTO mensa_accessi
           (mensa_id, esito, motivo_esito, operatore_id, eccezione_id,
            modalita_accesso, idempotency_key)
          VALUES ($1, 'negato', 'TEST_LEGACY', $2, 2147483000, 'manuale', $3)`,
-        [mensaId, userId, firstKey],
+        [fixture.mensaId, fixture.userId, firstKey],
       );
 
       await client.query(migrationSql);
@@ -231,7 +243,7 @@ describe("migrazione hardening operativo Mensa", () => {
             (mensa_id, esito, motivo_esito, operatore_id, eccezione_id,
              modalita_accesso, idempotency_key)
            VALUES ($1, 'negato', 'TEST_NEW', $2, 2147483001, 'manuale', $3)`,
-          [mensaId, userId, `${firstKey}-new`],
+          [fixture.mensaId, fixture.userId, `${firstKey}-new`],
         ),
       ).rejects.toMatchObject({ code: "23503" });
       await client.query("ROLLBACK TO SAVEPOINT new_orphan");
@@ -251,35 +263,12 @@ describe("migrazione hardening operativo Mensa", () => {
     const migrationSql = await readFile(migrationUrl, "utf8");
     try {
       await client.query("BEGIN");
+      const fixture = await createMensaFixture(client);
       await client.query(`
         DROP TRIGGER IF EXISTS mensa_abilitazioni_principale_overlap_trg
           ON mensa_abilitazioni;
         DROP INDEX IF EXISTS mensa_abilitazioni_principale_attiva_unique;
       `);
-      const reference = await client.query<{
-        mensa_id: number;
-        area_operativa_id: number;
-        user_id: number;
-      }>(`
-        SELECT m.id AS mensa_id, m.area_operativa_id, u.id AS user_id
-        FROM mense m CROSS JOIN utenti u
-        WHERE m.area_operativa_id IS NOT NULL
-        ORDER BY m.id, u.id
-        LIMIT 1
-      `);
-      expect(reference.rowCount).toBe(1);
-      const {
-        mensa_id: mensaId,
-        area_operativa_id: areaOperativaId,
-        user_id: userId,
-      } = reference.rows[0];
-      const beneficiary = await client.query<{ id: number }>(
-        `INSERT INTO beneficiari (codice, nome, cognome, area_operativa_id)
-         VALUES ($1, 'Legacy', 'Overlap', $2)
-         RETURNING id`,
-        [`OV-${Date.now().toString().slice(-12)}`, areaOperativaId],
-      );
-      const beneficiaryId = beneficiary.rows[0].id;
       await client.query(
         `INSERT INTO mensa_abilitazioni
           (beneficiario_id, mensa_id, data_inizio, data_fine, stato,
@@ -287,7 +276,7 @@ describe("migrazione hardening operativo Mensa", () => {
          VALUES
           ($1, $2, '2026-01-01', '2026-12-31', 'attiva', true, $3),
           ($1, $2, '2026-06-01', NULL, 'attiva', true, $3)`,
-        [beneficiaryId, mensaId, userId],
+        [fixture.beneficiarioId, fixture.mensaId, fixture.userId],
       );
 
       await client.query(migrationSql);
@@ -295,7 +284,7 @@ describe("migrazione hardening operativo Mensa", () => {
         `SELECT count(*)::int AS count
          FROM mensa_abilitazioni
          WHERE beneficiario_id = $1`,
-        [beneficiaryId],
+        [fixture.beneficiarioId],
       );
       expect(preserved.rows[0].count).toBe(2);
 
@@ -306,7 +295,7 @@ describe("migrazione hardening operativo Mensa", () => {
             (beneficiario_id, mensa_id, data_inizio, stato,
              mensa_principale, created_by)
            VALUES ($1, $2, '2026-09-01', 'attiva', true, $3)`,
-          [beneficiaryId, mensaId, userId],
+          [fixture.beneficiarioId, fixture.mensaId, fixture.userId],
         ),
       ).rejects.toMatchObject({ code: "23P01" });
       await client.query("ROLLBACK TO SAVEPOINT new_overlap");

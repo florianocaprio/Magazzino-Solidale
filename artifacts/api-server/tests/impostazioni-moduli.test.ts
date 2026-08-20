@@ -1,9 +1,10 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
 import {
   beneficiariTable,
+  auditConfigurazioniTable,
   centriAscoltoTable,
   areeOperativeTable,
   db,
@@ -13,6 +14,7 @@ import {
   pool,
   prodottiTable,
   zoneUdsTable,
+  utentiTable,
 } from "@workspace/db";
 import beneficiariRouter from "../src/routes/beneficiari";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
@@ -35,13 +37,14 @@ const magazzinoIds: number[] = [];
 const politicaIds: number[] = [];
 const prodottoIds: number[] = [];
 const zonaIds: number[] = [];
+let testUserId: number;
 
 function makeApp(isSuperAdmin = false): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = {
-      id: 1,
+      id: testUserId,
       username: "admin",
       nome: "Admin",
       cognome: null,
@@ -91,6 +94,14 @@ async function createCentro(areaOperativaId: number): Promise<number> {
   return centro.id;
 }
 
+beforeAll(async () => {
+  const [testUser] = await db
+    .insert(utentiTable)
+    .values({ username: `impostazioni_moduli_${rnd()}`, passwordHash: "x", nome: "Test Impostazioni Moduli" })
+    .returning({ id: utentiTable.id });
+  testUserId = testUser.id;
+});
+
 beforeEach(async () => {
   await setModuli(false, true);
 });
@@ -104,10 +115,13 @@ afterEach(async () => {
   if (centroIds.length > 0) await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds.splice(0)));
   if (areaOperativaIds.length > 0) await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds.splice(0)));
   await db.delete(impostazioniModuliTable).where(eq(impostazioniModuliTable.id, 1));
+  await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.utenteId, testUserId));
   await setModuli(false, true);
 });
 
 afterAll(async () => {
+  await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.utenteId, testUserId));
+  await db.delete(utentiTable).where(eq(utentiTable.id, testUserId));
   await setModuli(true, true);
   await pool.end();
 });

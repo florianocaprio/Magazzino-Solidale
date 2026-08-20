@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, areeOperativeTable, centriAscoltoTable, zoneUdsTable, magazziniTable, creditoSolidaleMovimentiTable } from "@workspace/db";
+import { db, pool, auditConfigurazioniTable, beneficiariTable, areeOperativeTable, centriAscoltoTable, zoneUdsTable, magazziniTable, creditoSolidaleMovimentiTable, utentiTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
@@ -72,11 +72,12 @@ async function createMagazzino(tipoMagazzino: "emporio" | "misto" | "logistico",
 }
 
 let areaOperativaA: number;
+let testUserId: number;
 
 const appAs = (areaOperativaId: number | null, zonaUdsId: number | null = null) =>
-  makeApp({ id: 1, centroAscoltoId: null, areaOperativaId, zonaUdsId });
+  makeApp({ id: testUserId, centroAscoltoId: null, areaOperativaId, zonaUdsId });
 const appAsCentro = (centroAscoltoId: number, areaOperativaId: number | null, zonaUdsId: number | null = null) =>
-  makeApp({ id: 1, centroAscoltoId, areaOperativaId, zonaUdsId });
+  makeApp({ id: testUserId, centroAscoltoId, areaOperativaId, zonaUdsId });
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 const sessoObbligatorioMsg = "Il campo Sesso è obbligatorio.";
 const creditoSolidaleCentroAscoltoRichiestoMsg =
@@ -91,6 +92,11 @@ async function setCentroAscoltoEnabled(enabled: boolean): Promise<void> {
 }
 
 beforeAll(async () => {
+  const [testUser] = await db
+    .insert(utentiTable)
+    .values({ username: `beneficiari_uds_${rnd()}`, passwordHash: "x", nome: "Test Beneficiari UDS" })
+    .returning({ id: utentiTable.id });
+  testUserId = testUser.id;
   areaOperativaA = await createAreaOperativa();
 });
 
@@ -111,9 +117,11 @@ afterEach(async () => {
   }
   await setEmporioEnabled(false);
   await setCentroAscoltoEnabled(true);
+  await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.utenteId, testUserId));
 });
 
 afterAll(async () => {
+  await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.utenteId, testUserId));
   if (centroIds.length > 0) {
     await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds));
   }
@@ -123,6 +131,7 @@ afterAll(async () => {
   if (areaOperativaIds.length > 0) {
     await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds));
   }
+  await db.delete(utentiTable).where(eq(utentiTable.id, testUserId));
   await setEmporioEnabled(true);
   await pool.end();
 });

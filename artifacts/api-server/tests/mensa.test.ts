@@ -47,6 +47,7 @@ import {
 } from "../src/lib/mensaWorkflow";
 import { aggregatiConsumiMensa } from "../src/lib/mensaService";
 import { areaGuard } from "../src/middlewares/auth";
+import { initDbExtensions } from "../src/lib/dbInit";
 
 const ids = {
   users: [] as number[],
@@ -273,6 +274,7 @@ async function verify(
 }
 
 beforeAll(async () => {
+  await initDbExtensions();
   await ensureAmbienteModuli();
   await updateModuloAmbiente("MENSA", true, null);
 });
