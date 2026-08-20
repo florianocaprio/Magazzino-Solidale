@@ -722,7 +722,10 @@ async function loadAccessoDto(id: number) {
         dataServizioMensa(row.accesso.dataOra),
       )
     : null;
+  const outsideMensaArea =
+    row.beneficiario != null && row.beneficiario.cittaId !== row.mensa.cittaId;
   const hidePersonal =
+    outsideMensaArea ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.AREA_NON_COMPATIBILE ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
   return {
@@ -757,6 +760,7 @@ async function loadAccessoDto(id: number) {
     dataOra: row.accesso.dataOra.toISOString(),
     eccezioneId: row.accesso.eccezioneId ?? null,
     eccezionePossibile:
+      !hidePersonal &&
       row.accesso.esito === "negato" &&
       row.accesso.motivoEsito === ACCESSO_MOTIVI.MENSA_NON_AUTORIZZATA &&
       canUseMensaException(

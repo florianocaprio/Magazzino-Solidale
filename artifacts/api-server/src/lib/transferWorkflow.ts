@@ -56,7 +56,7 @@ export async function normalizeTransferRows(
         row.prodottoId <= 0 ||
         !Number.isFinite(row.quantita) ||
         row.quantita <= 0 ||
-        (row.unitaMisura !== undefined && typeof row.unitaMisura !== "string"),
+        (row.unitaMisura != null && typeof row.unitaMisura !== "string"),
     )
   ) {
     throw new TransferRequestError(
@@ -85,7 +85,7 @@ export async function normalizeTransferRows(
     if (!product.attivo) {
       throw new TransferRequestError(400, "Il Prodotto non è attivo");
     }
-    if (row.unitaMisura !== undefined) {
+    if (row.unitaMisura != null) {
       if (
         typeof row.unitaMisura !== "string" ||
         row.unitaMisura.trim() !== product.unitaMisura

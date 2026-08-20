@@ -198,6 +198,7 @@ async function createFixture() {
       cognome: "Milano",
       cittaId: milan.id,
       attivo: true,
+      restrizioniAlimentari: "DATO ALIMENTARE RISERVATO",
       allergie: "DATO DA NON ESPORRE",
     })
     .returning({ id: beneficiariTable.id });
@@ -229,6 +230,14 @@ async function createFixture() {
       createdBy: user.id,
     })
     .returning();
+  await db.insert(mensaAbilitazioniTable).values({
+    beneficiarioId: milanBeneficiary.id,
+    mensaId: canteens[2].id,
+    dataInizio: "2020-01-01",
+    stato: "attiva",
+    mensaPrincipale: true,
+    createdBy: user.id,
+  });
   return {
     userId: user.id,
     romeId: rome.id,
@@ -1029,17 +1038,52 @@ describe("Modulo Mensa", () => {
       "mensa.transfers.request",
       "mensa.transfers.receive",
     ];
+    const mismatchedKey = `transfer-mismatch-${rnd()}`;
     const mismatched = await request(makeApp(fixture, permissions))
       .post("/mensa/trasferimenti")
       .send({
         mensaId: fixture.mensaA,
         magazzinoOrigineId: fixture.warehouseIds[1],
         dataRichiesta: dataServizioMensa(),
-        idempotencyKey: `transfer-mismatch-${rnd()}`,
+        idempotencyKey: mismatchedKey,
         righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: "kg" }],
       });
     expect(mismatched.status).toBe(400);
     expect(mismatched.body.error).toMatch(/deve essere pz/i);
+    const malformedKey = `transfer-malformed-${rnd()}`;
+    const malformed = await request(makeApp(fixture, permissions))
+      .post("/mensa/trasferimenti")
+      .send({
+        mensaId: fixture.mensaA,
+        magazzinoOrigineId: fixture.warehouseIds[1],
+        dataRichiesta: dataServizioMensa(),
+        idempotencyKey: malformedKey,
+        righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: 42 }],
+      });
+    expect(malformed.status).toBe(400);
+    expect(
+      await db
+        .select({ id: trasferimentiTable.id })
+        .from(trasferimentiTable)
+        .where(
+          inArray(trasferimentiTable.idempotencyKey, [
+            mismatchedKey,
+            malformedKey,
+          ]),
+        ),
+    ).toEqual([]);
+    expect(
+      await db
+        .select({ id: trasferimentoRigheTable.id })
+        .from(trasferimentoRigheTable)
+        .where(eq(trasferimentoRigheTable.prodottoId, product.id)),
+    ).toEqual([]);
+    expect(
+      await db
+        .select({ id: movimentiTable.id })
+        .from(movimentiTable)
+        .where(eq(movimentiTable.prodottoId, product.id)),
+    ).toEqual([]);
     const requested = await request(makeApp(fixture, permissions))
       .post("/mensa/trasferimenti")
       .send({
@@ -1056,6 +1100,24 @@ describe("Modulo Mensa", () => {
       .from(trasferimentoRigheTable)
       .where(eq(trasferimentoRigheTable.trasferimentoId, requested.body.id));
     expect(savedRow.unitaMisura).toBe("pz");
+    const requestedWithNull = await request(makeApp(fixture, permissions))
+      .post("/mensa/trasferimenti")
+      .send({
+        mensaId: fixture.mensaA,
+        magazzinoOrigineId: fixture.warehouseIds[1],
+        dataRichiesta: dataServizioMensa(),
+        idempotencyKey: `transfer-null-unit-${rnd()}`,
+        righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: null }],
+      });
+    expect(requestedWithNull.status).toBe(201);
+    ids.transfers.push(requestedWithNull.body.id);
+    const [savedNullUnitRow] = await db
+      .select({ unitaMisura: trasferimentoRigheTable.unitaMisura })
+      .from(trasferimentoRigheTable)
+      .where(
+        eq(trasferimentoRigheTable.trasferimentoId, requestedWithNull.body.id),
+      );
+    expect(savedNullUnitRow.unitaMisura).toBe("pz");
     const deniedDispatch = await request(makeApp(fixture, permissions))
       .post(`/trasferimenti/${requested.body.id}/avvia`)
       .send({ versione: 1 });
@@ -1487,9 +1549,14 @@ describe("Modulo Mensa", () => {
       motivoEsito: "AREA_NON_COMPATIBILE",
       beneficiarioId: null,
       beneficiarioNome: null,
+      beneficiarioCodice: null,
+      mensaPrincipaleId: null,
+      mensaPrincipaleNome: null,
+      statoAbilitazione: null,
+      restrizioniAlimentari: null,
+      allergie: null,
       eccezionePossibile: false,
     });
-    expect(response.body.allergie).toBeNull();
   });
 
   it("applica le sospensioni, revoche, scadenze e lo stato del beneficiario", async () => {
@@ -2001,6 +2068,53 @@ describe("Modulo Mensa", () => {
     expect(deniedNormal.body).toMatchObject({
       esito: "negato",
       motivoEsito: "SERVIZIO_CHIUSO",
+      beneficiarioId: fixture.beneficiaryId,
+      beneficiarioNome: "Mario Rossi",
+      mensaPrincipaleId: fixture.mensaA,
+      statoAbilitazione: "attiva",
+      restrizioniAlimentari: "senza glutine",
+      allergie: "arachidi",
+    });
+
+    const crossAreaKey = `closed-cross-area-${rnd()}`;
+    const deniedCrossArea = await verify(app, fixture, {
+      codiceTessera: fixture.milanCardCode,
+      tipoServizio: "pranzo",
+      idempotencyKey: crossAreaKey,
+    });
+    expect(deniedCrossArea.status).toBe(201);
+    expect(deniedCrossArea.body).toMatchObject({
+      esito: "negato",
+      motivoEsito: "SERVIZIO_CHIUSO",
+      beneficiarioId: null,
+      beneficiarioNome: null,
+      beneficiarioCodice: null,
+      mensaPrincipaleId: null,
+      mensaPrincipaleNome: null,
+      statoAbilitazione: null,
+      restrizioniAlimentari: null,
+      allergie: null,
+      eccezionePossibile: false,
+    });
+    const replayCrossArea = await verify(app, fixture, {
+      codiceTessera: fixture.cardCode,
+      tipoServizio: "pranzo",
+      idempotencyKey: crossAreaKey,
+    });
+    expect(replayCrossArea.status).toBe(200);
+    expect(replayCrossArea.body).toMatchObject({
+      id: deniedCrossArea.body.id,
+      idempotentReplay: true,
+      motivoEsito: "SERVIZIO_CHIUSO",
+      beneficiarioId: null,
+      beneficiarioNome: null,
+      beneficiarioCodice: null,
+      mensaPrincipaleId: null,
+      mensaPrincipaleNome: null,
+      statoAbilitazione: null,
+      restrizioniAlimentari: null,
+      allergie: null,
+      eccezionePossibile: false,
     });
 
     const [temporaryBeneficiary] = await db
