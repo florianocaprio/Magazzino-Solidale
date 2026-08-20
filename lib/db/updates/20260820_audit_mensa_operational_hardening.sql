@@ -5,6 +5,7 @@ DO $audit$
 DECLARE
   overlap_count bigint;
   invalid_service_count bigint;
+  canonical_collision_count bigint;
   orphan_exception_count bigint;
   inconsistent_warehouse_count bigint;
 BEGIN
@@ -30,13 +31,23 @@ BEGIN
    AND daterange(a.data_inizio, coalesce(a.data_fine, 'infinity'::date), '[]')
        && daterange(b.data_inizio, coalesce(b.data_fine, 'infinity'::date), '[]');
   IF overlap_count > 0 THEN
-    RAISE EXCEPTION 'Preflight Mensa: trovate % coppie di abilitazioni principali sovrapposte. Bonificare esplicitamente prima della migrazione.', overlap_count;
+    RAISE NOTICE 'Preflight Mensa: trovate % coppie di abilitazioni principali sovrapposte. Restano preservate; il trigger proteggerà le nuove scritture e la bonifica richiede una decisione funzionale.', overlap_count;
   END IF;
 
   SELECT count(*) INTO invalid_service_count
   FROM public.mensa_pasti
   WHERE lower(trim(tipo_servizio)) NOT IN ('pranzo', 'cena');
   RAISE NOTICE 'Preflight Mensa: % pasti legacy hanno un tipo servizio non canonico; restano preservati e il vincolo rimarrà NOT VALID.', invalid_service_count;
+
+  SELECT count(*) INTO canonical_collision_count
+  FROM (
+    SELECT beneficiario_id, data_servizio, lower(trim(tipo_servizio)) AS tipo_canonico
+    FROM public.mensa_pasti
+    WHERE lower(trim(tipo_servizio)) IN ('pranzo', 'cena')
+    GROUP BY beneficiario_id, data_servizio, lower(trim(tipo_servizio))
+    HAVING count(*) > 1
+  ) collisions;
+  RAISE NOTICE 'Preflight Mensa: % gruppi di pasti legacy colliderebbero dopo la canonicalizzazione; restano preservati senza normalizzazione automatica.', canonical_collision_count;
 
   SELECT count(*) INTO orphan_exception_count
   FROM public.mensa_accessi a

@@ -181,4 +181,86 @@ describe("migrazione hardening operativo Mensa", () => {
       client.release();
     }
   });
+
+  it("preserva overlap legacy e installa comunque la protezione per nuove scritture", async () => {
+    const client = await pool.connect();
+    const migrationSql = await readFile(migrationUrl, "utf8");
+    try {
+      await client.query("BEGIN");
+      await client.query(`
+        DROP TRIGGER IF EXISTS mensa_abilitazioni_principale_overlap_trg
+          ON mensa_abilitazioni;
+        DROP INDEX IF EXISTS mensa_abilitazioni_principale_attiva_unique;
+      `);
+      const reference = await client.query<{
+        mensa_id: number;
+        citta_id: number;
+        user_id: number;
+      }>(`
+        SELECT m.id AS mensa_id, m.citta_id, u.id AS user_id
+        FROM mense m CROSS JOIN utenti u
+        WHERE m.citta_id IS NOT NULL
+        ORDER BY m.id, u.id
+        LIMIT 1
+      `);
+      expect(reference.rowCount).toBe(1);
+      const {
+        mensa_id: mensaId,
+        citta_id: cittaId,
+        user_id: userId,
+      } = reference.rows[0];
+      const beneficiary = await client.query<{ id: number }>(
+        `INSERT INTO beneficiari (codice, nome, cognome, citta_id)
+         VALUES ($1, 'Legacy', 'Overlap', $2)
+         RETURNING id`,
+        [`OV-${Date.now().toString().slice(-12)}`, cittaId],
+      );
+      const beneficiaryId = beneficiary.rows[0].id;
+      await client.query(
+        `INSERT INTO mensa_abilitazioni
+          (beneficiario_id, mensa_id, data_inizio, data_fine, stato,
+           mensa_principale, created_by)
+         VALUES
+          ($1, $2, '2026-01-01', '2026-12-31', 'attiva', true, $3),
+          ($1, $2, '2026-06-01', NULL, 'attiva', true, $3)`,
+        [beneficiaryId, mensaId, userId],
+      );
+
+      await client.query(migrationSql);
+      const preserved = await client.query<{ count: number }>(
+        `SELECT count(*)::int AS count
+         FROM mensa_abilitazioni
+         WHERE beneficiario_id = $1`,
+        [beneficiaryId],
+      );
+      expect(preserved.rows[0].count).toBe(2);
+
+      await client.query("SAVEPOINT new_overlap");
+      await expect(
+        client.query(
+          `INSERT INTO mensa_abilitazioni
+            (beneficiario_id, mensa_id, data_inizio, stato,
+             mensa_principale, created_by)
+           VALUES ($1, $2, '2026-09-01', 'attiva', true, $3)`,
+          [beneficiaryId, mensaId, userId],
+        ),
+      ).rejects.toMatchObject({ code: "23P01" });
+      await client.query("ROLLBACK TO SAVEPOINT new_overlap");
+
+      await client.query(migrationSql);
+      const trigger = await client.query<{ count: number }>(`
+        SELECT count(*)::int AS count
+        FROM pg_trigger
+        WHERE tgname = 'mensa_abilitazioni_principale_overlap_trg'
+          AND NOT tgisinternal
+      `);
+      expect(trigger.rows[0].count).toBe(1);
+      await client.query("ROLLBACK");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
 });

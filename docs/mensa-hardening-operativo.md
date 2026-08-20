@@ -34,10 +34,12 @@ DATABASE_URL=postgresql://... pnpm --filter @workspace/db run update
 Non usare `drizzle-kit push-force`. L'aggiornamento non cancella righe, non
 ricrea tabelle e può essere eseguito più volte. Prima di installare i vincoli
 esegue preflight espliciti: eventuali sovrapposizioni di abilitazioni principali
-attive interrompono l'operazione e devono essere risolte con una decisione
+attive vengono segnalate e preservate; il trigger viene comunque installato per
+impedire nuove sovrapposizioni. La bonifica dello storico richiede una decisione
 funzionale, senza cancellazioni automatiche. Valori servizio legacy diversi da
-`pranzo`/`cena` e riferimenti orfani vengono segnalati; i relativi vincoli
-restano `NOT VALID` finché i dati non sono bonificati.
+`pranzo`/`cena`, collisioni dopo canonicalizzazione e riferimenti orfani vengono
+segnalati; i relativi vincoli restano `NOT VALID` finché i dati non sono
+bonificati.
 
 ## Controlli dopo l'aggiornamento
 
