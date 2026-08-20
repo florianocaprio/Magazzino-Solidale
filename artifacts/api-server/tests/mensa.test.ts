@@ -2025,7 +2025,7 @@ describe("Modulo Mensa", () => {
     const accesses = await db
       .insert(mensaAccessiTable)
       .values(
-        Array.from({ length: 105 }, (_, index) => ({
+        Array.from({ length: 505 }, (_, index) => ({
           mensaId: fixture.mensaA,
           beneficiarioId: fixture.beneficiaryId,
           dataOra: new Date(`${shiftDate(today, -index)}T12:00:00Z`),
@@ -2062,7 +2062,7 @@ describe("Modulo Mensa", () => {
     const transfers = await db
       .insert(trasferimentiTable)
       .values(
-        Array.from({ length: 105 }, (_, index) => ({
+        Array.from({ length: 505 }, (_, index) => ({
           codice: `TR-PAGE-${rnd()}-${index}`,
           magazzinoOrigineId: fixture.warehouseIds[1],
           magazzinoDestinoId: fixture.warehouseIds[0],
@@ -2081,12 +2081,12 @@ describe("Modulo Mensa", () => {
       "/mensa/eccezioni",
       "/mensa/trasferimenti",
     ]) {
-      const page = await request(app).get(`${endpoint}?page=3&pageSize=50`);
+      const page = await request(app).get(`${endpoint}?page=11&pageSize=50`);
       expect(page.status, endpoint).toBe(200);
       expect(page.body, endpoint).toMatchObject({
-        page: 3,
+        page: 11,
         pageSize: 50,
-        total: 105,
+        total: 505,
       });
       expect(page.body.items, endpoint).toHaveLength(5);
     }
