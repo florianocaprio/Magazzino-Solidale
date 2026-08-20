@@ -3948,10 +3948,7 @@ router.get("/interventi/:id/storico-stati", async (req, res) => {
       .select()
       .from(interventiStoricoStatiTable)
       .where(eq(interventiStoricoStatiTable.interventoId, id))
-      .orderBy(
-        asc(interventiStoricoStatiTable.dataTransizione),
-        asc(interventiStoricoStatiTable.id),
-      );
+      .orderBy(asc(interventiStoricoStatiTable.id));
     res.json(rows.map(formatStoricoStato));
   } catch (error) {
     if (sendRouteError(error, res)) return;

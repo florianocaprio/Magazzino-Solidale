@@ -541,29 +541,55 @@ describe("workflow degli interventi", () => {
     expect(patched.status).toBe(400);
   });
 
-  it("mantiene ordinato cronologicamente lo storico", async () => {
+  it("mantiene l'ordine causale senza alterare i timestamp operativi", async () => {
     const created = await createWorkflow();
-    await request(makeApp())
+    const initialHistory = await request(makeApp()).get(
+      `/interventi/${created.body.id}/storico-stati`,
+    );
+    expect(initialHistory.status).toBe(200);
+    expect(initialHistory.body).toHaveLength(1);
+    const technicalCreationTimestamp = initialHistory.body[0].dataTransizione;
+    const retroactiveTransitionTimestamp = new Date(
+      Date.parse(technicalCreationTimestamp) - 60_000,
+    ).toISOString();
+
+    const planned = await request(makeApp())
       .post(`/interventi/${created.body.id}/transizioni`)
       .send({
         versione: await versioneIntervento(created.body.id),
         stato: "pianificato",
-        dataOraPianificata: "2026-09-01T10:00:00+02:00",
-        dataOraTransizione: "2026-08-20T10:00:00+02:00",
+        dataOraPianificata: retroactiveTransitionTimestamp,
+        dataOraTransizione: retroactiveTransitionTimestamp,
       });
-    await request(makeApp())
+    expect(planned.status).toBe(200);
+
+    const started = await request(makeApp())
       .post(`/interventi/${created.body.id}/avvia`)
       .send({
         versione: await versioneIntervento(created.body.id),
-        dataOraAvvio: "2026-09-01T10:05:00+02:00",
+        dataOraAvvio: retroactiveTransitionTimestamp,
       });
+    expect(started.status).toBe(200);
+
     const history = await request(makeApp()).get(
       `/interventi/${created.body.id}/storico-stati`,
     );
-    const times = history.body.map(
-      (row: { dataTransizione: string }) => row.dataTransizione,
+    expect(history.status).toBe(200);
+    expect(
+      history.body.map((row: { statoNuovo: string }) => row.statoNuovo),
+    ).toEqual(["da_pianificare", "pianificato", "in_corso"]);
+    expect(
+      history.body.map(
+        (row: { dataTransizione: string }) => row.dataTransizione,
+      ),
+    ).toEqual([
+      technicalCreationTimestamp,
+      retroactiveTransitionTimestamp,
+      retroactiveTransitionTimestamp,
+    ]);
+    expect(Date.parse(technicalCreationTimestamp)).toBeGreaterThan(
+      Date.parse(retroactiveTransitionTimestamp),
     );
-    expect(times).toEqual([...times].sort());
   });
 
   it("crea un successivo senza modificare il precedente e impedisce duplicati", async () => {
