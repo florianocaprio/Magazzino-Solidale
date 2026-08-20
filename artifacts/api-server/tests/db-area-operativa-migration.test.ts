@@ -28,6 +28,20 @@ const scopedTables = [
   "spese_emporio",
 ] as const;
 
+const canonicalAreaForeignKeys = {
+  utenti: "utenti_area_operativa_id_fk",
+  beneficiari: "beneficiari_area_operativa_id_fk",
+  centri_di_ascolto: "centri_di_ascolto_area_operativa_id_fk",
+  magazzini: "magazzini_area_operativa_id_fk",
+  zone_uds: "zone_uds_area_operativa_id_fk",
+  mense: "mense_area_operativa_id_fkey",
+  mensa_eccezioni: "mensa_eccezioni_area_operativa_id_fkey",
+  politiche_credito_solidale: "politiche_credito_solidale_area_operativa_id_fk",
+  credito_solidale_movimenti: "credito_solidale_movimenti_area_operativa_id_fk",
+  sessioni_cassa_emporio: "sessioni_cassa_emporio_area_operativa_id_fk",
+  spese_emporio: "spese_emporio_area_operativa_id_fk",
+} as const;
+
 type Client = Awaited<ReturnType<typeof pool.connect>>;
 
 async function areaSnapshot(client: Client, tableName: "citta" | "aree_operative") {
@@ -240,6 +254,113 @@ describe("migrazione Città -> Area Operativa", () => {
       expect(
         await referenceSnapshot(client, "area_operativa_id", "aree_operative"),
       ).toEqual(beforeReferences);
+      await client.query("ROLLBACK");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  it("normalizza le FK per semantica e rifiuta assenze, duplicati e collisioni", async () => {
+    const migrationSql = await readFile(migrationUrl, "utf8");
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(migrationSql);
+
+      await client.query(`
+        ALTER TABLE public.utenti
+        RENAME CONSTRAINT utenti_area_operativa_id_fk
+        TO utenti_area_operativa_id_aree_operative_id_fk
+      `);
+      await client.query(migrationSql);
+      await client.query(migrationSql);
+
+      const normalizedForeignKeys = await client.query<{
+        table_name: string;
+        constraint_name: string;
+      }>(`
+        SELECT source_table.relname AS table_name, c.conname AS constraint_name
+        FROM pg_constraint c
+        JOIN pg_class source_table ON source_table.oid = c.conrelid
+        JOIN pg_namespace source_namespace ON source_namespace.oid = source_table.relnamespace
+        JOIN pg_attribute source_column
+          ON source_column.attrelid = c.conrelid
+          AND source_column.attnum = c.conkey[1]
+        JOIN pg_attribute referenced_column
+          ON referenced_column.attrelid = c.confrelid
+          AND referenced_column.attnum = c.confkey[1]
+        WHERE c.contype = 'f'
+          AND source_namespace.nspname = 'public'
+          AND source_column.attname = 'area_operativa_id'
+          AND c.confrelid = 'public.aree_operative'::regclass
+          AND referenced_column.attname = 'id'
+          AND cardinality(c.conkey) = 1
+          AND cardinality(c.confkey) = 1
+        ORDER BY source_table.relname
+      `);
+      expect(
+        Object.fromEntries(
+          normalizedForeignKeys.rows.map((row) => [
+            row.table_name,
+            row.constraint_name,
+          ]),
+        ),
+      ).toEqual(canonicalAreaForeignKeys);
+
+      const fornitoriForeignKeys = await client.query<{ count: number }>(`
+        SELECT count(*)::int AS count
+        FROM pg_constraint c
+        JOIN pg_class source_table ON source_table.oid = c.conrelid
+        JOIN pg_namespace source_namespace ON source_namespace.oid = source_table.relnamespace
+        JOIN pg_attribute source_column
+          ON source_column.attrelid = c.conrelid
+          AND source_column.attnum = ANY(c.conkey)
+        WHERE c.contype = 'f'
+          AND source_namespace.nspname = 'public'
+          AND source_table.relname = 'fornitori'
+          AND source_column.attname = 'area_operativa_id'
+      `);
+      expect(fornitoriForeignKeys.rows[0].count).toBe(0);
+
+      await client.query("SAVEPOINT missing_fk");
+      await client.query(
+        "ALTER TABLE public.utenti DROP CONSTRAINT utenti_area_operativa_id_fk",
+      );
+      await expect(client.query(migrationSql)).rejects.toThrow(
+        /nessuna FK semantica/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT missing_fk");
+
+      await client.query("SAVEPOINT duplicate_fk");
+      await client.query(`
+        ALTER TABLE public.utenti
+        ADD CONSTRAINT utenti_area_operativa_duplicate_fk
+        FOREIGN KEY (area_operativa_id) REFERENCES public.aree_operative(id)
+      `);
+      await expect(client.query(migrationSql)).rejects.toThrow(
+        /2 FK semantiche/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT duplicate_fk");
+
+      await client.query("SAVEPOINT canonical_collision");
+      await client.query(`
+        ALTER TABLE public.utenti
+        RENAME CONSTRAINT utenti_area_operativa_id_fk
+        TO utenti_area_operativa_noncanonical_fk
+      `);
+      await client.query(`
+        ALTER TABLE public.utenti
+        ADD CONSTRAINT utenti_area_operativa_id_fk
+        CHECK (area_operativa_id IS NULL OR area_operativa_id > 0)
+      `);
+      await expect(client.query(migrationSql)).rejects.toThrow(
+        /nome canonico .* occupato da un constraint diverso/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT canonical_collision");
+
       await client.query("ROLLBACK");
     } catch (error) {
       await client.query("ROLLBACK");
