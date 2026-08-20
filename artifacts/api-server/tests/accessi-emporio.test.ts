@@ -48,7 +48,12 @@ const sessioneIds: number[] = [];
 let operatorUserId: number;
 
 function makeApp(
-  options: { isAdmin?: boolean; permessi?: string[] } = {},
+  options: {
+    isAdmin?: boolean;
+    permessi?: string[];
+    centroAscoltoId?: number | null;
+    cittaId?: number | null;
+  } = {},
 ): Express {
   const app = express();
   app.use(express.json());
@@ -66,8 +71,8 @@ function makeApp(
       }
     ).user = {
       id: operatorUserId,
-      centroAscoltoId: null,
-      cittaId: null,
+      centroAscoltoId: options.centroAscoltoId ?? null,
+      cittaId: options.cittaId ?? null,
       isAdmin: options.isAdmin ?? true,
       permessi: options.permessi ?? [],
       aree: ["emporio"],
@@ -486,6 +491,77 @@ describe("Accessi Emporio", () => {
     expect(denied.body.error).toMatch(/non è attivo/i);
     const history = await request(makeApp()).get("/accessi-emporio");
     expect(history.status).toBe(200);
+  });
+
+  it("applica insieme scope Beneficiario e Magazzino a lista, dettaglio e modifiche", async () => {
+    const cittaId = await createCitta();
+    const centroAId = await createCentro(cittaId);
+    const centroBId = await createCentro(cittaId);
+    const magazzinoAId = await createMagazzino("emporio", cittaId, centroAId);
+    const magazzinoBId = await createMagazzino("emporio", cittaId, centroBId);
+    const beneficiarioId = await createBeneficiario({
+      cittaId,
+      centroAscoltoId: centroAId,
+    });
+    const globalApp = makeApp();
+    const accessoA = await request(globalApp).post("/accessi-emporio").send({
+      beneficiarioId,
+      magazzinoEmporioId: magazzinoAId,
+      dataOraInizio: "2026-07-20T09:00:00",
+    });
+    const accessoB = await request(globalApp).post("/accessi-emporio").send({
+      beneficiarioId,
+      magazzinoEmporioId: magazzinoBId,
+      dataOraInizio: "2026-07-21T09:00:00",
+    });
+    expect(accessoA.status).toBe(201);
+    expect(accessoB.status).toBe(201);
+    consegnaIds.push(accessoA.body.id, accessoB.body.id);
+
+    const scopedCentroA = makeApp({
+      isAdmin: false,
+      permessi: ["emporio.access.view", "emporio.access.manage"],
+      centroAscoltoId: centroAId,
+      cittaId,
+    });
+    const list = await request(scopedCentroA).get("/accessi-emporio");
+    expect(list.status).toBe(200);
+    expect(list.headers["x-total-count"]).toBe("1");
+    expect(list.body.map((row: { id: number }) => row.id)).toEqual([
+      accessoA.body.id,
+    ]);
+    expect(
+      (await request(scopedCentroA).get(`/accessi-emporio/${accessoA.body.id}`))
+        .status,
+    ).toBe(200);
+    expect(
+      (await request(scopedCentroA).get(`/accessi-emporio/${accessoB.body.id}`))
+        .status,
+    ).toBe(403);
+
+    const [before] = await db
+      .select()
+      .from(consegneTable)
+      .where(eq(consegneTable.id, accessoB.body.id));
+    const update = await request(scopedCentroA)
+      .patch(`/accessi-emporio/${accessoB.body.id}`)
+      .send({ noteAccessoEmporio: "Tentativo fuori scope" });
+    const updateStato = await request(scopedCentroA)
+      .patch(`/accessi-emporio/${accessoB.body.id}/stato`)
+      .send({ statoAccessoEmporio: "confermato" });
+    expect(update.status).toBe(403);
+    expect(updateStato.status).toBe(403);
+    expect(update.body.error).toBe(
+      "Risorsa non accessibile per il tuo profilo",
+    );
+    expect(updateStato.body.error).toBe(
+      "Risorsa non accessibile per il tuo profilo",
+    );
+    const [after] = await db
+      .select()
+      .from(consegneTable)
+      .where(eq(consegneTable.id, accessoB.body.id));
+    expect(after).toEqual(before);
   });
 
   it("recupera oltre 250 Accessi tramite paginazione stabile", async () => {

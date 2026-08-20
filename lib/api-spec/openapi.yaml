@@ -11557,6 +11557,8 @@ components:
           type: ["integer", "null"]
         bollaRigaId:
           type: ["integer", "null"]
+        fsePlus:
+          type: boolean
       required:
         [
           id,
@@ -11568,6 +11570,7 @@ components:
           quantitaStornabile,
           creditoUnitario,
           creditoTotale,
+          fsePlus,
         ]
 
     SpesaEmporio:
@@ -11786,6 +11789,9 @@ components:
         dataChiusura:
           type: string
           format: date-time
+        dataBolla:
+          type: string
+          format: date
         beneficiario:
           type: ["string", "null"]
         beneficiarioCodice:
@@ -11817,6 +11823,7 @@ components:
           intestazione,
           numeroSpesa,
           dataChiusura,
+          dataBolla,
           righe,
           totaleCreditoConsumati,
           saldoPrima,

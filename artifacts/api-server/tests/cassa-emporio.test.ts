@@ -263,6 +263,7 @@ async function createProdotto(opts: {
   codiceBarre?: string;
   unitaMisura?: string;
   dataScadenza?: string | null;
+  fsePlus?: boolean;
 }): Promise<number> {
   const [prodotto] = await db
     .insert(prodottiTable)
@@ -296,6 +297,7 @@ async function createProdotto(opts: {
         quantitaCaricata: opts.quantitaResidua ?? "10",
         quantitaResidua: opts.quantitaResidua ?? "10",
         magazzinoId: opts.magazzinoId,
+        fsePlus: opts.fsePlus ?? false,
       })
       .returning({ id: lottiTable.id });
     lottoIds.push(lotto.id);
@@ -2424,6 +2426,59 @@ describe("Cassa Emporio", () => {
     const bollaNormale = await request(makeApp()).get(`/bolle/${bolla.id}`);
     expect(bollaNormale.status).toBe(200);
     expect(bollaNormale.body.righe[0].unitaMisura).toBe("l");
+  });
+
+  it("espone data documento Europe/Rome e provenienza FSE+ reale nella Bolla Emporio", async () => {
+    const fixture = await createFixture();
+    const prodottoFseId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      fsePlus: true,
+    });
+    const prodottoNonFseId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      fsePlus: false,
+    });
+    const sessione = await openSession(fixture.accessoId);
+    expect((await addProduct(sessione.body.id, prodottoFseId)).status).toBe(
+      201,
+    );
+    expect((await addProduct(sessione.body.id, prodottoNonFseId)).status).toBe(
+      201,
+    );
+    await postSessionAction(sessione.body.id, "pronta-per-chiusura");
+    const chiusura = await postSessionAction(sessione.body.id, "chiudi");
+    expect(chiusura.status).toBe(200);
+    await trackSpesa(chiusura.body.spesa.id);
+
+    const dataChiusura = new Date("2026-08-20T22:30:00.000Z");
+    await db
+      .update(speseEmporioTable)
+      .set({ dataChiusura })
+      .where(eq(speseEmporioTable.id, chiusura.body.spesa.id));
+    await db
+      .update(bolleTable)
+      .set({ dataBolla: "2026-08-21" })
+      .where(eq(bolleTable.id, chiusura.body.spesa.bollaId));
+
+    const stampa = await request(makeApp()).get(
+      `/spese-emporio/${chiusura.body.spesa.id}/bolla-stampa`,
+    );
+    expect(stampa.status).toBe(200);
+    expect(stampa.body.dataChiusura).toBe("2026-08-20T22:30:00.000Z");
+    expect(stampa.body.dataBolla).toBe("2026-08-21");
+    expect(
+      Object.fromEntries(
+        stampa.body.righe.map(
+          (riga: { prodottoId: number; fsePlus: boolean }) => [
+            riga.prodottoId,
+            riga.fsePlus,
+          ],
+        ),
+      ),
+    ).toEqual({
+      [prodottoFseId]: true,
+      [prodottoNonFseId]: false,
+    });
   });
 
   it("impone quantità intere per pz e conserva i decimali per kg e l", async () => {

@@ -4626,7 +4626,8 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
-  "bollaRigaId": zod.number().nullish()
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
 })),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -4691,7 +4692,8 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
-  "bollaRigaId": zod.number().nullish()
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
 })),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -4830,7 +4832,8 @@ export const ListSpeseEmporioResponseItem = zod.object({
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
-  "bollaRigaId": zod.number().nullish()
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
 })),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -4898,7 +4901,8 @@ export const GetSpesaEmporioBySessioneResponse = zod.object({
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
-  "bollaRigaId": zod.number().nullish()
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
 })),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -4965,7 +4969,8 @@ export const GetSpesaEmporioResponse = zod.object({
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
-  "bollaRigaId": zod.number().nullish()
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
 })),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -4987,6 +4992,7 @@ export const GetBollaStampaSpesaEmporioResponse = zod.object({
   "numeroBolla": zod.string().nullish(),
   "numeroSpesa": zod.string(),
   "dataChiusura": zod.coerce.date(),
+  "dataBolla": zod.coerce.date(),
   "beneficiario": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "beneficiarioCodiceFiscale": zod.string().nullish(),
@@ -5011,7 +5017,8 @@ export const GetBollaStampaSpesaEmporioResponse = zod.object({
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
-  "bollaRigaId": zod.number().nullish()
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
 })),
   "totaleCreditoConsumati": zod.number(),
   "saldoPrima": zod.number(),
@@ -5094,7 +5101,8 @@ export const RegistraInvioManualeBollaSpesaEmporioResponse = zod.object({
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
-  "bollaRigaId": zod.number().nullish()
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
 })),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -5176,7 +5184,8 @@ export const InviaBollaEmailSpesaEmporioResponse = zod.object({
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
-  "bollaRigaId": zod.number().nullish()
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
 })),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()

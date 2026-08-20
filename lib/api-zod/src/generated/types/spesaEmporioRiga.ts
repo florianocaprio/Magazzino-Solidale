@@ -34,4 +34,5 @@ export interface SpesaEmporioRiga {
   scaricoId?: number | null;
   /** @nullable */
   bollaRigaId?: number | null;
+  fsePlus: boolean;
 }

@@ -3998,6 +3998,7 @@ export interface SpesaEmporioRiga {
   scaricoId?: number | null;
   /** @nullable */
   bollaRigaId?: number | null;
+  fsePlus: boolean;
 }
 
 export type SpesaEmporioStatoSpesa = typeof SpesaEmporioStatoSpesa[keyof typeof SpesaEmporioStatoSpesa];
@@ -4156,6 +4157,7 @@ export interface BollaEmporioStampa {
   numeroBolla?: string | null;
   numeroSpesa: string;
   dataChiusura: string;
+  dataBolla: string;
   /** @nullable */
   beneficiario?: string | null;
   /** @nullable */

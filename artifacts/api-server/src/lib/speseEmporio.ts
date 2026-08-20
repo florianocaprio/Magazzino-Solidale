@@ -748,6 +748,7 @@ function formatSpesa(
     r: typeof speseEmporioRigheTable.$inferSelect;
     prodottoNome: string | null;
     codiceLotto: string | null;
+    fsePlus: boolean | null;
   }> = [],
   quantitaStornataByRiga = new Map<number, number>(),
 ) {
@@ -811,6 +812,7 @@ function formatSpesa(
       creditoTotale: parseDbNumber(r.r.creditoTotale),
       scaricoId: r.r.scaricoId,
       bollaRigaId: r.r.bollaRigaId,
+      fsePlus: r.fsePlus ?? false,
     })),
     createdAt: row.s.createdAt.toISOString(),
     updatedAt: row.s.updatedAt.toISOString(),
@@ -945,6 +947,7 @@ export async function getSpesaEmporio(id: number) {
       r: speseEmporioRigheTable,
       prodottoNome: prodottiTable.nome,
       codiceLotto: lottiTable.codiceLotto,
+      fsePlus: lottiTable.fsePlus,
     })
     .from(speseEmporioRigheTable)
     .leftJoin(
@@ -997,6 +1000,7 @@ export async function getBollaStampaSpesaEmporio(id: number) {
       magazzinoIndirizzo: magazziniTable.indirizzo,
       operatoreMatricola: utentiTable.matricola,
       operatoreUsername: utentiTable.username,
+      dataBolla: bolleTable.dataBolla,
     })
     .from(speseEmporioTable)
     .leftJoin(
@@ -1015,6 +1019,7 @@ export async function getBollaStampaSpesaEmporio(id: number) {
       utentiTable,
       eq(speseEmporioTable.operatoreChiusuraId, utentiTable.id),
     )
+    .leftJoin(bolleTable, eq(speseEmporioTable.bollaId, bolleTable.id))
     .where(eq(speseEmporioTable.id, id));
 
   return {
@@ -1022,6 +1027,8 @@ export async function getBollaStampaSpesaEmporio(id: number) {
     numeroBolla: spesa.bollaNumero,
     numeroSpesa: spesa.numeroSpesa,
     dataChiusura: spesa.dataChiusura,
+    dataBolla:
+      dati?.dataBolla ?? dataOperativaEuropeRome(new Date(spesa.dataChiusura)),
     beneficiario: dati?.beneficiarioNome ?? spesa.beneficiarioNome,
     beneficiarioCodice: dati?.beneficiarioCodice ?? spesa.beneficiarioCodice,
     beneficiarioCodiceFiscale: dati?.beneficiarioCodiceFiscale ?? null,

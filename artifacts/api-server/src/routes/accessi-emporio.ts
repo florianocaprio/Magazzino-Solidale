@@ -30,6 +30,8 @@ import {
   canUseBeneficiario,
   centroScopeFilter,
   cittaScopeFilter,
+  magazzinoScopeFilter,
+  visibleMagazzinoIds,
   zonaUdsScopeFilter,
 } from "../lib/centroScope";
 import {
@@ -83,6 +85,8 @@ const MSG_DUPLICATO =
   "Esiste già un Accesso Emporio pianificato per questo beneficiario nella data selezionata.";
 const MSG_ACCESSO_NON_TROVATO =
   "Accesso Emporio non trovato. Verifica l'accesso selezionato e riprova.";
+const MSG_RISORSA_NON_ACCESSIBILE =
+  "Risorsa non accessibile per il tuo profilo";
 
 class SpesaAccessoError extends Error {
   constructor(
@@ -144,6 +148,29 @@ async function loadBeneficiario(beneficiarioId: number) {
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId));
   return beneficiario ?? null;
+}
+
+async function canAccessAccessoEmporio(
+  accesso: Pick<
+    typeof consegneTable.$inferSelect,
+    "beneficiarioId" | "magazzinoEmporioId"
+  >,
+  req: import("express").Request,
+): Promise<boolean> {
+  if (accesso.magazzinoEmporioId == null) return false;
+  return (
+    (await canUseBeneficiario(
+      accesso.beneficiarioId,
+      callerCentroId(req),
+      callerCittaId(req),
+      callerZonaUdsId(req),
+    )) &&
+    (await canAccessMagazzino(
+      accesso.magazzinoEmporioId,
+      callerCentroId(req),
+      callerCittaId(req),
+    ))
+  );
 }
 
 function validateBeneficiarioAccesso(
@@ -398,6 +425,11 @@ router.get(
       callerZonaUdsId(req),
     );
     if (zonaFilter) conditions.push(zonaFilter);
+    const magazzinoFilter = magazzinoScopeFilter(
+      consegneTable.magazzinoEmporioId,
+      await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)),
+    );
+    if (magazzinoFilter) conditions.push(magazzinoFilter);
 
     const where = and(
       eq(consegneTable.tipoPianificazione, TIPO_ACCESSO),
@@ -539,17 +571,8 @@ router.get(
       return;
     }
     const row = rows[0];
-    if (
-      !(await canUseBeneficiario(
-        row.c.beneficiarioId,
-        callerCentroId(req),
-        callerCittaId(req),
-        callerZonaUdsId(req),
-      ))
-    ) {
-      res
-        .status(403)
-        .json({ error: "Risorsa non accessibile per il tuo profilo" });
+    if (!(await canAccessAccessoEmporio(row.c, req))) {
+      res.status(403).json({ error: MSG_RISORSA_NON_ACCESSIBILE });
       return;
     }
     res.json(formatAccesso(row));
@@ -697,17 +720,8 @@ router.patch(
       res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO });
       return;
     }
-    if (
-      !(await canUseBeneficiario(
-        existing.beneficiarioId,
-        callerCentroId(req),
-        callerCittaId(req),
-        callerZonaUdsId(req),
-      ))
-    ) {
-      res
-        .status(403)
-        .json({ error: "Risorsa non accessibile per il tuo profilo" });
+    if (!(await canAccessAccessoEmporio(existing, req))) {
+      res.status(403).json({ error: MSG_RISORSA_NON_ACCESSIBILE });
       return;
     }
 
@@ -781,6 +795,8 @@ router.patch(
           .from(consegneTable)
           .where(eq(consegneTable.id, id));
         if (!locked) throw new SpesaAccessoError(404, MSG_ACCESSO_NON_TROVATO);
+        if (!(await canAccessAccessoEmporio(locked, req)))
+          throw new SpesaAccessoError(403, MSG_RISORSA_NON_ACCESSIBILE);
         const [linkedSession] = await tx
           .select({ id: sessioniCassaEmporioTable.id })
           .from(sessioniCassaEmporioTable)
@@ -881,17 +897,8 @@ router.patch(
       res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO });
       return;
     }
-    if (
-      !(await canUseBeneficiario(
-        existing.beneficiarioId,
-        callerCentroId(req),
-        callerCittaId(req),
-        callerZonaUdsId(req),
-      ))
-    ) {
-      res
-        .status(403)
-        .json({ error: "Risorsa non accessibile per il tuo profilo" });
+    if (!(await canAccessAccessoEmporio(existing, req))) {
+      res.status(403).json({ error: MSG_RISORSA_NON_ACCESSIBILE });
       return;
     }
     const motivoAnnullamento = asText(req.body?.motivoAnnullamento);
@@ -909,6 +916,8 @@ router.patch(
           .from(consegneTable)
           .where(eq(consegneTable.id, id));
         if (!locked) throw new SpesaAccessoError(404, MSG_ACCESSO_NON_TROVATO);
+        if (!(await canAccessAccessoEmporio(locked, req)))
+          throw new SpesaAccessoError(403, MSG_RISORSA_NON_ACCESSIBILE);
         const current = locked.statoAccessoEmporio as StatoAccesso;
         if (
           stato !== current &&

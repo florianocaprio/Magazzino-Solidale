@@ -15,7 +15,7 @@ export function adattaBollaEmporioPerPdf(
   return {
     id: bollaId,
     numeroBolla: stampa.numeroBolla ?? stampa.numeroSpesa,
-    dataBolla: stampa.dataChiusura.slice(0, 10),
+    dataBolla: stampa.dataBolla,
     beneficiarioId: spesa.beneficiarioId,
     beneficiarioNome: stampa.beneficiario,
     magazzinoId: spesa.magazzinoEmporioId,
@@ -33,7 +33,7 @@ export function adattaBollaEmporioPerPdf(
       prodottoNome: riga.prodottoNome,
       lottoId: riga.lottoId,
       codiceLotto: riga.codiceLotto,
-      fsePlus: false,
+      fsePlus: riga.fsePlus,
       quantita: riga.quantita,
       unitaMisura: riga.unitaMisura ?? null,
       note: null,
