@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getGetBeneficiarioQueryKey,
   getListBeneficiariQueryKey,
-  getListCittaQueryKey,
+  getListAreeOperativeQueryKey,
   type BeneficiarioDirectory,
   type ListBeneficiariParams,
   useListBeneficiari,
-  useListCitta,
+  useListAreeOperative,
   useListZoneUds,
   useUpdateBeneficiarioStato,
   useAuthorizeBeneficiariExport,
@@ -50,8 +50,8 @@ export default function UdsAnagrafica() {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const isGlobal = user?.cittaId == null;
-  const [filterCitta, setFilterCitta] = useState("");
+  const isGlobal = user?.areaOperativaId == null;
+  const [filterAreaOperativa, setFilterAreaOperativa] = useState("");
   const [filterZona, setFilterZona] = useState(
     user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
   );
@@ -59,25 +59,25 @@ export default function UdsAnagrafica() {
   const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  const { data: cittaList } = useListCitta({
-    query: { queryKey: getListCittaQueryKey(), enabled: isGlobal },
+  const { data: areaOperativaList } = useListAreeOperative({
+    query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal },
   });
-  const effectiveCitta = isGlobal
-    ? filterCitta
-      ? parseInt(filterCitta)
+  const effectiveAreaOperativa = isGlobal
+    ? filterAreaOperativa
+      ? parseInt(filterAreaOperativa)
       : undefined
-    : (user?.cittaId ?? undefined);
+    : (user?.areaOperativaId ?? undefined);
   const { data: zoneList } = useListZoneUds(
-    effectiveCitta ? { cittaId: effectiveCitta } : undefined,
-    { query: { queryKey: ["zoneUds", effectiveCitta], enabled: effectiveCitta != null } },
+    effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : undefined,
+    { query: { queryKey: ["zoneUds", effectiveAreaOperativa], enabled: effectiveAreaOperativa != null } },
   );
 
   const listFilters = useMemo<ListBeneficiariParams>(() => ({
     uds: true,
     ...(search.trim() ? { search: search.trim() } : {}),
-    ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
+    ...(isGlobal && effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : {}),
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
-  }), [effectiveCitta, filterZona, isGlobal, search]);
+  }), [effectiveAreaOperativa, filterZona, isGlobal, search]);
   useEffect(() => setPage(1), [listFilters]);
   const { data: beneficiari, isLoading } = useListBeneficiari({
     ...listFilters,
@@ -188,22 +188,22 @@ export default function UdsAnagrafica() {
           </div>
           {isGlobal && (
             <div className="space-y-1">
-              <span className="text-sm font-medium">{t("udsAnagrafica.filterCitta")}</span>
+              <span className="text-sm font-medium">{t("udsAnagrafica.filterAreaOperativa")}</span>
               <Select
-                value={filterCitta || ALL_ZONE}
+                value={filterAreaOperativa || ALL_ZONE}
                 onValueChange={(value) => {
-                  setFilterCitta(value === ALL_ZONE ? "" : value);
+                  setFilterAreaOperativa(value === ALL_ZONE ? "" : value);
                   setFilterZona(ALL_ZONE);
                 }}
               >
                 <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder={t("udsAnagrafica.allCitta")} />
+                  <SelectValue placeholder={t("udsAnagrafica.allAreaOperativa")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allCitta")}</SelectItem>
-                  {cittaList?.map((citta) => (
-                    <SelectItem key={citta.id} value={String(citta.id)}>
-                      {citta.nome}
+                  <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allAreaOperativa")}</SelectItem>
+                  {areaOperativaList?.map((areaOperativa) => (
+                    <SelectItem key={areaOperativa.id} value={String(areaOperativa.id)}>
+                      {areaOperativa.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -330,7 +330,7 @@ export default function UdsAnagrafica() {
       <UdsPersonaSheet
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        initialCittaId={effectiveCitta}
+        initialAreaOperativaId={effectiveAreaOperativa}
         initialZonaUdsId={initialZona}
       />
     </div>

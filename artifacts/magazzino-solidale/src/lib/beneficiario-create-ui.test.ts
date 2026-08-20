@@ -22,8 +22,8 @@ describe("creazione Beneficiario globale per Area", () => {
     expect(buildBeneficiarioDuplicateParams(" Mario ", " Rossi ", true, 1)).toEqual({
       nome: "Mario",
       cognome: "Rossi",
-      cittaId: 1,
+      areaOperativaId: 1,
     });
-    expect(buildBeneficiarioDuplicateParams("Mario", "Rossi", true, 2).cittaId).toBe(2);
+    expect(buildBeneficiarioDuplicateParams("Mario", "Rossi", true, 2).areaOperativaId).toBe(2);
   });
 });

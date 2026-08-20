@@ -15,13 +15,13 @@ import { NAV_ITEMS } from "@/components/layout";
 
 describe("reportistica integrata", () => {
   it("blocca i filtri corrispondenti allo scope del caller", () => {
-    expect(getReportingFilterLocks({ cittaId: 1, centroAscoltoId: 2, zonaUdsId: 3 })).toEqual({
-      cityLocked: true,
+    expect(getReportingFilterLocks({ areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 3 })).toEqual({
+      areaOperativaLocked: true,
       centreLocked: true,
       zoneLocked: true,
     });
-    expect(getReportingFilterLocks({ cittaId: null, centroAscoltoId: null, zonaUdsId: null })).toEqual({
-      cityLocked: false,
+    expect(getReportingFilterLocks({ areaOperativaId: null, centroAscoltoId: null, zonaUdsId: null })).toEqual({
+      areaOperativaLocked: false,
       centreLocked: false,
       zoneLocked: false,
     });

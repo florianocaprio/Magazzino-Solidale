@@ -115,7 +115,7 @@ const beneficiario = {
   id: 42,
   attivo: true,
   statoAnagrafica: "completa" as const,
-  cittaId: 1,
+  areaOperativaId: 1,
 };
 
 const activeEligibility = {
@@ -284,7 +284,7 @@ describe("Mensa nella scheda Beneficiario", () => {
     await act(async () => open?.click());
 
     expect(mocks.menseHook).toHaveBeenLastCalledWith(
-      { attiva: true, cittaId: 1 },
+      { attiva: true, areaOperativaId: 1 },
       expect.objectContaining({
         query: expect.objectContaining({ enabled: true }),
       }),

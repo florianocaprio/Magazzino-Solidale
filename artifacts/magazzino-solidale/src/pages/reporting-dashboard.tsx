@@ -33,7 +33,7 @@ type CommonParams = {
   da?: string;
   a?: string;
   anno?: number;
-  cittaId?: number;
+  areaOperativaId?: number;
   centroAscoltoId?: number;
   magazzinoId?: number;
   mensaId?: number;
@@ -55,7 +55,7 @@ function initialFilters(user: ReturnType<typeof useAuth>["user"]): ReportingFilt
   return {
     da: validDate(params.get("da"), `${today.slice(0, 4)}-01-01`),
     a: validDate(params.get("a"), today),
-    cittaId: positiveId(params, "cittaId", user?.cittaId ?? null),
+    areaOperativaId: positiveId(params, "areaOperativaId", user?.areaOperativaId ?? null),
     centroAscoltoId: positiveId(params, "centroAscoltoId", user?.centroAscoltoId ?? null),
     magazzinoId: positiveId(params, "magazzinoId", null),
     mensaId: positiveId(params, "mensaId", null),
@@ -67,7 +67,7 @@ function writeFiltersToUrl(filters: ReportingFilterState) {
   const params = new URLSearchParams();
   params.set("da", filters.da);
   params.set("a", filters.a);
-  for (const key of ["cittaId", "centroAscoltoId", "magazzinoId", "mensaId", "zonaUdsId"] as const) {
+  for (const key of ["areaOperativaId", "centroAscoltoId", "magazzinoId", "mensaId", "zonaUdsId"] as const) {
     if (filters[key] != null) params.set(key, String(filters[key]));
   }
   window.history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
@@ -78,7 +78,7 @@ function apiParams(filters: ReportingFilterState): CommonParams {
     da: filters.da,
     a: filters.a,
     anno: Number(filters.a.slice(0, 4)),
-    cittaId: filters.cittaId ?? undefined,
+    areaOperativaId: filters.areaOperativaId ?? undefined,
     centroAscoltoId: filters.centroAscoltoId ?? undefined,
     magazzinoId: filters.magazzinoId ?? undefined,
     mensaId: filters.mensaId ?? undefined,

@@ -5,7 +5,7 @@ const it = {
   contestoCassa: "Contesto apertura Cassa",
   dataCassa: "Data",
   area: "Area",
-  tutteLeAree: "Tutte le aree",
+  tutteLeAree: "Tutte le Aree Operative",
   tuttiGliEmpori: "Tutti gli Empori",
   esciCassa: "Esci dalla Cassa",
   cercaBeneficiario: "Cerca beneficiario per nome, codice o codice a barre",

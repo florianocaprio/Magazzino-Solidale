@@ -9,8 +9,8 @@ const labels = {
   text: (value: string) => value,
   unavailable: "Dato non disponibile", locale: "it",
   metadata: {
-    from: "Da", to: "A", city: "Città", centre: "Centro", warehouse: "Magazzino",
-    mensa: "Mensa", zone: "Zona", allCities: "Tutte", allCentres: "Tutti",
+    from: "Da", to: "A", areaOperativa: "Area Operativa", centre: "Centro", warehouse: "Magazzino",
+    mensa: "Mensa", zone: "Zona", allAreeOperative: "Tutte", allCentres: "Tutti",
     allWarehouses: "Tutti", allMense: "Tutte", allZones: "Tutte",
     generatedAt: "Generato il", application: "Applicazione", indicator: "Indicatore",
     value: "Valore", unit: "Unità", availability: "Disponibilità", definitions: "Definizioni",
@@ -31,7 +31,7 @@ describe("export reportistica", () => {
     const workbook = buildReportingWorkbook(
       {
         section: "fse-plus",
-        filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, cittaId: null, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
+        filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, areaOperativaId: null, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
         kpi: [], series: [], tables: [], quality: [], definitions: [],
         generatedAt: "2026-08-15T00:00:00.000Z",
         timezone: "Europe/Rome",
@@ -58,12 +58,12 @@ describe("export reportistica", () => {
     const workbook = buildReportingWorkbook(
       {
         section: "fse-plus",
-        filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, cittaId: 1, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
+        filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, areaOperativaId: 1, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
         kpi: [], series: [], tables: [], quality: [], definitions: [],
         generatedAt: "2026-08-15T00:00:00.000Z", timezone: "Europe/Rome",
       },
       labels,
-      { city: "Roma" },
+      { areaOperativa: "Roma" },
       {
         section: "fse-plus", metric: "prodottiFse", page: 1, pageSize: 1, total: 1,
         columns: ["data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita", "canale"],
@@ -74,6 +74,6 @@ describe("export reportistica", () => {
     expect(detail).toHaveLength(1);
     expect(detail[0]).toMatchObject({ documento: "B-1", beneficiarioCodice: "BEN-1", canale: "pacchi" });
     expect(detail[0]).not.toHaveProperty("nome");
-    expect(XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets["00_Riepilogo"], { header: 1 })).toContainEqual(["Città", "Roma"]);
+    expect(XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets["00_Riepilogo"], { header: 1 })).toContainEqual(["Area Operativa", "Roma"]);
   });
 });

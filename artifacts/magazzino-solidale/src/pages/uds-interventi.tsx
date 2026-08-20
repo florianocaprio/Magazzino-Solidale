@@ -4,11 +4,11 @@ import {
   useListInterventi,
   useCreateIntervento,
   useUpdateIntervento,
-  useListCitta,
+  useListAreeOperative,
   useListZoneUds,
   useListTipiIntervento,
   getListInterventiQueryKey,
-  getListCittaQueryKey,
+  getListAreeOperativeQueryKey,
   listBisogniPianificati,
   type Beneficiario,
   type BisognoPianificato,
@@ -161,10 +161,10 @@ export default function UdsInterventi() {
   const schema = makeSchema(t);
   const canCreatePerson = hasArea("uds");
 
-  const isGlobal = user?.cittaId == null;
+  const isGlobal = user?.areaOperativaId == null;
   const [selectedPerson, setSelectedPerson] = useState<string>("");
   const [personSearch, setPersonSearch] = useState("");
-  const [filterCitta, setFilterCitta] = useState<string>("");
+  const [filterAreaOperativa, setFilterAreaOperativa] = useState<string>("");
   const [filterZona, setFilterZona] = useState<string>(
     user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
   );
@@ -180,23 +180,23 @@ export default function UdsInterventi() {
   const [isLoadingBisogni, setIsLoadingBisogni] = useState(false);
   const bisogniLoadRequest = useRef(0);
 
-  const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isGlobal } });
+  const { data: areaOperativaList } = useListAreeOperative({ query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal } });
 
-  const effectiveCitta = isGlobal
-    ? filterCitta
-      ? parseInt(filterCitta)
+  const effectiveAreaOperativa = isGlobal
+    ? filterAreaOperativa
+      ? parseInt(filterAreaOperativa)
       : undefined
-    : (user?.cittaId ?? undefined);
+    : (user?.areaOperativaId ?? undefined);
 
   const { data: zoneList } = useListZoneUds(
-    effectiveCitta ? { cittaId: effectiveCitta } : undefined,
-    { query: { queryKey: ["zoneUds", "udsInt", effectiveCitta], enabled: effectiveCitta != null } },
+    effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : undefined,
+    { query: { queryKey: ["zoneUds", "udsInt", effectiveAreaOperativa], enabled: effectiveAreaOperativa != null } },
   );
 
   const personeParams = {
     uds: true,
     ...(personSearch.trim() ? { search: personSearch.trim() } : {}),
-    ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
+    ...(isGlobal && effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : {}),
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
   };
   const { data: persone } = useListBeneficiari(personeParams);
@@ -206,7 +206,7 @@ export default function UdsInterventi() {
     beneficiarioId: personId,
     ambito: "uds" as const,
     includiStorici: true,
-    ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
+    ...(isGlobal && effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : {}),
     ...(bisogniFilter !== "tutti" ? { bisogni: bisogniFilter } : {}),
   };
   const { data: interventi, isLoading } = useListInterventi(interventiParams, {
@@ -244,7 +244,7 @@ export default function UdsInterventi() {
     "ascolto";
 
   const handlePersonReady = (person: UdsPersonaSelection) => {
-    if (isGlobal && person.cittaId != null) setFilterCitta(String(person.cittaId));
+    if (isGlobal && person.areaOperativaId != null) setFilterAreaOperativa(String(person.areaOperativaId));
     setFilterZona(person.zonaUdsId != null ? String(person.zonaUdsId) : ALL_ZONE);
     setPersonSearch("");
     setSelectedPersonFallback(person);
@@ -441,11 +441,11 @@ export default function UdsInterventi() {
         <CardContent className="flex flex-wrap items-end gap-4 p-4">
           {isGlobal && (
             <div className="space-y-1">
-              <span className="text-sm font-medium">{t("udsAnagrafica.filterCitta")}</span>
+              <span className="text-sm font-medium">{t("udsAnagrafica.filterAreaOperativa")}</span>
               <Select
-                value={filterCitta || ALL_ZONE}
+                value={filterAreaOperativa || ALL_ZONE}
                 onValueChange={(v) => {
-                  setFilterCitta(v === ALL_ZONE ? "" : v);
+                  setFilterAreaOperativa(v === ALL_ZONE ? "" : v);
                   setFilterZona(ALL_ZONE);
                   setSelectedPerson("");
                   setSelectedPersonFallback(null);
@@ -453,11 +453,11 @@ export default function UdsInterventi() {
                 }}
               >
                 <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder={t("udsAnagrafica.allCitta")} />
+                  <SelectValue placeholder={t("udsAnagrafica.allAreaOperativa")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allCitta")}</SelectItem>
-                  {cittaList?.map((c) => (
+                  <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allAreaOperativa")}</SelectItem>
+                  {areaOperativaList?.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                   ))}
                 </SelectContent>
@@ -536,7 +536,7 @@ export default function UdsInterventi() {
       <UdsPersonaSheet
         open={isNewPersonOpen}
         onOpenChange={setIsNewPersonOpen}
-        initialCittaId={effectiveCitta}
+        initialAreaOperativaId={effectiveAreaOperativa}
         initialZonaUdsId={
           filterZona !== ALL_ZONE
             ? parseInt(filterZona)

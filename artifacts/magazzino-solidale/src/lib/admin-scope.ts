@@ -3,11 +3,11 @@ export type RuoloAssegnabile = { nome: string; aree?: string[] };
 export type AdminTerritorialScope = {
   isAdmin?: boolean;
   isSuperAdmin?: boolean;
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
 };
 
 export function canManageGlobalAdminResources(user: AdminTerritorialScope | null | undefined): boolean {
-  return Boolean(user && (user.isAdmin || user.isSuperAdmin) && user.cittaId == null);
+  return Boolean(user && (user.isAdmin || user.isSuperAdmin) && user.areaOperativaId == null);
 }
 
 export function ruoliNelPerimetro<T extends RuoloAssegnabile>(ruoli: T[], areeCaller: string[], isSuperAdmin: boolean): T[] {

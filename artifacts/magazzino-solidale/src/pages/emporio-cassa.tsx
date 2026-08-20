@@ -20,7 +20,7 @@ import {
   useForzaAccessoEmporioCassa,
   useGetSessioneCassaEmporio,
   useGetImpostazioniStampa,
-  useListCitta,
+  useListAreeOperative,
   useListMagazzini,
   useListSessioniCassaEmporio,
   usePreparaChiusuraSessioneCassaEmporio,
@@ -357,7 +357,7 @@ export default function EmporioCassa() {
   const beneficiarioQuery = beneficiarioSearch.trim();
   const prodottoQuery = prodottoSearch.trim();
 
-  const { data: citta = [] } = useListCitta();
+  const { data: areaOperativa = [] } = useListAreeOperative();
   const { data: magazzini = [] } = useListMagazzini();
   const empori = useMemo(
     () =>
@@ -369,7 +369,7 @@ export default function EmporioCassa() {
   const areaId = optionalId(areaFilter);
   const emporiFiltrati = useMemo(
     () =>
-      areaId == null ? empori : empori.filter((m) => m.cittaId === areaId),
+      areaId == null ? empori : empori.filter((m) => m.areaOperativaId === areaId),
     [areaId, empori],
   );
   const contestoCassaCompleto = areaFilter !== ALL && emporioFilter !== ALL;
@@ -388,7 +388,7 @@ export default function EmporioCassa() {
 
   const searchContext = {
     data: cassaDate || undefined,
-    cittaId: areaId,
+    areaOperativaId: areaId,
     magazzinoEmporioId: optionalId(emporioFilter),
   };
   const beneficiariSearchParams = {
@@ -486,8 +486,8 @@ export default function EmporioCassa() {
     mutation: {
       onSuccess: (data) => {
         setSelectedSessioneId(data.id);
-        if (data.cittaId != null && areaFilter === ALL)
-          setAreaFilter(String(data.cittaId));
+        if (data.areaOperativaId != null && areaFilter === ALL)
+          setAreaFilter(String(data.areaOperativaId));
         if (data.magazzinoEmporioId != null && emporioFilter === ALL)
           setEmporioFilter(String(data.magazzinoEmporioId));
         queryClient.setQueryData(
@@ -635,7 +635,7 @@ export default function EmporioCassa() {
     const liveSessioni = await listSessioniCassaEmporio({
       beneficiarioSearch: b.beneficiarioCodice,
       magazzinoEmporioId: optionalId(emporioFilter),
-      cittaId: areaId ?? b.cittaId ?? undefined,
+      areaOperativaId: areaId ?? b.areaOperativaId ?? undefined,
     }).catch(() => sessioni);
     return liveSessioni.find(
       (s) =>
@@ -998,7 +998,7 @@ export default function EmporioCassa() {
                     <SelectItem value={ALL}>
                       {t("cassaEmporio.tutteLeAree")}
                     </SelectItem>
-                    {citta.map((area) => (
+                    {areaOperativa.map((area) => (
                       <SelectItem key={area.id} value={String(area.id)}>
                         {area.nome}
                       </SelectItem>

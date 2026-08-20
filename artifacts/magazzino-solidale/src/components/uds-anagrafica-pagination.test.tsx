@@ -9,10 +9,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@workspace/api-client-react", () => ({
   getGetBeneficiarioQueryKey: () => ["beneficiario"],
   getListBeneficiariQueryKey: () => ["beneficiari"],
-  getListCittaQueryKey: () => ["aree"],
+  getListAreeOperativeQueryKey: () => ["aree"],
   listBeneficiari: vi.fn().mockResolvedValue([]),
   useListBeneficiari: (params: unknown) => mocks.list(params),
-  useListCitta: () => ({ data: [] }),
+  useListAreeOperative: () => ({ data: [] }),
   useListZoneUds: () => ({ data: [] }),
   useUpdateBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
   useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn() }),
@@ -23,7 +23,7 @@ vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: 1, cittaId: 1, zonaUdsId: null },
+    user: { id: 1, areaOperativaId: 1, zonaUdsId: null },
     hasPermission: () => true,
   }),
 }));

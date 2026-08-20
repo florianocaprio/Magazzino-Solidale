@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useBulkFornitori, useListCitta, useListTipologieFornitore, getListFornitoriQueryKey } from "@workspace/api-client-react";
+import { useListFornitori, useCreateFornitore, useUpdateFornitore, useDeleteFornitore, useBulkFornitori, useListAreeOperative, useListTipologieFornitore, getListFornitoriQueryKey } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,7 +33,7 @@ const formSchema = z.object({
   telefono: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   referente: z.string().optional(),
-  cittaId: z.string().optional(),
+  areaOperativaId: z.string().optional(),
   note: z.string().optional(),
   noteOperative: z.string().optional()
 });
@@ -41,19 +41,19 @@ const formSchema = z.object({
 export default function Fornitori() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const lockedCittaId = user?.cittaId ?? null;
-  const isCittaLocked = lockedCittaId != null;
-  const isGlobal = !isCittaLocked;
-  const [cittaFilter, setCittaFilter] = useState("all");
+  const lockedAreaOperativaId = user?.areaOperativaId ?? null;
+  const isAreaOperativaLocked = lockedAreaOperativaId != null;
+  const isGlobal = !isAreaOperativaLocked;
+  const [areaOperativaFilter, setAreaOperativaFilter] = useState("all");
   useEffect(() => {
-    if (isCittaLocked && lockedCittaId != null) {
-      setCittaFilter(String(lockedCittaId));
+    if (isAreaOperativaLocked && lockedAreaOperativaId != null) {
+      setAreaOperativaFilter(String(lockedAreaOperativaId));
     }
-  }, [isCittaLocked, lockedCittaId]);
+  }, [isAreaOperativaLocked, lockedAreaOperativaId]);
   const { data: fornitori, isLoading } = useListFornitori(
-    cittaFilter !== "all" ? { cittaId: parseInt(cittaFilter) } : undefined
+    areaOperativaFilter !== "all" ? { areaOperativaId: parseInt(areaOperativaFilter) } : undefined
   );
-  const { data: citta } = useListCitta();
+  const { data: areaOperativa } = useListAreeOperative();
   const { data: tipologie } = useListTipologieFornitore();
 
   // Built-in type keys keep their translated label; admin-added custom names show
@@ -78,7 +78,7 @@ export default function Fornitori() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", cittaId: "all", noteOperative: ""
+      nome: "", tipo: "commerciale", telefono: "", email: "", referente: "", comune: "", areaOperativaId: "all", noteOperative: ""
     }
   });
 
@@ -88,7 +88,7 @@ export default function Fornitori() {
       nome: f.nome, tipo: f.tipo, partitaIva: f.partitaIva || "", codiceFiscale: f.codiceFiscale || "",
       indirizzo: f.indirizzo || "", comune: f.comune || "", telefono: f.telefono || "",
       email: f.email || "", referente: f.referente || "", note: f.note || "",
-      cittaId: f.cittaId != null ? String(f.cittaId) : "all",
+      areaOperativaId: f.areaOperativaId != null ? String(f.areaOperativaId) : "all",
       noteOperative: f.noteOperative || ""
     });
     setIsFormOpen(true);
@@ -96,15 +96,15 @@ export default function Fornitori() {
 
   const handleCreate = () => {
     setEditingId(null);
-    form.reset({ nome: "", tipo: defaultTipo(), telefono: "", email: "", referente: "", comune: "", cittaId: isCittaLocked && lockedCittaId != null ? String(lockedCittaId) : "all", noteOperative: "" });
+    form.reset({ nome: "", tipo: defaultTipo(), telefono: "", email: "", referente: "", comune: "", areaOperativaId: isAreaOperativaLocked && lockedAreaOperativaId != null ? String(lockedAreaOperativaId) : "all", noteOperative: "" });
     setIsFormOpen(true);
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const { cittaId, ...rest } = values;
+    const { areaOperativaId, ...rest } = values;
     const data = {
       ...rest,
-      cittaId: cittaId && cittaId !== "all" ? parseInt(cittaId) : null,
+      areaOperativaId: areaOperativaId && areaOperativaId !== "all" ? parseInt(areaOperativaId) : null,
     };
     if (editingId) {
       updateFornitore.mutate({ id: editingId, data }, {
@@ -126,7 +126,7 @@ export default function Fornitori() {
   };
 
   const filtered = fornitori?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase()));
-  const cittaNome = (id: number | null | undefined) => id != null ? (citta?.find(c => c.id === id)?.nome ?? "-") : t("fornitori.tutteCitta");
+  const areaOperativaNome = (id: number | null | undefined) => id != null ? (areaOperativa?.find(c => c.id === id)?.nome ?? "-") : t("fornitori.tutteAreaOperativa");
 
   const tipoColors: Record<string, string> = {
     commerciale: "bg-blue-500/10 text-blue-700",
@@ -156,7 +156,7 @@ export default function Fornitori() {
               { header: t("common.phone"), accessor: (f) => f.telefono },
               { header: t("common.email"), accessor: (f) => f.email },
               { header: t("fornitori.referente"), accessor: (f) => f.referente },
-              { header: t("fornitori.citta"), accessor: (f) => f.cittaId == null ? t("fornitori.tutteCitta") : (f.cittaNome ?? cittaNome(f.cittaId)) },
+              { header: t("fornitori.areaOperativa"), accessor: (f) => f.areaOperativaId == null ? t("fornitori.tutteAreaOperativa") : (f.areaOperativaNome ?? areaOperativaNome(f.areaOperativaId)) },
               { header: t("fornitori.noteOperative"), accessor: (f) => f.noteOperative },
             ]}
             filename="fornitori"
@@ -184,17 +184,17 @@ export default function Fornitori() {
           { key: "telefono", header: t("common.phone"), example: "021234567" },
           { key: "email", header: t("common.email"), example: "info@example.com" },
           { key: "referente", header: t("fornitori.referente"), example: "" },
-          { key: "citta", header: t("fornitori.citta"), example: "" },
+          { key: "areaOperativa", header: t("fornitori.areaOperativa"), example: "" },
           { key: "noteOperative", header: t("fornitori.noteOperative"), example: "" },
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
           if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("fornitori.nominativo") }) };
           if (!r.tipo) return { error: t("bulkImport.requiredMissing", { field: t("common.type") }) };
-          let cittaId: number | null = null;
-          if (r.citta) {
-            const c = matchByName(citta, r.citta, (x) => x.nome);
-            if (!c) return { error: t("bulkImport.unknownRef", { field: t("fornitori.citta"), value: r.citta }) };
-            cittaId = c.id;
+          let areaOperativaId: number | null = null;
+          if (r.areaOperativa) {
+            const c = matchByName(areaOperativa, r.areaOperativa, (x) => x.nome);
+            if (!c) return { error: t("bulkImport.unknownRef", { field: t("fornitori.areaOperativa"), value: r.areaOperativa }) };
+            areaOperativaId = c.id;
           }
           return {
             data: {
@@ -207,7 +207,7 @@ export default function Fornitori() {
               telefono: r.telefono || undefined,
               email: r.email || undefined,
               referente: r.referente || undefined,
-              cittaId,
+              areaOperativaId,
               noteOperative: r.noteOperative || undefined,
             },
           };
@@ -223,13 +223,13 @@ export default function Fornitori() {
             {isGlobal && (
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={cittaFilter} onValueChange={setCittaFilter}>
+                <Select value={areaOperativaFilter} onValueChange={setAreaOperativaFilter}>
                   <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder={t("fornitori.tutteCitta")} />
+                    <SelectValue placeholder={t("fornitori.tutteAreaOperativa")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{t("fornitori.tutteCitta")}</SelectItem>
-                    {citta?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                    <SelectItem value="all">{t("fornitori.tutteAreaOperativa")}</SelectItem>
+                    {areaOperativa?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -242,7 +242,7 @@ export default function Fornitori() {
               <TableRow>
                 <TableHead>{t("fornitori.nominativo")}</TableHead>
                 <TableHead>{t("common.type")}</TableHead>
-                {isGlobal && <TableHead>{t("fornitori.citta")}</TableHead>}
+                {isGlobal && <TableHead>{t("fornitori.areaOperativa")}</TableHead>}
                 <TableHead>{t("fornitori.contatti")}</TableHead>
                 <TableHead>{t("fornitori.referente")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -273,9 +273,9 @@ export default function Fornitori() {
                   </TableCell>
                   {isGlobal && (
                     <TableCell className="text-sm">
-                      {f.cittaId == null
-                        ? <span className="text-muted-foreground italic">{t("fornitori.tutteCitta")}</span>
-                        : (f.cittaNome ?? cittaNome(f.cittaId))}
+                      {f.areaOperativaId == null
+                        ? <span className="text-muted-foreground italic">{t("fornitori.tutteAreaOperativa")}</span>
+                        : (f.areaOperativaNome ?? areaOperativaNome(f.areaOperativaId))}
                     </TableCell>
                   )}
                   <TableCell>
@@ -341,14 +341,14 @@ export default function Fornitori() {
                 <FormField control={form.control} name="referente" render={({ field }) => (
                   <FormItem><FormLabel>{t("fornitori.personaRiferimento")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
-                <FormField control={form.control} name="cittaId" render={({ field }) => (
+                <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("fornitori.citta")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "all"} disabled={isCittaLocked}>
+                    <FormLabel>{t("fornitori.areaOperativa")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "all"} disabled={isAreaOperativaLocked}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="all">{t("fornitori.tutteCitta")}</SelectItem>
-                        {citta?.filter((c) => c.attivo || String(c.id) === field.value).map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                        <SelectItem value="all">{t("fornitori.tutteAreaOperativa")}</SelectItem>
+                        {areaOperativa?.filter((c) => c.attivo || String(c.id) === field.value).map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </FormItem>

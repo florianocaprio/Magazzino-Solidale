@@ -62,7 +62,7 @@ vi.mock("@/hooks/use-toast", () => ({
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: 1, cittaId: 1 },
+    user: { id: 1, areaOperativaId: 1 },
     hasPermission: (permission: string) => permission !== "mensa.access.manual",
   }),
 }));

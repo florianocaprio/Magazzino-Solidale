@@ -5,7 +5,7 @@ import {
   useReportUdsInterventiPerTipo,
   useReportUdsInterventiPerZona,
   useReportUdsPersonePerZona,
-  useListCitta,
+  useListAreeOperative,
   useListZoneUds,
   getReportUdsInterventiPerMeseQueryKey,
   getReportUdsInterventiPerTipoQueryKey,
@@ -29,31 +29,31 @@ const ALL = "all";
 export default function ReportUds() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const isGlobalCitta = (user?.cittaId ?? null) == null;
+  const isGlobalAreaOperativa = (user?.areaOperativaId ?? null) == null;
   const lockedZonaId = user?.zonaUdsId ?? null;
 
   const currentYear = new Date().getFullYear();
   const [da, setDa] = useState(`${currentYear}-01-01`);
   const [a, setA] = useState(new Date().toISOString().slice(0, 10));
-  const [cittaId, setCittaId] = useState<string>(ALL);
+  const [areaOperativaId, setAreaOperativaId] = useState<string>(ALL);
   const [zonaId, setZonaId] = useState<string>(lockedZonaId != null ? String(lockedZonaId) : ALL);
 
   useEffect(() => {
     if (lockedZonaId != null) setZonaId(String(lockedZonaId));
   }, [lockedZonaId]);
 
-  const { data: citta } = useListCitta();
-  const cittaParam = cittaId === ALL ? undefined : parseInt(cittaId);
+  const { data: areaOperativa } = useListAreeOperative();
+  const areaOperativaParam = areaOperativaId === ALL ? undefined : parseInt(areaOperativaId);
 
-  const zoneParams = isGlobalCitta && cittaParam ? { cittaId: cittaParam } : undefined;
+  const zoneParams = isGlobalAreaOperativa && areaOperativaParam ? { areaOperativaId: areaOperativaParam } : undefined;
   const { data: zone } = useListZoneUds(zoneParams, {
     query: { queryKey: getListZoneUdsQueryKey(zoneParams) },
   });
   const zonaParam = zonaId === ALL ? undefined : parseInt(zonaId);
 
-  const baseParams = { da, a, cittaId: cittaParam, zonaUdsId: zonaParam };
-  const zonaScopeParams = { da, a, cittaId: cittaParam };
-  const personeParams = { cittaId: cittaParam };
+  const baseParams = { da, a, areaOperativaId: areaOperativaParam, zonaUdsId: zonaParam };
+  const zonaScopeParams = { da, a, areaOperativaId: areaOperativaParam };
+  const personeParams = { areaOperativaId: areaOperativaParam };
 
   const { data: perMese, isLoading: loadingMese } = useReportUdsInterventiPerMese(baseParams, {
     query: { queryKey: getReportUdsInterventiPerMeseQueryKey(baseParams) },
@@ -92,27 +92,27 @@ export default function ReportUds() {
               <Input id="a" type="date" value={a} min={da} onChange={(e) => setA(e.target.value)} className="w-40" />
             </div>
           </div>
-          {isGlobalCitta && (
+          {isGlobalAreaOperativa && (
             <div className="space-y-1.5">
-              <Label className="text-xs">{t("reportUds.city")}</Label>
+              <Label className="text-xs">{t("reportUds.areaOperativa")}</Label>
               <Select
-                value={cittaId}
+                value={areaOperativaId}
                 onValueChange={(v) => {
-                  setCittaId(v);
+                  setAreaOperativaId(v);
                   setZonaId(ALL);
                 }}
               >
                 <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>{t("reportUds.allCities")}</SelectItem>
-                  {(citta ?? []).map((c) => (
+                  <SelectItem value={ALL}>{t("reportUds.allAreeOperative")}</SelectItem>
+                  {(areaOperativa ?? []).map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
-          {!isGlobalCitta || cittaParam != null ? (
+          {!isGlobalAreaOperativa || areaOperativaParam != null ? (
             <div className="space-y-1.5">
               <Label className="text-xs">{t("reportUds.zone")}</Label>
               <Select value={zonaId} onValueChange={setZonaId} disabled={lockedZonaId != null}>
@@ -130,7 +130,7 @@ export default function ReportUds() {
               <Label className="text-xs">{t("reportUds.zone")}</Label>
               <Select disabled>
                 <SelectTrigger className="w-52">
-                  <SelectValue placeholder={t("reportUds.selectCityFirst")} />
+                  <SelectValue placeholder={t("reportUds.selectAreaOperativaFirst")} />
                 </SelectTrigger>
                 <SelectContent />
               </Select>

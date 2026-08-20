@@ -32,7 +32,7 @@ const intervento = {
   sede: "Sede Roma",
   centroAscoltoId: 1,
   centroAscoltoNome: "Centro Roma",
-  cittaId: 1,
+  areaOperativaId: 1,
   operatoreId: 4,
   operatoreNome: "Operatore Test",
   operatoreCodice: "OP-4",

@@ -10,11 +10,11 @@ const reference = new Date("2026-08-14T10:00:00Z");
 describe("filtri URL degli interventi Sociali", () => {
   it("usa Oggi come vista predefinita e normalizza valori malformati", () => {
     const filters = parseInterventiSocialiFilters(
-      "?vista=sconosciuta&citta=-2&da=2026-02-31&modo=calendario",
+      "?vista=sconosciuta&areaOperativa=-2&da=2026-02-31&modo=calendario",
       reference,
     );
     expect(filters.vista).toBe("oggi");
-    expect(filters.cittaId).toBe("");
+    expect(filters.areaOperativaId).toBe("");
     expect(filters.da).toBe("");
     expect(filters.modo).toBe("calendario");
   });

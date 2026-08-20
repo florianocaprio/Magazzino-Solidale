@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListMagazzini, useCreateMagazzino, useUpdateMagazzino, useDeleteMagazzino, useListCentriAscolto, useListCitta, getListMagazziniQueryKey } from "@workspace/api-client-react";
+import { useListMagazzini, useCreateMagazzino, useUpdateMagazzino, useDeleteMagazzino, useListCentriAscolto, useListAreeOperative, getListMagazziniQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,12 +34,12 @@ const formSchema = z.object({
   tipoMagazzino: z.enum(["logistico", "emporio", "misto", "mensa"]).default("logistico"),
   stato: z.string().default("attivo"),
   centroAscoltoId: z.string().optional(),
-  cittaId: z.string().optional(),
+  areaOperativaId: z.string().optional(),
   note: z.string().optional()
 });
 
 const NO_CENTRO = "__none__";
-const NO_CITTA = "__nocitta__";
+const NO_AREA_OPERATIVA = "__noareaOperativa__";
 
 const tipoMagazzinoBadgeClasses: Record<string, string> = {
   logistico: "bg-slate-500/10 text-slate-700 hover:bg-slate-500/20",
@@ -58,17 +58,17 @@ export default function Magazzini() {
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
-  const lockedCittaId = user?.cittaId ?? null;
-  const isCittaLocked = lockedCittaId != null;
+  const lockedAreaOperativaId = user?.areaOperativaId ?? null;
+  const isAreaOperativaLocked = lockedAreaOperativaId != null;
   const { data: magazzini, isLoading } = useListMagazzini();
   const { emporioAbilitato } = useModuloFlags();
   const { data: centri } = useListCentriAscolto();
-  const { data: citta } = useListCitta();
+  const { data: areaOperativa } = useListAreeOperative();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState<string>("all");
-  const [cittaFilter, setCittaFilter] = useState<string>("all");
+  const [areaOperativaFilter, setAreaOperativaFilter] = useState<string>("all");
   const [tipoFilter, setTipoFilter] = useState<string>("all");
   
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -83,7 +83,7 @@ export default function Magazzini() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       codice: "", nome: "", indirizzo: "", comune: "", zona: "",
-      responsabile: "", telefono: "", email: "", tipoMagazzino: "logistico", stato: "attivo", centroAscoltoId: NO_CENTRO, cittaId: NO_CITTA, note: ""
+      responsabile: "", telefono: "", email: "", tipoMagazzino: "logistico", stato: "attivo", centroAscoltoId: NO_CENTRO, areaOperativaId: NO_AREA_OPERATIVA, note: ""
     }
   });
 
@@ -101,7 +101,7 @@ export default function Magazzini() {
       tipoMagazzino: magazzino.tipoMagazzino || "logistico",
       stato: magazzino.stato,
       centroAscoltoId: magazzino.centroAscoltoId != null ? String(magazzino.centroAscoltoId) : NO_CENTRO,
-      cittaId: magazzino.cittaId != null ? String(magazzino.cittaId) : NO_CITTA,
+      areaOperativaId: magazzino.areaOperativaId != null ? String(magazzino.areaOperativaId) : NO_AREA_OPERATIVA,
       note: magazzino.note || ""
     });
     setIsFormOpen(true);
@@ -113,28 +113,28 @@ export default function Magazzini() {
       codice: "", nome: "", indirizzo: "", comune: "", zona: "",
       responsabile: "", telefono: "", email: "", tipoMagazzino: "logistico", stato: "attivo",
       centroAscoltoId: isCentroLocked ? String(lockedCentroId) : NO_CENTRO,
-      cittaId: isCittaLocked ? String(lockedCittaId) : NO_CITTA, note: ""
+      areaOperativaId: isAreaOperativaLocked ? String(lockedAreaOperativaId) : NO_AREA_OPERATIVA, note: ""
     });
     setIsFormOpen(true);
   };
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    const { centroAscoltoId: centroStr, cittaId: cittaStr, ...rest } = data;
+    const { centroAscoltoId: centroStr, areaOperativaId: areaOperativaStr, ...rest } = data;
     const centroAscoltoId = isCentroLocked
       ? lockedCentroId
       : !centroStr || centroStr === NO_CENTRO
         ? null
         : parseInt(centroStr, 10);
-    const cittaId = isCittaLocked
-      ? lockedCittaId
-      : !cittaStr || cittaStr === NO_CITTA
+    const areaOperativaId = isAreaOperativaLocked
+      ? lockedAreaOperativaId
+      : !areaOperativaStr || areaOperativaStr === NO_AREA_OPERATIVA
         ? null
-        : parseInt(cittaStr, 10);
-    if (rest.tipoMagazzino === "mensa" && cittaId == null) {
-      form.setError("cittaId", { message: t("magazzini.mensaAreaRequired") });
+        : parseInt(areaOperativaStr, 10);
+    if (rest.tipoMagazzino === "mensa" && areaOperativaId == null) {
+      form.setError("areaOperativaId", { message: t("magazzini.mensaAreaRequired") });
       return;
     }
-    const payload = { ...rest, centroAscoltoId, cittaId };
+    const payload = { ...rest, centroAscoltoId, areaOperativaId };
     if (editingId) {
       updateMagazzino.mutate({ id: editingId, data: payload }, {
         onSuccess: () => {
@@ -189,9 +189,9 @@ export default function Magazzini() {
       m.codice.toLowerCase().includes(search.toLowerCase()) ||
       m.comune?.toLowerCase().includes(search.toLowerCase());
     const matchesCentro = centroFilter === "all" || m.centroAscoltoId === parseInt(centroFilter);
-    const matchesCitta = cittaFilter === "all" || m.cittaId === parseInt(cittaFilter);
+    const matchesAreaOperativa = areaOperativaFilter === "all" || m.areaOperativaId === parseInt(areaOperativaFilter);
     const matchesTipo = tipoFilter === "all" || (m.tipoMagazzino ?? "logistico") === tipoFilter;
-    return matchesSearch && matchesCentro && matchesCitta && matchesTipo;
+    return matchesSearch && matchesCentro && matchesAreaOperativa && matchesTipo;
   });
 
   return (
@@ -248,14 +248,14 @@ export default function Magazzini() {
                   <SelectItem value="mensa">{t("magazzini.tipo_mensa")}</SelectItem>
                 </SelectContent>
               </Select>
-              {!isCittaLocked && (
-                <Select value={cittaFilter} onValueChange={setCittaFilter}>
+              {!isAreaOperativaLocked && (
+                <Select value={areaOperativaFilter} onValueChange={setAreaOperativaFilter}>
                   <SelectTrigger className="w-full sm:w-56">
-                    <SelectValue placeholder={t("common.tutteCitta")} />
+                    <SelectValue placeholder={t("common.tutteAreaOperativa")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{t("common.tutteCitta")}</SelectItem>
-                    {citta?.map((c) => (
+                    <SelectItem value="all">{t("common.tutteAreaOperativa")}</SelectItem>
+                    {areaOperativa?.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                     ))}
                   </SelectContent>
@@ -475,18 +475,18 @@ export default function Magazzini() {
                   </FormItem>
                 )} />
 
-                <FormField control={form.control} name="cittaId" render={({ field }) => (
+                <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("magazzini.citta")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isCittaLocked}>
+                    <FormLabel>{t("magazzini.areaOperativa")}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isAreaOperativaLocked}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={NO_CITTA}>{t("magazzini.nessunaCitta")}</SelectItem>
-                        {citta?.map((c) => (
+                        <SelectItem value={NO_AREA_OPERATIVA}>{t("magazzini.nessunaAreaOperativa")}</SelectItem>
+                        {areaOperativa?.map((c) => (
                           <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                         ))}
                       </SelectContent>

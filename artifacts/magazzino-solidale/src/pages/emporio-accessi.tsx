@@ -5,7 +5,7 @@ import {
   useCreateAccessoEmporio,
   useListAccessiEmporio,
   useListCentriAscolto,
-  useListCitta,
+  useListAreeOperative,
   useListMagazzini,
   useSearchBeneficiariAccessiEmporio,
   useUpdateAccessoEmporio,
@@ -155,7 +155,7 @@ export default function EmporioAccessi() {
   const [dataDa, setDataDa] = useState(todayEuropeRome());
   const [dataA, setDataA] = useState(todayEuropeRome());
   const [centroFilter, setCentroFilter] = useState(ALL);
-  const [cittaFilter, setCittaFilter] = useState(ALL);
+  const [areaOperativaFilter, setAreaOperativaFilter] = useState(ALL);
   const [emporioFilter, setEmporioFilter] = useState(ALL);
   const [statoFilter, setStatoFilter] = useState(ALL);
   const [beneficiarioSearch, setBeneficiarioSearch] = useState("");
@@ -176,7 +176,7 @@ export default function EmporioAccessi() {
     dataDa: dataDa || undefined,
     dataA: dataA || undefined,
     centroAscoltoId: centroFilter === ALL ? undefined : Number(centroFilter),
-    cittaId: cittaFilter === ALL ? undefined : Number(cittaFilter),
+    areaOperativaId: areaOperativaFilter === ALL ? undefined : Number(areaOperativaFilter),
     magazzinoEmporioId:
       emporioFilter === ALL ? undefined : Number(emporioFilter),
     statoAccessoEmporio:
@@ -190,7 +190,7 @@ export default function EmporioAccessi() {
   };
   const { data: accessi, isLoading } = useListAccessiEmporio(params);
   const { data: centri } = useListCentriAscolto();
-  const { data: citta } = useListCitta();
+  const { data: areaOperativa } = useListAreeOperative();
   const { data: magazzini } = useListMagazzini();
   const beneficiarioSearchParams = beneficiarioSearch.trim()
     ? { search: beneficiarioSearch.trim() }
@@ -498,9 +498,9 @@ export default function EmporioAccessi() {
             </SelectContent>
           </Select>
           <Select
-            value={cittaFilter}
+            value={areaOperativaFilter}
             onValueChange={(value) => {
-              setCittaFilter(value);
+              setAreaOperativaFilter(value);
               setPage(1);
             }}
           >
@@ -511,7 +511,7 @@ export default function EmporioAccessi() {
               <SelectItem value={ALL}>
                 {t("accessiEmporio.tutteLeAree")}
               </SelectItem>
-              {citta?.map((c) => (
+              {areaOperativa?.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
                   {c.nome}
                 </SelectItem>

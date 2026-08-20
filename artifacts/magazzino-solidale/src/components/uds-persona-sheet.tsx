@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getCercaBeneficiariSimiliQueryKey,
   getListBeneficiariQueryKey,
-  getListCittaQueryKey,
+  getListAreeOperativeQueryKey,
   type BeneficiarioSimile,
   useCercaBeneficiariSimili,
   useCreateBeneficiario,
   useListCentriAscolto,
-  useListCitta,
+  useListAreeOperative,
   useListZoneUds,
   useUpdateBeneficiario,
 } from "@workspace/api-client-react";
@@ -84,13 +84,13 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
       motivoConsegnaDomicilio: z.string().optional(),
       restrizioniAlimentari: z.string().optional(),
       zonaUdsId: z.string().optional(),
-      cittaId: z.string().optional(),
+      areaOperativaId: z.string().optional(),
       centroAscoltoId: z.string().optional(),
       uds: z.boolean().optional(),
     })
     .superRefine((data, ctx) => {
-      if (isGlobal && (data.uds ?? true) && !data.cittaId) {
-        ctx.addIssue({ code: "custom", path: ["cittaId"], message: t("common.requiredField") });
+      if (isGlobal && (data.uds ?? true) && !data.areaOperativaId) {
+        ctx.addIssue({ code: "custom", path: ["areaOperativaId"], message: t("common.requiredField") });
       }
     });
 }
@@ -103,14 +103,14 @@ export interface UdsPersonaSelection {
   nome: string;
   cognome: string;
   soprannome?: string | null;
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   zonaUdsId?: number | null;
 }
 
 interface UdsPersonaSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialCittaId?: number | null;
+  initialAreaOperativaId?: number | null;
   initialZonaUdsId?: number | null;
   onPersonReady?: (person: UdsPersonaSelection, outcome: UdsPersonaOutcome) => void;
 }
@@ -131,7 +131,7 @@ function maskPhone(phone: string | null | undefined): string | null {
   return `•••• ${compact.slice(-4)}`;
 }
 
-function emptyFormValues(initialCittaId?: number | null, initialZonaUdsId?: number | null): FormValues {
+function emptyFormValues(initialAreaOperativaId?: number | null, initialZonaUdsId?: number | null): FormValues {
   return {
     nome: "",
     cognome: "",
@@ -154,7 +154,7 @@ function emptyFormValues(initialCittaId?: number | null, initialZonaUdsId?: numb
     motivoConsegnaDomicilio: "",
     restrizioniAlimentari: "",
     zonaUdsId: initialZonaUdsId != null ? String(initialZonaUdsId) : NO_ZONE,
-    cittaId: initialCittaId != null ? String(initialCittaId) : "",
+    areaOperativaId: initialAreaOperativaId != null ? String(initialAreaOperativaId) : "",
     centroAscoltoId: "",
     uds: true,
   };
@@ -163,7 +163,7 @@ function emptyFormValues(initialCittaId?: number | null, initialZonaUdsId?: numb
 export function UdsPersonaSheet({
   open,
   onOpenChange,
-  initialCittaId,
+  initialAreaOperativaId,
   initialZonaUdsId,
   onPersonReady,
 }: UdsPersonaSheetProps) {
@@ -172,7 +172,7 @@ export function UdsPersonaSheet({
   const canViewSensitive = Boolean(user?.isAdmin || user?.permessi?.includes("beneficiari.sensitive.view"));
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const isGlobal = user?.cittaId == null;
+  const isGlobal = user?.areaOperativaId == null;
   const schema = useMemo(() => makeSchema(t, isGlobal), [t, isGlobal]);
   const [linkCandidate, setLinkCandidate] = useState<BeneficiarioSimile | null>(null);
   const [dupDismissed, setDupDismissed] = useState(false);
@@ -189,13 +189,13 @@ export function UdsPersonaSheet({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: emptyFormValues(initialCittaId, initialZonaUdsId ?? user?.zonaUdsId),
+    defaultValues: emptyFormValues(initialAreaOperativaId, initialZonaUdsId ?? user?.zonaUdsId),
   });
   const { reset } = form;
   const wasOpenRef = useRef(false);
 
-  const { data: cittaList } = useListCitta({
-    query: { queryKey: getListCittaQueryKey(), enabled: isGlobal },
+  const { data: areaOperativaList } = useListAreeOperative({
+    query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal },
   });
   const { data: centri } = useListCentriAscolto();
   const createBenef = useCreateBeneficiario();
@@ -215,14 +215,14 @@ export function UdsPersonaSheet({
     wasOpenRef.current = open;
     if (!hasJustOpened) return;
 
-    reset(emptyFormValues(initialCittaId, initialZonaUdsId ?? user?.zonaUdsId));
+    reset(emptyFormValues(initialAreaOperativaId, initialZonaUdsId ?? user?.zonaUdsId));
     setDupDismissed(false);
     setDupParams({});
     setExistingSearch("");
     setDebouncedExistingSearch("");
     setDupDebouncing(false);
     setLinkCandidate(null);
-  }, [initialCittaId, initialZonaUdsId, open, reset, user?.zonaUdsId]);
+  }, [initialAreaOperativaId, initialZonaUdsId, open, reset, user?.zonaUdsId]);
 
   const wNome = form.watch("nome");
   const wCognome = form.watch("cognome");
@@ -263,13 +263,13 @@ export function UdsPersonaSheet({
     ((dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 2) ||
     (dupParams.soprannome ?? "").length >= 2 ||
     (dupParams.telefono ?? "").length >= 2;
-  const selectedCitta = form.watch("cittaId");
-  const dupCitta = isGlobal && selectedCitta ? parseInt(selectedCitta) : undefined;
-  const dupScopeReady = !isGlobal || dupCitta != null;
+  const selectedAreaOperativa = form.watch("areaOperativaId");
+  const dupAreaOperativa = isGlobal && selectedAreaOperativa ? parseInt(selectedAreaOperativa) : undefined;
+  const dupScopeReady = !isGlobal || dupAreaOperativa != null;
   const dupQueryParams = {
     ...dupParams,
     ...(debouncedExistingSearch.length >= 2 ? { search: debouncedExistingSearch } : {}),
-    ...(dupCitta != null ? { cittaId: dupCitta } : {}),
+    ...(dupAreaOperativa != null ? { areaOperativaId: dupAreaOperativa } : {}),
   };
   const { data: dupMatches, isFetching: isDupFetching } = useCercaBeneficiariSimili(
     dupQueryParams,
@@ -282,14 +282,14 @@ export function UdsPersonaSheet({
   );
   const suggestions = dupMatches ?? [];
 
-  const formCitta = isGlobal
-    ? selectedCitta
-      ? parseInt(selectedCitta)
+  const formAreaOperativa = isGlobal
+    ? selectedAreaOperativa
+      ? parseInt(selectedAreaOperativa)
       : undefined
-    : (user?.cittaId ?? undefined);
+    : (user?.areaOperativaId ?? undefined);
   const { data: formZone } = useListZoneUds(
-    formCitta ? { cittaId: formCitta } : undefined,
-    { query: { queryKey: ["zoneUds", "personaForm", formCitta], enabled: formCitta != null } },
+    formAreaOperativa ? { areaOperativaId: formAreaOperativa } : undefined,
+    { query: { queryKey: ["zoneUds", "personaForm", formAreaOperativa], enabled: formAreaOperativa != null } },
   );
 
   const finish = (person: UdsPersonaSelection, outcome: UdsPersonaOutcome) => {
@@ -386,7 +386,7 @@ export function UdsPersonaSheet({
     if (data.uds && data.zonaUdsId && data.zonaUdsId !== NO_ZONE) {
       payload.zonaUdsId = parseInt(data.zonaUdsId);
     }
-    if (isGlobal && data.cittaId) payload.cittaId = parseInt(data.cittaId);
+    if (isGlobal && data.areaOperativaId) payload.areaOperativaId = parseInt(data.areaOperativaId);
 
     createBenef.mutate(
       { data: payload as never },
@@ -431,10 +431,10 @@ export function UdsPersonaSheet({
                 {isGlobal && (
                   <FormField
                     control={form.control}
-                    name="cittaId"
+                    name="areaOperativaId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
+                        <FormLabel>{t("udsAnagrafica.fAreaOperativa")}</FormLabel>
                         <Select
                           value={field.value || ""}
                           onValueChange={(value) => {
@@ -447,13 +447,13 @@ export function UdsPersonaSheet({
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder={t("udsAnagrafica.selectCittaForSearch")} />
+                              <SelectValue placeholder={t("udsAnagrafica.selectAreaOperativaForSearch")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {cittaList?.map((citta) => (
-                              <SelectItem key={citta.id} value={String(citta.id)}>
-                                {citta.nome}
+                            {areaOperativaList?.map((areaOperativa) => (
+                              <SelectItem key={areaOperativa.id} value={String(areaOperativa.id)}>
+                                {areaOperativa.nome}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -484,7 +484,7 @@ export function UdsPersonaSheet({
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {!dupScopeReady
-                      ? t("udsAnagrafica.selectCittaForSearch")
+                      ? t("udsAnagrafica.selectAreaOperativaForSearch")
                       : t("udsAnagrafica.existingSearchHint")}
                   </p>
                 </div>
@@ -521,7 +521,7 @@ export function UdsPersonaSheet({
                                   suggestion.codice,
                                   suggestion.dataNascita,
                                   maskPhone(suggestion.telefono),
-                                  suggestion.cittaNome,
+                                  suggestion.areaOperativaNome,
                                 ]
                                   .filter(Boolean)
                                   .join(" · ") || "—"}

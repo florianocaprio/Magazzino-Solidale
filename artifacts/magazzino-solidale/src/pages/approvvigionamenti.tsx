@@ -6,7 +6,7 @@ import {
   useUpdateApprovvigionamento,
   useSubmitApprovvigionamento,
   useListFornitori,
-  useListCitta,
+  useListAreeOperative,
   useListMagazzini,
   useListCentriAscolto,
   useListProdotti,
@@ -38,7 +38,7 @@ import { fornitoriAttiviPerArea } from "@/lib/approvvigionamenti-area";
 import { loadAllPages } from "@/lib/paged-export";
 
 const formSchema = z.object({
-  cittaId: z.coerce.number().positive(),
+  areaOperativaId: z.coerce.number().positive(),
   fornitoreId: z.coerce.number().positive(),
   magazzinoId: z.coerce.number().positive(),
   centroAscoltoId: z.coerce.number().optional(),
@@ -57,7 +57,7 @@ interface OrderRow {
   fornitoreId?: number | null;
   fornitoreNome?: string | null;
   fornitoreEmail?: string | null;
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   magazzinoId?: number | null;
   magazzinoNome?: string | null;
   centroAscoltoId?: number | null;
@@ -95,7 +95,7 @@ export default function Approvvigionamenti() {
 
   const { data: approvvigionamenti, isLoading } = useListApprovvigionamenti(listParams);
   const { data: fornitori } = useListFornitori();
-  const { data: citta } = useListCitta();
+  const { data: areaOperativa } = useListAreeOperative();
   const { data: magazzini } = useListMagazzini();
   const { data: centri } = useListCentriAscolto();
   const { data: prodotti } = useListProdotti();
@@ -122,35 +122,35 @@ export default function Approvvigionamenti() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListApprovvigionamentiQueryKey() });
 
-  const selectedCittaId = form.watch("cittaId");
-  const fornitoriArea = fornitoriAttiviPerArea(fornitori ?? [], selectedCittaId);
-  const fornitoreCittaId = selectedCittaId ?? null;
-  const matchesCitta = (cittaId?: number | null) =>
-    fornitoreCittaId == null || cittaId == null || cittaId === fornitoreCittaId;
-  const filteredMagazzini = (magazzini ?? []).filter((m) => m.stato === "attivo" && matchesCitta(m.cittaId));
-  const filteredCentri = (centri ?? []).filter((c) => c.attivo && matchesCitta(c.cittaId));
+  const selectedAreaOperativaId = form.watch("areaOperativaId");
+  const fornitoriArea = fornitoriAttiviPerArea(fornitori ?? [], selectedAreaOperativaId);
+  const fornitoreAreaOperativaId = selectedAreaOperativaId ?? null;
+  const matchesAreaOperativa = (areaOperativaId?: number | null) =>
+    fornitoreAreaOperativaId == null || areaOperativaId == null || areaOperativaId === fornitoreAreaOperativaId;
+  const filteredMagazzini = (magazzini ?? []).filter((m) => m.stato === "attivo" && matchesAreaOperativa(m.areaOperativaId));
+  const filteredCentri = (centri ?? []).filter((c) => c.attivo && matchesAreaOperativa(c.areaOperativaId));
 
   const handleFornitoreChange = (val: string) => {
     form.setValue("fornitoreId", Number(val));
     const f = (fornitori ?? []).find((x) => x.id === Number(val));
-    const cid = f?.cittaId ?? null;
+    const cid = f?.areaOperativaId ?? null;
     if (cid == null) return;
     const magId = form.getValues("magazzinoId");
     if (magId != null) {
       const m = (magazzini ?? []).find((x) => x.id === Number(magId));
-      if (m && m.cittaId != null && m.cittaId !== cid) form.resetField("magazzinoId");
+      if (m && m.areaOperativaId != null && m.areaOperativaId !== cid) form.resetField("magazzinoId");
     }
     if (!isCentroLocked) {
       const cenId = form.getValues("centroAscoltoId");
       if (cenId != null) {
         const c = (centri ?? []).find((x) => x.id === Number(cenId));
-        if (c && c.cittaId != null && c.cittaId !== cid) form.setValue("centroAscoltoId", undefined);
+        if (c && c.areaOperativaId != null && c.areaOperativaId !== cid) form.setValue("centroAscoltoId", undefined);
       }
     }
   };
 
-  const handleCittaChange = (val: string) => {
-    form.setValue("cittaId", Number(val), { shouldValidate: true });
+  const handleAreaOperativaChange = (val: string) => {
+    form.setValue("areaOperativaId", Number(val), { shouldValidate: true });
     form.resetField("fornitoreId");
     form.resetField("magazzinoId");
     if (!isCentroLocked) form.setValue("centroAscoltoId", undefined);
@@ -158,7 +158,7 @@ export default function Approvvigionamenti() {
 
   const openCreate = () => {
     setEditingId(null);
-    form.reset({ cittaId: user?.cittaId ?? undefined, dataRichiesta: new Date().toISOString().substring(0, 10), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
+    form.reset({ areaOperativaId: user?.areaOperativaId ?? undefined, dataRichiesta: new Date().toISOString().substring(0, 10), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
     setRigheDraft([]);
     setDraftProdottoId("");
     setDraftQuantita("1");
@@ -169,7 +169,7 @@ export default function Approvvigionamenti() {
     setEditingId(a.id);
     form.reset({
       fornitoreId: a.fornitoreId ?? undefined,
-      cittaId: a.cittaId ?? undefined,
+      areaOperativaId: a.areaOperativaId ?? undefined,
       magazzinoId: a.magazzinoId ?? undefined,
       centroAscoltoId: a.centroAscoltoId ?? undefined,
       dataRichiesta: a.dataRichiesta ? a.dataRichiesta.substring(0, 10) : new Date().toISOString().substring(0, 10),
@@ -467,12 +467,12 @@ export default function Approvvigionamenti() {
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="cittaId" render={({ field }) => (
+                <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Area</FormLabel>
-                    <Select onValueChange={handleCittaChange} value={field.value ? String(field.value) : undefined}>
+                    <Select onValueChange={handleAreaOperativaChange} value={field.value ? String(field.value) : undefined}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Seleziona prima l'area" /></SelectTrigger></FormControl>
-                      <SelectContent>{(citta ?? []).map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}</SelectContent>
+                      <SelectContent>{(areaOperativa ?? []).map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}</SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
@@ -480,13 +480,13 @@ export default function Approvvigionamenti() {
                 <FormField control={form.control} name="fornitoreId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("approvvigionamenti.fornitoreDonatore")}</FormLabel>
-                    <Select onValueChange={handleFornitoreChange} value={field.value ? String(field.value) : undefined} disabled={!selectedCittaId}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={selectedCittaId ? t("approvvigionamenti.seleziona") : "Seleziona prima l'area"} /></SelectTrigger></FormControl>
+                    <Select onValueChange={handleFornitoreChange} value={field.value ? String(field.value) : undefined} disabled={!selectedAreaOperativaId}>
+                      <FormControl><SelectTrigger><SelectValue placeholder={selectedAreaOperativaId ? t("approvvigionamenti.seleziona") : "Seleziona prima l'area"} /></SelectTrigger></FormControl>
                       <SelectContent>
                         {fornitoriArea.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    {selectedCittaId && fornitoriArea.length === 0 && <p className="text-sm text-muted-foreground">Nessun fornitore associato all'area selezionata.</p>}
+                    {selectedAreaOperativaId && fornitoriArea.length === 0 && <p className="text-sm text-muted-foreground">Nessun fornitore associato all'area selezionata.</p>}
                   </FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">

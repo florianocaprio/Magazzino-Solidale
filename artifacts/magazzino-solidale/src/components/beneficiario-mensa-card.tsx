@@ -37,7 +37,7 @@ import { useModuloFlags } from "@/lib/use-moduli";
 
 type BeneficiarioMensa = Pick<
   BeneficiarioDettaglio,
-  "id" | "attivo" | "statoAnagrafica" | "cittaId"
+  "id" | "attivo" | "statoAnagrafica" | "areaOperativaId"
 >;
 
 export type MensaDisplayState =
@@ -171,12 +171,12 @@ export function BeneficiarioMensaCard({
   const [dataFine, setDataFine] = useState("");
   const menseParams = {
     attiva: true,
-    cittaId: beneficiario.cittaId ?? undefined,
+    areaOperativaId: beneficiario.areaOperativaId ?? undefined,
   };
   const mense = useListMense(menseParams, {
     query: {
       queryKey: getListMenseQueryKey(menseParams),
-      enabled: dialogOpen && beneficiario.cittaId != null,
+      enabled: dialogOpen && beneficiario.areaOperativaId != null,
     },
   });
 
@@ -337,13 +337,13 @@ export function BeneficiarioMensaCard({
                   ))}
                 </SelectContent>
               </Select>
-              {beneficiario.cittaId == null && (
+              {beneficiario.areaOperativaId == null && (
                 <p className="text-sm text-destructive">
                   Associa prima il beneficiario a un'Area per scegliere la
                   Mensa.
                 </p>
               )}
-              {beneficiario.cittaId != null &&
+              {beneficiario.areaOperativaId != null &&
                 !mense.isLoading &&
                 (mense.data ?? []).length === 0 && (
                   <p className="text-sm text-muted-foreground">
@@ -415,7 +415,7 @@ export function BeneficiarioMensaCard({
 export function NuovaAbilitazioneMensaFields({
   enabled,
   onEnabledChange,
-  cittaId,
+  areaOperativaId,
   mensaId,
   onMensaIdChange,
   dataInizio,
@@ -425,7 +425,7 @@ export function NuovaAbilitazioneMensaFields({
 }: {
   enabled: boolean;
   onEnabledChange: (checked: boolean) => void;
-  cittaId?: number;
+  areaOperativaId?: number;
   mensaId: string;
   onMensaIdChange: (value: string) => void;
   dataInizio: string;
@@ -433,11 +433,11 @@ export function NuovaAbilitazioneMensaFields({
   dataFine: string;
   onDataFineChange: (value: string) => void;
 }) {
-  const params = { attiva: true, cittaId };
+  const params = { attiva: true, areaOperativaId };
   const mense = useListMense(params, {
     query: {
       queryKey: getListMenseQueryKey(params),
-      enabled: enabled && cittaId != null,
+      enabled: enabled && areaOperativaId != null,
     },
   });
   const invalidRange = dataFine !== "" && dataFine < dataInizio;
@@ -476,16 +476,16 @@ export function NuovaAbilitazioneMensaFields({
                 ))}
               </SelectContent>
             </Select>
-            {cittaId == null && (
+            {areaOperativaId == null && (
               <p className="text-sm text-destructive">
                 Seleziona prima l'Area del beneficiario.
               </p>
             )}
-            {cittaId != null &&
+            {areaOperativaId != null &&
               !mense.isLoading &&
               (mense.data ?? []).length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  Nessuna Mensa attiva accessibile nell'Area selezionata.
+                  Nessuna Mensa attiva accessibile nell'Area Operativa selezionata.
                 </p>
               )}
           </div>

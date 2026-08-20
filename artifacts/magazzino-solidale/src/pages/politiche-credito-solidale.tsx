@@ -4,7 +4,7 @@ import {
   useCreatePoliticaCreditoSolidale,
   useDeletePoliticaCreditoSolidale,
   useListCentriAscolto,
-  useListCitta,
+  useListAreeOperative,
   useListPoliticheCreditoSolidale,
   useUpdatePoliticaCreditoSolidale,
   type PoliticaCreditoSolidale,
@@ -39,7 +39,7 @@ function makeSchema(t: (k: string) => string) {
     nome: z.string().min(1, t("common.requiredField")),
     descrizione: z.string().optional().default(""),
     centroAscoltoId: z.string().default(NONE),
-    cittaId: z.string().default(NONE),
+    areaOperativaId: z.string().default(NONE),
     attiva: z.boolean().default(true),
     creditoBaseNucleo: z.coerce.number().min(0),
     creditoPerComponente: z.coerce.number().min(0),
@@ -68,7 +68,7 @@ const defaultValues: FormValues = {
   nome: "",
   descrizione: "",
   centroAscoltoId: NONE,
-  cittaId: NONE,
+  areaOperativaId: NONE,
   attiva: true,
   creditoBaseNucleo: 50,
   creditoPerComponente: 10,
@@ -105,7 +105,7 @@ export default function PoliticheCreditoSolidale() {
   const { t } = useTranslation();
   const schema = makeSchema(t);
   const { data: politiche, isLoading } = useListPoliticheCreditoSolidale();
-  const { data: citta } = useListCitta();
+  const { data: areaOperativa } = useListAreeOperative();
   const { data: centri } = useListCentriAscolto();
   const { emporioAbilitato } = useModuloFlags();
   const queryClient = useQueryClient();
@@ -128,7 +128,7 @@ export default function PoliticheCreditoSolidale() {
 
   const scopeLabel = (p: PoliticaCreditoSolidale) => {
     if (p.centroAscoltoNome) return `${t("creditoSolidale.centerScope")}: ${p.centroAscoltoNome}`;
-    if (p.cittaNome) return `${t("creditoSolidale.cityScope")}: ${p.cittaNome}`;
+    if (p.areaOperativaNome) return `${t("creditoSolidale.areaOperativaScope")}: ${p.areaOperativaNome}`;
     return t("creditoSolidale.globalScope");
   };
 
@@ -144,7 +144,7 @@ export default function PoliticheCreditoSolidale() {
       nome: p.nome,
       descrizione: p.descrizione ?? "",
       centroAscoltoId: p.centroAscoltoId == null ? NONE : String(p.centroAscoltoId),
-      cittaId: p.cittaId == null ? NONE : String(p.cittaId),
+      areaOperativaId: p.areaOperativaId == null ? NONE : String(p.areaOperativaId),
       attiva: p.attiva,
       creditoBaseNucleo: p.creditoBaseNucleo,
       creditoPerComponente: p.creditoPerComponente,
@@ -166,7 +166,7 @@ export default function PoliticheCreditoSolidale() {
       nome: data.nome.trim(),
       descrizione: nullable(data.descrizione),
       centroAscoltoId: optionalId(data.centroAscoltoId),
-      cittaId: optionalId(data.cittaId),
+      areaOperativaId: optionalId(data.areaOperativaId),
       attiva: data.attiva,
       creditoBaseNucleo: data.creditoBaseNucleo,
       creditoPerComponente: data.creditoPerComponente,
@@ -340,14 +340,14 @@ export default function PoliticheCreditoSolidale() {
                 )} />
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <FormField control={form.control} name="cittaId" render={({ field }) => (
+                  <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("creditoSolidale.selectCity")}</FormLabel>
+                      <FormLabel>{t("creditoSolidale.selectAreaOperativa")}</FormLabel>
                       <Select value={field.value} onValueChange={field.onChange}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value={NONE}>{t("creditoSolidale.allCities")}</SelectItem>
-                          {citta?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                          <SelectItem value={NONE}>{t("creditoSolidale.allAreeOperative")}</SelectItem>
+                          {areaOperativa?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </FormItem>

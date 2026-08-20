@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@workspace/api-client-react", () => ({
   getCercaBeneficiariSimiliQueryKey: () => ["beneficiari", "cerca-simili"],
   getListBeneficiariQueryKey: () => ["beneficiari"],
-  getListCittaQueryKey: () => ["citta"],
+  getListAreeOperativeQueryKey: () => ["areaOperativa"],
   useCercaBeneficiariSimili: () => ({ data: [], isFetching: false }),
   useCreateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useListCentriAscolto: () => ({ data: [] }),
-  useListCitta: () => ({ data: [{ id: 1, nome: "Roma" }] }),
+  useListAreeOperative: () => ({ data: [{ id: 1, nome: "Roma" }] }),
   useListZoneUds: () => ({ data: [{ id: 10, nome: "Zona test" }] }),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -27,7 +27,7 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
-  useAuth: () => ({ user: { id: 1, cittaId: 1, zonaUdsId: 10 } }),
+  useAuth: () => ({ user: { id: 1, areaOperativaId: 1, zonaUdsId: 10 } }),
 }));
 
 import { UdsPersonaSheet } from "./uds-persona-sheet";
@@ -60,7 +60,7 @@ describe("UdsPersonaSheet", () => {
           <UdsPersonaSheet
             open={open}
             onOpenChange={onOpenChange}
-            initialCittaId={1}
+            initialAreaOperativaId={1}
             initialZonaUdsId={initialZonaUdsId}
           />,
         );

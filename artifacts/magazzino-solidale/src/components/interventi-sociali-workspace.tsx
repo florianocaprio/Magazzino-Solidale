@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 interface NamedOption {
   id: number;
   nome: string;
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   attivo?: boolean;
 }
 
@@ -47,13 +47,13 @@ interface Props {
   filters: InterventiSocialiFilters;
   interventi: Intervento[];
   counts?: InterventiRiepilogoViste;
-  citta: NamedOption[];
+  areaOperativa: NamedOption[];
   centri: NamedOption[];
   tipi: NamedOption[];
   operatori: InterventoOperatore[];
   isGlobal: boolean;
   isCentroLocked: boolean;
-  cityRequired?: boolean;
+  areaOperativaRequired?: boolean;
   isLoading?: boolean;
   isError?: boolean;
   onFiltersChange: (next: InterventiSocialiFilters) => void;
@@ -113,13 +113,13 @@ export function InterventiSocialiWorkspace({
   filters,
   interventi,
   counts,
-  citta,
+  areaOperativa,
   centri,
   tipi,
   operatori,
   isGlobal,
   isCentroLocked,
-  cityRequired = false,
+  areaOperativaRequired = false,
   isLoading = false,
   isError = false,
   onFiltersChange,
@@ -135,16 +135,16 @@ export function InterventiSocialiWorkspace({
     filters.vista === "pianificati" || filters.vista === "oggi";
   const filteredCenters = centri.filter(
     (centro) =>
-      !filters.cittaId ||
-      centro.cittaId == null ||
-      String(centro.cittaId) === filters.cittaId,
+      !filters.areaOperativaId ||
+      centro.areaOperativaId == null ||
+      String(centro.areaOperativaId) === filters.areaOperativaId,
   );
 
   const renderResults = () => {
-    if (cityRequired) {
+    if (areaOperativaRequired) {
       return (
         <p className="py-12 text-center text-muted-foreground">
-          {t("interventi.filters.chooseCity")}
+          {t("interventi.filters.chooseAreaOperativa")}
         </p>
       );
     }
@@ -417,23 +417,23 @@ export function InterventiSocialiWorkspace({
             </div>
             {isGlobal && (
               <Select
-                value={filters.cittaId || "all"}
+                value={filters.areaOperativaId || "all"}
                 onValueChange={(value) =>
                   onFiltersChange({
                     ...filters,
-                    cittaId: value === "all" ? "" : value,
+                    areaOperativaId: value === "all" ? "" : value,
                     centroAscoltoId: "",
                   })
                 }
               >
-                <SelectTrigger aria-label={t("interventi.filters.city")}>
+                <SelectTrigger aria-label={t("interventi.filters.areaOperativa")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">
-                    {t("interventi.filters.chooseCity")}
+                    {t("interventi.filters.chooseAreaOperativa")}
                   </SelectItem>
-                  {citta.map((item) => (
+                  {areaOperativa.map((item) => (
                     <SelectItem key={item.id} value={String(item.id)}>
                       {item.nome}
                     </SelectItem>
@@ -446,7 +446,7 @@ export function InterventiSocialiWorkspace({
               onValueChange={(value) =>
                 update("centroAscoltoId", value === "all" ? "" : value)
               }
-              disabled={isCentroLocked || (isGlobal && !filters.cittaId)}
+              disabled={isCentroLocked || (isGlobal && !filters.areaOperativaId)}
             >
               <SelectTrigger aria-label={t("interventi.filters.center")}>
                 <SelectValue />

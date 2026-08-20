@@ -28,10 +28,10 @@ export function buildBeneficiarioDuplicateParams(
   cognome: string | undefined,
   isGlobal: boolean,
   areaId?: number,
-): { nome: string; cognome: string; cittaId?: number } {
+): { nome: string; cognome: string; areaOperativaId?: number } {
   return {
     nome: (nome ?? "").trim(),
     cognome: (cognome ?? "").trim(),
-    ...(isGlobal && areaId != null ? { cittaId: areaId } : {}),
+    ...(isGlobal && areaId != null ? { areaOperativaId: areaId } : {}),
   };
 }

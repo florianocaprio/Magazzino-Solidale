@@ -8,9 +8,9 @@ const mocks = vi.hoisted(() => ({
   areas: new Set<string>(),
   permissions: new Set<string>(),
   mensaAbilitato: true,
-  user: { id: 1, cittaId: 1 as number | null, centroAscoltoId: 2 as number | null },
-  centri: [] as Array<{ id: number; nome: string; cittaId: number | null }>,
-  citta: [] as Array<{ id: number; nome: string }>,
+  user: { id: 1, areaOperativaId: 1 as number | null, centroAscoltoId: 2 as number | null },
+  centri: [] as Array<{ id: number; nome: string; areaOperativaId: number | null }>,
+  areaOperativa: [] as Array<{ id: number; nome: string }>,
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
@@ -36,12 +36,12 @@ vi.mock("@workspace/api-client-react", () => ({
   useListMagazzini: () => ({ data: [] }),
   useGetBeneficiario: () => ({ data: undefined }),
   useCercaBeneficiariSimili: () => ({ data: [] }),
-  useListCitta: () => ({ data: mocks.citta }),
+  useListAreeOperative: () => ({ data: mocks.areaOperativa }),
   useListZoneUds: () => ({ data: [] }),
   getListBeneficiariQueryKey: () => ["beneficiari"],
   getGetBeneficiarioQueryKey: (id: number) => ["beneficiari", id],
   getCercaBeneficiariSimiliQueryKey: () => ["beneficiari", "simili"],
-  getListCittaQueryKey: () => ["citta"],
+  getListAreeOperativeQueryKey: () => ["areaOperativa"],
   getListMensaAbilitazioniQueryKey: () => ["mensa-abilitazioni"],
   getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey: (params?: unknown) => [
     "mensa-riepilogo",
@@ -105,9 +105,9 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     mocks.areas = new Set(["mensa"]);
     mocks.permissions = new Set();
     mocks.mensaAbilitato = true;
-    mocks.user = { id: 1, cittaId: 1, centroAscoltoId: 2 };
+    mocks.user = { id: 1, areaOperativaId: 1, centroAscoltoId: 2 };
     mocks.centri = [];
-    mocks.citta = [];
+    mocks.areaOperativa = [];
     mocks.listBeneficiari.mockReturnValue({
       data: [
         {
@@ -157,11 +157,11 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
   });
 
   it("mostra sempre l'Area obbligatoria nella creazione Sociale di un Admin globale", async () => {
-    mocks.user = { id: 1, cittaId: null, centroAscoltoId: null };
-    mocks.citta = [{ id: 1, nome: "Area A" }, { id: 2, nome: "Area B" }];
+    mocks.user = { id: 1, areaOperativaId: null, centroAscoltoId: null };
+    mocks.areaOperativa = [{ id: 1, nome: "Area A" }, { id: 2, nome: "Area B" }];
     mocks.centri = [
-      { id: 10, nome: "Centro A", cittaId: 1 },
-      { id: 20, nome: "Centro B", cittaId: 2 },
+      { id: 10, nome: "Centro A", areaOperativaId: 1 },
+      { id: 20, nome: "Centro B", areaOperativaId: 2 },
     ];
     await act(async () => root.render(<Beneficiari />));
     const newButton = Array.from(document.querySelectorAll("button")).find((button) =>

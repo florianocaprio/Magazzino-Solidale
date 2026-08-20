@@ -3,8 +3,8 @@ export const preparazioneConsegne = {
     title: "Preparazione Consegne",
     subtitle:
       "Seleziona area e magazzino per sapere quanta e quale merce preparare per le consegne pianificate.",
-    selectCitta: "Area",
-    allCitta: "Tutte le aree",
+    selectAreaOperativa: "Area Operativa",
+    allAreaOperativa: "Tutte le Aree Operative",
     selectMagazzino: "Magazzino di riferimento",
     allMagazzini: "Tutti i magazzini",
     selectPrompt: "Seleziona un magazzino per vedere la merce da preparare.",
@@ -37,8 +37,8 @@ export const preparazioneConsegne = {
     title: "Preparación de Entregas",
     subtitle:
       "Selecciona área y almacén para saber cuánta y qué mercancía preparar para las entregas planificadas.",
-    selectCitta: "Área",
-    allCitta: "Todas las áreas",
+    selectAreaOperativa: "Área Operativa",
+    allAreaOperativa: "Todas las Áreas Operativas",
     selectMagazzino: "Almacén de referencia",
     allMagazzini: "Todos los almacenes",
     selectPrompt: "Selecciona un almacén para ver la mercancía a preparar.",
@@ -71,8 +71,8 @@ export const preparazioneConsegne = {
     title: "Delivery Preparation",
     subtitle:
       "Select an area and warehouse to see how much and which goods to prepare for planned deliveries.",
-    selectCitta: "Area",
-    allCitta: "All areas",
+    selectAreaOperativa: "Operational Area",
+    allAreaOperativa: "All Operational Areas",
     selectMagazzino: "Reference warehouse",
     allMagazzini: "All warehouses",
     selectPrompt: "Select a warehouse to see the goods to prepare.",
@@ -104,9 +104,9 @@ export const preparazioneConsegne = {
   fr: {
     title: "Préparation des Livraisons",
     subtitle:
-      "Sélectionnez un secteur et un entrepôt pour savoir quelle quantité et quelle marchandise préparer pour les livraisons planifiées.",
-    selectCitta: "Secteur",
-    allCitta: "Tous les secteurs",
+      "Sélectionnez un zone opérationnelle et un entrepôt pour savoir quelle quantité et quelle marchandise préparer pour les livraisons planifiées.",
+    selectAreaOperativa: "Zone opérationnelle",
+    allAreaOperativa: "Toutes les zones opérationnelles",
     selectMagazzino: "Entrepôt de référence",
     allMagazzini: "Tous les entrepôts",
     selectPrompt: "Sélectionnez un entrepôt pour voir la marchandise à préparer.",
@@ -138,9 +138,9 @@ export const preparazioneConsegne = {
   de: {
     title: "Lieferungsvorbereitung",
     subtitle:
-      "Wählen Sie Gebiet und Lager, um zu sehen, wie viel und welche Ware für geplante Lieferungen vorzubereiten ist.",
-    selectCitta: "Gebiet",
-    allCitta: "Alle Gebiete",
+      "Wählen Sie Betriebsbereich und Lager, um zu sehen, wie viel und welche Ware für geplante Lieferungen vorzubereiten ist.",
+    selectAreaOperativa: "Betriebsbereich",
+    allAreaOperativa: "Alle Betriebsbereiche",
     selectMagazzino: "Referenzlager",
     allMagazzini: "Alle Lager",
     selectPrompt: "Wählen Sie ein Lager, um die vorzubereitende Ware zu sehen.",
@@ -172,9 +172,9 @@ export const preparazioneConsegne = {
   ar: {
     title: "تحضير عمليات التسليم",
     subtitle:
-      "اختر الإقليم والمستودع لمعرفة كمية ونوع البضائع التي يجب تحضيرها لعمليات التسليم المخططة.",
-    selectCitta: "الإقليم",
-    allCitta: "جميع الأقاليم",
+      "اختر المنطقة التشغيلية والمستودع لمعرفة كمية ونوع البضائع التي يجب تحضيرها لعمليات التسليم المخططة.",
+    selectAreaOperativa: "المنطقة التشغيلية",
+    allAreaOperativa: "جميع المناطق التشغيلية",
     selectMagazzino: "المستودع المرجعي",
     allMagazzini: "جميع المستودعات",
     selectPrompt: "اختر مستودعًا لعرض البضائع المطلوب تحضيرها.",
