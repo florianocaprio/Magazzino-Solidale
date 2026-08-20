@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
@@ -412,6 +412,43 @@ describe("Modulo Mensa", () => {
     ]);
     expect(result.consumiPerProdotto).toHaveLength(3);
     expect(result).not.toHaveProperty("consumoTotale");
+  });
+
+  it("separa lo storico dello stesso Prodotto quando cambia l'unità registrata", () => {
+    const result = aggregatiConsumiMensa([
+      {
+        causale: "consumo",
+        prodottoId: 10,
+        prodottoNome: "Prodotto legacy",
+        unitaMisura: "kg",
+        quantita: 3,
+      },
+      {
+        causale: "consumo",
+        prodottoId: 10,
+        prodottoNome: "Prodotto legacy",
+        unitaMisura: "pz",
+        quantita: 7,
+      },
+    ]);
+    expect(result.consumiPerProdotto).toEqual([
+      {
+        prodottoId: 10,
+        prodottoNome: "Prodotto legacy",
+        unitaMisura: "kg",
+        quantita: 3,
+      },
+      {
+        prodottoId: 10,
+        prodottoNome: "Prodotto legacy",
+        unitaMisura: "pz",
+        quantita: 7,
+      },
+    ]);
+    expect(result.consumiPerUnitaMisura).toEqual([
+      { unitaMisura: "kg", quantita: 3 },
+      { unitaMisura: "pz", quantita: 7 },
+    ]);
   });
 
   it.each([
@@ -1315,6 +1352,132 @@ describe("Modulo Mensa", () => {
     expect(stored.mensaDestinazioneId).toBe(fixture.mensaB);
   });
 
+  it("rende la chiusura dominante e blocca eccezioni su accessi precedenti", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const today = dataServizioMensa();
+    const deniedBeforeClosure = await verify(app, fixture, {
+      mensaId: fixture.mensaB,
+      tipoServizio: "pranzo",
+    });
+    expect(deniedBeforeClosure.body).toMatchObject({
+      esito: "negato",
+      motivoEsito: "MENSA_NON_AUTORIZZATA",
+      eccezionePossibile: true,
+    });
+    const [day] = await db
+      .insert(mensaGiornateServizioTable)
+      .values({
+        mensaId: fixture.mensaB,
+        dataServizio: today,
+        tipoServizio: "pranzo",
+        apertaDa: fixture.userId,
+      })
+      .returning({ id: mensaGiornateServizioTable.id });
+    const closed = await request(app)
+      .post(`/mensa/giornate/${day.id}/chiudi`)
+      .send({ note: "Fine servizio" });
+    expect(closed.status).toBe(200);
+
+    const exception = await request(app)
+      .post(`/mensa/accessi/${deniedBeforeClosure.body.id}/eccezione`)
+      .send({ motivo: "Non deve essere concessa" });
+    expect(exception.status).toBe(409);
+    expect(
+      await db
+        .select()
+        .from(mensaEccezioniTable)
+        .where(
+          eq(mensaEccezioniTable.accessoMensaId, deniedBeforeClosure.body.id),
+        ),
+    ).toHaveLength(0);
+    const [unchangedAccess] = await db
+      .select()
+      .from(mensaAccessiTable)
+      .where(eq(mensaAccessiTable.id, deniedBeforeClosure.body.id));
+    expect(unchangedAccess).toMatchObject({
+      esito: "negato",
+      motivoEsito: "MENSA_NON_AUTORIZZATA",
+      eccezioneId: null,
+    });
+    expect(
+      await db
+        .select()
+        .from(auditConfigurazioniTable)
+        .where(
+          and(
+            eq(
+              auditConfigurazioniTable.chiave,
+              `mensa-accesso:${deniedBeforeClosure.body.id}`,
+            ),
+            eq(auditConfigurazioniTable.azione, "eccezione-stessa-area"),
+          ),
+        ),
+    ).toHaveLength(0);
+    const [storedDay] = await db
+      .select({ snapshot: mensaGiornateServizioTable.snapshot })
+      .from(mensaGiornateServizioTable)
+      .where(eq(mensaGiornateServizioTable.id, day.id));
+    expect(storedDay.snapshot).toEqual(closed.body.snapshot);
+
+    const deniedAfterClosure = await verify(app, fixture, {
+      mensaId: fixture.mensaB,
+      tipoServizio: "pranzo",
+    });
+    expect(deniedAfterClosure.body).toMatchObject({
+      esito: "negato",
+      motivoEsito: "SERVIZIO_CHIUSO",
+      eccezionePossibile: false,
+    });
+  });
+
+  it("serializza chiusura ed eccezione concorrenti senza eccezioni post-snapshot", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const denied = await verify(app, fixture, {
+      mensaId: fixture.mensaB,
+      tipoServizio: "pranzo",
+    });
+    const [day] = await db
+      .insert(mensaGiornateServizioTable)
+      .values({
+        mensaId: fixture.mensaB,
+        dataServizio: dataServizioMensa(),
+        tipoServizio: "pranzo",
+        apertaDa: fixture.userId,
+      })
+      .returning({ id: mensaGiornateServizioTable.id });
+
+    const [closure, exception] = await Promise.all([
+      request(app)
+        .post(`/mensa/giornate/${day.id}/chiudi`)
+        .send({ note: "Chiusura concorrente" }),
+      request(app)
+        .post(`/mensa/accessi/${denied.body.id}/eccezione`)
+        .send({ motivo: "Eccezione concorrente" }),
+    ]);
+    expect(closure.status).toBe(200);
+    expect([200, 409]).toContain(exception.status);
+
+    const [storedAccess] = await db
+      .select()
+      .from(mensaAccessiTable)
+      .where(eq(mensaAccessiTable.id, denied.body.id));
+    const storedExceptions = await db
+      .select()
+      .from(mensaEccezioniTable)
+      .where(eq(mensaEccezioniTable.accessoMensaId, denied.body.id));
+    if (exception.status === 200) {
+      expect(storedAccess.esito).toBe("consentito_eccezione");
+      expect(storedExceptions).toHaveLength(1);
+      expect(closure.body.snapshot.accessiEccezione).toBe(1);
+    } else {
+      expect(storedAccess.esito).toBe("negato");
+      expect(storedExceptions).toHaveLength(0);
+      expect(closure.body.snapshot.accessiNegati).toBe(1);
+    }
+  });
+
   it("nega l'altra città e non restituisce identità o informazioni alimentari", async () => {
     const fixture = await createFixture();
     const response = await verify(makeApp(fixture), fixture, {
@@ -1875,6 +2038,36 @@ describe("Modulo Mensa", () => {
           ),
         ),
     ).toHaveLength(0);
+
+    const beneficiariesBefore = await db
+      .select({ id: beneficiariTable.id })
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.cittaId, fixture.romeId));
+    const deniedNewPerson = await request(app)
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        tipoServizio: "pranzo",
+        motivo: "Arrivo provvisorio dopo chiusura",
+        idempotencyKey: `closed-new-person-${rnd()}`,
+        nuovaPersona: {
+          nome: `Chiuso${rnd()}`,
+          cognome: `Provvisorio${rnd()}`,
+          sesso: "ND",
+          fasciaEtaPresunta: "30_64",
+        },
+      });
+    expect(deniedNewPerson.status).toBe(201);
+    expect(deniedNewPerson.body).toMatchObject({
+      esito: "negato",
+      motivoEsito: "SERVIZIO_CHIUSO",
+      beneficiarioId: null,
+    });
+    const beneficiariesAfter = await db
+      .select({ id: beneficiariTable.id })
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.cittaId, fixture.romeId));
+    expect(beneficiariesAfter).toHaveLength(beneficiariesBefore.length);
 
     const dinner = await verify(app, fixture, { tipoServizio: "cena" });
     expect(dinner.status).toBe(201);
@@ -2682,6 +2875,7 @@ describe("Modulo Mensa", () => {
       { nome: "Piatti", unitaMisura: "pz", quantita: 20 },
       { nome: "Pasta", unitaMisura: "kg", quantita: 5 },
     ];
+    let firstProductId: number | null = null;
     for (const input of inputs) {
       const [product] = await db
         .insert(prodottiTable)
@@ -2693,6 +2887,7 @@ describe("Modulo Mensa", () => {
           attivo: true,
         })
         .returning({ id: prodottiTable.id });
+      firstProductId ??= product.id;
       ids.products.push(product.id);
       const [lot] = await db
         .insert(lottiTable)
@@ -2722,6 +2917,11 @@ describe("Modulo Mensa", () => {
       ids.consumptions.push(response.body.id);
       ids.issues.push(response.body.scaricoId);
     }
+
+    await db
+      .update(prodottiTable)
+      .set({ unitaMisura: "pz" })
+      .where(eq(prodottiTable.id, firstProductId!));
 
     const report = await request(app).get(
       `/mensa/report?dal=${today}&al=${today}&mensaId=${fixture.mensaA}&tipoServizio=pranzo`,

@@ -46,6 +46,7 @@ import {
 } from "../lib/inventoryLedger";
 import {
   createTransferRequest,
+  normalizeTransferRows,
   TransferRequestError,
 } from "../lib/transferWorkflow";
 
@@ -896,7 +897,7 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     prodottoId: number;
     lottoId?: number;
     quantita: number;
-    unitaMisura: string;
+    unitaMisura?: string;
     note?: string;
   }> = [];
   if (editRighe) {
@@ -931,6 +932,9 @@ router.patch("/trasferimenti/:id", async (req, res) => {
   updates.operatoreId = req.user!.id;
   const mutationApplied = await db
     .transaction(async (tx) => {
+      const normalizedRows = editRighe
+        ? await normalizeTransferRows(tx, righeInput)
+        : [];
       const [updated] = await tx
         .update(trasferimentiTable)
         .set({ ...updates, versione: sql`${trasferimentiTable.versione} + 1` })
@@ -947,7 +951,7 @@ router.patch("/trasferimenti/:id", async (req, res) => {
           .delete(trasferimentoRigheTable)
           .where(eq(trasferimentoRigheTable.trasferimentoId, id));
         await tx.insert(trasferimentoRigheTable).values(
-          righeInput.map((r) => ({
+          normalizedRows.map((r) => ({
             trasferimentoId: id,
             prodottoId: r.prodottoId,
             lottoId: r.lottoId,
@@ -967,8 +971,13 @@ router.patch("/trasferimenti/:id", async (req, res) => {
         return false;
       if (databaseErrorCode(error) === "23503")
         return "riga_non_valida" as const;
+      if (error instanceof TransferRequestError) return error;
       throw error;
     });
+  if (mutationApplied instanceof TransferRequestError) {
+    res.status(mutationApplied.status).json({ error: mutationApplied.message });
+    return;
+  }
   if (mutationApplied === "riga_non_valida") {
     res.status(400).json({
       error:

@@ -95,6 +95,7 @@ import {
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
+type MensaTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const ABILITAZIONE_STATI = [
   "attiva",
@@ -1312,22 +1313,20 @@ router.post(
       const created = await db.transaction(async (tx) => {
         let persistedEsito = esito;
         let persistedMotivoEsito = motivoEsito;
-        if (persistedEsito === "consentito") {
-          const [serviceDay] = await tx
-            .select({ stato: mensaGiornateServizioTable.stato })
-            .from(mensaGiornateServizioTable)
-            .where(
-              and(
-                eq(mensaGiornateServizioTable.mensaId, mensaId),
-                eq(mensaGiornateServizioTable.dataServizio, today),
-                eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
-              ),
-            )
-            .for("update");
-          if (serviceDay?.stato === "chiusa") {
-            persistedEsito = "negato";
-            persistedMotivoEsito = ACCESSO_MOTIVI.SERVIZIO_CHIUSO;
-          }
+        const [serviceDay] = await tx
+          .select({ stato: mensaGiornateServizioTable.stato })
+          .from(mensaGiornateServizioTable)
+          .where(
+            and(
+              eq(mensaGiornateServizioTable.mensaId, mensaId),
+              eq(mensaGiornateServizioTable.dataServizio, today),
+              eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
+            ),
+          )
+          .for("update");
+        if (serviceDay?.stato === "chiusa") {
+          persistedEsito = "negato";
+          persistedMotivoEsito = ACCESSO_MOTIVI.SERVIZIO_CHIUSO;
         }
         const [row] = await tx
           .insert(mensaAccessiTable)
@@ -1437,6 +1436,50 @@ router.post(
         optionalText(req.body?.motivo, "Il motivo", 2000) ??
         "Accesso temporaneo autorizzato dalla Postazione Mensa";
       const today = dataServizioMensa(new Date());
+      const createClosedAccessIfNeeded = async (tx: MensaTransaction) => {
+        const [serviceDay] = await tx
+          .select({ stato: mensaGiornateServizioTable.stato })
+          .from(mensaGiornateServizioTable)
+          .where(
+            and(
+              eq(mensaGiornateServizioTable.mensaId, mensaId),
+              eq(mensaGiornateServizioTable.dataServizio, today),
+              eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
+            ),
+          )
+          .for("update");
+        if (serviceDay?.stato !== "chiusa") return null;
+        const [denied] = await tx
+          .insert(mensaAccessiTable)
+          .values({
+            mensaId,
+            beneficiarioId: null,
+            tesseraId: null,
+            autorizzazioneTemporaneaId: null,
+            esito: "negato",
+            motivoEsito: ACCESSO_MOTIVI.SERVIZIO_CHIUSO,
+            operatoreId: req.user!.id,
+            modalitaAccesso: "temporaneo",
+            tipoServizio,
+            idempotencyKey,
+          })
+          .returning();
+        await tx.insert(auditConfigurazioniTable).values(
+          auditValues(req, `mensa-accesso:${denied.id}`, "verifica", null, {
+            mensaId,
+            esito: "negato",
+            motivoEsito: ACCESSO_MOTIVI.SERVIZIO_CHIUSO,
+            modalita: "temporaneo",
+            tipoServizio,
+          }),
+        );
+        return denied.id;
+      };
+      const closedAccessId = await db.transaction(createClosedAccessIfNeeded);
+      if (closedAccessId != null) {
+        res.status(201).json(await loadAccessoDto(closedAccessId));
+        return;
+      }
       let duplicates: Awaited<ReturnType<typeof searchBeneficiariDuplicates>> =
         [];
       let newPersonValues: Record<string, unknown> | null = null;
@@ -1486,54 +1529,13 @@ router.post(
           telefono: (newPersonValues.telefono as string | null) ?? "",
           dataNascita: (newPersonValues.dataNascita as string | null) ?? "",
         });
-        if (duplicates.length && req.body?.confermaDuplicato !== true) {
-          res.status(409).json({
-            error:
-              "Sono presenti possibili duplicati. Seleziona una persona esistente oppure conferma esplicitamente la nuova registrazione.",
-            possibiliDuplicati: duplicates,
-          });
-          return;
-        }
       }
 
       const createdAccessId = await db.transaction(async (tx) => {
-        const [serviceDay] = await tx
-          .select({ stato: mensaGiornateServizioTable.stato })
-          .from(mensaGiornateServizioTable)
-          .where(
-            and(
-              eq(mensaGiornateServizioTable.mensaId, mensaId),
-              eq(mensaGiornateServizioTable.dataServizio, today),
-              eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
-            ),
-          )
-          .for("update");
-        if (serviceDay?.stato === "chiusa") {
-          const [denied] = await tx
-            .insert(mensaAccessiTable)
-            .values({
-              mensaId,
-              beneficiarioId: null,
-              tesseraId: null,
-              autorizzazioneTemporaneaId: null,
-              esito: "negato",
-              motivoEsito: ACCESSO_MOTIVI.SERVIZIO_CHIUSO,
-              operatoreId: req.user!.id,
-              modalitaAccesso: "temporaneo",
-              tipoServizio,
-              idempotencyKey,
-            })
-            .returning();
-          await tx.insert(auditConfigurazioniTable).values(
-            auditValues(req, `mensa-accesso:${denied.id}`, "verifica", null, {
-              mensaId,
-              esito: "negato",
-              motivoEsito: ACCESSO_MOTIVI.SERVIZIO_CHIUSO,
-              modalita: "temporaneo",
-              tipoServizio,
-            }),
-          );
-          return denied.id;
+        const deniedId = await createClosedAccessIfNeeded(tx);
+        if (deniedId != null) return deniedId;
+        if (duplicates.length && req.body?.confermaDuplicato !== true) {
+          return { possibiliDuplicati: duplicates } as const;
         }
         let beneficiario: typeof beneficiariTable.$inferSelect;
         if (newPersonValues) {
@@ -1654,6 +1656,14 @@ router.post(
         );
         return access.id;
       });
+      if (typeof createdAccessId !== "number") {
+        res.status(409).json({
+          error:
+            "Sono presenti possibili duplicati. Seleziona una persona esistente oppure conferma esplicitamente la nuova registrazione.",
+          possibiliDuplicati: createdAccessId.possibiliDuplicati,
+        });
+        return;
+      }
       res.status(201).json(await loadAccessoDto(createdAccessId));
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -1737,6 +1747,31 @@ router.post(
           row.accesso.beneficiarioId == null
         )
           throw new MensaError(409, "Questo accesso non ammette eccezioni");
+        if (row.accesso.tipoServizio != null) {
+          const [serviceDay] = await tx
+            .select({ stato: mensaGiornateServizioTable.stato })
+            .from(mensaGiornateServizioTable)
+            .where(
+              and(
+                eq(mensaGiornateServizioTable.mensaId, row.destinazione.id),
+                eq(
+                  mensaGiornateServizioTable.dataServizio,
+                  dataServizioMensa(row.accesso.dataOra),
+                ),
+                eq(
+                  mensaGiornateServizioTable.tipoServizio,
+                  row.accesso.tipoServizio,
+                ),
+              ),
+            )
+            .for("update");
+          if (serviceDay?.stato === "chiusa") {
+            throw new MensaError(
+              409,
+              "Il servizio Mensa relativo all'accesso è chiuso",
+            );
+          }
+        }
         const eligibility = await activeEligibility(
           row.accesso.beneficiarioId,
           dataServizioMensa(row.accesso.dataOra),
@@ -2831,7 +2866,7 @@ router.post(
             causale: mensaConsumiTable.causale,
             prodottoId: mensaConsumiTable.prodottoId,
             prodottoNome: prodottiTable.nome,
-            unitaMisura: prodottiTable.unitaMisura,
+            unitaMisura: mensaConsumiTable.unitaMisura,
             quantita: mensaConsumiTable.quantita,
           })
           .from(mensaConsumiTable)
@@ -3129,7 +3164,7 @@ router.get(
           causale: mensaConsumiTable.causale,
           prodottoId: mensaConsumiTable.prodottoId,
           prodottoNome: prodottiTable.nome,
-          unitaMisura: prodottiTable.unitaMisura,
+          unitaMisura: mensaConsumiTable.unitaMisura,
           quantita: mensaConsumiTable.quantita,
         })
         .from(mensaConsumiTable)

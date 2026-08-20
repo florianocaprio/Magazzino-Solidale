@@ -34,7 +34,7 @@ export function aggregatiConsumiMensa(
   const aggregate = (causale: "consumo" | "scarto") => {
     const matching = rows.filter((row) => row.causale === causale);
     const perProduct = new Map<
-      number,
+      string,
       {
         prodottoId: number;
         prodottoNome: string;
@@ -45,22 +45,25 @@ export function aggregatiConsumiMensa(
     const perUnit = new Map<string, number>();
     for (const row of matching) {
       const quantity = Number(row.quantita);
-      const product = perProduct.get(row.prodottoId) ?? {
+      const productKey = `${row.prodottoId}\u0000${row.unitaMisura}`;
+      const product = perProduct.get(productKey) ?? {
         prodottoId: row.prodottoId,
         prodottoNome: row.prodottoNome,
         unitaMisura: row.unitaMisura,
         quantita: 0,
       };
       product.quantita += quantity;
-      perProduct.set(row.prodottoId, product);
+      perProduct.set(productKey, product);
       perUnit.set(
         row.unitaMisura,
         (perUnit.get(row.unitaMisura) ?? 0) + quantity,
       );
     }
     return {
-      perProdotto: [...perProduct.values()].sort((a, b) =>
-        a.prodottoNome.localeCompare(b.prodottoNome, "it"),
+      perProdotto: [...perProduct.values()].sort(
+        (a, b) =>
+          a.prodottoNome.localeCompare(b.prodottoNome, "it") ||
+          a.unitaMisura.localeCompare(b.unitaMisura, "it"),
       ),
       perUnitaMisura: [...perUnit.entries()]
         .map(([unitaMisura, quantita]) => ({ unitaMisura, quantita }))

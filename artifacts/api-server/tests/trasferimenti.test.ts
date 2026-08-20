@@ -446,6 +446,82 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
 });
 
 describe("PATCH /trasferimenti/:id — modifica righe", () => {
+  it("rifiuta atomicamente una UOM difforme senza cambiare testata, righe o versione", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 2,
+      unitaMisura: "pz",
+    });
+
+    const response = await request(app)
+      .patch(`/trasferimenti/${transfer.id}`)
+      .send({
+        versione: transfer.versione,
+        note: "non deve restare",
+        righe: [
+          { prodottoId, quantita: 4, unitaMisura: "pz" },
+          { prodottoId, quantita: 1, unitaMisura: "kg" },
+        ],
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/deve essere pz/i);
+
+    const unchanged = await request(app).get(`/trasferimenti/${transfer.id}`);
+    expect(unchanged.body).toMatchObject({
+      versione: transfer.versione,
+      note: transfer.note,
+    });
+    expect(unchanged.body.righe).toMatchObject([
+      { prodottoId, quantita: 2, unitaMisura: "pz" },
+    ]);
+    expect(await getMovimentiForTrasferimento(transfer.id)).toHaveLength(0);
+  });
+
+  it("normalizza PATCH con UOM corretta o omessa e la propaga al ledger", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    await createLotto({ prodottoId, magazzinoId: origineId, quantita: 10 });
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 2,
+      unitaMisura: "pz",
+    });
+
+    const withCanonicalUnit = await request(app)
+      .patch(`/trasferimenti/${transfer.id}`)
+      .send({
+        versione: transfer.versione,
+        righe: [{ prodottoId, quantita: 3, unitaMisura: "pz" }],
+      });
+    expect(withCanonicalUnit.status).toBe(200);
+    expect(withCanonicalUnit.body.righe).toMatchObject([
+      { prodottoId, quantita: 3, unitaMisura: "pz" },
+    ]);
+
+    const withoutUnit = await request(app)
+      .patch(`/trasferimenti/${transfer.id}`)
+      .send({
+        versione: withCanonicalUnit.body.versione,
+        righe: [{ prodottoId, quantita: 4 }],
+      });
+    expect(withoutUnit.status).toBe(200);
+    expect(withoutUnit.body.righe).toMatchObject([
+      { prodottoId, quantita: 4, unitaMisura: "pz" },
+    ]);
+
+    const started = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send({ versione: withoutUnit.body.versione });
+    expect(started.status).toBe(200);
+    const received = await request(app)
+      .post(`/trasferimenti/${transfer.id}/conferma`)
+      .send({ versione: started.body.versione });
+    expect(received.status).toBe(200);
+    const movements = await getMovimentiForTrasferimento(transfer.id);
+    expect(movements.length).toBeGreaterThanOrEqual(2);
+    expect(movements.every((row) => row.unitaMisura === "pz")).toBe(true);
+  });
+
   it("esegue rollback di testata e righe quando una FK della riga fallisce", async () => {
     const prodottoId = await createProdotto(scope);
     const before = await db
