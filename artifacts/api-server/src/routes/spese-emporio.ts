@@ -10,7 +10,7 @@ import {
 } from "../lib/speseEmporio";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   canAccessMagazzino,
   canUseBeneficiario,
@@ -97,7 +97,7 @@ async function ensureSpesaAccess(
     !(await canUseBeneficiario(
       spesa.beneficiarioId,
       callerCentroId(req),
-      callerCittaId(req),
+      callerAreaOperativaId(req),
       callerZonaUdsId(req),
     ))
   ) {
@@ -110,7 +110,7 @@ async function ensureSpesaAccess(
     !(await canAccessMagazzino(
       spesa.magazzinoEmporioId,
       callerCentroId(req),
-      callerCittaId(req),
+      callerAreaOperativaId(req),
     ))
   ) {
     res
@@ -128,7 +128,7 @@ router.get(
     if (!(await assertEmporioEnabled(res))) return;
     const q = req.query as Record<string, string | undefined>;
     const callerCentro = callerCentroId(req);
-    const callerCitta = callerCittaId(req);
+    const callerAreaOperativa = callerAreaOperativaId(req);
     const callerZona = callerZonaUdsId(req);
     const page = q.page == null ? 1 : Number(q.page);
     const limit = q.limit == null ? 50 : Number(q.limit);
@@ -152,9 +152,9 @@ router.get(
       beneficiarioId: asInt(q.beneficiarioId),
       magazzinoEmporioId: asInt(q.magazzinoEmporioId),
       centroAscoltoId: callerCentro ?? asInt(q.centroAscoltoId),
-      cittaId: callerCitta ?? asInt(q.cittaId ?? q.areaId),
+      areaOperativaId: callerAreaOperativa ?? asInt(q.areaOperativaId ?? q.areaId),
       zonaUdsId: callerZona ?? asInt(q.zonaUdsId),
-      visibleMagazzinoIds: await visibleMagazzinoIds(callerCentro, callerCitta),
+      visibleMagazzinoIds: await visibleMagazzinoIds(callerCentro, callerAreaOperativa),
       page,
       limit,
     });

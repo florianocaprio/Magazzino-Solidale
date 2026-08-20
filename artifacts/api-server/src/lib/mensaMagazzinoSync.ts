@@ -14,7 +14,7 @@ export async function syncMensaFromMagazzino(
   magazzino: Magazzino,
   userId: number | null,
 ): Promise<typeof menseTable.$inferSelect> {
-  if (magazzino.tipoMagazzino !== "mensa" || magazzino.cittaId == null) {
+  if (magazzino.tipoMagazzino !== "mensa" || magazzino.areaOperativaId == null) {
     throw new Error("Un magazzino Mensa deve avere un'Area");
   }
   const [existing] = await tx
@@ -26,7 +26,7 @@ export async function syncMensaFromMagazzino(
       .update(menseTable)
       .set({
         nome: magazzino.nome,
-        cittaId: magazzino.cittaId,
+        areaOperativaId: magazzino.areaOperativaId,
         indirizzo: magazzino.indirizzo,
         attiva: magazzino.stato === "attivo",
         note: magazzino.note,
@@ -41,7 +41,7 @@ export async function syncMensaFromMagazzino(
     .values({
       codice: internalMensaCode(magazzino.id),
       nome: magazzino.nome,
-      cittaId: magazzino.cittaId,
+      areaOperativaId: magazzino.areaOperativaId,
       magazzinoId: magazzino.id,
       indirizzo: magazzino.indirizzo,
       attiva: magazzino.stato === "attivo",

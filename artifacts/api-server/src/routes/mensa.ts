@@ -10,7 +10,7 @@ import {
   auditConfigurazioniTable,
   beneficiariTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   lottiTable,
   magazziniTable,
@@ -46,13 +46,13 @@ import {
   type SQL,
 } from "drizzle-orm";
 import {
-  callerCittaId,
+  callerAreaOperativaId,
   callerCentroId,
   callerZonaUdsId,
-  canAccessCitta,
+  canAccessAreaOperativa,
   canAccessMagazzino,
   centroScopeFilter,
-  cittaScopeFilter,
+  areaOperativaScopeFilter,
   visibleMagazzinoIds,
   zonaUdsScopeFilter,
 } from "../lib/centroScope";
@@ -354,7 +354,7 @@ function auditValues(
 
 function formatMensa(
   row: typeof menseTable.$inferSelect,
-  cittaNome?: string | null,
+  areaOperativaNome?: string | null,
   magazzino?: typeof magazziniTable.$inferSelect | null,
   centroAscoltoNome?: string | null,
 ) {
@@ -362,8 +362,8 @@ function formatMensa(
     id: row.id,
     codice: row.codice,
     nome: row.nome,
-    cittaId: row.cittaId,
-    cittaNome: cittaNome ?? null,
+    areaOperativaId: row.areaOperativaId,
+    areaOperativaNome: areaOperativaNome ?? null,
     magazzinoId: row.magazzinoId,
     magazzinoNome: magazzino?.nome ?? null,
     centroAscoltoId: magazzino?.centroAscoltoId ?? null,
@@ -389,14 +389,14 @@ async function loadMensa(id: number) {
   const [row] = await db
     .select({
       mensa: menseTable,
-      cittaNome: cittaTable.nome,
+      areaOperativaNome: areeOperativeTable.nome,
       magazzino: magazziniTable,
       centroAscoltoNome: centriAscoltoTable.nome,
       magazzinoStato: magazziniTable.stato,
       magazzinoTipo: magazziniTable.tipoMagazzino,
     })
     .from(menseTable)
-    .leftJoin(cittaTable, eq(menseTable.cittaId, cittaTable.id))
+    .leftJoin(areeOperativeTable, eq(menseTable.areaOperativaId, areeOperativeTable.id))
     .leftJoin(magazziniTable, eq(menseTable.magazzinoId, magazziniTable.id))
     .leftJoin(
       centriAscoltoTable,
@@ -409,7 +409,7 @@ async function loadMensa(id: number) {
 async function requireMensa(id: number, req: Request, active = false) {
   const row = await loadMensa(id);
   if (!row) throw new MensaError(404, "Mensa non trovata");
-  if (!canAccessCitta(row.mensa.cittaId, callerCittaId(req))) {
+  if (!canAccessAreaOperativa(row.mensa.areaOperativaId, callerAreaOperativaId(req))) {
     throw new MensaError(403, "Mensa non accessibile per la tua area");
   }
   if (
@@ -427,17 +427,17 @@ async function requireMensaLogisticsWarehouse(id: number, req: Request) {
   const [warehouse] = await db
     .select({
       id: magazziniTable.id,
-      cittaId: magazziniTable.cittaId,
+      areaOperativaId: magazziniTable.areaOperativaId,
       stato: magazziniTable.stato,
       tipoMagazzino: magazziniTable.tipoMagazzino,
     })
     .from(magazziniTable)
     .where(eq(magazziniTable.id, id));
   if (!warehouse) throw new MensaError(404, "Magazzino non trovato");
-  const ownCity = callerCittaId(req);
+  const ownAreaOperativa = callerAreaOperativaId(req);
   if (
-    (ownCity != null && warehouse.cittaId !== ownCity) ||
-    !(await canAccessMagazzino(id, callerCentroId(req), ownCity))
+    (ownAreaOperativa != null && warehouse.areaOperativaId !== ownAreaOperativa) ||
+    !(await canAccessMagazzino(id, callerCentroId(req), ownAreaOperativa))
   ) {
     throw new MensaError(403, "Magazzino non accessibile per la tua area");
   }
@@ -522,7 +522,7 @@ async function loadRiepilogoAbilitazioniBeneficiari(
   const conditions: SQL[] = [inArray(beneficiariTable.id, beneficiarioIds)];
   const scopes = [
     centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req)),
-    cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req)),
+    areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req)),
     zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req)),
   ];
   for (const scope of scopes) if (scope) conditions.push(scope);
@@ -584,7 +584,7 @@ async function loadAbilitazione(id: number) {
       beneficiarioNome: beneficiariTable.nome,
       beneficiarioCognome: beneficiariTable.cognome,
       beneficiarioCodice: beneficiariTable.codice,
-      cittaId: menseTable.cittaId,
+      areaOperativaId: menseTable.areaOperativaId,
     })
     .from(mensaAbilitazioniTable)
     .innerJoin(menseTable, eq(mensaAbilitazioniTable.mensaId, menseTable.id))
@@ -723,7 +723,7 @@ async function loadAccessoDto(id: number) {
       )
     : null;
   const outsideMensaArea =
-    row.beneficiario != null && row.beneficiario.cittaId !== row.mensa.cittaId;
+    row.beneficiario != null && row.beneficiario.areaOperativaId !== row.mensa.areaOperativaId;
   const hidePersonal =
     outsideMensaArea ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.AREA_NON_COMPATIBILE ||
@@ -764,8 +764,8 @@ async function loadAccessoDto(id: number) {
       row.accesso.esito === "negato" &&
       row.accesso.motivoEsito === ACCESSO_MOTIVI.MENSA_NON_AUTORIZZATA &&
       canUseMensaException(
-        eligibility?.mensa.cittaId ?? null,
-        row.mensa.cittaId,
+        eligibility?.mensa.areaOperativaId ?? null,
+        row.mensa.areaOperativaId,
       ),
   };
 }
@@ -802,12 +802,12 @@ router.get(
   async (req, res) => {
     try {
       const conditions: SQL[] = [];
-      const ownCity = callerCittaId(req);
-      const requestedCity = optionalPositiveInt(req.query.cittaId, "cittaId");
-      if (ownCity != null) {
-        conditions.push(eq(menseTable.cittaId, ownCity));
-      } else if (requestedCity != null) {
-        conditions.push(eq(menseTable.cittaId, requestedCity));
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      const requestedAreaOperativa = optionalPositiveInt(req.query.areaOperativaId, "areaOperativaId");
+      if (ownAreaOperativa != null) {
+        conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+      } else if (requestedAreaOperativa != null) {
+        conditions.push(eq(menseTable.areaOperativaId, requestedAreaOperativa));
       }
       if (req.query.attiva === "true")
         conditions.push(eq(menseTable.attiva, true));
@@ -816,12 +816,12 @@ router.get(
       const rows = await db
         .select({
           mensa: menseTable,
-          cittaNome: cittaTable.nome,
+          areaOperativaNome: areeOperativeTable.nome,
           magazzino: magazziniTable,
           centroAscoltoNome: centriAscoltoTable.nome,
         })
         .from(menseTable)
-        .leftJoin(cittaTable, eq(menseTable.cittaId, cittaTable.id))
+        .leftJoin(areeOperativeTable, eq(menseTable.areaOperativaId, areeOperativeTable.id))
         .leftJoin(magazziniTable, eq(menseTable.magazzinoId, magazziniTable.id))
         .leftJoin(
           centriAscoltoTable,
@@ -833,7 +833,7 @@ router.get(
         rows.map((row) =>
           formatMensa(
             row.mensa,
-            row.cittaNome,
+            row.areaOperativaNome,
             row.magazzino,
             row.centroAscoltoNome,
           ),
@@ -855,7 +855,7 @@ router.get(
       res.json(
         formatMensa(
           row.mensa,
-          row.cittaNome,
+          row.areaOperativaNome,
           row.magazzino,
           row.centroAscoltoNome,
         ),
@@ -874,19 +874,19 @@ router.post(
     try {
       const providedCodice = optionalText(req.body?.codice, "Il codice", 30);
       const nome = text(req.body?.nome, "Il nome", 160);
-      const ownCity = callerCittaId(req);
-      const cittaId = ownCity ?? positiveInt(req.body?.cittaId, "cittaId");
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      const areaOperativaId = ownAreaOperativa ?? positiveInt(req.body?.areaOperativaId, "areaOperativaId");
       if (
-        ownCity != null &&
-        req.body?.cittaId != null &&
-        Number(req.body.cittaId) !== ownCity
+        ownAreaOperativa != null &&
+        req.body?.areaOperativaId != null &&
+        Number(req.body.areaOperativaId) !== ownAreaOperativa
       ) {
         throw new MensaError(403, "La Mensa deve appartenere alla tua area");
       }
       const [area] = await db
-        .select({ id: cittaTable.id })
-        .from(cittaTable)
-        .where(eq(cittaTable.id, cittaId));
+        .select({ id: areeOperativeTable.id })
+        .from(areeOperativeTable)
+        .where(eq(areeOperativeTable.id, areaOperativaId));
       if (!area) throw new MensaError(400, "Area non trovata");
 
       const ownCenter = callerCentroId(req);
@@ -906,7 +906,7 @@ router.post(
       if (centroAscoltoId != null) {
         const [centro] = await db
           .select({
-            cittaId: centriAscoltoTable.cittaId,
+            areaOperativaId: centriAscoltoTable.areaOperativaId,
             attivo: centriAscoltoTable.attivo,
           })
           .from(centriAscoltoTable)
@@ -915,7 +915,7 @@ router.post(
         if (!centro.attivo) {
           throw new MensaError(409, "Il Centro di Ascolto non è attivo");
         }
-        if (centro.cittaId !== cittaId) {
+        if (centro.areaOperativaId !== areaOperativaId) {
           throw new MensaError(
             400,
             "Il Centro di Ascolto deve appartenere alla stessa area della Mensa",
@@ -953,7 +953,7 @@ router.post(
               .values({
                 codice: codiceMagazzino,
                 nome,
-                cittaId,
+                areaOperativaId,
                 centroAscoltoId,
                 indirizzo,
                 comune,
@@ -971,7 +971,7 @@ router.post(
               .values({
                 codice,
                 nome,
-                cittaId,
+                areaOperativaId,
                 magazzinoId: warehouse.id,
                 indirizzo,
                 attiva: stato === "attivo",
@@ -983,7 +983,7 @@ router.post(
               auditValues(req, `mensa:${row.id}`, "creazione", null, {
                 codice,
                 nome,
-                cittaId,
+                areaOperativaId,
                 centroAscoltoId,
                 magazzinoId: warehouse.id,
                 codiceMagazzino,
@@ -997,7 +997,7 @@ router.post(
             .json(
               formatMensa(
                 created,
-                loaded?.cittaNome ?? null,
+                loaded?.areaOperativaNome ?? null,
                 loaded?.magazzino ?? null,
                 loaded?.centroAscoltoNome ?? null,
               ),
@@ -1033,12 +1033,12 @@ router.get(
         "beneficiarioId",
       );
       const [beneficiario] = await db
-        .select({ cittaId: beneficiariTable.cittaId })
+        .select({ areaOperativaId: beneficiariTable.areaOperativaId })
         .from(beneficiariTable)
         .where(eq(beneficiariTable.id, beneficiarioId));
       if (!beneficiario) throw new MensaError(404, "Beneficiario non trovato");
-      const ownCity = callerCittaId(req);
-      if (ownCity != null && beneficiario.cittaId !== ownCity)
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null && beneficiario.areaOperativaId !== ownAreaOperativa)
         throw new MensaError(403, "Beneficiario non accessibile");
       const rows = await db
         .select()
@@ -1077,8 +1077,8 @@ router.post(
           409,
           "Completa l'anagrafica e associa un Centro di Ascolto prima di emettere la tessera",
         );
-      const ownCity = callerCittaId(req);
-      if (ownCity != null && beneficiario.cittaId !== ownCity)
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null && beneficiario.areaOperativaId !== ownAreaOperativa)
         throw new MensaError(403, "Beneficiario non accessibile");
       const dataScadenza = dateOnly(req.body?.dataScadenza, "La scadenza");
       const motivoSostituzione = optionalText(
@@ -1129,7 +1129,7 @@ router.post(
       const [current] = await db
         .select({
           tessera: tessereBeneficiariTable,
-          cittaId: beneficiariTable.cittaId,
+          areaOperativaId: beneficiariTable.areaOperativaId,
         })
         .from(tessereBeneficiariTable)
         .innerJoin(
@@ -1138,8 +1138,8 @@ router.post(
         )
         .where(eq(tessereBeneficiariTable.id, id));
       if (!current) throw new MensaError(404, "Tessera non trovata");
-      const ownCity = callerCittaId(req);
-      if (ownCity != null && current.cittaId !== ownCity)
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null && current.areaOperativaId !== ownAreaOperativa)
         throw new MensaError(403, "Tessera non accessibile");
       const updated = await db.transaction(async (tx) => {
         const allowed: Record<TesseraStato, readonly TesseraStato[]> = {
@@ -1292,7 +1292,7 @@ router.post(
         motivoEsito = ACCESSO_MOTIVI.TESSERA_SCADUTA;
       } else if (!beneficiario) {
         motivoEsito = ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
-      } else if (beneficiario.cittaId !== mensa.mensa.cittaId) {
+      } else if (beneficiario.areaOperativaId !== mensa.mensa.areaOperativaId) {
         motivoEsito = ACCESSO_MOTIVI.AREA_NON_COMPATIBILE;
       } else if (!beneficiario.attivo) {
         motivoEsito = ACCESSO_MOTIVI.BENEFICIARIO_NON_ATTIVO;
@@ -1526,7 +1526,7 @@ router.post(
           uds: false,
         };
         duplicates = await searchBeneficiariDuplicates({
-          cittaId: mensa.mensa.cittaId,
+          areaOperativaId: mensa.mensa.areaOperativaId,
           search: `${nome} ${cognome}`,
           nome,
           cognome,
@@ -1545,7 +1545,7 @@ router.post(
         if (newPersonValues) {
           const created = await createBeneficiarioOne(newPersonValues, req, {
             executor: tx,
-            cittaId: mensa.mensa.cittaId,
+            areaOperativaId: mensa.mensa.areaOperativaId,
             centroAscoltoId: null,
             zonaUdsId: null,
             allowSensitiveFields: true,
@@ -1562,7 +1562,7 @@ router.post(
               null,
               {
                 beneficiarioId: beneficiario.id,
-                cittaId: beneficiario.cittaId,
+                areaOperativaId: beneficiario.areaOperativaId,
                 statoAnagrafica: beneficiario.statoAnagrafica,
               },
               motivo,
@@ -1592,7 +1592,7 @@ router.post(
             .from(beneficiariTable)
             .where(eq(beneficiariTable.id, beneficiarioId))
             .for("update");
-          if (!existing || existing.cittaId !== mensa.mensa.cittaId) {
+          if (!existing || existing.areaOperativaId !== mensa.mensa.areaOperativaId) {
             throw new MensaError(404, "Beneficiario non disponibile");
           }
           if (!existing.attivo) {
@@ -1734,7 +1734,7 @@ router.post(
           .where(eq(mensaAccessiTable.id, accessoId))
           .for("update");
         if (!row) throw new MensaError(404, "Accesso non trovato");
-        if (!canAccessCitta(row.destinazione.cittaId, callerCittaId(req)))
+        if (!canAccessAreaOperativa(row.destinazione.areaOperativaId, callerAreaOperativaId(req)))
           throw new MensaError(403, "Accesso non disponibile");
         if (
           !row.destinazione.attiva ||
@@ -1783,8 +1783,8 @@ router.post(
         if (
           !eligibility ||
           !canUseMensaException(
-            eligibility.mensa.cittaId,
-            row.destinazione.cittaId,
+            eligibility.mensa.areaOperativaId,
+            row.destinazione.areaOperativaId,
           )
         )
           throw new MensaError(
@@ -1797,7 +1797,7 @@ router.post(
             beneficiarioId: row.accesso.beneficiarioId,
             mensaPrincipaleId: eligibility.mensa.id,
             mensaDestinazioneId: row.destinazione.id,
-            cittaId: row.destinazione.cittaId,
+            areaOperativaId: row.destinazione.areaOperativaId,
             motivo,
             operatoreId: req.user!.id,
             accessoMensaId: accessoId,
@@ -1854,8 +1854,8 @@ router.get(
       const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
       if (mensaId != null)
         conditions.push(eq(mensaAccessiTable.mensaId, mensaId));
-      const ownCity = callerCittaId(req);
-      if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const paging = pagination(req.query);
       const where = conditions.length ? and(...conditions) : undefined;
       const [totalRow] = paging.requested
@@ -1958,7 +1958,7 @@ router.post(
           "Il tipo servizio del pasto non corrisponde alla verifica accesso",
         );
       }
-      if (!canAccessCitta(access.mensa.cittaId, callerCittaId(req)))
+      if (!canAccessAreaOperativa(access.mensa.areaOperativaId, callerAreaOperativaId(req)))
         throw new MensaError(403, "Accesso non disponibile");
       await requireMensa(access.mensa.id, req, true);
       if (
@@ -2105,8 +2105,8 @@ router.get(
         conditions.push(eq(mensaPastiTable.mensaId, mensaId));
       if (data) conditions.push(eq(mensaPastiTable.dataServizio, data));
       if (tipo) conditions.push(eq(mensaPastiTable.tipoServizio, tipo));
-      const ownCity = callerCittaId(req);
-      if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const paging = pagination(req.query);
       const where = conditions.length ? and(...conditions) : undefined;
       const [totalRow] = paging.requested
@@ -2174,9 +2174,9 @@ router.get(
   async (req, res) => {
     try {
       const conditions: SQL[] = [];
-      const ownCity = callerCittaId(req);
-      if (ownCity != null)
-        conditions.push(eq(mensaEccezioniTable.cittaId, ownCity));
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null)
+        conditions.push(eq(mensaEccezioniTable.areaOperativaId, ownAreaOperativa));
       const paging = pagination(req.query);
       const where = conditions.length ? and(...conditions) : undefined;
       const [totalRow] = paging.requested
@@ -2229,11 +2229,11 @@ router.get(
   async (req, res) => {
     const ids = await visibleMagazzinoIds(
       callerCentroId(req),
-      callerCittaId(req),
+      callerAreaOperativaId(req),
     );
     const conditions: SQL[] = [eq(magazziniTable.stato, "attivo")];
-    const ownCity = callerCittaId(req);
-    if (ownCity != null) conditions.push(eq(magazziniTable.cittaId, ownCity));
+    const ownAreaOperativa = callerAreaOperativaId(req);
+    if (ownAreaOperativa != null) conditions.push(eq(magazziniTable.areaOperativaId, ownAreaOperativa));
     if (ids != null)
       conditions.push(
         ids.length ? inArray(magazziniTable.id, ids) : sql`false`,
@@ -2243,7 +2243,7 @@ router.get(
         id: magazziniTable.id,
         codice: magazziniTable.codice,
         nome: magazziniTable.nome,
-        cittaId: magazziniTable.cittaId,
+        areaOperativaId: magazziniTable.areaOperativaId,
         tipoMagazzino: magazziniTable.tipoMagazzino,
       })
       .from(magazziniTable)
@@ -2458,8 +2458,8 @@ router.get(
   requireMensaPermissionOrLegacy("mensa.transfers.request"),
   async (req, res) => {
     const conditions: SQL[] = [];
-    const ownCity = callerCittaId(req);
-    if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+    const ownAreaOperativa = callerAreaOperativaId(req);
+    if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
     const paging = pagination(req.query);
     const where = conditions.length ? and(...conditions) : undefined;
     const [totalRow] = paging.requested
@@ -2516,8 +2516,8 @@ router.get(
         conditions.push(eq(mensaConsumiTable.mensaId, mensaId));
       if (data != null)
         conditions.push(eq(mensaConsumiTable.dataServizio, data));
-      const ownCity = callerCittaId(req);
-      if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const paging = pagination(req.query);
       const where = conditions.length ? and(...conditions) : undefined;
       const [totalRow] = await db
@@ -2731,12 +2731,12 @@ router.post(
       const id = positiveInt(req.params.id, "id");
       const motivo = text(req.body?.motivo, "Il motivo dello storno", 2000);
       const [current] = await db
-        .select({ consumo: mensaConsumiTable, cittaId: menseTable.cittaId })
+        .select({ consumo: mensaConsumiTable, areaOperativaId: menseTable.areaOperativaId })
         .from(mensaConsumiTable)
         .innerJoin(menseTable, eq(mensaConsumiTable.mensaId, menseTable.id))
         .where(eq(mensaConsumiTable.id, id));
       if (!current) throw new MensaError(404, "Consumo non trovato");
-      if (!canAccessCitta(current.cittaId, callerCittaId(req))) {
+      if (!canAccessAreaOperativa(current.areaOperativaId, callerAreaOperativaId(req))) {
         throw new MensaError(403, "Consumo non accessibile per la tua Area");
       }
       const code = consumoCodice(current.consumo.idempotencyKey);
@@ -2801,8 +2801,8 @@ router.get(
         conditions.push(eq(mensaGiornateServizioTable.mensaId, mensaId));
       if (data != null)
         conditions.push(eq(mensaGiornateServizioTable.dataServizio, data));
-      const ownCity = callerCittaId(req);
-      if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const rows = await db
         .select({
           giornata: mensaGiornateServizioTable,
@@ -2839,7 +2839,7 @@ router.post(
         const [current] = await tx
           .select({
             giornata: mensaGiornateServizioTable,
-            cittaId: menseTable.cittaId,
+            areaOperativaId: menseTable.areaOperativaId,
           })
           .from(mensaGiornateServizioTable)
           .innerJoin(
@@ -2849,7 +2849,7 @@ router.post(
           .where(eq(mensaGiornateServizioTable.id, id))
           .for("update");
         if (!current) throw new MensaError(404, "Giornata Mensa non trovata");
-        if (!canAccessCitta(current.cittaId, callerCittaId(req)))
+        if (!canAccessAreaOperativa(current.areaOperativaId, callerAreaOperativaId(req)))
           throw new MensaError(403, "Giornata non accessibile");
         if (current.giornata.stato !== "aperta")
           throw new MensaError(409, "La giornata è già chiusa");
@@ -2990,7 +2990,7 @@ router.post(
         const [current] = await tx
           .select({
             giornata: mensaGiornateServizioTable,
-            cittaId: menseTable.cittaId,
+            areaOperativaId: menseTable.areaOperativaId,
           })
           .from(mensaGiornateServizioTable)
           .innerJoin(
@@ -3000,7 +3000,7 @@ router.post(
           .where(eq(mensaGiornateServizioTable.id, id))
           .for("update");
         if (!current) throw new MensaError(404, "Giornata Mensa non trovata");
-        if (!canAccessCitta(current.cittaId, callerCittaId(req)))
+        if (!canAccessAreaOperativa(current.areaOperativaId, callerAreaOperativaId(req)))
           throw new MensaError(403, "Giornata non accessibile");
         if (current.giornata.stato !== "chiusa")
           throw new MensaError(
@@ -3070,8 +3070,8 @@ router.get(
       if (mensaId != null)
         conditions.push(eq(mensaPastiTable.mensaId, mensaId));
       if (tipo) conditions.push(eq(mensaPastiTable.tipoServizio, tipo));
-      const ownCity = callerCittaId(req);
-      if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const distribution = await db
         .select({
           mensaId: menseTable.id,
@@ -3114,8 +3114,8 @@ router.get(
         accessConditions.push(eq(mensaAccessiTable.mensaId, mensaId));
       if (tipo != null)
         accessConditions.push(eq(mensaAccessiTable.tipoServizio, tipo));
-      if (ownCity != null)
-        accessConditions.push(eq(menseTable.cittaId, ownCity));
+      if (ownAreaOperativa != null)
+        accessConditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const [accesses] = await db
         .select({
           ordinari: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito' and ${mensaAccessiTable.autorizzazioneTemporaneaId} is null)::int`,
@@ -3161,8 +3161,8 @@ router.get(
         consumptionConditions.push(eq(mensaConsumiTable.mensaId, mensaId));
       if (tipo != null)
         consumptionConditions.push(eq(mensaConsumiTable.tipoServizio, tipo));
-      if (ownCity != null)
-        consumptionConditions.push(eq(menseTable.cittaId, ownCity));
+      if (ownAreaOperativa != null)
+        consumptionConditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const consumption = await db
         .select({
           causale: mensaConsumiTable.causale,
@@ -3298,7 +3298,7 @@ router.patch(
       res.json(
         formatMensa(
           updated,
-          loaded?.cittaNome ?? null,
+          loaded?.areaOperativaNome ?? null,
           loaded?.magazzino ?? null,
           loaded?.centroAscoltoNome ?? null,
         ),
@@ -3319,9 +3319,9 @@ router.get(
       if (search.length < 2)
         throw new MensaError(400, "Inserire almeno 2 caratteri");
       const conditions: SQL[] = [];
-      const ownCity = callerCittaId(req);
-      if (ownCity != null)
-        conditions.push(eq(beneficiariTable.cittaId, ownCity));
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null)
+        conditions.push(eq(beneficiariTable.areaOperativaId, ownAreaOperativa));
       const s = `%${search}%`;
       conditions.push(
         or(
@@ -3345,7 +3345,7 @@ router.get(
           cognome: beneficiariTable.cognome,
           codice: beneficiariTable.codice,
           attivo: beneficiariTable.attivo,
-          cittaId: beneficiariTable.cittaId,
+          areaOperativaId: beneficiariTable.areaOperativaId,
         })
         .from(beneficiariTable)
         .where(and(...conditions))
@@ -3392,11 +3392,11 @@ router.get(
         );
       if (mensaId != null)
         conditions.push(eq(mensaAbilitazioniTable.mensaId, mensaId));
-      const cityScope = cittaScopeFilter(
-        menseTable.cittaId,
-        callerCittaId(req),
+      const areaOperativaScope = areaOperativaScopeFilter(
+        menseTable.areaOperativaId,
+        callerAreaOperativaId(req),
       );
-      if (cityScope) conditions.push(cityScope);
+      if (areaOperativaScope) conditions.push(areaOperativaScope);
       const rows = await db
         .select({
           abilitazione: mensaAbilitazioniTable,
@@ -3454,7 +3454,7 @@ router.post(
       if (!beneficiario) throw new MensaError(404, "Beneficiario non trovato");
       if (!beneficiario.attivo)
         throw new MensaError(409, "Il beneficiario non è attivo");
-      if (beneficiario.cittaId !== mensa.mensa.cittaId)
+      if (beneficiario.areaOperativaId !== mensa.mensa.areaOperativaId)
         throw new MensaError(
           400,
           "Beneficiario e Mensa devono appartenere alla stessa area",
@@ -3559,7 +3559,7 @@ router.post(
       const expected = expectedVersion(req.body?.versione);
       const current = await loadAbilitazione(id);
       if (!current) throw new MensaError(404, "Abilitazione non trovata");
-      if (!canAccessCitta(current.cittaId, callerCittaId(req)))
+      if (!canAccessAreaOperativa(current.areaOperativaId, callerAreaOperativaId(req)))
         throw new MensaError(403, "Abilitazione non accessibile");
       const updated = await db.transaction(async (tx) => {
         const allowed: Record<AbilitazioneStato, readonly AbilitazioneStato[]> =

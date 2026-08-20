@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { and, eq, inArray, like, sql } from "drizzle-orm";
-import { auditConfigurazioniTable, beneficiariTable, bolleTable, centriAscoltoTable, cittaTable, consegneTable, creditoSolidaleMovimentiTable, db, interventiTable, magazziniTable, nucleoFamiliareTable, prodottiTable, ruoliTable, sessioniCassaEmporioTable, speseEmporioTable, userSessionsTable, utentiTable, zoneUdsTable } from "@workspace/db";
+import { auditConfigurazioniTable, beneficiariTable, bolleTable, centriAscoltoTable, areeOperativeTable, consegneTable, creditoSolidaleMovimentiTable, db, interventiTable, magazziniTable, nucleoFamiliareTable, prodottiTable, ruoliTable, sessioniCassaEmporioTable, speseEmporioTable, userSessionsTable, utentiTable, zoneUdsTable } from "@workspace/db";
 import { DEMO_AREA_NAME, DEMO_CENTRO_NAME, DEMO_MARKER, DEMO_PRODUCT_CODES, DEMO_WAREHOUSE_CODES, resetDemoWarehouseData, seedDemoWarehouseData, type EnvironmentDataSummary } from "./environmentData";
 import { EMPORIO_ROLE_NAME } from "./seedRoles";
 
@@ -48,7 +48,7 @@ export async function seedDemoEnvironmentData(actorUserId: number): Promise<Envi
   const warehouseSummary = await seedDemoWarehouseData(actorUserId);
 
   const socialSummary = await db.transaction(async (tx) => {
-    const [area] = await tx.select({ id: cittaTable.id, note: cittaTable.note }).from(cittaTable).where(eq(cittaTable.nome, DEMO_AREA_NAME));
+    const [area] = await tx.select({ id: areeOperativeTable.id, note: areeOperativeTable.note }).from(areeOperativeTable).where(eq(areeOperativeTable.nome, DEMO_AREA_NAME));
     const [centro] = await tx.select({ id: centriAscoltoTable.id, note: centriAscoltoTable.note }).from(centriAscoltoTable).where(eq(centriAscoltoTable.nome, DEMO_CENTRO_NAME));
     const [emporio] = await tx.select({ id: magazziniTable.id, note: magazziniTable.note }).from(magazziniTable).where(eq(magazziniTable.codice, DEMO_WAREHOUSE_CODES[1]));
     const [emporioRole] = await tx.select({ id: ruoliTable.id }).from(ruoliTable).where(eq(ruoliTable.nome, EMPORIO_ROLE_NAME));
@@ -64,14 +64,14 @@ export async function seedDemoEnvironmentData(actorUserId: number): Promise<Envi
     let [zone] = await tx
       .select({ id: zoneUdsTable.id, note: zoneUdsTable.note })
       .from(zoneUdsTable)
-      .where(and(eq(zoneUdsTable.nome, DEMO_ZONE_NAME), eq(zoneUdsTable.cittaId, area.id)));
+      .where(and(eq(zoneUdsTable.nome, DEMO_ZONE_NAME), eq(zoneUdsTable.areaOperativaId, area.id)));
     if (zone) assertDemoMarker("la zona UDS demo", zone.note);
     if (!zone) {
       [zone] = await tx
         .insert(zoneUdsTable)
         .values({
           nome: DEMO_ZONE_NAME,
-          cittaId: area.id,
+          areaOperativaId: area.id,
           note: `${DEMO_MARKER}: zona UDS sintetica`,
         })
         .returning({ id: zoneUdsTable.id, note: zoneUdsTable.note });
@@ -108,7 +108,7 @@ export async function seedDemoEnvironmentData(actorUserId: number): Promise<Envi
           matricola: DEMO_USER_MATRICOLA,
           ruoloId: emporioRole.id,
           centroAscoltoId: centro.id,
-          cittaId: area.id,
+          areaOperativaId: area.id,
           zonaUdsId: zone.id,
           attivo: true,
           isSuperAdmin: false,
@@ -135,7 +135,7 @@ export async function seedDemoEnvironmentData(actorUserId: number): Promise<Envi
           nome: "Beneficiario",
           email: "beneficiario.demo.001@example.org",
           centroAscoltoId: centro.id,
-          cittaId: area.id,
+          areaOperativaId: area.id,
           zonaUdsId: zone.id,
           uds: true,
           numComponenti: 1,
@@ -163,7 +163,7 @@ export async function seedDemoEnvironmentData(actorUserId: number): Promise<Envi
       await tx.insert(creditoSolidaleMovimentiTable).values({
         beneficiarioId: beneficiary.id,
         centroAscoltoId: centro.id,
-        cittaId: area.id,
+        areaOperativaId: area.id,
         tipoMovimento: "ricarica_iniziale",
         variazioneCredito: "50.00",
         saldoPrima: "0.00",
@@ -340,9 +340,9 @@ export async function previewDemoReset(): Promise<EnvironmentDataSummary> {
     const beneficiaryIds = await demoBeneficiaryIds(tx);
     const accessIds = await demoAccessIds(tx);
     const areas = await tx
-      .select({ id: cittaTable.id })
-      .from(cittaTable)
-      .where(and(eq(cittaTable.nome, DEMO_AREA_NAME), like(cittaTable.note, `%${DEMO_MARKER}%`)));
+      .select({ id: areeOperativeTable.id })
+      .from(areeOperativeTable)
+      .where(and(eq(areeOperativeTable.nome, DEMO_AREA_NAME), like(areeOperativeTable.note, `%${DEMO_MARKER}%`)));
     const centres = await tx
       .select({ id: centriAscoltoTable.id })
       .from(centriAscoltoTable)

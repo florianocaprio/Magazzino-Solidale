@@ -8,7 +8,7 @@ function udsIdentityConditions(filters: ReportFilters): SQL[] {
     sql`be.uds = true`,
     sql`(i.ambito = 'uds' OR i.ambito IS NULL)`,
     ...reportScope(filters, {
-      citta: sql`be.citta_id`,
+      areaOperativa: sql`be.area_operativa_id`,
       centro: sql`be.centro_ascolto_id`,
       zona: sql`be.zona_uds_id`,
     }),
@@ -104,7 +104,7 @@ export async function buildUdsReport(filters: ReportFilters) {
     `),
     rows<Record<string, unknown>>(sql`
       SELECT COUNT(*) FILTER (WHERE i.ambito IS NULL) AS ambito_legacy,
-             COUNT(*) FILTER (WHERE be.citta_id IS NULL) AS citta_mancante,
+             COUNT(*) FILTER (WHERE be.area_operativa_id IS NULL) AS areaOperativa_mancante,
              COUNT(*) FILTER (WHERE be.zona_uds_id IS NULL) AS zona_mancante
       FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
       WHERE ${base} AND ${period}
@@ -131,7 +131,7 @@ export async function buildUdsReport(filters: ReportFilters) {
     ],
     quality: [
       quality("ambitoLegacy", number(dq.ambito_legacy), number(dq.ambito_legacy) ? "derivable" : "ok", "Gli interventi legacy NULL seguono la compatibilità UDS esistente."),
-      quality("cittaMancante", number(dq.citta_mancante), number(dq.citta_mancante) ? "missing" : "ok"),
+      quality("areaOperativaMancante", number(dq.areaOperativa_mancante), number(dq.areaOperativa_mancante) ? "missing" : "ok"),
       quality("zonaMancante", number(dq.zona_mancante), number(dq.zona_mancante) ? "derivable" : "ok"),
     ],
     definitions: [

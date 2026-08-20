@@ -2,7 +2,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
 export interface BeneficiarioDuplicateSearch {
-  cittaId: number;
+  areaOperativaId: number;
   search?: string;
   nome?: string;
   cognome?: string;
@@ -20,8 +20,8 @@ export interface BeneficiarioDuplicate {
   soprannome: string | null;
   dataNascita: string | null;
   telefono: string | null;
-  cittaId: number;
-  cittaNome: string | null;
+  areaOperativaId: number;
+  areaOperativaNome: string | null;
   zonaUdsId: number | null;
   zonaUdsNome: string | null;
   centroAscoltoId: number | null;
@@ -52,7 +52,7 @@ export async function searchBeneficiariDuplicates(
       SELECT
         b.id, b.codice, b.nome, b.cognome, b.soprannome,
         b.data_nascita::text AS "dataNascita", b.telefono,
-        b.citta_id AS "cittaId", c.nome AS "cittaNome",
+        b.area_operativa_id AS "areaOperativaId", c.nome AS "areaOperativaNome",
         b.zona_uds_id AS "zonaUdsId", z.nome AS "zonaUdsNome",
         b.centro_ascolto_id AS "centroAscoltoId", ca.nome AS "centroAscoltoNome",
         b.uds AS "uds", b.versione AS "versione",
@@ -84,10 +84,10 @@ export async function searchBeneficiariDuplicates(
           + CASE WHEN ${dataNascita} <> '' AND b.data_nascita IS NOT NULL AND b.data_nascita::text = ${dataNascita} THEN 0.4 ELSE 0 END
         )::float8 AS score
       FROM beneficiari b
-      LEFT JOIN citta c ON c.id = b.citta_id
+      LEFT JOIN aree_operative c ON c.id = b.area_operativa_id
       LEFT JOIN zone_uds z ON z.id = b.zona_uds_id
       LEFT JOIN centri_di_ascolto ca ON ca.id = b.centro_ascolto_id
-      WHERE b.citta_id = ${input.cittaId}::int
+      WHERE b.area_operativa_id = ${input.areaOperativaId}::int
         AND (${input.excludeId ?? null}::int IS NULL OR b.id <> ${input.excludeId ?? null}::int)
     ) s
     WHERE s.score >= 0.2
@@ -103,8 +103,8 @@ export async function searchBeneficiariDuplicates(
     soprannome: (row.soprannome as string | null) ?? null,
     dataNascita: (row.dataNascita as string | null) ?? null,
     telefono: (row.telefono as string | null) ?? null,
-    cittaId: Number(row.cittaId),
-    cittaNome: (row.cittaNome as string | null) ?? null,
+    areaOperativaId: Number(row.areaOperativaId),
+    areaOperativaNome: (row.areaOperativaNome as string | null) ?? null,
     zonaUdsId: (row.zonaUdsId as number | null) ?? null,
     zonaUdsNome: (row.zonaUdsNome as string | null) ?? null,
     centroAscoltoId: (row.centroAscoltoId as number | null) ?? null,

@@ -13,7 +13,7 @@ import {
 import { eq, and, desc, inArray, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   centroScopeFilter,
   canAccessCentro,
   canAccessMagazzino,
@@ -149,12 +149,12 @@ router.get("/scarichi", requirePermission("magazzino.view"), async (req, res) =>
     res.status(400).json({ error: "Paginazione non valida: page >= 1 e limit tra 1 e 100" });
     return;
   }
-  // Centro is enforced via scarichi's own column; città is enforced via the
-  // scarico's magazzino (scarichi carry no direct cittaId).
-  const cittaMagazzini = await visibleMagazzinoIds(null, callerCittaId(req));
+  // Centro is enforced via scarichi's own column; area operativa is enforced via the
+  // scarico's magazzino (scarichi carry no direct areaOperativaId).
+  const areaOperativaMagazzini = await visibleMagazzinoIds(null, callerAreaOperativaId(req));
   const where = andScoped(
     centroScopeFilter(scarichiTable.centroAscoltoId, callerCentroId(req)),
-    magazzinoScopeFilter(scarichiTable.magazzinoId, cittaMagazzini),
+    magazzinoScopeFilter(scarichiTable.magazzinoId, areaOperativaMagazzini),
     callerCentroId(req) == null && req.query.centroAscoltoId != null
       ? eq(scarichiTable.centroAscoltoId, Number(req.query.centroAscoltoId))
       : undefined,
@@ -280,7 +280,7 @@ router.post("/scarichi", requirePermission("magazzino.stock.issue"), async (req,
     return;
   }
   const caller = callerCentroId(req);
-  if (!(await canAccessMagazzino(body.magazzinoId, caller, callerCittaId(req)))) {
+  if (!(await canAccessMagazzino(body.magazzinoId, caller, callerAreaOperativaId(req)))) {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
@@ -424,10 +424,10 @@ router.get("/scarichi/:id", requirePermission("magazzino.view"), async (req, res
     !(await canAccessMagazzino(
       result.magazzinoId,
       callerCentroId(req),
-      callerCittaId(req),
+      callerAreaOperativaId(req),
     ))
   ) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   res.json(result);

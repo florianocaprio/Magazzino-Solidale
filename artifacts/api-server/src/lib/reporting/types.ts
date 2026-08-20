@@ -14,7 +14,7 @@ export type ReportFilters = {
   da: string;
   a: string;
   anno: number;
-  cittaId: number | null;
+  areaOperativaId: number | null;
   centroAscoltoId: number | null;
   magazzinoId: number | null;
   mensaId: number | null;
@@ -22,7 +22,7 @@ export type ReportFilters = {
   operatoreId: number | null;
   tipoIntervento: string | null;
   tipoServizio: string | null;
-  cittaMode: "all" | "caller" | "query";
+  areaOperativaMode: "all" | "caller" | "query";
   centroMode: "all" | "caller" | "query";
   zonaMode: "all" | "caller" | "query";
   callerAreas: string[];
@@ -68,7 +68,7 @@ export type ReportingDashboard = {
   section: ReportSection;
   filters: Omit<
     ReportFilters,
-    | "cittaMode"
+    | "areaOperativaMode"
     | "centroMode"
     | "zonaMode"
     | "callerAreas"
@@ -96,7 +96,7 @@ export type ReportDrilldown = {
 
 export function publicFilters(filters: ReportFilters): ReportingDashboard["filters"] {
   const {
-    cittaMode: _cittaMode,
+    areaOperativaMode: _areaOperativaMode,
     centroMode: _centroMode,
     zonaMode: _zonaMode,
     callerAreas: _callerAreas,

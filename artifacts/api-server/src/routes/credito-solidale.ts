@@ -14,7 +14,7 @@ import {
   beneficiariTable,
   auditConfigurazioniTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   creditoSolidaleMovimentiTable,
   db,
   magazziniTable,
@@ -22,13 +22,13 @@ import {
 } from "@workspace/db";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   canAccessCentro,
-  canAccessCitta,
+  canAccessAreaOperativa,
   canAccessZonaUds,
   centroScopeFilter,
-  cittaScopeFilter,
+  areaOperativaScopeFilter,
 } from "../lib/centroScope";
 import { requireModulo } from "../lib/featureFlags";
 import {
@@ -84,7 +84,7 @@ const DEFAULT_POLICY = {
 };
 
 type PoliticaCalcolo = typeof DEFAULT_POLICY;
-type PoliticaOrigine = "centro" | "citta" | "globale" | "default";
+type PoliticaOrigine = "centro" | "areaOperativa" | "globale" | "default";
 
 const toNumber = (v: string | number | null | undefined): number => {
   if (v == null || v === "") return 0;
@@ -143,7 +143,7 @@ function canAccessBeneficiario(
 ): boolean {
   return (
     canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req)) &&
-    canAccessCitta(beneficiario.cittaId, callerCittaId(req)) &&
+    canAccessAreaOperativa(beneficiario.areaOperativaId, callerAreaOperativaId(req)) &&
     canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req))
   );
 }
@@ -188,7 +188,7 @@ async function findPolicyByBeneficiario(
     if (row) return { politica: row, origine: "centro" };
   }
 
-  if (beneficiario.cittaId != null) {
+  if (beneficiario.areaOperativaId != null) {
     const [row] = await db
       .select()
       .from(politicheCreditoSolidaleTable)
@@ -196,12 +196,12 @@ async function findPolicyByBeneficiario(
         and(
           eq(politicheCreditoSolidaleTable.attiva, true),
           isNull(politicheCreditoSolidaleTable.centroAscoltoId),
-          eq(politicheCreditoSolidaleTable.cittaId, beneficiario.cittaId),
+          eq(politicheCreditoSolidaleTable.areaOperativaId, beneficiario.areaOperativaId),
         ),
       )
       .orderBy(desc(politicheCreditoSolidaleTable.id))
       .limit(1);
-    if (row) return { politica: row, origine: "citta" };
+    if (row) return { politica: row, origine: "areaOperativa" };
   }
 
   const [globalPolicy] = await db
@@ -211,7 +211,7 @@ async function findPolicyByBeneficiario(
       and(
         eq(politicheCreditoSolidaleTable.attiva, true),
         isNull(politicheCreditoSolidaleTable.centroAscoltoId),
-        isNull(politicheCreditoSolidaleTable.cittaId),
+        isNull(politicheCreditoSolidaleTable.areaOperativaId),
       ),
     )
     .orderBy(desc(politicheCreditoSolidaleTable.id))
@@ -282,7 +282,7 @@ function fmtMovimento(row: {
   movimento: typeof creditoSolidaleMovimentiTable.$inferSelect;
   beneficiarioNome: string | null;
   centroAscoltoNome: string | null;
-  cittaNome: string | null;
+  areaOperativaNome: string | null;
 }) {
   const m = row.movimento;
   return {
@@ -291,8 +291,8 @@ function fmtMovimento(row: {
     beneficiarioNome: row.beneficiarioNome ?? "",
     centroAscoltoId: m.centroAscoltoId ?? null,
     centroAscoltoNome: row.centroAscoltoNome ?? null,
-    cittaId: m.cittaId ?? null,
-    cittaNome: row.cittaNome ?? null,
+    areaOperativaId: m.areaOperativaId ?? null,
+    areaOperativaNome: row.areaOperativaNome ?? null,
     tipoMovimento: m.tipoMovimento,
     variazioneCredito: Number(m.variazioneCredito),
     saldoPrima: Number(m.saldoPrima),
@@ -319,7 +319,7 @@ async function selectMovimenti(where: SQL[] = [], limit?: number) {
       movimento: creditoSolidaleMovimentiTable,
       beneficiarioNome: sqlBeneficiarioNome(),
       centroAscoltoNome: centriAscoltoTable.nome,
-      cittaNome: cittaTable.nome,
+      areaOperativaNome: areeOperativeTable.nome,
     })
     .from(creditoSolidaleMovimentiTable)
     .leftJoin(
@@ -331,8 +331,8 @@ async function selectMovimenti(where: SQL[] = [], limit?: number) {
       eq(creditoSolidaleMovimentiTable.centroAscoltoId, centriAscoltoTable.id),
     )
     .leftJoin(
-      cittaTable,
-      eq(creditoSolidaleMovimentiTable.cittaId, cittaTable.id),
+      areeOperativeTable,
+      eq(creditoSolidaleMovimentiTable.areaOperativaId, areeOperativeTable.id),
     )
     .where(where.length > 0 ? and(...where) : undefined)
     .orderBy(
@@ -426,7 +426,7 @@ async function creaMovimentoCreditoSolidaleTx(
     .values({
       beneficiarioId: beneficiario.id,
       centroAscoltoId: beneficiario.centroAscoltoId ?? null,
-      cittaId: beneficiario.cittaId ?? null,
+      areaOperativaId: beneficiario.areaOperativaId ?? null,
       tipoMovimento: input.tipoMovimento,
       variazioneCredito: decimalString(input.variazioneCredito),
       saldoPrima: decimalString(saldoPrima),
@@ -496,11 +496,11 @@ async function buildMonthlyPreview(
       status: 400,
     } as const;
   const centroAscolto = parseOptionalId(body.centroAscoltoId);
-  const citta = parseOptionalId(body.cittaId);
-  if (centroAscolto.error || citta.error)
+  const areaOperativa = parseOptionalId(body.areaOperativaId);
+  if (centroAscolto.error || areaOperativa.error)
     return { error: "Filtro non valido.", status: 400 } as const;
   const centroAscoltoId = centroAscolto.value;
-  const cittaId = citta.value;
+  const areaOperativaId = areaOperativa.value;
 
   const conditions: SQL[] = [
     eq(beneficiariTable.creditoSolidaleAbilitato, true),
@@ -508,31 +508,31 @@ async function buildMonthlyPreview(
     eq(beneficiariTable.attivo, true),
   ];
   const callerCentro = callerCentroId(req);
-  const callerCitta = callerCittaId(req);
+  const callerAreaOperativa = callerAreaOperativaId(req);
   if (callerCentro != null) {
     const f = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentro);
     if (f) conditions.push(f);
   } else if (centroAscoltoId !== undefined) {
     conditions.push(eq(beneficiariTable.centroAscoltoId, centroAscoltoId));
   }
-  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCitta);
-  if (cittaFilter) conditions.push(cittaFilter);
-  else if (cittaId !== undefined) {
-    conditions.push(eq(beneficiariTable.cittaId, cittaId));
+  const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativa);
+  if (areaOperativaFilter) conditions.push(areaOperativaFilter);
+  else if (areaOperativaId !== undefined) {
+    conditions.push(eq(beneficiariTable.areaOperativaId, areaOperativaId));
   }
 
   const rows = await db
     .select({
       beneficiario: beneficiariTable,
       centroAscoltoNome: centriAscoltoTable.nome,
-      cittaNome: cittaTable.nome,
+      areaOperativaNome: areeOperativeTable.nome,
     })
     .from(beneficiariTable)
     .leftJoin(
       centriAscoltoTable,
       eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
     )
-    .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+    .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
     .where(and(...conditions))
     .orderBy(beneficiariTable.cognome, beneficiariTable.nome);
 
@@ -578,8 +578,8 @@ async function buildMonthlyPreview(
       beneficiarioNome: `${b.cognome} ${b.nome}`,
       centroAscoltoId: b.centroAscoltoId ?? null,
       centroAscoltoNome: row.centroAscoltoNome ?? null,
-      cittaId: b.cittaId ?? null,
-      cittaNome: row.cittaNome ?? null,
+      areaOperativaId: b.areaOperativaId ?? null,
+      areaOperativaNome: row.areaOperativaNome ?? null,
       creditoSolidaleMensileAssegnato: quota,
       saldoAttuale,
       ricaricabile,
@@ -677,7 +677,7 @@ router.get(
       return;
     }
     const centro = parseOptionalId(q.centroAscoltoId);
-    const area = parseOptionalId(q.cittaId);
+    const area = parseOptionalId(q.areaOperativaId);
     if (centro.error || area.error) {
       res.status(400).json({ error: "Filtro Area o Centro non valido." });
       return;
@@ -694,7 +694,7 @@ router.get(
       if (predicate) conditions.push(predicate);
     }
     const callerCentro = callerCentroId(req);
-    const callerArea = callerCittaId(req);
+    const callerArea = callerAreaOperativaId(req);
     if (callerCentro != null) {
       const scoped = centroScopeFilter(
         beneficiariTable.centroAscoltoId,
@@ -703,10 +703,10 @@ router.get(
       if (scoped) conditions.push(scoped);
     } else if (centro.value != null)
       conditions.push(eq(beneficiariTable.centroAscoltoId, centro.value));
-    const areaScoped = cittaScopeFilter(beneficiariTable.cittaId, callerArea);
+    const areaScoped = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerArea);
     if (areaScoped) conditions.push(areaScoped);
     else if (area.value != null)
-      conditions.push(eq(beneficiariTable.cittaId, area.value));
+      conditions.push(eq(beneficiariTable.areaOperativaId, area.value));
     const where = conditions.length ? and(...conditions) : undefined;
     const [{ total }] = await db
       .select({ total: sql<number>`count(*)::int` })
@@ -716,7 +716,7 @@ router.get(
       .select({
         beneficiario: beneficiariTable,
         centroAscoltoNome: centriAscoltoTable.nome,
-        cittaNome: cittaTable.nome,
+        areaOperativaNome: areeOperativeTable.nome,
         magazzinoEmporioPreferitoNome: magazziniTable.nome,
       })
       .from(beneficiariTable)
@@ -724,7 +724,7 @@ router.get(
         centriAscoltoTable,
         eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
       )
-      .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+      .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
       .leftJoin(
         magazziniTable,
         eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id),
@@ -743,7 +743,7 @@ router.get(
         ({
           beneficiario: b,
           centroAscoltoNome,
-          cittaNome,
+          areaOperativaNome,
           magazzinoEmporioPreferitoNome,
         }) => ({
           id: b.id,
@@ -753,8 +753,8 @@ router.get(
           nome: b.nome,
           centroAscoltoId: b.centroAscoltoId ?? null,
           centroAscoltoNome: centroAscoltoNome ?? null,
-          cittaId: b.cittaId ?? null,
-          cittaNome: cittaNome ?? null,
+          areaOperativaId: b.areaOperativaId ?? null,
+          areaOperativaNome: areaOperativaNome ?? null,
           attivo: b.attivo,
           creditoSolidaleAbilitato: b.creditoSolidaleAbilitato,
           creditoSolidaleStato: b.creditoSolidaleStato,
@@ -780,7 +780,7 @@ router.get(
     const q = req.query as Record<string, string | undefined>;
     const conditions: SQL[] = [];
     const callerCentro = callerCentroId(req);
-    const callerCitta = callerCittaId(req);
+    const callerAreaOperativa = callerAreaOperativaId(req);
     if (q.beneficiarioId)
       conditions.push(
         eq(
@@ -821,14 +821,14 @@ router.get(
         ),
       );
     }
-    const cittaFilter = cittaScopeFilter(
-      creditoSolidaleMovimentiTable.cittaId,
-      callerCitta,
+    const areaOperativaFilter = areaOperativaScopeFilter(
+      creditoSolidaleMovimentiTable.areaOperativaId,
+      callerAreaOperativa,
     );
-    if (cittaFilter) conditions.push(cittaFilter);
-    else if (q.cittaId) {
+    if (areaOperativaFilter) conditions.push(areaOperativaFilter);
+    else if (q.areaOperativaId) {
       conditions.push(
-        eq(creditoSolidaleMovimentiTable.cittaId, Number(q.cittaId)),
+        eq(creditoSolidaleMovimentiTable.areaOperativaId, Number(q.areaOperativaId)),
       );
     }
     const rows = await selectMovimenti(conditions);

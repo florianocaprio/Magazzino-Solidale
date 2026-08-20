@@ -13,7 +13,7 @@ import {
 import { eq, and, ne, gt, sum, inArray, countDistinct, asc } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
   andScoped,
@@ -33,38 +33,38 @@ router.use(
 /**
  * Goods to prepare for the PLANNED deliveries of a warehouse.
  *
- * The user picks a città (narrows the magazzino list client-side) and a
+ * The user picks a area operativa (narrows the magazzino list client-side) and a
  * magazzino di riferimento; the endpoint aggregates, from every planned
  * (`consegne.stato='pianificata'`) delivery whose non-annullato bolla ships
  * from the selected warehouse(s), how much of each product must be prepared,
  * alongside the current stock available there and the list of deliveries
- * included. Città/centro HARD scoping is enforced server-side via the visible
+ * included. Area Operativa/centro HARD scoping is enforced server-side via the visible
  * warehouse set, regardless of the optional query filters.
  */
 router.get("/preparazione-consegne", requirePermission("magazzino.view"), async (req, res) => {
-  const { cittaId, magazzinoId } = req.query as Record<string, string>;
+  const { areaOperativaId, magazzinoId } = req.query as Record<string, string>;
 
-  const cittaIdNum = cittaId ? parseInt(cittaId) : undefined;
+  const areaOperativaIdNum = areaOperativaId ? parseInt(areaOperativaId) : undefined;
   const magazzinoIdNum = magazzinoId ? parseInt(magazzinoId) : undefined;
   if (
-    (cittaIdNum !== undefined && Number.isNaN(cittaIdNum)) ||
+    (areaOperativaIdNum !== undefined && Number.isNaN(areaOperativaIdNum)) ||
     (magazzinoIdNum !== undefined && Number.isNaN(magazzinoIdNum))
   ) {
     res
       .status(400)
-      .json({ message: "cittaId e magazzinoId devono essere numerici" });
+      .json({ message: "areaOperativaId e magazzinoId devono essere numerici" });
     return;
   }
 
-  // 1) Resolve the eligible warehouse ids: optional città/magazzino filters
-  //    intersected with the caller's visible (centro + città) warehouse set.
+  // 1) Resolve the eligible warehouse ids: optional area operativa/magazzino filters
+  //    intersected with the caller's visible (centro + area operativa) warehouse set.
   const visible = await visibleMagazzinoIds(
     callerCentroId(req),
-    callerCittaId(req),
+    callerAreaOperativaId(req),
   );
   const magConds = [
-    cittaIdNum !== undefined
-      ? eq(magazziniTable.cittaId, cittaIdNum)
+    areaOperativaIdNum !== undefined
+      ? eq(magazziniTable.areaOperativaId, areaOperativaIdNum)
       : undefined,
     magazzinoIdNum !== undefined
       ? eq(magazziniTable.id, magazzinoIdNum)

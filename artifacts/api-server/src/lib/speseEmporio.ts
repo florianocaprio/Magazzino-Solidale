@@ -3,7 +3,7 @@ import {
   bolleTable,
   bollaRigheTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   consegneTable,
   creditoSolidaleMovimentiTable,
   db,
@@ -614,7 +614,7 @@ export async function chiudiSessioneCassaEmporio(opts: {
         accessoEmporioId: accesso.id,
         beneficiarioId: sessione.beneficiarioId,
         centroAscoltoId: sessione.centroAscoltoId,
-        cittaId: sessione.cittaId,
+        areaOperativaId: sessione.areaOperativaId,
         magazzinoEmporioId: sessione.magazzinoEmporioId,
         scaricoId: scarico.id,
         bollaId: bolla.id,
@@ -652,7 +652,7 @@ export async function chiudiSessioneCassaEmporio(opts: {
       .values({
         beneficiarioId: beneficiario.id,
         centroAscoltoId: beneficiario.centroAscoltoId,
-        cittaId: beneficiario.cittaId,
+        areaOperativaId: beneficiario.areaOperativaId,
         tipoMovimento: "consumo_spesa",
         variazioneCredito: asDecimal(-totaleCredito),
         saldoPrima: asDecimal(saldoPrima),
@@ -738,7 +738,7 @@ function formatSpesa(
     beneficiarioNome: string | null;
     beneficiarioCodice: string | null;
     centroAscoltoNome: string | null;
-    cittaNome: string | null;
+    areaOperativaNome: string | null;
     magazzinoEmporioNome: string | null;
     bollaNumero: string | null;
     operatoreMatricola: string | null;
@@ -761,8 +761,8 @@ function formatSpesa(
     beneficiarioCodice: row.beneficiarioCodice,
     centroAscoltoId: row.s.centroAscoltoId,
     centroAscoltoNome: row.centroAscoltoNome,
-    cittaId: row.s.cittaId,
-    cittaNome: row.cittaNome,
+    areaOperativaId: row.s.areaOperativaId,
+    areaOperativaNome: row.areaOperativaNome,
     magazzinoEmporioId: row.s.magazzinoEmporioId,
     magazzinoEmporioNome: row.magazzinoEmporioNome,
     scaricoId: row.s.scaricoId,
@@ -826,7 +826,7 @@ function baseSpeseQuery(conditions: SQL[] = []) {
       beneficiarioNome: sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`,
       beneficiarioCodice: beneficiariTable.codice,
       centroAscoltoNome: centriAscoltoTable.nome,
-      cittaNome: cittaTable.nome,
+      areaOperativaNome: areeOperativeTable.nome,
       magazzinoEmporioNome: magazziniTable.nome,
       bollaNumero: bolleTable.numeroBolla,
       operatoreMatricola: utentiTable.matricola,
@@ -841,7 +841,7 @@ function baseSpeseQuery(conditions: SQL[] = []) {
       centriAscoltoTable,
       eq(speseEmporioTable.centroAscoltoId, centriAscoltoTable.id),
     )
-    .leftJoin(cittaTable, eq(speseEmporioTable.cittaId, cittaTable.id))
+    .leftJoin(areeOperativeTable, eq(speseEmporioTable.areaOperativaId, areeOperativeTable.id))
     .leftJoin(
       magazziniTable,
       eq(speseEmporioTable.magazzinoEmporioId, magazziniTable.id),
@@ -862,7 +862,7 @@ export async function listSpeseEmporio(
     beneficiarioId?: number;
     magazzinoEmporioId?: number;
     centroAscoltoId?: number;
-    cittaId?: number;
+    areaOperativaId?: number;
     zonaUdsId?: number;
     visibleMagazzinoIds?: number[] | null;
     page?: number;
@@ -896,8 +896,8 @@ export async function listSpeseEmporio(
     conditions.push(
       eq(speseEmporioTable.centroAscoltoId, params.centroAscoltoId),
     );
-  if (params.cittaId != null)
-    conditions.push(eq(speseEmporioTable.cittaId, params.cittaId));
+  if (params.areaOperativaId != null)
+    conditions.push(eq(speseEmporioTable.areaOperativaId, params.areaOperativaId));
   if (params.zonaUdsId != null)
     conditions.push(eq(beneficiariTable.zonaUdsId, params.zonaUdsId));
   const magazzinoFilter = magazzinoScopeFilter(
@@ -1267,7 +1267,7 @@ export async function stornaSpesaEmporio(
       .values({
         beneficiarioId: beneficiario.id,
         centroAscoltoId: beneficiario.centroAscoltoId,
-        cittaId: beneficiario.cittaId,
+        areaOperativaId: beneficiario.areaOperativaId,
         tipoMovimento: "storno",
         variazioneCredito: asDecimal(creditoRestituito),
         saldoPrima: asDecimal(saldoPrima),

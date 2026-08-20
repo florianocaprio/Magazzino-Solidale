@@ -5,10 +5,10 @@ import { dashboard, kpi, quality } from "./shared";
 import { isModuloAttivo } from "../featureFlags";
 
 function warehouseConditions(filters: ReportFilters, alias: "mg" | "mo" | "md" = "mg"): SQL[] {
-  const citta = alias === "mg" ? sql`mg.citta_id` : alias === "mo" ? sql`mo.citta_id` : sql`md.citta_id`;
+  const areaOperativa = alias === "mg" ? sql`mg.area_operativa_id` : alias === "mo" ? sql`mo.area_operativa_id` : sql`md.area_operativa_id`;
   const centro = alias === "mg" ? sql`mg.centro_ascolto_id` : alias === "mo" ? sql`mo.centro_ascolto_id` : sql`md.centro_ascolto_id`;
   const id = alias === "mg" ? sql`mg.id` : alias === "mo" ? sql`mo.id` : sql`md.id`;
-  return reportScope(filters, { citta, centro, magazzino: id });
+  return reportScope(filters, { areaOperativa, centro, magazzino: id });
 }
 
 function movementConditions(filters: ReportFilters): SQL[] {
@@ -80,21 +80,21 @@ export async function buildLogisticaReport(filters: ReportFilters) {
       WHERE ap.stato IN ('bozza', 'sottomesso')
         AND ap.data_richiesta BETWEEN ${filters.da} AND ${filters.a}
         AND ${andSql(reportScope(filters, {
-          citta: sql`mg.citta_id`, centro: sql`ap.centro_ascolto_id`, magazzino: sql`ap.magazzino_id`,
+          areaOperativa: sql`mg.area_operativa_id`, centro: sql`ap.centro_ascolto_id`, magazzino: sql`ap.magazzino_id`,
         }))}
     `),
     rows<Record<string, unknown>>(sql`
       SELECT COUNT(DISTINCT uso.mezzo_id) AS mezzi
       FROM (
-        SELECT c.mezzo_id, be.citta_id, be.centro_ascolto_id
+        SELECT c.mezzo_id, be.area_operativa_id, be.centro_ascolto_id
         FROM consegne c JOIN beneficiari be ON be.id = c.beneficiario_id
         WHERE c.mezzo_id IS NOT NULL AND c.data_prevista BETWEEN ${filters.da} AND ${filters.a}
         UNION ALL
-        SELECT b.mezzo_id, be.citta_id, be.centro_ascolto_id
+        SELECT b.mezzo_id, be.area_operativa_id, be.centro_ascolto_id
         FROM bolle b JOIN beneficiari be ON be.id = b.beneficiario_id
         WHERE b.mezzo_id IS NOT NULL AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
       ) uso
-      WHERE ${andSql(reportScope(filters, { citta: sql`uso.citta_id`, centro: sql`uso.centro_ascolto_id` }))}
+      WHERE ${andSql(reportScope(filters, { areaOperativa: sql`uso.area_operativa_id`, centro: sql`uso.centro_ascolto_id` }))}
     `),
     rows<Record<string, unknown>>(sql`
       SELECT to_char(mv.data_movimento, 'YYYY-MM') AS mese,

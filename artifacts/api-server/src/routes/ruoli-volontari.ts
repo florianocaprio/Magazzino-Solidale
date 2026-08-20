@@ -21,7 +21,7 @@ function fmt(r: typeof ruoliVolontariTable.$inferSelect) {
   };
 }
 
-// Volunteer roles are a GLOBAL configurable lookup (no città/centro scoping),
+// Volunteer roles are a GLOBAL configurable lookup (no area operativa/centro scoping),
 // readable by logistica staff (to fill the volontari form) and editable only by
 // admins (mutations are guarded with requireAdmin).
 router.get("/ruoli-volontari", async (_req, res) => {

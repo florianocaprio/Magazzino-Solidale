@@ -3,17 +3,17 @@ import { and, eq } from "drizzle-orm";
 import {
   beneficiariTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   magazziniTable,
   zoneUdsTable,
 } from "@workspace/db";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   canAccessCentro,
-  canAccessCitta,
+  canAccessAreaOperativa,
   canAccessZonaUds,
 } from "./centroScope";
 import type { PermissionKey } from "./permissions";
@@ -23,11 +23,11 @@ export function hasPermission(req: Request, permission: PermissionKey): boolean 
 }
 
 export function canAccessBeneficiarioRecord(
-  beneficiario: Pick<typeof beneficiariTable.$inferSelect, "cittaId" | "centroAscoltoId" | "zonaUdsId">,
+  beneficiario: Pick<typeof beneficiariTable.$inferSelect, "areaOperativaId" | "centroAscoltoId" | "zonaUdsId">,
   req: Request,
 ): boolean {
   return canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req))
-    && canAccessCitta(beneficiario.cittaId, callerCittaId(req))
+    && canAccessAreaOperativa(beneficiario.areaOperativaId, callerAreaOperativaId(req))
     && canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req));
 }
 
@@ -38,11 +38,11 @@ export function canAccessBeneficiarioRecord(
  * Centro/Zona applicati da {@link canAccessBeneficiarioRecord}.
  */
 export function canViewBeneficiarioRecord(
-  beneficiario: Pick<typeof beneficiariTable.$inferSelect, "cittaId" | "centroAscoltoId" | "zonaUdsId">,
+  beneficiario: Pick<typeof beneficiariTable.$inferSelect, "areaOperativaId" | "centroAscoltoId" | "zonaUdsId">,
   req: Request,
 ): boolean {
   if (req.user?.aree?.includes("uds") && !req.user?.aree?.includes("sociale")) {
-    return canAccessCitta(beneficiario.cittaId, callerCittaId(req));
+    return canAccessAreaOperativa(beneficiario.areaOperativaId, callerAreaOperativaId(req));
   }
   return canAccessBeneficiarioRecord(beneficiario, req);
 }
@@ -56,7 +56,7 @@ export function visibleInterventoAmbiti(req: Request): Array<"sociale" | "uds"> 
 }
 
 export type BeneficiarioTerritorialAssignment = {
-  cittaId: number | null;
+  areaOperativaId: number | null;
   centroAscoltoId: number | null;
   zonaUdsId: number | null;
   magazzinoEmporioPreferitoId: number | null;
@@ -66,35 +66,35 @@ export async function validateBeneficiarioTerritorialAssignment(
   assignment: BeneficiarioTerritorialAssignment,
   options: { requireArea: boolean; requireActiveArea: boolean },
 ): Promise<{ status: number; error: string } | null> {
-  const { cittaId, centroAscoltoId, zonaUdsId, magazzinoEmporioPreferitoId } = assignment;
-  if (cittaId == null) {
+  const { areaOperativaId, centroAscoltoId, zonaUdsId, magazzinoEmporioPreferitoId } = assignment;
+  if (areaOperativaId == null) {
     return options.requireArea ? { status: 400, error: "Seleziona un'Area per il Beneficiario." } : null;
   }
 
-  const [area] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo })
-    .from(cittaTable).where(eq(cittaTable.id, cittaId));
-  if (!area) return { status: 400, error: "L'Area selezionata non esiste." };
-  if (options.requireActiveArea && !area.attivo) return { status: 400, error: "L'Area selezionata non è attiva." };
+  const [area] = await db.select({ id: areeOperativeTable.id, attivo: areeOperativeTable.attivo })
+    .from(areeOperativeTable).where(eq(areeOperativeTable.id, areaOperativaId));
+  if (!area) return { status: 400, error: "L'Area Operativa selezionata non esiste." };
+  if (options.requireActiveArea && !area.attivo) return { status: 400, error: "L'Area Operativa selezionata non è attiva." };
 
   if (centroAscoltoId != null) {
-    const [centro] = await db.select({ cittaId: centriAscoltoTable.cittaId, attivo: centriAscoltoTable.attivo })
+    const [centro] = await db.select({ areaOperativaId: centriAscoltoTable.areaOperativaId, attivo: centriAscoltoTable.attivo })
       .from(centriAscoltoTable).where(eq(centriAscoltoTable.id, centroAscoltoId));
     if (!centro) return { status: 400, error: "Il Centro di Ascolto selezionato non esiste." };
     if (!centro.attivo) return { status: 400, error: "Il Centro di Ascolto selezionato non è attivo." };
-    if (centro.cittaId !== cittaId) return { status: 400, error: "Il Centro di Ascolto deve appartenere alla stessa Area del Beneficiario." };
+    if (centro.areaOperativaId !== areaOperativaId) return { status: 400, error: "Il Centro di Ascolto deve appartenere alla stessa Area Operativa del Beneficiario." };
   }
 
   if (zonaUdsId != null) {
-    const [zona] = await db.select({ cittaId: zoneUdsTable.cittaId, attivo: zoneUdsTable.attivo })
+    const [zona] = await db.select({ areaOperativaId: zoneUdsTable.areaOperativaId, attivo: zoneUdsTable.attivo })
       .from(zoneUdsTable).where(eq(zoneUdsTable.id, zonaUdsId));
     if (!zona) return { status: 400, error: "La Zona UDS selezionata non esiste." };
     if (!zona.attivo) return { status: 400, error: "La Zona UDS selezionata non è attiva." };
-    if (zona.cittaId !== cittaId) return { status: 400, error: "La Zona UDS deve appartenere alla stessa Area del Beneficiario." };
+    if (zona.areaOperativaId !== areaOperativaId) return { status: 400, error: "La Zona UDS deve appartenere alla stessa Area Operativa del Beneficiario." };
   }
 
   if (magazzinoEmporioPreferitoId != null) {
     const [emporio] = await db.select({
-      cittaId: magazziniTable.cittaId,
+      areaOperativaId: magazziniTable.areaOperativaId,
       stato: magazziniTable.stato,
       tipoMagazzino: magazziniTable.tipoMagazzino,
     }).from(magazziniTable).where(and(
@@ -105,7 +105,7 @@ export async function validateBeneficiarioTerritorialAssignment(
     if (emporio.tipoMagazzino !== "emporio" && emporio.tipoMagazzino !== "misto") {
       return { status: 400, error: "Il magazzino selezionato non è un Emporio Solidale." };
     }
-    if (emporio.cittaId !== cittaId) return { status: 400, error: "L'Emporio deve appartenere alla stessa Area del Beneficiario." };
+    if (emporio.areaOperativaId !== areaOperativaId) return { status: 400, error: "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario." };
   }
   return null;
 }
@@ -113,7 +113,7 @@ export async function validateBeneficiarioTerritorialAssignment(
 export async function canCreateActivityForBeneficiario(beneficiarioId: number, req: Request): Promise<boolean> {
   const [beneficiario] = await db.select({
     attivo: beneficiariTable.attivo,
-    cittaId: beneficiariTable.cittaId,
+    areaOperativaId: beneficiariTable.areaOperativaId,
     centroAscoltoId: beneficiariTable.centroAscoltoId,
     zonaUdsId: beneficiariTable.zonaUdsId,
   }).from(beneficiariTable).where(eq(beneficiariTable.id, beneficiarioId));

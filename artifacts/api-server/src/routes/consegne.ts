@@ -11,16 +11,16 @@ import {
 import { eq, and, gte, lte, desc, inArray, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   centroScopeFilter,
-  cittaScopeFilter,
+  areaOperativaScopeFilter,
   zonaUdsScopeFilter,
   canAccessCentro,
-  canAccessCitta,
+  canAccessAreaOperativa,
   canAccessZonaUds,
   beneficiarioCentroId,
-  beneficiarioCittaId,
+  beneficiarioAreaOperativaId,
   beneficiarioZonaUdsId,
   canUseBeneficiario,
   canAccessMagazzino,
@@ -106,8 +106,8 @@ router.get("/consegne", async (req, res) => {
   } else if (centroAscoltoId) {
     conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
   }
-  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
-  if (cittaFilter) conditions.push(cittaFilter);
+  const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
+  if (areaOperativaFilter) conditions.push(areaOperativaFilter);
   const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
 
@@ -169,7 +169,7 @@ router.get("/consegne", async (req, res) => {
 router.post("/consegne", async (req, res) => {
   const body = normalizeConsegnaPayload(req.body);
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
   if (body.volontarioId != null && body.volontarioAltro) {
     res.status(400).json({ error: "Indicare un volontario censito oppure Altro, non entrambi" });
@@ -204,7 +204,7 @@ router.get("/consegne/:id", async (req, res) => {
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   if (row.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(row.beneficiarioId), callerCittaId(req))
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(row.beneficiarioId), callerAreaOperativaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(row.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -218,10 +218,10 @@ router.patch("/consegne/:id", async (req, res) => {
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (existing.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
   if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)
-      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), cid)
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(existing.beneficiarioId), cid)
       || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), zid)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -263,7 +263,7 @@ router.delete("/consegne/:id", async (req, res) => {
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (existing.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(existing.beneficiarioId), callerCittaId(req))
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(existing.beneficiarioId), callerAreaOperativaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -285,7 +285,7 @@ router.post("/consegne/:id/associa-bolla", async (req, res) => {
   if (!consegna) { res.status(404).json({ error: "Consegna non trovata" }); return; }
   if (consegna.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Consegna non trovata" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), callerCittaId(req))
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(consegna.beneficiarioId), callerAreaOperativaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -334,10 +334,10 @@ router.post("/consegne/:id/completa", async (req, res) => {
   if (!consegna) { res.status(404).json({ error: "Not found" }); return; }
   if (consegna.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
   if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), caller)
-      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), cid)
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(consegna.beneficiarioId), cid)
       || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), zid)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -464,7 +464,7 @@ async function inviaReminderConsegna(req: import("express").Request, res: import
   const r = await caricaConsegnaPerEmail(consegnaId);
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(r.c.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(r.c.beneficiarioId), callerCittaId(req))
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(r.c.beneficiarioId), callerAreaOperativaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(r.c.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;

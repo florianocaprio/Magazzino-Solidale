@@ -141,15 +141,15 @@ router.get("/report/filter-options", async (req, res) => {
   try {
     const section = String(req.query.section ?? "") as ReportSection;
     if (!sections.has(section)) throw new ReportingError(400, "section non valida");
-    const rawCityId = req.query.cittaId;
-    const requestedCityId = rawCityId == null || rawCityId === "" ? null : Number(rawCityId);
-    if (requestedCityId != null && (!Number.isInteger(requestedCityId) || requestedCityId <= 0)) {
-      throw new ReportingError(400, "cittaId non valido");
+    const rawAreaOperativaId = req.query.areaOperativaId;
+    const requestedAreaOperativaId = rawAreaOperativaId == null || rawAreaOperativaId === "" ? null : Number(rawAreaOperativaId);
+    if (requestedAreaOperativaId != null && (!Number.isInteger(requestedAreaOperativaId) || requestedAreaOperativaId <= 0)) {
+      throw new ReportingError(400, "areaOperativaId non valido");
     }
-    if (req.user?.cittaId != null && requestedCityId != null && req.user.cittaId !== requestedCityId) {
-      throw new ReportingError(403, "La città richiesta è fuori dal perimetro del ruolo");
+    if (req.user?.areaOperativaId != null && requestedAreaOperativaId != null && req.user.areaOperativaId !== requestedAreaOperativaId) {
+      throw new ReportingError(403, "La area operativa richiesta è fuori dal perimetro del ruolo");
     }
-    res.json(await buildReportFilterOptions(req, section, requestedCityId));
+    res.json(await buildReportFilterOptions(req, section, requestedAreaOperativaId));
   } catch (error) {
     if (sendError(error, res)) return;
     throw error;

@@ -15,7 +15,7 @@ export function stessoGiornoServizioMensa(accesso: Date, pasto: Date): boolean {
 /**
  * Territorial policy for exceptions between Mense.
  *
- * The current domain uses cittaId as its canonical territorial scope. Keeping
+ * The current domain uses areaOperativaId as its canonical territorial scope. Keeping
  * this comparison behind a semantic policy function avoids spreading that
  * implementation detail when a dedicated areaId is introduced in the future.
  */

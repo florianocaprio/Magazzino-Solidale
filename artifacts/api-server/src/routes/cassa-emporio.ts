@@ -3,7 +3,7 @@ import {
   beneficiariTable,
   centriAscoltoTable,
   consegneTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   lottiTable,
   magazziniTable,
@@ -31,12 +31,12 @@ import {
 } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   canAccessMagazzino,
   canUseBeneficiario,
   centroScopeFilter,
-  cittaScopeFilter,
+  areaOperativaScopeFilter,
   magazzinoScopeFilter,
   visibleMagazzinoIds,
   zonaUdsScopeFilter,
@@ -337,7 +337,7 @@ async function validateMagazzinoEmporio(
     .where(eq(magazziniTable.id, id));
   if (!magazzino || !["emporio", "misto"].includes(magazzino.tipoMagazzino))
     return { error: MSG_MAGAZZINO_EMPORIO, status: 400 };
-  if (!(await canAccessMagazzino(id, callerCentroId(req), callerCittaId(req))))
+  if (!(await canAccessMagazzino(id, callerCentroId(req), callerAreaOperativaId(req))))
     return {
       error: "Magazzino non accessibile per il tuo profilo",
       status: 403,
@@ -356,7 +356,7 @@ async function ensureSessioneAccessibile(
     !(await canUseBeneficiario(
       sessione.beneficiarioId,
       callerCentroId(req),
-      callerCittaId(req),
+      callerAreaOperativaId(req),
       callerZonaUdsId(req),
     ))
   ) {
@@ -369,7 +369,7 @@ async function ensureSessioneAccessibile(
     !(await canAccessMagazzino(
       sessione.magazzinoEmporioId,
       callerCentroId(req),
-      callerCittaId(req),
+      callerAreaOperativaId(req),
     ))
   ) {
     res
@@ -458,7 +458,7 @@ async function formatSessione(
       : null,
     beneficiarioCodice: beneficiario?.codice ?? null,
     centroAscoltoId: sessione.centroAscoltoId,
-    cittaId: sessione.cittaId,
+    areaOperativaId: sessione.areaOperativaId,
     magazzinoEmporioId: sessione.magazzinoEmporioId,
     magazzinoEmporioNome: magazzino?.nome ?? null,
     statoSessione: sessione.statoSessione,
@@ -655,10 +655,10 @@ router.get(
     if (!(await assertEmporioEnabled(res))) return;
     const query = req.query as Record<string, string>;
     const q = asText(query.search);
-    const requestedCittaId = asInt(query.cittaId ?? query.areaId);
+    const requestedAreaOperativaId = asInt(query.areaOperativaId ?? query.areaId);
     const magazzinoEmporioId = asInt(query.magazzinoEmporioId);
     const dateBounds = dayBounds(asText(query.data));
-    if (!q && requestedCittaId == null && magazzinoEmporioId == null) {
+    if (!q && requestedAreaOperativaId == null && magazzinoEmporioId == null) {
       res.json([]);
       return;
     }
@@ -671,9 +671,9 @@ router.get(
       }
       selectedMagazzino = magazzino.magazzino;
       if (
-        requestedCittaId != null &&
-        selectedMagazzino.cittaId != null &&
-        selectedMagazzino.cittaId !== requestedCittaId
+        requestedAreaOperativaId != null &&
+        selectedMagazzino.areaOperativaId != null &&
+        selectedMagazzino.areaOperativaId !== requestedAreaOperativaId
       ) {
         res.json([]);
         return;
@@ -758,21 +758,21 @@ router.get(
           ),
         )!,
       );
-    } else if (requestedCittaId != null) {
-      conditions.push(eq(beneficiariTable.cittaId, requestedCittaId));
-    } else if (!q && selectedMagazzino?.cittaId != null) {
-      conditions.push(eq(beneficiariTable.cittaId, selectedMagazzino.cittaId));
+    } else if (requestedAreaOperativaId != null) {
+      conditions.push(eq(beneficiariTable.areaOperativaId, requestedAreaOperativaId));
+    } else if (!q && selectedMagazzino?.areaOperativaId != null) {
+      conditions.push(eq(beneficiariTable.areaOperativaId, selectedMagazzino.areaOperativaId));
     }
     const centroFilter = centroScopeFilter(
       beneficiariTable.centroAscoltoId,
       callerCentroId(req),
     );
     if (centroFilter) conditions.push(centroFilter);
-    const cittaFilter = cittaScopeFilter(
-      beneficiariTable.cittaId,
-      callerCittaId(req),
+    const areaOperativaFilter = areaOperativaScopeFilter(
+      beneficiariTable.areaOperativaId,
+      callerAreaOperativaId(req),
     );
-    if (cittaFilter) conditions.push(cittaFilter);
+    if (areaOperativaFilter) conditions.push(areaOperativaFilter);
     const zonaFilter = zonaUdsScopeFilter(
       beneficiariTable.zonaUdsId,
       callerZonaUdsId(req),
@@ -834,7 +834,7 @@ router.get(
         beneficiarioCodice: beneficiario.codice,
         beneficiarioCodiceFiscale: beneficiario.codiceFiscale,
         centroAscoltoId: beneficiario.centroAscoltoId,
-        cittaId: beneficiario.cittaId,
+        areaOperativaId: beneficiario.areaOperativaId,
         magazzinoEmporioPreferitoId: beneficiario.magazzinoEmporioPreferitoId,
         magazzinoEmporioPreferitoNome: magazzinoPreferito?.nome ?? null,
         saldoCreditoSolidale: parseDbNumber(beneficiario.creditoSolidaleSaldo),
@@ -987,9 +987,9 @@ router.get(
           Number(q.magazzinoEmporioId),
         ),
       );
-    const requestedCittaId = asInt(q.cittaId ?? q.areaId);
-    if (requestedCittaId != null)
-      conditions.push(eq(sessioniCassaEmporioTable.cittaId, requestedCittaId));
+    const requestedAreaOperativaId = asInt(q.areaOperativaId ?? q.areaId);
+    if (requestedAreaOperativaId != null)
+      conditions.push(eq(sessioniCassaEmporioTable.areaOperativaId, requestedAreaOperativaId));
     const dateBounds = dayBounds(asText(q.data));
     if (dateBounds != null) {
       conditions.push(
@@ -1023,11 +1023,11 @@ router.get(
       callerCentroId(req),
     );
     if (centroFilter) conditions.push(centroFilter);
-    const cittaFilter = cittaScopeFilter(
-      beneficiariTable.cittaId,
-      callerCittaId(req),
+    const areaOperativaFilter = areaOperativaScopeFilter(
+      beneficiariTable.areaOperativaId,
+      callerAreaOperativaId(req),
     );
-    if (cittaFilter) conditions.push(cittaFilter);
+    if (areaOperativaFilter) conditions.push(areaOperativaFilter);
     const zonaFilter = zonaUdsScopeFilter(
       beneficiariTable.zonaUdsId,
       callerZonaUdsId(req),
@@ -1035,7 +1035,7 @@ router.get(
     if (zonaFilter) conditions.push(zonaFilter);
     const magazzinoFilter = magazzinoScopeFilter(
       sessioniCassaEmporioTable.magazzinoEmporioId,
-      await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)),
+      await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)),
     );
     if (magazzinoFilter) conditions.push(magazzinoFilter);
     const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -1110,7 +1110,7 @@ router.post(
       !(await canUseBeneficiario(
         accesso.beneficiarioId,
         callerCentroId(req),
-        callerCittaId(req),
+        callerAreaOperativaId(req),
         callerZonaUdsId(req),
       ))
     ) {
@@ -1136,9 +1136,9 @@ router.post(
       res.status(magazzino.status).json({ error: magazzino.error });
       return;
     }
-    if (magazzino.magazzino.cittaId !== beneficiario!.cittaId) {
+    if (magazzino.magazzino.areaOperativaId !== beneficiario!.areaOperativaId) {
       res.status(400).json({
-        error: "L'Emporio deve appartenere alla stessa Area del Beneficiario.",
+        error: "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
       });
       return;
     }
@@ -1196,7 +1196,7 @@ router.post(
             beneficiarioId: lockedAccess.beneficiarioId,
             magazzinoEmporioId: lockedAccess.magazzinoEmporioId,
             centroAscoltoId: beneficiario!.centroAscoltoId,
-            cittaId: beneficiario!.cittaId,
+            areaOperativaId: beneficiario!.areaOperativaId,
             saldoCreditoIniziale: asMoney(saldoCreditoIniziale),
             totaleCreditoPrevisto: "0.00",
             creditoResiduoPrevisto: asMoney(saldoCreditoIniziale),
@@ -1270,7 +1270,7 @@ router.post(
       !(await canUseBeneficiario(
         beneficiarioId,
         callerCentroId(req),
-        callerCittaId(req),
+        callerAreaOperativaId(req),
         callerZonaUdsId(req),
       ))
     ) {
@@ -1293,9 +1293,9 @@ router.post(
       res.status(magazzino.status).json({ error: magazzino.error });
       return;
     }
-    if (magazzino.magazzino.cittaId !== beneficiario!.cittaId) {
+    if (magazzino.magazzino.areaOperativaId !== beneficiario!.areaOperativaId) {
       res.status(400).json({
-        error: "L'Emporio deve appartenere alla stessa Area del Beneficiario.",
+        error: "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
       });
       return;
     }
@@ -1385,7 +1385,7 @@ router.post(
             beneficiarioId,
             magazzinoEmporioId,
             centroAscoltoId: beneficiario!.centroAscoltoId,
-            cittaId: beneficiario!.cittaId,
+            areaOperativaId: beneficiario!.areaOperativaId,
             saldoCreditoIniziale: asMoney(saldoCreditoIniziale),
             totaleCreditoPrevisto: "0.00",
             creditoResiduoPrevisto: asMoney(saldoCreditoIniziale),

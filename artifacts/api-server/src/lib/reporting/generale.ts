@@ -45,31 +45,31 @@ function eventUnions(filters: ReportFilters, active: ActiveSources): SQL[] {
   const unions: SQL[] = [];
   if (active.pacchi) {
     unions.push(sql`SELECT b.beneficiario_id, b.data_bolla::date AS giorno, 'pacchi'::text AS area,
-      be.citta_id, be.centro_ascolto_id
+      be.area_operativa_id, be.centro_ascolto_id
       FROM bolle b JOIN beneficiari be ON be.id = b.beneficiario_id
       WHERE ${andSql(pacchiConditions(filters))}`);
   }
   if (active.sociale) {
     unions.push(sql`SELECT i.beneficiario_id, ${socialEventDate} AS giorno, 'centro-ascolto'::text AS area,
-      be.citta_id, be.centro_ascolto_id
+      be.area_operativa_id, be.centro_ascolto_id
       FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
       WHERE ${andSql(socialCompletedConditions(filters))}`);
   }
   if (active.emporio) {
     unions.push(sql`SELECT se.beneficiario_id, se.data_chiusura::date AS giorno, 'emporio'::text AS area,
-      se.citta_id, se.centro_ascolto_id
+      se.area_operativa_id, se.centro_ascolto_id
       FROM spese_emporio se WHERE ${andSql(speseConditions(filters))}`);
   }
   if (active.mensa) {
     unions.push(sql`SELECT mp.beneficiario_id, mp.data_servizio AS giorno, 'mensa'::text AS area,
-      m.citta_id, mg.centro_ascolto_id
+      m.area_operativa_id, mg.centro_ascolto_id
       FROM mensa_pasti mp JOIN mense m ON m.id = mp.mensa_id
       JOIN magazzini mg ON mg.id = m.magazzino_id
       WHERE ${andSql(mealConditions(filters))}`);
   }
   if (active.uds) {
     unions.push(sql`SELECT i.beneficiario_id, ${udsEventDate} AS giorno, 'uds'::text AS area,
-      be.citta_id, be.centro_ascolto_id
+      be.area_operativa_id, be.centro_ascolto_id
       FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
       WHERE ${andSql(udsBaseConditions(filters))}
         AND ${udsEventDate} BETWEEN ${filters.da} AND ${filters.a}`);
@@ -101,17 +101,17 @@ export async function buildGeneralReport(filters: ReportFilters) {
         SELECT COUNT(DISTINCT beneficiario_id) AS persone FROM eventi
       `)
     : [];
-  const geographicRows = unions.length && filters.cittaId == null && filters.centroAscoltoId == null
+  const geographicRows = unions.length && filters.areaOperativaId == null && filters.centroAscoltoId == null
     ? await rows<Record<string, unknown>>(sql`
         WITH eventi AS (${sql.join(unions, sql` UNION ALL `)})
-        SELECT e.citta_id, COALESCE(ci.nome, 'Senza città') AS citta,
+        SELECT e.area_operativa_id, COALESCE(ao.nome, 'Senza area operativa') AS areaOperativa,
                e.centro_ascolto_id, COALESCE(ca.nome, 'Senza centro') AS centro,
                COUNT(*) AS eventi, COUNT(DISTINCT e.beneficiario_id) AS persone
         FROM eventi e
-        LEFT JOIN citta ci ON ci.id = e.citta_id
+        LEFT JOIN aree_operative ao ON ao.id = e.area_operativa_id
         LEFT JOIN centri_di_ascolto ca ON ca.id = e.centro_ascolto_id
-        GROUP BY e.citta_id, ci.nome, e.centro_ascolto_id, ca.nome
-        ORDER BY eventi DESC, citta, centro
+        GROUP BY e.area_operativa_id, ao.nome, e.centro_ascolto_id, ca.nome
+        ORDER BY eventi DESC, areaOperativa, centro
       `)
     : [];
 
@@ -163,10 +163,10 @@ export async function buildGeneralReport(filters: ReportFilters) {
       { key: "confrontoAree", columns: ["area", "eventi", "personeMese"], rows: areaTable },
       ...(geographicRows.length ? [{
         key: "distribuzioneTerritoriale",
-        columns: ["cittaId", "citta", "centroId", "centro", "eventi", "persone"],
+        columns: ["areaOperativaId", "areaOperativa", "centroId", "centro", "eventi", "persone"],
         rows: geographicRows.map((row) => ({
-          cittaId: row.citta_id == null ? null : number(row.citta_id),
-          citta: String(row.citta),
+          areaOperativaId: row.area_operativa_id == null ? null : number(row.area_operativa_id),
+          areaOperativa: String(row.areaOperativa),
           centroId: row.centro_ascolto_id == null ? null : number(row.centro_ascolto_id),
           centro: String(row.centro),
           eventi: number(row.eventi),

@@ -21,19 +21,19 @@ import {
 import { isModuloAttivo, requireAllModuli, requireModulo } from "../lib/featureFlags";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   centroScopeFilter,
-  cittaScopeFilter,
+  areaOperativaScopeFilter,
   zonaUdsScopeFilter,
   magazzinoScopeFilter,
   visibleMagazzinoIds,
   canAccessCentro,
-  canAccessCitta,
+  canAccessAreaOperativa,
   canAccessZonaUds,
   canAccessMagazzino,
   beneficiarioCentroId,
-  beneficiarioCittaId,
+  beneficiarioAreaOperativaId,
   beneficiarioZonaUdsId,
 } from "../lib/centroScope";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
@@ -171,10 +171,10 @@ router.get(
       isNotNull(interventiTable.sede),
     ];
     const centro = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req));
-    const citta = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
+    const areaOperativa = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
     const zona = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
     if (centro) conditions.push(centro);
-    if (citta) conditions.push(citta);
+    if (areaOperativa) conditions.push(areaOperativa);
     if (zona) conditions.push(zona);
     const rows = await db.select({ id: interventiTable.id, tipo: interventiTable.tipoIntervento, stato: interventiTable.stato, sede: interventiTable.sede, data: interventiTable.dataOraPianificata })
       .from(interventiTable)
@@ -212,10 +212,10 @@ router.get(
       isNotNull(consegneTable.indirizzoConsegna),
     ];
     const centro = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req));
-    const citta = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
+    const areaOperativa = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
     const zona = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
-    const warehouse = magazzinoScopeFilter(consegneTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
-    for (const scoped of [centro, citta, zona, warehouse]) if (scoped) conditions.push(scoped);
+    const warehouse = magazzinoScopeFilter(consegneTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)));
+    for (const scoped of [centro, areaOperativa, zona, warehouse]) if (scoped) conditions.push(scoped);
     const rows = await db.select({ id: consegneTable.id, codice: consegneTable.codice, stato: consegneTable.stato, indirizzo: consegneTable.indirizzoConsegna, data: consegneTable.dataPrevista, fascia: consegneTable.fasciaOraria })
       .from(consegneTable).innerJoin(beneficiariTable, eq(consegneTable.beneficiarioId, beneficiariTable.id))
       .where(and(...conditions)).limit(500);
@@ -252,10 +252,10 @@ router.get(
       isNotNull(beneficiariTable.domicilio),
     ];
     const centro = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req));
-    const citta = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
+    const areaOperativa = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
     const zona = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
-    const warehouse = magazzinoScopeFilter(bolleTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
-    for (const scoped of [centro, citta, zona, warehouse]) if (scoped) conditions.push(scoped);
+    const warehouse = magazzinoScopeFilter(bolleTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)));
+    for (const scoped of [centro, areaOperativa, zona, warehouse]) if (scoped) conditions.push(scoped);
     const rows = await db.select({ id: bolleTable.id, numero: bolleTable.numeroBolla, stato: bolleTable.stato, at: bolleTable.ritiroNonEffettuatoAt, indirizzo: beneficiariTable.domicilio, magazzino: magazziniTable.nome })
       .from(bolleTable)
       .innerJoin(beneficiariTable, eq(bolleTable.beneficiarioId, beneficiariTable.id))
@@ -283,16 +283,16 @@ router.get(
   requireModulo("MAGAZZINO_SOLIDALE"),
   async (req, res) => {
     if (!hasMapsArea(req, "magazzino") && !hasMapsArea(req, "sociale")) { res.status(403).json({ error: "Area operativa non consentita" }); return; }
-    const visibleWarehouses = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
+    const visibleWarehouses = await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req));
     const warehouseCondition = magazzinoScopeFilter(magazziniTable.id, visibleWarehouses);
     const warehouses = await db.select({ id: magazziniTable.id, nome: magazziniTable.nome, stato: magazziniTable.stato, indirizzo: magazziniTable.indirizzo, comune: magazziniTable.comune })
       .from(magazziniTable)
       .where(and(warehouseCondition, eq(magazziniTable.stato, "attivo"), isNotNull(magazziniTable.indirizzo))).limit(300);
     const centreConditions: SQL[] = [eq(centriAscoltoTable.attivo, true), isNotNull(centriAscoltoTable.indirizzo)];
     const centre = centroScopeFilter(centriAscoltoTable.id, callerCentroId(req));
-    const city = cittaScopeFilter(centriAscoltoTable.cittaId, callerCittaId(req));
+    const areaOperativa = areaOperativaScopeFilter(centriAscoltoTable.areaOperativaId, callerAreaOperativaId(req));
     if (centre) centreConditions.push(centre);
-    if (city) centreConditions.push(city);
+    if (areaOperativa) centreConditions.push(areaOperativa);
     const centres = await db.select({ id: centriAscoltoTable.id, nome: centriAscoltoTable.nome, indirizzo: centriAscoltoTable.indirizzo, comune: centriAscoltoTable.comune })
       .from(centriAscoltoTable).where(and(...centreConditions)).limit(300);
     const markers: MapsMarker[] = [
@@ -317,9 +317,9 @@ router.get(
     if (!row || row.consegna.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Consegna non trovata" }); return; }
     const { consegna } = row;
     if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(consegna.beneficiarioId), callerCittaId(req))
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(consegna.beneficiarioId), callerAreaOperativaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), callerZonaUdsId(req))
-      || !(await canAccessMagazzino(consegna.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+      || !(await canAccessMagazzino(consegna.magazzinoId, callerCentroId(req), callerAreaOperativaId(req)))) {
       res.status(403).json({ error: "Consegna non accessibile" }); return;
     }
     if (consegna.tipoConsegna !== "domicilio") { res.status(422).json({ error: "Il percorso è disponibile solo per consegne a domicilio" }); return; }

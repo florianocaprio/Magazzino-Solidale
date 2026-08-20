@@ -10,16 +10,16 @@ import {
 import { eq, and, desc, asc, gt, sum, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   centroScopeFilter,
-  cittaScopeFilter,
+  areaOperativaScopeFilter,
   zonaUdsScopeFilter,
   canAccessCentro,
-  canAccessCitta,
+  canAccessAreaOperativa,
   canAccessZonaUds,
   beneficiarioCentroId,
-  beneficiarioCittaId,
+  beneficiarioAreaOperativaId,
   beneficiarioZonaUdsId,
   canUseBeneficiario,
   visibleMagazzinoIds,
@@ -252,16 +252,16 @@ async function quantitaGiaInBollaLotto(bollaId: number, lottoId: number): Promis
 async function canAccessBollaOperativa(
   bolla: Pick<typeof bolleTable.$inferSelect, "beneficiarioId" | "magazzinoId">,
   caller: number | null,
-  cittaId: number | null,
+  areaOperativaId: number | null,
   zonaUdsId: number | null,
 ): Promise<boolean> {
   if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), caller)
-      || !canAccessCitta(await beneficiarioCittaId(bolla.beneficiarioId), cittaId)
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(bolla.beneficiarioId), areaOperativaId)
       || !canAccessZonaUds(await beneficiarioZonaUdsId(bolla.beneficiarioId), zonaUdsId)) {
     return false;
   }
 
-  const visibili = await visibleMagazzinoIds(caller, cittaId);
+  const visibili = await visibleMagazzinoIds(caller, areaOperativaId);
   return visibili == null || visibili.includes(bolla.magazzinoId);
 }
 
@@ -423,8 +423,8 @@ router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
     if (!Number.isInteger(cid)) { res.status(400).json({ error: "centroAscoltoId non valido" }); return; }
     conditions.push(eq(beneficiariTable.centroAscoltoId, cid));
   }
-  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
-  if (cittaFilter) conditions.push(cittaFilter);
+  const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
+  if (areaOperativaFilter) conditions.push(areaOperativaFilter);
   const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
 
@@ -515,7 +515,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
     return;
   }
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
   if ((caller != null || cid != null || zid != null) && !(await canUseBeneficiario(body.beneficiarioId, caller, cid, zid))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo centro" });
@@ -615,7 +615,7 @@ router.get("/bolle/:id/righe", requirePermission("bolle.view"), async (req, res)
   const det = await buildDettaglio(Number(req.params.id));
   if (!det) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(det.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(det.beneficiarioId), callerCittaId(req))
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(det.beneficiarioId), callerAreaOperativaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(det.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -627,7 +627,7 @@ router.get("/bolle/:id", requirePermission("bolle.view"), async (req, res) => {
   const det = await buildDettaglio(Number(req.params.id));
   if (!det) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(await beneficiarioCentroId(det.beneficiarioId), callerCentroId(req))
-      || !canAccessCitta(await beneficiarioCittaId(det.beneficiarioId), callerCittaId(req))
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(det.beneficiarioId), callerAreaOperativaId(req))
       || !canAccessZonaUds(await beneficiarioZonaUdsId(det.beneficiarioId), callerZonaUdsId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -642,10 +642,10 @@ router.patch("/bolle/:id", requirePermission("bolle.manage"), async (req, res) =
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
   if (!canAccessCentro(await beneficiarioCentroId(bolla.beneficiarioId), caller)
-      || !canAccessCitta(await beneficiarioCittaId(bolla.beneficiarioId), cid)
+      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(bolla.beneficiarioId), cid)
       || !canAccessZonaUds(await beneficiarioZonaUdsId(bolla.beneficiarioId), zid)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
@@ -730,7 +730,7 @@ router.post("/bolle/:id/righe", requirePermission("bolle.manage"), async (req, r
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -836,7 +836,7 @@ router.delete("/bolle/:id/righe/:rigaId", requirePermission("bolle.manage"), asy
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -865,7 +865,7 @@ router.post("/bolle/:id/conferma", requirePermission("bolle.deliver"), async (re
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -908,7 +908,7 @@ router.post("/bolle/:id/consegna", requirePermission("bolle.deliver"), async (re
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -949,7 +949,7 @@ router.post("/bolle/:id/ritiro-non-effettuato", requirePermission("bolle.deliver
   }
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" }); return;
   }
   try {
@@ -1030,7 +1030,7 @@ router.post(
   }
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" }); return;
   }
   let result: { consegna: typeof consegneTable.$inferSelect; existing: boolean };
@@ -1118,7 +1118,7 @@ router.post("/bolle/:id/annulla", requirePermission("bolle.cancel"), async (req,
 
   const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
   if (!bolla) { res.status(404).json({ error: "Bolla non trovata" }); return; }
-  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
+  if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }

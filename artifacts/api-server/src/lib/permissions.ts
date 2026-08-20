@@ -12,7 +12,7 @@ export const MENSA_PERMISSIONS = [
   { key: "mensa.eligibility.manage", label: "Mensa: gestione abilitazioni" },
   {
     key: "mensa.exceptions.manage",
-    label: "Mensa: eccezioni nella stessa Area",
+    label: "Mensa: eccezioni nella stessa Area Operativa",
   },
   { key: "mensa.transfers.manage", label: "Mensa: rifornimenti" },
   { key: "mensa.transfers.request", label: "Mensa: richiesta rifornimenti" },

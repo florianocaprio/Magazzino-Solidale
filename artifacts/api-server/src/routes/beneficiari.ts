@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
-import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, cittaTable, magazziniTable, tessereBeneficiariTable, zoneUdsTable } from "@workspace/db";
+import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, areeOperativeTable, magazziniTable, tessereBeneficiariTable, zoneUdsTable } from "@workspace/db";
 import { db } from "@workspace/db";
 import { calcolaEta, isFasciaEtaPresunta, risolviFasciaEta } from "@workspace/api-zod";
 import { runBulk } from "../lib/bulk";
@@ -8,16 +8,16 @@ import { eq, and, or, ilike, inArray, isNull, sql, desc, ne, type SQL } from "dr
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   centroScopeFilter,
-  cittaScopeFilter,
+  areaOperativaScopeFilter,
   zonaUdsScopeFilter,
   canAccessCentro,
-  canAccessCitta,
+  canAccessAreaOperativa,
   canAccessZonaUds,
   beneficiarioCentroId,
-  beneficiarioCittaId,
+  beneficiarioAreaOperativaId,
   beneficiarioZonaUdsId,
 } from "../lib/centroScope";
 import {
@@ -325,7 +325,7 @@ async function validateMagazzinoEmporioPreferito(
   if (!canAccessCentro(magazzino.centroAscoltoId, callerCentroId(req))) {
     return { error: "Risorsa non accessibile per il tuo centro", status: 403 };
   }
-  if (!canAccessCitta(magazzino.cittaId, callerCittaId(req))) {
+  if (!canAccessAreaOperativa(magazzino.areaOperativaId, callerAreaOperativaId(req))) {
     return { error: "Risorsa non accessibile per la tua Area", status: 403 };
   }
   if (magazzino.tipoMagazzino !== "emporio" && magazzino.tipoMagazzino !== "misto") {
@@ -343,7 +343,7 @@ async function magazzinoEmporioNomeOf(id: number | null | undefined): Promise<st
 function fmtBenef(
   r: typeof beneficiariTable.$inferSelect,
   centroNome?: string | null,
-  cittaNome?: string | null,
+  areaOperativaNome?: string | null,
   magazzinoEmporioPreferitoNome?: string | null,
 ) {
   const fasciaEta = risolviFasciaEta(r.dataNascita, r.fasciaEtaPresunta);
@@ -396,8 +396,8 @@ function fmtBenef(
     creditoSolidaleSaldo: Number(r.creditoSolidaleSaldo ?? "0"),
     creditoSolidaleDataUltimoMovimento: r.creditoSolidaleDataUltimoMovimento?.toISOString() ?? null,
     uds: r.uds,
-    cittaId: r.cittaId ?? null,
-    cittaNome: cittaNome ?? null,
+    areaOperativaId: r.areaOperativaId ?? null,
+    areaOperativaNome: areaOperativaNome ?? null,
     zonaUdsId: r.zonaUdsId ?? null,
     attivo: r.attivo,
     dataPresaInCarico: r.dataPresaInCarico ?? null,
@@ -412,10 +412,10 @@ function fmtBenefForRequest(
   r: typeof beneficiariTable.$inferSelect,
   req: Request,
   centroNome?: string | null,
-  cittaNome?: string | null,
+  areaOperativaNome?: string | null,
   magazzinoEmporioPreferitoNome?: string | null,
 ) {
-  const result = fmtBenef(r, centroNome, cittaNome, magazzinoEmporioPreferitoNome) as Record<string, unknown>;
+  const result = fmtBenef(r, centroNome, areaOperativaNome, magazzinoEmporioPreferitoNome) as Record<string, unknown>;
   if (!hasPermission(req, "beneficiari.sensitive.view")) {
     for (const key of ["codiceFiscale", ...SOCIAL_SENSITIVE_FIELDS]) delete result[key];
   }
@@ -436,7 +436,7 @@ function parseOptionalPositiveQueryId(value: string | undefined): number | null 
 function fmtBeneficiarioDirectory(
   r: typeof beneficiariTable.$inferSelect,
   centroNome?: string | null,
-  cittaNome?: string | null,
+  areaOperativaNome?: string | null,
   zonaUdsNome?: string | null,
 ) {
   const fasciaEta = risolviFasciaEta(r.dataNascita, r.fasciaEtaPresunta);
@@ -454,8 +454,8 @@ function fmtBeneficiarioDirectory(
     telefono: r.telefono ?? null,
     centroAscoltoId: r.centroAscoltoId ?? null,
     centroAscoltoNome: centroNome ?? null,
-    cittaId: r.cittaId ?? null,
-    cittaNome: cittaNome ?? null,
+    areaOperativaId: r.areaOperativaId ?? null,
+    areaOperativaNome: areaOperativaNome ?? null,
     zonaUdsId: r.zonaUdsId ?? null,
     zonaUdsNome: zonaUdsNome ?? null,
     uds: r.uds,
@@ -467,7 +467,7 @@ function fmtBeneficiarioDirectory(
 }
 
 router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, res) => {
-  const { search, priorita, domicilio, centroAscoltoId, cittaId, zonaUdsId, uds, attivo, statoAnagrafica } = req.query as Record<string, string>;
+  const { search, priorita, domicilio, centroAscoltoId, areaOperativaId, zonaUdsId, uds, attivo, statoAnagrafica } = req.query as Record<string, string>;
   const page = req.query.page == null ? 1 : Number(req.query.page);
   const limit = req.query.limit == null ? 50 : Number(req.query.limit);
   if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
@@ -496,14 +496,14 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   if (domicilio === "true") conditions.push(eq(beneficiariTable.consegnaDomicilio, true));
   // Area and Zona are boundaries when present on the caller; explicit
   // query params let a global caller narrow the result.
-  const requestedAreaId = parseOptionalPositiveQueryId(cittaId);
+  const requestedAreaId = parseOptionalPositiveQueryId(areaOperativaId);
   const requestedZonaId = parseOptionalPositiveQueryId(zonaUdsId);
   const requestedCentroId = parseOptionalPositiveQueryId(centroAscoltoId);
   if ([requestedAreaId, requestedZonaId, requestedCentroId].includes("invalid")) {
     res.status(400).json({ error: "I filtri Area, Centro e Zona devono essere identificativi numerici validi." });
     return;
   }
-  if (requestedAreaId != null) conditions.push(eq(beneficiariTable.cittaId, requestedAreaId as number));
+  if (requestedAreaId != null) conditions.push(eq(beneficiariTable.areaOperativaId, requestedAreaId as number));
   if (requestedZonaId != null) conditions.push(eq(beneficiariTable.zonaUdsId, requestedZonaId as number));
   if (uds === "true") conditions.push(eq(beneficiariTable.uds, true));
   const caller = callerCentroId(req);
@@ -515,8 +515,8 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   } else if (requestedCentroId != null) {
     conditions.push(eq(beneficiariTable.centroAscoltoId, requestedCentroId as number));
   }
-  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
-  if (cittaFilter) conditions.push(cittaFilter);
+  const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
+  if (areaOperativaFilter) conditions.push(areaOperativaFilter);
   const zonaFilter = areaWideUdsDirectory ? undefined : zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
   if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
@@ -529,13 +529,13 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
     .select({
       b: beneficiariTable,
       centroNome: centriAscoltoTable.nome,
-      cittaNome: cittaTable.nome,
+      areaOperativaNome: areeOperativeTable.nome,
       magazzinoEmporioPreferitoNome: magazziniTable.nome,
       zonaUdsNome: zoneUdsTable.nome,
     })
     .from(beneficiariTable)
     .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
-    .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+    .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
     .leftJoin(magazziniTable, eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id))
     .leftJoin(zoneUdsTable, eq(beneficiariTable.zonaUdsId, zoneUdsTable.id))
     .where(where)
@@ -545,13 +545,13 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   res.setHeader("X-Total-Count", String(total));
   res.setHeader("X-Page", String(page));
   res.setHeader("X-Page-Size", String(limit));
-  res.json(rows.map(r => fmtBeneficiarioDirectory(r.b, r.centroNome, r.cittaNome, r.zonaUdsNome)));
+  res.json(rows.map(r => fmtBeneficiarioDirectory(r.b, r.centroNome, r.areaOperativaNome, r.zonaUdsNome)));
 });
 
 type BeneficiarioTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 interface BeneficiarioCreationOptions {
   executor?: typeof db | BeneficiarioTx;
-  cittaId?: number;
+  areaOperativaId?: number;
   centroAscoltoId?: number | null;
   zonaUdsId?: number | null;
   /** Internal domain workflow already protected by its own purpose-specific permissions. */
@@ -571,7 +571,7 @@ export async function createBeneficiarioOne(
     return { error: "Non hai il permesso di modificare i dati sociali sensibili.", status: 403 };
   }
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
   const codice = trimOrUndefined(b.codice) ?? await generaCodiceBeneficiario();
   if (await codiceBeneficiarioEsiste(codice)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
@@ -589,13 +589,13 @@ export async function createBeneficiarioOne(
   if (eta.error) return { error: eta.error, status: 400 };
   if ("uds" in values) values.uds = toBool(values.uds);
   if (caller != null) values.centroAscoltoId = caller;
-  if (cid != null) values.cittaId = cid;
+  if (cid != null) values.areaOperativaId = cid;
   if (zid != null) values.zonaUdsId = zid;
-  if (options.cittaId != null) values.cittaId = options.cittaId;
+  if (options.areaOperativaId != null) values.areaOperativaId = options.areaOperativaId;
   if ("centroAscoltoId" in options) values.centroAscoltoId = options.centroAscoltoId;
   if ("zonaUdsId" in options) values.zonaUdsId = options.zonaUdsId;
   const scopeError = await validateBeneficiarioTerritorialAssignment({
-    cittaId: values.cittaId ?? null,
+    areaOperativaId: values.areaOperativaId ?? null,
     centroAscoltoId: values.centroAscoltoId ?? null,
     zonaUdsId: values.zonaUdsId ?? null,
     magazzinoEmporioPreferitoId: values.magazzinoEmporioPreferitoId ?? null,
@@ -638,7 +638,7 @@ export async function createBeneficiarioOne(
       valoreNuovo: {
         beneficiarioId: row.id,
         statoAnagrafica: row.statoAnagrafica,
-        cittaId: row.cittaId,
+        areaOperativaId: row.areaOperativaId,
         centroAscoltoId: row.centroAscoltoId,
         zonaUdsId: row.zonaUdsId,
       },
@@ -713,32 +713,32 @@ router.get("/beneficiari/cerca-simili", requirePermission("beneficiari.duplicate
 
   // A global caller must always choose one valid Area explicitly. Scoped
   // callers cannot override their own Area, even by sending another value.
-  const callerCitta = callerCittaId(req);
-  let cittaId: number;
-  if (callerCitta != null) {
-    cittaId = callerCitta;
+  const callerAreaOperativa = callerAreaOperativaId(req);
+  let areaOperativaId: number;
+  if (callerAreaOperativa != null) {
+    areaOperativaId = callerAreaOperativa;
   } else {
-    const rawCitta = q.cittaId as unknown;
-    if (rawCitta == null || (typeof rawCitta === "string" && !rawCitta.trim())) {
+    const rawAreaOperativa = q.areaOperativaId as unknown;
+    if (rawAreaOperativa == null || (typeof rawAreaOperativa === "string" && !rawAreaOperativa.trim())) {
       res.status(400).json({ error: "Seleziona un'Area per cercare le persone." });
       return;
     }
-    const requestedCitta = typeof rawCitta === "string" ? rawCitta.trim() : "";
-    const parsedCitta = Number(requestedCitta);
+    const requestedAreaOperativa = typeof rawAreaOperativa === "string" ? rawAreaOperativa.trim() : "";
+    const parsedAreaOperativa = Number(requestedAreaOperativa);
     if (
-      !/^\d+$/.test(requestedCitta) ||
-      !Number.isSafeInteger(parsedCitta) ||
-      parsedCitta <= 0 ||
-      parsedCitta > 2_147_483_647
+      !/^\d+$/.test(requestedAreaOperativa) ||
+      !Number.isSafeInteger(parsedAreaOperativa) ||
+      parsedAreaOperativa <= 0 ||
+      parsedAreaOperativa > 2_147_483_647
     ) {
-      res.status(400).json({ error: "L'Area selezionata non è valida." });
+      res.status(400).json({ error: "L'Area Operativa selezionata non è valida." });
       return;
     }
-    cittaId = parsedCitta;
+    areaOperativaId = parsedAreaOperativa;
   }
 
   res.json(await searchBeneficiariDuplicates({
-    cittaId,
+    areaOperativaId,
     search,
     nome,
     cognome,
@@ -764,7 +764,7 @@ router.post("/beneficiari/export/authorize", requirePermission("beneficiari.expo
       tipo: parsed.data.tipo,
       beneficiarioId: parsed.data.beneficiarioId ?? null,
       numeroRecord: parsed.data.numeroRecord,
-      cittaId: callerCittaId(req),
+      areaOperativaId: callerAreaOperativaId(req),
       centroAscoltoId: callerCentroId(req),
       zonaUdsId: callerZonaUdsId(req),
     },
@@ -780,7 +780,7 @@ router.get("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.mana
   const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!beneficiario) { res.status(404).json({ error: "Beneficiario non trovato" }); return; }
   if (!canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req))
-    || !canAccessCitta(beneficiario.cittaId, callerCittaId(req))
+    || !canAccessAreaOperativa(beneficiario.areaOperativaId, callerAreaOperativaId(req))
     || !canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req))) {
     res.status(403).json({ error: "Beneficiario non accessibile" }); return;
   }
@@ -796,7 +796,7 @@ router.post("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.man
   const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!beneficiario) { res.status(404).json({ error: "Beneficiario non trovato" }); return; }
   if (!canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req))
-    || !canAccessCitta(beneficiario.cittaId, callerCittaId(req))
+    || !canAccessAreaOperativa(beneficiario.areaOperativaId, callerAreaOperativaId(req))
     || !canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req))) {
     res.status(403).json({ error: "Beneficiario non accessibile" }); return;
   }
@@ -940,7 +940,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     return;
   }
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
@@ -949,19 +949,19 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     && toBool(input.uds) === true
     && patchKeys.length > 0
     && patchKeys.every((key) => key === "uds" || key === "zonaUdsId" || key === "fasciaEtaPresunta" || key === "versione");
-  const canLinkWithinCallerCitta = isInitialUdsLink
+  const canLinkWithinCallerAreaOperativa = isInitialUdsLink
     && cid != null
-    && existing.cittaId === cid;
+    && existing.areaOperativaId === cid;
 
   // The shared-directory UDS action is the only mutation allowed across centro
   // and Zona boundaries, and only for a non-UDS person in the caller's exact
   // Area. Every other patch retains the standard territorial checks.
-  if (!canLinkWithinCallerCitta) {
+  if (!canLinkWithinCallerAreaOperativa) {
     if (!canAccessCentro(existing.centroAscoltoId, caller)) {
       res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
       return;
     }
-    if (!canAccessCitta(existing.cittaId, cid)) {
+    if (!canAccessAreaOperativa(existing.areaOperativaId, cid)) {
       res.status(403).json({ error: "Risorsa non accessibile per la tua Area" });
       return;
     }
@@ -1014,7 +1014,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
       delete updates.centroAscoltoId;
     }
   }
-  if (cid != null) delete updates.cittaId;
+  if (cid != null) delete updates.areaOperativaId;
   if (zid != null) updates.zonaUdsId = zid;
 
   if ("statoAnagrafica" in updates) {
@@ -1027,12 +1027,12 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
       res.status(400).json({ error: "Associa un Centro di Ascolto prima di completare l'anagrafica" }); return;
     }
     const [centro] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, centroId));
-    const finalCittaId = "cittaId" in updates ? Number(updates.cittaId) : existing.cittaId;
+    const finalAreaOperativaId = "areaOperativaId" in updates ? Number(updates.areaOperativaId) : existing.areaOperativaId;
     if (!centro || !centro.attivo) {
       res.status(400).json({ error: "Il Centro di Ascolto selezionato non è disponibile" }); return;
     }
-    if (!canAccessCentro(centro.id, caller) || !canAccessCitta(centro.cittaId, cid)
-      || (finalCittaId != null && centro.cittaId != null && centro.cittaId !== finalCittaId)) {
+    if (!canAccessCentro(centro.id, caller) || !canAccessAreaOperativa(centro.areaOperativaId, cid)
+      || (finalAreaOperativaId != null && centro.areaOperativaId != null && centro.areaOperativaId !== finalAreaOperativaId)) {
       res.status(403).json({ error: "Il Centro di Ascolto selezionato non appartiene al perimetro territoriale consentito" }); return;
     }
     const nome = String(updates.nome ?? existing.nome).trim();
@@ -1100,20 +1100,20 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
   // assegna la propria Area anche ai record legacy; un caller globale deve
   // supply one explicitly.
   const resultingUds = "uds" in updates ? updates.uds === true : existing.uds === true;
-  const resultingCitta = "cittaId" in updates ? updates.cittaId : existing.cittaId;
-  if (resultingUds && resultingCitta == null) {
+  const resultingAreaOperativa = "areaOperativaId" in updates ? updates.areaOperativaId : existing.areaOperativaId;
+  if (resultingUds && resultingAreaOperativa == null) {
     if (cid != null) {
-      updates.cittaId = cid;
+      updates.areaOperativaId = cid;
     } else {
       res.status(400).json({ error: "L'Area è obbligatoria per una persona UDS" });
       return;
     }
   }
-  const assignmentChanged = ["cittaId", "centroAscoltoId", "zonaUdsId", "magazzinoEmporioPreferitoId"]
+  const assignmentChanged = ["areaOperativaId", "centroAscoltoId", "zonaUdsId", "magazzinoEmporioPreferitoId"]
     .some((key) => key in updates);
   if (assignmentChanged || (existing.statoAnagrafica === "provvisoria" && updates.statoAnagrafica === "completa")) {
     const assignmentError = await validateBeneficiarioTerritorialAssignment({
-      cittaId: ("cittaId" in updates ? updates.cittaId : existing.cittaId) ?? null,
+      areaOperativaId: ("areaOperativaId" in updates ? updates.areaOperativaId : existing.areaOperativaId) ?? null,
       centroAscoltoId: ("centroAscoltoId" in updates ? updates.centroAscoltoId : existing.centroAscoltoId) ?? null,
       zonaUdsId: ("zonaUdsId" in updates ? updates.zonaUdsId : existing.zonaUdsId) ?? null,
       magazzinoEmporioPreferitoId: ("magazzinoEmporioPreferitoId" in updates
@@ -1140,7 +1140,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
         valorePrecedente: {
           versione: existing.versione,
           statoAnagrafica: existing.statoAnagrafica,
-          cittaId: existing.cittaId,
+          areaOperativaId: existing.areaOperativaId,
           centroAscoltoId: existing.centroAscoltoId,
           zonaUdsId: existing.zonaUdsId,
           campiModificati: changedFields,
@@ -1148,7 +1148,7 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
         valoreNuovo: {
           versione: updated.versione,
           statoAnagrafica: updated.statoAnagrafica,
-          cittaId: updated.cittaId,
+          areaOperativaId: updated.areaOperativaId,
           centroAscoltoId: updated.centroAscoltoId,
           zonaUdsId: updated.zonaUdsId,
           campiModificati: changedFields,
@@ -1218,7 +1218,7 @@ router.delete("/beneficiari/:id", requirePermission("beneficiari.deactivate"), a
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!canAccessCitta(existing.cittaId, callerCittaId(req))) {
+  if (!canAccessAreaOperativa(existing.areaOperativaId, callerAreaOperativaId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per la tua Area" });
     return;
   }

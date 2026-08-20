@@ -8,7 +8,7 @@ function speseConditions(filters: ReportFilters): SQL[] {
     sql`se.stato_spesa = 'chiusa'`,
     sql`se.data_chiusura::date BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      citta: sql`se.citta_id`,
+      areaOperativa: sql`se.area_operativa_id`,
       centro: sql`se.centro_ascolto_id`,
       magazzino: sql`se.magazzino_emporio_id`,
     }),
@@ -21,7 +21,7 @@ function accessConditions(filters: ReportFilters): SQL[] {
     sql`c.stato_accesso_emporio = 'effettuato'`,
     sql`COALESCE(c.data_ora_effettiva_accesso::date, c.data_prevista) BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      citta: sql`be.citta_id`,
+      areaOperativa: sql`be.area_operativa_id`,
       centro: sql`be.centro_ascolto_id`,
       magazzino: sql`c.magazzino_emporio_id`,
     }),
@@ -32,7 +32,7 @@ export async function emporioMetrics(filters: ReportFilters) {
   const speseWhere = andSql(speseConditions(filters));
   const accessWhere = andSql(accessConditions(filters));
   const scopeBeneficiari = andSql(reportScope(filters, {
-    citta: sql`be.citta_id`,
+    areaOperativa: sql`be.area_operativa_id`,
     centro: sql`be.centro_ascolto_id`,
   }));
   const [spese, accessi, enabled, stock] = await Promise.all([
@@ -47,7 +47,7 @@ export async function emporioMetrics(filters: ReportFilters) {
                WHERE se2.id IN (SELECT se3.id FROM spese_emporio se3 WHERE se3.stato_spesa = 'chiusa'
                  AND se3.data_chiusura::date BETWEEN ${filters.da} AND ${filters.a}
                  AND ${andSql(reportScope(filters, {
-                   citta: sql`se3.citta_id`, centro: sql`se3.centro_ascolto_id`, magazzino: sql`se3.magazzino_emporio_id`,
+                   areaOperativa: sql`se3.area_operativa_id`, centro: sql`se3.centro_ascolto_id`, magazzino: sql`se3.magazzino_emporio_id`,
                  }))})) , 0) AS prodotti_distinti
       FROM spese_emporio se WHERE ${speseWhere}
     `),
@@ -72,7 +72,7 @@ export async function emporioMetrics(filters: ReportFilters) {
         WHERE mg.tipo_magazzino IN ('emporio', 'misto')
           AND mg.stato = 'attivo'
           AND ${andSql(reportScope(filters, {
-            citta: sql`mg.citta_id`, centro: sql`mg.centro_ascolto_id`, magazzino: sql`mg.id`,
+            areaOperativa: sql`mg.area_operativa_id`, centro: sql`mg.centro_ascolto_id`, magazzino: sql`mg.id`,
           }))}
         GROUP BY l.magazzino_id, l.prodotto_id
       )

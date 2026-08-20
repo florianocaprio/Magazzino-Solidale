@@ -1,10 +1,10 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, ne, desc, ilike, or, type SQL } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable, zoneUdsTable } from "@workspace/db";
+import { db, utentiTable, ruoliTable, centriAscoltoTable, areeOperativeTable, zoneUdsTable } from "@workspace/db";
 import { CreateUtenteBody, UpdateUtenteBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
-import { callerCentroId, callerCittaId, callerZonaUdsId, andScoped } from "../lib/centroScope";
+import { callerCentroId, callerAreaOperativaId, callerZonaUdsId, andScoped } from "../lib/centroScope";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { ensureSuperAdminRole, SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 import { logSystemEvent, systemLogMetaFromRequest } from "../lib/systemLog";
@@ -29,8 +29,8 @@ type UtenteRow = {
   ruoloNome: string | null;
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
-  cittaId: number | null;
-  cittaNome: string | null;
+  areaOperativaId: number | null;
+  areaOperativaNome: string | null;
   zonaUdsId: number | null;
   zonaUdsNome: string | null;
   isSuperAdmin: boolean;
@@ -54,8 +54,8 @@ const fmt = (r: UtenteRow) => ({
   ruoloNome: r.ruoloNome ?? null,
   centroAscoltoId: r.centroAscoltoId ?? null,
   centroAscoltoNome: r.centroAscoltoNome ?? null,
-  cittaId: r.cittaId ?? null,
-  cittaNome: r.cittaNome ?? null,
+  areaOperativaId: r.areaOperativaId ?? null,
+  areaOperativaNome: r.areaOperativaNome ?? null,
   zonaUdsId: r.zonaUdsId ?? null,
   zonaUdsNome: r.zonaUdsNome ?? null,
   isSuperAdmin: r.isSuperAdmin || r.ruoloNome === SUPER_ADMIN_ROLE_NAME,
@@ -81,8 +81,8 @@ const selectUtente = () =>
       ruoloNome: ruoliTable.nome,
       centroAscoltoId: utentiTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
-      cittaId: utentiTable.cittaId,
-      cittaNome: cittaTable.nome,
+      areaOperativaId: utentiTable.areaOperativaId,
+      areaOperativaNome: areeOperativeTable.nome,
       zonaUdsId: utentiTable.zonaUdsId,
       zonaUdsNome: zoneUdsTable.nome,
       isSuperAdmin: utentiTable.isSuperAdmin,
@@ -96,7 +96,7 @@ const selectUtente = () =>
     .from(utentiTable)
     .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
     .leftJoin(centriAscoltoTable, eq(utentiTable.centroAscoltoId, centriAscoltoTable.id))
-    .leftJoin(cittaTable, eq(utentiTable.cittaId, cittaTable.id))
+    .leftJoin(areeOperativeTable, eq(utentiTable.areaOperativaId, areeOperativeTable.id))
     .leftJoin(zoneUdsTable, eq(utentiTable.zonaUdsId, zoneUdsTable.id));
 
 async function otherActiveAdminExists(excludeId: number): Promise<boolean> {
@@ -118,12 +118,12 @@ async function otherActiveSuperAdminExists(excludeId: number): Promise<boolean> 
 
 /**
  * Operator matricola format: <InitialNome><InitialCognome><yy>-<SIGLA>-<NNNNNN>
- * e.g. Mario Rossi inserted in 2026, città Milano (sigla MI) → "MR26-MI-482910".
- * The città sigla is the città's `sigla` (or first 2 letters of its name as a
- * fallback); "OO" for global users (no città). The 6-digit number is random; on
+ * e.g. Mario Rossi inserted in 2026, area operativa Milano (sigla MI) → "MR26-MI-482910".
+ * The area operativa sigla is the area operativa's `sigla` (or first 2 letters of its name as a
+ * fallback); "OO" for global users (no area operativa). The 6-digit number is random; on
  * a full-matricola collision the first digit becomes a letter (A, B, C, ...).
  */
-function cittaSigla(sigla: string | null, nome: string | null): string {
+function areaOperativaSigla(sigla: string | null, nome: string | null): string {
   const s = (sigla ?? "").trim().toUpperCase();
   if (s.length >= 2) return s.slice(0, 2);
   const fromName = (nome ?? "").replace(/[^A-Za-z]/g, "").toUpperCase();
@@ -161,12 +161,12 @@ async function emailExists(email: string, excludeId?: number): Promise<boolean> 
   return !!hit;
 }
 
-async function generateMatricola(nome: string, cognome: string, cittaId: number | null, year?: number): Promise<string> {
+async function generateMatricola(nome: string, cognome: string, areaOperativaId: number | null, year?: number): Promise<string> {
   const yy = String(year ?? new Date().getFullYear()).slice(-2);
   let sigla = "OO";
-  if (cittaId != null) {
-    const [c] = await db.select({ sigla: cittaTable.sigla, nome: cittaTable.nome }).from(cittaTable).where(eq(cittaTable.id, cittaId));
-    sigla = cittaSigla(c?.sigla ?? null, c?.nome ?? null);
+  if (areaOperativaId != null) {
+    const [c] = await db.select({ sigla: areeOperativeTable.sigla, nome: areeOperativeTable.nome }).from(areeOperativeTable).where(eq(areeOperativeTable.id, areaOperativaId));
+    sigla = areaOperativaSigla(c?.sigla ?? null, c?.nome ?? null);
   }
   for (let i = 0; i < 50; i++) {
     const num = String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
@@ -211,20 +211,20 @@ async function validateAssignableRole(req: Request, ruoloId: number | null): Pro
   return null;
 }
 
-async function areaIsAvailable(cittaId: number | null): Promise<boolean> {
-  if (cittaId == null) return true;
-  const [row] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, cittaId));
+async function areaIsAvailable(areaOperativaId: number | null): Promise<boolean> {
+  if (areaOperativaId == null) return true;
+  const [row] = await db.select({ id: areeOperativeTable.id, attivo: areeOperativeTable.attivo }).from(areeOperativeTable).where(eq(areeOperativeTable.id, areaOperativaId));
   return Boolean(row?.attivo);
 }
 
-async function validateUserTerritorialAssignment(params: { cittaId: number | null; centroAscoltoId: number | null; zonaUdsId: number | null }): Promise<string | null> {
-  if (!(await areaIsAvailable(params.cittaId))) {
-    return "L'Area selezionata non è disponibile";
+async function validateUserTerritorialAssignment(params: { areaOperativaId: number | null; centroAscoltoId: number | null; zonaUdsId: number | null }): Promise<string | null> {
+  if (!(await areaIsAvailable(params.areaOperativaId))) {
+    return "L'Area Operativa selezionata non è disponibile";
   }
   if (params.centroAscoltoId != null) {
     const [centro] = await db
       .select({
-        cittaId: centriAscoltoTable.cittaId,
+        areaOperativaId: centriAscoltoTable.areaOperativaId,
         attivo: centriAscoltoTable.attivo,
       })
       .from(centriAscoltoTable)
@@ -232,18 +232,18 @@ async function validateUserTerritorialAssignment(params: { cittaId: number | nul
     if (!centro || !centro.attivo) {
       return "Il Centro di Ascolto selezionato non è disponibile";
     }
-    if (centro.cittaId !== params.cittaId) {
-      return "Il Centro di Ascolto deve appartenere alla stessa Area dell'utente";
+    if (centro.areaOperativaId !== params.areaOperativaId) {
+      return "Il Centro di Ascolto deve appartenere alla stessa Area Operativa dell'utente";
     }
   }
 
   if (params.zonaUdsId != null) {
-    const [zona] = await db.select({ cittaId: zoneUdsTable.cittaId, attivo: zoneUdsTable.attivo }).from(zoneUdsTable).where(eq(zoneUdsTable.id, params.zonaUdsId));
+    const [zona] = await db.select({ areaOperativaId: zoneUdsTable.areaOperativaId, attivo: zoneUdsTable.attivo }).from(zoneUdsTable).where(eq(zoneUdsTable.id, params.zonaUdsId));
     if (!zona || !zona.attivo) {
       return "La Zona UDS selezionata non è disponibile";
     }
-    if (zona.cittaId !== params.cittaId) {
-      return "La Zona UDS deve appartenere alla stessa Area dell'utente";
+    if (zona.areaOperativaId !== params.areaOperativaId) {
+      return "La Zona UDS deve appartenere alla stessa Area Operativa dell'utente";
     }
   }
 
@@ -258,26 +258,26 @@ function requireCallerSuperAdmin(req: Request, res: Response): boolean {
 
 router.get("/utenti", async (req, res): Promise<void> => {
   const caller = callerCentroId(req);
-  // STRICT città boundary on utenti: a città-bound admin sees ONLY users of
-  // their own città (no NULL/global users), mirroring the strict centro rule.
-  const cittaCaller = callerCittaId(req);
+  // STRICT area operativa boundary on utenti: a area operativa-bound admin sees ONLY users of
+  // their own area operativa (no NULL/global users), mirroring the strict centro rule.
+  const areaOperativaCaller = callerAreaOperativaId(req);
   const zonaCaller = callerZonaUdsId(req);
-  const cittaId = req.query.cittaId != null ? Number(req.query.cittaId) : null;
+  const areaOperativaId = req.query.areaOperativaId != null ? Number(req.query.areaOperativaId) : null;
   const matricola = typeof req.query.matricola === "string" ? req.query.matricola.trim() : "";
   const query = typeof req.query.query === "string" ? req.query.query.trim() : "";
   const filters: SQL[] = [];
-  if (cittaId != null) {
-    if (!Number.isInteger(cittaId) || cittaId <= 0) {
-      res.status(400).json({ error: "Area geografica non valida" });
+  if (areaOperativaId != null) {
+    if (!Number.isInteger(areaOperativaId) || areaOperativaId <= 0) {
+      res.status(400).json({ error: "Area Operativa non valida" });
       return;
     }
-    if (cittaCaller != null && cittaId !== cittaCaller) {
+    if (areaOperativaCaller != null && areaOperativaId !== areaOperativaCaller) {
       res.status(403).json({
-        error: "Area geografica non accessibile per il tuo perimetro",
+        error: "Area Operativa non accessibile per il tuo perimetro",
       });
       return;
     }
-    filters.push(eq(utentiTable.cittaId, cittaId));
+    filters.push(eq(utentiTable.areaOperativaId, areaOperativaId));
   }
   if (matricola) filters.push(ilike(utentiTable.matricola, `%${matricola}%`));
   if (query) {
@@ -285,7 +285,7 @@ router.get("/utenti", async (req, res): Promise<void> => {
     filters.push(or(ilike(utentiTable.nome, pattern), ilike(utentiTable.cognome, pattern), ilike(utentiTable.username, pattern), ilike(utentiTable.email, pattern))!);
   }
   const rows = await selectUtente()
-    .where(andScoped(caller != null ? eq(utentiTable.centroAscoltoId, caller) : undefined, cittaCaller != null ? eq(utentiTable.cittaId, cittaCaller) : undefined, zonaCaller != null ? eq(utentiTable.zonaUdsId, zonaCaller) : undefined, ...filters))
+    .where(andScoped(caller != null ? eq(utentiTable.centroAscoltoId, caller) : undefined, areaOperativaCaller != null ? eq(utentiTable.areaOperativaId, areaOperativaCaller) : undefined, zonaCaller != null ? eq(utentiTable.zonaUdsId, zonaCaller) : undefined, ...filters))
     .orderBy(desc(utentiTable.id));
   res.json(rows.map(fmt));
 });
@@ -296,7 +296,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { username, email, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId, cittaId, zonaUdsId } = parsed.data;
+  const { username, email, password, nome, cognome, matricola, ruoloId, attivo, centroAscoltoId, areaOperativaId, zonaUdsId } = parsed.data;
   const passwordError = validatePassword(password);
   if (passwordError) {
     res.status(400).json({ error: passwordError });
@@ -331,22 +331,22 @@ router.post("/utenti", async (req, res): Promise<void> => {
     return;
   }
   const finalCentroId = bootstrap || finalIsSuperAdmin ? null : caller != null ? caller : (centroAscoltoId ?? null);
-  // Likewise a città-bound admin can only create users inside their own città;
-  // the caller's città is auto-assigned and locked (any body value is ignored).
-  const cittaCaller = callerCittaId(req);
-  if (cittaCaller != null && cittaId != null && cittaId !== cittaCaller) {
+  // Likewise a area operativa-bound admin can only create users inside their own area operativa;
+  // the caller's area operativa is auto-assigned and locked (any body value is ignored).
+  const areaOperativaCaller = callerAreaOperativaId(req);
+  if (areaOperativaCaller != null && areaOperativaId != null && areaOperativaId !== areaOperativaCaller) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
-  const finalCittaId = bootstrap || finalIsSuperAdmin ? null : cittaCaller != null ? cittaCaller : (cittaId ?? null);
+  const finalAreaOperativaId = bootstrap || finalIsSuperAdmin ? null : areaOperativaCaller != null ? areaOperativaCaller : (areaOperativaId ?? null);
   const zonaCaller = callerZonaUdsId(req);
-  const finalZonaUdsId = bootstrap || finalIsSuperAdmin ? null : zonaCaller != null ? zonaCaller : finalCittaId == null ? null : (zonaUdsId ?? null);
-  if (!(await areaIsAvailable(finalCittaId))) {
-    res.status(400).json({ error: "L'Area selezionata non è disponibile" });
+  const finalZonaUdsId = bootstrap || finalIsSuperAdmin ? null : zonaCaller != null ? zonaCaller : finalAreaOperativaId == null ? null : (zonaUdsId ?? null);
+  if (!(await areaIsAvailable(finalAreaOperativaId))) {
+    res.status(400).json({ error: "L'Area Operativa selezionata non è disponibile" });
     return;
   }
   const assignmentError = await validateUserTerritorialAssignment({
-    cittaId: finalCittaId,
+    areaOperativaId: finalAreaOperativaId,
     centroAscoltoId: finalCentroId,
     zonaUdsId: finalZonaUdsId,
   });
@@ -367,7 +367,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
 
   const nomeTrim = nome.trim();
   const cognomeTrim = cognome.trim();
-  const finalMatricola = normalizeMatricola(matricola) || (await generateMatricola(nomeTrim, cognomeTrim, finalCittaId));
+  const finalMatricola = normalizeMatricola(matricola) || (await generateMatricola(nomeTrim, cognomeTrim, finalAreaOperativaId));
   if (await matricolaExists(finalMatricola)) {
     res.status(409).json({ error: "Matricola già assegnata a un altro utente" });
     return;
@@ -386,7 +386,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
       matricola: finalMatricola,
       ruoloId: finalRuoloId,
       centroAscoltoId: finalCentroId,
-      cittaId: finalCittaId,
+      areaOperativaId: finalAreaOperativaId,
       zonaUdsId: finalZonaUdsId,
       attivo: attivo ?? true,
       isSuperAdmin: finalIsSuperAdmin,
@@ -420,9 +420,9 @@ router.get("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
     return;
   }
-  const cittaCaller = callerCittaId(req);
-  if (cittaCaller != null && row.cittaId !== cittaCaller) {
-    res.status(403).json({ error: "Utente non accessibile per la tua città" });
+  const areaOperativaCaller = callerAreaOperativaId(req);
+  if (areaOperativaCaller != null && row.areaOperativaId !== areaOperativaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua area operativa" });
     return;
   }
   const zonaCaller = callerZonaUdsId(req);
@@ -441,8 +441,8 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     return;
   }
   const body = parsed.data;
-  if (body.cittaId !== undefined && !(await areaIsAvailable(body.cittaId))) {
-    res.status(400).json({ error: "L'Area selezionata non è disponibile" });
+  if (body.areaOperativaId !== undefined && !(await areaIsAvailable(body.areaOperativaId))) {
+    res.status(400).json({ error: "L'Area Operativa selezionata non è disponibile" });
     return;
   }
 
@@ -461,12 +461,12 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
     return;
   }
-  const cittaCaller = callerCittaId(req);
-  if (cittaCaller != null && target.cittaId !== cittaCaller) {
-    res.status(403).json({ error: "Utente non accessibile per la tua città" });
+  const areaOperativaCaller = callerAreaOperativaId(req);
+  if (areaOperativaCaller != null && target.areaOperativaId !== areaOperativaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua area operativa" });
     return;
   }
-  if (cittaCaller != null && body.cittaId !== undefined && body.cittaId !== target.cittaId) {
+  if (areaOperativaCaller != null && body.areaOperativaId !== undefined && body.areaOperativaId !== target.areaOperativaId) {
     res.status(403).json({
       error: "Non sei autorizzato a modificare le aree assegnate al tuo profilo.",
     });
@@ -523,7 +523,7 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     updates.isSuperAdmin = nextIsSuperAdmin;
     if (nextIsSuperAdmin) {
       updates.centroAscoltoId = null;
-      updates.cittaId = null;
+      updates.areaOperativaId = null;
       updates.zonaUdsId = null;
     }
   }
@@ -553,32 +553,32 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   if (caller == null && body.centroAscoltoId !== undefined && updates.isSuperAdmin !== true) {
     updates.centroAscoltoId = body.centroAscoltoId;
   }
-  // A città-bound admin cannot move users to another città; only a città-global
-  // admin may (re)assign the città.
-  if (cittaCaller == null && body.cittaId !== undefined && updates.isSuperAdmin !== true) {
-    updates.cittaId = body.cittaId;
+  // A area operativa-bound admin cannot move users to another area operativa; only a area operativa-global
+  // admin may (re)assign the area operativa.
+  if (areaOperativaCaller == null && body.areaOperativaId !== undefined && updates.isSuperAdmin !== true) {
+    updates.areaOperativaId = body.areaOperativaId;
   }
   // A zona-bound admin cannot move users to another zona; only a zona-global
-  // admin may (re)assign the UDS zona. A user without città cannot keep a zona.
+  // admin may (re)assign the UDS zona. A user without area operativa cannot keep a zona.
   if (zonaCaller == null && body.zonaUdsId !== undefined && updates.isSuperAdmin !== true) {
-    const effectiveCittaId = updates.cittaId !== undefined ? (updates.cittaId ?? null) : target.cittaId;
-    updates.zonaUdsId = effectiveCittaId == null ? null : body.zonaUdsId;
+    const effectiveAreaOperativaId = updates.areaOperativaId !== undefined ? (updates.areaOperativaId ?? null) : target.areaOperativaId;
+    updates.zonaUdsId = effectiveAreaOperativaId == null ? null : body.zonaUdsId;
   }
   if (zonaCaller != null) {
     updates.zonaUdsId = zonaCaller;
   }
-  if (updates.cittaId === null) {
+  if (updates.areaOperativaId === null) {
     updates.zonaUdsId = null;
   }
   const effectiveIsSuperAdmin = updates.isSuperAdmin ?? target.isSuperAdmin;
   if (effectiveIsSuperAdmin) {
     updates.centroAscoltoId = null;
-    updates.cittaId = null;
+    updates.areaOperativaId = null;
     updates.zonaUdsId = null;
   }
-  if (body.cittaId !== undefined || body.centroAscoltoId !== undefined || body.zonaUdsId !== undefined || updates.isSuperAdmin === true) {
+  if (body.areaOperativaId !== undefined || body.centroAscoltoId !== undefined || body.zonaUdsId !== undefined || updates.isSuperAdmin === true) {
     const assignmentError = await validateUserTerritorialAssignment({
-      cittaId: updates.cittaId !== undefined ? (updates.cittaId ?? null) : target.cittaId,
+      areaOperativaId: updates.areaOperativaId !== undefined ? (updates.areaOperativaId ?? null) : target.areaOperativaId,
       centroAscoltoId: updates.centroAscoltoId !== undefined ? (updates.centroAscoltoId ?? null) : target.centroAscoltoId,
       zonaUdsId: updates.zonaUdsId !== undefined ? (updates.zonaUdsId ?? null) : target.zonaUdsId,
     });
@@ -599,14 +599,14 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
 
   // If the user would be left without a matricola (legacy record, or the edit
   // cleared it), auto-generate one per the matricola rules — using the user's
-  // ORIGINAL insertion year (yy) and the effective città after this update.
+  // ORIGINAL insertion year (yy) and the effective area operativa after this update.
   const resultingMatricola = updates.matricola !== undefined ? updates.matricola : target.matricola;
   if (!(resultingMatricola ?? "").trim()) {
     const genNome = updates.nome !== undefined ? updates.nome : target.nome;
     const genCognome = (updates.cognome !== undefined ? updates.cognome : target.cognome) ?? "";
-    const genCittaId = updates.cittaId !== undefined ? (updates.cittaId ?? null) : target.cittaId;
+    const genAreaOperativaId = updates.areaOperativaId !== undefined ? (updates.areaOperativaId ?? null) : target.areaOperativaId;
     const genYear = new Date(target.dataCreazione).getFullYear();
-    updates.matricola = await generateMatricola(genNome, genCognome, genCittaId, genYear);
+    updates.matricola = await generateMatricola(genNome, genCognome, genAreaOperativaId, genYear);
   }
   if (updates.matricola !== undefined && updates.matricola !== null) {
     if (await matricolaExists(updates.matricola, id)) {
@@ -673,9 +673,9 @@ router.delete("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
     return;
   }
-  const cittaCaller = callerCittaId(req);
-  if (cittaCaller != null && target.cittaId !== cittaCaller) {
-    res.status(403).json({ error: "Utente non accessibile per la tua città" });
+  const areaOperativaCaller = callerAreaOperativaId(req);
+  if (areaOperativaCaller != null && target.areaOperativaId !== areaOperativaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua area operativa" });
     return;
   }
   const zonaCaller = callerZonaUdsId(req);
@@ -711,7 +711,7 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
     .select({
       id: utentiTable.id,
       centroAscoltoId: utentiTable.centroAscoltoId,
-      cittaId: utentiTable.cittaId,
+      areaOperativaId: utentiTable.areaOperativaId,
       zonaUdsId: utentiTable.zonaUdsId,
       isSuperAdmin: utentiTable.isSuperAdmin,
       email: utentiTable.email,
@@ -736,9 +736,9 @@ router.post("/utenti/:id/reset-password", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per il tuo centro" });
     return;
   }
-  const cittaCaller = callerCittaId(req);
-  if (cittaCaller != null && target.cittaId !== cittaCaller) {
-    res.status(403).json({ error: "Utente non accessibile per la tua città" });
+  const areaOperativaCaller = callerAreaOperativaId(req);
+  if (areaOperativaCaller != null && target.areaOperativaId !== areaOperativaCaller) {
+    res.status(403).json({ error: "Utente non accessibile per la tua area operativa" });
     return;
   }
   const zonaCaller = callerZonaUdsId(req);
