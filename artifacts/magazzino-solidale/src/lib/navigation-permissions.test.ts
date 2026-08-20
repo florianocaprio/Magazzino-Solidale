@@ -49,4 +49,13 @@ describe("permission gate della navigazione operativa", () => {
       ]),
     );
   });
+
+  it("espone le viste operative Mensa con permessi separati", () => {
+    expect(
+      NAV_ITEMS.find((item) => item.key === "mensaTrasferimenti")?.permission,
+    ).toBe("mensa.transfers.request");
+    expect(
+      NAV_ITEMS.find((item) => item.key === "mensaConsumi")?.permission,
+    ).toBe("mensa.consumption.manage");
+  });
 });
