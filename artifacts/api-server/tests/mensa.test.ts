@@ -1924,6 +1924,101 @@ describe("Modulo Mensa", () => {
     });
   });
 
+  it("aggrega nel report tutte le categorie storiche di sesso, fascia età e temporaneità", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const today = dataServizioMensa();
+    const categories = [
+      { sesso: "M", fascia: "0_17", temporaneo: false, tipo: "pranzo" },
+      { sesso: "F", fascia: "18_29", temporaneo: true, tipo: "cena" },
+      { sesso: "ALTRO", fascia: "30_64", temporaneo: false, tipo: "pranzo" },
+      { sesso: "ND", fascia: "65_plus", temporaneo: true, tipo: "cena" },
+      {
+        sesso: "M",
+        fascia: "non_determinata",
+        temporaneo: false,
+        tipo: "pranzo",
+      },
+    ] as const;
+    const beneficiaries = await db
+      .insert(beneficiariTable)
+      .values(
+        categories.map((_, index) => ({
+          codice: `BEN-REPORT-${index}-${rnd()}`,
+          nome: `Report${index}`,
+          cognome: "Mensa",
+          cittaId: fixture.romeId,
+          attivo: true,
+        })),
+      )
+      .returning({ id: beneficiariTable.id });
+    ids.beneficiaries.push(...beneficiaries.map((row) => row.id));
+    const accesses = await db
+      .insert(mensaAccessiTable)
+      .values(
+        categories.map((category, index) => ({
+          mensaId: fixture.mensaA,
+          beneficiarioId: beneficiaries[index].id,
+          esito: "consentito",
+          motivoEsito: "ABILITAZIONE_VALIDA",
+          operatoreId: fixture.userId,
+          modalitaAccesso: category.temporaneo ? "temporaneo" : "manuale",
+          tipoServizio: category.tipo,
+          idempotencyKey: `report-access-${index}-${rnd()}`,
+        })),
+      )
+      .returning({ id: mensaAccessiTable.id });
+    await db.insert(mensaPastiTable).values(
+      categories.map((category, index) => ({
+        mensaId: fixture.mensaA,
+        beneficiarioId: beneficiaries[index].id,
+        accessoMensaId: accesses[index].id,
+        dataServizio: today,
+        tipoServizio: category.tipo,
+        sessoSnapshot: category.sesso,
+        fasciaEtaSnapshot: category.fascia,
+        fasciaEtaOrigineSnapshot:
+          category.fascia === "non_determinata"
+            ? "non_determinata"
+            : "calcolata",
+        anagraficaProvvisoriaSnapshot: false,
+        temporaneoSnapshot: category.temporaneo,
+        operatoreId: fixture.userId,
+        idempotencyKey: `report-meal-${index}-${rnd()}`,
+      })),
+    );
+
+    const report = await request(app).get(
+      `/mensa/report?dal=${today}&al=${today}&mensaId=${fixture.mensaA}`,
+    );
+    expect(report.status).toBe(200);
+    expect(report.body.totalePasti).toBe(5);
+    expect(report.body.pastiTemporanei).toBe(2);
+    expect(report.body.pastiOrdinari).toBe(3);
+    expect(report.body.distribuzioneSesso).toEqual(
+      expect.arrayContaining([
+        { chiave: "M", totale: 2 },
+        { chiave: "F", totale: 1 },
+        { chiave: "ALTRO", totale: 1 },
+        { chiave: "ND", totale: 1 },
+      ]),
+    );
+    expect(report.body.distribuzioneFasciaEta).toEqual(
+      expect.arrayContaining(
+        categories.map((category) => ({
+          chiave: category.fascia,
+          totale: 1,
+        })),
+      ),
+    );
+    expect(report.body.distribuzioneTipoServizio).toEqual(
+      expect.arrayContaining([
+        { chiave: "pranzo", totale: 3 },
+        { chiave: "cena", totale: 2 },
+      ]),
+    );
+  });
+
   it("pagina senza limiti silenziosi Accessi, Pasti, Eccezioni e Trasferimenti", async () => {
     const fixture = await createFixture();
     const today = dataServizioMensa();
