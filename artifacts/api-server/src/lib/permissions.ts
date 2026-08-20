@@ -15,6 +15,11 @@ export const MENSA_PERMISSIONS = [
     label: "Mensa: eccezioni nella stessa Area",
   },
   { key: "mensa.transfers.manage", label: "Mensa: rifornimenti" },
+  { key: "mensa.transfers.request", label: "Mensa: richiesta rifornimenti" },
+  { key: "mensa.transfers.receive", label: "Mensa: ricezione rifornimenti" },
+  { key: "mensa.consumption.manage", label: "Mensa: consumi e scarti" },
+  { key: "mensa.service.close", label: "Mensa: chiusura giornata" },
+  { key: "mensa.service.reopen", label: "Mensa: riapertura giornata" },
   { key: "mensa.reports.view", label: "Mensa: report" },
   { key: "mensa.cards.manage", label: "Mensa: gestione tessere" },
 ] as const;
@@ -101,10 +106,22 @@ export const MAGAZZINO_PERMISSIONS = [
   { key: "magazzino.products.manage", label: "Magazzino: gestione prodotti" },
   { key: "magazzino.stock.receive", label: "Magazzino: carico merce" },
   { key: "magazzino.stock.issue", label: "Magazzino: scarico merce" },
-  { key: "magazzino.stock.adjust", label: "Magazzino: rettifiche inventariali" },
-  { key: "magazzino.transfers.create", label: "Magazzino: creazione trasferimenti" },
-  { key: "magazzino.transfers.dispatch", label: "Magazzino: spedizione trasferimenti" },
-  { key: "magazzino.transfers.receive", label: "Magazzino: ricezione trasferimenti" },
+  {
+    key: "magazzino.stock.adjust",
+    label: "Magazzino: rettifiche inventariali",
+  },
+  {
+    key: "magazzino.transfers.create",
+    label: "Magazzino: creazione trasferimenti",
+  },
+  {
+    key: "magazzino.transfers.dispatch",
+    label: "Magazzino: spedizione trasferimenti",
+  },
+  {
+    key: "magazzino.transfers.receive",
+    label: "Magazzino: ricezione trasferimenti",
+  },
 ] as const;
 
 export const BOLLE_PERMISSIONS = [
@@ -115,9 +132,18 @@ export const BOLLE_PERMISSIONS = [
 ] as const;
 
 export const APPROVVIGIONAMENTI_PERMISSIONS = [
-  { key: "approvvigionamenti.view", label: "Approvvigionamenti: consultazione" },
-  { key: "approvvigionamenti.manage", label: "Approvvigionamenti: gestione ordini" },
-  { key: "approvvigionamenti.receive", label: "Approvvigionamenti: ricezione merce" },
+  {
+    key: "approvvigionamenti.view",
+    label: "Approvvigionamenti: consultazione",
+  },
+  {
+    key: "approvvigionamenti.manage",
+    label: "Approvvigionamenti: gestione ordini",
+  },
+  {
+    key: "approvvigionamenti.receive",
+    label: "Approvvigionamenti: ricezione merce",
+  },
 ] as const;
 
 export const ALL_PERMISSIONS = [

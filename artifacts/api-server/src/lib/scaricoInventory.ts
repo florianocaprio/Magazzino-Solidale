@@ -45,6 +45,14 @@ interface ScaricoInventarialeInput {
   righe: ScaricoInventarialeRiga[];
 }
 
+interface StornoScaricoInventarialeInput {
+  documentoRiferimento: string;
+  dataMovimento: string;
+  operatoreId: number;
+  tipoDettaglio: string;
+  note: string;
+}
+
 async function impegnatoAttivoLotto(
   tx: InventoryTransaction,
   lottoId: number,
@@ -96,10 +104,7 @@ async function scaricaRigaFefo(
     )
       ? await impegnatoAttivoLotto(tx, lotto.id)
       : 0;
-    const disponibile = Math.max(
-      0,
-      residua - impegnato,
-    );
+    const disponibile = Math.max(0, residua - impegnato);
     const prelievo = Math.min(disponibile, rimanente);
     if (prelievo <= 0) continue;
 
@@ -170,4 +175,65 @@ export async function creaScaricoInventariale(
     await scaricaRigaFefo(tx, input, riga);
   }
   return scarico.id;
+}
+
+/**
+ * Compensa, senza cancellarli, tutti i movimenti di uno scarico identificato
+ * dal documento di riferimento. Il ripristino dei Lotti e le rettifiche
+ * append-only restano atomici nel ledger condiviso.
+ */
+export async function stornaScaricoInventariale(
+  tx: InventoryTransaction,
+  input: StornoScaricoInventarialeInput,
+): Promise<number> {
+  const movements = await tx
+    .select()
+    .from(movimentiTable)
+    .where(
+      and(
+        eq(movimentiTable.documentoRiferimento, input.documentoRiferimento),
+        eq(movimentiTable.tipoMovimento, "scarico"),
+      ),
+    )
+    .for("update");
+  if (!movements.length) {
+    throw new InventoryError(
+      "Movimenti inventariali dello scarico non trovati",
+    );
+  }
+  for (const movement of movements) {
+    if (movement.lottoId == null) {
+      throw new InventoryError("Movimento senza Lotto non stornabile");
+    }
+    const [lotto] = await tx
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, movement.lottoId))
+      .for("update");
+    if (!lotto) throw new InventoryError("Lotto storico non disponibile");
+    const quantity = parseDbNumber(movement.quantita);
+    await tx
+      .update(lottiTable)
+      .set({
+        quantitaResidua: (
+          parseDbNumber(lotto.quantitaResidua) + quantity
+        ).toFixed(2),
+      })
+      .where(eq(lottiTable.id, lotto.id));
+    await tx.insert(movimentiTable).values({
+      tipoMovimento: "rettifica_positiva",
+      tipoDettaglio: input.tipoDettaglio,
+      dataMovimento: input.dataMovimento,
+      magazzinoId: movement.magazzinoId,
+      prodottoId: movement.prodottoId,
+      lottoId: movement.lottoId,
+      quantita: quantity.toFixed(2),
+      unitaMisura: movement.unitaMisura,
+      movimentoOrigineId: movement.id,
+      operatoreId: input.operatoreId,
+      documentoRiferimento: input.documentoRiferimento,
+      note: input.note,
+    });
+  }
+  return movements.length;
 }

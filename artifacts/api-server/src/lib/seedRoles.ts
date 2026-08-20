@@ -94,6 +94,29 @@ export function roleAreasAfterEmporioSeed(
   ];
 }
 
+const MENSA_STANDARD_DENIED_PERMISSIONS = new Set([
+  "mensa.meals.override",
+  "mensa.service.reopen",
+  "mensa.transfers.manage",
+  "magazzino.transfers.dispatch",
+  "magazzino.stock.issue",
+  "magazzino.stock.adjust",
+]);
+
+export function defaultMensaRolePermissions(
+  current: string[] | null | undefined,
+): string[] {
+  const required = MENSA_PERMISSIONS.map((item) => item.key).filter(
+    (key) => !MENSA_STANDARD_DENIED_PERMISSIONS.has(key),
+  );
+  return mergePermissions(
+    (current ?? []).filter(
+      (permission) => !MENSA_STANDARD_DENIED_PERMISSIONS.has(permission),
+    ),
+    required,
+  );
+}
+
 export async function ensureSuperAdminRole(): Promise<number> {
   const [existing] = await db
     .select({ id: ruoliTable.id })
@@ -192,7 +215,11 @@ export async function seedRoles(): Promise<void> {
   }
 
   const [logisticaRole] = await db
-    .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
+    .select({
+      id: ruoliTable.id,
+      aree: ruoliTable.aree,
+      permessi: ruoliTable.permessi,
+    })
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, LOGISTICA_ROLE_NAME));
   if (!logisticaRole) {
@@ -205,14 +232,26 @@ export async function seedRoles(): Promise<void> {
     });
     logger.info("Seeded Logistics operator role");
   } else {
-    await db.update(ruoliTable).set({
-      aree: logisticaRole.aree.includes("logistica") ? logisticaRole.aree : [...logisticaRole.aree, "logistica"],
-      permessi: mergePermissions(logisticaRole.permessi, LOGISTICA_OPERATOR_PERMISSIONS),
-    }).where(eq(ruoliTable.id, logisticaRole.id));
+    await db
+      .update(ruoliTable)
+      .set({
+        aree: logisticaRole.aree.includes("logistica")
+          ? logisticaRole.aree
+          : [...logisticaRole.aree, "logistica"],
+        permessi: mergePermissions(
+          logisticaRole.permessi,
+          LOGISTICA_OPERATOR_PERMISSIONS,
+        ),
+      })
+      .where(eq(ruoliTable.id, logisticaRole.id));
   }
 
   const [magazzinoRole] = await db
-    .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
+    .select({
+      id: ruoliTable.id,
+      aree: ruoliTable.aree,
+      permessi: ruoliTable.permessi,
+    })
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, MAGAZZINO_ROLE_NAME));
   if (!magazzinoRole) {
@@ -225,10 +264,18 @@ export async function seedRoles(): Promise<void> {
     });
     logger.info("Seeded Magazzino operator role");
   } else {
-    await db.update(ruoliTable).set({
-      aree: magazzinoRole.aree.includes("magazzino") ? magazzinoRole.aree : [...magazzinoRole.aree, "magazzino"],
-      permessi: mergePermissions(magazzinoRole.permessi, MAGAZZINO_OPERATOR_PERMISSIONS),
-    }).where(eq(ruoliTable.id, magazzinoRole.id));
+    await db
+      .update(ruoliTable)
+      .set({
+        aree: magazzinoRole.aree.includes("magazzino")
+          ? magazzinoRole.aree
+          : [...magazzinoRole.aree, "magazzino"],
+        permessi: mergePermissions(
+          magazzinoRole.permessi,
+          MAGAZZINO_OPERATOR_PERMISSIONS,
+        ),
+      })
+      .where(eq(ruoliTable.id, magazzinoRole.id));
   }
 
   // Provide a ready-to-assign "Operatore UDS" role so a street-unit operator can
@@ -287,9 +334,7 @@ export async function seedRoles(): Promise<void> {
       .where(eq(ruoliTable.id, emporioRole.id));
   }
 
-  const defaultMensaPermissions = MENSA_PERMISSIONS.map(
-    (item) => item.key,
-  ).filter((key) => key !== "mensa.meals.override");
+  const defaultMensaPermissions = defaultMensaRolePermissions([]);
   const [mensaRole] = await db
     .select({
       id: ruoliTable.id,
@@ -314,7 +359,9 @@ export async function seedRoles(): Promise<void> {
         aree: mensaRole.aree.includes(MENSA_AREA_KEY)
           ? mensaRole.aree
           : [...mensaRole.aree, MENSA_AREA_KEY],
-        permessi: mergePermissions(mensaRole.permessi, defaultMensaPermissions),
+        // Soltanto il ruolo standard viene riallineato: i ruoli custom restano
+        // invariati e possono ricevere esplicitamente override/reopen/dispatch.
+        permessi: defaultMensaRolePermissions(mensaRole.permessi),
       })
       .where(eq(ruoliTable.id, mensaRole.id));
   }

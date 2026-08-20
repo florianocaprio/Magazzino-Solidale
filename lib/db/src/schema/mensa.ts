@@ -3,8 +3,10 @@ import {
   boolean,
   check,
   date,
+  decimal,
   index,
   integer,
+  jsonb,
   pgTable,
   serial,
   text,
@@ -15,6 +17,8 @@ import {
 import { beneficiariTable } from "./beneficiari";
 import { cittaTable } from "./citta";
 import { magazziniTable } from "./magazzini";
+import { prodottiTable } from "./prodotti";
+import { scarichiTable } from "./scarichi";
 import { utentiTable } from "./auth";
 
 export const menseTable = pgTable(
@@ -267,6 +271,14 @@ export const mensaPastiTable = pgTable(
       .defaultNow(),
     dataServizio: date("data_servizio").notNull(),
     tipoServizio: varchar("tipo_servizio", { length: 40 }).notNull(),
+    giornataServizioId: integer("giornata_servizio_id"),
+    sessoSnapshot: varchar("sesso_snapshot", { length: 10 }),
+    fasciaEtaSnapshot: varchar("fascia_eta_snapshot", { length: 20 }),
+    fasciaEtaOrigineSnapshot: varchar("fascia_eta_origine_snapshot", {
+      length: 20,
+    }),
+    anagraficaProvvisoriaSnapshot: boolean("anagrafica_provvisoria_snapshot"),
+    temporaneoSnapshot: boolean("temporaneo_snapshot"),
     operatoreId: integer("operatore_id")
       .notNull()
       .references(() => utentiTable.id),
@@ -297,12 +309,124 @@ export const mensaPastiTable = pgTable(
     ),
     check(
       "mensa_pasti_tipo_check",
-      sql`length(trim(${table.tipoServizio})) > 0`,
+      sql`${table.tipoServizio} in ('pranzo', 'cena')`,
     ),
     check(
       "mensa_pasti_override_motivo_check",
       sql`${table.override} = false or length(trim(coalesce(${table.motivoOverride}, ''))) > 0`,
     ),
+  ],
+);
+
+export const mensaGiornateServizioTable = pgTable(
+  "mensa_giornate_servizio",
+  {
+    id: serial("id").primaryKey(),
+    mensaId: integer("mensa_id")
+      .notNull()
+      .references(() => menseTable.id),
+    dataServizio: date("data_servizio").notNull(),
+    tipoServizio: varchar("tipo_servizio", { length: 40 }).notNull(),
+    stato: varchar("stato", { length: 20 }).notNull().default("aperta"),
+    apertaDa: integer("aperta_da").references(() => utentiTable.id),
+    apertaAt: timestamp("aperta_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    chiusaDa: integer("chiusa_da").references(() => utentiTable.id),
+    chiusaAt: timestamp("chiusa_at", { withTimezone: true }),
+    riapertaDa: integer("riaperta_da").references(() => utentiTable.id),
+    riapertaAt: timestamp("riaperta_at", { withTimezone: true }),
+    motivoRiapertura: text("motivo_riapertura"),
+    noteChiusura: text("note_chiusura"),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("mensa_giornate_servizio_unique").on(
+      table.mensaId,
+      table.dataServizio,
+      table.tipoServizio,
+    ),
+    index("mensa_giornate_servizio_mensa_data_idx").on(
+      table.mensaId,
+      table.dataServizio,
+    ),
+    check(
+      "mensa_giornate_servizio_tipo_check",
+      sql`${table.tipoServizio} in ('pranzo', 'cena')`,
+    ),
+    check(
+      "mensa_giornate_servizio_stato_check",
+      sql`${table.stato} in ('aperta', 'chiusa')`,
+    ),
+  ],
+);
+
+export const mensaConsumiTable = pgTable(
+  "mensa_consumi",
+  {
+    id: serial("id").primaryKey(),
+    giornataServizioId: integer("giornata_servizio_id")
+      .notNull()
+      .references(() => mensaGiornateServizioTable.id),
+    mensaId: integer("mensa_id")
+      .notNull()
+      .references(() => menseTable.id),
+    scaricoId: integer("scarico_id")
+      .notNull()
+      .references(() => scarichiTable.id),
+    dataServizio: date("data_servizio").notNull(),
+    tipoServizio: varchar("tipo_servizio", { length: 40 }).notNull(),
+    prodottoId: integer("prodotto_id")
+      .notNull()
+      .references(() => prodottiTable.id),
+    quantita: decimal("quantita", { precision: 10, scale: 2 }).notNull(),
+    unitaMisura: varchar("unita_misura", { length: 20 }).notNull(),
+    causale: varchar("causale", { length: 20 }).notNull(),
+    note: text("note"),
+    operatoreId: integer("operatore_id")
+      .notNull()
+      .references(() => utentiTable.id),
+    idempotencyKey: varchar("idempotency_key", { length: 80 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("mensa_consumi_idempotency_unique").on(table.idempotencyKey),
+    index("mensa_consumi_giornata_idx").on(table.giornataServizioId),
+    index("mensa_consumi_mensa_data_idx").on(table.mensaId, table.dataServizio),
+    check(
+      "mensa_consumi_tipo_check",
+      sql`${table.tipoServizio} in ('pranzo', 'cena')`,
+    ),
+    check(
+      "mensa_consumi_causale_check",
+      sql`${table.causale} in ('consumo', 'scarto')`,
+    ),
+    check("mensa_consumi_quantita_check", sql`${table.quantita} > 0`),
+  ],
+);
+
+export const mensaConsumiStorniTable = pgTable(
+  "mensa_consumi_storni",
+  {
+    id: serial("id").primaryKey(),
+    consumoId: integer("consumo_id")
+      .notNull()
+      .references(() => mensaConsumiTable.id),
+    motivo: text("motivo").notNull(),
+    operatoreId: integer("operatore_id")
+      .notNull()
+      .references(() => utentiTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("mensa_consumi_storni_consumo_unique").on(table.consumoId),
   ],
 );
 
@@ -314,3 +438,6 @@ export type MensaAutorizzazioneTemporanea =
 export type MensaAccesso = typeof mensaAccessiTable.$inferSelect;
 export type MensaEccezione = typeof mensaEccezioniTable.$inferSelect;
 export type MensaPasto = typeof mensaPastiTable.$inferSelect;
+export type MensaGiornataServizio =
+  typeof mensaGiornateServizioTable.$inferSelect;
+export type MensaConsumo = typeof mensaConsumiTable.$inferSelect;
