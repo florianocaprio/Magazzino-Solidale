@@ -10,7 +10,7 @@ import {
   cleanup,
   type SeedScope,
   createCentroRec,
-  createCitta,
+  createAreaOperativa,
   createMezzo,
   createVolontario,
 } from "./scope-helpers";
@@ -25,7 +25,7 @@ import {
 let scope: SeedScope;
 
 const appGlobal = () =>
-  makeScopedApp(turniRouter, { id: 0, centroAscoltoId: null, cittaId: null });
+  makeScopedApp(turniRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
 
 const DATA = "2026-07-15";
 const FASCIA = "09-13";
@@ -44,9 +44,9 @@ afterAll(async () => {
 
 describe("PUT /turni — anti-doppia-prenotazione mezzo", () => {
   it("rifiuta lo stesso mezzo in due centri nello stesso giorno+fascia (409)", async () => {
-    const citta = await createCitta(scope);
-    const centroA = await createCentroRec(scope, { cittaId: citta });
-    const centroB = await createCentroRec(scope, { cittaId: citta });
+    const areaOperativa = await createAreaOperativa(scope);
+    const centroA = await createCentroRec(scope, { areaOperativaId: areaOperativa });
+    const centroB = await createCentroRec(scope, { areaOperativaId: areaOperativa });
     const mezzo = await createMezzo(scope, { centroId: null }); // universale
     const volA = await createVolontario(scope, null);
     const volB = await createVolontario(scope, null);
@@ -76,8 +76,8 @@ describe("PUT /turni — anti-doppia-prenotazione mezzo", () => {
   });
 
   it("consente di ri-aggiornare lo stesso slot con lo stesso mezzo", async () => {
-    const citta = await createCitta(scope);
-    const centro = await createCentroRec(scope, { cittaId: citta });
+    const areaOperativa = await createAreaOperativa(scope);
+    const centro = await createCentroRec(scope, { areaOperativaId: areaOperativa });
     const mezzo = await createMezzo(scope, { centroId: null });
     const vol1 = await createVolontario(scope, null);
     const vol2 = await createVolontario(scope, null);
@@ -109,8 +109,8 @@ describe("PUT /turni — anti-doppia-prenotazione mezzo", () => {
   });
 
   it("serializza due creazioni concorrenti dello stesso slot", async () => {
-    const citta = await createCitta(scope);
-    const centro = await createCentroRec(scope, { cittaId: citta });
+    const areaOperativa = await createAreaOperativa(scope);
+    const centro = await createCentroRec(scope, { areaOperativaId: areaOperativa });
     const vol1 = await createVolontario(scope, null);
     const vol2 = await createVolontario(scope, null);
     const payload = (volontarioId: number) => ({

@@ -12,10 +12,10 @@ who can be attached.
 **Rule:** validate every assigned `volontarioId` server-side before insert — each must be
 universal (`volontari.centroAscoltoId IS NULL`) OR belong to the turno's centro. Otherwise a
 scoped caller attaches out-of-scope volunteers and reads their names back via the GET join
-(cross-centro/città data leak). Mirror this on any future record→record assignment endpoint.
+(cross-centro/area operativa data leak). Mirror this on any future record→record assignment endpoint.
 
 **Why:** code review flagged it as broken access control / IDOR. The centro itself is
-città-validated, but the FK payload (volontari) was not.
+area operativa-validated, but the FK payload (volontari) was not.
 
 **How to apply:** dedupe the payload by volontarioId (no DB unique constraint — low-concurrency
 design), then `inArray` fetch the referenced volontari and reject (403) if any fail the

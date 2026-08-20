@@ -5,7 +5,7 @@ import { eq, inArray, or } from "drizzle-orm";
 import {
   beneficiariTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   magazziniTable,
   menseTable,
@@ -19,7 +19,7 @@ import {
   utentiTable,
   zoneUdsTable,
 } from "@workspace/db";
-import cittaRouter from "../src/routes/citta";
+import areaOperativaRouter from "../src/routes/aree-operative";
 import zoneRouter from "../src/routes/zone-uds";
 import centriRouter from "../src/routes/centri-ascolto";
 import magazziniRouter from "../src/routes/magazzini";
@@ -33,7 +33,7 @@ import emailRouter from "../src/routes/impostazioni-email";
 
 type Actor = {
   id: number;
-  cittaId: number | null;
+  areaOperativaId: number | null;
   centroAscoltoId?: number | null;
   isAdmin: boolean;
   isSuperAdmin?: boolean;
@@ -86,8 +86,8 @@ function appAs(actor: Actor, ...routers: Router[]): Express {
       ruoloNome: actor.isAdmin ? "Audit Admin" : "Audit Operator",
       centroAscoltoId: actor.centroAscoltoId ?? null,
       centroAscoltoNome: null,
-      cittaId: actor.cittaId,
-      cittaNome: null,
+      areaOperativaId: actor.areaOperativaId,
+      areaOperativaNome: null,
       zonaUdsId: null,
       zonaUdsNome: null,
       isSuperAdmin: actor.isSuperAdmin ?? false,
@@ -118,7 +118,7 @@ async function createUser(
       cognome: "User",
       matricola: `AUD-${token}`,
       ruoloId: roleId,
-      cittaId: actor.cittaId,
+      areaOperativaId: actor.areaOperativaId,
       centroAscoltoId: actor.centroAscoltoId ?? null,
       isSuperAdmin: actor.isSuperAdmin ?? false,
     })
@@ -130,9 +130,9 @@ async function createUser(
 beforeEach(async () => {
   const token = suffix();
   const [a, b] = await db
-    .insert(cittaTable)
+    .insert(areeOperativeTable)
     .values([{ nome: `Area A ${token}` }, { nome: `Area B ${token}` }])
-    .returning({ id: cittaTable.id });
+    .returning({ id: areeOperativeTable.id });
   areaA = a.id;
   areaB = b.id;
   ids.aree.push(areaA, areaB);
@@ -140,8 +140,8 @@ beforeEach(async () => {
   const [ca, cb] = await db
     .insert(centriAscoltoTable)
     .values([
-      { nome: `Centro A ${token}`, cittaId: areaA },
-      { nome: `Centro B ${token}`, cittaId: areaB },
+      { nome: `Centro A ${token}`, areaOperativaId: areaA },
+      { nome: `Centro B ${token}`, areaOperativaId: areaB },
     ])
     .returning({ id: centriAscoltoTable.id });
   centroA = ca.id;
@@ -151,8 +151,8 @@ beforeEach(async () => {
   const [za, zb] = await db
     .insert(zoneUdsTable)
     .values([
-      { nome: `Zona A ${token}`, cittaId: areaA },
-      { nome: `Zona B ${token}`, cittaId: areaB },
+      { nome: `Zona A ${token}`, areaOperativaId: areaA },
+      { nome: `Zona B ${token}`, areaOperativaId: areaB },
     ])
     .returning({ id: zoneUdsTable.id });
   zonaA = za.id;
@@ -179,14 +179,14 @@ beforeEach(async () => {
   ids.ruoli.push(adminRoleId, operatorRoleId);
 
   superAdmin = await createUser(
-    { cittaId: null, isAdmin: true, isSuperAdmin: true },
+    { areaOperativaId: null, isAdmin: true, isSuperAdmin: true },
     adminRoleId,
   );
-  globalAdmin = await createUser({ cittaId: null, isAdmin: true }, adminRoleId);
-  adminA = await createUser({ cittaId: areaA, isAdmin: true }, adminRoleId);
-  adminB = await createUser({ cittaId: areaB, isAdmin: true }, adminRoleId);
+  globalAdmin = await createUser({ areaOperativaId: null, isAdmin: true }, adminRoleId);
+  adminA = await createUser({ areaOperativaId: areaA, isAdmin: true }, adminRoleId);
+  adminB = await createUser({ areaOperativaId: areaB, isAdmin: true }, adminRoleId);
   operator = await createUser(
-    { cittaId: areaA, isAdmin: false },
+    { areaOperativaId: areaA, isAdmin: false },
     operatorRoleId,
   );
 });
@@ -234,8 +234,8 @@ afterEach(async () => {
       .where(inArray(centriAscoltoTable.id, ids.centri.splice(0)));
   if (ids.aree.length)
     await db
-      .delete(cittaTable)
-      .where(inArray(cittaTable.id, ids.aree.splice(0)));
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, ids.aree.splice(0)));
   if (ids.ruoliVolontari.length)
     await db
       .delete(ruoliVolontariTable)
@@ -262,42 +262,42 @@ afterAll(async () => {
 
 describe("audit hardening Amministrazione/Core", () => {
   it("ADM-01 limita l'Admin A alla lettura della propria Area e riserva le mutazioni all'amministrazione globale", async () => {
-    const scopedApp = appAs(adminA, cittaRouter);
-    const list = await request(scopedApp).get("/citta");
+    const scopedApp = appAs(adminA, areaOperativaRouter);
+    const list = await request(scopedApp).get("/aree-operative");
     expect(list.status).toBe(200);
     expect(list.body.map((row: { id: number }) => row.id)).toEqual([areaA]);
     expect(
-      (await request(scopedApp).post("/citta").send({ nome: "Non consentita" }))
+      (await request(scopedApp).post("/aree-operative").send({ nome: "Non consentita" }))
         .status,
     ).toBe(403);
     expect(
       (
         await request(scopedApp)
-          .patch(`/citta/${areaB}`)
+          .patch(`/aree-operative/${areaB}`)
           .send({ nome: "Violazione" })
       ).status,
     ).toBe(403);
-    expect((await request(scopedApp).delete(`/citta/${areaB}`)).status).toBe(
+    expect((await request(scopedApp).delete(`/aree-operative/${areaB}`)).status).toBe(
       403,
     );
 
-    const globalApp = appAs(globalAdmin, cittaRouter);
+    const globalApp = appAs(globalAdmin, areaOperativaRouter);
     const created = await request(globalApp)
-      .post("/citta")
+      .post("/aree-operative")
       .send({ nome: `Area globale ${suffix()}` });
     expect(created.status).toBe(201);
     ids.aree.push(created.body.id);
   });
 
   it("ADM-01 disattiva l'Area senza scollegare le dipendenze", async () => {
-    const response = await request(appAs(superAdmin, cittaRouter)).delete(
-      `/citta/${areaA}`,
+    const response = await request(appAs(superAdmin, areaOperativaRouter)).delete(
+      `/aree-operative/${areaA}`,
     );
     expect(response.status).toBe(204);
     const [area] = await db
       .select()
-      .from(cittaTable)
-      .where(eq(cittaTable.id, areaA));
+      .from(areeOperativeTable)
+      .where(eq(areeOperativeTable.id, areaA));
     const [centro] = await db
       .select()
       .from(centriAscoltoTable)
@@ -307,8 +307,8 @@ describe("audit hardening Amministrazione/Core", () => {
       .from(zoneUdsTable)
       .where(eq(zoneUdsTable.id, zonaA));
     expect(area.attivo).toBe(false);
-    expect(centro.cittaId).toBe(areaA);
-    expect(zona.cittaId).toBe(areaA);
+    expect(centro.areaOperativaId).toBe(areaA);
+    expect(zona.areaOperativaId).toBe(areaA);
   });
 
   it("ADM-02 applica lo scope alle Zone e la rimozione le disattiva senza partial update", async () => {
@@ -317,7 +317,7 @@ describe("audit hardening Amministrazione/Core", () => {
       (
         await request(app)
           .post("/zone-uds")
-          .send({ cittaId: areaB, nome: "Zona vietata" })
+          .send({ areaOperativaId: areaB, nome: "Zona vietata" })
       ).status,
     ).toBe(403);
     expect(
@@ -329,7 +329,7 @@ describe("audit hardening Amministrazione/Core", () => {
     ).toBe(403);
     expect((await request(app).delete(`/zone-uds/${zonaB}`)).status).toBe(403);
     expect(
-      (await request(app).post("/zone-uds").send({ cittaId: areaA })).status,
+      (await request(app).post("/zone-uds").send({ areaOperativaId: areaA })).status,
     ).toBe(400);
 
     expect(
@@ -362,7 +362,7 @@ describe("audit hardening Amministrazione/Core", () => {
         nome: "Mario",
         cognome: "Rossi",
         sesso: "M",
-        cittaId: areaA,
+        areaOperativaId: areaA,
         centroAscoltoId: centroA,
       })
       .returning({ id: beneficiariTable.id });
@@ -407,9 +407,9 @@ describe("audit hardening Amministrazione/Core", () => {
     const [own, other, shared] = await db
       .insert(magazziniTable)
       .values([
-        { codice: `MA-${token}`, nome: "Mag A", cittaId: areaA },
-        { codice: `MB-${token}`, nome: "Mag B", cittaId: areaB },
-        { codice: `MS-${token}`, nome: "Mag shared", cittaId: null },
+        { codice: `MA-${token}`, nome: "Mag A", areaOperativaId: areaA },
+        { codice: `MB-${token}`, nome: "Mag B", areaOperativaId: areaB },
+        { codice: `MS-${token}`, nome: "Mag shared", areaOperativaId: null },
       ])
       .returning({ id: magazziniTable.id });
     ids.magazzini.push(own.id, other.id, shared.id);
@@ -453,7 +453,7 @@ describe("audit hardening Amministrazione/Core", () => {
         await request(appA).post("/magazzini").send({
           codice: crossAreaCode,
           nome: "Magazzino incoerente Admin A",
-          cittaId: areaA,
+          areaOperativaId: areaA,
           centroAscoltoId: centroB,
           tipoMagazzino: "logistico",
         })
@@ -467,7 +467,7 @@ describe("audit hardening Amministrazione/Core", () => {
         await request(globalApp).post("/magazzini").send({
           codice: globalMismatchCode,
           nome: "Magazzino incoerente globale",
-          cittaId: areaA,
+          areaOperativaId: areaA,
           centroAscoltoId: centroB,
           tipoMagazzino: "logistico",
         })
@@ -477,7 +477,7 @@ describe("audit hardening Amministrazione/Core", () => {
     const centerBoundApp = appAs({ ...adminA, centroAscoltoId: centroA }, magazziniRouter);
     const centerBound = await request(centerBoundApp).post("/magazzini").send({
       nome: "Centro vincolato",
-      cittaId: areaA,
+      areaOperativaId: areaA,
       centroAscoltoId: centroB,
     });
     expect(centerBound.status).toBe(201);
@@ -492,14 +492,14 @@ describe("audit hardening Amministrazione/Core", () => {
         await request(globalApp).post("/magazzini").send({
           codice: inactiveCenterCode,
           nome: "Centro inattivo",
-          cittaId: areaA,
+          areaOperativaId: areaA,
           centroAscoltoId: centroA,
         })
       ).status,
     ).toBe(400);
     await db.update(centriAscoltoTable).set({ attivo: true }).where(eq(centriAscoltoTable.id, centroA));
 
-    await db.update(cittaTable).set({ attivo: false }).where(eq(cittaTable.id, areaA));
+    await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaA));
     const inactiveAreaCode = `MA-${suffix()}`;
     rejectedCodes.push(inactiveAreaCode);
     expect(
@@ -507,44 +507,44 @@ describe("audit hardening Amministrazione/Core", () => {
         await request(globalApp).post("/magazzini").send({
           codice: inactiveAreaCode,
           nome: "Area inattiva",
-          cittaId: areaA,
+          areaOperativaId: areaA,
           centroAscoltoId: centroA,
         })
       ).status,
     ).toBe(400);
-    await db.update(cittaTable).set({ attivo: true }).where(eq(cittaTable.id, areaA));
+    await db.update(areeOperativeTable).set({ attivo: true }).where(eq(areeOperativeTable.id, areaA));
 
     const active = await request(globalApp).post("/magazzini").send({
       nome: "Magazzino valido",
-      cittaId: areaA,
+      areaOperativaId: areaA,
       centroAscoltoId: centroA,
       tipoMagazzino: "logistico",
     });
     expect(active.status).toBe(201);
     ids.magazzini.push(active.body.id);
 
-    await db.update(cittaTable).set({ attivo: false }).where(eq(cittaTable.id, areaB));
+    await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaB));
     expect(
       (
         await request(globalApp)
           .patch(`/magazzini/${active.body.id}`)
-          .send({ cittaId: areaB, centroAscoltoId: null })
+          .send({ areaOperativaId: areaB, centroAscoltoId: null })
       ).status,
     ).toBe(400);
-    await db.update(cittaTable).set({ attivo: true }).where(eq(cittaTable.id, areaB));
+    await db.update(areeOperativeTable).set({ attivo: true }).where(eq(areeOperativeTable.id, areaB));
     await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centroB));
     expect(
       (
         await request(globalApp)
           .patch(`/magazzini/${active.body.id}`)
-          .send({ cittaId: areaB, centroAscoltoId: centroB })
+          .send({ areaOperativaId: areaB, centroAscoltoId: centroB })
       ).status,
     ).toBe(400);
     await db.update(centriAscoltoTable).set({ attivo: true }).where(eq(centriAscoltoTable.id, centroB));
 
     const mensa = await request(globalApp).post("/magazzini").send({
       nome: "Mensa valida",
-      cittaId: areaA,
+      areaOperativaId: areaA,
       centroAscoltoId: centroA,
       tipoMagazzino: "mensa",
     });
@@ -560,7 +560,7 @@ describe("audit hardening Amministrazione/Core", () => {
 
   it("impedisce nuove relazioni operative con Aree e Centri disattivati", async () => {
     const globalApp = appAs(globalAdmin, utentiRouter, centriRouter, politicheRouter);
-    await db.update(cittaTable).set({ attivo: false }).where(eq(cittaTable.id, areaA));
+    await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaA));
 
     const userToken = suffix();
     expect(
@@ -572,7 +572,7 @@ describe("audit hardening Amministrazione/Core", () => {
           nome: "Area",
           cognome: "Inattiva",
           ruoloId: operatorRoleId,
-          cittaId: areaA,
+          areaOperativaId: areaA,
         })
       ).status,
     ).toBe(400);
@@ -580,7 +580,7 @@ describe("audit hardening Amministrazione/Core", () => {
       (
         await request(globalApp).post("/centri-ascolto").send({
           nome: `Centro area inattiva ${suffix()}`,
-          cittaId: areaA,
+          areaOperativaId: areaA,
         })
       ).status,
     ).toBe(400);
@@ -588,34 +588,34 @@ describe("audit hardening Amministrazione/Core", () => {
       (
         await request(globalApp).post("/politiche-credito-solidale").send({
           nome: `Policy area inattiva ${suffix()}`,
-          cittaId: areaA,
+          areaOperativaId: areaA,
         })
       ).status,
     ).toBe(400);
 
-    await db.update(cittaTable).set({ attivo: false }).where(eq(cittaTable.id, areaB));
+    await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaB));
     expect(
       (
         await request(globalApp)
           .patch(`/centri-ascolto/${centroA}`)
-          .send({ cittaId: areaB })
+          .send({ areaOperativaId: areaB })
       ).status,
     ).toBe(400);
     expect(
       (
         await request(globalApp)
           .patch(`/utenti/${operator.id}`)
-          .send({ cittaId: areaB })
+          .send({ areaOperativaId: areaB })
       ).status,
     ).toBe(400);
 
-    await db.update(cittaTable).set({ attivo: true }).where(eq(cittaTable.id, areaA));
+    await db.update(areeOperativeTable).set({ attivo: true }).where(eq(areeOperativeTable.id, areaA));
     await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centroA));
     expect(
       (
         await request(globalApp).post("/politiche-credito-solidale").send({
           nome: `Policy centro inattivo ${suffix()}`,
-          cittaId: areaA,
+          areaOperativaId: areaA,
           centroAscoltoId: centroA,
         })
       ).status,
@@ -623,7 +623,7 @@ describe("audit hardening Amministrazione/Core", () => {
 
     const [existingPolicy] = await db
       .insert(politicheCreditoSolidaleTable)
-      .values({ nome: `Policy storica ${suffix()}`, cittaId: areaA, centroAscoltoId: centroA })
+      .values({ nome: `Policy storica ${suffix()}`, areaOperativaId: areaA, centroAscoltoId: centroA })
       .returning({ id: politicheCreditoSolidaleTable.id });
     ids.politiche.push(existingPolicy.id);
     expect(
@@ -639,10 +639,10 @@ describe("audit hardening Amministrazione/Core", () => {
     const [globalPolicy, otherPolicy] = await db
       .insert(politicheCreditoSolidaleTable)
       .values([
-        { nome: `Globale ${suffix()}`, cittaId: null, centroAscoltoId: null },
+        { nome: `Globale ${suffix()}`, areaOperativaId: null, centroAscoltoId: null },
         {
           nome: `Area B ${suffix()}`,
-          cittaId: areaB,
+          areaOperativaId: areaB,
           centroAscoltoId: centroB,
         },
       ])
@@ -678,7 +678,7 @@ describe("audit hardening Amministrazione/Core", () => {
       .post("/politiche-credito-solidale")
       .send({
         nome: `Incoerente ${suffix()}`,
-        cittaId: areaA,
+        areaOperativaId: areaA,
         centroAscoltoId: centroB,
       });
     expect(response.status).toBe(400);
@@ -739,7 +739,7 @@ describe("audit hardening Amministrazione/Core", () => {
         nome: "Cross",
         cognome: "Area",
         ruoloId: operatorRoleId,
-        cittaId: areaB,
+        areaOperativaId: areaB,
       });
     expect(crossArea.status).toBe(403);
 
@@ -752,7 +752,7 @@ describe("audit hardening Amministrazione/Core", () => {
         nome: "Centro",
         cognome: "Errato",
         ruoloId: operatorRoleId,
-        cittaId: areaA,
+        areaOperativaId: areaA,
         centroAscoltoId: centroB,
       });
     expect(incoherent.status).toBe(400);
@@ -764,7 +764,7 @@ describe("audit hardening Amministrazione/Core", () => {
       nome: "Nuovo",
       cognome: "Utente",
       ruoloId: operatorRoleId,
-      cittaId: areaA,
+      areaOperativaId: areaA,
     };
     for (const password of ["Abc123", "solotesto", "12345678"]) {
       const token = suffix();
@@ -795,7 +795,7 @@ describe("audit hardening Amministrazione/Core", () => {
 
   it("ADM-08 il DELETE utenti disattiva l'account e ne conserva l'identità", async () => {
     const target = await createUser(
-      { cittaId: areaA, isAdmin: false },
+      { areaOperativaId: areaA, isAdmin: false },
       operatorRoleId,
     );
     const response = await request(appAs(adminA, utentiRouter)).delete(
@@ -832,15 +832,15 @@ describe("audit hardening Amministrazione/Core", () => {
   });
 
   it("ADM-15 consente al SuperAdmin di operare globalmente senza indebolire lo scope degli Admin di Area", async () => {
-    const created = await request(appAs(superAdmin, cittaRouter))
-      .post("/citta")
+    const created = await request(appAs(superAdmin, areaOperativaRouter))
+      .post("/aree-operative")
       .send({ nome: `Area Super ${suffix()}` });
     expect(created.status).toBe(201);
     ids.aree.push(created.body.id);
     expect(
       (
-        await request(appAs(adminB, cittaRouter))
-          .patch(`/citta/${created.body.id}`)
+        await request(appAs(adminB, areaOperativaRouter))
+          .patch(`/aree-operative/${created.body.id}`)
           .send({ note: "No" })
       ).status,
     ).toBe(403);

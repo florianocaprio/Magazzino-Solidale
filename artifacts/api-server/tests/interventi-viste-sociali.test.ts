@@ -5,7 +5,7 @@ import {
   beneficiariTable,
   bisogniPianificatiTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   interventiStoricoStatiTable,
   interventiTable,
@@ -23,7 +23,7 @@ import {
 
 const rnd = () => Math.random().toString(36).slice(2, 10);
 const ids = {
-  citta: [] as number[],
+  areaOperativa: [] as number[],
   centri: [] as number[],
   beneficiari: [] as number[],
   utenti: [] as number[],
@@ -57,7 +57,7 @@ function addDays(value: string, days: number): string {
 function makeApp(
   options: {
     userId?: number;
-    cittaId?: number | null;
+    areaOperativaId?: number | null;
     centroId?: number | null;
     aree?: string[];
   } = {},
@@ -69,7 +69,7 @@ function makeApp(
       req as unknown as {
         user: {
           id: number;
-          cittaId: number | null;
+          areaOperativaId: number | null;
           centroAscoltoId: number | null;
           zonaUdsId: null;
           aree: string[];
@@ -80,7 +80,7 @@ function makeApp(
       }
     ).user = {
       id: options.userId ?? operatoreRoma,
-      cittaId: options.cittaId === undefined ? roma : options.cittaId,
+      areaOperativaId: options.areaOperativaId === undefined ? roma : options.areaOperativaId,
       centroAscoltoId:
         options.centroId === undefined ? centroRoma : options.centroId,
       zonaUdsId: null,
@@ -101,26 +101,26 @@ function makeApp(
   return app;
 }
 
-async function createCitta(nome: string): Promise<number> {
+async function createAreaOperativa(nome: string): Promise<number> {
   const [row] = await db
-    .insert(cittaTable)
+    .insert(areeOperativeTable)
     .values({ nome })
-    .returning({ id: cittaTable.id });
-  ids.citta.push(row.id);
+    .returning({ id: areeOperativeTable.id });
+  ids.areaOperativa.push(row.id);
   return row.id;
 }
 
-async function createCentro(cittaId: number): Promise<number> {
+async function createCentro(areaOperativaId: number): Promise<number> {
   const [row] = await db
     .insert(centriAscoltoTable)
-    .values({ nome: `Centro ${rnd()}`, cittaId })
+    .values({ nome: `Centro ${rnd()}`, areaOperativaId })
     .returning({ id: centriAscoltoTable.id });
   ids.centri.push(row.id);
   return row.id;
 }
 
 async function createBeneficiario(input: {
-  cittaId: number;
+  areaOperativaId: number;
   centroId: number;
   uds?: boolean;
   nome?: string;
@@ -134,7 +134,7 @@ async function createBeneficiario(input: {
       nome: input.nome ?? "Mario",
       cognome: input.cognome ?? "Rossi",
       sesso: "M",
-      cittaId: input.cittaId,
+      areaOperativaId: input.areaOperativaId,
       centroAscoltoId: input.centroId,
       uds: input.uds ?? false,
       numComponenti: 4,
@@ -142,7 +142,7 @@ async function createBeneficiario(input: {
     })
     .returning({ id: beneficiariTable.id });
   ids.beneficiari.push(row.id);
-  if (input.cittaId === roma && input.centroId === centroRoma && !input.uds) {
+  if (input.areaOperativaId === roma && input.centroId === centroRoma && !input.uds) {
     codiceRoma = codice;
   }
   return row.id;
@@ -187,8 +187,8 @@ beforeAll(async () => {
   today = dataCivileEuropeRome();
   tomorrow = addDays(today, 1);
   yesterday = addDays(today, -1);
-  roma = await createCitta(`Roma 53B ${rnd()}`);
-  milano = await createCitta(`Milano 53B ${rnd()}`);
+  roma = await createAreaOperativa(`Roma 53B ${rnd()}`);
+  milano = await createAreaOperativa(`Milano 53B ${rnd()}`);
   centroRoma = await createCentro(roma);
   altroCentroRoma = await createCentro(roma);
   centroMilano = await createCentro(milano);
@@ -207,7 +207,7 @@ beforeAll(async () => {
         passwordHash: "test",
         nome: "Operatore Roma",
         ruoloId: role.id,
-        cittaId: roma,
+        areaOperativaId: roma,
         centroAscoltoId: centroRoma,
       },
       {
@@ -215,7 +215,7 @@ beforeAll(async () => {
         passwordHash: "test",
         nome: "Assegnabile Roma",
         ruoloId: role.id,
-        cittaId: roma,
+        areaOperativaId: roma,
         centroAscoltoId: centroRoma,
       },
       {
@@ -223,7 +223,7 @@ beforeAll(async () => {
         passwordHash: "test",
         nome: "Operatore Milano",
         ruoloId: role.id,
-        cittaId: milano,
+        areaOperativaId: milano,
         centroAscoltoId: centroMilano,
       },
     ])
@@ -234,25 +234,25 @@ beforeAll(async () => {
   ids.utenti.push(...users.map((user) => user.id));
 
   beneficiarioRoma = await createBeneficiario({
-    cittaId: roma,
+    areaOperativaId: roma,
     centroId: centroRoma,
     nome: "Mario",
     cognome: "Rossi",
   });
   beneficiarioAltroCentro = await createBeneficiario({
-    cittaId: roma,
+    areaOperativaId: roma,
     centroId: altroCentroRoma,
     nome: "Altra",
     cognome: "Persona",
   });
   beneficiarioMilano = await createBeneficiario({
-    cittaId: milano,
+    areaOperativaId: milano,
     centroId: centroMilano,
     nome: "Milano",
     cognome: "Persona",
   });
   beneficiarioUds = await createBeneficiario({
-    cittaId: roma,
+    areaOperativaId: roma,
     centroId: centroRoma,
     uds: true,
     nome: "Uds",
@@ -348,8 +348,8 @@ afterAll(async () => {
     await db
       .delete(centriAscoltoTable)
       .where(inArray(centriAscoltoTable.id, ids.centri));
-  if (ids.citta.length)
-    await db.delete(cittaTable).where(inArray(cittaTable.id, ids.citta));
+  if (ids.areaOperativa.length)
+    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, ids.areaOperativa));
   await pool.end();
 });
 
@@ -534,20 +534,20 @@ describe("viste operative degli interventi Sociali", () => {
     expect(classified.body).toHaveLength(1); // il centro inviato viene ignorato per l'operatore territorialmente bloccato
   });
 
-  it("un globale filtra per città senza vedere Milano o UDS", async () => {
-    const response = await request(makeApp({ cittaId: null, centroId: null }))
+  it("un globale filtra per area operativa senza vedere Milano o UDS", async () => {
+    const response = await request(makeApp({ areaOperativaId: null, centroId: null }))
       .get("/interventi")
       .query({
         ambito: "sociale",
         includiStorici: true,
         vista: "oggi",
-        cittaId: roma,
+        areaOperativaId: roma,
       });
     expect(response.status).toBe(200);
     expect(
       response.body.every(
-        (row: { cittaId: number; ambito: string | null }) =>
-          row.cittaId === roma && row.ambito !== "uds",
+        (row: { areaOperativaId: number; ambito: string | null }) =>
+          row.areaOperativaId === roma && row.ambito !== "uds",
       ),
     ).toBe(true);
   });
@@ -587,10 +587,10 @@ describe("creazione dal menu unico", () => {
     expect(response.body.map((row: { id: number }) => row.id)).not.toContain(
       operatoreMilano,
     );
-    const globalMissingCity = await request(
-      makeApp({ cittaId: null, centroId: null }),
+    const globalMissingAreaOperativa = await request(
+      makeApp({ areaOperativaId: null, centroId: null }),
     ).get("/interventi/operatori");
-    expect(globalMissingCity.status).toBe(400);
+    expect(globalMissingAreaOperativa.status).toBe(400);
   });
 
   it("crea da pianificare e pianificato con ambito Sociale e storico iniziale", async () => {
@@ -672,7 +672,7 @@ describe("creazione dal menu unico", () => {
   it("mantiene compatibili elenco UDS e Bisogni Pianificati", async () => {
     const uds = await request(makeApp({ aree: ["uds"] }))
       .get("/interventi")
-      .query({ ambito: "uds", cittaId: roma });
+      .query({ ambito: "uds", areaOperativaId: roma });
     expect(uds.status).toBe(200);
     expect(
       uds.body.every((row: { ambito: string }) => row.ambito === "uds"),

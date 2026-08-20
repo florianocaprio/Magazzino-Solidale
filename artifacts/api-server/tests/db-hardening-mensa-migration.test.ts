@@ -50,7 +50,7 @@ describe("migrazione hardening operativo Mensa", () => {
       }>(`
         SELECT b.id AS beneficiario_id, m.id AS mensa_id, u.id AS user_id
         FROM beneficiari b
-        JOIN mense m ON m.citta_id = b.citta_id
+        JOIN mense m ON m.area_operativa_id = b.area_operativa_id
         CROSS JOIN utenti u
         ORDER BY b.id, m.id, u.id
         LIMIT 1
@@ -258,26 +258,26 @@ describe("migrazione hardening operativo Mensa", () => {
       `);
       const reference = await client.query<{
         mensa_id: number;
-        citta_id: number;
+        area_operativa_id: number;
         user_id: number;
       }>(`
-        SELECT m.id AS mensa_id, m.citta_id, u.id AS user_id
+        SELECT m.id AS mensa_id, m.area_operativa_id, u.id AS user_id
         FROM mense m CROSS JOIN utenti u
-        WHERE m.citta_id IS NOT NULL
+        WHERE m.area_operativa_id IS NOT NULL
         ORDER BY m.id, u.id
         LIMIT 1
       `);
       expect(reference.rowCount).toBe(1);
       const {
         mensa_id: mensaId,
-        citta_id: cittaId,
+        area_operativa_id: areaOperativaId,
         user_id: userId,
       } = reference.rows[0];
       const beneficiary = await client.query<{ id: number }>(
-        `INSERT INTO beneficiari (codice, nome, cognome, citta_id)
+        `INSERT INTO beneficiari (codice, nome, cognome, area_operativa_id)
          VALUES ($1, 'Legacy', 'Overlap', $2)
          RETURNING id`,
-        [`OV-${Date.now().toString().slice(-12)}`, cittaId],
+        [`OV-${Date.now().toString().slice(-12)}`, areaOperativaId],
       );
       const beneficiaryId = beneficiary.rows[0].id;
       await client.query(

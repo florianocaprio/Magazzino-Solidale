@@ -41,7 +41,7 @@ function app(router: Parameters<typeof makeScopedApp>[0]) {
   return makeScopedApp(router, {
     id: 0,
     centroAscoltoId: null,
-    cittaId: null,
+    areaOperativaId: null,
     aree: ["amministrazione", "logistica"],
   });
 }

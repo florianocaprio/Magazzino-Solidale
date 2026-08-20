@@ -5,7 +5,7 @@ import {
   beneficiariTable,
   bisogniPianificatiTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   interventiTable,
   pool,
@@ -21,16 +21,16 @@ const interventoIds: number[] = [];
 const beneficiarioIds: number[] = [];
 const centroIds: number[] = [];
 const zonaIds: number[] = [];
-const cittaIds: number[] = [];
+const areaOperativaIds: number[] = [];
 
 let operatorUserId: number;
-let cittaRoma: number;
-let cittaMilano: number;
+let areaOperativaRoma: number;
+let areaOperativaMilano: number;
 let centroRoma: number;
 let zonaRoma: number;
 
 function makeApp(
-  cittaId: number | null = cittaRoma,
+  areaOperativaId: number | null = areaOperativaRoma,
   centroAscoltoId: number | null = centroRoma,
   zonaUdsId: number | null = zonaRoma,
 ): Express {
@@ -41,7 +41,7 @@ function makeApp(
       req as unknown as {
         user: {
           id: number;
-          cittaId: number | null;
+          areaOperativaId: number | null;
           centroAscoltoId: number | null;
           zonaUdsId: number | null;
           aree: string[];
@@ -49,7 +49,7 @@ function makeApp(
       }
     ).user = {
       id: operatorUserId,
-      cittaId,
+      areaOperativaId,
       centroAscoltoId,
       zonaUdsId,
       aree: ["uds"],
@@ -60,35 +60,35 @@ function makeApp(
   return app;
 }
 
-async function createCitta(nome: string): Promise<number> {
+async function createAreaOperativa(nome: string): Promise<number> {
   const [row] = await db
-    .insert(cittaTable)
+    .insert(areeOperativeTable)
     .values({ nome })
-    .returning({ id: cittaTable.id });
-  cittaIds.push(row.id);
+    .returning({ id: areeOperativeTable.id });
+  areaOperativaIds.push(row.id);
   return row.id;
 }
 
-async function createCentro(cittaId: number): Promise<number> {
+async function createCentro(areaOperativaId: number): Promise<number> {
   const [row] = await db
     .insert(centriAscoltoTable)
-    .values({ nome: `Centro ${rnd()}`, cittaId })
+    .values({ nome: `Centro ${rnd()}`, areaOperativaId })
     .returning({ id: centriAscoltoTable.id });
   centroIds.push(row.id);
   return row.id;
 }
 
-async function createZona(cittaId: number): Promise<number> {
+async function createZona(areaOperativaId: number): Promise<number> {
   const [row] = await db
     .insert(zoneUdsTable)
-    .values({ nome: `Zona ${rnd()}`, cittaId })
+    .values({ nome: `Zona ${rnd()}`, areaOperativaId })
     .returning({ id: zoneUdsTable.id });
   zonaIds.push(row.id);
   return row.id;
 }
 
 async function createBeneficiario(
-  cittaId: number | null,
+  areaOperativaId: number | null,
   centroAscoltoId: number | null = null,
   zonaUdsId: number | null = null,
 ): Promise<number> {
@@ -100,7 +100,7 @@ async function createBeneficiario(
       cognome: rnd(),
       sesso: "M",
       uds: true,
-      cittaId,
+      areaOperativaId,
       centroAscoltoId,
       zonaUdsId,
     })
@@ -140,10 +140,10 @@ async function createNeed(
 }
 
 beforeAll(async () => {
-  cittaRoma = await createCitta(`Roma ${rnd()}`);
-  cittaMilano = await createCitta(`Milano ${rnd()}`);
-  centroRoma = await createCentro(cittaRoma);
-  zonaRoma = await createZona(cittaRoma);
+  areaOperativaRoma = await createAreaOperativa(`Roma ${rnd()}`);
+  areaOperativaMilano = await createAreaOperativa(`Milano ${rnd()}`);
+  centroRoma = await createCentro(areaOperativaRoma);
+  zonaRoma = await createZona(areaOperativaRoma);
   const [operator] = await db
     .insert(utentiTable)
     .values({
@@ -151,7 +151,7 @@ beforeAll(async () => {
       passwordHash: "test-only",
       nome: "Operatore Bisogni",
       attivo: true,
-      cittaId: cittaRoma,
+      areaOperativaId: areaOperativaRoma,
       centroAscoltoId: centroRoma,
       zonaUdsId: zonaRoma,
     })
@@ -183,15 +183,15 @@ afterAll(async () => {
       .delete(centriAscoltoTable)
       .where(inArray(centriAscoltoTable.id, centroIds));
   }
-  if (cittaIds.length > 0)
-    await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds));
+  if (areaOperativaIds.length > 0)
+    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds));
   await pool.end();
 });
 
 describe("Bisogni Pianificati negli Interventi UDS", () => {
   it("crea e consulta un intervento senza Bisogni Pianificati", async () => {
     const beneficiarioId = await createBeneficiario(
-      cittaRoma,
+      areaOperativaRoma,
       centroRoma,
       zonaRoma,
     );
@@ -213,7 +213,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it("crea contestualmente uno o più bisogni distinguendo richiesta e azione", async () => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const created = await request(makeApp())
       .post("/interventi")
       .send({
@@ -252,7 +252,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it("annulla transazionalmente anche l'intervento se un bisogno contestuale non è valido", async () => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const before = await db
       .select({ id: interventiTable.id })
       .from(interventiTable);
@@ -285,7 +285,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it("richiede la data prevista per il passaggio a pianificato", async () => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const interventoId = await createIntervento(beneficiarioId);
     const created = await createNeed(interventoId);
     expect(created.status).toBe(201);
@@ -308,7 +308,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it("valorizza la data al completamento e la azzera alla riapertura", async () => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const interventoId = await createIntervento(beneficiarioId);
     const created = await createNeed(interventoId, { tipo: "azione" });
 
@@ -330,7 +330,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it("mantiene gli elementi annullati nello storico senza cancellazione", async () => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const interventoId = await createIntervento(beneficiarioId);
     const created = await createNeed(interventoId);
     const cancelled = await request(makeApp())
@@ -351,7 +351,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it("ordina per data prevista e priorità e individua gli elementi scaduti", async () => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const interventoId = await createIntervento(beneficiarioId);
     const first = await createNeed(interventoId, {
       descrizione: "Data prima",
@@ -396,7 +396,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it("filtra lo storico degli interventi senza bisogni e con bisogni aperti", async () => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const emptyInterventoId = await createIntervento(beneficiarioId);
     const openInterventoId = await createIntervento(beneficiarioId);
     await createNeed(openInterventoId);
@@ -422,18 +422,18 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
     );
   });
 
-  it("consente la gestione nella stessa città anche con centro e zona differenti", async () => {
-    const altroCentro = await createCentro(cittaRoma);
-    const altraZona = await createZona(cittaRoma);
+  it("consente la gestione nella stessa area operativa anche con centro e zona differenti", async () => {
+    const altroCentro = await createCentro(areaOperativaRoma);
+    const altraZona = await createZona(areaOperativaRoma);
     const beneficiarioId = await createBeneficiario(
-      cittaRoma,
+      areaOperativaRoma,
       altroCentro,
       altraZona,
     );
     const interventoId = await createIntervento(beneficiarioId);
 
     const created = await createNeed(interventoId, {
-      descrizione: "Stessa città",
+      descrizione: "Stessa area operativa",
     });
     expect(created.status).toBe(201);
     const history = await request(makeApp()).get(
@@ -443,8 +443,8 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it.each([
-    ["altra città", () => createBeneficiario(cittaMilano)],
-    ["città NULL", () => createBeneficiario(null)],
+    ["altra area operativa", () => createBeneficiario(areaOperativaMilano)],
+    ["area operativa NULL", () => createBeneficiario(null)],
   ])(
     "nega lettura e modifica per un intervento di %s",
     async (_label, makeBeneficiario) => {
@@ -471,9 +471,9 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
     },
   );
 
-  it("permette a un utente globale di gestire una città valorizzata ma non un legacy NULL", async () => {
+  it("permette a un utente globale di gestire una area operativa valorizzata ma non un legacy NULL", async () => {
     const globalApp = makeApp(null, null, null);
-    const beneficiarioMilano = await createBeneficiario(cittaMilano);
+    const beneficiarioMilano = await createBeneficiario(areaOperativaMilano);
     const interventoMilano = await createIntervento(beneficiarioMilano);
     const allowed = await request(globalApp)
       .post(`/interventi/${interventoMilano}/bisogni-pianificati`)
@@ -490,7 +490,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   });
 
   it("non permette di modificare un bisogno appartenente a un altro intervento", async () => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const interventoA = await createIntervento(beneficiarioId);
     const interventoB = await createIntervento(beneficiarioId);
     const created = await createNeed(interventoB, {
@@ -533,7 +533,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
       { tipo: "richiesta", descrizione: "Test", note: "x".repeat(2001) },
     ],
   ])("valida %s", async (_label, payload) => {
-    const beneficiarioId = await createBeneficiario(cittaRoma);
+    const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const interventoId = await createIntervento(beneficiarioId);
     const response = await request(makeApp())
       .post(`/interventi/${interventoId}/bisogni-pianificati`)

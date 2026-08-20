@@ -16,7 +16,7 @@ import {
   bolleTable,
   bollaRigheTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   consegneTable,
   creditoSolidaleMovimentiTable,
   db,
@@ -44,7 +44,7 @@ import { quantitaNettaMensileProdotto } from "../src/lib/speseEmporio";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
-const cittaIds: number[] = [];
+const areaOperativaIds: number[] = [];
 const centroIds: number[] = [];
 const magazzinoIds: number[] = [];
 const beneficiarioIds: number[] = [];
@@ -64,7 +64,7 @@ function makeApp(
     permessi?: string[];
     aree?: string[];
     centroAscoltoId?: number | null;
-    cittaId?: number | null;
+    areaOperativaId?: number | null;
   } = {},
 ): Express {
   const app = express();
@@ -75,7 +75,7 @@ function makeApp(
         user: {
           id: number;
           centroAscoltoId: number | null;
-          cittaId: number | null;
+          areaOperativaId: number | null;
           isAdmin: boolean;
           permessi: string[];
           aree: string[];
@@ -84,7 +84,7 @@ function makeApp(
     ).user = {
       id: operatorUserId,
       centroAscoltoId: options.centroAscoltoId ?? null,
-      cittaId: options.cittaId ?? null,
+      areaOperativaId: options.areaOperativaId ?? null,
       isAdmin: options.isAdmin ?? true,
       permessi: options.permessi ?? [],
       aree: options.aree ?? ["emporio"],
@@ -102,22 +102,22 @@ async function setEmporioEnabled(enabled: boolean): Promise<void> {
   await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
-async function createCitta(): Promise<number> {
-  const [citta] = await db
-    .insert(cittaTable)
-    .values({ nome: `Citta ${rnd()}` })
-    .returning({ id: cittaTable.id });
-  cittaIds.push(citta.id);
-  return citta.id;
+async function createAreaOperativa(): Promise<number> {
+  const [areaOperativa] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `AreaOperativa ${rnd()}` })
+    .returning({ id: areeOperativeTable.id });
+  areaOperativaIds.push(areaOperativa.id);
+  return areaOperativa.id;
 }
 
 async function createCentro(
-  cittaId: number,
+  areaOperativaId: number,
   email?: string | null,
 ): Promise<number> {
   const [centro] = await db
     .insert(centriAscoltoTable)
-    .values({ nome: `Centro ${rnd()}`, cittaId, email })
+    .values({ nome: `Centro ${rnd()}`, areaOperativaId, email })
     .returning({ id: centriAscoltoTable.id });
   centroIds.push(centro.id);
   return centro.id;
@@ -125,7 +125,7 @@ async function createCentro(
 
 async function createMagazzino(
   tipoMagazzino: "emporio" | "misto" | "logistico",
-  cittaId: number,
+  areaOperativaId: number,
   centroAscoltoId: number,
 ): Promise<number> {
   const [magazzino] = await db
@@ -134,7 +134,7 @@ async function createMagazzino(
       codice: `MAG-${rnd()}`,
       nome: `Mag ${rnd()}`,
       tipoMagazzino,
-      cittaId,
+      areaOperativaId,
       centroAscoltoId,
     })
     .returning({ id: magazziniTable.id });
@@ -143,7 +143,7 @@ async function createMagazzino(
 }
 
 async function createBeneficiario(opts: {
-  cittaId: number;
+  areaOperativaId: number;
   centroAscoltoId: number | null;
   creditoSolidaleAbilitato?: boolean;
   creditoSolidaleStato?: "non_abilitato" | "attivo" | "sospeso" | "revocato";
@@ -163,7 +163,7 @@ async function createBeneficiario(opts: {
       nome: opts.nome ?? "Emporio",
       email: opts.email,
       sesso: "M",
-      cittaId: opts.cittaId,
+      areaOperativaId: opts.areaOperativaId,
       centroAscoltoId: opts.centroAscoltoId,
       creditoSolidaleAbilitato: opts.creditoSolidaleAbilitato ?? true,
       creditoSolidaleStato: opts.creditoSolidaleStato ?? "attivo",
@@ -231,15 +231,15 @@ async function createFixture(
     beneficiarioEmail?: string | null;
   } = {},
 ) {
-  const cittaId = await createCitta();
-  const centroId = await createCentro(cittaId, opts.centroEmail);
+  const areaOperativaId = await createAreaOperativa();
+  const centroId = await createCentro(areaOperativaId, opts.centroEmail);
   const magazzinoId = await createMagazzino(
     opts.tipoMagazzino ?? "emporio",
-    cittaId,
+    areaOperativaId,
     centroId,
   );
   const beneficiarioId = await createBeneficiario({
-    cittaId,
+    areaOperativaId,
     centroAscoltoId: centroId,
     creditoSolidaleAbilitato: opts.creditoSolidaleAbilitato,
     creditoSolidaleStato: opts.creditoSolidaleStato,
@@ -249,7 +249,7 @@ async function createFixture(
     magazzinoEmporioPreferitoId: magazzinoId,
   });
   const accessoId = await createAccesso({ beneficiarioId, magazzinoId });
-  return { cittaId, centroId, magazzinoId, beneficiarioId, accessoId };
+  return { areaOperativaId, centroId, magazzinoId, beneficiarioId, accessoId };
 }
 
 async function createProdotto(opts: {
@@ -468,10 +468,10 @@ afterEach(async () => {
     await db
       .delete(centriAscoltoTable)
       .where(inArray(centriAscoltoTable.id, centroIds.splice(0)));
-  if (cittaIds.length > 0)
+  if (areaOperativaIds.length > 0)
     await db
-      .delete(cittaTable)
-      .where(inArray(cittaTable.id, cittaIds.splice(0)));
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, areaOperativaIds.splice(0)));
   await setEmporioEnabled(false);
 });
 
@@ -633,7 +633,7 @@ describe("Cassa Emporio", () => {
           beneficiarioId: fixture.beneficiarioId,
           magazzinoEmporioId: fixture.magazzinoId,
           centroAscoltoId: fixture.centroId,
-          cittaId: fixture.cittaId,
+          areaOperativaId: fixture.areaOperativaId,
           statoSessione: "chiusa",
           saldoCreditoIniziale: "20.00",
           creditoResiduoPrevisto: "20.00",
@@ -652,7 +652,7 @@ describe("Cassa Emporio", () => {
           accessoEmporioId: sessione.accessoEmporioId,
           beneficiarioId: fixture.beneficiarioId,
           centroAscoltoId: fixture.centroId,
-          cittaId: fixture.cittaId,
+          areaOperativaId: fixture.areaOperativaId,
           magazzinoEmporioId: fixture.magazzinoId,
           numeroSpesa: `EMP-PAGE-${Date.now()}-${index}`,
           totaleCreditoConsumati: "0.00",
@@ -762,11 +762,11 @@ describe("Cassa Emporio", () => {
   });
 
   it("forza un Accesso Emporio dalla Cassa e apre una sessione tracciata", async () => {
-    const cittaId = await createCitta();
-    const centroId = await createCentro(cittaId);
-    const magazzinoId = await createMagazzino("emporio", cittaId, centroId);
+    const areaOperativaId = await createAreaOperativa();
+    const centroId = await createCentro(areaOperativaId);
+    const magazzinoId = await createMagazzino("emporio", areaOperativaId, centroId);
     const beneficiarioId = await createBeneficiario({
-      cittaId,
+      areaOperativaId,
       centroAscoltoId: centroId,
       saldo: "15.00",
     });
@@ -812,7 +812,7 @@ describe("Cassa Emporio", () => {
     const fixture = await createFixture({ codiceBeneficiario: codice });
     const res = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
-      .query({ search: codice, cittaId: fixture.cittaId });
+      .query({ search: codice, areaOperativaId: fixture.areaOperativaId });
     expect(res.status).toBe(200);
     expect(res.body[0].beneficiarioId).toBe(fixture.beneficiarioId);
     expect(res.body[0].accessi.map((a: { id: number }) => a.id)).toContain(
@@ -823,7 +823,7 @@ describe("Cassa Emporio", () => {
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
         search: codice.replace(/[^a-zA-Z0-9]/g, ""),
-        cittaId: fixture.cittaId,
+        areaOperativaId: fixture.areaOperativaId,
       });
     expect(scanned.status).toBe(200);
     expect(
@@ -832,20 +832,20 @@ describe("Cassa Emporio", () => {
   });
 
   it("mostra beneficiari accreditati anche senza Accesso Emporio pianificato", async () => {
-    const cittaId = await createCitta();
-    const centroId = await createCentro(cittaId);
-    await createMagazzino("emporio", cittaId, centroId);
+    const areaOperativaId = await createAreaOperativa();
+    const centroId = await createCentro(areaOperativaId);
+    await createMagazzino("emporio", areaOperativaId, centroId);
     const suffix = rnd();
     const popescuCognome = `Popescu${suffix}`;
     const popescuId = await createBeneficiario({
-      cittaId,
+      areaOperativaId,
       centroAscoltoId: centroId,
       cognome: popescuCognome,
       nome: "Pavel",
       saldo: "80.00",
     });
     const galliId = await createBeneficiario({
-      cittaId,
+      areaOperativaId,
       centroAscoltoId: centroId,
       cognome: `Galli${suffix}`,
       nome: "Lucia",
@@ -854,7 +854,7 @@ describe("Cassa Emporio", () => {
 
     const byArea = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
-      .query({ cittaId });
+      .query({ areaOperativaId });
     expect(byArea.status).toBe(200);
     expect(
       byArea.body.map((b: { beneficiarioId: number }) => b.beneficiarioId),
@@ -874,17 +874,17 @@ describe("Cassa Emporio", () => {
   });
 
   it("ricerca in Cassa i beneficiari accreditati sull'Emporio selezionato anche se l'anagrafica è di un'altra Area", async () => {
-    const romaId = await createCitta();
+    const romaId = await createAreaOperativa();
     const centroRomaId = await createCentro(romaId);
     const emporioRomaId = await createMagazzino(
       "emporio",
       romaId,
       centroRomaId,
     );
-    const bolognaId = await createCitta();
+    const bolognaId = await createAreaOperativa();
     const centroBolognaId = await createCentro(bolognaId);
     const galliId = await createBeneficiario({
-      cittaId: bolognaId,
+      areaOperativaId: bolognaId,
       centroAscoltoId: centroBolognaId,
       cognome: "Galli",
       nome: "Lucia",
@@ -897,7 +897,7 @@ describe("Cassa Emporio", () => {
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
         search: "Galli Luciana",
-        cittaId: romaId,
+        areaOperativaId: romaId,
         magazzinoEmporioId: emporioRomaId,
       });
 
@@ -910,7 +910,7 @@ describe("Cassa Emporio", () => {
   it("non mostra beneficiari Cassa senza Area o Emporio e scarta beneficiari non eleggibili", async () => {
     const fixture = await createFixture();
     const nonAbilitatoId = await createBeneficiario({
-      cittaId: fixture.cittaId,
+      areaOperativaId: fixture.areaOperativaId,
       centroAscoltoId: fixture.centroId,
       creditoSolidaleAbilitato: false,
       creditoSolidaleStato: "non_abilitato",
@@ -938,7 +938,7 @@ describe("Cassa Emporio", () => {
 
     const byArea = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
-      .query({ data: "2026-07-15", cittaId: fixture.cittaId });
+      .query({ data: "2026-07-15", areaOperativaId: fixture.areaOperativaId });
     expect(byArea.status).toBe(200);
     const ids = byArea.body.map(
       (b: { beneficiarioId: number }) => b.beneficiarioId,
@@ -949,11 +949,11 @@ describe("Cassa Emporio", () => {
 
   it("mostra beneficiari accreditati e filtra gli accessi validi per data, area ed Emporio", async () => {
     const fixture = await createFixture();
-    const otherCittaId = await createCitta();
-    const otherCentroId = await createCentro(otherCittaId);
+    const otherAreaOperativaId = await createAreaOperativa();
+    const otherCentroId = await createCentro(otherAreaOperativaId);
     const otherMagazzinoId = await createMagazzino(
       "emporio",
-      otherCittaId,
+      otherAreaOperativaId,
       otherCentroId,
     );
 
@@ -961,7 +961,7 @@ describe("Cassa Emporio", () => {
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
         data: "2026-07-15",
-        cittaId: fixture.cittaId,
+        areaOperativaId: fixture.areaOperativaId,
         magazzinoEmporioId: fixture.magazzinoId,
       });
     expect(list.status).toBe(200);
@@ -976,7 +976,7 @@ describe("Cassa Emporio", () => {
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
         data: "2026-07-16",
-        cittaId: fixture.cittaId,
+        areaOperativaId: fixture.areaOperativaId,
         magazzinoEmporioId: fixture.magazzinoId,
       });
     const wrongDateRow = wrongDate.body.find(
@@ -989,7 +989,7 @@ describe("Cassa Emporio", () => {
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
         data: "2026-07-15",
-        cittaId: fixture.cittaId,
+        areaOperativaId: fixture.areaOperativaId,
         magazzinoEmporioId: otherMagazzinoId,
       });
     expect(
@@ -1006,7 +1006,7 @@ describe("Cassa Emporio", () => {
 
     const list = await request(makeApp()).get("/cassa-emporio/sessioni").query({
       data: today,
-      cittaId: fixture.cittaId,
+      areaOperativaId: fixture.areaOperativaId,
       magazzinoEmporioId: fixture.magazzinoId,
     });
     expect(list.status).toBe(200);
@@ -1014,12 +1014,12 @@ describe("Cassa Emporio", () => {
       sessione.body.id,
     );
 
-    const otherCittaId = await createCitta();
+    const otherAreaOperativaId = await createAreaOperativa();
     const wrongArea = await request(makeApp())
       .get("/cassa-emporio/sessioni")
       .query({
         data: today,
-        cittaId: otherCittaId,
+        areaOperativaId: otherAreaOperativaId,
         magazzinoEmporioId: fixture.magazzinoId,
       });
     expect(wrongArea.body.map((s: { id: number }) => s.id)).not.toContain(
@@ -1229,7 +1229,7 @@ describe("Cassa Emporio", () => {
 
     const secondMagazzinoId = await createMagazzino(
       "emporio",
-      fixture.cittaId,
+      fixture.areaOperativaId,
       fixture.centroId,
     );
     const [secondLotto] = await db
@@ -2163,7 +2163,7 @@ describe("Cassa Emporio", () => {
     await addProduct(sessione.body.id, prodottoId, 1);
     await postSessionAction(sessione.body.id, "pronta-per-chiusura");
     const altroBeneficiarioId = await createBeneficiario({
-      cittaId: fixture.cittaId,
+      areaOperativaId: fixture.areaOperativaId,
       centroAscoltoId: fixture.centroId,
       saldo: "20.00",
     });
@@ -2192,13 +2192,13 @@ describe("Cassa Emporio", () => {
   });
 
   it("applica insieme scope Beneficiario e Magazzino a Sessioni, Spese, Bolla, email e storno", async () => {
-    const cittaId = await createCitta();
-    const centroAId = await createCentro(cittaId);
-    const centroBId = await createCentro(cittaId);
-    const magazzinoAId = await createMagazzino("emporio", cittaId, centroAId);
-    const magazzinoBId = await createMagazzino("emporio", cittaId, centroBId);
+    const areaOperativaId = await createAreaOperativa();
+    const centroAId = await createCentro(areaOperativaId);
+    const centroBId = await createCentro(areaOperativaId);
+    const magazzinoAId = await createMagazzino("emporio", areaOperativaId, centroAId);
+    const magazzinoBId = await createMagazzino("emporio", areaOperativaId, centroBId);
     const beneficiarioId = await createBeneficiario({
-      cittaId,
+      areaOperativaId,
       centroAscoltoId: centroAId,
       saldo: "50.00",
     });
@@ -2233,7 +2233,7 @@ describe("Cassa Emporio", () => {
     const scopedCentroA = makeApp({
       isAdmin: false,
       centroAscoltoId: centroAId,
-      cittaId,
+      areaOperativaId,
       permessi: [
         "emporio.cassa.view",
         "emporio.sales.view",
@@ -2382,7 +2382,7 @@ describe("Cassa Emporio", () => {
         accessoEmporioId: fixture.accessoId,
         beneficiarioId: fixture.beneficiarioId,
         centroAscoltoId: fixture.centroId,
-        cittaId: fixture.cittaId,
+        areaOperativaId: fixture.areaOperativaId,
         magazzinoEmporioId: fixture.magazzinoId,
         bollaId: bolla.id,
         numeroSpesa: `SP-LEG-${rnd()}`,

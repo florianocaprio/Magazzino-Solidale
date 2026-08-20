@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import type { Request } from "express";
 import {
-  db, pool, beneficiariTable, bolleTable, bollaRigheTable, cittaTable,
+  db, pool, beneficiariTable, bolleTable, bollaRigheTable, areeOperativeTable,
   centriAscoltoTable, lottiTable, magazziniTable, movimentiTable, prodottiTable,
   consegneTable, sessioniCassaEmporioTable, speseEmporioTable,
   speseEmporioRigheTable, interventiTable, menseTable,
@@ -25,12 +25,12 @@ import { buildReportFilterOptions } from "../src/lib/reporting/filterOptions";
 
 function requestFor(
   query: Record<string, unknown>,
-  scope: { cittaId?: number | null; centroAscoltoId?: number | null; zonaUdsId?: number | null; aree?: string[]; permessi?: string[]; isAdmin?: boolean } = {},
+  scope: { areaOperativaId?: number | null; centroAscoltoId?: number | null; zonaUdsId?: number | null; aree?: string[]; permessi?: string[]; isAdmin?: boolean } = {},
 ) {
   return {
     query,
     user: {
-      cittaId: scope.cittaId ?? null,
+      areaOperativaId: scope.areaOperativaId ?? null,
       centroAscoltoId: scope.centroAscoltoId ?? null,
       zonaUdsId: scope.zonaUdsId ?? null,
       aree: scope.aree ?? ["analisi"],
@@ -43,9 +43,9 @@ function requestFor(
 function fullFilters(): ReportFilters {
   return {
     da: "2026-01-01", a: "2026-12-31", anno: 2026,
-    cittaId: null, centroAscoltoId: null, magazzinoId: null, mensaId: null,
+    areaOperativaId: null, centroAscoltoId: null, magazzinoId: null, mensaId: null,
     zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null,
-    cittaMode: "all", centroMode: "all", zonaMode: "all",
+    areaOperativaMode: "all", centroMode: "all", zonaMode: "all",
     callerAreas: ["sociale", "emporio", "mensa", "uds", "magazzino", "logistica"],
     callerPermissions: ["mensa.reports.view"],
     callerIsAdmin: true,
@@ -66,18 +66,18 @@ describe("filtri condivisi dei report", () => {
     expect(parsed.a).toBe("2025-12-31");
   });
 
-  it("impedisce a città, centro e zona scoped di allargare il perimetro", () => {
-    expect(() => parseReportFilters(requestFor({ cittaId: "2" }, { cittaId: 1 }))).toThrowError(/perimetro/);
+  it("impedisce a area operativa, centro e zona scoped di allargare il perimetro", () => {
+    expect(() => parseReportFilters(requestFor({ areaOperativaId: "2" }, { areaOperativaId: 1 }))).toThrowError(/perimetro/);
     expect(() => parseReportFilters(requestFor({ centroAscoltoId: "3" }, { centroAscoltoId: 2 }))).toThrowError(/perimetro/);
     expect(() => parseReportFilters(requestFor({ zonaUdsId: "4" }, { zonaUdsId: 3 }))).toThrowError(/perimetro/);
-    const parsed = parseReportFilters(requestFor({}, { cittaId: 1, centroAscoltoId: 2, zonaUdsId: 3 }));
-    expect(parsed).toMatchObject({ cittaId: 1, centroAscoltoId: 2, zonaUdsId: 3, cittaMode: "caller", centroMode: "caller", zonaMode: "caller" });
+    const parsed = parseReportFilters(requestFor({}, { areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 3 }));
+    expect(parsed).toMatchObject({ areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 3, areaOperativaMode: "caller", centroMode: "caller", zonaMode: "caller" });
   });
 
   it("accetta filtri espliciti per un utente globale ma rifiuta identificativi malformati", () => {
-    expect(parseReportFilters(requestFor({ cittaId: "5", centroAscoltoId: "6", zonaUdsId: "7" }))).toMatchObject({ cittaId: 5, centroAscoltoId: 6, zonaUdsId: 7 });
+    expect(parseReportFilters(requestFor({ areaOperativaId: "5", centroAscoltoId: "6", zonaUdsId: "7" }))).toMatchObject({ areaOperativaId: 5, centroAscoltoId: 6, zonaUdsId: 7 });
     for (const value of ["x", "0", "-2", "1.5"]) {
-      expect(() => parseReportFilters(requestFor({ cittaId: value }))).toThrowError(/cittaId/);
+      expect(() => parseReportFilters(requestFor({ areaOperativaId: value }))).toThrowError(/areaOperativaId/);
     }
   });
 });
@@ -145,11 +145,11 @@ describe("semantica dei servizi Centro di Ascolto", () => {
   it("conta come servite solo le persone con interventi conclusi e applica il cutoff temporale", async () => {
     const suffix = Math.random().toString(36).slice(2, 9);
     const interventionIds: number[] = [];
-    const [city] = await db.insert(cittaTable).values({ nome: `Social report city ${suffix}` }).returning({ id: cittaTable.id });
-    const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Social report centre ${suffix}`, cittaId: city.id }).returning({ id: centriAscoltoTable.id });
+    const [areaOperativa] = await db.insert(areeOperativeTable).values({ nome: `Social report areaOperativa ${suffix}` }).returning({ id: areeOperativeTable.id });
+    const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Social report centre ${suffix}`, areaOperativaId: areaOperativa.id }).returning({ id: centriAscoltoTable.id });
     const beneficiaries = await db.insert(beneficiariTable).values([
-      { codice: `SRV-${suffix}`, nome: "Servita", cognome: "Report", cittaId: city.id, centroAscoltoId: centre.id },
-      { codice: `PLN-${suffix}`, nome: "Pianificata", cognome: "Report", cittaId: city.id, centroAscoltoId: centre.id },
+      { codice: `SRV-${suffix}`, nome: "Servita", cognome: "Report", areaOperativaId: areaOperativa.id, centroAscoltoId: centre.id },
+      { codice: `PLN-${suffix}`, nome: "Pianificata", cognome: "Report", areaOperativaId: areaOperativa.id, centroAscoltoId: centre.id },
     ]).returning({ id: beneficiariTable.id, codice: beneficiariTable.codice });
     const served = beneficiaries.find((row) => row.codice.startsWith("SRV"))!;
     const plannedOnly = beneficiaries.find((row) => row.codice.startsWith("PLN"))!;
@@ -168,8 +168,8 @@ describe("semantica dei servizi Centro di Ascolto", () => {
       interventionIds.push(...created.map((row) => row.id));
       const filters = {
         ...fullFilters(), da: "2020-01-01", a: "2100-12-31", anno: 2026,
-        cittaId: city.id, centroAscoltoId: centre.id,
-        cittaMode: "query" as const, centroMode: "query" as const,
+        areaOperativaId: areaOperativa.id, centroAscoltoId: centre.id,
+        areaOperativaMode: "query" as const, centroMode: "query" as const,
       };
       const report = await buildCentroAscoltoReport(filters);
       expect(report.kpi.find((item) => item.key === "personeServite")?.value).toBe(1);
@@ -186,7 +186,7 @@ describe("semantica dei servizi Centro di Ascolto", () => {
       if (interventionIds.length) await db.delete(interventiTable).where(inArray(interventiTable.id, interventionIds));
       await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiaries.map((row) => row.id)));
       await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centre.id]));
-      await db.delete(cittaTable).where(inArray(cittaTable.id, [city.id]));
+      await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, [areaOperativa.id]));
     }
   });
 
@@ -207,11 +207,11 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       accessi: [] as number[], sessioni: [] as number[], spese: [] as number[], spesaRighe: [] as number[],
       mense: [] as number[],
     };
-    const [city] = await db.insert(cittaTable).values({ nome: `Report city ${suffix}` }).returning({ id: cittaTable.id });
-    const [otherCity] = await db.insert(cittaTable).values({ nome: `Other report city ${suffix}` }).returning({ id: cittaTable.id });
-    const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Report centre ${suffix}`, cittaId: city.id }).returning({ id: centriAscoltoTable.id });
-    const [warehouse] = await db.insert(magazziniTable).values({ codice: `R-${suffix}`, nome: `Report warehouse ${suffix}`, cittaId: city.id, centroAscoltoId: centre.id }).returning({ id: magazziniTable.id });
-    const [beneficiary] = await db.insert(beneficiariTable).values({ codice: `RB-${suffix}`, nome: "Report", cognome: "Test", sesso: "F", cittaId: city.id, centroAscoltoId: centre.id }).returning({ id: beneficiariTable.id });
+    const [areaOperativa] = await db.insert(areeOperativeTable).values({ nome: `Report areaOperativa ${suffix}` }).returning({ id: areeOperativeTable.id });
+    const [otherAreaOperativa] = await db.insert(areeOperativeTable).values({ nome: `Other report areaOperativa ${suffix}` }).returning({ id: areeOperativeTable.id });
+    const [centre] = await db.insert(centriAscoltoTable).values({ nome: `Report centre ${suffix}`, areaOperativaId: areaOperativa.id }).returning({ id: centriAscoltoTable.id });
+    const [warehouse] = await db.insert(magazziniTable).values({ codice: `R-${suffix}`, nome: `Report warehouse ${suffix}`, areaOperativaId: areaOperativa.id, centroAscoltoId: centre.id }).returning({ id: magazziniTable.id });
+    const [beneficiary] = await db.insert(beneficiariTable).values({ codice: `RB-${suffix}`, nome: "Report", cognome: "Test", sesso: "F", areaOperativaId: areaOperativa.id, centroAscoltoId: centre.id }).returning({ id: beneficiariTable.id });
     const products = await db.insert(prodottiTable).values([
       { codice: `RP-KG-${suffix}`, nome: `Report kg ${suffix}`, tipoProdotto: "alimentare", unitaMisura: "kg", fsePlus: false },
       { codice: `RP-PZ-${suffix}`, nome: `Report pezzi ${suffix}`, tipoProdotto: "alimentare", unitaMisura: "pz", fsePlus: false },
@@ -257,13 +257,13 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       ids.accessi.push(access.id);
       const [session] = await db.insert(sessioniCassaEmporioTable).values({
         accessoEmporioId: access.id, beneficiarioId: beneficiary.id,
-        magazzinoEmporioId: warehouse.id, centroAscoltoId: centre.id, cittaId: city.id,
+        magazzinoEmporioId: warehouse.id, centroAscoltoId: centre.id, areaOperativaId: areaOperativa.id,
         statoSessione: "chiusa", dataChiusura: new Date("2026-06-01T10:15:00Z"),
       }).returning({ id: sessioniCassaEmporioTable.id });
       ids.sessioni.push(session.id);
       const [expense] = await db.insert(speseEmporioTable).values({
         sessioneCassaId: session.id, accessoEmporioId: access.id,
-        beneficiarioId: beneficiary.id, centroAscoltoId: centre.id, cittaId: city.id,
+        beneficiarioId: beneficiary.id, centroAscoltoId: centre.id, areaOperativaId: areaOperativa.id,
         magazzinoEmporioId: warehouse.id, bollaId: emporioBolla.id,
         numeroSpesa: `RS-${suffix}`, dataChiusura: new Date("2026-06-01T10:15:00Z"),
         totaleCreditoConsumati: "4", saldoPrima: "10", saldoDopo: "6", statoSpesa: "chiusa",
@@ -278,12 +278,12 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       const [canteen] = await db.insert(menseTable).values({
         codice: `RM-${suffix}`,
         nome: `Report mensa ${suffix}`,
-        cittaId: city.id,
+        areaOperativaId: areaOperativa.id,
         magazzinoId: warehouse.id,
       }).returning({ id: menseTable.id });
       ids.mense.push(canteen.id);
 
-      const filters = { ...fullFilters(), cittaId: city.id, centroAscoltoId: centre.id, magazzinoId: warehouse.id, cittaMode: "query" as const, centroMode: "query" as const };
+      const filters = { ...fullFilters(), areaOperativaId: areaOperativa.id, centroAscoltoId: centre.id, magazzinoId: warehouse.id, areaOperativaMode: "query" as const, centroMode: "query" as const };
       const parcelReport = await buildPacchiReport(filters);
       expect(parcelReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(1);
       expect(parcelReport.kpi.find((item) => item.key === "nucleiServiti")?.value).toBe(1);
@@ -341,25 +341,25 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       ]));
 
       const pacchiOptions = await buildReportFilterOptions(
-        requestFor({}, { cittaId: city.id, aree: ["analisi", "sociale"] }),
+        requestFor({}, { areaOperativaId: areaOperativa.id, aree: ["analisi", "sociale"] }),
         "pacchi",
-        city.id,
+        areaOperativa.id,
       );
       expect(pacchiOptions.warehouses).toEqual(expect.arrayContaining([
         expect.objectContaining({ id: warehouse.id, nome: `Report warehouse ${suffix}` }),
       ]));
-      expect(pacchiOptions.cities.map((item) => item.id)).toEqual([city.id]);
-      expect(pacchiOptions.cities.map((item) => item.id)).not.toContain(otherCity.id);
+      expect(pacchiOptions.areeOperative.map((item) => item.id)).toEqual([areaOperativa.id]);
+      expect(pacchiOptions.areeOperative.map((item) => item.id)).not.toContain(otherAreaOperativa.id);
       expect(pacchiOptions.mense).toEqual([]);
       expect(pacchiOptions.zones).toEqual([]);
 
       const unauthorizedPacchiOptions = await buildReportFilterOptions(
-        requestFor({}, { cittaId: city.id, aree: ["analisi"] }),
+        requestFor({}, { areaOperativaId: areaOperativa.id, aree: ["analisi"] }),
         "pacchi",
-        city.id,
+        areaOperativa.id,
       );
       expect(unauthorizedPacchiOptions).toMatchObject({
-        cities: [],
+        areeOperative: [],
         centres: [],
         warehouses: [],
         mense: [],
@@ -367,15 +367,15 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       });
 
       const mensaOptionsWithoutPermission = await buildReportFilterOptions(
-        requestFor({}, { cittaId: city.id, aree: ["analisi", "mensa"], permessi: [] }),
+        requestFor({}, { areaOperativaId: areaOperativa.id, aree: ["analisi", "mensa"], permessi: [] }),
         "mensa",
-        city.id,
+        areaOperativa.id,
       );
       expect(mensaOptionsWithoutPermission.mense).toEqual([]);
       const mensaOptionsWithPermission = await buildReportFilterOptions(
-        requestFor({}, { cittaId: city.id, aree: ["analisi", "mensa"], permessi: ["mensa.reports.view"] }),
+        requestFor({}, { areaOperativaId: areaOperativa.id, aree: ["analisi", "mensa"], permessi: ["mensa.reports.view"] }),
         "mensa",
-        city.id,
+        areaOperativa.id,
       );
       expect(mensaOptionsWithPermission.mense).toEqual([
         expect.objectContaining({ id: canteen.id, nome: `Report mensa ${suffix}` }),
@@ -394,8 +394,8 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, [beneficiary.id]));
       await db.delete(magazziniTable).where(inArray(magazziniTable.id, [warehouse.id]));
       await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centre.id]));
-      await db.delete(cittaTable).where(inArray(cittaTable.id, [city.id]));
-      await db.delete(cittaTable).where(inArray(cittaTable.id, [otherCity.id]));
+      await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, [areaOperativa.id]));
+      await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, [otherAreaOperativa.id]));
     }
   });
 });

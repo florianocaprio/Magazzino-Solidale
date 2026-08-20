@@ -6,7 +6,7 @@ import {
   pool,
   approvvigionamentiTable,
   approvvigionamentoRigheTable,
-  cittaTable,
+  areeOperativeTable,
   fornitoriTable,
   magazziniTable,
   prodottiTable,
@@ -14,31 +14,31 @@ import {
 import { inArray } from "drizzle-orm";
 import approvvigionamentiRouter from "../src/routes/approvvigionamenti";
 
-const ids = { ordini: [] as number[], fornitori: [] as number[], magazzini: [] as number[], prodotti: [] as number[], citta: [] as number[] };
+const ids = { ordini: [] as number[], fornitori: [] as number[], magazzini: [] as number[], prodotti: [] as number[], areaOperativa: [] as number[] };
 let areaA: number; let areaB: number; let fornitoreA: number; let fornitoreB: number; let inattivoA: number;
 let magazzinoA: number; let magazzinoB: number; let prodottoId: number;
 
 const app = express();
 app.use(express.json());
 app.use((req, _res, next) => {
-  req.user = { id: 800001, isAdmin: true, isSuperAdmin: false, cittaId: null, centroAscoltoId: null } as NonNullable<typeof req.user>;
+  req.user = { id: 800001, isAdmin: true, isSuperAdmin: false, areaOperativaId: null, centroAscoltoId: null } as NonNullable<typeof req.user>;
   next();
 });
 app.use(approvvigionamentiRouter);
 
 beforeEach(async () => {
   const suffix = Math.random().toString(36).slice(2, 8);
-  const [a, b] = await db.insert(cittaTable).values([{ nome: `Area ordine A ${suffix}` }, { nome: `Area ordine B ${suffix}` }]).returning({ id: cittaTable.id });
-  areaA = a.id; areaB = b.id; ids.citta.push(areaA, areaB);
+  const [a, b] = await db.insert(areeOperativeTable).values([{ nome: `Area ordine A ${suffix}` }, { nome: `Area ordine B ${suffix}` }]).returning({ id: areeOperativeTable.id });
+  areaA = a.id; areaB = b.id; ids.areaOperativa.push(areaA, areaB);
   const [fa, fb, fi] = await db.insert(fornitoriTable).values([
-    { nome: `Fornitore A ${suffix}`, tipo: "azienda", cittaId: areaA, attivo: true },
-    { nome: `Fornitore B ${suffix}`, tipo: "azienda", cittaId: areaB, attivo: true },
-    { nome: `Fornitore inattivo ${suffix}`, tipo: "azienda", cittaId: areaA, attivo: false },
+    { nome: `Fornitore A ${suffix}`, tipo: "azienda", areaOperativaId: areaA, attivo: true },
+    { nome: `Fornitore B ${suffix}`, tipo: "azienda", areaOperativaId: areaB, attivo: true },
+    { nome: `Fornitore inattivo ${suffix}`, tipo: "azienda", areaOperativaId: areaA, attivo: false },
   ]).returning({ id: fornitoriTable.id });
   fornitoreA = fa.id; fornitoreB = fb.id; inattivoA = fi.id; ids.fornitori.push(fornitoreA, fornitoreB, inattivoA);
   const [ma, mb] = await db.insert(magazziniTable).values([
-    { codice: `MAG-A-${suffix}`, nome: `Magazzino A ${suffix}`, cittaId: areaA, stato: "attivo" },
-    { codice: `MAG-B-${suffix}`, nome: `Magazzino B ${suffix}`, cittaId: areaB, stato: "attivo" },
+    { codice: `MAG-A-${suffix}`, nome: `Magazzino A ${suffix}`, areaOperativaId: areaA, stato: "attivo" },
+    { codice: `MAG-B-${suffix}`, nome: `Magazzino B ${suffix}`, areaOperativaId: areaB, stato: "attivo" },
   ]).returning({ id: magazziniTable.id });
   magazzinoA = ma.id; magazzinoB = mb.id; ids.magazzini.push(magazzinoA, magazzinoB);
   const [prodotto] = await db.insert(prodottiTable).values({
@@ -57,15 +57,15 @@ afterEach(async () => {
   if (ids.prodotti.length) await db.delete(prodottiTable).where(inArray(prodottiTable.id, ids.prodotti.splice(0)));
   if (ids.magazzini.length) await db.delete(magazziniTable).where(inArray(magazziniTable.id, ids.magazzini.splice(0)));
   if (ids.fornitori.length) await db.delete(fornitoriTable).where(inArray(fornitoriTable.id, ids.fornitori.splice(0)));
-  if (ids.citta.length) await db.delete(cittaTable).where(inArray(cittaTable.id, ids.citta.splice(0)));
+  if (ids.areaOperativa.length) await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, ids.areaOperativa.splice(0)));
 });
 afterAll(async () => { await pool.end(); });
 
-async function create(cittaId: number, fornitoreId: number) {
+async function create(areaOperativaId: number, fornitoreId: number) {
   const response = await request(app).post("/approvvigionamenti").send({
-    cittaId,
+    areaOperativaId,
     fornitoreId,
-    magazzinoId: cittaId === areaA ? magazzinoA : magazzinoB,
+    magazzinoId: areaOperativaId === areaA ? magazzinoA : magazzinoB,
     dataRichiesta: "2026-07-16",
     righe: [{ prodottoId, quantitaRichiesta: 1, unitaMisura: "pz" }],
   });
@@ -77,7 +77,7 @@ describe("Area territoriale e fornitori negli ordini", () => {
   it("esegue rollback di testata e righe quando una FK Prodotto fallisce", async () => {
     const before = await db.select({ id: approvvigionamentiTable.id }).from(approvvigionamentiTable);
     const failed = await request(app).post("/approvvigionamenti").send({
-      cittaId: areaA,
+      areaOperativaId: areaA,
       fornitoreId: fornitoreA,
       magazzinoId: magazzinoA,
       dataRichiesta: "2026-07-16",
@@ -111,10 +111,10 @@ describe("Area territoriale e fornitori negli ordini", () => {
 
   it("consente il cambio Area soltanto insieme a un fornitore coerente", async () => {
     const created = await create(areaA, fornitoreA);
-    expect((await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({ versione: 1, cittaId: areaB, fornitoreId: fornitoreA, magazzinoId: magazzinoB })).status).toBe(400);
-    const valid = await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({ versione: 1, cittaId: areaB, fornitoreId: fornitoreB, magazzinoId: magazzinoB });
+    expect((await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({ versione: 1, areaOperativaId: areaB, fornitoreId: fornitoreA, magazzinoId: magazzinoB })).status).toBe(400);
+    const valid = await request(app).patch(`/approvvigionamenti/${created.body.id}`).send({ versione: 1, areaOperativaId: areaB, fornitoreId: fornitoreB, magazzinoId: magazzinoB });
     expect(valid.status).toBe(200);
-    expect(valid.body.cittaId).toBe(areaB);
+    expect(valid.body.areaOperativaId).toBe(areaB);
   });
 
   it("mantiene leggibile un ordine storico privo di fornitore", async () => {
@@ -123,6 +123,6 @@ describe("Area territoriale e fornitori negli ordini", () => {
     const response = await request(app).get(`/approvvigionamenti/${historical.id}`);
     expect(response.status).toBe(200);
     expect(response.body.fornitoreId).toBeNull();
-    expect(response.body.cittaId).toBeNull();
+    expect(response.body.areaOperativaId).toBeNull();
   });
 });

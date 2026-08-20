@@ -13,4 +13,4 @@ The 4 hardcoded volontari role options were replaced by an admin-managed CRUD lo
 - Display name = `t(\`volontari.roles.<nome>\`, { defaultValue: nome.replace(/_/g," ") })` — built-in keys translate, admin-added custom names show as typed. Same helper used on both the volontari form and the roles admin page.
 - The volontari role select shows active roles OR the row's current value (so an existing volunteer on a now-inactive/renamed role still displays it).
 - Deleting a role is free (no FK) — it just retires the option; volunteers keep their stored name.
-- Roles are GLOBAL (no città/centro scoping). GET is readable by logistica (feeds the form); mutations are requireAdmin.
+- Roles are GLOBAL (no area operativa/centro scoping). GET is readable by logistica (feeds the form); mutations are requireAdmin.

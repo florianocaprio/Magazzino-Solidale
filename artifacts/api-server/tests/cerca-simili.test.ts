@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable } from "@workspace/db";
+import { db, pool, beneficiariTable, areeOperativeTable, centriAscoltoTable, zoneUdsTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
 import { initDbExtensions } from "../src/lib/dbInit";
@@ -9,13 +9,13 @@ import { initDbExtensions } from "../src/lib/dbInit";
 /**
  * Fuzzy anti-duplicate search (GET /beneficiari/cerca-simili). pg_trgm-backed
  * lookup over names in both orders, soprannome, telefono, beneficiary/tax codes,
- * plus fuzzy identity matching. Città is the only HARD scope: centro/zona are
- * ignored and NULL/other-città records are hidden from scoped callers.
+ * plus fuzzy identity matching. Area Operativa is the only HARD scope: centro/zona are
+ * ignored and NULL/other-area operativa records are hidden from scoped callers.
  */
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
-function makeApp(user: { id: number; centroAscoltoId: number | null; cittaId: number | null; zonaUdsId: number | null }): Express {
+function makeApp(user: { id: number; centroAscoltoId: number | null; areaOperativaId: number | null; zonaUdsId: number | null }): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -31,20 +31,20 @@ function makeApp(user: { id: number; centroAscoltoId: number | null; cittaId: nu
 }
 
 const beneficiarioIds: number[] = [];
-const cittaIds: number[] = [];
+const areaOperativaIds: number[] = [];
 const centroIds: number[] = [];
 const zonaIds: number[] = [];
 
-async function createCitta(nome = `Citta ${rnd()}`): Promise<number> {
-  const [c] = await db.insert(cittaTable).values({ nome }).returning({ id: cittaTable.id });
-  cittaIds.push(c.id);
+async function createAreaOperativa(nome = `AreaOperativa ${rnd()}`): Promise<number> {
+  const [c] = await db.insert(areeOperativeTable).values({ nome }).returning({ id: areeOperativeTable.id });
+  areaOperativaIds.push(c.id);
   return c.id;
 }
 
 async function createBeneficiario(opts: {
   nome: string;
   cognome: string;
-  cittaId: number | null;
+  areaOperativaId: number | null;
   soprannome?: string | null;
   telefono?: string | null;
   dataNascita?: string | null;
@@ -63,7 +63,7 @@ async function createBeneficiario(opts: {
       nome: opts.nome,
       cognome: opts.cognome,
       sesso: opts.sesso ?? "M",
-      cittaId: opts.cittaId,
+      areaOperativaId: opts.areaOperativaId,
       soprannome: opts.soprannome ?? null,
       telefono: opts.telefono ?? null,
       dataNascita: opts.dataNascita ?? null,
@@ -76,31 +76,31 @@ async function createBeneficiario(opts: {
   return b.id;
 }
 
-async function createCentro(cittaId: number): Promise<number> {
+async function createCentro(areaOperativaId: number): Promise<number> {
   const [centro] = await db
     .insert(centriAscoltoTable)
-    .values({ nome: `Centro ${rnd()}`, cittaId })
+    .values({ nome: `Centro ${rnd()}`, areaOperativaId })
     .returning({ id: centriAscoltoTable.id });
   centroIds.push(centro.id);
   return centro.id;
 }
 
-async function createZona(cittaId: number): Promise<number> {
+async function createZona(areaOperativaId: number): Promise<number> {
   const [zona] = await db
     .insert(zoneUdsTable)
-    .values({ nome: `Zona ${rnd()}`, cittaId })
+    .values({ nome: `Zona ${rnd()}`, areaOperativaId })
     .returning({ id: zoneUdsTable.id });
   zonaIds.push(zona.id);
   return zona.id;
 }
 
-let cittaA: number;
-let cittaB: number;
+let areaOperativaA: number;
+let areaOperativaB: number;
 
 beforeAll(async () => {
   await initDbExtensions();
-  cittaA = await createCitta();
-  cittaB = await createCitta();
+  areaOperativaA = await createAreaOperativa();
+  areaOperativaB = await createAreaOperativa();
 });
 
 beforeEach(() => {
@@ -120,51 +120,51 @@ afterAll(async () => {
   if (centroIds.length > 0) {
     await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds));
   }
-  if (cittaIds.length > 0) {
-    await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds));
+  if (areaOperativaIds.length > 0) {
+    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds));
   }
   await pool.end();
 });
 
 const appAs = (
-  cittaId: number | null,
+  areaOperativaId: number | null,
   options: { centroAscoltoId?: number | null; zonaUdsId?: number | null } = {},
 ) => makeApp({
   id: 1,
   centroAscoltoId: options.centroAscoltoId ?? null,
-  cittaId,
+  areaOperativaId,
   zonaUdsId: options.zonaUdsId ?? null,
 });
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 
 describe("GET /beneficiari/cerca-simili", () => {
-  it("trova un nome simile (Ammed Solin ≈ Hamed Saolin) nella stessa città", async () => {
-    const id = await createBeneficiario({ nome: "Hamed", cognome: "Saolin", cittaId: cittaA });
-    const res = await request(appAs(cittaA)).get("/beneficiari/cerca-simili").query({ nome: "Ammed", cognome: "Solin" });
+  it("trova un nome simile (Ammed Solin ≈ Hamed Saolin) nella stessa area operativa", async () => {
+    const id = await createBeneficiario({ nome: "Hamed", cognome: "Saolin", areaOperativaId: areaOperativaA });
+    const res = await request(appAs(areaOperativaA)).get("/beneficiari/cerca-simili").query({ nome: "Ammed", cognome: "Solin" });
     expect(res.status).toBe(200);
     expect(idsOf(res.body)).toContain(id);
     const hit = (res.body as Array<{ id: number; score: number }>).find((r) => r.id === id);
     expect(hit!.score).toBeGreaterThanOrEqual(0.2);
   });
 
-  it("non restituisce persone di un'altra città (confine duro)", async () => {
-    const other = await createBeneficiario({ nome: "Hamed", cognome: "Saolin", cittaId: cittaB });
-    const res = await request(appAs(cittaA)).get("/beneficiari/cerca-simili").query({ nome: "Hamed", cognome: "Saolin" });
+  it("non restituisce persone di un'altra area operativa (confine duro)", async () => {
+    const other = await createBeneficiario({ nome: "Hamed", cognome: "Saolin", areaOperativaId: areaOperativaB });
+    const res = await request(appAs(areaOperativaA)).get("/beneficiari/cerca-simili").query({ nome: "Hamed", cognome: "Saolin" });
     expect(res.status).toBe(200);
     expect(idsOf(res.body)).not.toContain(other);
   });
 
-  it("un operatore trova un beneficiario Sociale non UDS della propria città anche se appartiene a un altro centro", async () => {
-    const centroOperatore = await createCentro(cittaA);
-    const centroPersona = await createCentro(cittaA);
+  it("un operatore trova un beneficiario Sociale non UDS della propria area operativa anche se appartiene a un altro centro", async () => {
+    const centroOperatore = await createCentro(areaOperativaA);
+    const centroPersona = await createCentro(areaOperativaA);
     const sociale = await createBeneficiario({
       nome: "Sociale",
       cognome: "Condiviso",
-      cittaId: cittaA,
+      areaOperativaId: areaOperativaA,
       centroAscoltoId: centroPersona,
       uds: false,
     });
-    const res = await request(appAs(cittaA, { centroAscoltoId: centroOperatore }))
+    const res = await request(appAs(areaOperativaA, { centroAscoltoId: centroOperatore }))
       .get("/beneficiari/cerca-simili")
       .query({ search: "Sociale Condiviso" });
     expect(res.status).toBe(200);
@@ -172,40 +172,40 @@ describe("GET /beneficiari/cerca-simili", () => {
     expect((res.body as Array<{ id: number; uds: boolean }>).find((row) => row.id === sociale)?.uds).toBe(false);
   });
 
-  it("un operatore trova una persona UDS di un'altra zona della stessa città", async () => {
-    const zonaOperatore = await createZona(cittaA);
-    const altraZona = await createZona(cittaA);
-    const uds = await createBeneficiario({ nome: "Altra", cognome: "Zona", cittaId: cittaA, zonaUdsId: altraZona, uds: true });
-    const res = await request(appAs(cittaA, { zonaUdsId: zonaOperatore }))
+  it("un operatore trova una persona UDS di un'altra zona della stessa area operativa", async () => {
+    const zonaOperatore = await createZona(areaOperativaA);
+    const altraZona = await createZona(areaOperativaA);
+    const uds = await createBeneficiario({ nome: "Altra", cognome: "Zona", areaOperativaId: areaOperativaA, zonaUdsId: altraZona, uds: true });
+    const res = await request(appAs(areaOperativaA, { zonaUdsId: zonaOperatore }))
       .get("/beneficiari/cerca-simili")
       .query({ search: "Altra Zona" });
     expect(res.status).toBe(200);
     expect(idsOf(res.body)).toContain(uds);
   });
 
-  it("non mostra a un operatore territoriale i record legacy con città NULL", async () => {
-    const legacy = await createBeneficiario({ nome: "Legacy", cognome: "SenzaCitta", cittaId: null });
-    const res = await request(appAs(cittaA)).get("/beneficiari/cerca-simili").query({ search: "Legacy SenzaCitta" });
+  it("non mostra a un operatore territoriale i record legacy con area operativa NULL", async () => {
+    const legacy = await createBeneficiario({ nome: "Legacy", cognome: "SenzaAreaOperativa", areaOperativaId: null });
+    const res = await request(appAs(areaOperativaA)).get("/beneficiari/cerca-simili").query({ search: "Legacy SenzaAreaOperativa" });
     expect(res.status).toBe(200);
     expect(idsOf(res.body)).not.toContain(legacy);
   });
 
   it("ritorna [] quando non c'è nulla su cui cercare", async () => {
-    await createBeneficiario({ nome: "Mario", cognome: "Rossi", cittaId: cittaA });
-    const res = await request(appAs(cittaA)).get("/beneficiari/cerca-simili");
+    await createBeneficiario({ nome: "Mario", cognome: "Rossi", areaOperativaId: areaOperativaA });
+    const res = await request(appAs(areaOperativaA)).get("/beneficiari/cerca-simili");
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
   });
 
   it("esclude il record indicato da excludeId", async () => {
-    const id = await createBeneficiario({ nome: "Giuseppe", cognome: "Verdi", cittaId: cittaA });
-    const res = await request(appAs(cittaA))
+    const id = await createBeneficiario({ nome: "Giuseppe", cognome: "Verdi", areaOperativaId: areaOperativaA });
+    const res = await request(appAs(areaOperativaA))
       .get("/beneficiari/cerca-simili")
       .query({ nome: "Giuseppe", cognome: "Verdi", excludeId: String(id) });
     expect(idsOf(res.body)).not.toContain(id);
   });
 
-  it("un caller globale deve indicare esplicitamente la città", async () => {
+  it("un caller globale deve indicare esplicitamente la area operativa", async () => {
     const res = await request(appAs(null))
       .get("/beneficiari/cerca-simili")
       .query({ search: "Anna Bianchi" });
@@ -213,12 +213,12 @@ describe("GET /beneficiari/cerca-simili", () => {
     expect(res.body.error).toMatch(/Area/i);
   });
 
-  it("un caller globale ricerca soltanto nella città indicata", async () => {
-    const inA = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaA });
-    const inB = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaB });
+  it("un caller globale ricerca soltanto nella area operativa indicata", async () => {
+    const inA = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", areaOperativaId: areaOperativaA });
+    const inB = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", areaOperativaId: areaOperativaB });
     const res = await request(appAs(null))
       .get("/beneficiari/cerca-simili")
-      .query({ nome: "Anna", cognome: "Bianchi", cittaId: String(cittaA) });
+      .query({ nome: "Anna", cognome: "Bianchi", areaOperativaId: String(areaOperativaA) });
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(inA);
@@ -226,24 +226,24 @@ describe("GET /beneficiari/cerca-simili", () => {
   });
 
   it.each(["abc", "12abc", "0", "-1", "1.5", "1e2", "2147483648"])(
-    "un cittaId globale malformato non avvia una ricerca globale: %s",
-    async (cittaId) => {
-      await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaA });
-      await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaB });
+    "un areaOperativaId globale malformato non avvia una ricerca globale: %s",
+    async (areaOperativaId) => {
+      await createBeneficiario({ nome: "Anna", cognome: "Bianchi", areaOperativaId: areaOperativaA });
+      await createBeneficiario({ nome: "Anna", cognome: "Bianchi", areaOperativaId: areaOperativaB });
       const res = await request(appAs(null))
         .get("/beneficiari/cerca-simili")
-        .query({ search: "Anna Bianchi", cittaId });
+        .query({ search: "Anna Bianchi", areaOperativaId });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/Area/i);
     },
   );
 
-  it("un operatore territoriale usa sempre la propria città ignorando cittaId", async () => {
-    const inA = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaA });
-    const inB = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", cittaId: cittaB });
-    const res = await request(appAs(cittaA))
+  it("un operatore territoriale usa sempre la propria area operativa ignorando areaOperativaId", async () => {
+    const inA = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", areaOperativaId: areaOperativaA });
+    const inB = await createBeneficiario({ nome: "Anna", cognome: "Bianchi", areaOperativaId: areaOperativaB });
+    const res = await request(appAs(areaOperativaA))
       .get("/beneficiari/cerca-simili")
-      .query({ search: "Anna Bianchi", cittaId: String(cittaB) });
+      .query({ search: "Anna Bianchi", areaOperativaId: String(areaOperativaB) });
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(inA);
@@ -258,9 +258,9 @@ describe("GET /beneficiari/cerca-simili", () => {
         cognome: "Polo",
         soprannome: "IlViaggiatore",
         telefono: "3337654321",
-        cittaId: cittaA,
+        areaOperativaId: areaOperativaA,
       });
-      const res = await request(appAs(cittaA)).get("/beneficiari/cerca-simili").query({ search });
+      const res = await request(appAs(areaOperativaA)).get("/beneficiari/cerca-simili").query({ search });
       expect(res.status).toBe(200);
       expect(idsOf(res.body)).toContain(id);
     },
@@ -271,10 +271,10 @@ describe("GET /beneficiari/cerca-simili", () => {
     ["codice fiscale", "RSSMRA80A01H501U"],
   ])("ricerca per %s senza esporre il codice fiscale nel risultato", async (_label, search) => {
     const id = await createBeneficiario({
-      nome: "Codice", cognome: "Identificativo", cittaId: cittaA,
+      nome: "Codice", cognome: "Identificativo", areaOperativaId: areaOperativaA,
       codice: "BEN-RICERCA-42", codiceFiscale: "RSSMRA80A01H501U",
     });
-    const res = await request(appAs(cittaA)).get("/beneficiari/cerca-simili").query({ search });
+    const res = await request(appAs(areaOperativaA)).get("/beneficiari/cerca-simili").query({ search });
     expect(res.status).toBe(200);
     const hit = (res.body as Array<Record<string, unknown>>).find((row) => row.id === id);
     expect(hit).toBeDefined();
@@ -282,15 +282,15 @@ describe("GET /beneficiari/cerca-simili", () => {
   });
 
   it("non esegue una ricerca libera con meno di 2 caratteri", async () => {
-    await createBeneficiario({ nome: "Al", cognome: "Corto", cittaId: cittaA });
-    const res = await request(appAs(cittaA)).get("/beneficiari/cerca-simili").query({ search: "A" });
+    await createBeneficiario({ nome: "Al", cognome: "Corto", areaOperativaId: areaOperativaA });
+    const res = await request(appAs(areaOperativaA)).get("/beneficiari/cerca-simili").query({ search: "A" });
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
   });
 
   it("ignora parametri numerici malformati (excludeId=abc) senza errore", async () => {
-    const id = await createBeneficiario({ nome: "Paola", cognome: "Gialli", cittaId: cittaA });
-    const res = await request(appAs(cittaA))
+    const id = await createBeneficiario({ nome: "Paola", cognome: "Gialli", areaOperativaId: areaOperativaA });
+    const res = await request(appAs(areaOperativaA))
       .get("/beneficiari/cerca-simili")
       .query({ nome: "Paola", cognome: "Gialli", excludeId: "abc" });
     expect(res.status).toBe(200);
@@ -298,8 +298,8 @@ describe("GET /beneficiari/cerca-simili", () => {
   });
 
   it("un match esatto su telefono alza il punteggio", async () => {
-    const id = await createBeneficiario({ nome: "Luca", cognome: "Neri", cittaId: cittaA, telefono: "3331234567" });
-    const res = await request(appAs(cittaA))
+    const id = await createBeneficiario({ nome: "Luca", cognome: "Neri", areaOperativaId: areaOperativaA, telefono: "3331234567" });
+    const res = await request(appAs(areaOperativaA))
       .get("/beneficiari/cerca-simili")
       .query({ nome: "Luca", cognome: "Neri", telefono: "3331234567" });
     const hit = (res.body as Array<{ id: number; score: number }>).find((r) => r.id === id);

@@ -4,7 +4,7 @@ import request from "supertest";
 import {
   beneficiariTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   interventiMaterialiTable,
   interventiStoricoStatiTable,
@@ -30,7 +30,7 @@ const ALL_SOCIAL_PERMISSIONS = [
   "sociale.interventi.cancel",
 ];
 const ids = {
-  citta: [] as number[],
+  areaOperativa: [] as number[],
   centri: [] as number[],
   beneficiari: [] as number[],
   utenti: [] as number[],
@@ -57,7 +57,7 @@ let magazzinoInattivo: number;
 
 function app(
   options: {
-    cittaId?: number | null;
+    areaOperativaId?: number | null;
     centroId?: number | null;
     aree?: string[];
     permessi?: string[];
@@ -69,7 +69,7 @@ function app(
   server.use((req, _res, next) => {
     (req as unknown as { user: Record<string, unknown> }).user = {
       id: operatoreId,
-      cittaId: options.cittaId === undefined ? areaA : options.cittaId,
+      areaOperativaId: options.areaOperativaId === undefined ? areaA : options.areaOperativaId,
       centroAscoltoId:
         options.centroId === undefined ? centroA : options.centroId,
       zonaUdsId: null,
@@ -134,19 +134,19 @@ async function totaleMovimenti(interventoId: number): Promise<number> {
 
 beforeAll(async () => {
   const aree = await db
-    .insert(cittaTable)
+    .insert(areeOperativeTable)
     .values([
       { nome: `Area Audit A ${rnd()}` },
       { nome: `Area Audit B ${rnd()}` },
     ])
-    .returning({ id: cittaTable.id });
+    .returning({ id: areeOperativeTable.id });
   [areaA, areaB] = aree.map((row) => row.id);
-  ids.citta.push(areaA, areaB);
+  ids.areaOperativa.push(areaA, areaB);
   const centri = await db
     .insert(centriAscoltoTable)
     .values([
-      { nome: `Centro Audit A ${rnd()}`, cittaId: areaA },
-      { nome: `Centro Audit B ${rnd()}`, cittaId: areaB },
+      { nome: `Centro Audit A ${rnd()}`, areaOperativaId: areaA },
+      { nome: `Centro Audit B ${rnd()}`, areaOperativaId: areaB },
     ])
     .returning({ id: centriAscoltoTable.id });
   [centroA, centroB] = centri.map((row) => row.id);
@@ -158,7 +158,7 @@ beforeAll(async () => {
       passwordHash: "test",
       nome: "Operatore Audit",
       attivo: true,
-      cittaId: areaA,
+      areaOperativaId: areaA,
       centroAscoltoId: centroA,
     })
     .returning({ id: utentiTable.id });
@@ -172,7 +172,7 @@ beforeAll(async () => {
         nome: "Persona",
         cognome: "Area A",
         sesso: "F",
-        cittaId: areaA,
+        areaOperativaId: areaA,
         centroAscoltoId: centroA,
       },
       {
@@ -180,7 +180,7 @@ beforeAll(async () => {
         nome: "Persona",
         cognome: "Area Null",
         sesso: "F",
-        cittaId: null,
+        areaOperativaId: null,
         centroAscoltoId: centroA,
       },
       {
@@ -188,7 +188,7 @@ beforeAll(async () => {
         nome: "Persona",
         cognome: "Centro Null",
         sesso: "M",
-        cittaId: areaA,
+        areaOperativaId: areaA,
         centroAscoltoId: null,
       },
       {
@@ -196,7 +196,7 @@ beforeAll(async () => {
         nome: "Persona",
         cognome: "UDS",
         sesso: "M",
-        cittaId: areaA,
+        areaOperativaId: areaA,
         centroAscoltoId: centroA,
         uds: true,
       },
@@ -223,18 +223,18 @@ beforeAll(async () => {
   const magazzini = await db
     .insert(magazziniTable)
     .values([
-      { codice: `CDA-MA-${rnd()}`, nome: "Magazzino A", cittaId: areaA },
-      { codice: `CDA-MB-${rnd()}`, nome: "Magazzino B", cittaId: areaB },
+      { codice: `CDA-MA-${rnd()}`, nome: "Magazzino A", areaOperativaId: areaA },
+      { codice: `CDA-MB-${rnd()}`, nome: "Magazzino B", areaOperativaId: areaB },
       {
         codice: `CDA-MCB-${rnd()}`,
         nome: "Magazzino Centro B",
-        cittaId: areaA,
+        areaOperativaId: areaA,
         centroAscoltoId: centroB,
       },
       {
         codice: `CDA-MI-${rnd()}`,
         nome: "Magazzino inattivo",
-        cittaId: areaA,
+        areaOperativaId: areaA,
         stato: "inattivo",
       },
     ])
@@ -300,7 +300,7 @@ afterAll(async () => {
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));
-  await db.delete(cittaTable).where(inArray(cittaTable.id, ids.citta));
+  await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, ids.areaOperativa));
   await pool.end();
 });
 
@@ -373,7 +373,7 @@ describe("audit hardening Centro di Ascolto", () => {
       centroNull.id,
     );
     const global = app({
-      cittaId: null,
+      areaOperativaId: null,
       centroId: null,
       isAdmin: true,
       permessi: [],
@@ -393,7 +393,7 @@ describe("audit hardening Centro di Ascolto", () => {
     });
     const social = await createIntervento();
     const udsApp = app({
-      cittaId: areaA,
+      areaOperativaId: areaA,
       centroId: null,
       aree: ["uds"],
       permessi: [],

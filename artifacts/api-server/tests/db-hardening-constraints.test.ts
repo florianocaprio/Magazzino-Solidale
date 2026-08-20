@@ -66,11 +66,11 @@ describe("vincoli referenziali Interventi e Turni", () => {
   it("impedisce un Volontario orfano nell'associazione al Turno", async () => {
     await inRollback(async (client) => {
       const area = await client.query<{ id: number }>(
-        "INSERT INTO citta (nome) VALUES ($1) RETURNING id",
+        "INSERT INTO aree_operative (nome) VALUES ($1) RETURNING id",
         [`Area Audit FK ${Date.now()}`],
       );
       const centro = await client.query<{ id: number }>(
-        `INSERT INTO centri_di_ascolto (nome, citta_id)
+        `INSERT INTO centri_di_ascolto (nome, area_operativa_id)
          VALUES ($1, $2) RETURNING id`,
         [`Centro Audit FK ${Date.now()}`, area.rows[0].id],
       );

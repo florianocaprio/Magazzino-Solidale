@@ -25,7 +25,7 @@ import {
   movimentiTable,
   turniTable,
   turniVolontariTable,
-  cittaTable,
+  areeOperativeTable,
   zoneUdsTable,
   auditConfigurazioniTable,
 } from "@workspace/db";
@@ -46,7 +46,7 @@ export function makeScopedApp(
   user: {
     id: number;
     centroAscoltoId: number | null;
-    cittaId?: number | null;
+    areaOperativaId?: number | null;
     zonaUdsId?: number | null;
     aree?: string[];
     permessi?: string[];
@@ -63,7 +63,7 @@ export function makeScopedApp(
         user: {
           id: number;
           centroAscoltoId: number | null;
-          cittaId: number | null;
+          areaOperativaId: number | null;
           zonaUdsId: number | null;
           aree: string[];
           permessi: string[];
@@ -74,7 +74,7 @@ export function makeScopedApp(
     ).user = {
       id: user.id,
       centroAscoltoId: user.centroAscoltoId,
-      cittaId: user.cittaId ?? null,
+      areaOperativaId: user.areaOperativaId ?? null,
       zonaUdsId: user.zonaUdsId ?? null,
       aree: user.aree ?? ["sociale", "uds", "magazzino"],
       // Questi test isolano lo scoping territoriale, non l'RBAC.
@@ -152,7 +152,7 @@ export interface SeedScope {
   trasferimentoIds: number[];
   turnoIds: number[];
   zonaIds: number[];
-  cittaIds: number[];
+  areaOperativaIds: number[];
 }
 
 export function newScope(): SeedScope {
@@ -176,7 +176,7 @@ export function newScope(): SeedScope {
     trasferimentoIds: [],
     turnoIds: [],
     zonaIds: [],
-    cittaIds: [],
+    areaOperativaIds: [],
   };
 }
 
@@ -191,15 +191,15 @@ export async function createCentro(scope: SeedScope, nome = `Centro ${rnd()}`): 
   return c.id;
 }
 
-/** Like {@link createCentro} but accepts a città and returns id + nome. */
+/** Like {@link createCentro} but accepts a area operativa and returns id + nome. */
 export async function createCentroRec(
   scope: SeedScope,
-  opts: { cittaId?: number | null; nome?: string } = {},
+  opts: { areaOperativaId?: number | null; nome?: string } = {},
 ): Promise<{ id: number; nome: string }> {
   const nome = opts.nome ?? `Centro ${rnd()}`;
   const [c] = await db
     .insert(centriAscoltoTable)
-    .values({ nome, cittaId: opts.cittaId ?? null })
+    .values({ nome, areaOperativaId: opts.areaOperativaId ?? null })
     .returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return { id: c.id, nome };
@@ -208,11 +208,11 @@ export async function createCentroRec(
 export async function createMagazzino(
   scope: SeedScope,
   centroId: number | null,
-  opts: { cittaId?: number | null } = {},
+  opts: { areaOperativaId?: number | null } = {},
 ): Promise<number> {
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `MAG-${rnd()}`, nome: `Mag ${rnd()}`, centroAscoltoId: centroId, cittaId: opts.cittaId ?? null })
+    .values({ codice: `MAG-${rnd()}`, nome: `Mag ${rnd()}`, centroAscoltoId: centroId, areaOperativaId: opts.areaOperativaId ?? null })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
   return m.id;
@@ -222,12 +222,12 @@ export async function createMagazzino(
 export async function createMagazzinoRec(
   scope: SeedScope,
   centroId: number | null,
-  opts: { cittaId?: number | null } = {},
+  opts: { areaOperativaId?: number | null } = {},
 ): Promise<{ id: number; nome: string }> {
   const nome = `Mag ${rnd()}`;
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `MAG-${rnd()}`, nome, centroAscoltoId: centroId, cittaId: opts.cittaId ?? null })
+    .values({ codice: `MAG-${rnd()}`, nome, centroAscoltoId: centroId, areaOperativaId: opts.areaOperativaId ?? null })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
   return { id: m.id, nome };
@@ -236,7 +236,7 @@ export async function createMagazzinoRec(
 export async function createBeneficiario(
   scope: SeedScope,
   centroId: number | null,
-  opts: { uds?: boolean; cittaId?: number | null; zonaUdsId?: number | null; sesso?: string } = {},
+  opts: { uds?: boolean; areaOperativaId?: number | null; zonaUdsId?: number | null; sesso?: string } = {},
 ): Promise<number> {
   const [b] = await db
     .insert(beneficiariTable)
@@ -247,7 +247,7 @@ export async function createBeneficiario(
       sesso: opts.sesso ?? "M",
       centroAscoltoId: centroId,
       uds: opts.uds ?? false,
-      cittaId: opts.cittaId ?? null,
+      areaOperativaId: opts.areaOperativaId ?? null,
       zonaUdsId: opts.zonaUdsId ?? null,
     })
     .returning({ id: beneficiariTable.id });
@@ -255,20 +255,20 @@ export async function createBeneficiario(
   return b.id;
 }
 
-export async function createCitta(scope: SeedScope): Promise<number> {
+export async function createAreaOperativa(scope: SeedScope): Promise<number> {
   const [c] = await db
-    .insert(cittaTable)
-    .values({ nome: `Citta ${rnd()}` })
-    .returning({ id: cittaTable.id });
-  scope.cittaIds.push(c.id);
+    .insert(areeOperativeTable)
+    .values({ nome: `AreaOperativa ${rnd()}` })
+    .returning({ id: areeOperativeTable.id });
+  scope.areaOperativaIds.push(c.id);
   return c.id;
 }
 
-export async function createZona(scope: SeedScope, cittaId: number): Promise<{ id: number; nome: string }> {
+export async function createZona(scope: SeedScope, areaOperativaId: number): Promise<{ id: number; nome: string }> {
   const nome = `Zona ${rnd()}`;
   const [z] = await db
     .insert(zoneUdsTable)
-    .values({ cittaId, nome })
+    .values({ areaOperativaId, nome })
     .returning({ id: zoneUdsTable.id });
   scope.zonaIds.push(z.id);
   return { id: z.id, nome };
@@ -291,11 +291,11 @@ export async function createProdotto(scope: SeedScope): Promise<number> {
 
 export async function createFornitore(
   scope: SeedScope,
-  cittaId: number | null,
+  areaOperativaId: number | null,
 ): Promise<number> {
   const [f] = await db
     .insert(fornitoriTable)
-    .values({ nome: `Fornitore ${rnd()}`, tipo: "azienda", cittaId })
+    .values({ nome: `Fornitore ${rnd()}`, tipo: "azienda", areaOperativaId })
     .returning({ id: fornitoriTable.id });
   scope.fornitoreIds.push(f.id);
   return f.id;
@@ -683,7 +683,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   if (scope.zonaIds.length > 0) {
     await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, scope.zonaIds));
   }
-  if (scope.cittaIds.length > 0) {
-    await db.delete(cittaTable).where(inArray(cittaTable.id, scope.cittaIds));
+  if (scope.areaOperativaIds.length > 0) {
+    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, scope.areaOperativaIds));
   }
 }

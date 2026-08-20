@@ -5,7 +5,7 @@ import {
   db,
   pool,
   beneficiariTable,
-  cittaTable,
+  areeOperativeTable,
   interventiTable,
   utentiTable,
 } from "@workspace/db";
@@ -21,7 +21,7 @@ import interventiRouter from "../src/routes/interventi";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 let operatorUserId: number;
-let cittaId: number;
+let areaOperativaId: number;
 
 function makeApp(): Express {
   const app = express();
@@ -32,14 +32,14 @@ function makeApp(): Express {
         user: {
           id: number;
           centroAscoltoId: number | null;
-          cittaId: number | null;
+          areaOperativaId: number | null;
           aree: string[];
         };
       }
     ).user = {
       id: operatorUserId,
       centroAscoltoId: null,
-      cittaId,
+      areaOperativaId,
       aree: ["sociale", "uds"],
     };
     next();
@@ -53,18 +53,18 @@ const beneficiarioIds: number[] = [];
 let beneficiarioId: number;
 
 beforeAll(async () => {
-  const [citta] = await db
-    .insert(cittaTable)
+  const [areaOperativa] = await db
+    .insert(areeOperativeTable)
     .values({ nome: `Area Note UDS ${rnd()}` })
-    .returning({ id: cittaTable.id });
-  cittaId = citta.id;
+    .returning({ id: areeOperativeTable.id });
+  areaOperativaId = areaOperativa.id;
   const [operator] = await db
     .insert(utentiTable)
     .values({
       username: `interventi_test_${rnd()}`,
       passwordHash: "test-only",
       nome: "Operatore Interventi Test",
-      cittaId,
+      areaOperativaId,
       attivo: true,
     })
     .returning({ id: utentiTable.id });
@@ -78,7 +78,7 @@ beforeAll(async () => {
       cognome: rnd(),
       sesso: "M",
       uds: true,
-      cittaId,
+      areaOperativaId,
     })
     .returning({ id: beneficiariTable.id });
   beneficiarioId = b.id;
@@ -97,7 +97,7 @@ afterAll(async () => {
       .where(inArray(beneficiariTable.id, beneficiarioIds));
   }
   await db.delete(utentiTable).where(eq(utentiTable.id, operatorUserId));
-  await db.delete(cittaTable).where(eq(cittaTable.id, cittaId));
+  await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, areaOperativaId));
   await pool.end();
 });
 

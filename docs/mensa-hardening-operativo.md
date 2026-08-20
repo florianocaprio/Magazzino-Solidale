@@ -4,8 +4,8 @@ Questo aggiornamento completa il workflow Mensa senza sostituire il motore di
 magazzino. Una Mensa continua a usare il proprio Magazzino associato; consumi e
 scarti producono scarichi inventariali FEFO nel registro canonico.
 
-Nel dominio e nell'interfaccia si usa il termine **Area**. I nomi `citta` e
-`citta_id` restano esclusivamente identificatori tecnici legacy del database.
+Nel dominio e nell'interfaccia si usa il termine **Area**. I nomi `area operativa` e
+`area_operativa_id` restano esclusivamente identificatori tecnici legacy del database.
 
 ## Prima dell'aggiornamento
 

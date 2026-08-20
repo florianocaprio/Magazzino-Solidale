@@ -107,8 +107,8 @@ async function createAdminUser(isSuperAdmin: boolean): Promise<SessionUser> {
     ruoloNome,
     centroAscoltoId: null,
     centroAscoltoNome: null,
-    cittaId: null,
-    cittaNome: null,
+    areaOperativaId: null,
+    areaOperativaNome: null,
     zonaUdsId: null,
     zonaUdsNome: null,
     isSuperAdmin,
@@ -219,7 +219,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
         passwordHash: utentiTable.passwordHash,
         isSuperAdmin: utentiTable.isSuperAdmin,
         centroAscoltoId: utentiTable.centroAscoltoId,
-        cittaId: utentiTable.cittaId,
+        areaOperativaId: utentiTable.areaOperativaId,
         zonaUdsId: utentiTable.zonaUdsId,
         ruoloNome: ruoliTable.nome,
         attivo: utentiTable.attivo,
@@ -238,7 +238,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
         passwordHash: utentiTable.passwordHash,
         isSuperAdmin: utentiTable.isSuperAdmin,
         centroAscoltoId: utentiTable.centroAscoltoId,
-        cittaId: utentiTable.cittaId,
+        areaOperativaId: utentiTable.areaOperativaId,
         zonaUdsId: utentiTable.zonaUdsId,
         ruoloNome: ruoliTable.nome,
         attivo: utentiTable.attivo,
@@ -257,7 +257,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
     expect(seeded.ruoloNome).toBe("SuperAdmin");
     expect(seeded.isSuperAdmin).toBe(true);
     expect(seeded.centroAscoltoId).toBeNull();
-    expect(seeded.cittaId).toBeNull();
+    expect(seeded.areaOperativaId).toBeNull();
     expect(seeded.zonaUdsId).toBeNull();
     expect(seeded.passwordHash).toBe(before.passwordHash);
     expect(seeded.attivo).toBe(before.attivo);

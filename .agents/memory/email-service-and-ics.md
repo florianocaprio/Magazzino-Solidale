@@ -33,8 +33,8 @@ and send it as a `text/calendar` attachment.
 all-day event (DTSTART/DTEND VALUE=DATE, DTEND = next day, exclusive) is correct.
 
 **How to apply:**
-- These endpoints reuse the same centro+città access checks (`canAccessCentro` +
-  `canAccessCitta` via beneficiario) as the rest of the consegne router.
+- These endpoints reuse the same centro+area operativa access checks (`canAccessCentro` +
+  `canAccessAreaOperativa` via beneficiario) as the rest of the consegne router.
 - `sent=false` (not an error status) is returned when the recipient has no email or
   no volontario is assigned — tests assert 404 / sent=false / 403 without ever
   hitting a real provider.

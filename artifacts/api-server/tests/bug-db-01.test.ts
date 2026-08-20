@@ -5,7 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   lottiTable,
   magazziniTable,
@@ -39,7 +39,7 @@ let adminRoleId: number;
 let adminUserId: number;
 let superUserId: number;
 let createdRoleId: number | undefined;
-let createdCittaId: number | undefined;
+let createdAreaOperativaId: number | undefined;
 let createdCentroId: number | undefined;
 let adminAgent: ReturnType<typeof request.agent>;
 let originalPrint: Awaited<ReturnType<typeof ensureImpostazioniStampa>>;
@@ -113,8 +113,8 @@ afterAll(async () => {
       .delete(centriAscoltoTable)
       .where(eq(centriAscoltoTable.id, createdCentroId));
   }
-  if (createdCittaId) {
-    await db.delete(cittaTable).where(eq(cittaTable.id, createdCittaId));
+  if (createdAreaOperativaId) {
+    await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, createdAreaOperativaId));
   }
   await adminAgent?.post("/api/auth/logout");
   await db
@@ -159,26 +159,26 @@ describe("BUG-DB-01 - DB vergine e autenticazione", () => {
   });
 
   it("crea un'area e un centro collegato, e consente un centro senza area", async () => {
-    const area = await adminAgent.post("/api/citta").send({
+    const area = await adminAgent.post("/api/aree-operative").send({
       nome: `Area BUG-DB-01 ${suffix}`,
       provincia: "Demo",
       sigla: "de",
     });
     expect(area.status).toBe(201);
     expect(area.body.sigla).toBe("DE");
-    createdCittaId = area.body.id;
+    createdAreaOperativaId = area.body.id;
 
     const centre = await adminAgent.post("/api/centri-ascolto").send({
       nome: `Centro BUG-DB-01 ${suffix}`,
-      cittaId: createdCittaId,
+      areaOperativaId: createdAreaOperativaId,
     });
     expect(centre.status).toBe(201);
-    expect(centre.body.cittaId).toBe(createdCittaId);
+    expect(centre.body.areaOperativaId).toBe(createdAreaOperativaId);
     createdCentroId = centre.body.id;
 
     const withoutArea = await adminAgent.post("/api/centri-ascolto").send({
       nome: `Centro senza area ${suffix}`,
-      cittaId: null,
+      areaOperativaId: null,
     });
     expect(withoutArea.status).toBe(201);
     await db
@@ -187,16 +187,16 @@ describe("BUG-DB-01 - DB vergine e autenticazione", () => {
   });
 
   it("restituisce errori chiari per payload area e FK centro non validi", async () => {
-    const invalidArea = await adminAgent.post("/api/citta").send({});
+    const invalidArea = await adminAgent.post("/api/aree-operative").send({});
     expect(invalidArea.status).toBe(400);
     expect(invalidArea.body.error).toBe("Inserimento area non valido");
 
     const invalidCentre = await adminAgent.post("/api/centri-ascolto").send({
       nome: `Centro FK non valida ${suffix}`,
-      cittaId: 2_147_483_000,
+      areaOperativaId: 2_147_483_000,
     });
     expect(invalidCentre.status).toBe(400);
-    expect(invalidCentre.body.error).toBe("L'Area selezionata non esiste");
+    expect(invalidCentre.body.error).toBe("L'Area Operativa selezionata non esiste");
   });
 });
 
