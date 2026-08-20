@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { MensaAccessoTemporaneoInputTipoServizio } from './mensaAccessoTemporaneoInputTipoServizio';
 import type { MensaNuovaPersonaTemporaneaInput } from './mensaNuovaPersonaTemporaneaInput';
 
 /**
@@ -16,6 +17,7 @@ export interface MensaAccessoTemporaneoInput {
   nuovaPersona?: MensaNuovaPersonaTemporaneaInput;
   /** @nullable */
   motivo?: string | null;
+  tipoServizio?: MensaAccessoTemporaneoInputTipoServizio;
   confermaDuplicato?: boolean;
   /**
      * @minLength 1

@@ -746,6 +746,7 @@ async function loadAccessoDto(id: number) {
     esito: row.accesso.esito,
     motivoEsito: row.accesso.motivoEsito,
     modalitaAccesso: row.accesso.modalitaAccesso,
+    tipoServizio: row.accesso.tipoServizio ?? null,
     temporaneo: row.accesso.autorizzazioneTemporaneaId != null,
     dataOra: row.accesso.dataOra.toISOString(),
     eccezioneId: row.accesso.eccezioneId ?? null,
@@ -1181,6 +1182,9 @@ router.post(
         80,
       );
       const modalita = req.body?.modalitaAccesso ?? "tessera";
+      const tipoServizio = canonicalTipoServizio(
+        req.body?.tipoServizio ?? "pranzo",
+      );
       if (!["tessera", "manuale"].includes(modalita))
         throw new MensaError(400, "Modalità di accesso non valida");
       if (modalita === "manuale") assertPermission(req, "mensa.access.manual");
@@ -1282,6 +1286,7 @@ router.post(
             motivoEsito,
             operatoreId: req.user!.id,
             modalitaAccesso: modalita,
+            tipoServizio,
             idempotencyKey,
           })
           .returning();
@@ -1292,6 +1297,7 @@ router.post(
             esito,
             motivoEsito,
             modalita,
+            tipoServizio,
           }),
         );
         return row;
@@ -1331,6 +1337,9 @@ router.post(
         req.body?.idempotencyKey,
         "La chiave di idempotenza",
         80,
+      );
+      const tipoServizio = canonicalTipoServizio(
+        req.body?.tipoServizio ?? "pranzo",
       );
       const [replay] = await db
         .select({ id: mensaAccessiTable.id })
@@ -1514,6 +1523,7 @@ router.post(
             motivoEsito: ACCESSO_MOTIVI.ACCESSO_TEMPORANEO,
             operatoreId: req.user!.id,
             modalitaAccesso: "temporaneo",
+            tipoServizio,
             idempotencyKey,
           })
           .returning();
@@ -1528,6 +1538,7 @@ router.post(
               beneficiarioId: beneficiario.id,
               mensaId,
               dataServizio: today,
+              tipoServizio,
             },
             motivo,
           ),
@@ -1771,6 +1782,15 @@ router.post(
         )
         .where(eq(mensaAccessiTable.id, accessoId));
       if (!access) throw new MensaError(404, "Accesso non trovato");
+      if (
+        access.accesso.tipoServizio != null &&
+        access.accesso.tipoServizio !== tipoServizio
+      ) {
+        throw new MensaError(
+          409,
+          "Il tipo servizio del pasto non corrisponde alla verifica accesso",
+        );
+      }
       if (!canAccessCitta(access.mensa.cittaId, callerCittaId(req)))
         throw new MensaError(403, "Accesso non disponibile");
       await requireMensa(access.mensa.id, req, true);
@@ -2645,6 +2665,7 @@ router.post(
           .where(
             and(
               eq(mensaAccessiTable.mensaId, current.giornata.mensaId),
+              eq(mensaAccessiTable.tipoServizio, current.giornata.tipoServizio),
               gte(mensaAccessiTable.dataOra, range.start),
               lt(mensaAccessiTable.dataOra, range.end),
             ),
@@ -2855,6 +2876,8 @@ router.get(
       ];
       if (mensaId != null)
         accessConditions.push(eq(mensaAccessiTable.mensaId, mensaId));
+      if (tipo != null)
+        accessConditions.push(eq(mensaAccessiTable.tipoServizio, tipo));
       if (ownCity != null)
         accessConditions.push(eq(menseTable.cittaId, ownCity));
       const [accesses] = await db

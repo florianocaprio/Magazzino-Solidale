@@ -8321,6 +8321,7 @@ export const UpdateTesseraBeneficiarioStatoResponse = zod.object({
 })
 
 
+export const verificaAccessoMensaBodyTipoServizioDefault = `pranzo`;
 export const verificaAccessoMensaBodyIdempotencyKeyMax = 80;
 
 
@@ -8330,6 +8331,7 @@ export const VerificaAccessoMensaBody = zod.object({
   "modalitaAccesso": zod.enum(['tessera', 'manuale']),
   "codiceTessera": zod.string().optional(),
   "beneficiarioId": zod.number().optional(),
+  "tipoServizio": zod.enum(['pranzo', 'cena']).default(verificaAccessoMensaBodyTipoServizioDefault),
   "idempotencyKey": zod.string().min(1).max(verificaAccessoMensaBodyIdempotencyKeyMax)
 })
 
@@ -8348,6 +8350,7 @@ export const VerificaAccessoMensaResponse = zod.object({
   "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
   "motivoEsito": zod.string(),
   "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "tipoServizio": zod.union([zod.literal('pranzo'),zod.literal('cena'),zod.literal(null)]).nullish(),
   "temporaneo": zod.boolean(),
   "dataOra": zod.coerce.date(),
   "eccezioneId": zod.number().nullish(),
@@ -8367,6 +8370,7 @@ export const createAccessoTemporaneoMensaBodyNuovaPersonaTelefonoMax = 20;
 
 export const createAccessoTemporaneoMensaBodyNuovaPersonaCittadinanzaMax = 60;
 
+export const createAccessoTemporaneoMensaBodyTipoServizioDefault = `pranzo`;
 export const createAccessoTemporaneoMensaBodyConfermaDuplicatoDefault = false;
 export const createAccessoTemporaneoMensaBodyIdempotencyKeyMax = 80;
 
@@ -8387,6 +8391,7 @@ export const CreateAccessoTemporaneoMensaBody = zod.object({
   "restrizioniAlimentari": zod.string().nullish()
 }).optional(),
   "motivo": zod.string().nullish(),
+  "tipoServizio": zod.enum(['pranzo', 'cena']).default(createAccessoTemporaneoMensaBodyTipoServizioDefault),
   "confermaDuplicato": zod.boolean().default(createAccessoTemporaneoMensaBodyConfermaDuplicatoDefault),
   "idempotencyKey": zod.string().min(1).max(createAccessoTemporaneoMensaBodyIdempotencyKeyMax)
 }).describe('Indicare esattamente uno tra beneficiarioId e nuovaPersona. L\'autorizzazione vale solo per la data civile corrente Europe\/Rome.')
@@ -8406,6 +8411,7 @@ export const CreateAccessoTemporaneoMensaResponse = zod.object({
   "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
   "motivoEsito": zod.string(),
   "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "tipoServizio": zod.union([zod.literal('pranzo'),zod.literal('cena'),zod.literal(null)]).nullish(),
   "temporaneo": zod.boolean(),
   "dataOra": zod.coerce.date(),
   "eccezioneId": zod.number().nullish(),
@@ -8440,6 +8446,7 @@ export const ListAccessiMensaResponse = zod.union([zod.array(zod.object({
   "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
   "motivoEsito": zod.string(),
   "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "tipoServizio": zod.union([zod.literal('pranzo'),zod.literal('cena'),zod.literal(null)]).nullish(),
   "temporaneo": zod.boolean(),
   "dataOra": zod.coerce.date(),
   "eccezioneId": zod.number().nullish(),
@@ -8461,6 +8468,7 @@ export const ListAccessiMensaResponse = zod.union([zod.array(zod.object({
   "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
   "motivoEsito": zod.string(),
   "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "tipoServizio": zod.union([zod.literal('pranzo'),zod.literal('cena'),zod.literal(null)]).nullish(),
   "temporaneo": zod.boolean(),
   "dataOra": zod.coerce.date(),
   "eccezioneId": zod.number().nullish(),
@@ -8500,6 +8508,7 @@ export const AutorizzaEccezioneMensaResponse = zod.object({
   "esito": zod.enum(['consentito', 'negato', 'consentito_eccezione']),
   "motivoEsito": zod.string(),
   "modalitaAccesso": zod.enum(['tessera', 'manuale', 'temporaneo']),
+  "tipoServizio": zod.union([zod.literal('pranzo'),zod.literal('cena'),zod.literal(null)]).nullish(),
   "temporaneo": zod.boolean(),
   "dataOra": zod.coerce.date(),
   "eccezioneId": zod.number().nullish(),

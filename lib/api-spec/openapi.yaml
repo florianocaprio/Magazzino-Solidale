@@ -12679,6 +12679,10 @@ components:
         nuovaPersona:
           { $ref: "#/components/schemas/MensaNuovaPersonaTemporaneaInput" }
         motivo: { type: ["string", "null"] }
+        tipoServizio:
+          type: string
+          enum: [pranzo, cena]
+          default: pranzo
         confermaDuplicato: { type: boolean, default: false }
         idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
 
@@ -12690,6 +12694,10 @@ components:
         modalitaAccesso: { type: string, enum: [tessera, manuale] }
         codiceTessera: { type: string }
         beneficiarioId: { type: integer }
+        tipoServizio:
+          type: string
+          enum: [pranzo, cena]
+          default: pranzo
         idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
 
     MensaAccesso:
@@ -12722,6 +12730,7 @@ components:
           { type: string, enum: [consentito, negato, consentito_eccezione] }
         motivoEsito: { type: string }
         modalitaAccesso: { type: string, enum: [tessera, manuale, temporaneo] }
+        tipoServizio: { type: [string, "null"], enum: [pranzo, cena, null] }
         temporaneo: { type: boolean }
         dataOra: { type: string, format: date-time }
         eccezioneId: { type: ["integer", "null"] }

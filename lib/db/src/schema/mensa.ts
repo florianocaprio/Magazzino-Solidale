@@ -190,6 +190,7 @@ export const mensaAccessiTable = pgTable(
       .references(() => utentiTable.id),
     eccezioneId: integer("eccezione_id"),
     modalitaAccesso: varchar("modalita_accesso", { length: 20 }).notNull(),
+    tipoServizio: varchar("tipo_servizio", { length: 40 }),
     idempotencyKey: varchar("idempotency_key", { length: 80 }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -209,6 +210,10 @@ export const mensaAccessiTable = pgTable(
     check(
       "mensa_accessi_modalita_check",
       sql`${table.modalitaAccesso} in ('tessera', 'manuale', 'temporaneo')`,
+    ),
+    check(
+      "mensa_accessi_tipo_servizio_check",
+      sql`${table.tipoServizio} is null or ${table.tipoServizio} in ('pranzo', 'cena')`,
     ),
   ],
 );

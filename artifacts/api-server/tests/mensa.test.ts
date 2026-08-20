@@ -256,6 +256,7 @@ async function verify(
       mensaId: fixture.mensaA,
       modalitaAccesso: "tessera",
       codiceTessera: fixture.cardCode,
+      tipoServizio: "pranzo",
       idempotencyKey: `access-${rnd()}`,
       ...values,
     });
@@ -1019,7 +1020,7 @@ describe("Modulo Mensa", () => {
       .from(magazziniTable)
       .where(eq(magazziniTable.id, fixture.warehouseIds[0]));
     expect(warehouse.stato).toBe("attivo");
-    const access = await verify(app, fixture);
+    const access = await verify(app, fixture, { tipoServizio: "cena" });
     expect(access.body.motivoEsito).toBe("MENSA_NON_ATTIVA");
   });
 
@@ -1786,7 +1787,7 @@ describe("Modulo Mensa", () => {
   it("rifiuta un pasto con accesso del giorno precedente e un'autorizzazione temporanea di altra data", async () => {
     const fixture = await createFixture();
     const app = makeApp(fixture);
-    const access = await verify(app, fixture);
+    const access = await verify(app, fixture, { tipoServizio: "cena" });
     const today = dataServizioMensa();
     const yesterday = shiftDate(today, -1);
     await db
@@ -1821,6 +1822,7 @@ describe("Modulo Mensa", () => {
         mensaId: fixture.mensaA,
         beneficiarioId: existing.id,
         motivo: "Controllo data autorizzazione",
+        tipoServizio: "cena",
         idempotencyKey: `temp-date-${rnd()}`,
       });
     expect(temporary.status).toBe(201);
@@ -1869,7 +1871,10 @@ describe("Modulo Mensa", () => {
           })
       ).status,
     ).toBe(201);
-    const denied = await verify(app, fixture, { mensaId: fixture.mensaB });
+    const denied = await verify(app, fixture, {
+      mensaId: fixture.mensaB,
+      tipoServizio: "cena",
+    });
     const exceptional = await request(app)
       .post(`/mensa/accessi/${denied.body.id}/eccezione`)
       .send({ motivo: "Servizio temporaneamente spostato" });
@@ -1903,6 +1908,20 @@ describe("Modulo Mensa", () => {
     expect(report.body.beneficiariDistintiPerSesso).toEqual([
       expect.objectContaining({ totale: 1 }),
     ]);
+    const days = await request(app).get(
+      `/mensa/giornate?mensaId=${fixture.mensaA}&data=${today}`,
+    );
+    const lunchDay = days.body.find(
+      (item: { tipoServizio: string }) => item.tipoServizio === "pranzo",
+    );
+    const closedLunch = await request(app)
+      .post(`/mensa/giornate/${lunchDay.id}/chiudi`)
+      .send({ note: "Chiusura pranzo" });
+    expect(closedLunch.status).toBe(200);
+    expect(closedLunch.body.snapshot).toMatchObject({
+      accessiOrdinari: 1,
+      accessiEccezione: 0,
+    });
   });
 
   it("pagina senza limiti silenziosi Accessi, Pasti, Eccezioni e Trasferimenti", async () => {
@@ -2083,7 +2102,9 @@ describe("Modulo Mensa", () => {
       });
     expect(malformed.status).toBe(400);
 
-    const dinnerAccess = await verify(app, fixture);
+    const dinnerAccess = await verify(app, fixture, {
+      tipoServizio: "cena",
+    });
     const dinner = await request(app)
       .post("/mensa/pasti")
       .send({

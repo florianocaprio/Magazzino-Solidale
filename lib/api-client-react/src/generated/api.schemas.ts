@@ -4914,6 +4914,14 @@ export interface MensaNuovaPersonaTemporaneaInput {
   restrizioniAlimentari?: string | null;
 }
 
+export type MensaAccessoTemporaneoInputTipoServizio = typeof MensaAccessoTemporaneoInputTipoServizio[keyof typeof MensaAccessoTemporaneoInputTipoServizio];
+
+
+export const MensaAccessoTemporaneoInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
 /**
  * Indicare esattamente uno tra beneficiarioId e nuovaPersona. L'autorizzazione vale solo per la data civile corrente Europe/Rome.
  */
@@ -4923,6 +4931,7 @@ export interface MensaAccessoTemporaneoInput {
   nuovaPersona?: MensaNuovaPersonaTemporaneaInput;
   /** @nullable */
   motivo?: string | null;
+  tipoServizio?: MensaAccessoTemporaneoInputTipoServizio;
   confermaDuplicato?: boolean;
   /**
      * @minLength 1
@@ -4939,11 +4948,20 @@ export const MensaAccessoInputModalitaAccesso = {
   manuale: 'manuale',
 } as const;
 
+export type MensaAccessoInputTipoServizio = typeof MensaAccessoInputTipoServizio[keyof typeof MensaAccessoInputTipoServizio];
+
+
+export const MensaAccessoInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
 export interface MensaAccessoInput {
   mensaId: number;
   modalitaAccesso: MensaAccessoInputModalitaAccesso;
   codiceTessera?: string;
   beneficiarioId?: number;
+  tipoServizio?: MensaAccessoInputTipoServizio;
   /**
      * @minLength 1
      * @maxLength 80
@@ -4969,6 +4987,17 @@ export const MensaAccessoModalitaAccesso = {
   temporaneo: 'temporaneo',
 } as const;
 
+/**
+ * @nullable
+ */
+export type MensaAccessoTipoServizio = typeof MensaAccessoTipoServizio[keyof typeof MensaAccessoTipoServizio] | null;
+
+
+export const MensaAccessoTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
 export interface MensaAccesso {
   id: number;
   mensaId: number;
@@ -4992,6 +5021,8 @@ export interface MensaAccesso {
   esito: MensaAccessoEsito;
   motivoEsito: string;
   modalitaAccesso: MensaAccessoModalitaAccesso;
+  /** @nullable */
+  tipoServizio?: MensaAccessoTipoServizio;
   temporaneo: boolean;
   dataOra: string;
   /** @nullable */

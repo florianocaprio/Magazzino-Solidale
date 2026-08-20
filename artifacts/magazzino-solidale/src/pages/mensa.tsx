@@ -294,6 +294,7 @@ export function MensaPostazione() {
           mensaId,
           modalitaAccesso: "tessera",
           codiceTessera: code.trim(),
+          tipoServizio,
           idempotencyKey: requestKey("scan"),
         },
       },
@@ -323,6 +324,7 @@ export function MensaPostazione() {
           mensaId,
           modalitaAccesso: "manuale",
           beneficiarioId: beneficiary.id,
+          tipoServizio,
           idempotencyKey: requestKey("manual"),
         },
       },
@@ -410,6 +412,7 @@ export function MensaPostazione() {
           mensaId,
           beneficiarioId: beneficiary.id,
           motivo: temporaryReason.trim() || null,
+          tipoServizio,
           idempotencyKey: requestKey("temporary-existing"),
         },
       },
@@ -432,6 +435,7 @@ export function MensaPostazione() {
         data: {
           mensaId,
           motivo: temporaryReason.trim() || null,
+          tipoServizio,
           confermaDuplicato: confirmDuplicate,
           idempotencyKey: requestKey("temporary-new"),
           nuovaPersona: {

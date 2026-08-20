@@ -60,6 +60,32 @@ ALTER TABLE public.mensa_pasti
   ADD COLUMN IF NOT EXISTS anagrafica_provvisoria_snapshot boolean,
   ADD COLUMN IF NOT EXISTS temporaneo_snapshot boolean;
 
+ALTER TABLE public.mensa_accessi
+  ADD COLUMN IF NOT EXISTS tipo_servizio varchar(40);
+
+DO $audit$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.mensa_accessi'::regclass
+      AND conname = 'mensa_accessi_tipo_servizio_check'
+  ) THEN
+    ALTER TABLE public.mensa_accessi
+      ADD CONSTRAINT mensa_accessi_tipo_servizio_check
+      CHECK (tipo_servizio IS NULL OR tipo_servizio IN ('pranzo', 'cena'))
+      NOT VALID;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.mensa_accessi
+    WHERE tipo_servizio IS NOT NULL
+      AND tipo_servizio NOT IN ('pranzo', 'cena')
+  ) THEN
+    ALTER TABLE public.mensa_accessi
+      VALIDATE CONSTRAINT mensa_accessi_tipo_servizio_check;
+  END IF;
+END
+$audit$;
+
 CREATE TABLE IF NOT EXISTS public.mensa_giornate_servizio (
   id serial PRIMARY KEY,
   mensa_id integer NOT NULL REFERENCES public.mense(id),

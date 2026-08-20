@@ -62,8 +62,11 @@ pasto o riaprire una giornata. Queste operazioni richiedono rispettivamente
 permessi espliciti; i ruoli personalizzati esistenti non vengono modificati.
 
 Le giornate sono identificate da Mensa, data civile Europe/Rome e tipo servizio
-(`pranzo` o `cena`). Dopo la chiusura non sono ammessi nuovi pasti, consumi o
-storni. La riapertura richiede permesso dedicato, motivo obbligatorio e audit.
+(`pranzo` o `cena`). I nuovi accessi memorizzano lo stesso codice servizio, così
+i conteggi di chiusura del pranzo e della cena restano separati; gli accessi
+legacy senza codice non vengono attribuiti arbitrariamente. Dopo la chiusura non
+sono ammessi nuovi pasti, consumi o storni. La riapertura richiede permesso
+dedicato, motivo obbligatorio e audit.
 
 ## Collaudo minimo
 

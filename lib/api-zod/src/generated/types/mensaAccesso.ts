@@ -7,6 +7,7 @@
  */
 import type { MensaAccessoEsito } from './mensaAccessoEsito';
 import type { MensaAccessoModalitaAccesso } from './mensaAccessoModalitaAccesso';
+import type { MensaAccessoTipoServizio } from './mensaAccessoTipoServizio';
 
 export interface MensaAccesso {
   id: number;
@@ -31,6 +32,8 @@ export interface MensaAccesso {
   esito: MensaAccessoEsito;
   motivoEsito: string;
   modalitaAccesso: MensaAccessoModalitaAccesso;
+  /** @nullable */
+  tipoServizio?: MensaAccessoTipoServizio;
   temporaneo: boolean;
   dataOra: Date;
   /** @nullable */
