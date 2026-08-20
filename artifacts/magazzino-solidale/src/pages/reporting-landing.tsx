@@ -32,7 +32,7 @@ const CARDS: LandingCard[] = [
   { section: "centro-ascolto", path: "/report/centro-ascolto", icon: Building2, areas: ["sociale"], modules: ["CENTRO_ASCOLTO"] },
   { section: "emporio", path: "/report/emporio", icon: Store, areas: ["emporio"], modules: ["EMPORIO_SOLIDALE"] },
   { section: "mensa", path: "/report/mensa", icon: Soup, areas: ["mensa"], modules: ["MENSA"], permission: "mensa.reports.view" },
-  { section: "uds", path: "/report/uds", icon: Footprints, areas: ["uds"], modules: ["UDS"] },
+  { section: "uds", path: "/report/uds", icon: Footprints, areas: ["uds"], modules: ["UDS"], permission: "uds.reports.view" },
   { section: "magazzino-logistica", path: "/report/magazzino-logistica", icon: Warehouse, areas: ["magazzino", "logistica"], anyModule: ["MAGAZZINO_SOLIDALE", "LOTTI", "TRASFERIMENTI", "MEZZI", "FORNITORI", "APPROVVIGIONAMENTI"] },
   {
     section: "fse-plus",

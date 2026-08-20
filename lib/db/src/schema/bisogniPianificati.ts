@@ -4,12 +4,15 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   serial,
+  text,
   timestamp,
   varchar,
 } from "drizzle-orm/pg-core";
 import { interventiTable } from "./interventi";
+import { utentiTable } from "./auth";
 
 export const bisogniPianificatiTable = pgTable(
   "bisogni_pianificati",
@@ -24,6 +27,7 @@ export const bisogniPianificatiTable = pgTable(
     dataPrevista: date("data_prevista"),
     priorita: varchar("priorita", { length: 20 }).notNull().default("normale"),
     note: varchar("note", { length: 2000 }),
+    versione: integer("versione").notNull().default(1),
     dataCompletamento: timestamp("data_completamento"),
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
     dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
@@ -54,3 +58,34 @@ export const bisogniPianificatiTable = pgTable(
 export type BisognoPianificato = typeof bisogniPianificatiTable.$inferSelect;
 export type InsertBisognoPianificato =
   typeof bisogniPianificatiTable.$inferInsert;
+
+export const bisogniPianificatiStoricoTable = pgTable(
+  "bisogni_pianificati_storico",
+  {
+    id: serial("id").primaryKey(),
+    bisognoId: integer("bisogno_id")
+      .notNull()
+      .references(() => bisogniPianificatiTable.id, { onDelete: "cascade" }),
+    statoPrecedente: varchar("stato_precedente", { length: 30 }),
+    statoNuovo: varchar("stato_nuovo", { length: 30 }).notNull(),
+    operatoreId: integer("operatore_id").references(() => utentiTable.id),
+    dataTransizione: timestamp("data_transizione", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    motivo: text("motivo"),
+    valorePrecedente: jsonb("valore_precedente").$type<Record<
+      string,
+      unknown
+    > | null>(),
+    valoreNuovo: jsonb("valore_nuovo").$type<Record<string, unknown> | null>(),
+  },
+  (table) => [
+    index("bisogni_pianificati_storico_bisogno_idx").on(
+      table.bisognoId,
+      table.id,
+    ),
+  ],
+);
+
+export type BisognoPianificatoStorico =
+  typeof bisogniPianificatiStoricoTable.$inferSelect;

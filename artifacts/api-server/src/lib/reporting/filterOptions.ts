@@ -67,7 +67,7 @@ export async function buildReportFilterOptions(
   const socialSource = hasArea("sociale") && centroAscolto;
   const emporioSource = hasArea("emporio") && emporio;
   const mensaSource = hasArea("mensa") && hasPermission("mensa.reports.view") && mensa;
-  const udsSource = hasArea("uds") && uds;
+  const udsSource = hasArea("uds") && hasPermission("uds.reports.view") && uds;
   const logisticsSource =
     (hasArea("magazzino") || hasArea("logistica")) &&
     (magazzino || lotti || trasferimenti);

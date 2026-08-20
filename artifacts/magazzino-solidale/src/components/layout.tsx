@@ -349,7 +349,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "uds",
     area: "uds",
     moduloCodice: "UDS",
-    permission: "beneficiari.view",
+    permission: "uds.directory.view",
   },
   {
     key: "udsInterventi",
@@ -358,6 +358,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "uds",
     area: "uds",
     moduloCodice: "UDS",
+    permission: "uds.interventi.view",
   },
   {
     key: "udsReportGiornaliero",
@@ -366,6 +367,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "uds",
     area: "uds",
     moduloCodice: "UDS",
+    permission: "uds.reports.view",
   },
 
   {
@@ -480,6 +482,7 @@ export const NAV_ITEMS: NavItem[] = [
     area: "analisi",
     sourceAreas: ["uds"],
     moduloCodiciAll: ["REPORT", "UDS"],
+    permission: "uds.reports.view",
   },
   {
     key: "reportLogistica",
@@ -522,6 +525,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "amministrazione",
     area: "amministrazione",
     moduloCodice: "UDS",
+    permission: "uds.directory.view",
   },
   {
     key: "utenti",

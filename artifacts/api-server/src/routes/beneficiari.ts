@@ -31,7 +31,6 @@ import { formatTesseraBeneficiario, issueTesseraBeneficiario, TesseraBeneficiari
 import { requirePermission } from "../middlewares/auth";
 import {
   canAccessBeneficiarioRecord,
-  canViewBeneficiarioRecord,
   hasPermission,
   validateBeneficiarioTerritorialAssignment,
   visibleInterventoAmbiti,
@@ -507,9 +506,7 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   if (requestedZonaId != null) conditions.push(eq(beneficiariTable.zonaUdsId, requestedZonaId as number));
   if (uds === "true") conditions.push(eq(beneficiariTable.uds, true));
   const caller = callerCentroId(req);
-  const areaWideUdsDirectory = req.user?.aree?.includes("uds") === true
-    && req.user?.aree?.includes("sociale") !== true;
-  if (caller != null && !areaWideUdsDirectory) {
+  if (caller != null) {
     const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
     if (f) conditions.push(f);
   } else if (requestedCentroId != null) {
@@ -517,7 +514,7 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   }
   const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
   if (areaOperativaFilter) conditions.push(areaOperativaFilter);
-  const zonaFilter = areaWideUdsDirectory ? undefined : zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
+  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
   if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
   else if (attivo === "false") conditions.push(eq(beneficiariTable.attivo, false));
@@ -697,6 +694,15 @@ router.post("/beneficiari/bulk", requirePermission("beneficiari.manage"), async 
 // MUST stay registered before "/beneficiari/:id" so the literal segment is not
 // captured as an id.
 router.get("/beneficiari/cerca-simili", requirePermission("beneficiari.duplicates.search"), async (req, res) => {
+  if (
+    !req.user?.isAdmin &&
+    !req.user?.isSuperAdmin &&
+    req.user?.aree?.includes("uds") === true &&
+    req.user?.aree?.includes("sociale") !== true
+  ) {
+    res.status(403).json({ error: "Ricerca anagrafica completa non consentita al profilo UDS" });
+    return;
+  }
   const q = req.query as Record<string, string>;
   const search = (q.search ?? "").trim().toLowerCase();
   const nome = (q.nome ?? "").trim();
@@ -829,7 +835,7 @@ router.get("/beneficiari/:id", requirePermission("beneficiari.view"), async (req
   const id = Number(req.params.id);
   const [row] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canViewBeneficiarioRecord(row, req)) {
+  if (!canAccessBeneficiarioRecord(row, req)) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo profilo" });
     return;
   }

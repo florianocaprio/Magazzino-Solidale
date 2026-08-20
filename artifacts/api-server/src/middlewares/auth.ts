@@ -246,7 +246,9 @@ export const requireSuperAdmin: RequestHandler = (req, res, next) => {
  */
 export const areaGuard: RequestHandler = (req, res, next) => {
   const segment = req.path.split("/").filter(Boolean)[0];
-  const mapped = segment ? AREA_BY_SEGMENT[segment] : undefined;
+  const mapped = segment === "report" && req.path.startsWith("/report/uds/")
+    ? "uds"
+    : segment ? AREA_BY_SEGMENT[segment] : undefined;
   if (!mapped) {
     next();
     return;

@@ -117,6 +117,7 @@ describe("InterventoSocialeDetailSheet", () => {
               dataPrevista: "2026-08-20",
               priorita: "alta",
               note: null,
+              versione: 1,
               dataCompletamento: null,
               dataCreazione: "2026-08-14T09:00:00Z",
               dataAggiornamento: "2026-08-14T09:00:00Z",

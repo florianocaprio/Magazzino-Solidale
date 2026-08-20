@@ -54,6 +54,7 @@ import type {
   BeneficiarioUpdate,
   BisognoPianificato,
   BisognoPianificatoInput,
+  BisognoPianificatoStorico,
   BisognoPianificatoUpdate,
   Bolla,
   BollaDettaglio,
@@ -185,6 +186,7 @@ import type {
   ListTrasferimentiMensaParams,
   ListTrasferimentiParams,
   ListTurniParams,
+  ListUdsDirectoryParams,
   ListUtentiParams,
   ListVolontariParams,
   ListZoneUdsParams,
@@ -308,10 +310,15 @@ import type {
   TurnoInput,
   TurnoMezzoPendingInput,
   TurnoVolontarioPendingInput,
+  UdsDirectoryItem,
   UdsInterventiMeseReport,
   UdsInterventiTipoReport,
   UdsInterventiZonaReport,
+  UdsIntervento,
   UdsInterventoGiornaliero,
+  UdsInterventoInput,
+  UdsInterventoNotaInput,
+  UdsInterventoRettificaInput,
   UdsPersonePerZonaReport,
   Utente,
   UtenteInput,
@@ -323,7 +330,8 @@ import type {
   VolontarioUpdate,
   ZonaUds,
   ZonaUdsInput,
-  ZonaUdsUpdate
+  ZonaUdsUpdate,
+  ZonaUdsVersioneInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -6390,6 +6398,499 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getUpdateBisognoPianificatoMutationOptions(options));
     }
 
+export const getListBisognoPianificatoStoricoUrl = (interventoId: number,
+    bisognoId: number,) => {
+
+
+
+
+  return `/api/interventi/${interventoId}/bisogni-pianificati/${bisognoId}/storico`
+}
+
+export const listBisognoPianificatoStorico = async (interventoId: number,
+    bisognoId: number, options?: RequestInit): Promise<BisognoPianificatoStorico[]> => {
+
+  return customFetch<BisognoPianificatoStorico[]>(getListBisognoPianificatoStoricoUrl(interventoId,bisognoId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBisognoPianificatoStoricoQueryKey = (interventoId: number,
+    bisognoId: number,) => {
+    return [
+    `/api/interventi/${interventoId}/bisogni-pianificati/${bisognoId}/storico`
+    ] as const;
+    }
+
+
+export const getListBisognoPianificatoStoricoQueryOptions = <TData = Awaited<ReturnType<typeof listBisognoPianificatoStorico>>, TError = ErrorType<void>>(interventoId: number,
+    bisognoId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBisognoPianificatoStorico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBisognoPianificatoStoricoQueryKey(interventoId,bisognoId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBisognoPianificatoStorico>>> = ({ signal }) => listBisognoPianificatoStorico(interventoId,bisognoId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(interventoId && bisognoId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBisognoPianificatoStorico>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBisognoPianificatoStoricoQueryResult = NonNullable<Awaited<ReturnType<typeof listBisognoPianificatoStorico>>>
+export type ListBisognoPianificatoStoricoQueryError = ErrorType<void>
+
+
+
+export function useListBisognoPianificatoStorico<TData = Awaited<ReturnType<typeof listBisognoPianificatoStorico>>, TError = ErrorType<void>>(
+ interventoId: number,
+    bisognoId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBisognoPianificatoStorico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBisognoPianificatoStoricoQueryOptions(interventoId,bisognoId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListUdsDirectoryUrl = (params?: ListUdsDirectoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/uds/directory?${stringifiedParams}` : `/api/uds/directory`
+}
+
+export const listUdsDirectory = async (params?: ListUdsDirectoryParams, options?: RequestInit): Promise<UdsDirectoryItem[]> => {
+
+  return customFetch<UdsDirectoryItem[]>(getListUdsDirectoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListUdsDirectoryQueryKey = (params?: ListUdsDirectoryParams,) => {
+    return [
+    `/api/uds/directory`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListUdsDirectoryQueryOptions = <TData = Awaited<ReturnType<typeof listUdsDirectory>>, TError = ErrorType<void>>(params?: ListUdsDirectoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUdsDirectory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListUdsDirectoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUdsDirectory>>> = ({ signal }) => listUdsDirectory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUdsDirectory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListUdsDirectoryQueryResult = NonNullable<Awaited<ReturnType<typeof listUdsDirectory>>>
+export type ListUdsDirectoryQueryError = ErrorType<void>
+
+
+
+export function useListUdsDirectory<TData = Awaited<ReturnType<typeof listUdsDirectory>>, TError = ErrorType<void>>(
+ params?: ListUdsDirectoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUdsDirectory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListUdsDirectoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateUdsInterventoUrl = () => {
+
+
+
+
+  return `/api/uds/interventi`
+}
+
+export const createUdsIntervento = async (udsInterventoInput: UdsInterventoInput, options?: RequestInit): Promise<UdsIntervento> => {
+
+  return customFetch<UdsIntervento>(getCreateUdsInterventoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      udsInterventoInput,)
+  }
+);}
+
+
+
+
+export const getCreateUdsInterventoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUdsIntervento>>, TError,{data: BodyType<UdsInterventoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createUdsIntervento>>, TError,{data: BodyType<UdsInterventoInput>}, TContext> => {
+
+const mutationKey = ['createUdsIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createUdsIntervento>>, {data: BodyType<UdsInterventoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createUdsIntervento(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateUdsInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof createUdsIntervento>>>
+    export type CreateUdsInterventoMutationBody = BodyType<UdsInterventoInput>
+    export type CreateUdsInterventoMutationError = ErrorType<void>
+
+    export const useCreateUdsIntervento = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUdsIntervento>>, TError,{data: BodyType<UdsInterventoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createUdsIntervento>>,
+        TError,
+        {data: BodyType<UdsInterventoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateUdsInterventoMutationOptions(options));
+    }
+
+export const getGetUdsInterventoUrl = (id: number,) => {
+
+
+
+
+  return `/api/uds/interventi/${id}`
+}
+
+export const getUdsIntervento = async (id: number, options?: RequestInit): Promise<UdsIntervento> => {
+
+  return customFetch<UdsIntervento>(getGetUdsInterventoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUdsInterventoQueryKey = (id: number,) => {
+    return [
+    `/api/uds/interventi/${id}`
+    ] as const;
+    }
+
+
+export const getGetUdsInterventoQueryOptions = <TData = Awaited<ReturnType<typeof getUdsIntervento>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUdsIntervento>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUdsInterventoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUdsIntervento>>> = ({ signal }) => getUdsIntervento(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUdsIntervento>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUdsInterventoQueryResult = NonNullable<Awaited<ReturnType<typeof getUdsIntervento>>>
+export type GetUdsInterventoQueryError = ErrorType<void>
+
+
+
+export function useGetUdsIntervento<TData = Awaited<ReturnType<typeof getUdsIntervento>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUdsIntervento>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUdsInterventoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListUdsInterventiBeneficiarioUrl = (beneficiarioId: number,) => {
+
+
+
+
+  return `/api/uds/beneficiari/${beneficiarioId}/interventi`
+}
+
+export const listUdsInterventiBeneficiario = async (beneficiarioId: number, options?: RequestInit): Promise<UdsIntervento[]> => {
+
+  return customFetch<UdsIntervento[]>(getListUdsInterventiBeneficiarioUrl(beneficiarioId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListUdsInterventiBeneficiarioQueryKey = (beneficiarioId: number,) => {
+    return [
+    `/api/uds/beneficiari/${beneficiarioId}/interventi`
+    ] as const;
+    }
+
+
+export const getListUdsInterventiBeneficiarioQueryOptions = <TData = Awaited<ReturnType<typeof listUdsInterventiBeneficiario>>, TError = ErrorType<void>>(beneficiarioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUdsInterventiBeneficiario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListUdsInterventiBeneficiarioQueryKey(beneficiarioId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUdsInterventiBeneficiario>>> = ({ signal }) => listUdsInterventiBeneficiario(beneficiarioId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(beneficiarioId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUdsInterventiBeneficiario>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListUdsInterventiBeneficiarioQueryResult = NonNullable<Awaited<ReturnType<typeof listUdsInterventiBeneficiario>>>
+export type ListUdsInterventiBeneficiarioQueryError = ErrorType<void>
+
+
+
+export function useListUdsInterventiBeneficiario<TData = Awaited<ReturnType<typeof listUdsInterventiBeneficiario>>, TError = ErrorType<void>>(
+ beneficiarioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUdsInterventiBeneficiario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListUdsInterventiBeneficiarioQueryOptions(beneficiarioId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateUdsInterventoNotaUrl = (id: number,) => {
+
+
+
+
+  return `/api/uds/interventi/${id}/nota`
+}
+
+export const updateUdsInterventoNota = async (id: number,
+    udsInterventoNotaInput: UdsInterventoNotaInput, options?: RequestInit): Promise<UdsIntervento> => {
+
+  return customFetch<UdsIntervento>(getUpdateUdsInterventoNotaUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      udsInterventoNotaInput,)
+  }
+);}
+
+
+
+
+export const getUpdateUdsInterventoNotaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUdsInterventoNota>>, TError,{id: number;data: BodyType<UdsInterventoNotaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateUdsInterventoNota>>, TError,{id: number;data: BodyType<UdsInterventoNotaInput>}, TContext> => {
+
+const mutationKey = ['updateUdsInterventoNota'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateUdsInterventoNota>>, {id: number;data: BodyType<UdsInterventoNotaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateUdsInterventoNota(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateUdsInterventoNotaMutationResult = NonNullable<Awaited<ReturnType<typeof updateUdsInterventoNota>>>
+    export type UpdateUdsInterventoNotaMutationBody = BodyType<UdsInterventoNotaInput>
+    export type UpdateUdsInterventoNotaMutationError = ErrorType<void>
+
+    export const useUpdateUdsInterventoNota = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUdsInterventoNota>>, TError,{id: number;data: BodyType<UdsInterventoNotaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateUdsInterventoNota>>,
+        TError,
+        {id: number;data: BodyType<UdsInterventoNotaInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateUdsInterventoNotaMutationOptions(options));
+    }
+
+export const getRectifyUdsInterventoUrl = (id: number,) => {
+
+
+
+
+  return `/api/uds/interventi/${id}/rettifica`
+}
+
+export const rectifyUdsIntervento = async (id: number,
+    udsInterventoRettificaInput: UdsInterventoRettificaInput, options?: RequestInit): Promise<UdsIntervento> => {
+
+  return customFetch<UdsIntervento>(getRectifyUdsInterventoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      udsInterventoRettificaInput,)
+  }
+);}
+
+
+
+
+export const getRectifyUdsInterventoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rectifyUdsIntervento>>, TError,{id: number;data: BodyType<UdsInterventoRettificaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rectifyUdsIntervento>>, TError,{id: number;data: BodyType<UdsInterventoRettificaInput>}, TContext> => {
+
+const mutationKey = ['rectifyUdsIntervento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rectifyUdsIntervento>>, {id: number;data: BodyType<UdsInterventoRettificaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  rectifyUdsIntervento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RectifyUdsInterventoMutationResult = NonNullable<Awaited<ReturnType<typeof rectifyUdsIntervento>>>
+    export type RectifyUdsInterventoMutationBody = BodyType<UdsInterventoRettificaInput>
+    export type RectifyUdsInterventoMutationError = ErrorType<void>
+
+    export const useRectifyUdsIntervento = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rectifyUdsIntervento>>, TError,{id: number;data: BodyType<UdsInterventoRettificaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rectifyUdsIntervento>>,
+        TError,
+        {id: number;data: BodyType<UdsInterventoRettificaInput>},
+        TContext
+      > => {
+      return useMutation(getRectifyUdsInterventoMutationOptions(options));
+    }
+
 export const getListConsegneUrl = (params?: ListConsegneParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -11642,14 +12143,16 @@ export const getDeleteZonaUdsUrl = (id: number,) => {
   return `/api/zone-uds/${id}`
 }
 
-export const deleteZonaUds = async (id: number, options?: RequestInit): Promise<void> => {
+export const deleteZonaUds = async (id: number,
+    zonaUdsVersioneInput: ZonaUdsVersioneInput, options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getDeleteZonaUdsUrl(id),
   {
     ...options,
-    method: 'DELETE'
-
-
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      zonaUdsVersioneInput,)
   }
 );}
 
@@ -11657,8 +12160,8 @@ export const deleteZonaUds = async (id: number, options?: RequestInit): Promise<
 
 
 export const getDeleteZonaUdsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number;data: BodyType<ZonaUdsVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number;data: BodyType<ZonaUdsVersioneInput>}, TContext> => {
 
 const mutationKey = ['deleteZonaUds'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -11670,10 +12173,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteZonaUds>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteZonaUds>>, {id: number;data: BodyType<ZonaUdsVersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  deleteZonaUds(id,requestOptions)
+          return  deleteZonaUds(id,data,requestOptions)
         }
 
 
@@ -11684,15 +12187,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteZonaUdsMutationResult = NonNullable<Awaited<ReturnType<typeof deleteZonaUds>>>
-
+    export type DeleteZonaUdsMutationBody = BodyType<ZonaUdsVersioneInput>
     export type DeleteZonaUdsMutationError = ErrorType<unknown>
 
     export const useDeleteZonaUds = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteZonaUds>>, TError,{id: number;data: BodyType<ZonaUdsVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteZonaUds>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<ZonaUdsVersioneInput>},
         TContext
       > => {
       return useMutation(getDeleteZonaUdsMutationOptions(options));

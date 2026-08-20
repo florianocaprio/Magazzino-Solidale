@@ -6,11 +6,13 @@ vi.mock("@workspace/api-client-react", () => ({
   getCercaBeneficiariSimiliQueryKey: () => ["beneficiari", "cerca-simili"],
   getListBeneficiariQueryKey: () => ["beneficiari"],
   getListAreeOperativeQueryKey: () => ["areaOperativa"],
+  getListUdsDirectoryQueryKey: () => ["uds", "directory"],
   useCercaBeneficiariSimili: () => ({ data: [], isFetching: false }),
   useCreateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useListCentriAscolto: () => ({ data: [] }),
   useListAreeOperative: () => ({ data: [{ id: 1, nome: "Roma" }] }),
   useListZoneUds: () => ({ data: [{ id: 10, nome: "Zona test" }] }),
+  useListUdsDirectory: () => ({ data: [], isFetching: false }),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -81,8 +83,12 @@ describe("UdsPersonaSheet", () => {
     ).toBeGreaterThan(0);
     expect(onOpenChange).not.toHaveBeenCalled();
 
-    const fasciaPreview = document.querySelector('[data-testid="fascia-eta-corrente"]');
-    expect(fasciaPreview?.textContent).toContain("udsAnagrafica.fasciaEta.non_determinata");
+    const fasciaPreview = document.querySelector(
+      '[data-testid="fascia-eta-corrente"]',
+    );
+    expect(fasciaPreview?.textContent).toContain(
+      "udsAnagrafica.fasciaEta.non_determinata",
+    );
     expect(fasciaPreview?.textContent).toContain(
       "udsAnagrafica.fasciaEtaOrigine.non_determinata",
     );
@@ -100,9 +106,15 @@ describe("UdsPersonaSheet", () => {
       valueSetter?.call(dataNascitaInput, birthDateAge20);
       dataNascitaInput?.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(fasciaPreview?.textContent).toContain("udsAnagrafica.fasciaEta.18_29");
-    expect(fasciaPreview?.textContent).toContain("udsAnagrafica.fasciaEtaOrigine.calcolata");
-    expect(fasciaPreview?.textContent).toContain("udsAnagrafica.fasciaEtaCalcolataHint");
+    expect(fasciaPreview?.textContent).toContain(
+      "udsAnagrafica.fasciaEta.18_29",
+    );
+    expect(fasciaPreview?.textContent).toContain(
+      "udsAnagrafica.fasciaEtaOrigine.calcolata",
+    );
+    expect(fasciaPreview?.textContent).toContain(
+      "udsAnagrafica.fasciaEtaCalcolataHint",
+    );
 
     const nomeInput =
       document.querySelector<HTMLInputElement>('input[name="nome"]');
@@ -129,7 +141,8 @@ describe("UdsPersonaSheet", () => {
       document.querySelector<HTMLInputElement>('input[name="nome"]')?.value,
     ).toBe("");
     expect(
-      document.querySelector('[data-testid="fascia-eta-corrente"]')?.textContent,
+      document.querySelector('[data-testid="fascia-eta-corrente"]')
+        ?.textContent,
     ).toContain("udsAnagrafica.fasciaEta.non_determinata");
     expect(onOpenChange).not.toHaveBeenCalled();
 

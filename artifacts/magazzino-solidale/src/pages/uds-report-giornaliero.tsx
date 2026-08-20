@@ -19,6 +19,7 @@ import { CalendarClock, FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { exportUdsReportGiornalieroPdf } from "@/lib/uds-report-pdf";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 const ALL = "all";
 type Mode = "day" | "range";
@@ -29,7 +30,7 @@ export default function UdsReportGiornaliero() {
   const isGlobalAreaOperativa = (user?.areaOperativaId ?? null) == null;
   const lockedZonaId = user?.zonaUdsId ?? null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayEuropeRome();
   const [mode, setMode] = useState<Mode>("day");
   const [da, setDa] = useState(today);
   const [a, setA] = useState(today);

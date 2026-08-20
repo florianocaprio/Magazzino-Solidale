@@ -88,6 +88,13 @@ export function makeScopedApp(
         "sociale.interventi.update",
         "sociale.interventi.complete",
         "sociale.interventi.cancel",
+        "uds.directory.view",
+        "uds.interventi.view",
+        "uds.interventi.create",
+        "uds.interventi.update",
+        "uds.interventi.note",
+        "uds.bisogni.manage",
+        "uds.reports.view",
         "magazzino.view",
         "magazzino.products.manage",
         "magazzino.stock.receive",
@@ -548,7 +555,14 @@ export async function insertPrenotazioneMagazzino(
 
 export async function insertIntervento(
   scope: SeedScope,
-  opts: { beneficiarioId: number; dataIntervento?: string; tipoIntervento?: string },
+  opts: {
+    beneficiarioId: number;
+    dataIntervento?: string;
+    tipoIntervento?: string;
+    ambito?: "sociale" | "uds" | null;
+    areaOperativaIdSnapshot?: number | null;
+    zonaUdsIdSnapshot?: number | null;
+  },
 ): Promise<number> {
   const [i] = await db
     .insert(interventiTable)
@@ -556,6 +570,9 @@ export async function insertIntervento(
       beneficiarioId: opts.beneficiarioId,
       dataIntervento: opts.dataIntervento ?? "2026-06-01",
       tipoIntervento: opts.tipoIntervento ?? "pacco_alimentare",
+      ambito: opts.ambito,
+      areaOperativaIdSnapshot: opts.areaOperativaIdSnapshot,
+      zonaUdsIdSnapshot: opts.zonaUdsIdSnapshot,
     })
     .returning({ id: interventiTable.id });
   scope.interventoIds.push(i.id);

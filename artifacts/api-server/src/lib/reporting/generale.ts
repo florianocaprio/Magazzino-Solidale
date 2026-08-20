@@ -32,12 +32,16 @@ async function activeSources(filters: ReportFilters): Promise<ActiveSources> {
     filters.callerIsAdmin ||
     (filters.callerAreas.includes("mensa") &&
       filters.callerPermissions.includes("mensa.reports.view"));
+  const canReadUds =
+    filters.callerIsAdmin ||
+    (filters.callerAreas.includes("uds") &&
+      filters.callerPermissions.includes("uds.reports.view"));
   return {
     pacchi: magazzino && bolle && canRead("sociale"),
     sociale: sociale && canRead("sociale"),
     emporio: emporio && canRead("emporio"),
     mensa: mensa && canReadMensa,
-    uds: uds && canRead("uds"),
+    uds: uds && canReadUds,
   };
 }
 
@@ -69,7 +73,7 @@ function eventUnions(filters: ReportFilters, active: ActiveSources): SQL[] {
   }
   if (active.uds) {
     unions.push(sql`SELECT i.beneficiario_id, ${udsEventDate} AS giorno, 'uds'::text AS area,
-      be.area_operativa_id, be.centro_ascolto_id
+      i.area_operativa_id_snapshot AS area_operativa_id, NULL::integer AS centro_ascolto_id
       FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
       WHERE ${andSql(udsBaseConditions(filters))}
         AND ${udsEventDate} BETWEEN ${filters.da} AND ${filters.a}`);

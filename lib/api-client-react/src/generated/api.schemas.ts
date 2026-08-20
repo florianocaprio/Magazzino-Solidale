@@ -1665,6 +1665,10 @@ export interface Intervento {
   /** @nullable */
   areaOperativaId: number | null;
   /** @nullable */
+  areaOperativaIdSnapshot?: number | null;
+  /** @nullable */
+  zonaUdsIdSnapshot?: number | null;
+  /** @nullable */
   dataIntervento: string | null;
   tipoIntervento: string;
   /** @nullable */
@@ -2555,6 +2559,9 @@ export interface ZonaUds {
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
+  /** @minimum 1 */
+  versione: number;
+  dataAggiornamento: string;
 }
 
 export interface ZonaUdsInput {
@@ -2571,6 +2578,199 @@ export interface ZonaUdsUpdate {
   nome?: string;
   attivo?: boolean;
   note?: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface ZonaUdsVersioneInput {
+  /** @minimum 1 */
+  versione: number;
+}
+
+export type UdsDirectoryItemFasciaEtaCorrente = typeof UdsDirectoryItemFasciaEtaCorrente[keyof typeof UdsDirectoryItemFasciaEtaCorrente];
+
+
+export const UdsDirectoryItemFasciaEtaCorrente = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+export type UdsDirectoryItemCanale = typeof UdsDirectoryItemCanale[keyof typeof UdsDirectoryItemCanale];
+
+
+export const UdsDirectoryItemCanale = {
+  uds: 'uds',
+  uds_centro: 'uds_centro',
+} as const;
+
+/**
+ * Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.
+ */
+export interface UdsDirectoryItem {
+  id: number;
+  codice: string;
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  soprannome: string | null;
+  fasciaEtaCorrente: UdsDirectoryItemFasciaEtaCorrente;
+  /** @nullable */
+  zonaUdsId: number | null;
+  /** @nullable */
+  zonaUdsNome: string | null;
+  canale: UdsDirectoryItemCanale;
+  accessoCompleto: boolean;
+}
+
+export type UdsInterventoStato = typeof UdsInterventoStato[keyof typeof UdsInterventoStato];
+
+
+export const UdsInterventoStato = {
+  concluso: 'concluso',
+} as const;
+
+export type UdsInterventoAmbito = typeof UdsInterventoAmbito[keyof typeof UdsInterventoAmbito];
+
+
+export const UdsInterventoAmbito = {
+  uds: 'uds',
+} as const;
+
+export interface UdsIntervento {
+  id: number;
+  beneficiarioId: number;
+  /** @nullable */
+  operatoreId: number | null;
+  /** @nullable */
+  dataIntervento: string | null;
+  tipoIntervento: string;
+  /** @nullable */
+  descrizione: string | null;
+  /** @nullable */
+  note: string | null;
+  /** @nullable */
+  noteUds: string | null;
+  stato: UdsInterventoStato;
+  ambito: UdsInterventoAmbito;
+  /** @nullable */
+  areaOperativaIdSnapshot: number | null;
+  /** @nullable */
+  zonaUdsIdSnapshot: number | null;
+  /** @nullable */
+  dataOraConclusione: string | null;
+  dataCreazione: string;
+  /** @nullable */
+  dataAggiornamento: string | null;
+  /** @nullable */
+  versione: string | null;
+}
+
+export type BisognoPianificatoInputTipo = typeof BisognoPianificatoInputTipo[keyof typeof BisognoPianificatoInputTipo];
+
+
+export const BisognoPianificatoInputTipo = {
+  richiesta: 'richiesta',
+  azione: 'azione',
+} as const;
+
+export type BisognoPianificatoInputStato = typeof BisognoPianificatoInputStato[keyof typeof BisognoPianificatoInputStato];
+
+
+export const BisognoPianificatoInputStato = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+export type BisognoPianificatoInputPriorita = typeof BisognoPianificatoInputPriorita[keyof typeof BisognoPianificatoInputPriorita];
+
+
+export const BisognoPianificatoInputPriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export interface BisognoPianificatoInput {
+  tipo: BisognoPianificatoInputTipo;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  descrizione: string;
+  stato?: BisognoPianificatoInputStato;
+  /** @nullable */
+  dataPrevista?: string | null;
+  priorita?: BisognoPianificatoInputPriorita;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
+}
+
+export interface UdsInterventoInput {
+  beneficiarioId: number;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  tipoIntervento: string;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  descrizione?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  note?: string | null;
+  bisogniPianificati?: BisognoPianificatoInput[];
+}
+
+export interface UdsInterventoNotaInput {
+  versione: string;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  noteUds?: string | null;
+}
+
+export interface UdsInterventoRettificaInput {
+  versione: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  tipoIntervento?: string;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  descrizione?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  note?: string | null;
+  dataIntervento?: string;
 }
 
 export interface CentroAscolto {
@@ -3073,6 +3273,8 @@ export const BisognoPianificatoUpsertPriorita = {
 
 export interface BisognoPianificatoUpsert {
   id?: number;
+  /** @minimum 1 */
+  versione?: number;
   tipo: BisognoPianificatoUpsertTipo;
   /**
      * @minLength 1
@@ -3088,6 +3290,11 @@ export interface BisognoPianificatoUpsert {
      * @nullable
      */
   note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
 }
 
 export interface InterventoInput {
@@ -3157,7 +3364,6 @@ export interface InterventoUpdate {
   esito?: string;
   prossimAzione?: string;
   note?: string;
-  noteUds?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;
@@ -3544,56 +3750,12 @@ export interface BisognoPianificato {
      * @nullable
      */
   note: string | null;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   dataCompletamento: string | null;
   dataCreazione: string;
   dataAggiornamento: string;
-}
-
-export type BisognoPianificatoInputTipo = typeof BisognoPianificatoInputTipo[keyof typeof BisognoPianificatoInputTipo];
-
-
-export const BisognoPianificatoInputTipo = {
-  richiesta: 'richiesta',
-  azione: 'azione',
-} as const;
-
-export type BisognoPianificatoInputStato = typeof BisognoPianificatoInputStato[keyof typeof BisognoPianificatoInputStato];
-
-
-export const BisognoPianificatoInputStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  completato: 'completato',
-  annullato: 'annullato',
-} as const;
-
-export type BisognoPianificatoInputPriorita = typeof BisognoPianificatoInputPriorita[keyof typeof BisognoPianificatoInputPriorita];
-
-
-export const BisognoPianificatoInputPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
-} as const;
-
-export interface BisognoPianificatoInput {
-  tipo: BisognoPianificatoInputTipo;
-  /**
-     * @minLength 1
-     * @maxLength 500
-     */
-  descrizione: string;
-  stato?: BisognoPianificatoInputStato;
-  /** @nullable */
-  dataPrevista?: string | null;
-  priorita?: BisognoPianificatoInputPriorita;
-  /**
-     * @maxLength 2000
-     * @nullable
-     */
-  note?: string | null;
 }
 
 export type BisognoPianificatoUpdateTipo = typeof BisognoPianificatoUpdateTipo[keyof typeof BisognoPianificatoUpdateTipo];
@@ -3625,6 +3787,8 @@ export const BisognoPianificatoUpdatePriorita = {
 } as const;
 
 export interface BisognoPianificatoUpdate {
+  /** @minimum 1 */
+  versione: number;
   tipo?: BisognoPianificatoUpdateTipo;
   /**
      * @minLength 1
@@ -3640,6 +3804,47 @@ export interface BisognoPianificatoUpdate {
      * @nullable
      */
   note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
+}
+
+export type BisognoPianificatoStoricoStatoNuovo = typeof BisognoPianificatoStoricoStatoNuovo[keyof typeof BisognoPianificatoStoricoStatoNuovo];
+
+
+export const BisognoPianificatoStoricoStatoNuovo = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+/**
+ * @nullable
+ */
+export type BisognoPianificatoStoricoValorePrecedente = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type BisognoPianificatoStoricoValoreNuovo = { [key: string]: unknown } | null;
+
+export interface BisognoPianificatoStorico {
+  id: number;
+  bisognoId: number;
+  statoPrecedente: 'da_pianificare' | 'pianificato' | 'completato' | 'annullato' | null;
+  statoNuovo: BisognoPianificatoStoricoStatoNuovo;
+  /** @nullable */
+  operatoreId: number | null;
+  dataTransizione: string;
+  /** @nullable */
+  motivo: string | null;
+  /** @nullable */
+  valorePrecedente: BisognoPianificatoStoricoValorePrecedente;
+  /** @nullable */
+  valoreNuovo: BisognoPianificatoStoricoValoreNuovo;
 }
 
 export type AccessoEmporioStato = typeof AccessoEmporioStato[keyof typeof AccessoEmporioStato];
@@ -6133,6 +6338,28 @@ export const GetMaterialeDaPrepararePeriodo = {
   personalizzato: 'personalizzato',
 } as const;
 
+export type ListUdsDirectoryParams = {
+/**
+ * @minLength 2
+ * @maxLength 120
+ */
+search?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * Disponibile soltanto ai profili amministrativi globali.
+ */
+areaOperativaId?: number;
+zonaUdsId?: number;
+};
+
 export type ListConsegneParams = {
 stato?: string;
 data?: string;
@@ -6275,6 +6502,10 @@ a?: MapsAParameter;
 
 export type ListZoneUdsParams = {
 areaOperativaId?: number;
+/**
+ * Riservato ai profili amministrativi.
+ */
+includiInattive?: boolean;
 };
 
 export type ListSuperAdminAuditConfigurazioniParams = {

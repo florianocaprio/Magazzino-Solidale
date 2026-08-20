@@ -402,7 +402,7 @@ function AppRoutes() {
           {() => (
             <Guard area="sociale">
               <RequireModulo codice="CENTRO_ASCOLTO">
-                <RequirePermission permission="beneficiari.view">
+                <RequirePermission permission="uds.directory.view">
                   <Beneficiari />
                 </RequirePermission>
               </RequireModulo>
@@ -521,7 +521,9 @@ function AppRoutes() {
           {() => (
             <Guard area="uds">
               <RequireModulo codice="UDS">
-                <UdsInterventi />
+                <RequirePermission permission="uds.interventi.view">
+                  <UdsInterventi />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -530,7 +532,9 @@ function AppRoutes() {
           {() => (
             <Guard area="uds">
               <RequireModulo codice="UDS">
-                <UdsReportGiornaliero />
+                <RequirePermission permission="uds.reports.view">
+                  <UdsReportGiornaliero />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -654,6 +658,7 @@ function AppRoutes() {
                   section="uds"
                   areas={["uds"]}
                   modules={["UDS"]}
+                  permission="uds.reports.view"
                 />
               </RequireModulo>
             </Guard>
@@ -705,6 +710,7 @@ function AppRoutes() {
                   section="uds"
                   areas={["uds"]}
                   modules={["UDS"]}
+                  permission="uds.reports.view"
                 />
               </RequireModulo>
             </Guard>
@@ -721,7 +727,9 @@ function AppRoutes() {
           {() => (
             <Guard area="amministrazione">
               <RequireModulo codice="UDS">
-                <ZoneUds />
+                <RequirePermission permission="uds.directory.view">
+                  <ZoneUds />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}

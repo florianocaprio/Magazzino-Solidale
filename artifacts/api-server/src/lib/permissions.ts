@@ -102,6 +102,16 @@ export const SOCIALE_INTERVENTI_PERMISSIONS = [
   },
 ] as const;
 
+export const UDS_PERMISSIONS = [
+  { key: "uds.directory.view", label: "UDS: directory minimizzata" },
+  { key: "uds.interventi.view", label: "UDS: consultazione interventi" },
+  { key: "uds.interventi.create", label: "UDS: registrazione interventi" },
+  { key: "uds.interventi.update", label: "UDS: rettifica interventi" },
+  { key: "uds.interventi.note", label: "UDS: annotazioni operative" },
+  { key: "uds.bisogni.manage", label: "UDS: gestione Bisogni Pianificati" },
+  { key: "uds.reports.view", label: "UDS: consultazione report" },
+] as const;
+
 export const MAPS_PERMISSIONS = [
   {
     key: "maps.route",
@@ -165,6 +175,7 @@ export const ALL_PERMISSIONS = [
   ...EMPORIO_ACCESS_PERMISSIONS,
   ...EMPORIO_CASSA_SALES_PERMISSIONS,
   ...SOCIALE_INTERVENTI_PERMISSIONS,
+  ...UDS_PERMISSIONS,
   ...MAPS_PERMISSIONS,
   ...MAGAZZINO_PERMISSIONS,
   ...BOLLE_PERMISSIONS,

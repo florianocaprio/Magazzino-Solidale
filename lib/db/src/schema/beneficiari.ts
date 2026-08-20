@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, serial, varchar, text, boolean, timestamp, integer, date, decimal, check } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, boolean, timestamp, integer, date, decimal, check, foreignKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areeOperativeTable } from "./areeOperative";
@@ -61,6 +61,12 @@ export const beneficiariTable = pgTable("beneficiari", {
   dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
 }, (table) => [
   check("beneficiari_stato_anagrafica_check", sql`${table.statoAnagrafica} in ('provvisoria', 'completa')`),
+  check("beneficiari_zona_richiede_area_check", sql`${table.zonaUdsId} is null or ${table.areaOperativaId} is not null`),
+  foreignKey({
+    name: "beneficiari_zona_area_fk",
+    columns: [table.zonaUdsId, table.areaOperativaId],
+    foreignColumns: [zoneUdsTable.id, zoneUdsTable.areaOperativaId],
+  }),
 ]);
 
 export const nucleoFamiliareTable = pgTable("nucleo_familiare", {

@@ -12,4 +12,6 @@ export interface ZonaUdsUpdate {
   nome?: string;
   attivo?: boolean;
   note?: string;
+  /** @minimum 1 */
+  versione: number;
 }

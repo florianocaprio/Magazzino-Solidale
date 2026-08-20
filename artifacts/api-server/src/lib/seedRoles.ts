@@ -1,7 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db, ruoliTable } from "@workspace/db";
 import { ALL_AREA_KEYS, EMPORIO_AREA_KEY, MENSA_AREA_KEY } from "./areas";
-import { ALL_PERMISSION_KEYS, MENSA_PERMISSIONS } from "./permissions";
+import {
+  ALL_PERMISSION_KEYS,
+  MENSA_PERMISSIONS,
+  UDS_PERMISSIONS,
+} from "./permissions";
 import { logger } from "./logger";
 
 export const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
@@ -39,6 +43,7 @@ const UDS_OPERATOR_PERMISSIONS = [
   "beneficiari.view",
   "beneficiari.manage",
   "beneficiari.duplicates.search",
+  ...UDS_PERMISSIONS.map((permission) => permission.key),
 ] as const;
 const EMPORIO_OPERATOR_PERMISSIONS = [
   "credito.view",

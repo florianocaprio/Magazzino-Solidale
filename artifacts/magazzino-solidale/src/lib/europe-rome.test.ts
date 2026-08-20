@@ -12,6 +12,11 @@ describe("date civili Europe/Rome", () => {
     expect(civilDateEuropeRome("2026-08-14T22:00:00Z")).toBe("2026-08-15");
   });
 
+  it("usa il confine CET invernale indipendentemente dal timezone del processo", () => {
+    expect(civilDateEuropeRome("2026-01-14T22:59:59.999Z")).toBe("2026-01-14");
+    expect(civilDateEuropeRome("2026-01-14T23:00:00.000Z")).toBe("2026-01-15");
+  });
+
   it("rifiuta l'ora inesistente al passaggio all'ora legale", () => {
     expect(() => dateTimeEuropeRomeToIso("2026-03-29", "02:30")).toThrow(
       "non esistono",

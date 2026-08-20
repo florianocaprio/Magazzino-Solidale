@@ -6,7 +6,7 @@ import { pacchiConditions } from "./pacchi";
 import { socialCompletedConditions, socialEventDate } from "./centroAscolto";
 import { accessConditions, speseConditions } from "./emporio";
 import { mealConditions, mensaAccessConditions } from "./mensa";
-import { udsBaseConditions, udsIdentityConditions, udsEventDate } from "./uds";
+import { udsBaseConditions, udsEventDate } from "./uds";
 import { movementConditions, transferCondition } from "./logistica";
 import { fseBollaSourceCondition } from "./fsePlus";
 
@@ -252,6 +252,12 @@ function detailDefinition(
   if (section === "uds") {
     if (metric === "personeUniche" || metric === "primiContatti") {
       const periodFilters: SQL[] = [sql`giorno BETWEEN ${filters.da} AND ${filters.a}`];
+      if (filters.areaOperativaId != null && filters.areaOperativaMode !== "all") {
+        periodFilters.push(sql`area_operativa_id_snapshot = ${filters.areaOperativaId}`);
+      }
+      if (filters.zonaUdsId != null && filters.zonaMode === "query") {
+        periodFilters.push(sql`zona_uds_id_snapshot = ${filters.zonaUdsId}`);
+      }
       if (filters.operatoreId != null) periodFilters.push(sql`operatore_id = ${filters.operatoreId}`);
       if (filters.tipoIntervento) periodFilters.push(sql`${filters.tipoIntervento} = ANY(regexp_split_to_array(tipo_intervento, '\s*,\s*'))`);
       if (metric === "primiContatti") periodFilters.push(sql`numero = 1`);
@@ -260,10 +266,11 @@ function detailDefinition(
         query: sql`
           WITH sequenza AS (
             SELECT i.id, i.beneficiario_id, i.operatore_id, i.tipo_intervento,
+                   i.area_operativa_id_snapshot, i.zona_uds_id_snapshot,
                    ${udsEventDate} AS giorno,
                    row_number() OVER (PARTITION BY i.beneficiario_id ORDER BY ${udsEventDate}, i.id) AS numero
-            FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
-            WHERE ${andSql(udsIdentityConditions(filters))}
+            FROM interventi i
+            WHERE i.ambito = 'uds'
           ), periodo AS (
             SELECT * FROM sequenza WHERE ${andSql(periodFilters)}
           )
@@ -282,7 +289,7 @@ function detailDefinition(
                COALESCE(u.matricola, u.username) AS operatore,
                COUNT(*) OVER() AS full_count
         FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
-        LEFT JOIN zone_uds z ON z.id = be.zona_uds_id LEFT JOIN utenti u ON u.id = i.operatore_id
+        LEFT JOIN zone_uds z ON z.id = i.zona_uds_id_snapshot LEFT JOIN utenti u ON u.id = i.operatore_id
         WHERE ${andSql(udsBaseConditions(filters))}
           AND ${udsEventDate} BETWEEN ${filters.da} AND ${filters.a}
         ORDER BY ${udsEventDate} DESC, i.id DESC ${pagination}

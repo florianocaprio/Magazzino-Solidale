@@ -1,17 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  getGetBeneficiarioQueryKey,
-  getListBeneficiariQueryKey,
   getListAreeOperativeQueryKey,
-  type BeneficiarioDirectory,
-  type ListBeneficiariParams,
-  useListBeneficiari,
+  listUdsDirectory,
+  type ListUdsDirectoryParams,
+  type UdsDirectoryItem,
+  useListUdsDirectory,
   useListAreeOperative,
   useListZoneUds,
-  useUpdateBeneficiarioStato,
-  useAuthorizeBeneficiariExport,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Footprints, Plus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
@@ -28,7 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -38,18 +33,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { UdsPersonaSheet } from "@/components/uds-persona-sheet";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
-import { BENEFICIARI_PAGE_SIZE, fetchAllBeneficiariPages } from "@/lib/beneficiari-pagination";
+import { fasciaEtaLabel } from "@/lib/fascia-eta";
+
+const DIRECTORY_PAGE_SIZE = 50;
+
+async function fetchAllUdsDirectoryPages(
+  params: Omit<ListUdsDirectoryParams, "page" | "limit">,
+): Promise<UdsDirectoryItem[]> {
+  const all: UdsDirectoryItem[] = [];
+  for (let page = 1; ; page += 1) {
+    const rows = await listUdsDirectory({
+      ...params,
+      page,
+      limit: DIRECTORY_PAGE_SIZE,
+    });
+    all.push(...rows);
+    if (rows.length < DIRECTORY_PAGE_SIZE) return all;
+  }
+}
 
 const ALL_ZONE = "__all__";
 
 export default function UdsAnagrafica() {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
   const isGlobal = user?.areaOperativaId == null;
   const [filterAreaOperativa, setFilterAreaOperativa] = useState("");
   const [filterZona, setFilterZona] = useState(
@@ -68,77 +76,72 @@ export default function UdsAnagrafica() {
       : undefined
     : (user?.areaOperativaId ?? undefined);
   const { data: zoneList } = useListZoneUds(
-    effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : undefined,
-    { query: { queryKey: ["zoneUds", effectiveAreaOperativa], enabled: effectiveAreaOperativa != null } },
+    effectiveAreaOperativa
+      ? { areaOperativaId: effectiveAreaOperativa }
+      : undefined,
+    {
+      query: {
+        queryKey: ["zoneUds", effectiveAreaOperativa],
+        enabled: effectiveAreaOperativa != null,
+      },
+    },
   );
 
-  const listFilters = useMemo<ListBeneficiariParams>(() => ({
-    uds: true,
-    ...(search.trim() ? { search: search.trim() } : {}),
-    ...(isGlobal && effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : {}),
-    ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
-  }), [effectiveAreaOperativa, filterZona, isGlobal, search]);
+  const listFilters = useMemo<ListUdsDirectoryParams>(
+    () => ({
+      ...(search.trim() ? { search: search.trim() } : {}),
+      ...(isGlobal && effectiveAreaOperativa
+        ? { areaOperativaId: effectiveAreaOperativa }
+        : {}),
+      ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
+    }),
+    [effectiveAreaOperativa, filterZona, isGlobal, search],
+  );
   useEffect(() => setPage(1), [listFilters]);
-  const { data: beneficiari, isLoading } = useListBeneficiari({
+  const { data: beneficiari, isLoading } = useListUdsDirectory({
     ...listFilters,
     page,
-    limit: BENEFICIARI_PAGE_SIZE,
+    limit: DIRECTORY_PAGE_SIZE,
   });
-  const updateBenef = useUpdateBeneficiarioStato();
-  const authorizeExport = useAuthorizeBeneficiariExport();
 
-  const toggleStatus = (beneficiario: { id: number; attivo: boolean; versione: number }) => {
-    updateBenef.mutate(
-      { id: beneficiario.id, data: { attivo: !beneficiario.attivo, versione: beneficiario.versione } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(beneficiario.id) });
-          toast({
-            title: beneficiario.attivo
-              ? t("beneficiari.toastDisattivato")
-              : t("beneficiari.toastAttivato"),
-          });
-        },
-      },
-    );
-  };
-
-  const canale = (beneficiario: BeneficiarioDirectory) => {
-    const uds = beneficiario.uds;
-    const centro = beneficiario.centroAscoltoId != null;
-    if (uds && centro) {
+  const canale = (beneficiario: UdsDirectoryItem) => {
+    if (beneficiario.canale === "uds_centro") {
       return {
         label: t("udsAnagrafica.canaleEntrambi"),
         cls: "bg-purple-500/10 text-purple-700",
       };
     }
-    if (centro) {
-      return { label: t("udsAnagrafica.canaleCentro"), cls: "bg-blue-500/10 text-blue-700" };
-    }
-    if (uds) {
-      return { label: t("udsAnagrafica.canaleUds"), cls: "bg-amber-500/10 text-amber-700" };
-    }
-    return { label: t("udsAnagrafica.canaleNd"), cls: "bg-muted text-muted-foreground" };
+    return {
+      label: t("udsAnagrafica.canaleUds"),
+      cls: "bg-amber-500/10 text-amber-700",
+    };
   };
 
   const rows = beneficiari ?? [];
   const exportColumns = useMemo(
     () => [
-      { header: t("common.surname"), accessor: (b: BeneficiarioDirectory) => b.cognome },
-      { header: t("common.name"), accessor: (b: BeneficiarioDirectory) => b.nome },
+      {
+        header: t("common.surname"),
+        accessor: (b: UdsDirectoryItem) => b.cognome,
+      },
+      { header: t("common.name"), accessor: (b: UdsDirectoryItem) => b.nome },
       {
         header: t("udsAnagrafica.colSoprannome"),
-        accessor: (b: BeneficiarioDirectory) => b.soprannome ?? "",
+        accessor: (b: UdsDirectoryItem) => b.soprannome ?? "",
       },
-      { header: t("udsAnagrafica.colTelefono"), accessor: (b: BeneficiarioDirectory) => b.telefono ?? "" },
       {
         header: t("udsAnagrafica.colFasciaEta"),
-        accessor: (b: BeneficiarioDirectory) =>
-          `${fasciaEtaLabel(t, b.fasciaEtaCorrente)} (${fasciaEtaOrigineLabel(t, b.fasciaEtaOrigine)})`,
+        accessor: (b: UdsDirectoryItem) =>
+          fasciaEtaLabel(t, b.fasciaEtaCorrente),
       },
-      { header: t("udsAnagrafica.colZona"), accessor: (b: BeneficiarioDirectory) => b.zonaUdsNome ?? "" },
-      { header: t("udsAnagrafica.colCanale"), accessor: (b: BeneficiarioDirectory) => canale(b).label },
+      {
+        header: t("udsAnagrafica.colZona"),
+        accessor: (b: UdsDirectoryItem) => b.zonaUdsNome ?? "",
+      },
+      {
+        header: t("udsAnagrafica.colCanale"),
+        accessor: (b: UdsDirectoryItem) => canale(b).label,
+      },
     ],
     [t],
   );
@@ -154,28 +157,35 @@ export default function UdsAnagrafica() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("udsAnagrafica.title")}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("udsAnagrafica.title")}
+          </h1>
           <p className="text-muted-foreground">{t("udsAnagrafica.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          {hasPermission("beneficiari.export") && <ExportButtons
-            rows={rows}
-            columns={exportColumns}
-            filename="uds-anagrafica"
-            title={t("udsAnagrafica.exportTitle")}
-            loadRows={() => fetchAllBeneficiariPages(listFilters)}
-            beforeExport={(_format, exportRows) => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: exportRows.length, beneficiarioId: null } }).then(() => undefined)}
-          />}
-          {hasPermission("beneficiari.manage") && <Button onClick={() => setIsFormOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> {t("udsAnagrafica.newPerson")}
-          </Button>}
+          {hasPermission("beneficiari.export") && (
+            <ExportButtons
+              rows={rows}
+              columns={exportColumns}
+              filename="uds-anagrafica"
+              title={t("udsAnagrafica.exportTitle")}
+              loadRows={() => fetchAllUdsDirectoryPages(listFilters)}
+            />
+          )}
+          {hasPermission("beneficiari.manage") && (
+            <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> {t("udsAnagrafica.newPerson")}
+            </Button>
+          )}
         </div>
       </div>
 
       <Card>
         <CardContent className="flex flex-wrap items-end gap-4 p-4">
           <div className="space-y-1 min-w-[240px] flex-1">
-            <span className="text-sm font-medium">{t("udsAnagrafica.searchLabel")}</span>
+            <span className="text-sm font-medium">
+              {t("udsAnagrafica.searchLabel")}
+            </span>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -188,7 +198,9 @@ export default function UdsAnagrafica() {
           </div>
           {isGlobal && (
             <div className="space-y-1">
-              <span className="text-sm font-medium">{t("udsAnagrafica.filterAreaOperativa")}</span>
+              <span className="text-sm font-medium">
+                {t("udsAnagrafica.filterAreaOperativa")}
+              </span>
               <Select
                 value={filterAreaOperativa || ALL_ZONE}
                 onValueChange={(value) => {
@@ -197,12 +209,19 @@ export default function UdsAnagrafica() {
                 }}
               >
                 <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder={t("udsAnagrafica.allAreaOperativa")} />
+                  <SelectValue
+                    placeholder={t("udsAnagrafica.allAreaOperativa")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allAreaOperativa")}</SelectItem>
+                  <SelectItem value={ALL_ZONE}>
+                    {t("udsAnagrafica.allAreaOperativa")}
+                  </SelectItem>
                   {areaOperativaList?.map((areaOperativa) => (
-                    <SelectItem key={areaOperativa.id} value={String(areaOperativa.id)}>
+                    <SelectItem
+                      key={areaOperativa.id}
+                      value={String(areaOperativa.id)}
+                    >
                       {areaOperativa.nome}
                     </SelectItem>
                   ))}
@@ -211,13 +230,17 @@ export default function UdsAnagrafica() {
             </div>
           )}
           <div className="space-y-1">
-            <span className="text-sm font-medium">{t("udsAnagrafica.filterZona")}</span>
+            <span className="text-sm font-medium">
+              {t("udsAnagrafica.filterZona")}
+            </span>
             <Select value={filterZona} onValueChange={setFilterZona}>
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder={t("udsAnagrafica.allZone")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>
+                <SelectItem value={ALL_ZONE}>
+                  {t("udsAnagrafica.allZone")}
+                </SelectItem>
                 {zoneList?.map((zona) => (
                   <SelectItem key={zona.id} value={String(zona.id)}>
                     {zona.nome}
@@ -237,11 +260,11 @@ export default function UdsAnagrafica() {
                 <TableHead>{t("common.surname")}</TableHead>
                 <TableHead>{t("common.name")}</TableHead>
                 <TableHead>{t("udsAnagrafica.colSoprannome")}</TableHead>
-                <TableHead>{t("udsAnagrafica.colTelefono")}</TableHead>
                 <TableHead>{t("udsAnagrafica.colFasciaEta")}</TableHead>
                 <TableHead>{t("udsAnagrafica.colZona")}</TableHead>
-                <TableHead className="text-center">{t("udsAnagrafica.colCanale")}</TableHead>
-                <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
+                <TableHead className="text-center">
+                  {t("udsAnagrafica.colCanale")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -250,16 +273,21 @@ export default function UdsAnagrafica() {
                   .fill(0)
                   .map((_, rowIndex) => (
                     <TableRow key={rowIndex}>
-                      {Array(8)
+                      {Array(6)
                         .fill(0)
                         .map((_, cellIndex) => (
-                          <TableCell key={cellIndex}><Skeleton className="h-5 w-24" /></TableCell>
+                          <TableCell key={cellIndex}>
+                            <Skeleton className="h-5 w-24" />
+                          </TableCell>
                         ))}
                     </TableRow>
                   ))
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={6}
+                    className="h-32 text-center text-muted-foreground"
+                  >
                     {t("udsAnagrafica.noPersone")}
                   </TableCell>
                 </TableRow>
@@ -267,45 +295,42 @@ export default function UdsAnagrafica() {
                 rows.map((beneficiario) => {
                   const channel = canale(beneficiario);
                   return (
-                    <TableRow key={beneficiario.id} className={!beneficiario.attivo ? "opacity-60" : ""}>
+                    <TableRow key={beneficiario.id}>
                       <TableCell>
-                        <Link
-                          href={`/beneficiari/${beneficiario.id}`}
-                          className="flex items-center gap-2 font-medium text-primary hover:underline"
-                        >
-                          <Footprints className="h-4 w-4 text-muted-foreground" /> {beneficiario.cognome}
-                        </Link>
+                        {beneficiario.accessoCompleto ? (
+                          <Link
+                            href={`/beneficiari/${beneficiario.id}`}
+                            className="flex items-center gap-2 font-medium text-primary hover:underline"
+                          >
+                            <Footprints className="h-4 w-4 text-muted-foreground" />{" "}
+                            {beneficiario.cognome}
+                          </Link>
+                        ) : (
+                          <span className="flex items-center gap-2 font-medium">
+                            <Footprints className="h-4 w-4 text-muted-foreground" />{" "}
+                            {beneficiario.cognome}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>{beneficiario.nome}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {beneficiario.soprannome || "-"}
                       </TableCell>
-                      <TableCell className="text-sm">{beneficiario.telefono || "-"}</TableCell>
                       <TableCell className="text-sm">
-                        <div>{fasciaEtaLabel(t, beneficiario.fasciaEtaCorrente)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {fasciaEtaOrigineLabel(t, beneficiario.fasciaEtaOrigine)}
+                        <div>
+                          {fasciaEtaLabel(t, beneficiario.fasciaEtaCorrente)}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm">{beneficiario.zonaUdsNome || "-"}</TableCell>
+                      <TableCell className="text-sm">
+                        {beneficiario.zonaUdsNome || "-"}
+                      </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline" className={`border-none ${channel.cls}`}>
+                        <Badge
+                          variant="outline"
+                          className={`border-none ${channel.cls}`}
+                        >
                           {channel.label}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center">
-                          <Switch
-                            checked={beneficiario.attivo}
-                            onCheckedChange={() => toggleStatus(beneficiario)}
-                            disabled={!hasPermission("beneficiari.deactivate") || updateBenef.isPending}
-                            aria-label={
-                              beneficiario.attivo
-                                ? t("beneficiari.disattiva")
-                                : t("beneficiari.attiva")
-                            }
-                          />
-                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -316,10 +341,22 @@ export default function UdsAnagrafica() {
           <div className="flex items-center justify-between border-t px-4 py-3">
             <span className="text-sm text-muted-foreground">Pagina {page}</span>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page === 1 || isLoading}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
                 Precedente
               </Button>
-              <Button type="button" variant="outline" size="sm" disabled={isLoading || rows.length < BENEFICIARI_PAGE_SIZE} onClick={() => setPage((current) => current + 1)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isLoading || rows.length < DIRECTORY_PAGE_SIZE}
+                onClick={() => setPage((current) => current + 1)}
+              >
                 Successiva
               </Button>
             </div>

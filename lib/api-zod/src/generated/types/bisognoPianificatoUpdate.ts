@@ -10,6 +10,8 @@ import type { BisognoPianificatoUpdateStato } from './bisognoPianificatoUpdateSt
 import type { BisognoPianificatoUpdateTipo } from './bisognoPianificatoUpdateTipo';
 
 export interface BisognoPianificatoUpdate {
+  /** @minimum 1 */
+  versione: number;
   tipo?: BisognoPianificatoUpdateTipo;
   /**
      * @minLength 1
@@ -25,4 +27,9 @@ export interface BisognoPianificatoUpdate {
      * @nullable
      */
   note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
 }

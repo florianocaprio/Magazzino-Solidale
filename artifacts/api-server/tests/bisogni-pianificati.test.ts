@@ -2,7 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express, { type Express } from "express";
 import request, { type Response } from "supertest";
 import {
+  auditConfigurazioniTable,
   beneficiariTable,
+  bisogniPianificatiStoricoTable,
   bisogniPianificatiTable,
   centriAscoltoTable,
   areeOperativeTable,
@@ -14,6 +16,7 @@ import {
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
+import udsRouter from "../src/routes/uds";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 const bisognoIds: number[] = [];
@@ -45,6 +48,7 @@ function makeApp(
           centroAscoltoId: number | null;
           zonaUdsId: number | null;
           aree: string[];
+          permessi: string[];
         };
       }
     ).user = {
@@ -53,9 +57,15 @@ function makeApp(
       centroAscoltoId,
       zonaUdsId,
       aree: ["uds"],
+      permessi: [
+        "uds.interventi.view",
+        "uds.interventi.create",
+        "uds.bisogni.manage",
+      ],
     };
     next();
   });
+  app.use(udsRouter);
   app.use(interventiRouter);
   return app;
 }
@@ -110,12 +120,22 @@ async function createBeneficiario(
 }
 
 async function createIntervento(beneficiarioId: number): Promise<number> {
+  const [beneficiario] = await db
+    .select({
+      areaOperativaId: beneficiariTable.areaOperativaId,
+      zonaUdsId: beneficiariTable.zonaUdsId,
+    })
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, beneficiarioId));
   const [row] = await db
     .insert(interventiTable)
     .values({
       beneficiarioId,
       dataIntervento: "2026-08-14",
       tipoIntervento: "ascolto",
+      ambito: beneficiario?.areaOperativaId == null ? null : "uds",
+      areaOperativaIdSnapshot: beneficiario?.areaOperativaId ?? null,
+      zonaUdsIdSnapshot: beneficiario?.zonaUdsId ?? null,
     })
     .returning({ id: interventiTable.id });
   interventoIds.push(row.id);
@@ -161,6 +181,20 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (interventoIds.length > 0) {
+    const needs = await db
+      .select({ id: bisogniPianificatiTable.id })
+      .from(bisogniPianificatiTable)
+      .where(inArray(bisogniPianificatiTable.interventoId, interventoIds));
+    if (needs.length > 0) {
+      await db
+        .delete(bisogniPianificatiStoricoTable)
+        .where(
+          inArray(
+            bisogniPianificatiStoricoTable.bisognoId,
+            needs.map((need) => need.id),
+          ),
+        );
+    }
     await db
       .delete(bisogniPianificatiTable)
       .where(inArray(bisogniPianificatiTable.interventoId, interventoIds));
@@ -175,6 +209,9 @@ afterAll(async () => {
       .delete(beneficiariTable)
       .where(inArray(beneficiariTable.id, beneficiarioIds));
   }
+  await db
+    .delete(auditConfigurazioniTable)
+    .where(eq(auditConfigurazioniTable.utenteId, operatorUserId));
   await db.delete(utentiTable).where(eq(utentiTable.id, operatorUserId));
   if (zonaIds.length > 0)
     await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, zonaIds));
@@ -195,15 +232,13 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
       centroRoma,
       zonaRoma,
     );
-    const created = await request(makeApp()).post("/interventi").send({
+    const created = await request(makeApp()).post("/uds/interventi").send({
       beneficiarioId,
-      dataIntervento: "2026-08-14",
       tipoIntervento: "ascolto",
       bisogniPianificati: [],
     });
     expect(created.status).toBe(201);
     interventoIds.push(created.body.id);
-    expect(created.body.bisogniPianificatiTotale).toBe(0);
 
     const history = await request(makeApp()).get(
       `/interventi/${created.body.id}/bisogni-pianificati`,
@@ -215,10 +250,9 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
   it("crea contestualmente uno o più bisogni distinguendo richiesta e azione", async () => {
     const beneficiarioId = await createBeneficiario(areaOperativaRoma);
     const created = await request(makeApp())
-      .post("/interventi")
+      .post("/uds/interventi")
       .send({
         beneficiarioId,
-        dataIntervento: "2026-08-14",
         tipoIntervento: "ascolto",
         bisogniPianificati: [
           {
@@ -235,11 +269,9 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
             dataPrevista: "2026-08-20",
           },
         ],
-      });
+    });
     expect(created.status).toBe(201);
     interventoIds.push(created.body.id);
-    expect(created.body.bisogniPianificatiTotale).toBe(2);
-    expect(created.body.bisogniPianificatiAperti).toBe(2);
 
     const history = await request(makeApp()).get(
       `/interventi/${created.body.id}/bisogni-pianificati`,
@@ -249,6 +281,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
     expect(
       history.body.map((row: { tipo: string }) => row.tipo).sort(),
     ).toEqual(["azione", "richiesta"]);
+    expect(history.body).toHaveLength(2);
   });
 
   it("annulla transazionalmente anche l'intervento se un bisogno contestuale non è valido", async () => {
@@ -257,10 +290,9 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
       .select({ id: interventiTable.id })
       .from(interventiTable);
     const response = await request(makeApp())
-      .post("/interventi")
+      .post("/uds/interventi")
       .send({
         beneficiarioId,
-        dataIntervento: "2026-08-14",
         tipoIntervento: "ascolto",
         bisogniPianificati: [
           {
@@ -294,14 +326,18 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
       .patch(
         `/interventi/${interventoId}/bisogni-pianificati/${created.body.id}`,
       )
-      .send({ stato: "pianificato" });
+      .send({ versione: created.body.versione, stato: "pianificato" });
     expect(rejected.status).toBe(400);
 
     const planned = await request(makeApp())
       .patch(
         `/interventi/${interventoId}/bisogni-pianificati/${created.body.id}`,
       )
-      .send({ stato: "pianificato", dataPrevista: "2026-08-20" });
+      .send({
+        versione: created.body.versione,
+        stato: "pianificato",
+        dataPrevista: "2026-08-20",
+      });
     expect(planned.status).toBe(200);
     expect(planned.body.stato).toBe("pianificato");
     expect(planned.body.dataPrevista).toBe("2026-08-20");
@@ -316,7 +352,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
       .patch(
         `/interventi/${interventoId}/bisogni-pianificati/${created.body.id}`,
       )
-      .send({ stato: "completato" });
+      .send({ versione: created.body.versione, stato: "completato" });
     expect(completed.status).toBe(200);
     expect(completed.body.dataCompletamento).toEqual(expect.any(String));
 
@@ -324,7 +360,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
       .patch(
         `/interventi/${interventoId}/bisogni-pianificati/${created.body.id}`,
       )
-      .send({ stato: "da_pianificare" });
+      .send({ versione: completed.body.versione, stato: "da_pianificare" });
     expect(reopened.status).toBe(200);
     expect(reopened.body.dataCompletamento).toBeNull();
   });
@@ -337,7 +373,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
       .patch(
         `/interventi/${interventoId}/bisogni-pianificati/${created.body.id}`,
       )
-      .send({ stato: "annullato" });
+      .send({ versione: created.body.versione, stato: "annullato" });
     expect(cancelled.status).toBe(200);
 
     const history = await request(makeApp()).get(
@@ -501,7 +537,10 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
       .patch(
         `/interventi/${interventoA}/bisogni-pianificati/${created.body.id}`,
       )
-      .send({ descrizione: "Tentativo" });
+      .send({
+        versione: created.body.versione,
+        descrizione: "Tentativo",
+      });
     expect(response.status).toBe(404);
 
     const [stored] = await db

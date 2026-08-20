@@ -115,6 +115,7 @@ router.get(
   "/report/uds",
   requireSourceArea("uds"),
   requireModulo("UDS"),
+  requirePermission("uds.reports.view"),
   reportHandler(buildUdsReport),
 );
 router.get(
@@ -141,6 +142,13 @@ router.get("/report/filter-options", async (req, res) => {
   try {
     const section = String(req.query.section ?? "") as ReportSection;
     if (!sections.has(section)) throw new ReportingError(400, "section non valida");
+    if (
+      section === "uds" &&
+      !req.user?.isAdmin &&
+      !req.user?.permessi.includes("uds.reports.view")
+    ) {
+      throw new ReportingError(403, "Permesso uds.reports.view richiesto");
+    }
     const rawAreaOperativaId = req.query.areaOperativaId;
     const requestedAreaOperativaId = rawAreaOperativaId == null || rawAreaOperativaId === "" ? null : Number(rawAreaOperativaId);
     if (requestedAreaOperativaId != null && (!Number.isInteger(requestedAreaOperativaId) || requestedAreaOperativaId <= 0)) {
@@ -179,6 +187,13 @@ router.get("/report/drilldown", async (req, res) => {
       !req.user?.permessi.includes("mensa.reports.view")
     ) {
       throw new ReportingError(403, "Permesso mensa.reports.view richiesto");
+    }
+    if (
+      section === "uds" &&
+      !req.user?.isAdmin &&
+      !req.user?.permessi.includes("uds.reports.view")
+    ) {
+      throw new ReportingError(403, "Permesso uds.reports.view richiesto");
     }
     const sourceAreas: Partial<Record<ReportSection, string[]>> = {
       pacchi: ["sociale"],

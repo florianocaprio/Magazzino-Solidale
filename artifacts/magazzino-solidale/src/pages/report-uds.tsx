@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { ExportButtons } from "@/components/export-buttons";
 import { CalendarRange, ListChecks, Map as MapIcon, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 const ALL = "all";
 
@@ -34,7 +35,7 @@ export default function ReportUds() {
 
   const currentYear = new Date().getFullYear();
   const [da, setDa] = useState(`${currentYear}-01-01`);
-  const [a, setA] = useState(new Date().toISOString().slice(0, 10));
+  const [a, setA] = useState(todayEuropeRome());
   const [areaOperativaId, setAreaOperativaId] = useState<string>(ALL);
   const [zonaId, setZonaId] = useState<string>(lockedZonaId != null ? String(lockedZonaId) : ALL);
 

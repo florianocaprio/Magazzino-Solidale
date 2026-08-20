@@ -11,6 +11,8 @@ import type { BisognoPianificatoUpsertTipo } from './bisognoPianificatoUpsertTip
 
 export interface BisognoPianificatoUpsert {
   id?: number;
+  /** @minimum 1 */
+  versione?: number;
   tipo: BisognoPianificatoUpsertTipo;
   /**
      * @minLength 1
@@ -26,4 +28,9 @@ export interface BisognoPianificatoUpsert {
      * @nullable
      */
   note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
 }

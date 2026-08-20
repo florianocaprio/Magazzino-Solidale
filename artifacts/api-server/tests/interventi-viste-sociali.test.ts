@@ -91,6 +91,9 @@ function makeApp(
         "sociale.interventi.update",
         "sociale.interventi.complete",
         "sociale.interventi.cancel",
+        ...(options.aree?.includes("uds")
+          ? ["uds.interventi.view", "uds.bisogni.manage"]
+          : []),
       ],
       isAdmin: false,
       isSuperAdmin: false,
@@ -169,6 +172,7 @@ async function createIntervento(input: {
       tipoIntervento: input.tipo ?? `tipo-${rnd()}`,
       stato: input.stato,
       ambito: input.ambito === undefined ? "sociale" : input.ambito,
+      areaOperativaIdSnapshot: input.ambito === "uds" ? roma : null,
       priorita: input.priorita ?? "normale",
       dataOraPianificata: input.pianificata ?? null,
       dataOraAvvio: input.avvio ?? null,

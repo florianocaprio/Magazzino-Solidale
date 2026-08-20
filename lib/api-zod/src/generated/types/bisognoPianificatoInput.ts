@@ -25,4 +25,9 @@ export interface BisognoPianificatoInput {
      * @nullable
      */
   note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
 }

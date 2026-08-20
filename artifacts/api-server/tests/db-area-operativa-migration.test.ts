@@ -177,7 +177,20 @@ describe("migrazione Città -> Area Operativa", () => {
       const foreignKeys = await client.query<{ count: number; all_valid: boolean }>(`
         SELECT count(*)::int AS count, bool_and(convalidated) AS all_valid
         FROM pg_constraint
-        WHERE contype = 'f' AND confrelid = 'public.aree_operative'::regclass
+        WHERE contype = 'f'
+          AND conname IN (
+            'utenti_area_operativa_id_fk',
+            'beneficiari_area_operativa_id_fk',
+            'centri_di_ascolto_area_operativa_id_fk',
+            'magazzini_area_operativa_id_fk',
+            'zone_uds_area_operativa_id_fk',
+            'mense_area_operativa_id_fkey',
+            'mensa_eccezioni_area_operativa_id_fkey',
+            'politiche_credito_solidale_area_operativa_id_fk',
+            'credito_solidale_movimenti_area_operativa_id_fk',
+            'sessioni_cassa_emporio_area_operativa_id_fk',
+            'spese_emporio_area_operativa_id_fk'
+          )
       `);
       expect(foreignKeys.rows[0]).toEqual({ count: 11, all_valid: true });
 

@@ -1,10 +1,12 @@
 export const udsInterventi = {
   it: {
     title: "Interventi UDS",
-    subtitle: "Registra gli interventi di strada e stampa lo storico per persona.",
+    subtitle:
+      "Registra gli interventi di strada e stampa lo storico per persona.",
     selectPerson: "Persona",
     selectPersonPlaceholder: "Seleziona una persona",
-    noPersonSelected: "Seleziona una persona per vedere e registrare gli interventi.",
+    noPersonSelected:
+      "Seleziona una persona per vedere e registrare gli interventi.",
     newIntervento: "Nuovo intervento",
     newTitle: "Nuovo intervento di strada",
     colData: "Data",
@@ -31,6 +33,8 @@ export const udsInterventi = {
     editAction: "Modifica",
     toastUpdated: "Intervento aggiornato",
     toastNoteSaved: "Nota salvata",
+    concurrencyConflict:
+      "Il dato è stato modificato da un altro operatore. Lo storico è stato ricaricato: verifica i valori e riprova.",
     tipoAscolto: "Ascolto",
     tipoDistribuzione: "Distribuzione",
     tipoOrientamento: "Orientamento",
@@ -87,10 +91,12 @@ export const udsInterventi = {
   },
   es: {
     title: "Intervenciones UDS",
-    subtitle: "Registra las intervenciones de calle e imprime el historial por persona.",
+    subtitle:
+      "Registra las intervenciones de calle e imprime el historial por persona.",
     selectPerson: "Persona",
     selectPersonPlaceholder: "Selecciona una persona",
-    noPersonSelected: "Selecciona una persona para ver y registrar las intervenciones.",
+    noPersonSelected:
+      "Selecciona una persona para ver y registrar las intervenciones.",
     newIntervento: "Nueva intervención",
     newTitle: "Nueva intervención de calle",
     colData: "Fecha",
@@ -117,6 +123,8 @@ export const udsInterventi = {
     editAction: "Editar",
     toastUpdated: "Intervención actualizada",
     toastNoteSaved: "Nota guardada",
+    concurrencyConflict:
+      "Otro operador modificó el dato. El historial se ha recargado: comprueba los valores e inténtalo de nuevo.",
     tipoAscolto: "Escucha",
     tipoDistribuzione: "Distribución",
     tipoOrientamento: "Orientación",
@@ -203,6 +211,8 @@ export const udsInterventi = {
     editAction: "Edit",
     toastUpdated: "Intervention updated",
     toastNoteSaved: "Note saved",
+    concurrencyConflict:
+      "Another operator changed this record. The history was refreshed; review the values and try again.",
     tipoAscolto: "Listening",
     tipoDistribuzione: "Distribution",
     tipoOrientamento: "Orientation",
@@ -258,10 +268,12 @@ export const udsInterventi = {
   },
   fr: {
     title: "Interventions UDS",
-    subtitle: "Enregistrez les interventions de rue et imprimez l'historique par personne.",
+    subtitle:
+      "Enregistrez les interventions de rue et imprimez l'historique par personne.",
     selectPerson: "Personne",
     selectPersonPlaceholder: "Sélectionnez une personne",
-    noPersonSelected: "Sélectionnez une personne pour voir et enregistrer les interventions.",
+    noPersonSelected:
+      "Sélectionnez une personne pour voir et enregistrer les interventions.",
     newIntervento: "Nouvelle intervention",
     newTitle: "Nouvelle intervention de rue",
     colData: "Date",
@@ -344,10 +356,12 @@ export const udsInterventi = {
   },
   de: {
     title: "UDS-Maßnahmen",
-    subtitle: "Erfassen Sie Straßeneinsätze und drucken Sie den Verlauf pro Person.",
+    subtitle:
+      "Erfassen Sie Straßeneinsätze und drucken Sie den Verlauf pro Person.",
     selectPerson: "Person",
     selectPersonPlaceholder: "Person auswählen",
-    noPersonSelected: "Wählen Sie eine Person aus, um Maßnahmen anzuzeigen und zu erfassen.",
+    noPersonSelected:
+      "Wählen Sie eine Person aus, um Maßnahmen anzuzeigen und zu erfassen.",
     newIntervento: "Neue Maßnahme",
     newTitle: "Neuer Straßeneinsatz",
     colData: "Datum",
@@ -359,7 +373,8 @@ export const udsInterventi = {
     fTipo: "Typ",
     fBisogni: "Festgestellte Bedürfnisse",
     fMateriale: "Übergebenes Material",
-    bisogniPlaceholder: "Beschreiben Sie die festgestellten Bedürfnisse (Freitext)",
+    bisogniPlaceholder:
+      "Beschreiben Sie die festgestellten Bedürfnisse (Freitext)",
     materialePlaceholder: "Beschreiben Sie in Worten das übergebene Material",
     noIntervento: "Keine Maßnahmen für diese Person erfasst.",
     toastCreated: "Maßnahme erfasst",

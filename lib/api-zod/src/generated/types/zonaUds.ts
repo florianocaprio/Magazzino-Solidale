@@ -15,5 +15,8 @@ export interface ZonaUds {
   attivo: boolean;
   /** @nullable */
   note?: string | null;
-  dataCreazione: string;
+  dataCreazione: Date;
+  /** @minimum 1 */
+  versione: number;
+  dataAggiornamento: Date;
 }

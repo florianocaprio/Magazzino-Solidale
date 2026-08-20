@@ -4,7 +4,7 @@ import { isNavItemEnabledByAccess, NAV_ITEMS } from "@/components/layout";
 describe("permission gate della navigazione operativa", () => {
   it.each([
     ["beneficiari", "beneficiari.view"],
-    ["udsAnagrafica", "beneficiari.view"],
+    ["udsAnagrafica", "uds.directory.view"],
     ["interventi", "sociale.interventi.view"],
     ["emporioCreditiSaldo", "credito.view"],
     ["emporioAccessi", "emporio.access.view"],

@@ -7,19 +7,21 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
-  getGetBeneficiarioQueryKey: () => ["beneficiario"],
-  getListBeneficiariQueryKey: () => ["beneficiari"],
   getListAreeOperativeQueryKey: () => ["aree"],
-  listBeneficiari: vi.fn().mockResolvedValue([]),
-  useListBeneficiari: (params: unknown) => mocks.list(params),
+  listUdsDirectory: vi.fn().mockResolvedValue([]),
+  useListUdsDirectory: (params: unknown) => mocks.list(params),
   useListAreeOperative: () => ({ data: [] }),
   useListZoneUds: () => ({ data: [] }),
   useUpdateBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
   useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn() }),
 }));
 
-vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
-vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+}));
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
@@ -28,36 +30,49 @@ vi.mock("@/lib/auth", () => ({
   }),
 }));
 vi.mock("@/components/export-buttons", () => ({ ExportButtons: () => null }));
-vi.mock("@/components/uds-persona-sheet", () => ({ UdsPersonaSheet: () => null }));
+vi.mock("@/components/uds-persona-sheet", () => ({
+  UdsPersonaSheet: () => null,
+}));
 vi.mock("wouter", () => ({
-  Link: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a>,
+  Link: ({
+    children,
+    href,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
 }));
 
 import UdsAnagrafica from "@/pages/uds-anagrafica";
 
-const pageRows = (page: number) => Array.from({ length: 50 }, (_, index) => ({
-  id: page * 100 + index,
-  codice: `UDS-${page}-${index}`,
-  cognome: `Cognome ${page}-${index}`,
-  nome: "Persona",
-  soprannome: null,
-  telefono: null,
-  fasciaEtaCorrente: null,
-  fasciaEtaOrigine: "non_determinata",
-  zonaUdsNome: null,
-  centroAscoltoId: null,
-  uds: true,
-  attivo: true,
-  versione: 1,
-}));
+const pageRows = (page: number) =>
+  Array.from({ length: 50 }, (_, index) => ({
+    id: page * 100 + index,
+    codice: `UDS-${page}-${index}`,
+    cognome: `Cognome ${page}-${index}`,
+    nome: "Persona",
+    soprannome: null,
+    fasciaEtaCorrente: null,
+    zonaUdsId: null,
+    zonaUdsNome: null,
+    canale: "uds" as const,
+    accessoCompleto: index !== 0,
+  }));
 
 describe("paginazione UDS Anagrafica", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
-    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    mocks.list.mockImplementation((params: { page?: number }) => ({ data: pageRows(params.page ?? 1), isLoading: false }));
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.list.mockImplementation((params: { page?: number }) => ({
+      data: pageRows(params.page ?? 1),
+      isLoading: false,
+    }));
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -72,23 +87,44 @@ describe("paginazione UDS Anagrafica", () => {
 
   it("naviga avanti/indietro e resetta pagina al cambio ricerca", async () => {
     await act(async () => root.render(<UdsAnagrafica />));
-    expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, limit: 50, uds: true }));
+    expect(mocks.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, limit: 50 }),
+    );
+    expect(mocks.list).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ uds: true }),
+    );
+    expect(document.querySelector(`a[href="/beneficiari/${100}"]`)).toBeNull();
 
-    const next = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Successiva");
+    const next = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Successiva",
+    );
     await act(async () => next?.click());
-    expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
+    expect(mocks.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2 }),
+    );
 
-    const previous = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Precedente");
+    const previous = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Precedente",
+    );
     await act(async () => previous?.click());
-    expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }));
+    expect(mocks.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1 }),
+    );
 
     await act(async () => next?.click());
-    const search = document.querySelector<HTMLInputElement>('input[placeholder="udsAnagrafica.searchPlaceholder"]');
+    const search = document.querySelector<HTMLInputElement>(
+      'input[placeholder="udsAnagrafica.searchPlaceholder"]',
+    );
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
       setter?.call(search, "Mario");
       search?.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, search: "Mario" }));
+    expect(mocks.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, search: "Mario" }),
+    );
   });
 });

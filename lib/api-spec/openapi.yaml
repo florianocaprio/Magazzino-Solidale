@@ -33,6 +33,7 @@ tags:
   - name: aree
   - name: aree-operative
   - name: zone-uds
+  - name: uds
   - name: politiche-credito-solidale
   - name: credito-solidale
   - name: accessi-emporio
@@ -2116,6 +2117,172 @@ paths:
           description: Intervento non accessibile per la area operativa dell'operatore
         "404":
           description: Intervento o Bisogno Pianificato non trovato
+        "409":
+          description: Versione non aggiornata
+
+  /interventi/{interventoId}/bisogni-pianificati/{bisognoId}/storico:
+    get:
+      operationId: listBisognoPianificatoStorico
+      tags: [interventi]
+      parameters:
+        - name: interventoId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: bisognoId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Audit append-only del Bisogno Pianificato
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BisognoPianificatoStorico"
+        "403": { description: Intervento non accessibile }
+        "404": { description: Bisogno Pianificato non trovato }
+
+  /uds/directory:
+    get:
+      operationId: listUdsDirectory
+      tags: [uds]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string, minLength: 2, maxLength: 120 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: areaOperativaId
+          in: query
+          description: Disponibile soltanto ai profili amministrativi globali.
+          schema: { type: integer }
+        - name: zonaUdsId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Directory UDS minimizzata e paginata nell'Area autorizzata
+          headers:
+            X-Total-Count:
+              schema: { type: integer }
+            X-Page:
+              schema: { type: integer }
+            X-Page-Size:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UdsDirectoryItem" }
+        "403": { description: Area o permesso UDS non disponibile }
+
+  /uds/interventi:
+    post:
+      operationId: createUdsIntervento
+      tags: [uds]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UdsInterventoInput" }
+      responses:
+        "201":
+          description: Incontro UDS registrato esplicitamente come concluso
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UdsIntervento" }
+        "400": { description: Dati non validi }
+        "403": { description: "Persona, Area o permesso non accessibile" }
+
+  /uds/interventi/{id}:
+    get:
+      operationId: getUdsIntervento
+      tags: [uds]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Intervento UDS nello scope storico autorizzato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UdsIntervento" }
+        "403": { description: Intervento UDS non accessibile }
+        "404": { description: Intervento UDS non trovato }
+
+  /uds/beneficiari/{beneficiarioId}/interventi:
+    get:
+      operationId: listUdsInterventiBeneficiario
+      tags: [uds]
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Storico esclusivamente UDS della persona nella stessa Area
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UdsIntervento" }
+        "403": { description: Area o permesso non accessibile }
+
+  /uds/interventi/{id}/nota:
+    patch:
+      operationId: updateUdsInterventoNota
+      tags: [uds]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UdsInterventoNotaInput" }
+      responses:
+        "200":
+          description: Nota UDS aggiornata e auditata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UdsIntervento" }
+        "403": { description: Intervento UDS non accessibile }
+        "409": { description: Versione non aggiornata }
+
+  /uds/interventi/{id}/rettifica:
+    patch:
+      operationId: rectifyUdsIntervento
+      tags: [uds]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UdsInterventoRettificaInput" }
+      responses:
+        "200":
+          description: Rettifica storica auditata senza riapertura
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UdsIntervento" }
+        "403": { description: Intervento UDS non accessibile }
+        "409": { description: Versione non aggiornata }
 
   # ─── CONSEGNE ────────────────────────────────────────────────────────────────
   /consegne:
@@ -3670,6 +3837,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: includiInattive
+          in: query
+          description: Riservato ai profili amministrativi.
+          schema:
+            type: boolean
       responses:
         "200":
           description: List of UDS zones
@@ -3744,6 +3916,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZonaUdsVersioneInput"
       responses:
         "204":
           description: Deleted
@@ -7911,7 +8089,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ApprovvigionamentoRigaInput"
-      required: [fornitoreId, areaOperativaId, magazzinoId, dataRichiesta, righe]
+      required:
+        [fornitoreId, areaOperativaId, magazzinoId, dataRichiesta, righe]
 
     ApprovvigionamentoUpdate:
       type: object
@@ -9453,7 +9632,23 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, areaOperativaId, nome, attivo, dataCreazione]
+          format: date-time
+        versione:
+          type: integer
+          minimum: 1
+        dataAggiornamento:
+          type: string
+          format: date-time
+      required:
+        [
+          id,
+          areaOperativaId,
+          nome,
+          attivo,
+          versione,
+          dataCreazione,
+          dataAggiornamento,
+        ]
 
     ZonaUdsInput:
       type: object
@@ -9481,6 +9676,117 @@ components:
           type: boolean
         note:
           type: string
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
+
+    ZonaUdsVersioneInput:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
+
+    UdsDirectoryItem:
+      type: object
+      description: Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        nome: { type: string }
+        cognome: { type: string }
+        soprannome: { type: [string, "null"] }
+        fasciaEtaCorrente:
+          type: string
+          enum: ["0_17", "18_29", "30_64", "65_plus", non_determinata]
+        zonaUdsId: { type: [integer, "null"] }
+        zonaUdsNome: { type: [string, "null"] }
+        canale: { type: string, enum: [uds, uds_centro] }
+        accessoCompleto: { type: boolean }
+      required:
+        [
+          id,
+          codice,
+          nome,
+          cognome,
+          soprannome,
+          fasciaEtaCorrente,
+          zonaUdsId,
+          zonaUdsNome,
+          canale,
+          accessoCompleto,
+        ]
+
+    UdsIntervento:
+      type: object
+      properties:
+        id: { type: integer }
+        beneficiarioId: { type: integer }
+        operatoreId: { type: [integer, "null"] }
+        dataIntervento: { type: [string, "null"], format: date }
+        tipoIntervento: { type: string }
+        descrizione: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+        noteUds: { type: [string, "null"] }
+        stato: { type: string, enum: [concluso] }
+        ambito: { type: string, enum: [uds] }
+        areaOperativaIdSnapshot: { type: [integer, "null"] }
+        zonaUdsIdSnapshot: { type: [integer, "null"] }
+        dataOraConclusione: { type: [string, "null"], format: date-time }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: [string, "null"], format: date-time }
+        versione: { type: [string, "null"], format: date-time }
+      required:
+        [
+          id,
+          beneficiarioId,
+          operatoreId,
+          dataIntervento,
+          tipoIntervento,
+          descrizione,
+          note,
+          noteUds,
+          stato,
+          ambito,
+          areaOperativaIdSnapshot,
+          zonaUdsIdSnapshot,
+          dataOraConclusione,
+          dataCreazione,
+          dataAggiornamento,
+          versione,
+        ]
+
+    UdsInterventoInput:
+      type: object
+      properties:
+        beneficiarioId: { type: integer }
+        tipoIntervento: { type: string, minLength: 1, maxLength: 120 }
+        descrizione: { type: [string, "null"], maxLength: 4000 }
+        note: { type: [string, "null"], maxLength: 4000 }
+        bisogniPianificati:
+          type: array
+          items: { $ref: "#/components/schemas/BisognoPianificatoInput" }
+      required: [beneficiarioId, tipoIntervento]
+
+    UdsInterventoNotaInput:
+      type: object
+      properties:
+        versione: { type: string, format: date-time }
+        noteUds: { type: [string, "null"], maxLength: 4000 }
+      required: [versione]
+
+    UdsInterventoRettificaInput:
+      type: object
+      properties:
+        versione: { type: string, format: date-time }
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
+        tipoIntervento: { type: string, minLength: 1, maxLength: 120 }
+        descrizione: { type: [string, "null"], maxLength: 4000 }
+        note: { type: [string, "null"], maxLength: 4000 }
+        dataIntervento: { type: string, format: date }
+      required: [versione, motivo]
 
     # ── Centri di Ascolto ────────────────────────────────────────────────
     CentroAscolto:
@@ -10102,6 +10408,10 @@ components:
           type: ["string", "null"]
         areaOperativaId:
           type: ["integer", "null"]
+        areaOperativaIdSnapshot:
+          type: ["integer", "null"]
+        zonaUdsIdSnapshot:
+          type: ["integer", "null"]
         dataIntervento:
           type: ["string", "null"]
           format: date
@@ -10377,8 +10687,6 @@ components:
         prossimAzione:
           type: string
         note:
-          type: string
-        noteUds:
           type: string
         dataFollowup:
           type: string
@@ -10841,6 +11149,9 @@ components:
         note:
           type: ["string", "null"]
           maxLength: 2000
+        versione:
+          type: integer
+          minimum: 1
         dataCompletamento:
           type: ["string", "null"]
         dataCreazione:
@@ -10857,6 +11168,7 @@ components:
           dataPrevista,
           priorita,
           note,
+          versione,
           dataCompletamento,
           dataCreazione,
           dataAggiornamento,
@@ -10885,11 +11197,17 @@ components:
         note:
           type: ["string", "null"]
           maxLength: 2000
+        motivo:
+          type: ["string", "null"]
+          maxLength: 2000
       required: [tipo, descrizione]
 
     BisognoPianificatoUpdate:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         tipo:
           type: string
           enum: [richiesta, azione]
@@ -10908,12 +11226,19 @@ components:
         note:
           type: ["string", "null"]
           maxLength: 2000
+        motivo:
+          type: ["string", "null"]
+          maxLength: 2000
+      required: [versione]
 
     BisognoPianificatoUpsert:
       type: object
       properties:
         id:
           type: integer
+        versione:
+          type: integer
+          minimum: 1
         tipo:
           type: string
           enum: [richiesta, azione]
@@ -10932,7 +11257,41 @@ components:
         note:
           type: ["string", "null"]
           maxLength: 2000
+        motivo:
+          type: ["string", "null"]
+          maxLength: 2000
       required: [tipo, descrizione, stato, priorita]
+
+    BisognoPianificatoStorico:
+      type: object
+      properties:
+        id: { type: integer }
+        bisognoId: { type: integer }
+        statoPrecedente:
+          anyOf:
+            - type: string
+              enum: [da_pianificare, pianificato, completato, annullato]
+            - type: "null"
+        statoNuovo:
+          type: string
+          enum: [da_pianificare, pianificato, completato, annullato]
+        operatoreId: { type: [integer, "null"] }
+        dataTransizione: { type: string, format: date-time }
+        motivo: { type: [string, "null"] }
+        valorePrecedente: { type: [object, "null"], additionalProperties: true }
+        valoreNuovo: { type: [object, "null"], additionalProperties: true }
+      required:
+        [
+          id,
+          bisognoId,
+          statoPrecedente,
+          statoNuovo,
+          operatoreId,
+          dataTransizione,
+          motivo,
+          valorePrecedente,
+          valoreNuovo,
+        ]
     # ── Consegne ──────────────────────────────────────────────────────────
     Consegna:
       type: object
@@ -12646,7 +13005,16 @@ components:
     Mensa:
       type: object
       required:
-        [id, codice, nome, areaOperativaId, magazzinoId, attiva, createdAt, versione]
+        [
+          id,
+          codice,
+          nome,
+          areaOperativaId,
+          magazzinoId,
+          attiva,
+          createdAt,
+          versione,
+        ]
       properties:
         id: { type: integer }
         codice: { type: string }
