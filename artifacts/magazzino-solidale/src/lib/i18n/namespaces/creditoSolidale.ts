@@ -38,7 +38,7 @@ const it = {
   deactivateError: "Impossibile disattivare la politica Credito Solidale",
   maxMustBeGreater: "Il massimo mensile deve essere maggiore o uguale al minimo.",
   dayRange: "Il giorno deve essere compreso tra 1 e 28.",
-  selectAreaOperativa: "Seleziona area",
+  selectAreaOperativa: "Seleziona Area Operativa",
   selectCenter: "Seleziona centro",
   allAreeOperative: "Tutte le Aree Operative",
   allCenters: "Tutti i centri",

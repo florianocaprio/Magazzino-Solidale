@@ -2,7 +2,7 @@ export const preparazioneConsegne = {
   it: {
     title: "Preparazione Consegne",
     subtitle:
-      "Seleziona area e magazzino per sapere quanta e quale merce preparare per le consegne pianificate.",
+      "Seleziona Area Operativa e magazzino per sapere quanta e quale merce preparare per le consegne pianificate.",
     selectAreaOperativa: "Area Operativa",
     allAreaOperativa: "Tutte le Aree Operative",
     selectMagazzino: "Magazzino di riferimento",

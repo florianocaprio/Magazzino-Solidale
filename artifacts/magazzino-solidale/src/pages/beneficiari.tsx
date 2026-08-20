@@ -433,7 +433,7 @@ export default function Beneficiari() {
           { key: "areaProvenienza", header: t("beneficiarioDettaglio.areaProvenienza"), example: "UE" },
           { key: "centro", header: t("beneficiari.centroAscolto"), example: "" },
           { key: "magazzinoEmporioPreferito", header: t("beneficiari.magazzinoEmporioPreferito"), example: "" },
-          ...(isAreaOperativaGlobal ? [{ key: "areaOperativa", header: t("nav.areaOperativa"), example: "" }] : []),
+          ...(isAreaOperativaGlobal ? [{ key: "areaOperativa", header: t("nav.items.areeOperative"), example: "" }] : []),
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
           if (!r.cognome) return { error: t("bulkImport.requiredMissing", { field: t("common.surname") }) };
@@ -448,7 +448,7 @@ export default function Beneficiari() {
           let areaOperativaId: number | undefined;
           if (isAreaOperativaGlobal && r.areaOperativa) {
             const ci = matchByName(areaOperativaList, r.areaOperativa, (x) => x.nome);
-            if (!ci) return { error: t("bulkImport.unknownRef", { field: t("nav.areaOperativa"), value: r.areaOperativa }) };
+            if (!ci) return { error: t("bulkImport.unknownRef", { field: t("nav.items.areeOperative"), value: r.areaOperativa }) };
             areaOperativaId = ci.id;
           }
           let magazzinoEmporioPreferitoId: number | null = null;

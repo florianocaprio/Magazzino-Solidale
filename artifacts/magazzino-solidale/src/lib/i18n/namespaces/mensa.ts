@@ -21,7 +21,7 @@ const it = {
   scanPrompt: "Avvicina o scansiona la tessera",
   accessGranted: "ACCESSO CONSENTITO",
   accessDenied: "ACCESSO NON CONSENTITO",
-  exceptionPossible: "ALTRA MENSA DELLA STESSA AREA",
+  exceptionPossible: "ALTRA MENSA DELLA STESSA AREA OPERATIVA",
   registerMeal: "Registra pasto",
   authorizeException: "Autorizza eccezione",
   manualSearch: "Ricerca manuale",

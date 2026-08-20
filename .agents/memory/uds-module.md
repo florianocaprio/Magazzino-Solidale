@@ -1,6 +1,6 @@
 ---
 name: UDS (Unità di Strada) module
-description: How the street-outreach module reuses the shared person/intervento records and the area operativa/zona scoping axis.
+description: How the street-outreach module reuses the shared person/intervento records and the Area Operativa/zona scoping axis.
 ---
 
 # UDS module
@@ -16,23 +16,23 @@ The UDS (street-outreach) module does NOT have its own entities. It reuses the e
 **How to apply:**
 - The `uds` area exists alongside `sociale`. `AREA_BY_SEGMENT` maps the `beneficiari` and `interventi` segments to BOTH `["sociale","uds"]`, and `areaGuard` grants access if ANY mapped area matches — so a UDS-only operator can reach those shared endpoints without being given `sociale`.
 - Channel (canale) is driven by the EXPLICIT `uds` boolean (UDS) + `centroAscoltoId` (Centro): uds ⇒ UDS, centro ⇒ Centro, both ⇒ Entrambi, neither ⇒ unclassified. **Why:** zona-inferred channel could not represent a UDS person who hadn't been assigned a zona yet, so a dedicated flag was added. The UDS list filters on `uds=true`; the standard create form has an "anche UDS" toggle and the detail page toggles `uds` via PATCH.
-- The `uds` flag is normalized server-side (`toBool`) before the boundary guard AND before persistence in both POST and PATCH, so a loosely-typed body (`uds:"true"`, `uds:1`) can't bypass the area operativa check via type confusion.
+- The `uds` flag is normalized server-side (`toBool`) before the boundary guard AND before persistence in both POST and PATCH, so a loosely-typed body (`uds:"true"`, `uds:1`) can't bypass the Area Operativa check via type confusion.
 
 ## Area Operativa = hard boundary, Zona UDS = soft
 
-`areaOperativaId` is a HARD visibility boundary enforced server-side (an operator never sees another area operativa's people). `zonaUdsId` is a SOFT preference: the operator defaults to their own zona but can widen to the whole area operativa.
+`areaOperativaId` is a HARD visibility boundary enforced server-side (an operator never sees another Area Operativa's people). `zonaUdsId` is a SOFT preference: the operator defaults to their own zona but can widen to the whole Area Operativa.
 
 **How to apply on the frontend:**
-- Default the zona filter from `user.zonaUdsId`; offer "tutta la area operativa" to clear it. The area operativa filter only appears for the global super-admin (`user.areaOperativaId == null`).
-- A UDS person must NEVER have a null area operativa (it would be visible across every area operativa). Enforced for `uds=true` on BOTH POST and PATCH, for any path that can set the flag (UDS form, standard "anche UDS" toggle, detail toggle): scoped callers auto-pin their own area operativa (incl. legacy null-area operativa rows on PATCH); area operativa-global callers must supply a area operativa explicitly or get 400. Mirror this invariant on any future mutating path that can set `uds`.
+- Default the zona filter from `user.zonaUdsId`; offer "Tutta l'Area Operativa" to clear it. The Area Operativa filter only appears for the global super-admin (`user.areaOperativaId == null`).
+- A UDS person must NEVER have a null `areaOperativaId` (it would be visible across every Area Operativa). Enforced for `uds=true` on BOTH POST and PATCH, for any path that can set the flag (UDS form, standard "anche UDS" toggle, detail toggle): scoped callers auto-pin their own Area Operativa (including legacy rows with null `areaOperativaId` on PATCH); global callers must supply `areaOperativaId` explicitly or get 400. Mirror this invariant on any future mutating path that can set `uds`.
 - Guarded pages only mount once `user` is loaded (the route Guard's `hasArea` returns false while `user` is null), so deriving initial filter state from `user` at first render is safe — no effect-sync needed.
 - **Cross-linking a UDS page to a shared person screen needs a multi-area FE guard.** The backend lets a `uds`-only operator reach beneficiari/interventi (via `AREA_BY_SEGMENT`), but the wouter route Guard checks ONE area. Any Link from a UDS page to a `sociale`-guarded route (e.g. `/beneficiari/:id` detail) silently 403s for uds-only users unless the Guard accepts BOTH areas. **Why:** nav-hiding/guards are area-keyed and easy to forget when the destination lives under another area. **How to apply:** give the Guard a `string | string[]` area (grant if ANY matches) and pass `["sociale","uds"]` to shared-person routes.
 
 ## Fuzzy anti-duplicate search
 
-`GET /beneficiari/cerca-simili` (pg_trgm) SUGGESTS possible existing people at insert time; it never merges. It must respect the SAME area operativa hard boundary as everything else (scoped caller → own area operativa OR NULL legacy rows; global caller may narrow with `?areaOperativaId`) — a cross-area operativa match would defeat the privacy boundary.
+`GET /beneficiari/cerca-simili` (pg_trgm) SUGGESTS possible existing people at insert time; it never merges. It must respect the SAME Area Operativa hard boundary as everything else (scoped caller → own Area Operativa OR NULL legacy rows; global caller may narrow with `?areaOperativaId`) — a cross-Area-Operativa match would defeat the privacy boundary.
 
-**Why:** the brief's anti-duplicate goal ("Ammed Solin ≈ Hamed Saolin") only works because there's ONE person record per human; suggesting duplicates across area operativa would both leak data and re-fragment the registry.
+**Why:** the brief's anti-duplicate goal ("Ammed Solin ≈ Hamed Saolin") only works because there's ONE person record per human; suggesting duplicates across Aree Operative would both leak data and re-fragment the registry.
 
 **How to apply:**
 - The route MUST be registered before `/beneficiari/:id` or Express captures `cerca-simili` as an `:id`.

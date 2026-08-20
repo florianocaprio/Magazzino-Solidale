@@ -103,8 +103,8 @@ const kpi: Record<string, Labels> = {
 };
 
 const tables: Record<string, Labels> = {
-  attivitaPerMeseArea: ["Attività mensile per area", "Actividad mensual por área", "Monthly activity by area", "Activité mensuelle par domaine", "Monatliche Aktivität nach Bereich", "النشاط الشهري حسب المجال"],
-  confrontoAree: ["Confronto tra aree", "Comparación entre áreas", "Area comparison", "Comparaison des domaines", "Bereichsvergleich", "مقارنة المجالات"],
+  attivitaPerMeseArea: ["Attività mensile per Area Operativa", "Actividad mensual por área", "Monthly activity by area", "Activité mensuelle par domaine", "Monatliche Aktivität nach Bereich", "النشاط الشهري حسب المجال"],
+  confrontoAree: ["Confronto tra Aree Operative", "Comparación entre áreas", "Area comparison", "Comparaison des domaines", "Bereichsvergleich", "مقارنة المجالات"],
   distribuzioneTerritoriale: ["Distribuzione territoriale", "Distribución territorial", "Territorial distribution", "Répartition territoriale", "Territoriale Verteilung", "التوزيع الجغرافي"],
   pacchiPerMese: ["Pacchi per mese", "Paquetes por mes", "Parcels by month", "Colis par mois", "Pakete pro Monat", "الطرود حسب الشهر"],
   interventiPerMese: ["Interventi per mese", "Intervenciones por mes", "Interventions by month", "Interventions par mois", "Maßnahmen pro Monat", "التدخلات حسب الشهر"],

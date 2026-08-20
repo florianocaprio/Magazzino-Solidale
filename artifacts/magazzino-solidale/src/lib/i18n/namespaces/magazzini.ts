@@ -38,7 +38,7 @@ export const magazzini = {
     filterTipoMagazzino: "Tutti i tipi",
     areaOperativa: "Area Operativa",
     nessunaAreaOperativa: "Nessuna Area Operativa",
-    mensaAreaRequired: "Per una Mensa devi selezionare un\'Area",
+    mensaAreaRequired: "Per una Mensa devi selezionare un'Area Operativa",
   },
   es: {
     title: "Almacenes",

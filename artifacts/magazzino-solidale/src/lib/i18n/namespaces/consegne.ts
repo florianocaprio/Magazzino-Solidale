@@ -12,7 +12,7 @@ export const consegne = {
     colFasciaOraria: "Fascia Oraria",
     filterAreaOperativa: "Area Operativa",
     filterAllAreaOperativa: "Tutte le Aree Operative",
-    selectAreaOperativaFirst: "Seleziona prima un'area",
+    selectAreaOperativaFirst: "Seleziona prima un'Area Operativa",
     filterAllCenters: "Tutti i centri",
     filterAllStatuses: "Tutti gli stati",
     filterDateFrom: "Data inizio",

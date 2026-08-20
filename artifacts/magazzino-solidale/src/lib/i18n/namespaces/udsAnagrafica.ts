@@ -1,11 +1,11 @@
 export const udsAnagrafica = {
   it: {
     title: "Anagrafica UDS",
-    subtitle: "Persone seguite dall'Unità di Strada nella tua zona e area.",
+    subtitle: "Persone seguite dall'Unità di Strada nella tua zona e Area Operativa.",
     newPerson: "Nuova persona",
     newTitle: "Nuova persona UDS",
     filterZona: "Zona",
-    allZone: "Tutta l'area",
+    allZone: "Tutta l'Area Operativa",
     filterAreaOperativa: "Area Operativa",
     allAreaOperativa: "Tutte le Aree Operative",
     searchLabel: "Ricerca",
@@ -20,7 +20,7 @@ export const udsAnagrafica = {
     canaleEntrambi: "UDS + Centro",
     canaleNd: "Non classificato",
     noPersone: "Nessuna persona trovata.",
-    noAreaOperativaWarning: "Nessuna Area Operativa disponibile. Chiedi a un amministratore di creare le aree.",
+    noAreaOperativaWarning: "Nessuna Area Operativa disponibile. Chiedi a un amministratore di crearne una.",
     toastCreated: "Persona UDS creata",
     dupTitle: "Possibili persone già esistenti",
     dupHint: "Controlla se è una di queste prima di crearne una nuova.",

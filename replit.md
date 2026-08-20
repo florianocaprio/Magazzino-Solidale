@@ -144,9 +144,9 @@ Le app girano tramite **workflow** Replit (porte assegnate via `PORT`, non fisse
 
 #### Matricola autogen
 - Vuota su `POST /utenti` → `initial(nome)+initial(cognome)+yy-SIGLA-NNNNNN` in maiuscolo (es. Mario Rossi inserito 2026, area operativa Milano sigla MI → `MR26-MI-482910`).
-  - `yy` = anno inserimento a 2 cifre; `SIGLA` = `area operativa.sigla` (2 lettere) o prime 2 lettere del nome area operativa come fallback, `OO` per utenti globali (areaOperativaId null); `NNNNNN` = 6 cifre random. Su collisione di matricola completa la PRIMA cifra diventa lettera (A, B, C…). Solo server-side, trimmato prima.
+  - `yy` = anno inserimento a 2 cifre; `SIGLA` = `areeOperativeTable.sigla` (2 lettere) o prime 2 lettere di `areaOperativaNome` come fallback, `OO` per utenti globali (`areaOperativaId` null); `NNNNNN` = 6 cifre random. Su collisione di matricola completa la PRIMA cifra diventa lettera (A, B, C…). Solo server-side, trimmato prima.
 - Auto-generata anche in **edit** (`PATCH /utenti/:id`) quando l'utente resterebbe senza matricola (record legacy null / svuotato) — rispetta un valore esplicito, non sovrascrive mai uno esistente, usa l'anno di inserimento ORIGINALE (`dataCreazione`) + area operativa effettiva post-update.
-- `area operativa.sigla` è un campo editabile di 2 lettere nella pagina admin Area Operativa (maiuscolizzato server-side). Pulizia one-off: `pnpm --filter @workspace/scripts run bonifica:matricole`.
+- `areeOperativeTable.sigla` è un campo editabile di 2 lettere nella pagina admin Area Operativa (maiuscolizzato server-side). Pulizia one-off: `pnpm --filter @workspace/scripts run bonifica:matricole`.
 
 ### Scoping per Centro di Ascolto
 - Additivo all'RBAC per area, server-side (il lock FE è solo UX). Utente con `centroAscoltoId != null` → vede il proprio centro O i condivisi (`centro IS NULL`); null = globale. Helper in `lib/centroScope.ts`.

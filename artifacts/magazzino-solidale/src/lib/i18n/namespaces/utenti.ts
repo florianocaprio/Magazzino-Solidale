@@ -23,7 +23,7 @@ export const utenti = {
     nessunRuolo: "Nessun ruolo",
     colAreaOperativa: "Area Operativa",
     colZona: "Zona UDS",
-    selezionaAreaOperativa: "Seleziona area",
+    selezionaAreaOperativa: "Seleziona Area Operativa",
     areaOperativaGlobale: "Globale (tutte le aree)",
     selezionaZona: "Seleziona zona",
     tutteLeZone: "Tutte le zone",

@@ -5,7 +5,7 @@ type AdminScopeUser = Pick<SessionUser, "isAdmin" | "isSuperAdmin" | "areaOperat
 
 /**
  * Nel modello corrente un amministratore senza areaOperativaId opera globalmente;
- * areaOperativaId e la tabella `areaOperativa` rappresentano l'Area operativa (naming legacy).
+ * areaOperativaId e `areeOperativeTable` rappresentano l'Area Operativa.
  */
 export function isGlobalAdmin(
   user: AdminScopeUser | null | undefined,
