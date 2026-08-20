@@ -40,6 +40,8 @@ import {
 } from "drizzle-orm";
 import { parseDbNumber } from "./disponibilitaMagazzino";
 import { auditEmporioTx } from "./emporioAudit";
+import { magazzinoScopeFilter } from "./centroScope";
+import { quantitaCompatibileConUnitaMisuraEmporio } from "./emporioQuantita";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
 import {
   dateTimeEuropeRomeToUtc,
@@ -299,10 +301,21 @@ async function validateRigheFinali(
         "L'unità di misura del Prodotto è cambiata: aggiornare il carrello prima della chiusura.",
       );
     }
+    const quantitaRiga = parseDbNumber(riga.quantita);
+    if (
+      !quantitaCompatibileConUnitaMisuraEmporio(
+        quantitaRiga,
+        riga.unitaMisura ?? prodotto.unitaMisura,
+      )
+    ) {
+      throw new SpesaEmporioError(
+        409,
+        'Il carrello contiene una quantità frazionaria per un prodotto in "pz": è necessaria una verifica manuale.',
+      );
+    }
     quantityByProduct.set(
       riga.prodottoId,
-      (quantityByProduct.get(riga.prodottoId) ?? 0) +
-        parseDbNumber(riga.quantita),
+      (quantityByProduct.get(riga.prodottoId) ?? 0) + quantitaRiga,
     );
   }
 
@@ -849,6 +862,7 @@ export async function listSpeseEmporio(
     centroAscoltoId?: number;
     cittaId?: number;
     zonaUdsId?: number;
+    visibleMagazzinoIds?: number[] | null;
     page?: number;
     limit?: number;
   } = {},
@@ -884,6 +898,11 @@ export async function listSpeseEmporio(
     conditions.push(eq(speseEmporioTable.cittaId, params.cittaId));
   if (params.zonaUdsId != null)
     conditions.push(eq(beneficiariTable.zonaUdsId, params.zonaUdsId));
+  const magazzinoFilter = magazzinoScopeFilter(
+    speseEmporioTable.magazzinoEmporioId,
+    params.visibleMagazzinoIds ?? null,
+  );
+  if (magazzinoFilter) conditions.push(magazzinoFilter);
   if (params.beneficiarioSearch) {
     const s = `%${params.beneficiarioSearch}%`;
     conditions.push(

@@ -4272,7 +4272,8 @@ export interface BollaRiga {
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;
   quantita: number;
-  unitaMisura: string;
+  /** @nullable */
+  unitaMisura: string | null;
   /** @nullable */
   note?: string | null;
 }
@@ -5980,17 +5981,6 @@ export type AuthorizeBeneficiariExport200 = {
 
 export type ListInterventiParams = {
 beneficiarioId?: number;
-/**
- * Pagina richiesta, indicizzata da 1
- * @minimum 1
- */
-page?: PageParamParameter;
-/**
- * Numero di record per pagina
- * @minimum 1
- * @maximum 100
- */
-limit?: LimitParamParameter;
 tipo?: string;
 centroAscoltoId?: number;
 cittaId?: number;

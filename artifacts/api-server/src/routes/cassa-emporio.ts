@@ -37,6 +37,8 @@ import {
   canUseBeneficiario,
   centroScopeFilter,
   cittaScopeFilter,
+  magazzinoScopeFilter,
+  visibleMagazzinoIds,
   zonaUdsScopeFilter,
 } from "../lib/centroScope";
 import {
@@ -62,6 +64,7 @@ import {
   intervalloGiornoEuropeRome,
 } from "../lib/interventiViste";
 import { auditEmporioTx } from "../lib/emporioAudit";
+import { quantitaCompatibileConUnitaMisuraEmporio } from "../lib/emporioQuantita";
 
 const router: IRouter = Router();
 router.use(
@@ -115,6 +118,8 @@ const MSG_PRODOTTO_NON_ABILITATO =
   "Il prodotto non è abilitato per Emporio. Abilitalo nella scheda prodotto prima di aggiungerlo al carrello.";
 const MSG_PRODOTTO_SENZA_CREDITO =
   "Il prodotto non ha un Valore Credito Solidale configurato. Imposta il valore nella scheda prodotto.";
+const MSG_QUANTITA_PZ_INTERA =
+  'I prodotti con unità di misura "pz" richiedono una quantità intera positiva.';
 const MSG_GIACENZA_INSUFFICIENTE =
   "La quantità richiesta supera la giacenza disponibile nel magazzino Emporio selezionato.";
 const MSG_LIMITE_SPESA =
@@ -576,6 +581,8 @@ async function buildRigaValues(
     return { error: MSG_PRODOTTO_NON_ABILITATO, status: 400 } as const;
   if (creditoUnitario <= 0)
     return { error: MSG_PRODOTTO_SENZA_CREDITO, status: 400 } as const;
+  if (!quantitaCompatibileConUnitaMisuraEmporio(quantita, prodotto.unitaMisura))
+    return { error: MSG_QUANTITA_PZ_INTERA, status: 400 } as const;
 
   const otherQuantity = await quantitaProdottoInSessione(
     executor,
@@ -1026,6 +1033,11 @@ router.get(
       callerZonaUdsId(req),
     );
     if (zonaFilter) conditions.push(zonaFilter);
+    const magazzinoFilter = magazzinoScopeFilter(
+      sessioniCassaEmporioTable.magazzinoEmporioId,
+      await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)),
+    );
+    if (magazzinoFilter) conditions.push(magazzinoFilter);
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const [{ total }] = await db
       .select({ total: sql<number>`count(*)::int` })

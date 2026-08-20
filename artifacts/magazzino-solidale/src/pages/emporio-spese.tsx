@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  getBollaStampaSpesaEmporio,
   getGetSpesaEmporioQueryKey,
   getListSpeseEmporioQueryKey,
   useGetSpesaEmporio,
@@ -47,7 +46,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { speseEmporioCapabilities } from "@/lib/emporio-permissions";
-import { downloadBollaPdf } from "@/pages/bolle";
+import { downloadBollaEmporioPdf } from "@/lib/emporio-bolla-stampa";
 import type { BollaTemplate } from "@/lib/bolla-pdf";
 
 const ALL = "__all__";
@@ -328,19 +327,11 @@ export default function EmporioSpese() {
 
   const printBolla = async (spesa: SpesaEmporio) => {
     try {
-      if (spesa.bollaId != null) {
-        await downloadBollaPdf(spesa.bollaId, {
-          footer: impostazioniStampa?.footerBolla ?? null,
-          template:
-            (impostazioniStampa?.templateBolla as BollaTemplate) ?? "standard",
-        });
-        return;
-      }
-      const data = await getBollaStampaSpesaEmporio(spesa.id);
-      downloadHtmlFile(
-        buildPrintHtml(data),
-        `${safeFilename(data.numeroBolla ?? data.numeroSpesa)}.html`,
-      );
+      await downloadBollaEmporioPdf(spesa, {
+        footer: impostazioniStampa?.footerBolla ?? null,
+        template:
+          (impostazioniStampa?.templateBolla as BollaTemplate) ?? "standard",
+      });
     } catch {
       toast({ title: t("common.error"), variant: "destructive" });
     }

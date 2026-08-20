@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
-  getBollaStampaSpesaEmporio,
   getGetSpesaEmporioQueryKey,
   getGetSessioneCassaEmporioQueryKey,
   getListAccessiEmporioQueryKey,
@@ -93,7 +92,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useModuloFlags } from "@/lib/use-moduli";
 import { useAuth } from "@/lib/auth";
 import { cassaEmporioCapabilities } from "@/lib/emporio-permissions";
-import { downloadBollaPdf } from "@/pages/bolle";
+import { downloadBollaEmporioPdf } from "@/lib/emporio-bolla-stampa";
+import { configurazioneQuantitaEmporio } from "@/lib/emporio-quantita";
 import type { BollaTemplate } from "@/lib/bolla-pdf";
 
 const ALL = "__all__";
@@ -873,19 +873,11 @@ export default function EmporioCassa() {
 
   const downloadBolla = async (spesa: SpesaEmporio) => {
     try {
-      if (spesa.bollaId != null) {
-        await downloadBollaPdf(spesa.bollaId, {
-          footer: impostazioniStampa?.footerBolla ?? null,
-          template:
-            (impostazioniStampa?.templateBolla as BollaTemplate) ?? "standard",
-        });
-        return;
-      }
-      const data = await getBollaStampaSpesaEmporio(spesa.id);
-      downloadHtmlFile(
-        buildBollaPrintHtml(data),
-        `${safeFilename(data.numeroBolla ?? data.numeroSpesa)}.html`,
-      );
+      await downloadBollaEmporioPdf(spesa, {
+        footer: impostazioniStampa?.footerBolla ?? null,
+        template:
+          (impostazioniStampa?.templateBolla as BollaTemplate) ?? "standard",
+      });
     } catch {
       toast({ title: t("common.error"), variant: "destructive" });
     }
@@ -1575,19 +1567,41 @@ export default function EmporioCassa() {
                                   onClick={() =>
                                     updateQuantity(
                                       riga.id,
-                                      Math.round((riga.quantita - 0.25) * 100) /
-                                        100,
+                                      Math.round(
+                                        (riga.quantita -
+                                          configurazioneQuantitaEmporio(
+                                            riga.unitaMisura,
+                                          ).incremento) *
+                                          100,
+                                      ) / 100,
                                     )
                                   }
-                                  disabled={!canEdit || riga.quantita <= 0.25}
+                                  disabled={
+                                    !canEdit ||
+                                    riga.quantita -
+                                      configurazioneQuantitaEmporio(
+                                        riga.unitaMisura,
+                                      ).incremento <
+                                      configurazioneQuantitaEmporio(
+                                        riga.unitaMisura,
+                                      ).min
+                                  }
                                 >
                                   <Minus className="h-4 w-4" />
                                 </Button>
                                 <Input
                                   key={`${riga.id}-${riga.quantita}`}
                                   type="number"
-                                  min="0.01"
-                                  step="0.01"
+                                  min={
+                                    configurazioneQuantitaEmporio(
+                                      riga.unitaMisura,
+                                    ).min
+                                  }
+                                  step={
+                                    configurazioneQuantitaEmporio(
+                                      riga.unitaMisura,
+                                    ).step
+                                  }
                                   className="h-9 w-24 text-center"
                                   defaultValue={riga.quantita}
                                   onBlur={(e) =>
@@ -1604,8 +1618,13 @@ export default function EmporioCassa() {
                                   onClick={() =>
                                     updateQuantity(
                                       riga.id,
-                                      Math.round((riga.quantita + 0.25) * 100) /
-                                        100,
+                                      Math.round(
+                                        (riga.quantita +
+                                          configurazioneQuantitaEmporio(
+                                            riga.unitaMisura,
+                                          ).incremento) *
+                                          100,
+                                      ) / 100,
                                     )
                                   }
                                   disabled={!canEdit}

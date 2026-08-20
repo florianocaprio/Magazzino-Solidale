@@ -2230,11 +2230,6 @@ export const CreateTesseraBeneficiarioDaAnagraficaBody = zod.object({
 })
 
 
-export const listInterventiQueryPageDefault = 1;
-
-export const listInterventiQueryLimitDefault = 50;
-export const listInterventiQueryLimitMax = 100;
-
 export const listInterventiQueryIncludiStoriciDefault = false;
 export const listInterventiQueryRicercaMax = 120;
 
@@ -2247,8 +2242,6 @@ export const listInterventiQueryLimiteMax = 200;
 
 export const ListInterventiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
-  "page": zod.coerce.number().min(1).default(listInterventiQueryPageDefault).describe('Pagina richiesta, indicizzata da 1'),
-  "limit": zod.coerce.number().min(1).max(listInterventiQueryLimitMax).default(listInterventiQueryLimitDefault).describe('Numero di record per pagina'),
   "tipo": zod.coerce.string().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
   "cittaId": zod.coerce.number().optional(),
@@ -5328,7 +5321,7 @@ export const GetBollaResponse = zod.object({
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
 }))
 })
@@ -5390,7 +5383,7 @@ export const UpdateBollaResponse = zod.object({
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
 }))
 })
@@ -5414,7 +5407,7 @@ export const ListBollaRigheResponseItem = zod.object({
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
 })
 export const ListBollaRigheResponse = zod.array(ListBollaRigheResponseItem)
@@ -5493,7 +5486,7 @@ export const ConfermaBollaResponse = zod.object({
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
 }))
 })
@@ -5547,7 +5540,7 @@ export const AnnullaBollaResponse = zod.object({
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
 }))
 })
@@ -5606,7 +5599,7 @@ export const ConsegnaBollaResponse = zod.object({
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
 }))
 })
@@ -5668,7 +5661,7 @@ export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
   "quantita": zod.number(),
-  "unitaMisura": zod.string(),
+  "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
 }))
 })

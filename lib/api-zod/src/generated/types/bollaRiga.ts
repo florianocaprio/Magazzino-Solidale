@@ -20,7 +20,8 @@ export interface BollaRiga {
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;
   quantita: number;
-  unitaMisura: string;
+  /** @nullable */
+  unitaMisura: string | null;
   /** @nullable */
   note?: string | null;
 }

@@ -1486,8 +1486,6 @@ paths:
           in: query
           schema:
             type: integer
-        - $ref: "#/components/parameters/PageParam"
-        - $ref: "#/components/parameters/LimitParam"
         - name: tipo
           in: query
           schema:
@@ -12058,7 +12056,7 @@ components:
         quantita:
           type: number
         unitaMisura:
-          type: string
+          type: ["string", "null"]
         note:
           type: ["string", "null"]
       required: [id, bollaId, prodottoId, quantita, unitaMisura, fsePlus]

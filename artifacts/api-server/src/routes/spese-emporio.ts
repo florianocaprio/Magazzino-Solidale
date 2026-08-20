@@ -12,7 +12,9 @@ import {
   callerCentroId,
   callerCittaId,
   callerZonaUdsId,
+  canAccessMagazzino,
   canUseBeneficiario,
+  visibleMagazzinoIds,
 } from "../lib/centroScope";
 import {
   EMPORIO_DISABLED_MSG,
@@ -83,7 +85,7 @@ async function assertEmporioEnabled(
 }
 
 async function ensureSpesaAccess(
-  spesa: { beneficiarioId: number } | null,
+  spesa: { beneficiarioId: number; magazzinoEmporioId: number } | null,
   req: import("express").Request,
   res: import("express").Response,
 ): Promise<boolean> {
@@ -97,6 +99,18 @@ async function ensureSpesaAccess(
       callerCentroId(req),
       callerCittaId(req),
       callerZonaUdsId(req),
+    ))
+  ) {
+    res
+      .status(403)
+      .json({ error: "Risorsa non accessibile per il tuo profilo" });
+    return false;
+  }
+  if (
+    !(await canAccessMagazzino(
+      spesa.magazzinoEmporioId,
+      callerCentroId(req),
+      callerCittaId(req),
     ))
   ) {
     res
@@ -140,6 +154,7 @@ router.get(
       centroAscoltoId: callerCentro ?? asInt(q.centroAscoltoId),
       cittaId: callerCitta ?? asInt(q.cittaId ?? q.areaId),
       zonaUdsId: callerZona ?? asInt(q.zonaUdsId),
+      visibleMagazzinoIds: await visibleMagazzinoIds(callerCentro, callerCitta),
       page,
       limit,
     });

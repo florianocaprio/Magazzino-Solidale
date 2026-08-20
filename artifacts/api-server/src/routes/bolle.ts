@@ -217,7 +217,7 @@ async function buildDettaglio(id: number) {
       fsePlusQuantita: split.fse,
       nonFsePlusQuantita: split.nonFse,
       quantita: parseFloat(r.r.quantita),
-      unitaMisura: "pz",
+      unitaMisura: r.r.unitaMisura,
       note: "Riga da Spesa Emporio",
       };
     }),

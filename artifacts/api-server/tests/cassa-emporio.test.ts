@@ -59,7 +59,13 @@ const scaricoIds: number[] = [];
 let operatorUserId: number;
 
 function makeApp(
-  options: { isAdmin?: boolean; permessi?: string[]; aree?: string[] } = {},
+  options: {
+    isAdmin?: boolean;
+    permessi?: string[];
+    aree?: string[];
+    centroAscoltoId?: number | null;
+    cittaId?: number | null;
+  } = {},
 ): Express {
   const app = express();
   app.use(express.json());
@@ -77,8 +83,8 @@ function makeApp(
       }
     ).user = {
       id: operatorUserId,
-      centroAscoltoId: null,
-      cittaId: null,
+      centroAscoltoId: options.centroAscoltoId ?? null,
+      cittaId: options.cittaId ?? null,
       isAdmin: options.isAdmin ?? true,
       permessi: options.permessi ?? [],
       aree: options.aree ?? ["emporio"],
@@ -2181,6 +2187,328 @@ describe("Cassa Emporio", () => {
       );
     expect(spese).toHaveLength(0);
     expect(crediti).toHaveLength(0);
+  });
+
+  it("applica insieme scope Beneficiario e Magazzino a Sessioni, Spese, Bolla, email e storno", async () => {
+    const cittaId = await createCitta();
+    const centroAId = await createCentro(cittaId);
+    const centroBId = await createCentro(cittaId);
+    const magazzinoAId = await createMagazzino("emporio", cittaId, centroAId);
+    const magazzinoBId = await createMagazzino("emporio", cittaId, centroBId);
+    const beneficiarioId = await createBeneficiario({
+      cittaId,
+      centroAscoltoId: centroAId,
+      saldo: "50.00",
+    });
+    const accessoAId = await createAccesso({
+      beneficiarioId,
+      magazzinoId: magazzinoAId,
+      dataOraInizio: "2026-07-15T09:00:00",
+    });
+    const accessoBId = await createAccesso({
+      beneficiarioId,
+      magazzinoId: magazzinoBId,
+      dataOraInizio: "2026-07-16T09:00:00",
+    });
+    const prodottoAId = await createProdotto({ magazzinoId: magazzinoAId });
+    const prodottoBId = await createProdotto({ magazzinoId: magazzinoBId });
+    const lottoBId = lottoIds[lottoIds.length - 1];
+
+    const sessioneA = await openSession(accessoAId);
+    await addProduct(sessioneA.body.id, prodottoAId, 1);
+    await postSessionAction(sessioneA.body.id, "pronta-per-chiusura");
+    const chiusuraA = await postSessionAction(sessioneA.body.id, "chiudi");
+    expect(chiusuraA.status).toBe(200);
+    await trackSpesa(chiusuraA.body.spesa.id);
+
+    const sessioneB = await openSession(accessoBId);
+    await addProduct(sessioneB.body.id, prodottoBId, 1);
+    await postSessionAction(sessioneB.body.id, "pronta-per-chiusura");
+    const chiusuraB = await postSessionAction(sessioneB.body.id, "chiudi");
+    expect(chiusuraB.status).toBe(200);
+    await trackSpesa(chiusuraB.body.spesa.id);
+
+    const scopedCentroA = makeApp({
+      isAdmin: false,
+      centroAscoltoId: centroAId,
+      cittaId,
+      permessi: [
+        "emporio.cassa.view",
+        "emporio.sales.view",
+        "emporio.sales.manage",
+        "emporio.sales.reverse",
+      ],
+    });
+
+    const sessioni = await request(scopedCentroA).get(
+      "/cassa-emporio/sessioni",
+    );
+    expect(sessioni.status).toBe(200);
+    expect(sessioni.headers["x-total-count"]).toBe("1");
+    expect(sessioni.body.map((row: { id: number }) => row.id)).toEqual([
+      sessioneA.body.id,
+    ]);
+    expect(
+      (
+        await request(scopedCentroA).get(
+          `/cassa-emporio/sessioni/${sessioneB.body.id}`,
+        )
+      ).status,
+    ).toBe(403);
+
+    const spese = await request(scopedCentroA).get("/spese-emporio");
+    expect(spese.status).toBe(200);
+    expect(spese.headers["x-total-count"]).toBe("1");
+    expect(spese.body.map((row: { id: number }) => row.id)).toEqual([
+      chiusuraA.body.spesa.id,
+    ]);
+    expect(
+      (
+        await request(scopedCentroA).get(
+          `/spese-emporio/${chiusuraB.body.spesa.id}`,
+        )
+      ).status,
+    ).toBe(403);
+
+    expect(
+      (
+        await request(scopedCentroA).get(
+          `/spese-emporio/${chiusuraA.body.spesa.id}/bolla-stampa`,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(scopedCentroA).get(
+          `/bolle/${chiusuraA.body.spesa.bollaId}`,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(scopedCentroA).get(
+          `/spese-emporio/${chiusuraB.body.spesa.id}/bolla-stampa`,
+        )
+      ).status,
+    ).toBe(403);
+
+    const [lottoPrima] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lottoBId));
+    const [beneficiarioPrima] = await db
+      .select()
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, beneficiarioId));
+    const movimentiPrima = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.lottoId, lottoBId));
+    const auditPrima = await db
+      .select()
+      .from(auditConfigurazioniTable)
+      .where(eq(auditConfigurazioniTable.utenteId, operatorUserId));
+
+    expect(
+      (
+        await request(scopedCentroA)
+          .post(
+            `/spese-emporio/${chiusuraB.body.spesa.id}/registra-invio-manuale-bolla`,
+          )
+          .send({})
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(scopedCentroA)
+          .post(`/spese-emporio/${chiusuraB.body.spesa.id}/storna`)
+          .send({ motivo: "Tentativo fuori scope" })
+      ).status,
+    ).toBe(403);
+
+    const [lottoDopo] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lottoBId));
+    const [beneficiarioDopo] = await db
+      .select()
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, beneficiarioId));
+    const movimentiDopo = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.lottoId, lottoBId));
+    const auditDopo = await db
+      .select()
+      .from(auditConfigurazioniTable)
+      .where(eq(auditConfigurazioniTable.utenteId, operatorUserId));
+    const spesaBDopo = await request(makeApp()).get(
+      `/spese-emporio/${chiusuraB.body.spesa.id}`,
+    );
+
+    expect(lottoDopo.quantitaResidua).toBe(lottoPrima.quantitaResidua);
+    expect(beneficiarioDopo.creditoSolidaleSaldo).toBe(
+      beneficiarioPrima.creditoSolidaleSaldo,
+    );
+    expect(movimentiDopo).toHaveLength(movimentiPrima.length);
+    expect(auditDopo).toHaveLength(auditPrima.length);
+    expect(spesaBDopo.body.emailBollaStato).toBe("non_preparata");
+    expect(spesaBDopo.body.statoSpesa).toBe("chiusa");
+  });
+
+  it("preserva la UOM deterministica nel fallback Bolla legacy senza inventare pz", async () => {
+    const fixture = await createFixture();
+    const sessione = await openSession(fixture.accessoId);
+    const prodottoId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "kg",
+    });
+    const [bolla] = await db
+      .insert(bolleTable)
+      .values({
+        numeroBolla: `LEG-${rnd()}`,
+        dataBolla: "2026-07-15",
+        beneficiarioId: fixture.beneficiarioId,
+        magazzinoId: fixture.magazzinoId,
+      })
+      .returning();
+    bollaIds.push(bolla.id);
+    const [spesa] = await db
+      .insert(speseEmporioTable)
+      .values({
+        sessioneCassaId: sessione.body.id,
+        accessoEmporioId: fixture.accessoId,
+        beneficiarioId: fixture.beneficiarioId,
+        centroAscoltoId: fixture.centroId,
+        cittaId: fixture.cittaId,
+        magazzinoEmporioId: fixture.magazzinoId,
+        bollaId: bolla.id,
+        numeroSpesa: `SP-LEG-${rnd()}`,
+        totaleCreditoConsumati: "1.00",
+        saldoPrima: "20.00",
+        saldoDopo: "19.00",
+      })
+      .returning();
+    spesaIds.push(spesa.id);
+    const [rigaSpesa] = await db
+      .insert(speseEmporioRigheTable)
+      .values({
+        spesaEmporioId: spesa.id,
+        prodottoId,
+        descrizioneProdotto: "Farina legacy",
+        quantita: "0.50",
+        unitaMisura: "kg",
+        creditoUnitario: "2.00",
+        creditoTotale: "1.00",
+      })
+      .returning();
+
+    const fallbackKg = await request(makeApp()).get(`/bolle/${bolla.id}`);
+    expect(fallbackKg.status).toBe(200);
+    expect(fallbackKg.body.righe[0].unitaMisura).toBe("kg");
+
+    await db
+      .update(speseEmporioRigheTable)
+      .set({ unitaMisura: null })
+      .where(eq(speseEmporioRigheTable.id, rigaSpesa.id));
+    const fallbackSenzaUom = await request(makeApp()).get(`/bolle/${bolla.id}`);
+    expect(fallbackSenzaUom.status).toBe(200);
+    expect(fallbackSenzaUom.body.righe[0].unitaMisura).toBeNull();
+
+    await db.insert(bollaRigheTable).values({
+      bollaId: bolla.id,
+      prodottoId,
+      quantita: "0.50",
+      unitaMisura: "l",
+    });
+    const bollaNormale = await request(makeApp()).get(`/bolle/${bolla.id}`);
+    expect(bollaNormale.status).toBe(200);
+    expect(bollaNormale.body.righe[0].unitaMisura).toBe("l");
+  });
+
+  it("impone quantità intere per pz e conserva i decimali per kg e l", async () => {
+    const fixture = await createFixture();
+    const sessione = await openSession(fixture.accessoId);
+    const prodottoPzId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "pz",
+    });
+    const prodottoPzFrazionarioId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "pz",
+    });
+    const prodottoKgId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "kg",
+    });
+    const prodottoGrammiId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "g",
+    });
+    const prodottoLitriId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "l",
+    });
+    const prodottoMillilitriId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "ml",
+    });
+
+    const pz = await addProduct(sessione.body.id, prodottoPzId, 1);
+    expect(pz.status).toBe(201);
+    const pzFrazionario = await addProduct(
+      sessione.body.id,
+      prodottoPzFrazionarioId,
+      0.5,
+    );
+    expect(pzFrazionario.status).toBe(400);
+    expect(pzFrazionario.body.error).toContain('unità di misura "pz"');
+    let versione = await getSessionVersion(sessione.body.id);
+    const duePezzi = await request(makeApp())
+      .patch(`/cassa-emporio/sessioni/${sessione.body.id}/righe/${pz.body.id}`)
+      .send({ quantita: 2, versione });
+    expect(duePezzi.status).toBe(200);
+
+    versione = await getSessionVersion(sessione.body.id);
+    for (const quantita of [0.5, 1.25]) {
+      const frazionaria = await request(makeApp())
+        .patch(
+          `/cassa-emporio/sessioni/${sessione.body.id}/righe/${pz.body.id}`,
+        )
+        .send({ quantita, versione });
+      expect(frazionaria.status).toBe(400);
+      expect(frazionaria.body.error).toContain('unità di misura "pz"');
+    }
+
+    expect((await addProduct(sessione.body.id, prodottoKgId, 0.5)).status).toBe(
+      201,
+    );
+    expect(
+      (await addProduct(sessione.body.id, prodottoGrammiId, 0.5)).status,
+    ).toBe(201);
+    expect(
+      (await addProduct(sessione.body.id, prodottoLitriId, 0.75)).status,
+    ).toBe(201);
+    expect(
+      (await addProduct(sessione.body.id, prodottoMillilitriId, 0.5)).status,
+    ).toBe(201);
+
+    await db
+      .update(sessioniCassaEmporioRigheTable)
+      .set({ quantita: "0.50", creditoTotale: "0.50" })
+      .where(eq(sessioniCassaEmporioRigheTable.id, pz.body.id));
+    expect(
+      (await postSessionAction(sessione.body.id, "pronta-per-chiusura")).status,
+    ).toBe(200);
+    const chiusuraLegacy = await postSessionAction(sessione.body.id, "chiudi");
+    expect(chiusuraLegacy.status).toBe(409);
+    expect(chiusuraLegacy.body.error).toContain("verifica manuale");
+    expect(
+      await db
+        .select()
+        .from(speseEmporioTable)
+        .where(eq(speseEmporioTable.sessioneCassaId, sessione.body.id)),
+    ).toHaveLength(0);
   });
 
   it("sospende, riprende e annulla con motivo; sessione annullata non è modificabile", async () => {
