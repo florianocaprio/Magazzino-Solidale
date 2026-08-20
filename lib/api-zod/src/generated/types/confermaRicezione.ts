@@ -7,6 +7,8 @@
  */
 
 export interface ConfermaRicezione {
+  /** @minimum 1 */
+  versione: number;
   note?: string;
   dataConferma?: string;
 }

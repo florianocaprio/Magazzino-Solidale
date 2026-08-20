@@ -5,7 +5,7 @@ import {
   CreateRuoloVolontarioBody,
   UpdateRuoloVolontarioBody,
 } from "@workspace/api-zod";
-import { requireAdmin } from "../middlewares/auth";
+import { requireGlobalAdmin } from "../lib/adminScope";
 import { requireModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
@@ -32,9 +32,13 @@ router.get("/ruoli-volontari", async (_req, res) => {
   res.json(rows.map(fmt));
 });
 
-router.post("/ruoli-volontari", requireAdmin, async (req, res) => {
-  const parsed = CreateRuoloVolontarioBody.parse(req.body);
-  const nome = parsed.nome.trim();
+router.post("/ruoli-volontari", requireGlobalAdmin, async (req, res) => {
+  const parsed = CreateRuoloVolontarioBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Inserimento ruolo volontario non valido" });
+    return;
+  }
+  const nome = parsed.data.nome.trim();
   if (!nome) {
     res.status(400).json({ error: "Nome obbligatorio" });
     return;
@@ -49,15 +53,21 @@ router.post("/ruoli-volontari", requireAdmin, async (req, res) => {
   }
   const [row] = await db
     .insert(ruoliVolontariTable)
-    .values({ ...parsed, nome })
+    .values({ ...parsed.data, nome })
     .returning();
   res.status(201).json(fmt(row));
 });
 
-router.patch("/ruoli-volontari/:id", requireAdmin, async (req, res) => {
+router.patch("/ruoli-volontari/:id", requireGlobalAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const parsed = UpdateRuoloVolontarioBody.parse(req.body);
-  const updates: Partial<typeof ruoliVolontariTable.$inferInsert> = { ...parsed };
+  const parsed = UpdateRuoloVolontarioBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Modifica ruolo volontario non valida" });
+    return;
+  }
+  const updates: Partial<typeof ruoliVolontariTable.$inferInsert> = {
+    ...parsed.data,
+  };
   if (typeof updates.nome === "string") {
     updates.nome = updates.nome.trim();
     if (!updates.nome) {
@@ -85,7 +95,7 @@ router.patch("/ruoli-volontari/:id", requireAdmin, async (req, res) => {
   res.json(fmt(row));
 });
 
-router.delete("/ruoli-volontari/:id", requireAdmin, async (req, res) => {
+router.delete("/ruoli-volontari/:id", requireGlobalAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
   // `volontari.ruolo` stores the role NAME as free text (no FK), so removing a
   // role simply retires the option; existing volunteers keep their stored value.

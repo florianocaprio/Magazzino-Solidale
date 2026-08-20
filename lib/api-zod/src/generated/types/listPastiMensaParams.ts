@@ -10,4 +10,13 @@ export type ListPastiMensaParams = {
 mensaId?: number;
 data?: Date;
 tipoServizio?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
 };

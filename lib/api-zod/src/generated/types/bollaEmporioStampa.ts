@@ -13,6 +13,7 @@ export interface BollaEmporioStampa {
   numeroBolla?: string | null;
   numeroSpesa: string;
   dataChiusura: Date;
+  dataBolla: Date;
   /** @nullable */
   beneficiario?: string | null;
   /** @nullable */

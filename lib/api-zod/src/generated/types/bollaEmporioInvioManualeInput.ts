@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface BollaEmporioInvioManualeInput {
-  /** @nullable */
-  linkBolla?: string | null;
-}
+/**
+ * Il server costruisce il link Bolla da configurazione trusted o same-origin validata.
+ */
+export interface BollaEmporioInvioManualeInput { [key: string]: unknown }

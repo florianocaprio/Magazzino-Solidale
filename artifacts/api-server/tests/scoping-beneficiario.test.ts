@@ -9,7 +9,8 @@ import {
   newScope,
   cleanup,
   type SeedScope,
-  createCentro,
+  createCentroRec,
+  createCitta,
   createMagazzino,
   createBeneficiario,
   createUtente,
@@ -21,7 +22,8 @@ import {
 /**
  * Centro scoping for indirect-link entities (consegne, bolle, interventi):
  * the centro is reached via the linked beneficiario. A scoped caller sees rows
- * whose beneficiario is own-centro or shared (NULL), and create/PATCH may not
+ * whose beneficiario is own-centro; le cartelle Sociali prive di Centro non
+ * sono condivise. Create/PATCH may not
  * attach a record to a beneficiario/magazzino outside the caller's centro (IDOR).
  */
 
@@ -47,11 +49,12 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   scope = newScope();
-  centroA = await createCentro(scope);
-  centroB = await createCentro(scope);
-  benA = await createBeneficiario(scope, centroA);
-  benB = await createBeneficiario(scope, centroB);
-  benNull = await createBeneficiario(scope, null);
+  const cittaId = await createCitta(scope);
+  centroA = (await createCentroRec(scope, { cittaId })).id;
+  centroB = (await createCentroRec(scope, { cittaId })).id;
+  benA = await createBeneficiario(scope, centroA, { cittaId });
+  benB = await createBeneficiario(scope, centroB, { cittaId });
+  benNull = await createBeneficiario(scope, null, { cittaId });
   magNull = await createMagazzino(scope, null);
   magB = await createMagazzino(scope, centroB);
 });
@@ -211,7 +214,7 @@ describe("Bolle — scoping via beneficiario", () => {
 });
 
 describe("Interventi — scoping via beneficiario", () => {
-  it("lista: A vede gli interventi di benA + comune, non quelli di benB", async () => {
+  it("lista: A vede gli interventi di benA, non quelli di benB o senza Centro", async () => {
     const iA = await insertIntervento(scope, { beneficiarioId: benA });
     const iB = await insertIntervento(scope, { beneficiarioId: benB });
     const iNull = await insertIntervento(scope, { beneficiarioId: benNull });
@@ -219,7 +222,7 @@ describe("Interventi — scoping via beneficiario", () => {
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(iA);
-    expect(ids).toContain(iNull);
+    expect(ids).not.toContain(iNull);
     expect(ids).not.toContain(iB);
   });
 

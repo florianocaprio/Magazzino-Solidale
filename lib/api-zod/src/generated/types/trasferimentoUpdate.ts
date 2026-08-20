@@ -8,8 +8,8 @@
 import type { TrasferimentoRigaInput } from './trasferimentoRigaInput';
 
 export interface TrasferimentoUpdate {
-  stato?: string;
-  dataEsecuzione?: string;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   trasportatoreVolontarioId?: number | null;
   /** @nullable */

@@ -8,6 +8,7 @@
 import type { InterventoStato } from './interventoStato';
 
 export interface InterventoTransizioneInput {
+  versione: Date;
   stato: InterventoStato;
   /**
      * @maxLength 2000

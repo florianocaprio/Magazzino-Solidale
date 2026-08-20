@@ -218,7 +218,7 @@ export function requirePermission(permission: PermissionKey): RequestHandler {
       res.status(401).json({ error: "Non autenticato" });
       return;
     }
-    if (req.user.isAdmin || req.user.permessi.includes(permission)) {
+    if (req.user.isAdmin || (req.user.permessi ?? []).includes(permission)) {
       next();
       return;
     }

@@ -9,6 +9,8 @@ import {
   useListCitta,
   useListMagazzini,
   useListCentriAscolto,
+  useListProdotti,
+  listApprovvigionamenti,
   getListApprovvigionamentiQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,11 +35,12 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { fornitoriAttiviPerArea } from "@/lib/approvvigionamenti-area";
+import { loadAllPages } from "@/lib/paged-export";
 
 const formSchema = z.object({
   cittaId: z.coerce.number().positive(),
   fornitoreId: z.coerce.number().positive(),
-  magazzinoId: z.coerce.number().optional(),
+  magazzinoId: z.coerce.number().positive(),
   centroAscoltoId: z.coerce.number().optional(),
   dataRichiesta: z.string().min(1),
   dataPrevista: z.string().optional(),
@@ -48,6 +51,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface OrderRow {
   id: number;
+  versione: number;
   codice: string;
   stato: string;
   fornitoreId?: number | null;
@@ -65,36 +69,44 @@ interface OrderRow {
 
 export default function Approvvigionamenti() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canManage = hasPermission("approvvigionamenti.manage");
+  const canReceive = hasPermission("approvvigionamenti.receive");
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
   const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
   const [filterCentroId, setFilterCentroId] = useState("all");
   const [filterStato, setFilterStato] = useState("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setFilterCentroId(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
+  useEffect(() => setPage(1), [filterMagazzinoId, filterCentroId, filterStato]);
 
-  const listParams: { magazzinoId?: number; centroAscoltoId?: number; stato?: string } = {};
+  const listParams: { magazzinoId?: number; centroAscoltoId?: number; stato?: string; page?: number; limit?: number } = { page, limit: pageSize };
   if (filterMagazzinoId !== "all") listParams.magazzinoId = parseInt(filterMagazzinoId);
   if (filterCentroId !== "all") listParams.centroAscoltoId = parseInt(filterCentroId);
   if (filterStato !== "all") listParams.stato = filterStato;
-  const hasParams = Object.keys(listParams).length > 0;
   const filtersActive = filterMagazzinoId !== "all" || filterStato !== "all" || (isGlobal && filterCentroId !== "all");
 
-  const { data: approvvigionamenti, isLoading } = useListApprovvigionamenti(hasParams ? listParams : undefined);
+  const { data: approvvigionamenti, isLoading } = useListApprovvigionamenti(listParams);
   const { data: fornitori } = useListFornitori();
   const { data: citta } = useListCitta();
   const { data: magazzini } = useListMagazzini();
   const { data: centri } = useListCentriAscolto();
+  const { data: prodotti } = useListProdotti();
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [righeDraft, setRigheDraft] = useState<Array<{ prodottoId: number; quantitaRichiesta: number; unitaMisura: string }>>([]);
+  const [draftProdottoId, setDraftProdottoId] = useState("");
+  const [draftQuantita, setDraftQuantita] = useState("1");
 
   const createApprovvigionamento = useCreateApprovvigionamento();
   const updateApprovvigionamento = useUpdateApprovvigionamento();
@@ -115,8 +127,8 @@ export default function Approvvigionamenti() {
   const fornitoreCittaId = selectedCittaId ?? null;
   const matchesCitta = (cittaId?: number | null) =>
     fornitoreCittaId == null || cittaId == null || cittaId === fornitoreCittaId;
-  const filteredMagazzini = (magazzini ?? []).filter((m) => matchesCitta(m.cittaId));
-  const filteredCentri = (centri ?? []).filter((c) => matchesCitta(c.cittaId));
+  const filteredMagazzini = (magazzini ?? []).filter((m) => m.stato === "attivo" && matchesCitta(m.cittaId));
+  const filteredCentri = (centri ?? []).filter((c) => c.attivo && matchesCitta(c.cittaId));
 
   const handleFornitoreChange = (val: string) => {
     form.setValue("fornitoreId", Number(val));
@@ -126,7 +138,7 @@ export default function Approvvigionamenti() {
     const magId = form.getValues("magazzinoId");
     if (magId != null) {
       const m = (magazzini ?? []).find((x) => x.id === Number(magId));
-      if (m && m.cittaId != null && m.cittaId !== cid) form.setValue("magazzinoId", undefined);
+      if (m && m.cittaId != null && m.cittaId !== cid) form.resetField("magazzinoId");
     }
     if (!isCentroLocked) {
       const cenId = form.getValues("centroAscoltoId");
@@ -140,13 +152,16 @@ export default function Approvvigionamenti() {
   const handleCittaChange = (val: string) => {
     form.setValue("cittaId", Number(val), { shouldValidate: true });
     form.resetField("fornitoreId");
-    form.setValue("magazzinoId", undefined);
+    form.resetField("magazzinoId");
     if (!isCentroLocked) form.setValue("centroAscoltoId", undefined);
   };
 
   const openCreate = () => {
     setEditingId(null);
     form.reset({ cittaId: user?.cittaId ?? undefined, dataRichiesta: new Date().toISOString().substring(0, 10), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
+    setRigheDraft([]);
+    setDraftProdottoId("");
+    setDraftQuantita("1");
     setIsFormOpen(true);
   };
 
@@ -167,7 +182,7 @@ export default function Approvvigionamenti() {
   const onSubmit = (data: FormValues) => {
     if (editingId !== null) {
       updateApprovvigionamento.mutate(
-        { id: editingId, data },
+        { id: editingId, data: { ...data, versione: (approvvigionamenti ?? []).find((a) => a.id === editingId)?.versione ?? 0 } },
         {
           onSuccess: () => {
             invalidate();
@@ -178,7 +193,7 @@ export default function Approvvigionamenti() {
       );
     } else {
       createApprovvigionamento.mutate(
-        { data: { ...data, righe: [] } },
+        { data: { ...data, righe: righeDraft } },
         {
           onSuccess: () => {
             invalidate();
@@ -192,7 +207,7 @@ export default function Approvvigionamenti() {
 
   const handleSottometti = (a: OrderRow) => {
     submitApprovvigionamento.mutate(
-      { id: a.id },
+      { id: a.id, data: { versione: a.versione } },
       {
         onSuccess: () => {
           invalidate();
@@ -204,7 +219,7 @@ export default function Approvvigionamenti() {
 
   const handleCompleta = (a: OrderRow) => {
     updateApprovvigionamento.mutate(
-      { id: a.id, data: { stato: "completato" } },
+      { id: a.id, data: { stato: "completato", versione: a.versione } },
       {
         onSuccess: () => {
           invalidate();
@@ -212,6 +227,18 @@ export default function Approvvigionamenti() {
         },
       },
     );
+  };
+
+  const addRiga = () => {
+    const prodotto = (prodotti ?? []).find((item) => item.id === Number(draftProdottoId));
+    const quantita = Number(draftQuantita);
+    if (!prodotto || !Number.isFinite(quantita) || quantita <= 0) return;
+    setRigheDraft((current) => [
+      ...current.filter((row) => row.prodottoId !== prodotto.id),
+      { prodottoId: prodotto.id, quantitaRichiesta: quantita, unitaMisura: prodotto.unitaMisura },
+    ]);
+    setDraftProdottoId("");
+    setDraftQuantita("1");
   };
 
   const orderMailto = (a: OrderRow) => {
@@ -259,6 +286,7 @@ export default function Approvvigionamenti() {
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={approvvigionamenti ?? []}
+            loadRows={() => loadAllPages((exportPage, limit) => listApprovvigionamenti({ ...listParams, page: exportPage, limit }))}
             columns={[
               { header: t("common.code"), accessor: (a) => a.codice },
               { header: t("approvvigionamenti.dataRichiesta"), accessor: (a) => (a.dataRichiesta ? new Date(a.dataRichiesta).toLocaleDateString("it-IT") : "") },
@@ -271,7 +299,7 @@ export default function Approvvigionamenti() {
             filename="approvvigionamenti"
             title={t("approvvigionamenti.exportTitle")}
           />
-          <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> {t("approvvigionamenti.newOrdine")}</Button>
+          {canManage && <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> {t("approvvigionamenti.newOrdine")}</Button>}
         </div>
       </div>
 
@@ -372,7 +400,7 @@ export default function Approvvigionamenti() {
                   <TableCell className="text-center">{getStatusBadge(a.stato)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      {a.stato === "bozza" && (
+                      {a.stato === "bozza" && canManage && (
                         <>
                           <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => openEdit(a)}>
                             <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
@@ -387,9 +415,9 @@ export default function Approvvigionamenti() {
                           </Button>
                         </>
                       )}
-                      {a.stato === "sottomesso" && (
+                      {a.stato === "sottomesso" && (canManage || canReceive) && (
                         <>
-                          {orderMailto(a) ? (
+                          {canManage && (orderMailto(a) ? (
                             <Button asChild size="sm" variant="ghost" className="gap-1.5">
                               <a href={orderMailto(a)!} aria-label={`Prepara email per l'ordine ${a.codice}`}>
                                 <Mail className="h-3.5 w-3.5" /> {t("approvvigionamenti.inviaEmail")}
@@ -399,8 +427,8 @@ export default function Approvvigionamenti() {
                             <Button size="sm" variant="ghost" className="gap-1.5" disabled title="Il fornitore selezionato non dispone di un indirizzo e-mail.">
                               <Mail className="h-3.5 w-3.5" /> {t("approvvigionamenti.inviaEmail")}
                             </Button>
-                          )}
-                          <Button
+                          ))}
+                          {canReceive && <Button
                             size="sm"
                             variant="outline"
                             className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
@@ -408,7 +436,7 @@ export default function Approvvigionamenti() {
                             onClick={() => handleCompleta(a)}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" /> {t("approvvigionamenti.completatoBtn")}
-                          </Button>
+                          </Button>}
                         </>
                       )}
                     </div>
@@ -419,6 +447,12 @@ export default function Approvvigionamenti() {
           </Table>
         </CardContent>
       </Card>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Precedente</Button>
+        <span className="text-sm text-muted-foreground">Pagina {page}</span>
+        <Button variant="outline" size="sm" disabled={isLoading || (approvvigionamenti?.length ?? 0) < pageSize} onClick={() => setPage((value) => value + 1)}>Successiva</Button>
+      </div>
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -479,6 +513,22 @@ export default function Approvvigionamenti() {
                     </FormItem>
                   )} />
                 </div>
+                {editingId === null && <div className="space-y-3 rounded-lg border p-3">
+                  <Label>Prodotti richiesti</Label>
+                  <div className="grid grid-cols-[1fr_120px_auto] gap-2">
+                    <Select value={draftProdottoId} onValueChange={setDraftProdottoId}>
+                      <SelectTrigger><SelectValue placeholder="Seleziona prodotto" /></SelectTrigger>
+                      <SelectContent>{(prodotti ?? []).filter((p) => p.attivo && !righeDraft.some((r) => r.prodottoId === p.id)).map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Input type="number" min="0.01" step="0.01" value={draftQuantita} onChange={(event) => setDraftQuantita(event.target.value)} />
+                    <Button type="button" variant="outline" onClick={addRiga} disabled={!draftProdottoId || Number(draftQuantita) <= 0}>Aggiungi</Button>
+                  </div>
+                  {righeDraft.map((riga) => <div key={riga.prodottoId} className="flex items-center justify-between text-sm">
+                    <span>{prodotti?.find((p) => p.id === riga.prodottoId)?.nome} · {riga.quantitaRichiesta} {riga.unitaMisura}</span>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setRigheDraft((rows) => rows.filter((row) => row.prodottoId !== riga.prodottoId))}>Rimuovi</Button>
+                  </div>)}
+                  {righeDraft.length === 0 && <p className="text-xs text-muted-foreground">Aggiungi almeno un prodotto prima di salvare la bozza.</p>}
+                </div>}
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="dataRichiesta" render={({ field }) => (
                     <FormItem><FormLabel>{t("approvvigionamenti.dataRichiesta")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
@@ -502,7 +552,7 @@ export default function Approvvigionamenti() {
                 )} />
                 <div className="pt-4 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createApprovvigionamento.isPending || updateApprovvigionamento.isPending}>
+                  <Button type="submit" disabled={createApprovvigionamento.isPending || updateApprovvigionamento.isPending || (editingId === null && righeDraft.length === 0)}>
                     {editingId !== null ? t("approvvigionamenti.saveModifiche") : t("approvvigionamenti.saveBozza")}
                   </Button>
                 </div>

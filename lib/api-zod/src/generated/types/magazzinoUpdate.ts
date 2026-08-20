@@ -9,6 +9,7 @@ import type { MagazzinoUpdateTipoMagazzino } from './magazzinoUpdateTipoMagazzin
 
 export interface MagazzinoUpdate {
   codice?: string;
+  /** @minLength 1 */
   nome?: string;
   indirizzo?: string;
   comune?: string;

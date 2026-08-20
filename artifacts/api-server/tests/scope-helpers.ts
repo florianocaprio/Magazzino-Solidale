@@ -27,6 +27,7 @@ import {
   turniVolontariTable,
   cittaTable,
   zoneUdsTable,
+  auditConfigurazioniTable,
 } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 
@@ -75,8 +76,34 @@ export function makeScopedApp(
       centroAscoltoId: user.centroAscoltoId,
       cittaId: user.cittaId ?? null,
       zonaUdsId: user.zonaUdsId ?? null,
-      aree: user.aree ?? ["sociale", "uds"],
-      permessi: user.permessi ?? [],
+      aree: user.aree ?? ["sociale", "uds", "magazzino"],
+      // Questi test isolano lo scoping territoriale, non l'RBAC.
+      permessi: user.permessi ?? [
+        "beneficiari.view",
+        "beneficiari.manage",
+        "beneficiari.sensitive.view",
+        "beneficiari.deactivate",
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+        "sociale.interventi.complete",
+        "sociale.interventi.cancel",
+        "magazzino.view",
+        "magazzino.products.manage",
+        "magazzino.stock.receive",
+        "magazzino.stock.issue",
+        "magazzino.stock.adjust",
+        "magazzino.transfers.create",
+        "magazzino.transfers.dispatch",
+        "magazzino.transfers.receive",
+        "bolle.view",
+        "bolle.manage",
+        "bolle.deliver",
+        "bolle.cancel",
+        "approvvigionamenti.view",
+        "approvvigionamenti.manage",
+        "approvvigionamenti.receive",
+      ],
       isAdmin: user.isAdmin ?? false,
       isSuperAdmin: user.isSuperAdmin ?? false,
     };
@@ -642,6 +669,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   }
   if (scope.utenteIds.length > 0) {
     await db.delete(interventiTable).where(inArray(interventiTable.operatoreId, scope.utenteIds));
+    await db
+      .delete(auditConfigurazioniTable)
+      .where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
     await db.delete(utentiTable).where(inArray(utentiTable.id, scope.utenteIds));
   }
   if (scope.ruoloIds.length > 0) {

@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * @deprecated
+ */
 export type ImpostazioniEmailProvider = typeof ImpostazioniEmailProvider[keyof typeof ImpostazioniEmailProvider];
 
 

@@ -9,8 +9,12 @@ import type { BeneficiarioCreditoSolidaleStato } from './beneficiarioCreditoSoli
 import type { BeneficiarioFasciaEtaCorrente } from './beneficiarioFasciaEtaCorrente';
 import type { BeneficiarioFasciaEtaOrigine } from './beneficiarioFasciaEtaOrigine';
 import type { BeneficiarioFasciaEtaPresunta } from './beneficiarioFasciaEtaPresunta';
+import type { BeneficiarioPriorita } from './beneficiarioPriorita';
 import type { BeneficiarioStatoAnagrafica } from './beneficiarioStatoAnagrafica';
 
+/**
+ * Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
+ */
 export interface Beneficiario {
   id: number;
   codice: string;
@@ -48,14 +52,14 @@ export interface Beneficiario {
   numComponenti: number;
   numMinori: number;
   numAnziani: number;
-  priorita: string;
+  priorita: BeneficiarioPriorita;
   consegnaDomicilio: boolean;
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
-  creditoSolidaleAbilitato: boolean;
-  creditoSolidaleStato: BeneficiarioCreditoSolidaleStato;
+  creditoSolidaleAbilitato?: boolean;
+  creditoSolidaleStato?: BeneficiarioCreditoSolidaleStato;
   /** @nullable */
   creditoSolidaleDataAbilitazione?: Date | null;
   /** @nullable */
@@ -65,15 +69,15 @@ export interface Beneficiario {
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
   /** @nullable */
-  creditoSolidaleMensileAssegnato: number | null;
-  creditoSolidaleSaldo: number;
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleSaldo?: number;
   /** @nullable */
-  creditoSolidaleDataUltimoMovimento: Date | null;
-  creditoSolidaleMensileManuale: boolean;
+  creditoSolidaleDataUltimoMovimento?: Date | null;
+  creditoSolidaleMensileManuale?: boolean;
   /** @nullable */
-  creditoSolidaleMotivoModifica: string | null;
+  creditoSolidaleMotivoModifica?: string | null;
   /** @nullable */
-  creditoSolidaleDataUltimaModificaQuota: Date | null;
+  creditoSolidaleDataUltimaModificaQuota?: Date | null;
   uds: boolean;
   attivo: boolean;
   /** @nullable */
@@ -89,4 +93,7 @@ export interface Beneficiario {
   /** @nullable */
   dataPresaInCarico?: string | null;
   dataCreazione: string;
+  dataAggiornamento: string;
+  /** @minimum 1 */
+  versione: number;
 }

@@ -23,6 +23,8 @@ type ExportButtonsProps<T> = {
   disabled?: boolean;
   size?: "sm" | "default";
   variant?: "outline" | "default" | "secondary";
+  loadRows?: () => Promise<T[]>;
+  beforeExport?: (format: "xlsx" | "pdf", exportRows: T[]) => Promise<void>;
 };
 
 export function ExportButtons<T>({
@@ -36,46 +38,64 @@ export function ExportButtons<T>({
   disabled,
   size = "sm",
   variant = "outline",
+  loadRows,
+  beforeExport,
 }: ExportButtonsProps<T>) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const generatedBy = user ? `${user.nome ?? ""} ${user.cognome ?? ""}`.trim() || user.username : undefined;
-  const empty = disabled || rows.length === 0;
+  const empty = disabled || (rows.length === 0 && !loadRows);
+  const resolveRows = () => loadRows ? loadRows() : Promise.resolve(rows);
   const handlePdfExport = async () => {
-    setPdfLoading(true);
+    setExportLoading(true);
     try {
+      const exportRows = await resolveRows();
+      if (exportRows.length === 0) return;
+      await beforeExport?.("pdf", exportRows);
       const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
       await exportToPdf({
         filename,
         title,
         subtitle,
-        rows,
+        rows: exportRows,
         columns,
         orientation,
         generatedBy,
         branding: { ...branding, logoDataUrl },
       });
     } finally {
-      setPdfLoading(false);
+      setExportLoading(false);
+    }
+  };
+
+  const handleXlsxExport = async () => {
+    setExportLoading(true);
+    try {
+      const exportRows = await resolveRows();
+      if (exportRows.length === 0) return;
+      await beforeExport?.("xlsx", exportRows);
+      exportToXlsx(filename, sheetName ?? title, exportRows, columns);
+    } finally {
+      setExportLoading(false);
     }
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} disabled={empty || pdfLoading} className="gap-2">
+        <Button variant={variant} size={size} disabled={empty || exportLoading} className="gap-2">
           <Download className="h-4 w-4" /> {t("common.export")}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
-          onClick={() => exportToXlsx(filename, sheetName ?? title, rows, columns)}
+          onClick={() => void handleXlsxExport()}
         >
           <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" /> {t("common.exportExcel")}
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={pdfLoading}
+          disabled={exportLoading}
           onClick={() => void handlePdfExport()}
         >
           <FileText className="h-4 w-4 mr-2 text-red-600" /> {t("common.exportPdf")}

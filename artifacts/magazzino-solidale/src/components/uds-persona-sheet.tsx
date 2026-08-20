@@ -169,6 +169,7 @@ export function UdsPersonaSheet({
 }: UdsPersonaSheetProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const canViewSensitive = Boolean(user?.isAdmin || user?.permessi?.includes("beneficiari.sensitive.view"));
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const isGlobal = user?.cittaId == null;
@@ -316,6 +317,7 @@ export function UdsPersonaSheet({
         id: suggestion.id,
         data: {
           uds: true,
+          versione: suggestion.versione,
           ...(targetZona != null ? { zonaUdsId: targetZona } : {}),
           ...(fasciaEtaPresuntaDirty
             ? {
@@ -799,16 +801,18 @@ export function UdsPersonaSheet({
                     )}
                   />
                 </div>
-                <FormField
-                  control={form.control}
-                  name="restrizioniAlimentari"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel>
-                      <FormControl><Textarea rows={2} {...field} /></FormControl>
-                    </FormItem>
-                  )}
-                />
+                {canViewSensitive && (
+                  <FormField
+                    control={form.control}
+                    name="restrizioniAlimentari"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel>
+                        <FormControl><Textarea rows={2} {...field} /></FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={form.control}

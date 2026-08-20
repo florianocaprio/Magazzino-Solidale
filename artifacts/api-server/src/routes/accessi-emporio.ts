@@ -6,8 +6,22 @@ import {
   cittaTable,
   db,
   magazziniTable,
+  sessioniCassaEmporioTable,
 } from "@workspace/db";
-import { and, asc, desc, eq, gte, ilike, lt, lte, ne, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  lt,
+  lte,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
@@ -16,10 +30,19 @@ import {
   canUseBeneficiario,
   centroScopeFilter,
   cittaScopeFilter,
+  magazzinoScopeFilter,
+  visibleMagazzinoIds,
   zonaUdsScopeFilter,
 } from "../lib/centroScope";
-import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
+import {
+  EMPORIO_DISABLED_MSG,
+  isEmporioEnabled,
+} from "../lib/impostazioniModuli";
 import { requireModulo } from "../lib/featureFlags";
+import { requirePermission } from "../middlewares/auth";
+import { auditEmporioTx } from "../lib/emporioAudit";
+import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
+import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
 
 const router: IRouter = Router();
 router.use(
@@ -29,19 +52,58 @@ router.use(
 
 const TIPO_ACCESSO = "accesso_emporio";
 const TIPO_CONSEGNA_ACCESSO = "accesso_emporio";
-const STATI_ACCESSO = ["pianificato", "confermato", "effettuato", "annullato", "non_presentato"] as const;
+const STATI_ACCESSO = [
+  "pianificato",
+  "confermato",
+  "effettuato",
+  "annullato",
+  "non_presentato",
+] as const;
 type StatoAccesso = (typeof STATI_ACCESSO)[number];
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const ACCESS_TRANSITIONS: Readonly<
+  Record<StatoAccesso, readonly StatoAccesso[]>
+> = {
+  pianificato: ["confermato", "annullato", "non_presentato"],
+  confermato: ["annullato", "non_presentato"],
+  effettuato: [],
+  annullato: [],
+  non_presentato: [],
+};
 
 const MSG_BENEFICIARIO_NON_ATTIVO = "Il beneficiario non è attivo.";
-const MSG_CENTRO_RICHIESTO = "Per pianificare un Accesso Emporio è necessario associare il beneficiario a un Centro di Ascolto.";
-const MSG_CREDITO_RICHIESTO = "Il beneficiario non è abilitato al Credito Solidale.";
-const MSG_CREDITO_NON_ATTIVO = "Il Credito Solidale del beneficiario non è attivo.";
-const MSG_MAGAZZINO_EMPORIO = "Selezionare un magazzino di tipo Emporio o Misto.";
-const MSG_DUPLICATO = "Esiste già un Accesso Emporio pianificato per questo beneficiario nella data selezionata.";
-const MSG_ACCESSO_NON_TROVATO = "Accesso Emporio non trovato. Verifica l'accesso selezionato e riprova.";
+const MSG_CENTRO_RICHIESTO =
+  "Per pianificare un Accesso Emporio è necessario associare il beneficiario a un Centro di Ascolto.";
+const MSG_CREDITO_RICHIESTO =
+  "Il beneficiario non è abilitato al Credito Solidale.";
+const MSG_CREDITO_NON_ATTIVO =
+  "Il Credito Solidale del beneficiario non è attivo.";
+const MSG_MAGAZZINO_EMPORIO =
+  "Selezionare un magazzino di tipo Emporio o Misto.";
+const MSG_DUPLICATO =
+  "Esiste già un Accesso Emporio pianificato per questo beneficiario nella data selezionata.";
+const MSG_ACCESSO_NON_TROVATO =
+  "Accesso Emporio non trovato. Verifica l'accesso selezionato e riprova.";
+const MSG_RISORSA_NON_ACCESSIBILE =
+  "Risorsa non accessibile per il tuo profilo";
+
+class SpesaAccessoError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 function asInt(value: unknown): number | null {
-  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  const n =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+        ? Number(value)
+        : NaN;
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
@@ -56,19 +118,13 @@ function parseDateTime(value: unknown): Date | null {
 }
 
 function yyyyMmDd(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
-function dayBounds(value: Date): { start: Date; end: Date } {
-  const start = new Date(value);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { start, end };
+  return dataCivileEuropeRome(value);
 }
 
 function isStatoAccesso(value: unknown): value is StatoAccesso {
-  return typeof value === "string" && STATI_ACCESSO.includes(value as StatoAccesso);
+  return (
+    typeof value === "string" && STATI_ACCESSO.includes(value as StatoAccesso)
+  );
 }
 
 function statoConsegnaFromAccesso(stato: StatoAccesso): string {
@@ -78,7 +134,9 @@ function statoConsegnaFromAccesso(stato: StatoAccesso): string {
   return "pianificata";
 }
 
-async function assertEmporioEnabled(res: import("express").Response): Promise<boolean> {
+async function assertEmporioEnabled(
+  res: import("express").Response,
+): Promise<boolean> {
   if (await isEmporioEnabled()) return true;
   res.status(403).json({ error: EMPORIO_DISABLED_MSG });
   return false;
@@ -92,28 +150,84 @@ async function loadBeneficiario(beneficiarioId: number) {
   return beneficiario ?? null;
 }
 
-function validateBeneficiarioAccesso(beneficiario: typeof beneficiariTable.$inferSelect | null): string | null {
+async function canAccessAccessoEmporio(
+  accesso: Pick<
+    typeof consegneTable.$inferSelect,
+    "beneficiarioId" | "magazzinoEmporioId"
+  >,
+  req: import("express").Request,
+): Promise<boolean> {
+  if (accesso.magazzinoEmporioId == null) return false;
+  return (
+    (await canUseBeneficiario(
+      accesso.beneficiarioId,
+      callerCentroId(req),
+      callerCittaId(req),
+      callerZonaUdsId(req),
+    )) &&
+    (await canAccessMagazzino(
+      accesso.magazzinoEmporioId,
+      callerCentroId(req),
+      callerCittaId(req),
+    ))
+  );
+}
+
+function validateBeneficiarioAccesso(
+  beneficiario: typeof beneficiariTable.$inferSelect | null,
+): string | null {
   if (!beneficiario) return "Beneficiario non trovato.";
   if (!beneficiario.attivo) return MSG_BENEFICIARIO_NON_ATTIVO;
   if (beneficiario.centroAscoltoId == null) return MSG_CENTRO_RICHIESTO;
   if (!beneficiario.creditoSolidaleAbilitato) return MSG_CREDITO_RICHIESTO;
-  if (beneficiario.creditoSolidaleStato !== "attivo") return MSG_CREDITO_NON_ATTIVO;
+  if (beneficiario.creditoSolidaleStato !== "attivo")
+    return MSG_CREDITO_NON_ATTIVO;
   return null;
 }
 
-async function validateMagazzinoEmporio(id: number, req: import("express").Request): Promise<{ error: string; status: number } | { magazzino: typeof magazziniTable.$inferSelect }> {
-  const [magazzino] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
+async function validateMagazzinoEmporio(
+  id: number,
+  req: import("express").Request,
+  beneficiario?: typeof beneficiariTable.$inferSelect | null,
+): Promise<
+  | { error: string; status: number }
+  | { magazzino: typeof magazziniTable.$inferSelect }
+> {
+  const [magazzino] = await db
+    .select()
+    .from(magazziniTable)
+    .where(eq(magazziniTable.id, id));
   if (!magazzino || !["emporio", "misto"].includes(magazzino.tipoMagazzino)) {
     return { error: MSG_MAGAZZINO_EMPORIO, status: 400 };
   }
-  if (!(await canAccessMagazzino(id, callerCentroId(req), callerCittaId(req)))) {
-    return { error: "Magazzino non accessibile per il tuo profilo", status: 403 };
+  if (
+    !(await canAccessMagazzino(id, callerCentroId(req), callerCittaId(req)))
+  ) {
+    return {
+      error: "Magazzino non accessibile per il tuo profilo",
+      status: 403,
+    };
+  }
+  if (magazzino.stato !== "attivo")
+    return { error: "L'Emporio selezionato non è attivo.", status: 400 };
+  if (beneficiario && magazzino.cittaId !== beneficiario.cittaId) {
+    return {
+      error: "L'Emporio deve appartenere alla stessa Area del Beneficiario.",
+      status: 400,
+    };
   }
   return { magazzino };
 }
 
-async function hasDuplicateAccesso(beneficiarioId: number, dataOraInizio: Date, excludeId?: number): Promise<boolean> {
-  const { start, end } = dayBounds(dataOraInizio);
+async function hasDuplicateAccesso(
+  executor: Tx | typeof db,
+  beneficiarioId: number,
+  dataOraInizio: Date,
+  excludeId?: number,
+): Promise<boolean> {
+  const { start, end } = intervalloGiornoEuropeRome(
+    dataCivileEuropeRome(dataOraInizio),
+  );
   const conditions: SQL[] = [
     eq(consegneTable.tipoPianificazione, TIPO_ACCESSO),
     eq(consegneTable.beneficiarioId, beneficiarioId),
@@ -123,8 +237,17 @@ async function hasDuplicateAccesso(beneficiarioId: number, dataOraInizio: Date, 
     ne(consegneTable.statoAccessoEmporio, "non_presentato"),
   ];
   if (excludeId != null) conditions.push(ne(consegneTable.id, excludeId));
-  const rows = await db.select({ id: consegneTable.id }).from(consegneTable).where(and(...conditions)).limit(1);
+  const rows = await executor
+    .select({ id: consegneTable.id })
+    .from(consegneTable)
+    .where(and(...conditions))
+    .limit(1);
   return rows.length > 0;
+}
+
+function databaseErrorCode(error: unknown): unknown {
+  const candidate = error as { code?: unknown; cause?: { code?: unknown } };
+  return candidate?.code ?? candidate?.cause?.code;
 }
 
 function formatAccesso(row: {
@@ -145,7 +268,10 @@ function formatAccesso(row: {
     id: row.c.id,
     codice: row.c.codice,
     beneficiarioId: row.c.beneficiarioId,
-    beneficiarioNome: row.beneficiarioCognome && row.beneficiarioNome ? `${row.beneficiarioCognome} ${row.beneficiarioNome}` : null,
+    beneficiarioNome:
+      row.beneficiarioCognome && row.beneficiarioNome
+        ? `${row.beneficiarioCognome} ${row.beneficiarioNome}`
+        : null,
     beneficiarioCodice: row.beneficiarioCodice,
     beneficiarioCodiceFiscale: row.beneficiarioCodiceFiscale,
     centroAscoltoId: row.centroAscoltoId,
@@ -163,10 +289,14 @@ function formatAccesso(row: {
     origineAccesso: row.c.origineAccesso ?? null,
     accessoForzato: row.c.accessoForzato,
     motivoAccessoForzato: row.c.motivoAccessoForzato ?? null,
-    dataOraEffettivaAccesso: row.c.dataOraEffettivaAccesso?.toISOString() ?? null,
+    dataOraEffettivaAccesso:
+      row.c.dataOraEffettivaAccesso?.toISOString() ?? null,
     operatoreAccessoEmporioId: row.c.operatoreAccessoEmporioId ?? null,
     saldoCreditoSolidale: Number(row.creditoSolidaleSaldo ?? "0"),
-    quotaMensileAssegnata: row.creditoSolidaleMensileAssegnato == null ? null : Number(row.creditoSolidaleMensileAssegnato),
+    quotaMensileAssegnata:
+      row.creditoSolidaleMensileAssegnato == null
+        ? null
+        : Number(row.creditoSolidaleMensileAssegnato),
     dataCreazione: row.c.dataCreazione.toISOString(),
   };
 }
@@ -185,263 +315,653 @@ function selectAccessi(conditions: SQL[] = []) {
       cittaNome: cittaTable.nome,
       magazzinoEmporioNome: magazziniTable.nome,
       creditoSolidaleSaldo: beneficiariTable.creditoSolidaleSaldo,
-      creditoSolidaleMensileAssegnato: beneficiariTable.creditoSolidaleMensileAssegnato,
+      creditoSolidaleMensileAssegnato:
+        beneficiariTable.creditoSolidaleMensileAssegnato,
     })
     .from(consegneTable)
-    .leftJoin(beneficiariTable, eq(consegneTable.beneficiarioId, beneficiariTable.id))
-    .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(
+      beneficiariTable,
+      eq(consegneTable.beneficiarioId, beneficiariTable.id),
+    )
+    .leftJoin(
+      centriAscoltoTable,
+      eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
+    )
     .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
-    .leftJoin(magazziniTable, eq(consegneTable.magazzinoEmporioId, magazziniTable.id))
-    .where(and(eq(consegneTable.tipoPianificazione, TIPO_ACCESSO), ...conditions))
+    .leftJoin(
+      magazziniTable,
+      eq(consegneTable.magazzinoEmporioId, magazziniTable.id),
+    )
+    .where(
+      and(eq(consegneTable.tipoPianificazione, TIPO_ACCESSO), ...conditions),
+    )
     .orderBy(desc(consegneTable.dataOraInizio), desc(consegneTable.id));
 }
 
-router.get("/accessi-emporio", async (req, res) => {
-  const q = req.query as Record<string, string>;
-  const conditions: SQL[] = [];
-  if (q.dataDa) conditions.push(gte(consegneTable.dataOraInizio, new Date(`${q.dataDa}T00:00:00.000`)));
-  if (q.dataA) conditions.push(lte(consegneTable.dataOraInizio, new Date(`${q.dataA}T23:59:59.999`)));
-  if (q.magazzinoEmporioId) conditions.push(eq(consegneTable.magazzinoEmporioId, Number(q.magazzinoEmporioId)));
-  if (q.statoAccessoEmporio) conditions.push(eq(consegneTable.statoAccessoEmporio, q.statoAccessoEmporio));
-  if (q.beneficiarioId) conditions.push(eq(consegneTable.beneficiarioId, Number(q.beneficiarioId)));
-  if (q.beneficiarioSearch) {
-    const s = `%${q.beneficiarioSearch}%`;
-    const filter = or(
-      ilike(beneficiariTable.nome, s),
-      ilike(beneficiariTable.cognome, s),
-      ilike(sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`, s),
-      ilike(sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`, s),
-      ilike(beneficiariTable.codice, s),
-      ilike(beneficiariTable.codiceFiscale, s),
+router.get(
+  "/accessi-emporio",
+  requirePermission("emporio.access.view"),
+  async (req, res) => {
+    const q = req.query as Record<string, string>;
+    const page = q.page == null ? 1 : Number(q.page);
+    const limit = q.limit == null ? 50 : Number(q.limit);
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      !Number.isSafeInteger(limit) ||
+      limit < 1 ||
+      limit > 100
+    ) {
+      res.status(400).json({
+        error:
+          "Paginazione non valida: page >= 1 e limit compreso tra 1 e 100.",
+      });
+      return;
+    }
+    const conditions: SQL[] = [];
+    if (q.dataDa)
+      conditions.push(
+        gte(
+          consegneTable.dataOraInizio,
+          intervalloGiornoEuropeRome(q.dataDa).start,
+        ),
+      );
+    if (q.dataA)
+      conditions.push(
+        lt(
+          consegneTable.dataOraInizio,
+          intervalloGiornoEuropeRome(q.dataA).end,
+        ),
+      );
+    if (q.magazzinoEmporioId)
+      conditions.push(
+        eq(consegneTable.magazzinoEmporioId, Number(q.magazzinoEmporioId)),
+      );
+    if (q.statoAccessoEmporio)
+      conditions.push(
+        eq(consegneTable.statoAccessoEmporio, q.statoAccessoEmporio),
+      );
+    if (q.beneficiarioId)
+      conditions.push(
+        eq(consegneTable.beneficiarioId, Number(q.beneficiarioId)),
+      );
+    if (q.beneficiarioSearch) {
+      const s = `%${q.beneficiarioSearch}%`;
+      const filter = or(
+        ilike(beneficiariTable.nome, s),
+        ilike(beneficiariTable.cognome, s),
+        ilike(
+          sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`,
+          s,
+        ),
+        ilike(
+          sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`,
+          s,
+        ),
+        ilike(beneficiariTable.codice, s),
+        ilike(beneficiariTable.codiceFiscale, s),
+      );
+      if (filter) conditions.push(filter);
+    }
+    const caller = callerCentroId(req);
+    if (caller != null) {
+      const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
+      if (f) conditions.push(f);
+    } else if (q.centroAscoltoId) {
+      conditions.push(
+        eq(beneficiariTable.centroAscoltoId, Number(q.centroAscoltoId)),
+      );
+    }
+    const requestedCitta = q.cittaId ?? q.areaId;
+    if (requestedCitta)
+      conditions.push(eq(beneficiariTable.cittaId, Number(requestedCitta)));
+    const cittaFilter = cittaScopeFilter(
+      beneficiariTable.cittaId,
+      callerCittaId(req),
     );
-    if (filter) conditions.push(filter);
-  }
-  const caller = callerCentroId(req);
-  if (caller != null) {
-    const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
-    if (f) conditions.push(f);
-  } else if (q.centroAscoltoId) {
-    conditions.push(eq(beneficiariTable.centroAscoltoId, Number(q.centroAscoltoId)));
-  }
-  const requestedCitta = q.cittaId ?? q.areaId;
-  if (requestedCitta) conditions.push(eq(beneficiariTable.cittaId, Number(requestedCitta)));
-  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
-  if (cittaFilter) conditions.push(cittaFilter);
-  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
-  if (zonaFilter) conditions.push(zonaFilter);
+    if (cittaFilter) conditions.push(cittaFilter);
+    const zonaFilter = zonaUdsScopeFilter(
+      beneficiariTable.zonaUdsId,
+      callerZonaUdsId(req),
+    );
+    if (zonaFilter) conditions.push(zonaFilter);
+    const magazzinoFilter = magazzinoScopeFilter(
+      consegneTable.magazzinoEmporioId,
+      await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)),
+    );
+    if (magazzinoFilter) conditions.push(magazzinoFilter);
 
-  const rows = await selectAccessi(conditions).limit(250);
-  res.json(rows.map(formatAccesso));
-});
+    const where = and(
+      eq(consegneTable.tipoPianificazione, TIPO_ACCESSO),
+      ...conditions,
+    );
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(consegneTable)
+      .leftJoin(
+        beneficiariTable,
+        eq(consegneTable.beneficiarioId, beneficiariTable.id),
+      )
+      .leftJoin(
+        centriAscoltoTable,
+        eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
+      )
+      .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+      .leftJoin(
+        magazziniTable,
+        eq(consegneTable.magazzinoEmporioId, magazziniTable.id),
+      )
+      .where(where);
+    const rows = await selectAccessi(conditions)
+      .limit(limit)
+      .offset((page - 1) * limit);
+    res.setHeader("X-Total-Count", String(total));
+    res.json(rows.map(formatAccesso));
+  },
+);
 
-router.get("/accessi-emporio/beneficiari/ricerca", async (req, res) => {
-  if (!(await assertEmporioEnabled(res))) return;
-  const q = req.query as Record<string, string | undefined>;
-  const search = asText(q.search);
-  const beneficiarioId = asInt(q.beneficiarioId);
-  if (!search && beneficiarioId == null) { res.json([]); return; }
+router.get(
+  "/accessi-emporio/beneficiari/ricerca",
+  requirePermission("emporio.access.view"),
+  async (req, res) => {
+    if (!(await assertEmporioEnabled(res))) return;
+    const q = req.query as Record<string, string | undefined>;
+    const search = asText(q.search);
+    const beneficiarioId = asInt(q.beneficiarioId);
+    if (!search && beneficiarioId == null) {
+      res.json([]);
+      return;
+    }
 
-  const conditions: SQL[] = [eq(beneficiariTable.attivo, true)];
-  if (beneficiarioId != null) conditions.push(eq(beneficiariTable.id, beneficiarioId));
-  if (search) {
-    const s = `%${search}%`;
-    conditions.push(or(
-      ilike(beneficiariTable.nome, s),
-      ilike(beneficiariTable.cognome, s),
-      ilike(sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`, s),
-      ilike(sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`, s),
-      ilike(beneficiariTable.codice, s),
-      ilike(beneficiariTable.codiceFiscale, s),
-    )!);
-  }
-  const centroFilter = centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req));
-  if (centroFilter) conditions.push(centroFilter);
-  const cittaFilter = cittaScopeFilter(beneficiariTable.cittaId, callerCittaId(req));
-  if (cittaFilter) conditions.push(cittaFilter);
-  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
-  if (zonaFilter) conditions.push(zonaFilter);
+    const conditions: SQL[] = [eq(beneficiariTable.attivo, true)];
+    if (beneficiarioId != null)
+      conditions.push(eq(beneficiariTable.id, beneficiarioId));
+    if (search) {
+      const s = `%${search}%`;
+      conditions.push(
+        or(
+          ilike(beneficiariTable.nome, s),
+          ilike(beneficiariTable.cognome, s),
+          ilike(
+            sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`,
+            s,
+          ),
+          ilike(
+            sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`,
+            s,
+          ),
+          ilike(beneficiariTable.codice, s),
+          ilike(beneficiariTable.codiceFiscale, s),
+        )!,
+      );
+    }
+    const centroFilter = centroScopeFilter(
+      beneficiariTable.centroAscoltoId,
+      callerCentroId(req),
+    );
+    if (centroFilter) conditions.push(centroFilter);
+    const cittaFilter = cittaScopeFilter(
+      beneficiariTable.cittaId,
+      callerCittaId(req),
+    );
+    if (cittaFilter) conditions.push(cittaFilter);
+    const zonaFilter = zonaUdsScopeFilter(
+      beneficiariTable.zonaUdsId,
+      callerZonaUdsId(req),
+    );
+    if (zonaFilter) conditions.push(zonaFilter);
 
-  const rows = await db
-    .select({
-      beneficiario: beneficiariTable,
-      centroAscoltoNome: centriAscoltoTable.nome,
-      cittaNome: cittaTable.nome,
-      magazzinoEmporioPreferitoNome: magazziniTable.nome,
-    })
-    .from(beneficiariTable)
-    .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
-    .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
-    .leftJoin(magazziniTable, eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id))
-    .where(and(...conditions))
-    .orderBy(asc(beneficiariTable.cognome), asc(beneficiariTable.nome))
-    .limit(30);
+    const rows = await db
+      .select({
+        beneficiario: beneficiariTable,
+        centroAscoltoNome: centriAscoltoTable.nome,
+        cittaNome: cittaTable.nome,
+        magazzinoEmporioPreferitoNome: magazziniTable.nome,
+      })
+      .from(beneficiariTable)
+      .leftJoin(
+        centriAscoltoTable,
+        eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
+      )
+      .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+      .leftJoin(
+        magazziniTable,
+        eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id),
+      )
+      .where(and(...conditions))
+      .orderBy(asc(beneficiariTable.cognome), asc(beneficiariTable.nome))
+      .limit(30);
 
-  res.json(rows.map((row) => ({
-    beneficiarioId: row.beneficiario.id,
-    beneficiarioNome: `${row.beneficiario.cognome} ${row.beneficiario.nome}`,
-    beneficiarioCodice: row.beneficiario.codice,
-    beneficiarioCodiceFiscale: row.beneficiario.codiceFiscale,
-    centroAscoltoId: row.beneficiario.centroAscoltoId,
-    centroAscoltoNome: row.centroAscoltoNome,
-    cittaId: row.beneficiario.cittaId,
-    cittaNome: row.cittaNome,
-    creditoSolidaleAbilitato: row.beneficiario.creditoSolidaleAbilitato,
-    creditoSolidaleStato: row.beneficiario.creditoSolidaleStato,
-    saldoCreditoSolidale: Number(row.beneficiario.creditoSolidaleSaldo ?? "0"),
-    quotaMensileAssegnata: row.beneficiario.creditoSolidaleMensileAssegnato == null ? null : Number(row.beneficiario.creditoSolidaleMensileAssegnato),
-    magazzinoEmporioPreferitoId: row.beneficiario.magazzinoEmporioPreferitoId,
-    magazzinoEmporioPreferitoNome: row.magazzinoEmporioPreferitoNome,
-    attivo: row.beneficiario.attivo,
-  })));
-});
+    res.json(
+      rows.map((row) => ({
+        beneficiarioId: row.beneficiario.id,
+        beneficiarioNome: `${row.beneficiario.cognome} ${row.beneficiario.nome}`,
+        beneficiarioCodice: row.beneficiario.codice,
+        beneficiarioCodiceFiscale: row.beneficiario.codiceFiscale,
+        centroAscoltoId: row.beneficiario.centroAscoltoId,
+        centroAscoltoNome: row.centroAscoltoNome,
+        cittaId: row.beneficiario.cittaId,
+        cittaNome: row.cittaNome,
+        creditoSolidaleAbilitato: row.beneficiario.creditoSolidaleAbilitato,
+        creditoSolidaleStato: row.beneficiario.creditoSolidaleStato,
+        saldoCreditoSolidale: Number(
+          row.beneficiario.creditoSolidaleSaldo ?? "0",
+        ),
+        quotaMensileAssegnata:
+          row.beneficiario.creditoSolidaleMensileAssegnato == null
+            ? null
+            : Number(row.beneficiario.creditoSolidaleMensileAssegnato),
+        magazzinoEmporioPreferitoId:
+          row.beneficiario.magazzinoEmporioPreferitoId,
+        magazzinoEmporioPreferitoNome: row.magazzinoEmporioPreferitoNome,
+        attivo: row.beneficiario.attivo,
+      })),
+    );
+  },
+);
 
-router.get("/accessi-emporio/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  const rows = await selectAccessi([eq(consegneTable.id, id)]).limit(1);
-  if (rows.length === 0) { res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO }); return; }
-  const row = rows[0];
-  if (!(await canUseBeneficiario(row.c.beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
-    return;
-  }
-  res.json(formatAccesso(row));
-});
+router.get(
+  "/accessi-emporio/:id",
+  requirePermission("emporio.access.view"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const rows = await selectAccessi([eq(consegneTable.id, id)]).limit(1);
+    if (rows.length === 0) {
+      res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO });
+      return;
+    }
+    const row = rows[0];
+    if (!(await canAccessAccessoEmporio(row.c, req))) {
+      res.status(403).json({ error: MSG_RISORSA_NON_ACCESSIBILE });
+      return;
+    }
+    res.json(formatAccesso(row));
+  },
+);
 
-router.post("/accessi-emporio", async (req, res) => {
-  if (!(await assertEmporioEnabled(res))) return;
-  const beneficiarioId = asInt(req.body?.beneficiarioId);
-  const magazzinoEmporioId = asInt(req.body?.magazzinoEmporioId);
-  const dataOraInizio = parseDateTime(req.body?.dataOraInizio);
-  const dataOraFine = parseDateTime(req.body?.dataOraFine);
-  const statoAccessoEmporio = isStatoAccesso(req.body?.statoAccessoEmporio) ? req.body.statoAccessoEmporio : "pianificato";
-  if (beneficiarioId == null || magazzinoEmporioId == null || dataOraInizio == null) {
-    res.status(400).json({ error: "Beneficiario, Emporio e data/ora inizio sono obbligatori." });
-    return;
-  }
-  if (dataOraFine != null && dataOraFine <= dataOraInizio) {
-    res.status(400).json({ error: "L'ora fine deve essere successiva all'ora inizio." });
-    return;
-  }
-  if (!(await canUseBeneficiario(beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
-    res.status(403).json({ error: "Beneficiario non accessibile per il tuo profilo" });
-    return;
-  }
-  const beneficiario = await loadBeneficiario(beneficiarioId);
-  const beneficiarioError = validateBeneficiarioAccesso(beneficiario);
-  if (beneficiarioError) { res.status(400).json({ error: beneficiarioError }); return; }
-  const emporio = await validateMagazzinoEmporio(magazzinoEmporioId, req);
-  if ("error" in emporio) { res.status(emporio.status).json({ error: emporio.error }); return; }
-  if (await hasDuplicateAccesso(beneficiarioId, dataOraInizio)) {
-    res.status(409).json({ error: MSG_DUPLICATO });
-    return;
-  }
-
-  const [created] = await db
-    .insert(consegneTable)
-    .values({
-      codice: `EMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      beneficiarioId,
-      tipoPianificazione: TIPO_ACCESSO,
-      tipoConsegna: TIPO_CONSEGNA_ACCESSO,
-      dataPrevista: yyyyMmDd(dataOraInizio),
-      magazzinoId: magazzinoEmporioId,
+router.post(
+  "/accessi-emporio",
+  requirePermission("emporio.access.manage"),
+  async (req, res) => {
+    if (!(await assertEmporioEnabled(res))) return;
+    const beneficiarioId = asInt(req.body?.beneficiarioId);
+    const magazzinoEmporioId = asInt(req.body?.magazzinoEmporioId);
+    const dataOraInizio = parseDateTime(req.body?.dataOraInizio);
+    const dataOraFine = parseDateTime(req.body?.dataOraFine);
+    if (
+      req.body?.statoAccessoEmporio != null &&
+      req.body.statoAccessoEmporio !== "pianificato"
+    ) {
+      res.status(400).json({
+        error: "Un nuovo Accesso Emporio deve nascere nello stato pianificato.",
+      });
+      return;
+    }
+    if (
+      beneficiarioId == null ||
+      magazzinoEmporioId == null ||
+      dataOraInizio == null
+    ) {
+      res.status(400).json({
+        error: "Beneficiario, Emporio e data/ora inizio sono obbligatori.",
+      });
+      return;
+    }
+    if (dataOraFine != null && dataOraFine <= dataOraInizio) {
+      res
+        .status(400)
+        .json({ error: "L'ora fine deve essere successiva all'ora inizio." });
+      return;
+    }
+    if (
+      !(await canUseBeneficiario(
+        beneficiarioId,
+        callerCentroId(req),
+        callerCittaId(req),
+        callerZonaUdsId(req),
+      ))
+    ) {
+      res
+        .status(403)
+        .json({ error: "Beneficiario non accessibile per il tuo profilo" });
+      return;
+    }
+    const beneficiario = await loadBeneficiario(beneficiarioId);
+    const beneficiarioError = validateBeneficiarioAccesso(beneficiario);
+    if (beneficiarioError) {
+      res.status(400).json({ error: beneficiarioError });
+      return;
+    }
+    const emporio = await validateMagazzinoEmporio(
       magazzinoEmporioId,
-      dataOraInizio,
-      dataOraFine,
-      stato: statoConsegnaFromAccesso(statoAccessoEmporio),
-      statoAccessoEmporio,
-      noteAccessoEmporio: asText(req.body?.noteAccessoEmporio),
-    })
-    .returning({ id: consegneTable.id });
-  const rows = await selectAccessi([eq(consegneTable.id, created.id)]).limit(1);
-  res.status(201).json(formatAccesso(rows[0]));
-});
+      req,
+      beneficiario,
+    );
+    if ("error" in emporio) {
+      res.status(emporio.status).json({ error: emporio.error });
+      return;
+    }
+    let created: { id: number };
+    try {
+      created = await db.transaction(async (tx) => {
+        const civilDay = yyyyMmDd(dataOraInizio);
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('accesso-emporio'), hashtext(${`${beneficiarioId}:${civilDay}`}))`,
+        );
+        if (await hasDuplicateAccesso(tx, beneficiarioId, dataOraInizio)) {
+          throw new Error(MSG_DUPLICATO);
+        }
+        const [row] = await tx
+          .insert(consegneTable)
+          .values({
+            codice: `EMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            beneficiarioId,
+            tipoPianificazione: TIPO_ACCESSO,
+            tipoConsegna: TIPO_CONSEGNA_ACCESSO,
+            dataPrevista: civilDay,
+            magazzinoId: magazzinoEmporioId,
+            magazzinoEmporioId,
+            dataOraInizio,
+            dataOraFine,
+            stato: statoConsegnaFromAccesso("pianificato"),
+            statoAccessoEmporio: "pianificato",
+            noteAccessoEmporio: asText(req.body?.noteAccessoEmporio),
+          })
+          .returning({ id: consegneTable.id });
+        await auditEmporioTx(tx, {
+          entityType: "accesso",
+          entityId: row.id,
+          action: "creazione",
+          operatoreId: req.user?.id,
+          ip: req.ip,
+          after: {
+            beneficiarioId,
+            magazzinoEmporioId,
+            civilDay,
+            stato: "pianificato",
+          },
+        });
+        return row;
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.message === MSG_DUPLICATO ||
+          databaseErrorCode(error) === "23505")
+      ) {
+        res.status(409).json({ error: MSG_DUPLICATO });
+        return;
+      }
+      throw error;
+    }
+    const rows = await selectAccessi([eq(consegneTable.id, created.id)]).limit(
+      1,
+    );
+    res.status(201).json(formatAccesso(rows[0]));
+  },
+);
 
-router.patch("/accessi-emporio/:id", async (req, res) => {
-  if (!(await assertEmporioEnabled(res))) return;
-  const id = Number(req.params.id);
-  const [existing] = await db.select().from(consegneTable).where(and(eq(consegneTable.id, id), eq(consegneTable.tipoPianificazione, TIPO_ACCESSO)));
-  if (!existing) { res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO }); return; }
-  if (!(await canUseBeneficiario(existing.beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
-    return;
-  }
+router.patch(
+  "/accessi-emporio/:id",
+  requirePermission("emporio.access.manage"),
+  async (req, res) => {
+    if (!(await assertEmporioEnabled(res))) return;
+    const id = Number(req.params.id);
+    const [existing] = await db
+      .select()
+      .from(consegneTable)
+      .where(
+        and(
+          eq(consegneTable.id, id),
+          eq(consegneTable.tipoPianificazione, TIPO_ACCESSO),
+        ),
+      );
+    if (!existing) {
+      res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO });
+      return;
+    }
+    if (!(await canAccessAccessoEmporio(existing, req))) {
+      res.status(403).json({ error: MSG_RISORSA_NON_ACCESSIBILE });
+      return;
+    }
 
-  const beneficiarioId = asInt(req.body?.beneficiarioId) ?? existing.beneficiarioId;
-  const magazzinoEmporioId = asInt(req.body?.magazzinoEmporioId) ?? existing.magazzinoEmporioId;
-  const dataOraInizio = "dataOraInizio" in req.body ? parseDateTime(req.body.dataOraInizio) : existing.dataOraInizio;
-  const dataOraFine = "dataOraFine" in req.body ? parseDateTime(req.body.dataOraFine) : existing.dataOraFine;
-  if (magazzinoEmporioId == null || dataOraInizio == null) {
-    res.status(400).json({ error: "Emporio e data/ora inizio sono obbligatori." });
-    return;
-  }
-  if (dataOraFine != null && dataOraFine <= dataOraInizio) {
-    res.status(400).json({ error: "L'ora fine deve essere successiva all'ora inizio." });
-    return;
-  }
-  if (!(await canUseBeneficiario(beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
-    res.status(403).json({ error: "Beneficiario non accessibile per il tuo profilo" });
-    return;
-  }
-  const beneficiario = await loadBeneficiario(beneficiarioId);
-  const beneficiarioError = validateBeneficiarioAccesso(beneficiario);
-  if (beneficiarioError) { res.status(400).json({ error: beneficiarioError }); return; }
-  const emporio = await validateMagazzinoEmporio(magazzinoEmporioId, req);
-  if ("error" in emporio) { res.status(emporio.status).json({ error: emporio.error }); return; }
-  if (await hasDuplicateAccesso(beneficiarioId, dataOraInizio, id)) {
-    res.status(409).json({ error: MSG_DUPLICATO });
-    return;
-  }
+    if ("statoAccessoEmporio" in (req.body ?? {})) {
+      res.status(400).json({
+        error:
+          "Usare l'endpoint di transizione stato per modificare lo stato dell'Accesso.",
+      });
+      return;
+    }
 
-  const updates: Partial<typeof consegneTable.$inferInsert> = {
-    beneficiarioId,
-    magazzinoId: magazzinoEmporioId,
-    magazzinoEmporioId,
-    dataOraInizio,
-    dataOraFine,
-    dataPrevista: yyyyMmDd(dataOraInizio),
-    noteAccessoEmporio: "noteAccessoEmporio" in req.body ? asText(req.body.noteAccessoEmporio) : existing.noteAccessoEmporio,
-  };
-  if (isStatoAccesso(req.body?.statoAccessoEmporio)) {
-    updates.statoAccessoEmporio = req.body.statoAccessoEmporio;
-    updates.stato = statoConsegnaFromAccesso(req.body.statoAccessoEmporio);
-  }
+    const beneficiarioId =
+      asInt(req.body?.beneficiarioId) ?? existing.beneficiarioId;
+    const magazzinoEmporioId =
+      asInt(req.body?.magazzinoEmporioId) ?? existing.magazzinoEmporioId;
+    const dataOraInizio =
+      "dataOraInizio" in req.body
+        ? parseDateTime(req.body.dataOraInizio)
+        : existing.dataOraInizio;
+    const dataOraFine =
+      "dataOraFine" in req.body
+        ? parseDateTime(req.body.dataOraFine)
+        : existing.dataOraFine;
+    if (magazzinoEmporioId == null || dataOraInizio == null) {
+      res
+        .status(400)
+        .json({ error: "Emporio e data/ora inizio sono obbligatori." });
+      return;
+    }
+    if (dataOraFine != null && dataOraFine <= dataOraInizio) {
+      res
+        .status(400)
+        .json({ error: "L'ora fine deve essere successiva all'ora inizio." });
+      return;
+    }
+    if (
+      !(await canUseBeneficiario(
+        beneficiarioId,
+        callerCentroId(req),
+        callerCittaId(req),
+        callerZonaUdsId(req),
+      ))
+    ) {
+      res
+        .status(403)
+        .json({ error: "Beneficiario non accessibile per il tuo profilo" });
+      return;
+    }
+    const beneficiario = await loadBeneficiario(beneficiarioId);
+    const beneficiarioError = validateBeneficiarioAccesso(beneficiario);
+    if (beneficiarioError) {
+      res.status(400).json({ error: beneficiarioError });
+      return;
+    }
+    const emporio = await validateMagazzinoEmporio(
+      magazzinoEmporioId,
+      req,
+      beneficiario,
+    );
+    if ("error" in emporio) {
+      res.status(emporio.status).json({ error: emporio.error });
+      return;
+    }
+    try {
+      await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT id FROM ${consegneTable} WHERE ${consegneTable.id} = ${id} FOR UPDATE`,
+        );
+        const [locked] = await tx
+          .select()
+          .from(consegneTable)
+          .where(eq(consegneTable.id, id));
+        if (!locked) throw new SpesaAccessoError(404, MSG_ACCESSO_NON_TROVATO);
+        if (!(await canAccessAccessoEmporio(locked, req)))
+          throw new SpesaAccessoError(403, MSG_RISORSA_NON_ACCESSIBILE);
+        const [linkedSession] = await tx
+          .select({ id: sessioniCassaEmporioTable.id })
+          .from(sessioniCassaEmporioTable)
+          .where(eq(sessioniCassaEmporioTable.accessoEmporioId, id))
+          .limit(1);
+        if (
+          linkedSession &&
+          (beneficiarioId !== locked.beneficiarioId ||
+            magazzinoEmporioId !== locked.magazzinoEmporioId ||
+            dataOraInizio.getTime() !==
+              (locked.dataOraInizio?.getTime() ?? null) ||
+            (dataOraFine?.getTime() ?? null) !==
+              (locked.dataOraFine?.getTime() ?? null))
+        ) {
+          throw new SpesaAccessoError(
+            409,
+            "Beneficiario, Emporio e data/ora non sono modificabili dopo l'apertura della Sessione Cassa.",
+          );
+        }
+        const civilDay = yyyyMmDd(dataOraInizio);
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('accesso-emporio'), hashtext(${`${beneficiarioId}:${civilDay}`}))`,
+        );
+        if (await hasDuplicateAccesso(tx, beneficiarioId, dataOraInizio, id)) {
+          throw new SpesaAccessoError(409, MSG_DUPLICATO);
+        }
+        const updates: Partial<typeof consegneTable.$inferInsert> = {
+          beneficiarioId,
+          magazzinoId: magazzinoEmporioId,
+          magazzinoEmporioId,
+          dataOraInizio,
+          dataOraFine,
+          dataPrevista: civilDay,
+          noteAccessoEmporio:
+            "noteAccessoEmporio" in req.body
+              ? asText(req.body.noteAccessoEmporio)
+              : locked.noteAccessoEmporio,
+        };
+        await tx
+          .update(consegneTable)
+          .set(updates)
+          .where(eq(consegneTable.id, id));
+        await auditEmporioTx(tx, {
+          entityType: "accesso",
+          entityId: id,
+          action: "modifica",
+          operatoreId: req.user?.id,
+          ip: req.ip,
+          before: {
+            beneficiarioId: locked.beneficiarioId,
+            magazzinoEmporioId: locked.magazzinoEmporioId,
+            dataOraInizio: locked.dataOraInizio?.toISOString() ?? null,
+          },
+          after: {
+            beneficiarioId,
+            magazzinoEmporioId,
+            dataOraInizio: dataOraInizio.toISOString(),
+          },
+        });
+      });
+    } catch (error) {
+      if (error instanceof SpesaAccessoError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      if (databaseErrorCode(error) === "23505") {
+        res.status(409).json({ error: MSG_DUPLICATO });
+        return;
+      }
+      throw error;
+    }
+    const rows = await selectAccessi([eq(consegneTable.id, id)]).limit(1);
+    res.json(formatAccesso(rows[0]));
+  },
+);
 
-  await db.update(consegneTable).set(updates).where(eq(consegneTable.id, id));
-  const rows = await selectAccessi([eq(consegneTable.id, id)]).limit(1);
-  res.json(formatAccesso(rows[0]));
-});
-
-router.patch("/accessi-emporio/:id/stato", async (req, res) => {
-  if (!(await assertEmporioEnabled(res))) return;
-  const id = Number(req.params.id);
-  const stato = req.body?.statoAccessoEmporio ?? req.body?.stato;
-  if (!isStatoAccesso(stato)) {
-    res.status(400).json({ error: "Stato Accesso Emporio non valido." });
-    return;
-  }
-  const [existing] = await db.select().from(consegneTable).where(and(eq(consegneTable.id, id), eq(consegneTable.tipoPianificazione, TIPO_ACCESSO)));
-  if (!existing) { res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO }); return; }
-  if (!(await canUseBeneficiario(existing.beneficiarioId, callerCentroId(req), callerCittaId(req), callerZonaUdsId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
-    return;
-  }
-  const motivoAnnullamento = asText(req.body?.motivoAnnullamento);
-  if (stato === "annullato" && !motivoAnnullamento) {
-    res.status(400).json({ error: "Il motivo annullamento è obbligatorio." });
-    return;
-  }
-  await db
-    .update(consegneTable)
-    .set({
-      statoAccessoEmporio: stato,
-      stato: statoConsegnaFromAccesso(stato),
-      motivoAnnullamento: stato === "annullato" ? motivoAnnullamento : existing.motivoAnnullamento,
-      dataEffettuata: stato === "effettuato" ? new Date() : existing.dataEffettuata,
-    })
-    .where(eq(consegneTable.id, id));
-  const rows = await selectAccessi([eq(consegneTable.id, id)]).limit(1);
-  res.json(formatAccesso(rows[0]));
-});
+router.patch(
+  "/accessi-emporio/:id/stato",
+  requirePermission("emporio.access.manage"),
+  async (req, res) => {
+    if (!(await assertEmporioEnabled(res))) return;
+    const id = Number(req.params.id);
+    const stato = req.body?.statoAccessoEmporio ?? req.body?.stato;
+    if (!isStatoAccesso(stato)) {
+      res.status(400).json({ error: "Stato Accesso Emporio non valido." });
+      return;
+    }
+    const [existing] = await db
+      .select()
+      .from(consegneTable)
+      .where(
+        and(
+          eq(consegneTable.id, id),
+          eq(consegneTable.tipoPianificazione, TIPO_ACCESSO),
+        ),
+      );
+    if (!existing) {
+      res.status(404).json({ error: MSG_ACCESSO_NON_TROVATO });
+      return;
+    }
+    if (!(await canAccessAccessoEmporio(existing, req))) {
+      res.status(403).json({ error: MSG_RISORSA_NON_ACCESSIBILE });
+      return;
+    }
+    const motivoAnnullamento = asText(req.body?.motivoAnnullamento);
+    if (stato === "annullato" && !motivoAnnullamento) {
+      res.status(400).json({ error: "Il motivo annullamento è obbligatorio." });
+      return;
+    }
+    try {
+      await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT id FROM ${consegneTable} WHERE ${consegneTable.id} = ${id} FOR UPDATE`,
+        );
+        const [locked] = await tx
+          .select()
+          .from(consegneTable)
+          .where(eq(consegneTable.id, id));
+        if (!locked) throw new SpesaAccessoError(404, MSG_ACCESSO_NON_TROVATO);
+        if (!(await canAccessAccessoEmporio(locked, req)))
+          throw new SpesaAccessoError(403, MSG_RISORSA_NON_ACCESSIBILE);
+        const current = locked.statoAccessoEmporio as StatoAccesso;
+        if (
+          stato !== current &&
+          !ACCESS_TRANSITIONS[current]?.includes(stato)
+        ) {
+          throw new SpesaAccessoError(
+            409,
+            `Transizione Accesso Emporio non consentita: ${current} → ${stato}.`,
+          );
+        }
+        await tx
+          .update(consegneTable)
+          .set({
+            statoAccessoEmporio: stato,
+            stato: statoConsegnaFromAccesso(stato),
+            motivoAnnullamento:
+              stato === "annullato"
+                ? motivoAnnullamento
+                : locked.motivoAnnullamento,
+          })
+          .where(eq(consegneTable.id, id));
+        if (stato !== current) {
+          await auditEmporioTx(tx, {
+            entityType: "accesso",
+            entityId: id,
+            action: "cambio-stato",
+            operatoreId: req.user?.id,
+            ip: req.ip,
+            motivo: motivoAnnullamento,
+            before: { stato: current },
+            after: { stato },
+          });
+        }
+      });
+    } catch (error) {
+      if (error instanceof SpesaAccessoError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
+    const rows = await selectAccessi([eq(consegneTable.id, id)]).limit(1);
+    res.json(formatAccesso(rows[0]));
+  },
+);
 
 export default router;

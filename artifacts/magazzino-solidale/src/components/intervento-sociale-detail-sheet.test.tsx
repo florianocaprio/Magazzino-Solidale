@@ -181,8 +181,7 @@ describe("InterventoSocialeDetailSheet", () => {
     await act(async () => root.render(render(true)));
     expect(onOpenChange).not.toHaveBeenCalled();
     const concludedAt = Array.from(document.body.querySelectorAll("dt")).find(
-      (element) =>
-        element.textContent === "interventi.detail.concludedAt",
+      (element) => element.textContent === "interventi.detail.concludedAt",
     )?.nextElementSibling;
     expect(concludedAt?.textContent).toBe("–");
     const description = Array.from(
@@ -212,5 +211,49 @@ describe("InterventoSocialeDetailSheet", () => {
     );
     expect(reopenedDescription).toBeTruthy();
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("mostra soltanto le azioni consentite dai permessi Sociali", async () => {
+    const planned = {
+      ...intervento,
+      stato: "pianificato",
+      ambito: "sociale",
+      ambitoLegacy: false,
+      dataOraPianificata: "2026-08-20T08:00:00Z",
+      dataOraConclusione: null,
+    } as Intervento;
+    const plannedOperational = {
+      ...operativita,
+      stato: "pianificato",
+      risultato: null,
+      esito: null,
+    } satisfies InterventoOperativita;
+
+    await act(async () => {
+      root.render(
+        <InterventoSocialeDetailSheet
+          open
+          intervento={planned}
+          operativita={plannedOperational}
+          canUpdate={false}
+          canComplete
+          canCancel={false}
+          canCreate={false}
+          onOpenChange={vi.fn()}
+          {...callbacks}
+        />,
+      );
+    });
+
+    expect(document.body.textContent).toContain("interventi.operational.start");
+    expect(document.body.textContent).not.toContain(
+      "interventi.operational.saveWithoutClosing",
+    );
+    expect(document.body.textContent).not.toContain(
+      "interventi.operational.cancel",
+    );
+    expect(document.body.textContent).not.toContain(
+      "interventi.operational.noShow",
+    );
   });
 });

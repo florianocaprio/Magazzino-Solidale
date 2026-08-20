@@ -6,12 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { MensaAccessoInputModalitaAccesso } from './mensaAccessoInputModalitaAccesso';
+import type { MensaAccessoInputTipoServizio } from './mensaAccessoInputTipoServizio';
 
 export interface MensaAccessoInput {
   mensaId: number;
   modalitaAccesso: MensaAccessoInputModalitaAccesso;
   codiceTessera?: string;
   beneficiarioId?: number;
+  tipoServizio?: MensaAccessoInputTipoServizio;
   /**
      * @minLength 1
      * @maxLength 80

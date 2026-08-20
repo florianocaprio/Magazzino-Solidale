@@ -19,7 +19,11 @@ function makeApp(user: { id: number; centroAscoltoId: number | null; cittaId: nu
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as unknown as { user: typeof user }).user = user;
+    (req as unknown as { user: typeof user & { isAdmin: boolean; permessi: string[] } }).user = {
+      ...user,
+      isAdmin: false,
+      permessi: ["beneficiari.duplicates.search"],
+    };
     next();
   });
   app.use(beneficiariRouter);
@@ -206,7 +210,7 @@ describe("GET /beneficiari/cerca-simili", () => {
       .get("/beneficiari/cerca-simili")
       .query({ search: "Anna Bianchi" });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/città/i);
+    expect(res.body.error).toMatch(/Area/i);
   });
 
   it("un caller globale ricerca soltanto nella città indicata", async () => {
@@ -230,7 +234,7 @@ describe("GET /beneficiari/cerca-simili", () => {
         .get("/beneficiari/cerca-simili")
         .query({ search: "Anna Bianchi", cittaId });
       expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/città/i);
+      expect(res.body.error).toMatch(/Area/i);
     },
   );
 

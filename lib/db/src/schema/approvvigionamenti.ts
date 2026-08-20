@@ -12,6 +12,7 @@ export const approvvigionamentiTable = pgTable("approvvigionamenti", {
   dataPrevista: date("data_prevista"),
   stato: varchar("stato", { length: 30 }).notNull().default("bozza"),
   note: text("note"),
+  versione: integer("versione").notNull().default(1),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 

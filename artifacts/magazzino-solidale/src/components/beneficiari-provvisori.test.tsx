@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   areas: new Set<string>(),
   permissions: new Set<string>(),
   mensaAbilitato: true,
+  user: { id: 1, cittaId: 1 as number | null, centroAscoltoId: 2 as number | null },
+  centri: [] as Array<{ id: number; nome: string; cittaId: number | null }>,
+  citta: [] as Array<{ id: number; nome: string }>,
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
@@ -23,13 +26,17 @@ vi.mock("@workspace/api-client-react", () => ({
     options: unknown,
   ) => mocks.getMensaRiepilogo(params, options),
   useDeleteBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
+  useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn().mockResolvedValue({ autorizzato: true }) }),
+  getMensaAbilitazioniRiepilogoBeneficiari: vi.fn().mockResolvedValue([]),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useBulkBeneficiari: () => ({ mutate: vi.fn(), isPending: false }),
-  useListCentriAscolto: () => ({ data: [] }),
+  listBeneficiari: vi.fn().mockResolvedValue([]),
+  useListCentriAscolto: () => ({ data: mocks.centri }),
   useListMagazzini: () => ({ data: [] }),
   useGetBeneficiario: () => ({ data: undefined }),
   useCercaBeneficiariSimili: () => ({ data: [] }),
-  useListCitta: () => ({ data: [] }),
+  useListCitta: () => ({ data: mocks.citta }),
   useListZoneUds: () => ({ data: [] }),
   getListBeneficiariQueryKey: () => ["beneficiari"],
   getGetBeneficiarioQueryKey: (id: number) => ["beneficiari", id],
@@ -57,9 +64,9 @@ vi.mock("@/hooks/use-toast", () => ({
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: 1, cittaId: 1, centroAscoltoId: 2 },
+    user: mocks.user,
     hasArea: (area: string) => mocks.areas.has(area),
-    hasPermission: (permission: string) => mocks.permissions.has(permission),
+    hasPermission: (permission: string) => permission.startsWith("beneficiari.") || mocks.permissions.has(permission),
   }),
 }));
 
@@ -98,6 +105,9 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     mocks.areas = new Set(["mensa"]);
     mocks.permissions = new Set();
     mocks.mensaAbilitato = true;
+    mocks.user = { id: 1, cittaId: 1, centroAscoltoId: 2 };
+    mocks.centri = [];
+    mocks.citta = [];
     mocks.listBeneficiari.mockReturnValue({
       data: [
         {
@@ -144,6 +154,25 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     expect(mocks.listBeneficiari).toHaveBeenCalledWith(
       expect.objectContaining({ statoAnagrafica: undefined }),
     );
+  });
+
+  it("mostra sempre l'Area obbligatoria nella creazione Sociale di un Admin globale", async () => {
+    mocks.user = { id: 1, cittaId: null, centroAscoltoId: null };
+    mocks.citta = [{ id: 1, nome: "Area A" }, { id: 2, nome: "Area B" }];
+    mocks.centri = [
+      { id: 10, nome: "Centro A", cittaId: 1 },
+      { id: 20, nome: "Centro B", cittaId: 2 },
+    ];
+    await act(async () => root.render(<Beneficiari />));
+    const newButton = Array.from(document.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("beneficiari.newBeneficiario"),
+    );
+    await act(async () => newButton?.click());
+
+    expect(document.body.textContent).toContain("Area");
+    expect(document.body.textContent).toContain("Seleziona un'Area");
+    expect(document.body.textContent).not.toContain("Centro A");
+    expect(document.body.textContent).not.toContain("Centro B");
   });
 
   it("non abilita richieste né UI Mensa quando il modulo è disattivato", async () => {
@@ -302,5 +331,46 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     expect(document.body.textContent).toContain("ATTIVA");
     expect(document.body.textContent).toContain("PROGRAMMATA");
     expect(document.body.textContent).toContain("NON ABILITATO");
+  });
+
+  it("naviga pagina 1, pagina 2, ritorna e resetta a pagina 1 quando cambia ricerca", async () => {
+    const pageRows = (page: number) => Array.from({ length: 50 }, (_, index) => ({
+      id: page * 100 + index,
+      codice: `BEN-${page}-${index}`,
+      cognome: `Cognome ${page}-${index}`,
+      nome: "Persona",
+      statoAnagrafica: "completa",
+      priorita: "media",
+      numComponenti: 1,
+      consegnaDomicilio: false,
+      uds: false,
+      attivo: true,
+      versione: 1,
+    }));
+    mocks.mensaAbilitato = false;
+    mocks.listBeneficiari.mockImplementation((params: { page?: number }) => ({
+      data: pageRows(params.page ?? 1),
+      isLoading: false,
+    }));
+
+    await act(async () => root.render(<Beneficiari />));
+    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, limit: 50 }));
+
+    const next = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Successiva");
+    await act(async () => next?.click());
+    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, limit: 50 }));
+
+    const previous = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Precedente");
+    await act(async () => previous?.click());
+    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, limit: 50 }));
+
+    await act(async () => next?.click());
+    const search = document.querySelector<HTMLInputElement>('input[placeholder="beneficiari.searchPlaceholder"]');
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(search, "Rossi");
+      search?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, search: "Rossi" }));
   });
 });

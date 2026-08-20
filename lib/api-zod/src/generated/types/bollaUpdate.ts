@@ -7,7 +7,6 @@
  */
 
 export interface BollaUpdate {
-  stato?: string;
   beneficiarioId?: number;
   magazzinoId?: number;
   /** @nullable */
@@ -20,6 +19,4 @@ export interface BollaUpdate {
   indirizzoConsegna?: string;
   /** @nullable */
   noteConsegna?: string | null;
-  confermaRicezione?: boolean;
-  noteRicezione?: string;
 }

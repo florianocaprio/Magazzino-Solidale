@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiario, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type Beneficiario, type MensaAbilitazioneRiepilogoBeneficiario } from "@workspace/api-client-react";
-import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
+import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiarioStato, useAuthorizeBeneficiariExport, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListCitta, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListCittaQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type BeneficiarioDirectory, type MensaAbilitazioneRiepilogoBeneficiario, type ListBeneficiariParams } from "@workspace/api-client-react";
+import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,8 +33,10 @@ import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
 import { createBeneficiarioWithOptionalMensa } from "@/lib/beneficiario-mensa-workflow";
+import { BENEFICIARI_PAGE_SIZE, fetchBeneficiariExportRows, type BeneficiarioExportRow } from "@/lib/beneficiari-pagination";
+import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requireGlobalBeneficiarioArea } from "@/lib/beneficiario-create-ui";
 
-const makeFormSchema = (t: (k: string) => string) => z.object({
+const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.object({
   cognome: z.string().min(2),
   nome: z.string().min(2),
   soprannome: z.string().optional(),
@@ -64,7 +66,7 @@ const makeFormSchema = (t: (k: string) => string) => z.object({
   motivoConsegnaDomicilio: z.string().optional(),
   restrizioniAlimentari: z.string().optional(),
   uds: z.boolean().default(false),
-  cittaId: z.string().optional(),
+  cittaId: areaRequired ? z.string().min(1, t("common.requiredField")) : z.string().optional(),
   zonaUdsId: z.string().optional(),
 });
 type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
@@ -114,18 +116,25 @@ export default function Beneficiari() {
   const [prioritaFilter, setPrioritaFilter] = useState<string>(PRIORITA_ALL);
   const [cittaFilter, setCittaFilter] = useState<string>(CITTA_ALL);
   const [statoAnagraficaFilter, setStatoAnagraficaFilter] = useState<string>(STATO_ANAGRAFICA_ALL);
+  const [page, setPage] = useState(1);
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setCentroFilter(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
   const isCittaGlobal = user?.cittaId == null;
-  const { data: beneficiari, isLoading } = useListBeneficiari({
+  const beneficiariFilters = useMemo<ListBeneficiariParams>(() => ({
     search: search || undefined,
     centroAscoltoId: centroFilter !== CENTRO_ALL ? parseInt(centroFilter) : undefined,
     priorita: prioritaFilter !== PRIORITA_ALL ? prioritaFilter : undefined,
     cittaId: isCittaGlobal && cittaFilter !== CITTA_ALL ? parseInt(cittaFilter) : undefined,
     statoAnagrafica: statoAnagraficaFilter !== STATO_ANAGRAFICA_ALL ? statoAnagraficaFilter as "provvisoria" | "completa" : undefined,
+  }), [cittaFilter, centroFilter, isCittaGlobal, prioritaFilter, search, statoAnagraficaFilter]);
+  useEffect(() => setPage(1), [beneficiariFilters]);
+  const { data: beneficiari, isLoading } = useListBeneficiari({
+    ...beneficiariFilters,
+    page,
+    limit: BENEFICIARI_PAGE_SIZE,
   });
   const { data: centri } = useListCentriAscolto();
   const { data: magazzini } = useListMagazzini();
@@ -137,6 +146,9 @@ export default function Beneficiari() {
   const { emporioAbilitato, unitaStradaAbilitata, mensaAbilitato } = useModuloFlags();
   const canViewMensa = mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
   const canManageMensa = canViewMensa && hasPermission("mensa.eligibility.manage");
+  const canManage = hasPermission("beneficiari.manage");
+  const canDeactivate = hasPermission("beneficiari.deactivate");
+  const canExport = hasPermission("beneficiari.export");
   const beneficiarioIds = useMemo(() => (beneficiari ?? []).map((beneficiario) => beneficiario.id), [beneficiari]);
   const mensaSummaryParams = useMemo(() => beneficiarioIds.length > 0 ? { beneficiarioIds: beneficiarioIds.join(",") } : undefined, [beneficiarioIds]);
   const mensaSummary = useGetMensaAbilitazioniRiepilogoBeneficiari(mensaSummaryParams, {
@@ -148,6 +160,16 @@ export default function Beneficiari() {
   const mensaSummaryByBeneficiario = useMemo(() => new Map<number, MensaAbilitazioneRiepilogoBeneficiario>(
     (mensaSummary.data ?? []).map((item) => [item.beneficiarioId, item]),
   ), [mensaSummary.data]);
+  const currentExportRows = useMemo<BeneficiarioExportRow[]>(() => (beneficiari ?? []).map((row) => ({
+    ...row,
+    ...(canViewMensa ? {
+      mensaStatoExport: mensaSummary.isLoading
+        ? "IN CARICAMENTO"
+        : mensaSummary.isError
+          ? "NON DISPONIBILE"
+          : (mensaSummaryByBeneficiario.get(row.id)?.stato ?? "").toUpperCase(),
+    } : {}),
+  })), [beneficiari, canViewMensa, mensaSummary.isError, mensaSummary.isLoading, mensaSummaryByBeneficiario]);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -159,12 +181,13 @@ export default function Beneficiari() {
   const createBeneficiario = useCreateBeneficiario();
   const createMensaAbilitazione = useCreateMensaAbilitazione();
   const deleteBeneficiario = useDeleteBeneficiario();
-  const updateBeneficiario = useUpdateBeneficiario();
+  const updateBeneficiarioStato = useUpdateBeneficiarioStato();
+  const authorizeExport = useAuthorizeBeneficiariExport();
   const bulkBeneficiari = useBulkBeneficiari();
   const [isImportOpen, setIsImportOpen] = useState(false);
 
-  const toggleStatus = (b: { id: number; attivo: boolean }) => {
-    updateBeneficiario.mutate({ id: b.id, data: { attivo: !b.attivo } }, {
+  const toggleStatus = (b: { id: number; attivo: boolean; versione: number }) => {
+    updateBeneficiarioStato.mutate({ id: b.id, data: { attivo: !b.attivo, versione: b.versione } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(b.id) });
@@ -173,7 +196,7 @@ export default function Beneficiari() {
     });
   };
 
-  const formSchema = useMemo(() => makeFormSchema(t), [t]);
+  const formSchema = useMemo(() => makeFormSchema(t, isCittaGlobal), [isCittaGlobal, t]);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -194,6 +217,10 @@ export default function Beneficiari() {
   const formCitta = isCittaGlobal
     ? (form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined)
     : (user?.cittaId ?? undefined);
+  const formCentriDisponibili = useMemo(
+    () => (centri ?? []).filter((centro) => formCitta != null && centro.cittaId === formCitta),
+    [centri, formCitta],
+  );
   const { data: udsZone } = useListZoneUds(
     formCitta ? { cittaId: formCitta } : undefined,
     { query: { queryKey: ["zoneUds", "benefForm", formCitta], enabled: watchUds && formCitta != null } },
@@ -201,21 +228,30 @@ export default function Beneficiari() {
 
   // Anti-duplicate fuzzy suggestions (città-scoped) while the create form is open.
   const [dupDismissed, setDupDismissed] = useState(false);
-  const [dupParams, setDupParams] = useState<{ nome?: string; cognome?: string }>({});
+  const [dupParams, setDupParams] = useState<{ nome?: string; cognome?: string; cittaId?: number }>({});
   const wNome = form.watch("nome");
   const wCognome = form.watch("cognome");
   useEffect(() => {
-    if (!isFormOpen) return;
+    if (!isFormOpen || (isCittaGlobal && formCitta == null)) {
+      setDupParams({});
+      return;
+    }
     const handle = setTimeout(() => {
-      setDupParams({ nome: (wNome ?? "").trim(), cognome: (wCognome ?? "").trim() });
+      setDupParams(buildBeneficiarioDuplicateParams(wNome, wCognome, isCittaGlobal, formCitta));
     }, 300);
     return () => clearTimeout(handle);
-  }, [isFormOpen, wNome, wCognome]);
+  }, [formCitta, isCittaGlobal, isFormOpen, wNome, wCognome]);
   const dupHasInput = (dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 3;
   const { data: dupMatches } = useCercaBeneficiariSimili(dupParams, {
     query: {
       queryKey: getCercaBeneficiariSimiliQueryKey(dupParams),
-      enabled: isFormOpen && !dupDismissed && dupHasInput,
+      enabled: canSearchBeneficiarioDuplicates({
+        open: isFormOpen,
+        dismissed: dupDismissed,
+        hasInput: dupHasInput,
+        isGlobal: isCittaGlobal,
+        areaId: formCitta,
+      }),
     },
   });
   const suggestions = dupMatches ?? [];
@@ -230,29 +266,24 @@ export default function Beneficiari() {
       zonaUdsId,
       uds,
       magazzinoEmporioPreferitoId,
-      creditoSolidaleNote,
+      creditoSolidaleAbilitato: _creditoSolidaleAbilitato,
+      creditoSolidaleStato: _creditoSolidaleStato,
+      creditoSolidaleNote: _creditoSolidaleNote,
       abilitaMensa: shouldEnableMensa,
       mensaId,
       mensaDataInizio,
       mensaDataFine,
       ...rest
     } = data;
-    // A città-global admin must pin a città when flagging a person as UDS,
-    // mirroring the server-side hard-boundary guard.
-    if (uds && isCittaGlobal && !cittaId) {
+    // Un amministratore globale deve scegliere sempre l'Area del nuovo Beneficiario.
+    let selectedAreaId: number | undefined;
+    try {
+      selectedAreaId = requireGlobalBeneficiarioArea(isCittaGlobal, cittaId);
+    } catch {
       form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
       return;
     }
     const centroId = centroAscoltoId ? parseInt(centroAscoltoId) : (isCentroLocked && lockedCentroId != null ? lockedCentroId : null);
-    if (rest.creditoSolidaleAbilitato && centroId == null) {
-      form.setError("centroAscoltoId", { type: "manual", message: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto") });
-      toast({
-        title: t("beneficiari.creditoSolidaleSection"),
-        description: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto"),
-        variant: "destructive",
-      });
-      return;
-    }
     if (shouldEnableMensa) {
       if (!formCitta) {
         form.setError("cittaId", { type: "manual", message: "Seleziona l'Area" });
@@ -277,17 +308,12 @@ export default function Beneficiari() {
       sesso: rest.sesso,
       centroAscoltoId: centroId,
       codiceFiscale: codiceFiscale?.trim() ? codiceFiscale.trim().toUpperCase() : null,
-      creditoSolidaleAbilitato: rest.creditoSolidaleAbilitato,
-      creditoSolidaleStato: rest.creditoSolidaleAbilitato ? rest.creditoSolidaleStato : "non_abilitato",
-      creditoSolidaleNote: creditoSolidaleNote?.trim() ? creditoSolidaleNote.trim() : null,
       magazzinoEmporioPreferitoId:
         magazzinoEmporioPreferitoId && magazzinoEmporioPreferitoId !== NO_EMPORIO
           ? parseInt(magazzinoEmporioPreferitoId)
           : null,
     };
-    if ((uds || shouldEnableMensa) && isCittaGlobal && cittaId) {
-      payload.cittaId = parseInt(cittaId);
-    }
+    if (selectedAreaId != null) payload.cittaId = selectedAreaId;
     if (uds) {
       if (zonaUdsId && zonaUdsId !== NO_ZONE) payload.zonaUdsId = parseInt(zonaUdsId);
     }
@@ -350,43 +376,39 @@ export default function Beneficiari() {
           <p className="text-muted-foreground">{t("beneficiari.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons
-            rows={beneficiari ?? []}
+          {canExport && <ExportButtons<BeneficiarioExportRow>
+            rows={currentExportRows}
             columns={[
               { header: t("common.code"), accessor: (b) => b.codice },
               { header: t("common.surname"), accessor: (b) => b.cognome },
               { header: t("common.name"), accessor: (b) => b.nome },
-              { header: t("common.email"), accessor: (b) => b.email },
               { header: t("common.phone"), accessor: (b) => b.telefono },
-              { header: t("beneficiari.comune"), accessor: (b) => b.comune },
-              { header: t("beneficiari.zonaMunicipio"), accessor: (b) => b.zonaMunicipio },
               { header: t("beneficiari.centroAscolto"), accessor: (b) => b.centroAscoltoNome },
-              { header: t("beneficiari.creditoSolidaleStato"), accessor: (b) => t(creditoSolidaleLabelKey(b.creditoSolidaleStato)) },
-              { header: t("beneficiari.magazzinoEmporioPreferito"), accessor: (b) => b.magazzinoEmporioPreferitoNome },
               ...(canViewMensa ? [{
                 header: "Mensa",
-                accessor: (b: Beneficiario) => mensaSummary.isLoading
-                  ? "IN CARICAMENTO"
-                  : mensaSummary.isError
-                    ? "NON DISPONIBILE"
-                    : (mensaSummaryByBeneficiario.get(b.id)?.stato ?? "non_abilitato").toUpperCase(),
+                accessor: (b: BeneficiarioExportRow) => b.mensaStatoExport ?? "",
               }] : []),
             ]}
+            loadRows={() => fetchBeneficiariExportRows(beneficiariFilters, canViewMensa)}
+            beforeExport={(_format, exportRows) => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: exportRows.length, beneficiarioId: null } }).then(() => undefined)}
             filename="beneficiari"
             title={t("beneficiari.exportTitle")}
             orientation="landscape"
-          />
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+          />}
+          {canManage && <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" /> {t("bulkImport.button")}
-          </Button>
-          <Button onClick={() => {
+          </Button>}
+          {canManage && <Button onClick={() => {
             form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "");
             form.setValue("abilitaMensa", false);
             form.setValue("mensaId", "");
             form.setValue("mensaDataInizio", todayEuropeRome());
             form.setValue("mensaDataFine", "");
+            form.setValue("cittaId", "");
+            form.setValue("zonaUdsId", NO_ZONE);
+            form.setValue("magazzinoEmporioPreferitoId", NO_EMPORIO);
             setDupDismissed(false); setDupParams({}); setIsFormOpen(true);
-          }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>
+          }} className="gap-2"><Plus className="h-4 w-4" /> {t("beneficiari.newBeneficiario")}</Button>}
         </div>
       </div>
 
@@ -410,10 +432,7 @@ export default function Beneficiari() {
           { key: "priorita", header: t("beneficiari.colPriorita"), example: "media" },
           { key: "areaProvenienza", header: t("beneficiarioDettaglio.areaProvenienza"), example: "UE" },
           { key: "centro", header: t("beneficiari.centroAscolto"), example: "" },
-          { key: "creditoSolidaleAbilitato", header: t("beneficiari.creditoSolidaleAbilitato"), example: "No" },
-          { key: "creditoSolidaleStato", header: t("beneficiari.creditoSolidaleStato"), example: "non_abilitato" },
           { key: "magazzinoEmporioPreferito", header: t("beneficiari.magazzinoEmporioPreferito"), example: "" },
-          { key: "creditoSolidaleNote", header: t("beneficiari.creditoSolidaleNote"), example: "" },
           ...(isCittaGlobal ? [{ key: "citta", header: t("nav.citta"), example: "" }] : []),
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
@@ -440,11 +459,6 @@ export default function Beneficiari() {
             }
             magazzinoEmporioPreferitoId = emporio.id;
           }
-          const creditoSolidaleAbilitato = parseBoolCell(r.creditoSolidaleAbilitato);
-          const creditoSolidaleStato = r.creditoSolidaleStato?.trim() || (creditoSolidaleAbilitato ? "attivo" : "non_abilitato");
-          if (!STATI_CREDITO_SOLIDALE.includes(creditoSolidaleStato as CreditoSolidaleStato)) {
-            return { error: t("bulkImport.unknownRef", { field: t("beneficiari.creditoSolidaleStato"), value: creditoSolidaleStato }) };
-          }
           let numComponenti: number | undefined;
           if (r.numComponenti) {
             const n = Number(r.numComponenti);
@@ -468,9 +482,6 @@ export default function Beneficiari() {
               areaProvenienza: r.areaProvenienza || undefined,
               centroAscoltoId,
               cittaId,
-              creditoSolidaleAbilitato,
-              creditoSolidaleStato: creditoSolidaleAbilitato ? creditoSolidaleStato : "non_abilitato",
-              creditoSolidaleNote: r.creditoSolidaleNote || undefined,
               magazzinoEmporioPreferitoId,
             },
           };
@@ -548,13 +559,9 @@ export default function Beneficiari() {
               <TableRow>
                 <TableHead>{t("beneficiari.colNominativo")}</TableHead>
                 <TableHead>{t("common.code")}</TableHead>
-                <TableHead>{t("beneficiari.colZonaComune")}</TableHead>
                 {isGlobal && <TableHead>{t("beneficiari.centroAscolto")}</TableHead>}
-                <TableHead className="text-center">{t("beneficiari.colComponenti")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colPriorita")}</TableHead>
-                <TableHead className="text-center">{t("beneficiari.creditoSolidaleSection")}</TableHead>
                 {canViewMensa && <TableHead className="text-center">Mensa</TableHead>}
-                <TableHead className="text-center">{t("beneficiari.colDomicilio")}</TableHead>
                 <TableHead className="text-center">{t("beneficiari.colStato")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -565,20 +572,16 @@ export default function Beneficiari() {
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     {isGlobal && <TableCell><Skeleton className="h-5 w-28" /></TableCell>}
-                    <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
                     {canViewMensa && <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>}
-                    <TableCell><Skeleton className="h-5 w-8 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
               ) : beneficiari?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={(isGlobal ? 10 : 9) + (canViewMensa ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
+                  <TableCell colSpan={(isGlobal ? 6 : 5) + (canViewMensa ? 1 : 0)} className="h-32 text-center text-muted-foreground">{t("beneficiari.empty")}</TableCell>
                 </TableRow>
               ) : beneficiari?.map((b) => (
                 <TableRow key={b.id} className={!b.attivo ? "opacity-60" : ""}>
@@ -596,24 +599,12 @@ export default function Beneficiari() {
                     {b.statoAnagrafica === "provvisoria" && <Badge variant="secondary" className="mt-1">Provvisoria</Badge>}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{b.codice}</TableCell>
-                  <TableCell className="text-sm">
-                    {b.comune && <div className="flex items-center gap-1"><MapPin className="h-3 w-3 text-muted-foreground"/> {b.comune} {b.zonaMunicipio ? `(${b.zonaMunicipio})` : ''}</div>}
-                  </TableCell>
                   {isGlobal && (
                     <TableCell className="text-sm text-muted-foreground">
                       {b.centroAscoltoNome ?? <span className="italic">{t("common.none")}</span>}
                     </TableCell>
                   )}
-                  <TableCell className="text-center font-medium">{b.numComponenti}</TableCell>
                   <TableCell className="text-center">{getPriorityBadge(b.priorita)}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant="outline"
-                      className={creditoSolidaleBadgeClasses[(b.creditoSolidaleStato ?? "non_abilitato") as CreditoSolidaleStato] ?? creditoSolidaleBadgeClasses.non_abilitato}
-                    >
-                      {t(creditoSolidaleLabelKey(b.creditoSolidaleStato))}
-                    </Badge>
-                  </TableCell>
                   {canViewMensa && (
                     <TableCell className="text-center">
                       {mensaSummary.isLoading ? (
@@ -626,13 +617,11 @@ export default function Beneficiari() {
                     </TableCell>
                   )}
                   <TableCell className="text-center">
-                    {b.consegnaDomicilio && <Home className="h-4 w-4 text-blue-500 mx-auto" />}
-                  </TableCell>
-                  <TableCell className="text-center">
                     <div className="flex items-center justify-center">
                       <Switch
                         checked={b.attivo}
                         onCheckedChange={() => toggleStatus(b)}
+                        disabled={!canDeactivate || updateBeneficiarioStato.isPending}
                         aria-label={b.attivo ? t("beneficiari.disattiva") : t("beneficiari.attiva")}
                       />
                     </div>
@@ -646,9 +635,9 @@ export default function Beneficiari() {
                             {t("beneficiari.profileDetail")}
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}</DropdownMenuItem>
+                        {canManage && <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>}
+                        {canExport && <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>}
+                        {canDeactivate && <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> Disattiva</DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -656,6 +645,17 @@ export default function Beneficiari() {
               ))}
             </TableBody>
           </Table>
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <span className="text-sm text-muted-foreground">Pagina {page}</span>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+                Precedente
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={isLoading || (beneficiari?.length ?? 0) < BENEFICIARI_PAGE_SIZE} onClick={() => setPage((current) => current + 1)}>
+                Successiva
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -802,24 +802,27 @@ export default function Beneficiari() {
                 <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("beneficiari.centroRiferimento")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined} disabled={isCentroLocked}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined} disabled={isCentroLocked || formCitta == null}>
                       <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {centri?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                        {formCentriDisponibili.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
 
-                {isCittaGlobal && (watchUds || abilitaMensa) && (
+                {isCittaGlobal && (
                   <FormField control={form.control} name="cittaId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Area</FormLabel>
+                      <FormLabel>Area *</FormLabel>
                       <Select value={field.value || ""} onValueChange={(value) => {
                         field.onChange(value);
+                        form.setValue("centroAscoltoId", "");
                         form.setValue("zonaUdsId", NO_ZONE);
+                        form.setValue("magazzinoEmporioPreferitoId", NO_EMPORIO);
                         form.setValue("mensaId", "");
+                        resetDup();
                       }}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Seleziona un'Area" /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -848,77 +851,6 @@ export default function Beneficiari() {
                     onDataFineChange={(value) => form.setValue("mensaDataFine", value)}
                   />
                 )}
-
-                <div className="rounded-md border p-3 space-y-3">
-                  <div>
-                    <h4 className="text-sm font-medium">{t("beneficiari.creditoSolidaleSection")}</h4>
-                    <p className="text-xs text-muted-foreground">{t("beneficiari.creditoSolidaleHelp")}</p>
-                    {!emporioAbilitato && (
-                      <p className="text-xs text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>
-                    )}
-                  </div>
-                  <FormField control={form.control} name="creditoSolidaleAbilitato" render={({ field }) => (
-                    <FormItem className="flex items-center justify-between">
-                      <FormLabel className="!mt-0">{t("beneficiari.creditoSolidaleAbilitato")}</FormLabel>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          disabled={!emporioAbilitato}
-                          onCheckedChange={(checked) => {
-                            field.onChange(checked);
-                            form.setValue("creditoSolidaleStato", checked ? "attivo" : "non_abilitato");
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="creditoSolidaleStato" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("beneficiari.creditoSolidaleStato")}</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!emporioAbilitato || !creditoSolidaleAbilitato}
-                      >
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="non_abilitato">{t("beneficiari.creditoSolidaleStatoNonAbilitato")}</SelectItem>
-                          <SelectItem value="attivo">{t("beneficiari.creditoSolidaleStatoAttivo")}</SelectItem>
-                          <SelectItem value="sospeso">{t("beneficiari.creditoSolidaleStatoSospeso")}</SelectItem>
-                          <SelectItem value="revocato">{t("beneficiari.creditoSolidaleStatoRevocato")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="magazzinoEmporioPreferitoId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("beneficiari.magazzinoEmporioPreferito")}</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value || NO_EMPORIO}
-                        disabled={!emporioAbilitato || !creditoSolidaleAbilitato}
-                      >
-                        <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value={NO_EMPORIO}>{t("common.none")}</SelectItem>
-                          {emporiDisponibili.map((m) => (
-                            <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">{t("beneficiari.creditoSolidaleDataAbilitazione")}</label>
-                    <Input disabled placeholder={t("beneficiari.creditoSolidaleDataAutomatica")} />
-                  </div>
-                  <FormField control={form.control} name="creditoSolidaleNote" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("beneficiari.creditoSolidaleNote")}</FormLabel>
-                      <FormControl><Textarea rows={2} disabled={!emporioAbilitato} {...field} /></FormControl>
-                    </FormItem>
-                  )} />
-                </div>
 
                 <FormField control={form.control} name="consegnaDomicilio" render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">
@@ -981,7 +913,10 @@ export default function Beneficiari() {
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>{t("beneficiari.deleteTitle")}</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disattiva Beneficiario</AlertDialogTitle>
+            <AlertDialogDescription>Il Beneficiario non potrà generare nuove attività operative. Lo storico resta preservato e potrà essere riattivato.</AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
@@ -993,7 +928,7 @@ export default function Beneficiari() {
                   }
                 });
               }
-            }} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
+            }} className="bg-destructive text-destructive-foreground">Disattiva</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

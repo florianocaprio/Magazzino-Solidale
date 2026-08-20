@@ -10,6 +10,7 @@ vi.mock("@workspace/api-client-react", () => ({
   getSearchMensaBeneficiariQueryKey: () => ["mensa-beneficiari"],
   getListMensaAbilitazioniQueryKey: () => ["mensa-abilitazioni"],
   getListGiacenzeMensaQueryKey: () => ["mensa-giacenze"],
+  getListConsumiMensaQueryKey: () => ["mensa-consumi"],
   useListMense: () => ({
     data: [{ id: 10, nome: "Mensa Roma", attiva: true }],
   }),
@@ -22,6 +23,12 @@ vi.mock("@workspace/api-client-react", () => ({
   }),
   useSearchMensaBeneficiari: () => ({ data: [] }),
   useListPastiMensa: () => ({ data: [] }),
+  useListConsumiMensa: () => ({ data: [] }),
+  useListGiornateMensa: () => ({ data: [] }),
+  useCreateConsumoMensa: () => ({ mutate: vi.fn(), isPending: false }),
+  useStornaConsumoMensa: () => ({ mutate: vi.fn(), isPending: false }),
+  useChiudiGiornataMensa: () => ({ mutate: vi.fn(), isPending: false }),
+  useRiapriGiornataMensa: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateMensa: () => ({ mutate: vi.fn(), isPending: false }),
   useListMagazziniMensa: () => ({ data: [] }),
   useListMensaAbilitazioni: () => ({ data: [] }),
@@ -84,6 +91,8 @@ describe("Postazione Mensa", () => {
     container.remove();
     document.body.innerHTML = "";
     vi.clearAllMocks();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("mantiene il focus sul lettore e blocca una doppia scansione accidentale", async () => {
@@ -169,6 +178,74 @@ describe("Postazione Mensa", () => {
     expect(document.body.textContent).not.toContain("Mario Rossi");
     expect(input.value).toBe("");
     expect(document.activeElement).toBe(input);
+  });
+
+  it("richiede conferma e motivo prima di autorizzare un secondo pasto", async () => {
+    const confirm = vi.fn(() => true);
+    const prompt = vi.fn(() => "Necessità documentata");
+    vi.stubGlobal("confirm", confirm);
+    vi.stubGlobal("prompt", prompt);
+    verifyMutate.mockImplementation(
+      (_input, options: { onSuccess?: (value: unknown) => void }) =>
+        options.onSuccess?.({
+          id: 202,
+          mensaId: 10,
+          mensaNome: "Mensa Roma",
+          beneficiarioId: 33,
+          beneficiarioNome: "Anna Verdi",
+          beneficiarioCodice: "BEN-33",
+          esito: "consentito",
+          motivoEsito: "CONSENTITO",
+          modalitaAccesso: "tessera",
+          temporaneo: false,
+          dataOra: new Date().toISOString(),
+          eccezionePossibile: false,
+        }),
+    );
+    mealMutate.mockImplementation(
+      (_input, options: { onError?: (error: unknown) => void }) =>
+        options.onError?.({
+          data: {
+            error: "Servizio già erogato oggi; serve un override autorizzato",
+          },
+        }),
+    );
+
+    await act(async () => root.render(<MensaPostazione />));
+    const input = document.querySelector<HTMLInputElement>("#mensa-scan")!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "CARD-SECOND-MEAL");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input
+        .closest("form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+    });
+    const mealButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "mensa.registerMeal",
+    );
+    await act(async () => mealButton?.click());
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(mealMutate).toHaveBeenCalledTimes(2);
+    expect(mealMutate.mock.calls[0]?.[0]).toMatchObject({
+      data: { override: false, idempotencyKey: "meal-access-202" },
+    });
+    expect(mealMutate.mock.calls[1]?.[0]).toMatchObject({
+      data: {
+        override: true,
+        motivoOverride: "Necessità documentata",
+      },
+    });
+    expect(mealMutate.mock.calls[1]?.[0].data.idempotencyKey).not.toBe(
+      "meal-access-202",
+    );
   });
 
   it("offre il form minimo di nuova persona quando l'operatore ha il permesso temporaneo", async () => {

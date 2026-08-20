@@ -1,4 +1,11 @@
-import { Router, type IRouter, type Request } from "express";
+import {
+  Router,
+  type IRouter,
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
+import { createHash } from "node:crypto";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
@@ -10,18 +17,21 @@ import {
   mensaAbilitazioniTable,
   mensaAccessiTable,
   mensaAutorizzazioniTemporaneeTable,
+  mensaConsumiStorniTable,
+  mensaConsumiTable,
   mensaEccezioniTable,
+  mensaGiornateServizioTable,
   mensaPastiTable,
   menseTable,
   prodottiTable,
   tessereBeneficiariTable,
   trasferimentiTable,
-  trasferimentoRigheTable,
   utentiTable,
 } from "@workspace/db";
 import {
   and,
   asc,
+  count,
   desc,
   eq,
   gte,
@@ -48,7 +58,11 @@ import {
 } from "../lib/centroScope";
 import { isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
-import { canUseMensaException, dataServizioMensa, stessoGiornoServizioMensa } from "../lib/mensaWorkflow";
+import {
+  canUseMensaException,
+  dataServizioMensa,
+  stessoGiornoServizioMensa,
+} from "../lib/mensaWorkflow";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
@@ -58,9 +72,30 @@ import {
   TesseraBeneficiarioError,
 } from "../lib/tesseraBeneficiarioService";
 import { nextMagazzinoCodice } from "../lib/magazzinoCodice";
+import {
+  aggregatiConsumiMensa,
+  getOrCreateGiornataMensa,
+  snapshotBeneficiarioMensa,
+  tipoServizioMensa,
+} from "../lib/mensaService";
+import {
+  creaScaricoInventariale,
+  InventoryError,
+  stornaScaricoInventariale,
+} from "../lib/scaricoInventory";
+import {
+  calcolaImpegnatoAttivoPerGiacenze,
+  disponibilitaMagazzinoKey,
+  parseDbNumber,
+} from "../lib/disponibilitaMagazzino";
+import {
+  createTransferRequest,
+  TransferRequestError,
+} from "../lib/transferWorkflow";
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
+type MensaTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const ABILITAZIONE_STATI = [
   "attiva",
@@ -86,6 +121,7 @@ const ACCESSO_MOTIVI = {
   MENSA_NON_ATTIVA: "MENSA_NON_ATTIVA",
   ECCEZIONE_STESSA_AREA: "ECCEZIONE_STESSA_AREA",
   ACCESSO_TEMPORANEO: "ACCESSO_TEMPORANEO",
+  SERVIZIO_CHIUSO: "SERVIZIO_CHIUSO",
 } as const;
 
 type AbilitazioneStato = (typeof ABILITAZIONE_STATI)[number];
@@ -93,7 +129,10 @@ type TesseraStato = (typeof TESSERA_STATI)[number];
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function isAbilitazioneStato(value: unknown): value is AbilitazioneStato {
-  return typeof value === "string" && ABILITAZIONE_STATI.some((stato) => stato === value);
+  return (
+    typeof value === "string" &&
+    ABILITAZIONE_STATI.some((stato) => stato === value)
+  );
 }
 
 class MensaError extends Error {
@@ -129,6 +168,42 @@ function optionalPositiveInt(value: unknown, field: string): number | null {
   return positiveInt(value, field);
 }
 
+function pagination(query: Request["query"]) {
+  const requested = query.page != null || query.pageSize != null;
+  const page = optionalPositiveInt(query.page, "page") ?? 1;
+  const pageSize = optionalPositiveInt(query.pageSize, "pageSize") ?? 50;
+  if (pageSize > 200)
+    throw new MensaError(400, "pageSize non può superare 200");
+  return { requested, page, pageSize, offset: (page - 1) * pageSize };
+}
+
+function canonicalTipoServizio(value: unknown) {
+  try {
+    return tipoServizioMensa(value);
+  } catch {
+    throw new MensaError(400, "Il tipo servizio deve essere pranzo o cena");
+  }
+}
+
+function databaseErrorCode(error: unknown): unknown {
+  let current = error;
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    if (typeof current === "object" && "code" in current) {
+      const code = (current as { code?: unknown }).code;
+      if (code) return code;
+    }
+    current =
+      typeof current === "object"
+        ? (current as { cause?: unknown }).cause
+        : null;
+  }
+  return null;
+}
+
+function consumoCodice(idempotencyKey: string) {
+  return `MCON-${createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 20).toUpperCase()}`;
+}
+
 function beneficiarioIdsQuery(value: unknown): number[] {
   if (value == null || value === "") return [];
   if (typeof value !== "string") {
@@ -136,11 +211,19 @@ function beneficiarioIdsQuery(value: unknown): number[] {
   }
   const parts = value.split(",");
   if (parts.some((part) => !/^\d+$/.test(part))) {
-    throw new MensaError(400, "beneficiarioIds deve contenere ID positivi separati da virgola");
+    throw new MensaError(
+      400,
+      "beneficiarioIds deve contenere ID positivi separati da virgola",
+    );
   }
-  const ids = [...new Set(parts.map((part) => positiveInt(part, "beneficiarioIds")))];
+  const ids = [
+    ...new Set(parts.map((part) => positiveInt(part, "beneficiarioIds"))),
+  ];
   if (ids.length > MAX_RIEPILOGO_BENEFICIARI_IDS) {
-    throw new MensaError(400, `Sono consentiti al massimo ${MAX_RIEPILOGO_BENEFICIARI_IDS} beneficiari`);
+    throw new MensaError(
+      400,
+      `Sono consentiti al massimo ${MAX_RIEPILOGO_BENEFICIARI_IDS} beneficiari`,
+    );
   }
   return ids;
 }
@@ -219,6 +302,19 @@ function assertPermission(req: Request, permission: string): void {
   }
 }
 
+function requireMensaPermissionOrLegacy(permission: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (
+      hasPermission(req, permission) ||
+      hasPermission(req, "mensa.transfers.manage")
+    ) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "Permesso non consentito per il ruolo" });
+  };
+}
+
 function isUniqueViolation(error: unknown): boolean {
   let current = error;
   for (let depth = 0; current && depth < 5; depth += 1) {
@@ -279,6 +375,8 @@ function formatMensa(
     telefono: magazzino?.telefono ?? null,
     email: magazzino?.email ?? null,
     stato: magazzino?.stato ?? (row.attiva ? "attivo" : "inattivo"),
+    statoServizio: row.attiva ? "attivo" : "inattivo",
+    statoMagazzino: magazzino?.stato ?? null,
     attiva: row.attiva,
     note: row.note ?? null,
     createdBy: row.createdBy ?? null,
@@ -386,23 +484,40 @@ type MensaRiepilogoHistoryRow = {
   mensaPrincipale: boolean;
 };
 
-export function riepilogoAbilitazioneMensa(records: readonly MensaRiepilogoHistoryRow[], today: string) {
-  const current = records.find((item) =>
-    item.mensaPrincipale && item.stato === "attiva" && item.dataInizio <= today
-    && (item.dataFine == null || item.dataFine >= today));
-  const shown = current ?? records.find((item) => item.mensaPrincipale) ?? records[0] ?? null;
+export function riepilogoAbilitazioneMensa(
+  records: readonly MensaRiepilogoHistoryRow[],
+  today: string,
+) {
+  const current = records.find(
+    (item) =>
+      item.mensaPrincipale &&
+      item.stato === "attiva" &&
+      item.dataInizio <= today &&
+      (item.dataFine == null || item.dataFine >= today),
+  );
+  const shown =
+    current ??
+    records.find((item) => item.mensaPrincipale) ??
+    records[0] ??
+    null;
   if (!shown) {
     return { stato: "non_abilitato" as const };
   }
-  const stato: MensaRiepilogoStato = shown.stato === "attiva" && shown.dataInizio > today
-    ? "programmata"
-    : shown.stato === "attiva" && shown.dataFine != null && shown.dataFine < today
-      ? "scaduta"
-      : shown.stato;
+  const stato: MensaRiepilogoStato =
+    shown.stato === "attiva" && shown.dataInizio > today
+      ? "programmata"
+      : shown.stato === "attiva" &&
+          shown.dataFine != null &&
+          shown.dataFine < today
+        ? "scaduta"
+        : shown.stato;
   return { stato };
 }
 
-async function loadRiepilogoAbilitazioniBeneficiari(req: Request, beneficiarioIds: number[]) {
+async function loadRiepilogoAbilitazioniBeneficiari(
+  req: Request,
+  beneficiarioIds: number[],
+) {
   if (beneficiarioIds.length === 0) return [];
   const conditions: SQL[] = [inArray(beneficiariTable.id, beneficiarioIds)];
   const scopes = [
@@ -423,14 +538,25 @@ async function loadRiepilogoAbilitazioniBeneficiari(req: Request, beneficiarioId
       mensaPrincipale: mensaAbilitazioniTable.mensaPrincipale,
     })
     .from(beneficiariTable)
-    .leftJoin(mensaAbilitazioniTable, eq(mensaAbilitazioniTable.beneficiarioId, beneficiariTable.id))
+    .leftJoin(
+      mensaAbilitazioniTable,
+      eq(mensaAbilitazioniTable.beneficiarioId, beneficiariTable.id),
+    )
     .where(and(...conditions))
-    .orderBy(desc(mensaAbilitazioniTable.createdAt), desc(mensaAbilitazioniTable.id));
+    .orderBy(
+      desc(mensaAbilitazioniTable.createdAt),
+      desc(mensaAbilitazioniTable.id),
+    );
 
   const histories = new Map<number, MensaRiepilogoHistoryRow[]>();
   for (const row of rows) {
     const records = histories.get(row.beneficiarioId) ?? [];
-    if (row.id != null && row.dataInizio != null && isAbilitazioneStato(row.stato) && row.mensaPrincipale != null) {
+    if (
+      row.id != null &&
+      row.dataInizio != null &&
+      isAbilitazioneStato(row.stato) &&
+      row.mensaPrincipale != null
+    ) {
       records.push({
         id: row.id,
         dataInizio: row.dataInizio,
@@ -444,7 +570,9 @@ async function loadRiepilogoAbilitazioniBeneficiari(req: Request, beneficiarioId
   const today = dataServizioMensa();
   return beneficiarioIds.flatMap((beneficiarioId) => {
     const history = histories.get(beneficiarioId);
-    return history == null ? [] : [{ beneficiarioId, ...riepilogoAbilitazioneMensa(history, today) }];
+    return history == null
+      ? []
+      : [{ beneficiarioId, ...riepilogoAbilitazioneMensa(history, today) }];
   });
 }
 
@@ -594,7 +722,10 @@ async function loadAccessoDto(id: number) {
         dataServizioMensa(row.accesso.dataOra),
       )
     : null;
+  const outsideMensaArea =
+    row.beneficiario != null && row.beneficiario.cittaId !== row.mensa.cittaId;
   const hidePersonal =
+    outsideMensaArea ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.AREA_NON_COMPATIBILE ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
   return {
@@ -624,10 +755,12 @@ async function loadAccessoDto(id: number) {
     esito: row.accesso.esito,
     motivoEsito: row.accesso.motivoEsito,
     modalitaAccesso: row.accesso.modalitaAccesso,
+    tipoServizio: row.accesso.tipoServizio ?? null,
     temporaneo: row.accesso.autorizzazioneTemporaneaId != null,
     dataOra: row.accesso.dataOra.toISOString(),
     eccezioneId: row.accesso.eccezioneId ?? null,
     eccezionePossibile:
+      !hidePersonal &&
       row.accesso.esito === "negato" &&
       row.accesso.motivoEsito === ACCESSO_MOTIVI.MENSA_NON_AUTORIZZATA &&
       canUseMensaException(
@@ -635,6 +768,32 @@ async function loadAccessoDto(id: number) {
         row.mensa.cittaId,
       ),
   };
+}
+
+async function requireReplayMensaScope(
+  req: Request,
+  resourceMensaId: number,
+  requestedMensaId?: number,
+) {
+  if (requestedMensaId != null && resourceMensaId !== requestedMensaId) {
+    throw new MensaError(403, "Replay idempotente non accessibile");
+  }
+  await requireMensa(resourceMensaId, req);
+}
+
+async function sendReplayMensaScope(
+  req: Request,
+  res: Response,
+  resourceMensaId: number,
+  requestedMensaId?: number,
+) {
+  try {
+    await requireReplayMensaScope(req, resourceMensaId, requestedMensaId);
+    return true;
+  } catch (error) {
+    if (sendMensaError(error, res)) return false;
+    throw error;
+  }
 }
 
 router.get(
@@ -833,14 +992,16 @@ router.post(
             return row;
           });
           const loaded = await loadMensa(created.id);
-          res.status(201).json(
-            formatMensa(
-              created,
-              loaded?.cittaNome ?? null,
-              loaded?.magazzino ?? null,
-              loaded?.centroAscoltoNome ?? null,
-            ),
-          );
+          res
+            .status(201)
+            .json(
+              formatMensa(
+                created,
+                loaded?.cittaNome ?? null,
+                loaded?.magazzino ?? null,
+                loaded?.centroAscoltoNome ?? null,
+              ),
+            );
           return;
         } catch (error) {
           if (!isUniqueViolation(error)) throw error;
@@ -908,8 +1069,14 @@ router.post(
       if (!beneficiario) throw new MensaError(404, "Beneficiario non trovato");
       if (!beneficiario.attivo)
         throw new MensaError(409, "Il beneficiario non è attivo");
-      if (beneficiario.statoAnagrafica !== "completa" || beneficiario.centroAscoltoId == null)
-        throw new MensaError(409, "Completa l'anagrafica e associa un Centro di Ascolto prima di emettere la tessera");
+      if (
+        beneficiario.statoAnagrafica !== "completa" ||
+        beneficiario.centroAscoltoId == null
+      )
+        throw new MensaError(
+          409,
+          "Completa l'anagrafica e associa un Centro di Ascolto prima di emettere la tessera",
+        );
       const ownCity = callerCittaId(req);
       if (ownCity != null && beneficiario.cittaId !== ownCity)
         throw new MensaError(403, "Beneficiario non accessibile");
@@ -975,11 +1142,29 @@ router.post(
       if (ownCity != null && current.cittaId !== ownCity)
         throw new MensaError(403, "Tessera non accessibile");
       const updated = await db.transaction(async (tx) => {
+        const allowed: Record<TesseraStato, readonly TesseraStato[]> = {
+          attiva: ["sospesa", "revocata", "scaduta"],
+          sospesa: ["attiva", "revocata", "scaduta"],
+          revocata: [],
+          scaduta: [],
+        };
+        if (
+          !allowed[current.tessera.stato as TesseraStato]?.includes(
+            stato as TesseraStato,
+          )
+        ) {
+          throw new MensaError(
+            409,
+            `Transizione tessera ${current.tessera.stato} → ${stato} non consentita`,
+          );
+        }
         const [row] = await tx
           .update(tessereBeneficiariTable)
           .set({
             stato,
-            motivoRevoca: stato === "revocata" ? motivo : null,
+            motivoRevoca: ["sospesa", "revocata"].includes(stato)
+              ? motivo
+              : null,
             dataRevoca: stato === "revocata" ? new Date() : null,
             updatedAt: new Date(),
           })
@@ -1033,15 +1218,22 @@ router.post(
         80,
       );
       const modalita = req.body?.modalitaAccesso ?? "tessera";
+      const tipoServizio = canonicalTipoServizio(
+        req.body?.tipoServizio ?? "pranzo",
+      );
       if (!["tessera", "manuale"].includes(modalita))
         throw new MensaError(400, "Modalità di accesso non valida");
       if (modalita === "manuale") assertPermission(req, "mensa.access.manual");
       const existing = await db
-        .select({ id: mensaAccessiTable.id })
+        .select({
+          id: mensaAccessiTable.id,
+          mensaId: mensaAccessiTable.mensaId,
+        })
         .from(mensaAccessiTable)
         .where(eq(mensaAccessiTable.idempotencyKey, idempotencyKey))
         .limit(1);
       if (existing[0]) {
+        await requireReplayMensaScope(req, existing[0].mensaId, mensaId);
         const dto = await loadAccessoDto(existing[0].id);
         res.json({ ...dto, idempotentReplay: true });
         return;
@@ -1123,6 +1315,23 @@ router.post(
       }
 
       const created = await db.transaction(async (tx) => {
+        let persistedEsito = esito;
+        let persistedMotivoEsito = motivoEsito;
+        const [serviceDay] = await tx
+          .select({ stato: mensaGiornateServizioTable.stato })
+          .from(mensaGiornateServizioTable)
+          .where(
+            and(
+              eq(mensaGiornateServizioTable.mensaId, mensaId),
+              eq(mensaGiornateServizioTable.dataServizio, today),
+              eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
+            ),
+          )
+          .for("update");
+        if (serviceDay?.stato === "chiusa") {
+          persistedEsito = "negato";
+          persistedMotivoEsito = ACCESSO_MOTIVI.SERVIZIO_CHIUSO;
+        }
         const [row] = await tx
           .insert(mensaAccessiTable)
           .values({
@@ -1130,10 +1339,11 @@ router.post(
             beneficiarioId: beneficiario?.id ?? null,
             tesseraId: tessera?.id ?? null,
             dataOra: now,
-            esito,
-            motivoEsito,
+            esito: persistedEsito,
+            motivoEsito: persistedMotivoEsito,
             operatoreId: req.user!.id,
             modalitaAccesso: modalita,
+            tipoServizio,
             idempotencyKey,
           })
           .returning();
@@ -1141,9 +1351,10 @@ router.post(
           auditValues(req, `mensa-accesso:${row.id}`, "verifica", null, {
             mensaId,
             beneficiarioId: beneficiario?.id ?? null,
-            esito,
-            motivoEsito,
+            esito: persistedEsito,
+            motivoEsito: persistedMotivoEsito,
             modalita,
+            tipoServizio,
           }),
         );
         return row;
@@ -1156,10 +1367,22 @@ router.post(
             ? req.body.idempotencyKey
             : "";
         const [existing] = await db
-          .select({ id: mensaAccessiTable.id })
+          .select({
+            id: mensaAccessiTable.id,
+            mensaId: mensaAccessiTable.mensaId,
+          })
           .from(mensaAccessiTable)
           .where(eq(mensaAccessiTable.idempotencyKey, key));
         if (existing) {
+          if (
+            !(await sendReplayMensaScope(
+              req,
+              res,
+              existing.mensaId,
+              positiveInt(req.body?.mensaId, "mensaId"),
+            ))
+          )
+            return;
           res.json({
             ...(await loadAccessoDto(existing.id)),
             idempotentReplay: true,
@@ -1184,11 +1407,18 @@ router.post(
         "La chiave di idempotenza",
         80,
       );
+      const tipoServizio = canonicalTipoServizio(
+        req.body?.tipoServizio ?? "pranzo",
+      );
       const [replay] = await db
-        .select({ id: mensaAccessiTable.id })
+        .select({
+          id: mensaAccessiTable.id,
+          mensaId: mensaAccessiTable.mensaId,
+        })
         .from(mensaAccessiTable)
         .where(eq(mensaAccessiTable.idempotencyKey, idempotencyKey));
       if (replay) {
+        await requireReplayMensaScope(req, replay.mensaId, mensaId);
         res.json({
           ...(await loadAccessoDto(replay.id)),
           idempotentReplay: true,
@@ -1210,6 +1440,50 @@ router.post(
         optionalText(req.body?.motivo, "Il motivo", 2000) ??
         "Accesso temporaneo autorizzato dalla Postazione Mensa";
       const today = dataServizioMensa(new Date());
+      const createClosedAccessIfNeeded = async (tx: MensaTransaction) => {
+        const [serviceDay] = await tx
+          .select({ stato: mensaGiornateServizioTable.stato })
+          .from(mensaGiornateServizioTable)
+          .where(
+            and(
+              eq(mensaGiornateServizioTable.mensaId, mensaId),
+              eq(mensaGiornateServizioTable.dataServizio, today),
+              eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
+            ),
+          )
+          .for("update");
+        if (serviceDay?.stato !== "chiusa") return null;
+        const [denied] = await tx
+          .insert(mensaAccessiTable)
+          .values({
+            mensaId,
+            beneficiarioId: null,
+            tesseraId: null,
+            autorizzazioneTemporaneaId: null,
+            esito: "negato",
+            motivoEsito: ACCESSO_MOTIVI.SERVIZIO_CHIUSO,
+            operatoreId: req.user!.id,
+            modalitaAccesso: "temporaneo",
+            tipoServizio,
+            idempotencyKey,
+          })
+          .returning();
+        await tx.insert(auditConfigurazioniTable).values(
+          auditValues(req, `mensa-accesso:${denied.id}`, "verifica", null, {
+            mensaId,
+            esito: "negato",
+            motivoEsito: ACCESSO_MOTIVI.SERVIZIO_CHIUSO,
+            modalita: "temporaneo",
+            tipoServizio,
+          }),
+        );
+        return denied.id;
+      };
+      const closedAccessId = await db.transaction(createClosedAccessIfNeeded);
+      if (closedAccessId != null) {
+        res.status(201).json(await loadAccessoDto(closedAccessId));
+        return;
+      }
       let duplicates: Awaited<ReturnType<typeof searchBeneficiariDuplicates>> =
         [];
       let newPersonValues: Record<string, unknown> | null = null;
@@ -1250,7 +1524,6 @@ router.post(
           ),
           statoAnagrafica: "provvisoria",
           uds: false,
-          attivo: true,
         };
         duplicates = await searchBeneficiariDuplicates({
           cittaId: mensa.mensa.cittaId,
@@ -1260,17 +1533,14 @@ router.post(
           telefono: (newPersonValues.telefono as string | null) ?? "",
           dataNascita: (newPersonValues.dataNascita as string | null) ?? "",
         });
-        if (duplicates.length && req.body?.confermaDuplicato !== true) {
-          res.status(409).json({
-            error:
-              "Sono presenti possibili duplicati. Seleziona una persona esistente oppure conferma esplicitamente la nuova registrazione.",
-            possibiliDuplicati: duplicates,
-          });
-          return;
-        }
       }
 
       const createdAccessId = await db.transaction(async (tx) => {
+        const deniedId = await createClosedAccessIfNeeded(tx);
+        if (deniedId != null) return deniedId;
+        if (duplicates.length && req.body?.confermaDuplicato !== true) {
+          return { possibiliDuplicati: duplicates } as const;
+        }
         let beneficiario: typeof beneficiariTable.$inferSelect;
         if (newPersonValues) {
           const created = await createBeneficiarioOne(newPersonValues, req, {
@@ -1278,6 +1548,7 @@ router.post(
             cittaId: mensa.mensa.cittaId,
             centroAscoltoId: null,
             zonaUdsId: null,
+            allowSensitiveFields: true,
           });
           if ("error" in created) {
             throw new MensaError(created.status ?? 400, created.error);
@@ -1334,8 +1605,14 @@ router.post(
             );
           }
           const latest = await latestEligibility(existing.id);
-          if (latest?.abilitazione.stato === "sospesa" || latest?.abilitazione.stato === "revocata") {
-            throw new MensaError(409, `Accesso temporaneo non consentito: abilitazione Mensa ${latest.abilitazione.stato}`);
+          if (
+            latest?.abilitazione.stato === "sospesa" ||
+            latest?.abilitazione.stato === "revocata"
+          ) {
+            throw new MensaError(
+              409,
+              `Accesso temporaneo non consentito: abilitazione Mensa ${latest.abilitazione.stato}`,
+            );
           }
           beneficiario = existing;
         }
@@ -1345,6 +1622,7 @@ router.post(
             beneficiarioId: beneficiario.id,
             mensaId,
             dataServizio: today,
+            tipoServizio,
             motivo,
             operatoreId: req.user!.id,
           })
@@ -1360,6 +1638,7 @@ router.post(
             motivoEsito: ACCESSO_MOTIVI.ACCESSO_TEMPORANEO,
             operatoreId: req.user!.id,
             modalitaAccesso: "temporaneo",
+            tipoServizio,
             idempotencyKey,
           })
           .returning();
@@ -1374,12 +1653,21 @@ router.post(
               beneficiarioId: beneficiario.id,
               mensaId,
               dataServizio: today,
+              tipoServizio,
             },
             motivo,
           ),
         );
         return access.id;
       });
+      if (typeof createdAccessId !== "number") {
+        res.status(409).json({
+          error:
+            "Sono presenti possibili duplicati. Seleziona una persona esistente oppure conferma esplicitamente la nuova registrazione.",
+          possibiliDuplicati: createdAccessId.possibiliDuplicati,
+        });
+        return;
+      }
       res.status(201).json(await loadAccessoDto(createdAccessId));
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -1388,10 +1676,22 @@ router.post(
             ? req.body.idempotencyKey
             : "";
         const [existing] = await db
-          .select({ id: mensaAccessiTable.id })
+          .select({
+            id: mensaAccessiTable.id,
+            mensaId: mensaAccessiTable.mensaId,
+          })
           .from(mensaAccessiTable)
           .where(eq(mensaAccessiTable.idempotencyKey, key));
         if (existing) {
+          if (
+            !(await sendReplayMensaScope(
+              req,
+              res,
+              existing.mensaId,
+              positiveInt(req.body?.mensaId, "mensaId"),
+            ))
+          )
+            return;
           res.json({
             ...(await loadAccessoDto(existing.id)),
             idempotentReplay: true,
@@ -1451,6 +1751,31 @@ router.post(
           row.accesso.beneficiarioId == null
         )
           throw new MensaError(409, "Questo accesso non ammette eccezioni");
+        if (row.accesso.tipoServizio != null) {
+          const [serviceDay] = await tx
+            .select({ stato: mensaGiornateServizioTable.stato })
+            .from(mensaGiornateServizioTable)
+            .where(
+              and(
+                eq(mensaGiornateServizioTable.mensaId, row.destinazione.id),
+                eq(
+                  mensaGiornateServizioTable.dataServizio,
+                  dataServizioMensa(row.accesso.dataOra),
+                ),
+                eq(
+                  mensaGiornateServizioTable.tipoServizio,
+                  row.accesso.tipoServizio,
+                ),
+              ),
+            )
+            .for("update");
+          if (serviceDay?.stato === "chiusa") {
+            throw new MensaError(
+              409,
+              "Il servizio Mensa relativo all'accesso è chiuso",
+            );
+          }
+        }
         const eligibility = await activeEligibility(
           row.accesso.beneficiarioId,
           dataServizioMensa(row.accesso.dataOra),
@@ -1531,17 +1856,37 @@ router.get(
         conditions.push(eq(mensaAccessiTable.mensaId, mensaId));
       const ownCity = callerCittaId(req);
       if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const paging = pagination(req.query);
+      const where = conditions.length ? and(...conditions) : undefined;
+      const [totalRow] = paging.requested
+        ? await db
+            .select({ total: count() })
+            .from(mensaAccessiTable)
+            .innerJoin(menseTable, eq(mensaAccessiTable.mensaId, menseTable.id))
+            .where(where)
+        : [{ total: 0 }];
       const rows = await db
         .select({ id: mensaAccessiTable.id })
         .from(mensaAccessiTable)
         .innerJoin(menseTable, eq(mensaAccessiTable.mensaId, menseTable.id))
-        .where(conditions.length ? and(...conditions) : undefined)
+        .where(where)
         .orderBy(desc(mensaAccessiTable.dataOra))
-        .limit(200);
+        .limit(paging.requested ? paging.pageSize : 200)
+        .offset(paging.requested ? paging.offset : 0);
       const results = await Promise.all(
         rows.map((row) => loadAccessoDto(row.id)),
       );
-      res.json(results.filter(Boolean));
+      const items = results.filter(Boolean);
+      res.json(
+        paging.requested
+          ? {
+              items,
+              page: paging.page,
+              pageSize: paging.pageSize,
+              total: totalRow?.total ?? 0,
+            }
+          : items,
+      );
     } catch (error) {
       if (sendMensaError(error, res)) return;
       throw error;
@@ -1560,7 +1905,7 @@ router.post(
         "La chiave di idempotenza",
         80,
       );
-      const tipoServizio = text(req.body?.tipoServizio, "Il tipo servizio", 40);
+      const tipoServizio = canonicalTipoServizio(req.body?.tipoServizio);
       const override = req.body?.override === true;
       const motivoOverride = optionalText(
         req.body?.motivoOverride,
@@ -1577,16 +1922,42 @@ router.post(
         .from(mensaPastiTable)
         .where(eq(mensaPastiTable.idempotencyKey, idempotencyKey));
       if (replay) {
+        if (
+          replay.accessoMensaId !== accessoId ||
+          replay.tipoServizio !== tipoServizio
+        ) {
+          throw new MensaError(403, "Replay idempotente non accessibile");
+        }
+        await requireReplayMensaScope(req, replay.mensaId);
         res.json({ ...replay, idempotentReplay: true });
         return;
       }
       const [access] = await db
-        .select({ accesso: mensaAccessiTable, mensa: menseTable, autorizzazioneTemporanea: mensaAutorizzazioniTemporaneeTable })
+        .select({
+          accesso: mensaAccessiTable,
+          mensa: menseTable,
+          autorizzazioneTemporanea: mensaAutorizzazioniTemporaneeTable,
+        })
         .from(mensaAccessiTable)
         .innerJoin(menseTable, eq(mensaAccessiTable.mensaId, menseTable.id))
-        .leftJoin(mensaAutorizzazioniTemporaneeTable, eq(mensaAccessiTable.autorizzazioneTemporaneaId, mensaAutorizzazioniTemporaneeTable.id))
+        .leftJoin(
+          mensaAutorizzazioniTemporaneeTable,
+          eq(
+            mensaAccessiTable.autorizzazioneTemporaneaId,
+            mensaAutorizzazioniTemporaneeTable.id,
+          ),
+        )
         .where(eq(mensaAccessiTable.id, accessoId));
       if (!access) throw new MensaError(404, "Accesso non trovato");
+      if (
+        access.accesso.tipoServizio != null &&
+        access.accesso.tipoServizio !== tipoServizio
+      ) {
+        throw new MensaError(
+          409,
+          "Il tipo servizio del pasto non corrisponde alla verifica accesso",
+        );
+      }
       if (!canAccessCitta(access.mensa.cittaId, callerCittaId(req)))
         throw new MensaError(403, "Accesso non disponibile");
       await requireMensa(access.mensa.id, req, true);
@@ -1601,11 +1972,21 @@ router.post(
       const now = new Date();
       const serviceDate = dataServizioMensa(now);
       if (!stessoGiornoServizioMensa(access.accesso.dataOra, now)) {
-        throw new MensaError(409, "L'accesso Mensa non è valido per la data di servizio corrente");
+        throw new MensaError(
+          409,
+          "L'accesso Mensa non è valido per la data di servizio corrente",
+        );
       }
-      if (access.accesso.modalitaAccesso === "temporaneo"
-        && (!access.autorizzazioneTemporanea || access.autorizzazioneTemporanea.dataServizio !== serviceDate)) {
-        throw new MensaError(409, "L'autorizzazione temporanea non è valida per la data di servizio corrente");
+      if (
+        access.accesso.modalitaAccesso === "temporaneo" &&
+        (!access.autorizzazioneTemporanea ||
+          access.autorizzazioneTemporanea.dataServizio !== serviceDate ||
+          access.autorizzazioneTemporanea.tipoServizio !== tipoServizio)
+      ) {
+        throw new MensaError(
+          409,
+          "L'autorizzazione temporanea non è valida per data e tipo servizio correnti",
+        );
       }
       const [sameService] = await db
         .select({ id: mensaPastiTable.id })
@@ -1623,6 +2004,17 @@ router.post(
           "Servizio già erogato oggi; serve un override autorizzato",
         );
       const created = await db.transaction(async (tx) => {
+        const giornata = await getOrCreateGiornataMensa(tx, {
+          mensaId: access.accesso.mensaId,
+          dataServizio: serviceDate,
+          tipoServizio,
+          operatoreId: req.user!.id,
+        });
+        const snapshot = await snapshotBeneficiarioMensa(
+          tx,
+          beneficiarioId,
+          serviceDate,
+        );
         const [row] = await tx
           .insert(mensaPastiTable)
           .values({
@@ -1632,6 +2024,9 @@ router.post(
             dataOra: now,
             dataServizio: serviceDate,
             tipoServizio,
+            giornataServizioId: giornata.id,
+            ...snapshot,
+            temporaneoSnapshot: access.accesso.modalitaAccesso === "temporaneo",
             operatoreId: req.user!.id,
             eccezioneId: access.accesso.eccezioneId,
             note: optionalText(req.body?.note, "Le note operative", 2000),
@@ -1656,6 +2051,10 @@ router.post(
       });
       res.status(201).json(created);
     } catch (error) {
+      if (error instanceof Error && error.message === "GIORNATA_MENSA_CHIUSA") {
+        res.status(409).json({ error: "La giornata Mensa è chiusa" });
+        return;
+      }
       if (isUniqueViolation(error)) {
         const key =
           typeof req.body?.idempotencyKey === "string"
@@ -1666,6 +2065,18 @@ router.post(
           .from(mensaPastiTable)
           .where(eq(mensaPastiTable.idempotencyKey, key));
         if (existing) {
+          if (
+            existing.accessoMensaId !==
+              positiveInt(req.body?.accessoMensaId, "accessoMensaId") ||
+            existing.tipoServizio !==
+              canonicalTipoServizio(req.body?.tipoServizio)
+          ) {
+            res
+              .status(403)
+              .json({ error: "Replay idempotente non accessibile" });
+            return;
+          }
+          if (!(await sendReplayMensaScope(req, res, existing.mensaId))) return;
           res.json({ ...existing, idempotentReplay: true });
           return;
         }
@@ -1686,13 +2097,25 @@ router.get(
       const conditions: SQL[] = [];
       const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
       const data = dateOnly(req.query.data, "La data");
-      const tipo = optionalText(req.query.tipoServizio, "Il tipo servizio", 40);
+      const tipo =
+        req.query.tipoServizio == null
+          ? null
+          : canonicalTipoServizio(req.query.tipoServizio);
       if (mensaId != null)
         conditions.push(eq(mensaPastiTable.mensaId, mensaId));
       if (data) conditions.push(eq(mensaPastiTable.dataServizio, data));
       if (tipo) conditions.push(eq(mensaPastiTable.tipoServizio, tipo));
       const ownCity = callerCittaId(req);
       if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const paging = pagination(req.query);
+      const where = conditions.length ? and(...conditions) : undefined;
+      const [totalRow] = paging.requested
+        ? await db
+            .select({ total: count() })
+            .from(mensaPastiTable)
+            .innerJoin(menseTable, eq(mensaPastiTable.mensaId, menseTable.id))
+            .where(where)
+        : [{ total: 0 }];
       const rows = await db
         .select({
           pasto: mensaPastiTable,
@@ -1709,25 +2132,34 @@ router.get(
           eq(mensaPastiTable.beneficiarioId, beneficiariTable.id),
         )
         .innerJoin(utentiTable, eq(mensaPastiTable.operatoreId, utentiTable.id))
-        .where(conditions.length ? and(...conditions) : undefined)
+        .where(where)
         .orderBy(desc(mensaPastiTable.dataOra))
-        .limit(500);
+        .limit(paging.requested ? paging.pageSize : 500)
+        .offset(paging.requested ? paging.offset : 0);
+      const items = rows.map((row) => ({
+        id: row.pasto.id,
+        mensaId: row.pasto.mensaId,
+        mensaNome: row.mensaNome,
+        beneficiarioId: row.pasto.beneficiarioId,
+        beneficiarioNome: `${row.beneficiarioNome} ${row.beneficiarioCognome}`,
+        beneficiarioCodice: row.beneficiarioCodice,
+        accessoMensaId: row.pasto.accessoMensaId,
+        dataOra: row.pasto.dataOra.toISOString(),
+        dataServizio: row.pasto.dataServizio,
+        tipoServizio: row.pasto.tipoServizio,
+        eccezione: row.pasto.eccezioneId != null,
+        override: row.pasto.override,
+        operatore: row.operatoreUsername,
+      }));
       res.json(
-        rows.map((row) => ({
-          id: row.pasto.id,
-          mensaId: row.pasto.mensaId,
-          mensaNome: row.mensaNome,
-          beneficiarioId: row.pasto.beneficiarioId,
-          beneficiarioNome: `${row.beneficiarioNome} ${row.beneficiarioCognome}`,
-          beneficiarioCodice: row.beneficiarioCodice,
-          accessoMensaId: row.pasto.accessoMensaId,
-          dataOra: row.pasto.dataOra.toISOString(),
-          dataServizio: row.pasto.dataServizio,
-          tipoServizio: row.pasto.tipoServizio,
-          eccezione: row.pasto.eccezioneId != null,
-          override: row.pasto.override,
-          operatore: row.operatoreUsername,
-        })),
+        paging.requested
+          ? {
+              items,
+              page: paging.page,
+              pageSize: paging.pageSize,
+              total: totalRow?.total ?? 0,
+            }
+          : items,
       );
     } catch (error) {
       if (sendMensaError(error, res)) return;
@@ -1745,6 +2177,14 @@ router.get(
       const ownCity = callerCittaId(req);
       if (ownCity != null)
         conditions.push(eq(mensaEccezioniTable.cittaId, ownCity));
+      const paging = pagination(req.query);
+      const where = conditions.length ? and(...conditions) : undefined;
+      const [totalRow] = paging.requested
+        ? await db
+            .select({ total: count() })
+            .from(mensaEccezioniTable)
+            .where(where)
+        : [{ total: 0 }];
       const rows = await db
         .select({
           eccezione: mensaEccezioniTable,
@@ -1756,16 +2196,25 @@ router.get(
           beneficiariTable,
           eq(mensaEccezioniTable.beneficiarioId, beneficiariTable.id),
         )
-        .where(conditions.length ? and(...conditions) : undefined)
+        .where(where)
         .orderBy(desc(mensaEccezioniTable.dataOra))
-        .limit(500);
+        .limit(paging.requested ? paging.pageSize : 500)
+        .offset(paging.requested ? paging.offset : 0);
+      const items = rows.map(({ eccezione, nome, cognome }) => ({
+        ...eccezione,
+        beneficiarioNome: `${nome} ${cognome}`,
+        dataOra: eccezione.dataOra.toISOString(),
+        createdAt: eccezione.createdAt.toISOString(),
+      }));
       res.json(
-        rows.map(({ eccezione, nome, cognome }) => ({
-          ...eccezione,
-          beneficiarioNome: `${nome} ${cognome}`,
-          dataOra: eccezione.dataOra.toISOString(),
-          createdAt: eccezione.createdAt.toISOString(),
-        })),
+        paging.requested
+          ? {
+              items,
+              page: paging.page,
+              pageSize: paging.pageSize,
+              total: totalRow?.total ?? 0,
+            }
+          : items,
       );
     } catch (error) {
       if (sendMensaError(error, res)) return;
@@ -1776,7 +2225,7 @@ router.get(
 
 router.get(
   "/mensa/logistica/magazzini",
-  requirePermission("mensa.transfers.manage"),
+  requireMensaPermissionOrLegacy("mensa.transfers.request"),
   async (req, res) => {
     const ids = await visibleMagazzinoIds(
       callerCentroId(req),
@@ -1806,7 +2255,7 @@ router.get(
 
 router.get(
   "/mensa/logistica/giacenze",
-  requirePermission("mensa.transfers.manage"),
+  requireMensaPermissionOrLegacy("mensa.transfers.request"),
   async (req, res) => {
     try {
       const magazzinoId = positiveInt(req.query.magazzinoId, "magazzinoId");
@@ -1818,7 +2267,8 @@ router.get(
           codice: prodottiTable.codice,
           nome: prodottiTable.nome,
           unitaMisura: prodottiTable.unitaMisura,
-          quantita: sql<string>`sum(${lottiTable.quantitaResidua})`,
+          giacenzaFisica: sql<string>`sum(${lottiTable.quantitaResidua})`,
+          giacenzaDistribuibile: sql<string>`coalesce(sum(${lottiTable.quantitaResidua}) filter (where ${lottiTable.dataScadenza} is null or ${lottiTable.dataScadenza} >= ${today}), 0)`,
         })
         .from(lottiTable)
         .innerJoin(prodottiTable, eq(lottiTable.prodottoId, prodottiTable.id))
@@ -1826,15 +2276,33 @@ router.get(
           and(
             eq(lottiTable.magazzinoId, magazzinoId),
             gt(lottiTable.quantitaResidua, "0"),
-            or(
-              isNull(lottiTable.dataScadenza),
-              gte(lottiTable.dataScadenza, today),
-            ),
           ),
         )
         .groupBy(prodottiTable.id)
         .orderBy(asc(prodottiTable.nome));
-      res.json(rows.map((row) => ({ ...row, quantita: Number(row.quantita) })));
+      const committed = await calcolaImpegnatoAttivoPerGiacenze(
+        rows.map((row) => ({ prodottoId: row.prodottoId, magazzinoId })),
+      );
+      res.json(
+        rows.map((row) => {
+          const giacenzaFisica = parseDbNumber(row.giacenzaFisica);
+          const giacenzaDistribuibile = parseDbNumber(
+            row.giacenzaDistribuibile,
+          );
+          const impegnato =
+            committed.get(
+              disponibilitaMagazzinoKey(row.prodottoId, magazzinoId),
+            ) ?? 0;
+          return {
+            ...row,
+            quantita: Math.max(0, giacenzaDistribuibile - impegnato),
+            giacenzaFisica,
+            giacenzaDistribuibile,
+            impegnato,
+            disponibileReale: Math.max(0, giacenzaDistribuibile - impegnato),
+          };
+        }),
+      );
     } catch (error) {
       if (sendMensaError(error, res)) return;
       throw error;
@@ -1844,7 +2312,7 @@ router.get(
 
 router.post(
   "/mensa/trasferimenti",
-  requirePermission("mensa.transfers.manage"),
+  requireMensaPermissionOrLegacy("mensa.transfers.request"),
   async (req, res) => {
     try {
       const mensaId = positiveInt(req.body?.mensaId, "mensaId");
@@ -1879,7 +2347,10 @@ router.post(
       const normalized = righe.map((row: Record<string, unknown>) => ({
         prodottoId: positiveInt(row.prodottoId, "prodottoId"),
         quantita: Number(row.quantita),
-        unitaMisura: text(row.unitaMisura, "L'unità di misura", 20),
+        unitaMisura:
+          row.unitaMisura == null
+            ? null
+            : text(row.unitaMisura, "L'unità di misura", 20),
         note: optionalText(row.note, "Le note", 1000),
       }));
       if (
@@ -1889,71 +2360,87 @@ router.post(
       )
         throw new MensaError(400, "Le quantità devono essere maggiori di zero");
       const [replay] = await db
-        .select({ id: trasferimentiTable.id })
+        .select({
+          id: trasferimentiTable.id,
+          mensaId: trasferimentiTable.mensaId,
+        })
         .from(trasferimentiTable)
         .where(eq(trasferimentiTable.idempotencyKey, idempotencyKey));
       if (replay) {
+        if (replay.mensaId == null) {
+          throw new MensaError(403, "Replay idempotente non accessibile");
+        }
+        await requireReplayMensaScope(req, replay.mensaId, mensaId);
         res.json({ id: replay.id, idempotentReplay: true });
         return;
       }
-      const created = await db.transaction(async (tx) => {
-        const [transfer] = await tx
-          .insert(trasferimentiTable)
-          .values({
-            codice: `TRASM-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`,
-            magazzinoOrigineId: origineId,
-            magazzinoDestinoId: mensa.mensa.magazzinoId,
-            mensaId,
-            idempotencyKey,
-            dataRichiesta,
-            trasportatoreNome: optionalText(
-              req.body?.trasportatoreNome,
-              "Il trasportatore",
-              120,
+      const created = await createTransferRequest({
+        magazzinoOrigineId: origineId,
+        magazzinoDestinoId: mensa.mensa.magazzinoId,
+        mensaId,
+        idempotencyKey,
+        dataRichiesta,
+        trasportatoreNome: optionalText(
+          req.body?.trasportatoreNome,
+          "Il trasportatore",
+          120,
+        ),
+        note: optionalText(req.body?.note, "Le note", 2000),
+        operatoreId: req.user!.id,
+        righe: normalized,
+        afterCreate: async (tx, transfer) => {
+          await tx.insert(auditConfigurazioniTable).values(
+            auditValues(
+              req,
+              `mensa-trasferimento:${transfer.id}`,
+              "richiesta",
+              null,
+              {
+                mensaId,
+                origineId,
+                destinazioneId: mensa.mensa.magazzinoId,
+                righe: normalized.length,
+              },
             ),
-            note: optionalText(req.body?.note, "Le note", 2000),
-            operatoreId: req.user!.id,
-          })
-          .returning();
-        await tx.insert(trasferimentoRigheTable).values(
-          normalized.map((row) => ({
-            trasferimentoId: transfer.id,
-            prodottoId: row.prodottoId,
-            quantita: row.quantita.toFixed(2),
-            unitaMisura: row.unitaMisura,
-            note: row.note,
-          })),
-        );
-        await tx.insert(auditConfigurazioniTable).values(
-          auditValues(
-            req,
-            `mensa-trasferimento:${transfer.id}`,
-            "richiesta",
-            null,
-            {
-              mensaId,
-              origineId,
-              destinazioneId: mensa.mensa.magazzinoId,
-              righe: normalized.length,
-            },
-          ),
-        );
-        return transfer;
+          );
+        },
       });
       res
         .status(201)
         .json({ id: created.id, codice: created.codice, stato: created.stato });
     } catch (error) {
+      if (error instanceof TransferRequestError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       if (isUniqueViolation(error)) {
         const key =
           typeof req.body?.idempotencyKey === "string"
             ? req.body.idempotencyKey
             : "";
         const [existing] = await db
-          .select({ id: trasferimentiTable.id })
+          .select({
+            id: trasferimentiTable.id,
+            mensaId: trasferimentiTable.mensaId,
+          })
           .from(trasferimentiTable)
           .where(eq(trasferimentiTable.idempotencyKey, key));
         if (existing) {
+          if (existing.mensaId == null) {
+            res
+              .status(403)
+              .json({ error: "Replay idempotente non accessibile" });
+            return;
+          }
+          if (
+            !(await sendReplayMensaScope(
+              req,
+              res,
+              existing.mensaId,
+              positiveInt(req.body?.mensaId, "mensaId"),
+            ))
+          )
+            return;
           res.json({ id: existing.id, idempotentReplay: true });
           return;
         }
@@ -1968,11 +2455,20 @@ router.post(
 
 router.get(
   "/mensa/trasferimenti",
-  requirePermission("mensa.transfers.manage"),
+  requireMensaPermissionOrLegacy("mensa.transfers.request"),
   async (req, res) => {
     const conditions: SQL[] = [];
     const ownCity = callerCittaId(req);
     if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+    const paging = pagination(req.query);
+    const where = conditions.length ? and(...conditions) : undefined;
+    const [totalRow] = paging.requested
+      ? await db
+          .select({ total: count() })
+          .from(trasferimentiTable)
+          .innerJoin(menseTable, eq(trasferimentiTable.mensaId, menseTable.id))
+          .where(where)
+      : [{ total: 0 }];
     const rows = await db
       .select({
         trasferimento: trasferimentiTable,
@@ -1985,17 +2481,572 @@ router.get(
         magazziniTable,
         eq(trasferimentiTable.magazzinoOrigineId, magazziniTable.id),
       )
-      .where(conditions.length ? and(...conditions) : undefined)
+      .where(where)
       .orderBy(desc(trasferimentiTable.dataCreazione))
-      .limit(200);
+      .limit(paging.requested ? paging.pageSize : 200)
+      .offset(paging.requested ? paging.offset : 0);
+    const items = rows.map(({ trasferimento, mensaNome, origineNome }) => ({
+      ...trasferimento,
+      mensaNome,
+      magazzinoOrigineNome: origineNome,
+      dataCreazione: trasferimento.dataCreazione.toISOString(),
+    }));
     res.json(
-      rows.map(({ trasferimento, mensaNome, origineNome }) => ({
-        ...trasferimento,
-        mensaNome,
-        magazzinoOrigineNome: origineNome,
-        dataCreazione: trasferimento.dataCreazione.toISOString(),
-      })),
+      paging.requested
+        ? {
+            items,
+            page: paging.page,
+            pageSize: paging.pageSize,
+            total: totalRow?.total ?? 0,
+          }
+        : items,
     );
+  },
+);
+
+router.get(
+  "/mensa/consumi",
+  requirePermission("mensa.consumption.manage"),
+  async (req, res) => {
+    try {
+      const conditions: SQL[] = [];
+      const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
+      const data = dateOnly(req.query.data, "La data servizio");
+      if (mensaId != null)
+        conditions.push(eq(mensaConsumiTable.mensaId, mensaId));
+      if (data != null)
+        conditions.push(eq(mensaConsumiTable.dataServizio, data));
+      const ownCity = callerCittaId(req);
+      if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const paging = pagination(req.query);
+      const where = conditions.length ? and(...conditions) : undefined;
+      const [totalRow] = await db
+        .select({ total: count() })
+        .from(mensaConsumiTable)
+        .innerJoin(menseTable, eq(mensaConsumiTable.mensaId, menseTable.id))
+        .where(where);
+      const rows = await db
+        .select({
+          consumo: mensaConsumiTable,
+          mensaNome: menseTable.nome,
+          prodottoNome: prodottiTable.nome,
+          stornatoAt: mensaConsumiStorniTable.createdAt,
+          motivoStorno: mensaConsumiStorniTable.motivo,
+        })
+        .from(mensaConsumiTable)
+        .innerJoin(menseTable, eq(mensaConsumiTable.mensaId, menseTable.id))
+        .innerJoin(
+          prodottiTable,
+          eq(mensaConsumiTable.prodottoId, prodottiTable.id),
+        )
+        .leftJoin(
+          mensaConsumiStorniTable,
+          eq(mensaConsumiStorniTable.consumoId, mensaConsumiTable.id),
+        )
+        .where(where)
+        .orderBy(desc(mensaConsumiTable.createdAt), desc(mensaConsumiTable.id))
+        .limit(paging.requested ? paging.pageSize : 200)
+        .offset(paging.requested ? paging.offset : 0);
+      const items = rows.map((row) => ({
+        ...row.consumo,
+        quantita: Number(row.consumo.quantita),
+        mensaNome: row.mensaNome,
+        prodottoNome: row.prodottoNome,
+        stornato: row.stornatoAt != null,
+        stornatoAt: row.stornatoAt?.toISOString() ?? null,
+        motivoStorno: row.motivoStorno ?? null,
+        createdAt: row.consumo.createdAt.toISOString(),
+      }));
+      res.json(
+        paging.requested
+          ? {
+              items,
+              page: paging.page,
+              pageSize: paging.pageSize,
+              total: totalRow?.total ?? 0,
+            }
+          : items,
+      );
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.post(
+  "/mensa/consumi",
+  requirePermission("mensa.consumption.manage"),
+  async (req, res) => {
+    const idempotencyKey = text(
+      req.body?.idempotencyKey,
+      "La chiave di idempotenza",
+      80,
+    );
+    try {
+      const mensaId = positiveInt(req.body?.mensaId, "mensaId");
+      const [replay] = await db
+        .select()
+        .from(mensaConsumiTable)
+        .where(eq(mensaConsumiTable.idempotencyKey, idempotencyKey));
+      if (replay) {
+        await requireReplayMensaScope(req, replay.mensaId, mensaId);
+        res.json({
+          ...replay,
+          quantita: Number(replay.quantita),
+          idempotentReplay: true,
+        });
+        return;
+      }
+      const prodottoId = positiveInt(req.body?.prodottoId, "prodottoId");
+      const dataServizio = dateOnly(
+        req.body?.dataServizio,
+        "La data servizio",
+        true,
+      )!;
+      if (dataServizio > dataServizioMensa(new Date())) {
+        throw new MensaError(
+          400,
+          "La data servizio di un consumo o scarto non può essere futura",
+        );
+      }
+      const tipoServizio = canonicalTipoServizio(req.body?.tipoServizio);
+      const quantita = Number(req.body?.quantita);
+      if (!Number.isFinite(quantita) || quantita <= 0) {
+        throw new MensaError(400, "La quantità deve essere maggiore di zero");
+      }
+      const causale = req.body?.causale;
+      if (causale !== "consumo" && causale !== "scarto") {
+        throw new MensaError(400, "La causale deve essere consumo o scarto");
+      }
+      const mensa = await requireMensa(mensaId, req, true);
+      const [prodotto] = await db
+        .select({
+          id: prodottiTable.id,
+          unitaMisura: prodottiTable.unitaMisura,
+          attivo: prodottiTable.attivo,
+        })
+        .from(prodottiTable)
+        .where(eq(prodottiTable.id, prodottoId));
+      if (!prodotto || !prodotto.attivo) {
+        throw new MensaError(400, "Il prodotto non è disponibile");
+      }
+      const note = optionalText(req.body?.note, "Le note", 2000);
+      const codice = consumoCodice(idempotencyKey);
+      const created = await db.transaction(async (tx) => {
+        const giornata = await getOrCreateGiornataMensa(tx, {
+          mensaId,
+          dataServizio,
+          tipoServizio,
+          operatoreId: req.user!.id,
+        });
+        const scaricoId = await creaScaricoInventariale(tx, {
+          codice,
+          magazzinoId: mensa.mensa.magazzinoId,
+          centroAscoltoId: mensa.magazzino?.centroAscoltoId ?? null,
+          dataScarico: dataServizio,
+          causale: "altro",
+          causaleAltro:
+            causale === "consumo" ? "Consumo Mensa" : "Scarto Mensa",
+          note,
+          operatoreId: req.user!.id,
+          documentoRiferimento: codice,
+          righe: [
+            { prodottoId, quantita, unitaMisura: prodotto.unitaMisura, note },
+          ],
+        });
+        const [row] = await tx
+          .insert(mensaConsumiTable)
+          .values({
+            giornataServizioId: giornata.id,
+            mensaId,
+            scaricoId,
+            dataServizio,
+            tipoServizio,
+            prodottoId,
+            quantita: quantita.toFixed(2),
+            unitaMisura: prodotto.unitaMisura,
+            causale,
+            note,
+            operatoreId: req.user!.id,
+            idempotencyKey,
+          })
+          .returning();
+        await tx.insert(auditConfigurazioniTable).values(
+          auditValues(req, `mensa-consumo:${row.id}`, "registrazione", null, {
+            mensaId,
+            prodottoId,
+            quantita,
+            causale,
+            scaricoId,
+            giornataServizioId: giornata.id,
+          }),
+        );
+        return row;
+      });
+      res.status(201).json({ ...created, quantita: Number(created.quantita) });
+    } catch (error) {
+      if (error instanceof InventoryError) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      if (error instanceof Error && error.message === "GIORNATA_MENSA_CHIUSA") {
+        res.status(409).json({ error: "La giornata Mensa è chiusa" });
+        return;
+      }
+      if (isUniqueViolation(error)) {
+        const [replay] = await db
+          .select()
+          .from(mensaConsumiTable)
+          .where(eq(mensaConsumiTable.idempotencyKey, idempotencyKey));
+        if (replay) {
+          if (
+            !(await sendReplayMensaScope(
+              req,
+              res,
+              replay.mensaId,
+              positiveInt(req.body?.mensaId, "mensaId"),
+            ))
+          )
+            return;
+          res.json({
+            ...replay,
+            quantita: Number(replay.quantita),
+            idempotentReplay: true,
+          });
+          return;
+        }
+      }
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.post(
+  "/mensa/consumi/:id/storno",
+  requirePermission("mensa.consumption.manage"),
+  async (req, res) => {
+    try {
+      const id = positiveInt(req.params.id, "id");
+      const motivo = text(req.body?.motivo, "Il motivo dello storno", 2000);
+      const [current] = await db
+        .select({ consumo: mensaConsumiTable, cittaId: menseTable.cittaId })
+        .from(mensaConsumiTable)
+        .innerJoin(menseTable, eq(mensaConsumiTable.mensaId, menseTable.id))
+        .where(eq(mensaConsumiTable.id, id));
+      if (!current) throw new MensaError(404, "Consumo non trovato");
+      if (!canAccessCitta(current.cittaId, callerCittaId(req))) {
+        throw new MensaError(403, "Consumo non accessibile per la tua Area");
+      }
+      const code = consumoCodice(current.consumo.idempotencyKey);
+      await db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select({ id: mensaConsumiStorniTable.id })
+          .from(mensaConsumiStorniTable)
+          .where(eq(mensaConsumiStorniTable.consumoId, id))
+          .for("update");
+        if (existing)
+          throw new MensaError(409, "Il consumo è già stato stornato");
+        const giornata = await getOrCreateGiornataMensa(tx, {
+          mensaId: current.consumo.mensaId,
+          dataServizio: current.consumo.dataServizio,
+          tipoServizio: canonicalTipoServizio(current.consumo.tipoServizio),
+          operatoreId: req.user!.id,
+        });
+        await stornaScaricoInventariale(tx, {
+          documentoRiferimento: code,
+          dataMovimento: current.consumo.dataServizio,
+          operatoreId: req.user!.id,
+          tipoDettaglio: "errore_registrazione",
+          note: `Storno consumo Mensa: ${motivo}`,
+        });
+        const [storno] = await tx
+          .insert(mensaConsumiStorniTable)
+          .values({
+            consumoId: id,
+            motivo,
+            operatoreId: req.user!.id,
+          })
+          .returning();
+        await tx.insert(auditConfigurazioniTable).values(
+          auditValues(req, `mensa-consumo:${id}`, "storno", null, {
+            stornoId: storno.id,
+            giornataServizioId: giornata.id,
+            motivo,
+          }),
+        );
+      });
+      res.json({ id, stornato: true });
+    } catch (error) {
+      if (error instanceof InventoryError) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.get(
+  "/mensa/giornate",
+  requirePermission("mensa.view"),
+  async (req, res) => {
+    try {
+      const conditions: SQL[] = [];
+      const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
+      const data = dateOnly(req.query.data, "La data servizio");
+      if (mensaId != null)
+        conditions.push(eq(mensaGiornateServizioTable.mensaId, mensaId));
+      if (data != null)
+        conditions.push(eq(mensaGiornateServizioTable.dataServizio, data));
+      const ownCity = callerCittaId(req);
+      if (ownCity != null) conditions.push(eq(menseTable.cittaId, ownCity));
+      const rows = await db
+        .select({
+          giornata: mensaGiornateServizioTable,
+          mensaNome: menseTable.nome,
+        })
+        .from(mensaGiornateServizioTable)
+        .innerJoin(
+          menseTable,
+          eq(mensaGiornateServizioTable.mensaId, menseTable.id),
+        )
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(
+          desc(mensaGiornateServizioTable.dataServizio),
+          asc(mensaGiornateServizioTable.tipoServizio),
+        );
+      res.json(
+        rows.map(({ giornata, mensaNome }) => ({ ...giornata, mensaNome })),
+      );
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.post(
+  "/mensa/giornate/:id/chiudi",
+  requirePermission("mensa.service.close"),
+  async (req, res) => {
+    try {
+      const id = positiveInt(req.params.id, "id");
+      const note = optionalText(req.body?.note, "Le note di chiusura", 4000);
+      const result = await db.transaction(async (tx) => {
+        const [current] = await tx
+          .select({
+            giornata: mensaGiornateServizioTable,
+            cittaId: menseTable.cittaId,
+          })
+          .from(mensaGiornateServizioTable)
+          .innerJoin(
+            menseTable,
+            eq(mensaGiornateServizioTable.mensaId, menseTable.id),
+          )
+          .where(eq(mensaGiornateServizioTable.id, id))
+          .for("update");
+        if (!current) throw new MensaError(404, "Giornata Mensa non trovata");
+        if (!canAccessCitta(current.cittaId, callerCittaId(req)))
+          throw new MensaError(403, "Giornata non accessibile");
+        if (current.giornata.stato !== "aperta")
+          throw new MensaError(409, "La giornata è già chiusa");
+        const meals = await tx
+          .select({
+            beneficiarioId: mensaPastiTable.beneficiarioId,
+            override: mensaPastiTable.override,
+            eccezioneId: mensaPastiTable.eccezioneId,
+            sesso: mensaPastiTable.sessoSnapshot,
+            fasciaEta: mensaPastiTable.fasciaEtaSnapshot,
+            provvisoria: mensaPastiTable.anagraficaProvvisoriaSnapshot,
+            temporaneo: mensaPastiTable.temporaneoSnapshot,
+          })
+          .from(mensaPastiTable)
+          .where(eq(mensaPastiTable.giornataServizioId, id));
+        const consumi = await tx
+          .select({
+            causale: mensaConsumiTable.causale,
+            prodottoId: mensaConsumiTable.prodottoId,
+            prodottoNome: prodottiTable.nome,
+            unitaMisura: mensaConsumiTable.unitaMisura,
+            quantita: mensaConsumiTable.quantita,
+          })
+          .from(mensaConsumiTable)
+          .innerJoin(
+            prodottiTable,
+            eq(mensaConsumiTable.prodottoId, prodottiTable.id),
+          )
+          .leftJoin(
+            mensaConsumiStorniTable,
+            eq(mensaConsumiStorniTable.consumoId, mensaConsumiTable.id),
+          )
+          .where(
+            and(
+              eq(mensaConsumiTable.giornataServizioId, id),
+              isNull(mensaConsumiStorniTable.id),
+            ),
+          );
+        const range = intervalloGiornoEuropeRome(current.giornata.dataServizio);
+        const [accessi] = await tx
+          .select({
+            ordinari: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito' and ${mensaAccessiTable.autorizzazioneTemporaneaId} is null)::int`,
+            temporanei: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito' and ${mensaAccessiTable.autorizzazioneTemporaneaId} is not null)::int`,
+            eccezioni: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito_eccezione')::int`,
+            negati: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'negato')::int`,
+          })
+          .from(mensaAccessiTable)
+          .where(
+            and(
+              eq(mensaAccessiTable.mensaId, current.giornata.mensaId),
+              eq(mensaAccessiTable.tipoServizio, current.giornata.tipoServizio),
+              gte(mensaAccessiTable.dataOra, range.start),
+              lt(mensaAccessiTable.dataOra, range.end),
+            ),
+          );
+        const countBy = (values: Array<string | null>) =>
+          values.reduce<Record<string, number>>((acc, value) => {
+            const key = value ?? "ND";
+            acc[key] = (acc[key] ?? 0) + 1;
+            return acc;
+          }, {});
+        const consumptionBreakdown = aggregatiConsumiMensa(consumi);
+        const snapshot = {
+          pasti: meals.length,
+          beneficiariDistinti: new Set(meals.map((meal) => meal.beneficiarioId))
+            .size,
+          pastiOrdinari: meals.filter(
+            (meal) =>
+              meal.temporaneo === false &&
+              !meal.override &&
+              meal.eccezioneId == null,
+          ).length,
+          pastiOverride: meals.filter((meal) => meal.override).length,
+          pastiTemporanei: meals.filter((meal) => meal.temporaneo === true)
+            .length,
+          pastiEccezione: meals.filter((meal) => meal.eccezioneId != null)
+            .length,
+          accessiOrdinari: accessi?.ordinari ?? 0,
+          accessiTemporanei: accessi?.temporanei ?? 0,
+          accessiEccezione: accessi?.eccezioni ?? 0,
+          accessiNegati: accessi?.negati ?? 0,
+          perSesso: countBy(meals.map((meal) => meal.sesso)),
+          perFasciaEta: countBy(meals.map((meal) => meal.fasciaEta)),
+          ...consumptionBreakdown,
+        };
+        const [updated] = await tx
+          .update(mensaGiornateServizioTable)
+          .set({
+            stato: "chiusa",
+            chiusaDa: req.user!.id,
+            chiusaAt: new Date(),
+            noteChiusura: note,
+            snapshot,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(mensaGiornateServizioTable.id, id),
+              eq(mensaGiornateServizioTable.stato, "aperta"),
+            ),
+          )
+          .returning();
+        if (!updated)
+          throw new MensaError(
+            409,
+            "La giornata è stata chiusa da un altro operatore",
+          );
+        await tx
+          .insert(auditConfigurazioniTable)
+          .values(
+            auditValues(
+              req,
+              `mensa-giornata:${id}`,
+              "chiusura",
+              null,
+              snapshot,
+              note,
+            ),
+          );
+        return updated;
+      });
+      res.json(result);
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.post(
+  "/mensa/giornate/:id/riapri",
+  requirePermission("mensa.service.reopen"),
+  async (req, res) => {
+    try {
+      const id = positiveInt(req.params.id, "id");
+      const motivo = text(req.body?.motivo, "Il motivo della riapertura", 2000);
+      const result = await db.transaction(async (tx) => {
+        const [current] = await tx
+          .select({
+            giornata: mensaGiornateServizioTable,
+            cittaId: menseTable.cittaId,
+          })
+          .from(mensaGiornateServizioTable)
+          .innerJoin(
+            menseTable,
+            eq(mensaGiornateServizioTable.mensaId, menseTable.id),
+          )
+          .where(eq(mensaGiornateServizioTable.id, id))
+          .for("update");
+        if (!current) throw new MensaError(404, "Giornata Mensa non trovata");
+        if (!canAccessCitta(current.cittaId, callerCittaId(req)))
+          throw new MensaError(403, "Giornata non accessibile");
+        if (current.giornata.stato !== "chiusa")
+          throw new MensaError(
+            409,
+            "Solo una giornata chiusa può essere riaperta",
+          );
+        const [updated] = await tx
+          .update(mensaGiornateServizioTable)
+          .set({
+            stato: "aperta",
+            riapertaDa: req.user!.id,
+            riapertaAt: new Date(),
+            motivoRiapertura: motivo,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(mensaGiornateServizioTable.id, id),
+              eq(mensaGiornateServizioTable.stato, "chiusa"),
+            ),
+          )
+          .returning();
+        if (!updated)
+          throw new MensaError(
+            409,
+            "La giornata è stata modificata da un altro operatore",
+          );
+        await tx
+          .insert(auditConfigurazioniTable)
+          .values(
+            auditValues(
+              req,
+              `mensa-giornata:${id}`,
+              "riapertura",
+              current.giornata as unknown as Record<string, unknown>,
+              updated as unknown as Record<string, unknown>,
+              motivo,
+            ),
+          );
+        return updated;
+      });
+      res.json(result);
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
   },
 );
 
@@ -2012,7 +3063,10 @@ router.get(
         lte(mensaPastiTable.dataServizio, al),
       ];
       const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
-      const tipo = optionalText(req.query.tipoServizio, "Il tipo servizio", 40);
+      const tipo =
+        req.query.tipoServizio == null
+          ? null
+          : canonicalTipoServizio(req.query.tipoServizio);
       if (mensaId != null)
         conditions.push(eq(mensaPastiTable.mensaId, mensaId));
       if (tipo) conditions.push(eq(mensaPastiTable.tipoServizio, tipo));
@@ -2038,17 +3092,34 @@ router.get(
         .from(mensaPastiTable)
         .innerJoin(menseTable, eq(mensaPastiTable.mensaId, menseTable.id))
         .where(and(...conditions));
+      const dimensions = await db
+        .select({
+          beneficiarioId: mensaPastiTable.beneficiarioId,
+          tipoServizio: mensaPastiTable.tipoServizio,
+          sesso: mensaPastiTable.sessoSnapshot,
+          fasciaEta: mensaPastiTable.fasciaEtaSnapshot,
+          provvisoria: mensaPastiTable.anagraficaProvvisoriaSnapshot,
+          temporaneo: mensaPastiTable.temporaneoSnapshot,
+          eccezioneId: mensaPastiTable.eccezioneId,
+          override: mensaPastiTable.override,
+        })
+        .from(mensaPastiTable)
+        .innerJoin(menseTable, eq(mensaPastiTable.mensaId, menseTable.id))
+        .where(and(...conditions));
       const accessConditions: SQL[] = [
         gte(mensaAccessiTable.dataOra, intervalloGiornoEuropeRome(dal).start),
         lt(mensaAccessiTable.dataOra, intervalloGiornoEuropeRome(al).end),
       ];
       if (mensaId != null)
         accessConditions.push(eq(mensaAccessiTable.mensaId, mensaId));
+      if (tipo != null)
+        accessConditions.push(eq(mensaAccessiTable.tipoServizio, tipo));
       if (ownCity != null)
         accessConditions.push(eq(menseTable.cittaId, ownCity));
       const [accesses] = await db
         .select({
-          ordinari: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito')::int`,
+          ordinari: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito' and ${mensaAccessiTable.autorizzazioneTemporaneaId} is null)::int`,
+          temporanei: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito' and ${mensaAccessiTable.autorizzazioneTemporaneaId} is not null)::int`,
           eccezioni: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'consentito_eccezione')::int`,
           negati: sql<number>`count(*) filter (where ${mensaAccessiTable.esito} = 'negato')::int`,
         })
@@ -2061,14 +3132,103 @@ router.get(
             86400000,
         ) + 1;
       const total = distribution.reduce((sum, row) => sum + row.totalePasti, 0);
+      const distributionFor = (values: Array<string | null>) =>
+        Object.entries(
+          values.reduce<Record<string, number>>((acc, value) => {
+            const key = value ?? "ND";
+            acc[key] = (acc[key] ?? 0) + 1;
+            return acc;
+          }, {}),
+        ).map(([chiave, totale]) => ({ chiave, totale }));
+      const distinctDistributionFor = (
+        rows: Array<{ chiave: string | null; beneficiarioId: number }>,
+      ) =>
+        Array.from(
+          rows.reduce<Map<string, Set<number>>>((acc, row) => {
+            const key = row.chiave ?? "ND";
+            const values = acc.get(key) ?? new Set<number>();
+            values.add(row.beneficiarioId);
+            acc.set(key, values);
+            return acc;
+          }, new Map()),
+        ).map(([chiave, values]) => ({ chiave, totale: values.size }));
+      const consumptionConditions: SQL[] = [
+        gte(mensaConsumiTable.dataServizio, dal),
+        lte(mensaConsumiTable.dataServizio, al),
+        isNull(mensaConsumiStorniTable.id),
+      ];
+      if (mensaId != null)
+        consumptionConditions.push(eq(mensaConsumiTable.mensaId, mensaId));
+      if (tipo != null)
+        consumptionConditions.push(eq(mensaConsumiTable.tipoServizio, tipo));
+      if (ownCity != null)
+        consumptionConditions.push(eq(menseTable.cittaId, ownCity));
+      const consumption = await db
+        .select({
+          causale: mensaConsumiTable.causale,
+          prodottoId: mensaConsumiTable.prodottoId,
+          prodottoNome: prodottiTable.nome,
+          unitaMisura: mensaConsumiTable.unitaMisura,
+          quantita: mensaConsumiTable.quantita,
+        })
+        .from(mensaConsumiTable)
+        .innerJoin(menseTable, eq(mensaConsumiTable.mensaId, menseTable.id))
+        .innerJoin(
+          prodottiTable,
+          eq(mensaConsumiTable.prodottoId, prodottiTable.id),
+        )
+        .leftJoin(
+          mensaConsumiStorniTable,
+          eq(mensaConsumiStorniTable.consumoId, mensaConsumiTable.id),
+        )
+        .where(and(...consumptionConditions));
+      const consumptionBreakdown = aggregatiConsumiMensa(consumption);
       res.json({
         dal,
         al,
         totalePasti: total,
         beneficiariDistinti: mealTotals?.beneficiariDistinti ?? 0,
         accessiOrdinari: accesses?.ordinari ?? 0,
+        accessiTemporanei: accesses?.temporanei ?? 0,
         accessiEccezione: accesses?.eccezioni ?? 0,
         accessiNegati: accesses?.negati ?? 0,
+        pastiAnagraficaProvvisoria: dimensions.filter(
+          (row) => row.provvisoria === true,
+        ).length,
+        pastiTemporanei: dimensions.filter((row) => row.temporaneo === true)
+          .length,
+        pastiOrdinari: dimensions.filter(
+          (row) =>
+            row.temporaneo === false &&
+            row.eccezioneId == null &&
+            !row.override,
+        ).length,
+        pastiEccezione: dimensions.filter((row) => row.eccezioneId != null)
+          .length,
+        pastiOverride: dimensions.filter((row) => row.override).length,
+        pastiTemporaneitaNonDeterminata: dimensions.filter(
+          (row) => row.temporaneo == null,
+        ).length,
+        distribuzioneSesso: distributionFor(dimensions.map((row) => row.sesso)),
+        distribuzioneFasciaEta: distributionFor(
+          dimensions.map((row) => row.fasciaEta),
+        ),
+        distribuzioneTipoServizio: distributionFor(
+          dimensions.map((row) => row.tipoServizio),
+        ),
+        beneficiariDistintiPerSesso: distinctDistributionFor(
+          dimensions.map((row) => ({
+            chiave: row.sesso,
+            beneficiarioId: row.beneficiarioId,
+          })),
+        ),
+        beneficiariDistintiPerFasciaEta: distinctDistributionFor(
+          dimensions.map((row) => ({
+            chiave: row.fasciaEta,
+            beneficiarioId: row.beneficiarioId,
+          })),
+        ),
+        ...consumptionBreakdown,
         mediaPastiGiorno: Number((total / days).toFixed(2)),
         distribuzione: distribution,
       });
@@ -2205,7 +3365,9 @@ router.get(
   async (req, res) => {
     try {
       const beneficiarioIds = beneficiarioIdsQuery(req.query.beneficiarioIds);
-      res.json(await loadRiepilogoAbilitazioniBeneficiari(req, beneficiarioIds));
+      res.json(
+        await loadRiepilogoAbilitazioniBeneficiari(req, beneficiarioIds),
+      );
     } catch (error) {
       if (sendMensaError(error, res)) return;
       throw error;
@@ -2300,27 +3462,38 @@ router.post(
       const created = await db.transaction(async (tx) => {
         if (mensaPrincipale) {
           const today = dataServizioMensa();
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtext(${`mensa-abilitazione:${beneficiarioId}`}))`,
+          );
           await expireEndedPrincipalEligibilities(
             tx,
             beneficiarioId,
             today,
             req,
           );
+          const overlapConditions: SQL[] = [
+            eq(mensaAbilitazioniTable.beneficiarioId, beneficiarioId),
+            eq(mensaAbilitazioniTable.stato, "attiva"),
+            eq(mensaAbilitazioniTable.mensaPrincipale, true),
+            or(
+              isNull(mensaAbilitazioniTable.dataFine),
+              gte(mensaAbilitazioniTable.dataFine, dataInizio),
+            )!,
+          ];
+          if (dataFine != null) {
+            overlapConditions.push(
+              lte(mensaAbilitazioniTable.dataInizio, dataFine),
+            );
+          }
           const [current] = await tx
             .select({ id: mensaAbilitazioniTable.id })
             .from(mensaAbilitazioniTable)
-            .where(
-              and(
-                eq(mensaAbilitazioniTable.beneficiarioId, beneficiarioId),
-                eq(mensaAbilitazioniTable.stato, "attiva"),
-                eq(mensaAbilitazioniTable.mensaPrincipale, true),
-              ),
-            )
+            .where(and(...overlapConditions))
             .limit(1);
           if (current)
             throw new MensaError(
               409,
-              "Esiste già un'abilitazione principale attiva",
+              "Il periodo si sovrappone a un'abilitazione principale attiva",
             );
         }
         const [row] = await tx
@@ -2355,10 +3528,10 @@ router.post(
       const loaded = await loadAbilitazione(created.id);
       res.status(201).json(formatAbilitazione(loaded!));
     } catch (error) {
-      if (isUniqueViolation(error)) {
-        res
-          .status(409)
-          .json({ error: "Esiste già un'abilitazione principale attiva" });
+      if (isUniqueViolation(error) || databaseErrorCode(error) === "23P01") {
+        res.status(409).json({
+          error: "Il periodo si sovrappone a un'abilitazione principale attiva",
+        });
         return;
       }
       if (sendMensaError(error, res)) return;
@@ -2389,6 +3562,35 @@ router.post(
       if (!canAccessCitta(current.cittaId, callerCittaId(req)))
         throw new MensaError(403, "Abilitazione non accessibile");
       const updated = await db.transaction(async (tx) => {
+        const allowed: Record<AbilitazioneStato, readonly AbilitazioneStato[]> =
+          {
+            attiva: ["sospesa", "revocata", "scaduta"],
+            sospesa: ["attiva", "revocata"],
+            revocata: [],
+            scaduta: [],
+          };
+        const currentState = current.abilitazione.stato as AbilitazioneStato;
+        if (!allowed[currentState]?.includes(stato as AbilitazioneStato)) {
+          throw new MensaError(
+            409,
+            `Transizione abilitazione ${currentState} → ${stato} non consentita`,
+          );
+        }
+        if (
+          stato === "attiva" &&
+          current.abilitazione.dataFine != null &&
+          current.abilitazione.dataFine < dataServizioMensa()
+        ) {
+          throw new MensaError(
+            409,
+            "Un'abilitazione scaduta non può essere riattivata",
+          );
+        }
+        if (stato === "attiva" && current.abilitazione.mensaPrincipale) {
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtext(${`mensa-abilitazione:${current.abilitazione.beneficiarioId}`}))`,
+          );
+        }
         const [row] = await tx
           .update(mensaAbilitazioniTable)
           .set({ stato, motivo, updatedAt: new Date() })
@@ -2421,7 +3623,7 @@ router.post(
       const loaded = await loadAbilitazione(updated.id);
       res.json(formatAbilitazione(loaded!));
     } catch (error) {
-      if (isUniqueViolation(error)) {
+      if (isUniqueViolation(error) || databaseErrorCode(error) === "23P01") {
         res
           .status(409)
           .json({ error: "Esiste già un'abilitazione principale attiva" });

@@ -339,6 +339,7 @@ export const MagazzinoTipoMagazzino = {
 export interface Magazzino {
   id: number;
   codice: string;
+  /** @minLength 1 */
   nome: string;
   /** @nullable */
   indirizzo?: string | null;
@@ -482,14 +483,14 @@ export const BeneficiarioInputFasciaEtaPresunta = {
   '65_plus': '65_plus',
 } as const;
 
-export type BeneficiarioInputCreditoSolidaleStato = typeof BeneficiarioInputCreditoSolidaleStato[keyof typeof BeneficiarioInputCreditoSolidaleStato];
+export type BeneficiarioInputPriorita = typeof BeneficiarioInputPriorita[keyof typeof BeneficiarioInputPriorita];
 
 
-export const BeneficiarioInputCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+export const BeneficiarioInputPriorita = {
+  bassa: 'bassa',
+  media: 'media',
+  alta: 'alta',
+  urgente: 'urgente',
 } as const;
 
 export type BeneficiarioInputSesso = typeof BeneficiarioInputSesso[keyof typeof BeneficiarioInputSesso];
@@ -532,28 +533,13 @@ export interface BeneficiarioInput {
   restrizioniAlimentari?: string;
   allergie?: string;
   notePaccoAlimentare?: string;
-  priorita?: string;
+  priorita?: BeneficiarioInputPriorita;
   consegnaDomicilio?: boolean;
   motivoConsegnaDomicilio?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
-  creditoSolidaleAbilitato?: boolean;
-  creditoSolidaleStato?: BeneficiarioInputCreditoSolidaleStato;
-  /** @nullable */
-  creditoSolidaleDataAbilitazione?: string | null;
-  /** @nullable */
-  creditoSolidaleNote?: string | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
-  /** @nullable */
-  creditoSolidaleMensileAssegnato?: number | null;
-  creditoSolidaleMensileManuale?: boolean;
-  /** @nullable */
-  creditoSolidaleMotivoModifica?: string | null;
-  /** @nullable */
-  creditoSolidaleDataUltimaModificaQuota?: string | null;
-  /** @nullable */
-  creditoSolidaleMensileSuggerito?: number | null;
   dataPresaInCarico?: string;
   noteInterne?: string;
   soprannome?: string;
@@ -592,6 +578,7 @@ export const MagazzinoInputTipoMagazzino = {
 
 export interface MagazzinoInput {
   codice?: string;
+  /** @minLength 1 */
   nome: string;
   indirizzo?: string;
   comune?: string;
@@ -623,6 +610,7 @@ export const MagazzinoUpdateTipoMagazzino = {
 
 export interface MagazzinoUpdate {
   codice?: string;
+  /** @minLength 1 */
   nome?: string;
   indirizzo?: string;
   comune?: string;
@@ -736,12 +724,23 @@ export interface Lotto {
   dataCreazione: string;
 }
 
+export type LottoInputCausale = typeof LottoInputCausale[keyof typeof LottoInputCausale];
+
+
+export const LottoInputCausale = {
+  acquisto: 'acquisto',
+  donazione: 'donazione',
+  fse_plus: 'fse_plus',
+} as const;
+
 export interface LottoInput {
   prodottoId: number;
   codiceLotto?: string;
   dataScadenza?: string;
   dataCarico: string;
+  /** @exclusiveMinimum 0 */
   quantitaCaricata: number;
+  causale: LottoInputCausale;
   magazzinoId: number;
   fornitoreId?: number;
   fsePlus?: boolean;
@@ -752,7 +751,24 @@ export interface LottoInput {
 export interface LottoUpdate {
   codiceLotto?: string;
   dataScadenza?: string;
-  quantitaResidua?: number;
+  documentoCarico?: string;
+  note?: string;
+}
+
+export type RettificaLottoInputCausale = typeof RettificaLottoInputCausale[keyof typeof RettificaLottoInputCausale];
+
+
+export const RettificaLottoInputCausale = {
+  inventario_fisico: 'inventario_fisico',
+  errore_registrazione: 'errore_registrazione',
+  deterioramento: 'deterioramento',
+  altro: 'altro',
+} as const;
+
+export interface RettificaLottoInput {
+  delta: number;
+  causale: RettificaLottoInputCausale;
+  motivazione?: string;
   note?: string;
 }
 
@@ -775,6 +791,10 @@ export interface Movimento {
   fornitoreId?: number | null;
   /** @nullable */
   beneficiarioId?: number | null;
+  /** @nullable */
+  movimentoOrigineId?: number | null;
+  /** @nullable */
+  operatoreId?: number | null;
   /** @nullable */
   documentoRiferimento?: string | null;
   /** @nullable */
@@ -806,7 +826,12 @@ export interface Giacenza {
   magazzinoId: number;
   magazzinoNome: string;
   quantitaTotale: number;
+  /** Quantità fisicamente presente, inclusi i lotti scaduti. */
   giacenzaFisica: number;
+  /** Quantità fisicamente presente su lotti scaduti alla data civile Europe/Rome. */
+  giacenzaScaduta: number;
+  /** Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome. */
+  giacenzaDistribuibile: number;
   impegnato: number;
   disponibileReale: number;
   scortaMinima: number;
@@ -855,6 +880,8 @@ export interface TrasferimentoRiga {
   /** @nullable */
   lottoId?: number | null;
   fsePlus: boolean;
+  fsePlusQuantita?: number;
+  nonFsePlusQuantita?: number;
   quantita: number;
   unitaMisura: string;
   /** @nullable */
@@ -864,6 +891,7 @@ export interface TrasferimentoRiga {
 export interface Trasferimento {
   id: number;
   codice: string;
+  versione: number;
   magazzinoOrigineId: number;
   /** @nullable */
   magazzinoOrigineNome?: string | null;
@@ -912,7 +940,8 @@ export interface TrasferimentoRigaInput {
   prodottoId: number;
   lottoId?: number;
   quantita: number;
-  unitaMisura: string;
+  /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
+  unitaMisura?: string;
   note?: string;
 }
 
@@ -929,8 +958,8 @@ export interface TrasferimentoInput {
 }
 
 export interface TrasferimentoUpdate {
-  stato?: string;
-  dataEsecuzione?: string;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   trasportatoreVolontarioId?: number | null;
   /** @nullable */
@@ -945,6 +974,8 @@ export interface ScaricoRiga {
   /** @nullable */
   prodottoNome?: string | null;
   fsePlus: boolean;
+  fsePlusQuantita?: number;
+  nonFsePlusQuantita?: number;
   quantita: number;
   unitaMisura: string;
   /** @nullable */
@@ -1004,8 +1035,15 @@ export interface ScaricoInput {
 }
 
 export interface ConfermaRicezione {
+  /** @minimum 1 */
+  versione: number;
   note?: string;
   dataConferma?: string;
+}
+
+export interface VersioneInput {
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface Fornitore {
@@ -1073,6 +1111,7 @@ export interface ApprovvigionamentoRiga {
 export interface Approvvigionamento {
   id: number;
   codice: string;
+  versione: number;
   /** @nullable */
   fornitoreId?: number | null;
   /** @nullable */
@@ -1109,7 +1148,7 @@ export interface ApprovvigionamentoRigaInput {
 export interface ApprovvigionamentoInput {
   fornitoreId: number;
   cittaId: number;
-  magazzinoId?: number;
+  magazzinoId: number;
   centroAscoltoId?: number;
   dataRichiesta: string;
   dataPrevista?: string;
@@ -1118,6 +1157,8 @@ export interface ApprovvigionamentoInput {
 }
 
 export interface ApprovvigionamentoUpdate {
+  /** @minimum 1 */
+  versione: number;
   stato?: string;
   /** @nullable */
   fornitoreId?: number | null;
@@ -1129,6 +1170,7 @@ export interface ApprovvigionamentoUpdate {
   dataRichiesta?: string;
   dataPrevista?: string;
   note?: string;
+  righe?: ApprovvigionamentoRigaInput[];
 }
 
 export interface TurnoVolontario {
@@ -1221,8 +1263,103 @@ export interface BeneficiarioSimile {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
-  uds?: boolean;
+  uds: boolean;
+  /** @minimum 1 */
+  versione: number;
   score: number;
+}
+
+export type BeneficiarioDirectoryStatoAnagrafica = typeof BeneficiarioDirectoryStatoAnagrafica[keyof typeof BeneficiarioDirectoryStatoAnagrafica];
+
+
+export const BeneficiarioDirectoryStatoAnagrafica = {
+  provvisoria: 'provvisoria',
+  completa: 'completa',
+} as const;
+
+/**
+ * @nullable
+ */
+export type BeneficiarioDirectoryFasciaEtaPresunta = typeof BeneficiarioDirectoryFasciaEtaPresunta[keyof typeof BeneficiarioDirectoryFasciaEtaPresunta] | null;
+
+
+export const BeneficiarioDirectoryFasciaEtaPresunta = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+} as const;
+
+export type BeneficiarioDirectoryFasciaEtaCorrente = typeof BeneficiarioDirectoryFasciaEtaCorrente[keyof typeof BeneficiarioDirectoryFasciaEtaCorrente];
+
+
+export const BeneficiarioDirectoryFasciaEtaCorrente = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+export type BeneficiarioDirectoryFasciaEtaOrigine = typeof BeneficiarioDirectoryFasciaEtaOrigine[keyof typeof BeneficiarioDirectoryFasciaEtaOrigine];
+
+
+export const BeneficiarioDirectoryFasciaEtaOrigine = {
+  calcolata: 'calcolata',
+  presunta: 'presunta',
+  non_determinata: 'non_determinata',
+} as const;
+
+export type BeneficiarioDirectoryPriorita = typeof BeneficiarioDirectoryPriorita[keyof typeof BeneficiarioDirectoryPriorita];
+
+
+export const BeneficiarioDirectoryPriorita = {
+  bassa: 'bassa',
+  media: 'media',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+/**
+ * Proiezione minima usata negli elenchi, priva di dati sociali ed economici sensibili.
+ */
+export interface BeneficiarioDirectory {
+  id: number;
+  codice: string;
+  statoAnagrafica: BeneficiarioDirectoryStatoAnagrafica;
+  cognome: string;
+  nome: string;
+  /** @nullable */
+  soprannome?: string | null;
+  /** @nullable */
+  dataNascita?: string | null;
+  /** @nullable */
+  fasciaEtaPresunta: BeneficiarioDirectoryFasciaEtaPresunta;
+  fasciaEtaCorrente: BeneficiarioDirectoryFasciaEtaCorrente;
+  fasciaEtaOrigine: BeneficiarioDirectoryFasciaEtaOrigine;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /**
+     * Identificativo tecnico legacy dell'Area.
+     * @nullable
+     */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  /** @nullable */
+  zonaUdsId?: number | null;
+  /** @nullable */
+  zonaUdsNome?: string | null;
+  uds: boolean;
+  attivo: boolean;
+  priorita: BeneficiarioDirectoryPriorita;
+  consegnaDomicilio: boolean;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export type BeneficiarioStatoAnagrafica = typeof BeneficiarioStatoAnagrafica[keyof typeof BeneficiarioStatoAnagrafica];
@@ -1270,6 +1407,16 @@ export const BeneficiarioFasciaEtaOrigine = {
   non_determinata: 'non_determinata',
 } as const;
 
+export type BeneficiarioPriorita = typeof BeneficiarioPriorita[keyof typeof BeneficiarioPriorita];
+
+
+export const BeneficiarioPriorita = {
+  bassa: 'bassa',
+  media: 'media',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
 export type BeneficiarioCreditoSolidaleStato = typeof BeneficiarioCreditoSolidaleStato[keyof typeof BeneficiarioCreditoSolidaleStato];
 
 
@@ -1280,6 +1427,9 @@ export const BeneficiarioCreditoSolidaleStato = {
   revocato: 'revocato',
 } as const;
 
+/**
+ * Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
+ */
 export interface Beneficiario {
   id: number;
   codice: string;
@@ -1317,14 +1467,14 @@ export interface Beneficiario {
   numComponenti: number;
   numMinori: number;
   numAnziani: number;
-  priorita: string;
+  priorita: BeneficiarioPriorita;
   consegnaDomicilio: boolean;
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
-  creditoSolidaleAbilitato: boolean;
-  creditoSolidaleStato: BeneficiarioCreditoSolidaleStato;
+  creditoSolidaleAbilitato?: boolean;
+  creditoSolidaleStato?: BeneficiarioCreditoSolidaleStato;
   /** @nullable */
   creditoSolidaleDataAbilitazione?: string | null;
   /** @nullable */
@@ -1334,15 +1484,15 @@ export interface Beneficiario {
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
   /** @nullable */
-  creditoSolidaleMensileAssegnato: number | null;
-  creditoSolidaleSaldo: number;
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleSaldo?: number;
   /** @nullable */
-  creditoSolidaleDataUltimoMovimento: string | null;
-  creditoSolidaleMensileManuale: boolean;
+  creditoSolidaleDataUltimoMovimento?: string | null;
+  creditoSolidaleMensileManuale?: boolean;
   /** @nullable */
-  creditoSolidaleMotivoModifica: string | null;
+  creditoSolidaleMotivoModifica?: string | null;
   /** @nullable */
-  creditoSolidaleDataUltimaModificaQuota: string | null;
+  creditoSolidaleDataUltimaModificaQuota?: string | null;
   uds: boolean;
   attivo: boolean;
   /** @nullable */
@@ -1358,6 +1508,9 @@ export interface Beneficiario {
   /** @nullable */
   dataPresaInCarico?: string | null;
   dataCreazione: string;
+  dataAggiornamento: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export type BeneficiarioDettaglioStatoAnagrafica = typeof BeneficiarioDettaglioStatoAnagrafica[keyof typeof BeneficiarioDettaglioStatoAnagrafica];
@@ -1403,6 +1556,16 @@ export const BeneficiarioDettaglioFasciaEtaOrigine = {
   calcolata: 'calcolata',
   presunta: 'presunta',
   non_determinata: 'non_determinata',
+} as const;
+
+export type BeneficiarioDettaglioPriorita = typeof BeneficiarioDettaglioPriorita[keyof typeof BeneficiarioDettaglioPriorita];
+
+
+export const BeneficiarioDettaglioPriorita = {
+  bassa: 'bassa',
+  media: 'media',
+  alta: 'alta',
+  urgente: 'urgente',
 } as const;
 
 export type BeneficiarioDettaglioCreditoSolidaleStato = typeof BeneficiarioDettaglioCreditoSolidaleStato[keyof typeof BeneficiarioDettaglioCreditoSolidaleStato];
@@ -1537,12 +1700,12 @@ export interface Intervento {
   avviso: InterventoAvviso | null;
   /** @nullable */
   interventoPrecedenteId: number | null;
-  successoriIds: number[];
+  successoriIds?: number[];
   numeroSuccessori: number;
   /** @nullable */
   sede: string | null;
   /** @nullable */
-  motivoAnnullamento: string | null;
+  motivoAnnullamento?: string | null;
   dataCreazione: string;
   /** @nullable */
   dataAggiornamento: string | null;
@@ -1656,7 +1819,7 @@ export interface BeneficiarioDettaglio {
   allergie?: string | null;
   /** @nullable */
   notePaccoAlimentare?: string | null;
-  priorita: string;
+  priorita: BeneficiarioDettaglioPriorita;
   consegnaDomicilio: boolean;
   /** @nullable */
   motivoConsegnaDomicilio?: string | null;
@@ -1664,8 +1827,8 @@ export interface BeneficiarioDettaglio {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
-  creditoSolidaleAbilitato: boolean;
-  creditoSolidaleStato: BeneficiarioDettaglioCreditoSolidaleStato;
+  creditoSolidaleAbilitato?: boolean;
+  creditoSolidaleStato?: BeneficiarioDettaglioCreditoSolidaleStato;
   /** @nullable */
   creditoSolidaleDataAbilitazione?: string | null;
   /** @nullable */
@@ -1675,15 +1838,15 @@ export interface BeneficiarioDettaglio {
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
   /** @nullable */
-  creditoSolidaleMensileAssegnato: number | null;
-  creditoSolidaleSaldo: number;
+  creditoSolidaleMensileAssegnato?: number | null;
+  creditoSolidaleSaldo?: number;
   /** @nullable */
-  creditoSolidaleDataUltimoMovimento: string | null;
-  creditoSolidaleMensileManuale: boolean;
+  creditoSolidaleDataUltimoMovimento?: string | null;
+  creditoSolidaleMensileManuale?: boolean;
   /** @nullable */
-  creditoSolidaleMotivoModifica: string | null;
+  creditoSolidaleMotivoModifica?: string | null;
   /** @nullable */
-  creditoSolidaleDataUltimaModificaQuota: string | null;
+  creditoSolidaleDataUltimaModificaQuota?: string | null;
   uds?: boolean;
   attivo: boolean;
   /** @nullable */
@@ -1704,6 +1867,9 @@ export interface BeneficiarioDettaglio {
   interventi?: Intervento[];
   consegne?: Consegna[];
   dataCreazione: string;
+  dataAggiornamento: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 /**
@@ -1731,14 +1897,14 @@ export const BeneficiarioUpdateFasciaEtaPresunta = {
   '65_plus': '65_plus',
 } as const;
 
-export type BeneficiarioUpdateCreditoSolidaleStato = typeof BeneficiarioUpdateCreditoSolidaleStato[keyof typeof BeneficiarioUpdateCreditoSolidaleStato];
+export type BeneficiarioUpdatePriorita = typeof BeneficiarioUpdatePriorita[keyof typeof BeneficiarioUpdatePriorita];
 
 
-export const BeneficiarioUpdateCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+export const BeneficiarioUpdatePriorita = {
+  bassa: 'bassa',
+  media: 'media',
+  alta: 'alta',
+  urgente: 'urgente',
 } as const;
 
 export type BeneficiarioUpdateSesso = typeof BeneficiarioUpdateSesso[keyof typeof BeneficiarioUpdateSesso];
@@ -1781,30 +1947,14 @@ export interface BeneficiarioUpdate {
   restrizioniAlimentari?: string;
   allergie?: string;
   notePaccoAlimentare?: string;
-  priorita?: string;
+  priorita?: BeneficiarioUpdatePriorita;
   consegnaDomicilio?: boolean;
   motivoConsegnaDomicilio?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
-  creditoSolidaleAbilitato?: boolean;
-  creditoSolidaleStato?: BeneficiarioUpdateCreditoSolidaleStato;
-  /** @nullable */
-  creditoSolidaleDataAbilitazione?: string | null;
-  /** @nullable */
-  creditoSolidaleNote?: string | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
-  /** @nullable */
-  creditoSolidaleMensileAssegnato?: number | null;
-  creditoSolidaleMensileManuale?: boolean;
-  /** @nullable */
-  creditoSolidaleMotivoModifica?: string | null;
-  /** @nullable */
-  creditoSolidaleDataUltimaModificaQuota?: string | null;
-  /** @nullable */
-  creditoSolidaleMensileSuggerito?: number | null;
   uds?: boolean;
-  attivo?: boolean;
   noteInterne?: string;
   soprannome?: string;
   /** @nullable */
@@ -1813,6 +1963,35 @@ export interface BeneficiarioUpdate {
   zonaUdsId?: number | null;
   sesso?: BeneficiarioUpdateSesso;
   areaProvenienza?: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface BeneficiarioStatoInput {
+  attivo: boolean;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export type BeneficiariExportInputTipo = typeof BeneficiariExportInputTipo[keyof typeof BeneficiariExportInputTipo];
+
+
+export const BeneficiariExportInputTipo = {
+  lista: 'lista',
+  scheda: 'scheda',
+  dossier: 'dossier',
+  interventi: 'interventi',
+} as const;
+
+export interface BeneficiariExportInput {
+  tipo: BeneficiariExportInputTipo;
+  /** @nullable */
+  beneficiarioId?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  numeroRecord: number;
 }
 
 export type PoliticaCreditoSolidaleArrotondamento = typeof PoliticaCreditoSolidaleArrotondamento[keyof typeof PoliticaCreditoSolidaleArrotondamento];
@@ -2057,6 +2236,48 @@ export interface CreditoSolidaleMovimento {
   annullatoDaMovimentoId: number | null;
 }
 
+export type CreditoSolidaleBeneficiarioCreditoSolidaleStato = typeof CreditoSolidaleBeneficiarioCreditoSolidaleStato[keyof typeof CreditoSolidaleBeneficiarioCreditoSolidaleStato];
+
+
+export const CreditoSolidaleBeneficiarioCreditoSolidaleStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
+
+export interface CreditoSolidaleBeneficiario {
+  id: number;
+  codice: string;
+  /** @nullable */
+  codiceFiscale?: string | null;
+  cognome: string;
+  nome: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /**
+     * Identificativo tecnico legacy dell'Area.
+     * @nullable
+     */
+  cittaId?: number | null;
+  /** @nullable */
+  cittaNome?: string | null;
+  attivo: boolean;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: CreditoSolidaleBeneficiarioCreditoSolidaleStato;
+  creditoSolidaleSaldo: number;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato?: number | null;
+  /** @nullable */
+  creditoSolidaleDataUltimoMovimento?: string | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoId?: number | null;
+  /** @nullable */
+  magazzinoEmporioPreferitoNome?: string | null;
+}
+
 export type CreditoSolidaleSaldoCreditoSolidaleStato = typeof CreditoSolidaleSaldoCreditoSolidaleStato[keyof typeof CreditoSolidaleSaldoCreditoSolidaleStato];
 
 
@@ -2077,6 +2298,60 @@ export interface CreditoSolidaleSaldo {
   creditoSolidaleMensileAssegnato: number | null;
   /** @nullable */
   dataUltimoMovimento: string | null;
+}
+
+export type CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato[keyof typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato];
+
+
+export const CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
+
+export interface CreditoSolidaleConfigurazioneInput {
+  creditoSolidaleAbilitato?: boolean;
+  creditoSolidaleStato?: CreditoSolidaleConfigurazioneInputCreditoSolidaleStato;
+  /** @nullable */
+  creditoSolidaleNote?: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  creditoSolidaleMensileAssegnato?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  creditoSolidaleMensileSuggerito?: number | null;
+  /** @nullable */
+  creditoSolidaleMotivoModifica?: string | null;
+}
+
+export type CreditoSolidaleConfigurazioneCreditoSolidaleStato = typeof CreditoSolidaleConfigurazioneCreditoSolidaleStato[keyof typeof CreditoSolidaleConfigurazioneCreditoSolidaleStato];
+
+
+export const CreditoSolidaleConfigurazioneCreditoSolidaleStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
+
+export interface CreditoSolidaleConfigurazione {
+  beneficiarioId: number;
+  creditoSolidaleAbilitato: boolean;
+  creditoSolidaleStato: CreditoSolidaleConfigurazioneCreditoSolidaleStato;
+  /** @nullable */
+  creditoSolidaleNote: string | null;
+  /** @nullable */
+  creditoSolidaleMensileAssegnato: number | null;
+  creditoSolidaleMensileManuale: boolean;
+  /** @nullable */
+  creditoSolidaleMotivoModifica: string | null;
+  /** @nullable */
+  creditoSolidaleDataUltimaModificaQuota: string | null;
 }
 
 export interface CreditoSolidaleRefreshInput {
@@ -2383,6 +2658,9 @@ export interface ImpostazioniStampaUpdate {
   footerBolla?: string | null;
 }
 
+/**
+ * @deprecated
+ */
 export type ImpostazioniEmailProvider = typeof ImpostazioniEmailProvider[keyof typeof ImpostazioniEmailProvider];
 
 
@@ -2391,7 +2669,11 @@ export const ImpostazioniEmailProvider = {
   smtp: 'smtp',
 } as const;
 
+/**
+ * Le credenziali SMTP sono gestite esclusivamente tramite variabili MAIL_* e secret di ambiente; i campi SMTP restituiti sono legacy e non usati dal runtime.
+ */
 export interface ImpostazioniEmail {
+  /** @deprecated */
   provider: ImpostazioniEmailProvider;
   /** @nullable */
   mittenteEmail?: string | null;
@@ -2399,42 +2681,39 @@ export interface ImpostazioniEmail {
   mittenteNome?: string | null;
   /** @nullable */
   adminEmail?: string | null;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpHost?: string | null;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpPort?: number | null;
+  /** @deprecated */
   smtpSecure: boolean;
-  /** @nullable */
+  /**
+     * @deprecated
+     * @nullable
+     */
   smtpUser?: string | null;
+  /** @deprecated */
   hasPassword: boolean;
+  smtpManagedByEnvironment: boolean;
   dataAggiornamento?: string;
 }
 
-export type ImpostazioniEmailUpdateProvider = typeof ImpostazioniEmailUpdateProvider[keyof typeof ImpostazioniEmailUpdateProvider];
-
-
-export const ImpostazioniEmailUpdateProvider = {
-  connector: 'connector',
-  smtp: 'smtp',
-} as const;
-
+/**
+ * Aggiorna solo metadati non sensibili. Server e credenziali SMTP devono essere configurati tramite MAIL_* e secret di ambiente.
+ */
 export interface ImpostazioniEmailUpdate {
-  provider?: ImpostazioniEmailUpdateProvider;
   /** @nullable */
   mittenteEmail?: string | null;
   /** @nullable */
   mittenteNome?: string | null;
   /** @nullable */
   adminEmail?: string | null;
-  /** @nullable */
-  smtpHost?: string | null;
-  /** @nullable */
-  smtpPort?: number | null;
-  smtpSecure?: boolean;
-  /** @nullable */
-  smtpUser?: string | null;
-  /** @nullable */
-  smtpPassword?: string | null;
 }
 
 export interface ImpostazioniModuli {
@@ -2711,6 +2990,59 @@ export interface InterventoOperatore {
   codice: string;
 }
 
+/**
+ * Proiezione minimale per liste, calendario e dashboard; non include note o contenuti sociali estesi.
+ */
+export interface InterventoListItem {
+  id: number;
+  beneficiarioId: number;
+  /** @nullable */
+  beneficiarioNome: string | null;
+  /** @nullable */
+  beneficiarioCodice: string | null;
+  /** @nullable */
+  nucleoFamiliareSintesi: string | null;
+  /** @nullable */
+  operatoreId: number | null;
+  /** @nullable */
+  operatoreCodice: string | null;
+  /** @nullable */
+  operatoreNome: string | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  /** @nullable */
+  centroAscoltoNome: string | null;
+  /** @nullable */
+  cittaId: number | null;
+  /** @nullable */
+  dataIntervento: string | null;
+  tipoIntervento: string;
+  stato: InterventoStato;
+  ambito: InterventoAmbito | null;
+  ambitoLegacy: boolean;
+  priorita: InterventoPriorita;
+  /** @nullable */
+  dataOraPianificata: string | null;
+  /** @nullable */
+  dataOraAvvio: string | null;
+  /** @nullable */
+  dataOraConclusione: string | null;
+  avviso: InterventoAvviso | null;
+  /** @nullable */
+  interventoPrecedenteId: number | null;
+  numeroSuccessori: number;
+  /** @nullable */
+  sede: string | null;
+  dataCreazione: string;
+  /** @nullable */
+  dataAggiornamento: string | null;
+  bisogniPianificatiTotale: number;
+  bisogniPianificatiAperti: number;
+  bisogniPianificatiScaduti: number;
+  /** @nullable */
+  bisogniPianificatiProssimaScadenza: string | null;
+}
+
 export type BisognoPianificatoUpsertTipo = typeof BisognoPianificatoUpsertTipo[keyof typeof BisognoPianificatoUpsertTipo];
 
 
@@ -2803,6 +3135,8 @@ export interface InterventoInput {
 }
 
 export interface InterventoUpdate {
+  /** Versione letta dal client; obbligatoria per optimistic locking. */
+  versione: string;
   /** Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato. */
   operatoreId?: number;
   /** @nullable */
@@ -2832,6 +3166,7 @@ export interface InterventoUpdate {
 }
 
 export interface InterventoTransizioneInput {
+  versione: string;
   stato: InterventoStato;
   /**
      * @maxLength 2000
@@ -3378,7 +3713,6 @@ export interface AccessoEmporioInput {
   dataOraInizio: string;
   /** @nullable */
   dataOraFine?: string | null;
-  statoAccessoEmporio?: AccessoEmporioStato;
   /** @nullable */
   noteAccessoEmporio?: string | null;
 }
@@ -3389,7 +3723,6 @@ export interface AccessoEmporioUpdate {
   dataOraInizio?: string;
   /** @nullable */
   dataOraFine?: string | null;
-  statoAccessoEmporio?: AccessoEmporioStato;
   /** @nullable */
   noteAccessoEmporio?: string | null;
 }
@@ -3447,6 +3780,8 @@ export interface SessioneCassaEmporioRiga {
   codiceProdotto?: string | null;
   descrizioneProdotto: string;
   quantita: number;
+  /** @nullable */
+  unitaMisura: string | null;
   creditoUnitario: number;
   creditoTotale: number;
   /** @nullable */
@@ -3480,6 +3815,8 @@ export interface SessioneCassaEmporio {
   /** @nullable */
   magazzinoEmporioNome?: string | null;
   statoSessione: SessioneCassaEmporioStato;
+  /** @minimum 1 */
+  versione: number;
   saldoCreditoIniziale: number;
   totaleCreditoPrevisto: number;
   creditoResiduoPrevisto: number;
@@ -3520,10 +3857,17 @@ export interface SessioneCassaEmporioInput {
 }
 
 export interface SessioneCassaEmporioUpdate {
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   motivoAnnullamento?: string | null;
   /** @nullable */
   note?: string | null;
+}
+
+export interface SessioneCassaEmporioVersioneInput {
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface SessioneCassaEmporioAperturaInput {
@@ -3533,15 +3877,19 @@ export interface SessioneCassaEmporioAperturaInput {
 
 export interface SessioneCassaEmporioAggiungiProdottoInput {
   prodottoId: number;
-  /** @minimum 1 */
+  /** @minimum 0.01 */
   quantita: number;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   note?: string | null;
 }
 
 export interface SessioneCassaEmporioAggiornaRigaInput {
-  /** @minimum 1 */
+  /** @minimum 0.01 */
   quantita: number;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   note?: string | null;
 }
@@ -3612,6 +3960,8 @@ export interface SessioneCassaEmporioRicercaProdottoResult {
   quantitaMassimaMensile?: number | null;
   /** @nullable */
   giacenzaDisponibile?: number | null;
+  /** @nullable */
+  unitaMisura?: string | null;
 }
 
 export interface SessioneCassaEmporioValidazione {
@@ -3636,13 +3986,29 @@ export interface SpesaEmporioRiga {
   codiceProdotto?: string | null;
   descrizioneProdotto: string;
   quantita: number;
+  /** @nullable */
+  unitaMisura?: string | null;
+  /** @minimum 0 */
+  quantitaStornata: number;
+  /** @minimum 0 */
+  quantitaStornabile: number;
   creditoUnitario: number;
   creditoTotale: number;
   /** @nullable */
   scaricoId?: number | null;
   /** @nullable */
   bollaRigaId?: number | null;
+  fsePlus: boolean;
 }
+
+export type SpesaEmporioStatoSpesa = typeof SpesaEmporioStatoSpesa[keyof typeof SpesaEmporioStatoSpesa];
+
+
+export const SpesaEmporioStatoSpesa = {
+  chiusa: 'chiusa',
+  stornata_parzialmente: 'stornata_parzialmente',
+  stornata: 'stornata',
+} as const;
 
 export type SpesaEmporioEmailBollaStato = typeof SpesaEmporioEmailBollaStato[keyof typeof SpesaEmporioEmailBollaStato];
 
@@ -3687,7 +4053,7 @@ export interface SpesaEmporio {
   totaleCreditoConsumati: number;
   saldoPrima: number;
   saldoDopo: number;
-  statoSpesa: string;
+  statoSpesa: SpesaEmporioStatoSpesa;
   /** @nullable */
   operatoreChiusuraId?: number | null;
   /** @nullable */
@@ -3713,13 +4079,40 @@ export interface SpesaEmporio {
 }
 
 export interface SpesaEmporioChiusuraInput {
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   note?: string | null;
 }
 
-export interface BollaEmporioInvioManualeInput {
-  /** @nullable */
-  linkBolla?: string | null;
+/**
+ * Il server costruisce il link Bolla da configurazione trusted o same-origin validata.
+ */
+export interface BollaEmporioInvioManualeInput { [key: string]: unknown }
+
+export interface SpesaEmporioStornoRigaInput {
+  /** @minimum 1 */
+  spesaRigaId: number;
+  /** @minimum 0.01 */
+  quantita: number;
+}
+
+export interface SpesaEmporioStornoInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+  /** @minItems 1 */
+  righe?: SpesaEmporioStornoRigaInput[];
+  /** @maxLength 100 */
+  idempotencyKey?: string;
+}
+
+export interface SpesaEmporioStornoResult {
+  stornoId: number;
+  creditoRestituito: number;
+  spesa: SpesaEmporio;
 }
 
 export type BollaEmporioEmailResultStato = typeof BollaEmporioEmailResultStato[keyof typeof BollaEmporioEmailResultStato];
@@ -3764,6 +4157,7 @@ export interface BollaEmporioStampa {
   numeroBolla?: string | null;
   numeroSpesa: string;
   dataChiusura: string;
+  dataBolla: string;
   /** @nullable */
   beneficiario?: string | null;
   /** @nullable */
@@ -3877,8 +4271,11 @@ export interface BollaRiga {
   /** @nullable */
   codiceLotto?: string | null;
   fsePlus: boolean;
+  fsePlusQuantita?: number;
+  nonFsePlusQuantita?: number;
   quantita: number;
-  unitaMisura: string;
+  /** @nullable */
+  unitaMisura: string | null;
   /** @nullable */
   note?: string | null;
 }
@@ -4013,7 +4410,6 @@ export interface BollaInput {
 }
 
 export interface BollaUpdate {
-  stato?: string;
   beneficiarioId?: number;
   magazzinoId?: number;
   /** @nullable */
@@ -4026,8 +4422,6 @@ export interface BollaUpdate {
   indirizzoConsegna?: string;
   /** @nullable */
   noteConsegna?: string | null;
-  confermaRicezione?: boolean;
-  noteRicezione?: string;
 }
 
 export interface Volontario {
@@ -4278,6 +4672,25 @@ export const MensaStato = {
   inattivo: 'inattivo',
 } as const;
 
+export type MensaStatoServizio = typeof MensaStatoServizio[keyof typeof MensaStatoServizio];
+
+
+export const MensaStatoServizio = {
+  attivo: 'attivo',
+  inattivo: 'inattivo',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaStatoMagazzino = typeof MensaStatoMagazzino[keyof typeof MensaStatoMagazzino] | null;
+
+
+export const MensaStatoMagazzino = {
+  attivo: 'attivo',
+  inattivo: 'inattivo',
+} as const;
+
 export interface Mensa {
   id: number;
   codice: string;
@@ -4307,6 +4720,9 @@ export interface Mensa {
   /** @nullable */
   email?: string | null;
   stato?: MensaStato;
+  statoServizio?: MensaStatoServizio;
+  /** @nullable */
+  statoMagazzino?: MensaStatoMagazzino;
   attiva: boolean;
   /** @nullable */
   note?: string | null;
@@ -4559,6 +4975,14 @@ export interface MensaNuovaPersonaTemporaneaInput {
   restrizioniAlimentari?: string | null;
 }
 
+export type MensaAccessoTemporaneoInputTipoServizio = typeof MensaAccessoTemporaneoInputTipoServizio[keyof typeof MensaAccessoTemporaneoInputTipoServizio];
+
+
+export const MensaAccessoTemporaneoInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
 /**
  * Indicare esattamente uno tra beneficiarioId e nuovaPersona. L'autorizzazione vale solo per la data civile corrente Europe/Rome.
  */
@@ -4568,6 +4992,7 @@ export interface MensaAccessoTemporaneoInput {
   nuovaPersona?: MensaNuovaPersonaTemporaneaInput;
   /** @nullable */
   motivo?: string | null;
+  tipoServizio?: MensaAccessoTemporaneoInputTipoServizio;
   confermaDuplicato?: boolean;
   /**
      * @minLength 1
@@ -4584,11 +5009,20 @@ export const MensaAccessoInputModalitaAccesso = {
   manuale: 'manuale',
 } as const;
 
+export type MensaAccessoInputTipoServizio = typeof MensaAccessoInputTipoServizio[keyof typeof MensaAccessoInputTipoServizio];
+
+
+export const MensaAccessoInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
 export interface MensaAccessoInput {
   mensaId: number;
   modalitaAccesso: MensaAccessoInputModalitaAccesso;
   codiceTessera?: string;
   beneficiarioId?: number;
+  tipoServizio?: MensaAccessoInputTipoServizio;
   /**
      * @minLength 1
      * @maxLength 80
@@ -4614,6 +5048,17 @@ export const MensaAccessoModalitaAccesso = {
   temporaneo: 'temporaneo',
 } as const;
 
+/**
+ * @nullable
+ */
+export type MensaAccessoTipoServizio = typeof MensaAccessoTipoServizio[keyof typeof MensaAccessoTipoServizio] | null;
+
+
+export const MensaAccessoTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
 export interface MensaAccesso {
   id: number;
   mensaId: number;
@@ -4637,6 +5082,8 @@ export interface MensaAccesso {
   esito: MensaAccessoEsito;
   motivoEsito: string;
   modalitaAccesso: MensaAccessoModalitaAccesso;
+  /** @nullable */
+  tipoServizio?: MensaAccessoTipoServizio;
   temporaneo: boolean;
   dataOra: string;
   /** @nullable */
@@ -4645,13 +5092,17 @@ export interface MensaAccesso {
   idempotentReplay?: boolean;
 }
 
+export type MensaPastoInputTipoServizio = typeof MensaPastoInputTipoServizio[keyof typeof MensaPastoInputTipoServizio];
+
+
+export const MensaPastoInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
 export interface MensaPastoInput {
   accessoMensaId: number;
-  /**
-     * @minLength 1
-     * @maxLength 40
-     */
-  tipoServizio: string;
+  tipoServizio: MensaPastoInputTipoServizio;
   /** @nullable */
   note?: string | null;
   override?: boolean;
@@ -4664,6 +5115,53 @@ export interface MensaPastoInput {
   idempotencyKey: string;
 }
 
+export type MensaPastoTipoServizio = typeof MensaPastoTipoServizio[keyof typeof MensaPastoTipoServizio];
+
+
+export const MensaPastoTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaPastoSessoSnapshot = typeof MensaPastoSessoSnapshot[keyof typeof MensaPastoSessoSnapshot] | null;
+
+
+export const MensaPastoSessoSnapshot = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+  ND: 'ND',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaPastoFasciaEtaSnapshot = typeof MensaPastoFasciaEtaSnapshot[keyof typeof MensaPastoFasciaEtaSnapshot] | null;
+
+
+export const MensaPastoFasciaEtaSnapshot = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaPastoFasciaEtaOrigineSnapshot = typeof MensaPastoFasciaEtaOrigineSnapshot[keyof typeof MensaPastoFasciaEtaOrigineSnapshot] | null;
+
+
+export const MensaPastoFasciaEtaOrigineSnapshot = {
+  calcolata: 'calcolata',
+  presunta: 'presunta',
+  non_determinata: 'non_determinata',
+} as const;
+
 export interface MensaPasto {
   id: number;
   mensaId: number;
@@ -4674,7 +5172,19 @@ export interface MensaPasto {
   accessoMensaId: number;
   dataOra: string;
   dataServizio: string;
-  tipoServizio: string;
+  tipoServizio: MensaPastoTipoServizio;
+  /** @nullable */
+  giornataServizioId?: number | null;
+  /** @nullable */
+  sessoSnapshot?: MensaPastoSessoSnapshot;
+  /** @nullable */
+  fasciaEtaSnapshot?: MensaPastoFasciaEtaSnapshot;
+  /** @nullable */
+  fasciaEtaOrigineSnapshot?: MensaPastoFasciaEtaOrigineSnapshot;
+  /** @nullable */
+  anagraficaProvvisoriaSnapshot?: boolean | null;
+  /** @nullable */
+  temporaneoSnapshot?: boolean | null;
   eccezione?: boolean;
   override?: boolean;
   operatore?: string;
@@ -4717,13 +5227,206 @@ export interface MensaGiacenza {
   nome: string;
   unitaMisura: string;
   quantita: number;
+  giacenzaFisica: number;
+  giacenzaDistribuibile: number;
+  impegnato: number;
+  disponibileReale: number;
+}
+
+export type MensaConsumoInputTipoServizio = typeof MensaConsumoInputTipoServizio[keyof typeof MensaConsumoInputTipoServizio];
+
+
+export const MensaConsumoInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export type MensaConsumoInputCausale = typeof MensaConsumoInputCausale[keyof typeof MensaConsumoInputCausale];
+
+
+export const MensaConsumoInputCausale = {
+  consumo: 'consumo',
+  scarto: 'scarto',
+} as const;
+
+export interface MensaConsumoInput {
+  mensaId: number;
+  dataServizio: string;
+  tipoServizio: MensaConsumoInputTipoServizio;
+  prodottoId: number;
+  /** @exclusiveMinimum 0 */
+  quantita: number;
+  causale: MensaConsumoInputCausale;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  idempotencyKey: string;
+}
+
+export interface MensaStornoInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+}
+
+export interface MensaChiusuraInput {
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  note?: string | null;
+}
+
+export interface MensaRiaperturaInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+}
+
+export type MensaConsumoTipoServizio = typeof MensaConsumoTipoServizio[keyof typeof MensaConsumoTipoServizio];
+
+
+export const MensaConsumoTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export type MensaConsumoCausale = typeof MensaConsumoCausale[keyof typeof MensaConsumoCausale];
+
+
+export const MensaConsumoCausale = {
+  consumo: 'consumo',
+  scarto: 'scarto',
+} as const;
+
+export interface MensaConsumo {
+  id: number;
+  giornataServizioId: number;
+  mensaId: number;
+  mensaNome?: string;
+  scaricoId: number;
+  dataServizio: string;
+  tipoServizio: MensaConsumoTipoServizio;
+  prodottoId: number;
+  prodottoNome?: string;
+  quantita: number;
+  unitaMisura: string;
+  causale: MensaConsumoCausale;
+  /** @nullable */
+  note?: string | null;
+  operatoreId: number;
+  idempotencyKey: string;
+  stornato?: boolean;
+  /** @nullable */
+  stornatoAt?: string | null;
+  /** @nullable */
+  motivoStorno?: string | null;
+  createdAt?: string;
+  idempotentReplay?: boolean;
+  [key: string]: unknown;
+ }
+
+export type MensaGiornataTipoServizio = typeof MensaGiornataTipoServizio[keyof typeof MensaGiornataTipoServizio];
+
+
+export const MensaGiornataTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export type MensaGiornataStato = typeof MensaGiornataStato[keyof typeof MensaGiornataStato];
+
+
+export const MensaGiornataStato = {
+  aperta: 'aperta',
+  chiusa: 'chiusa',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MensaGiornataSnapshot = { [key: string]: unknown } | null;
+
+export interface MensaGiornata {
+  id: number;
+  mensaId: number;
+  mensaNome?: string;
+  dataServizio: string;
+  tipoServizio: MensaGiornataTipoServizio;
+  stato: MensaGiornataStato;
+  /** @nullable */
+  apertaDa?: number | null;
+  apertaAt?: string;
+  /** @nullable */
+  chiusaDa?: number | null;
+  /** @nullable */
+  chiusaAt?: string | null;
+  /** @nullable */
+  riapertaDa?: number | null;
+  /** @nullable */
+  riapertaAt?: string | null;
+  /** @nullable */
+  motivoRiapertura?: string | null;
+  /** @nullable */
+  noteChiusura?: string | null;
+  /** @nullable */
+  snapshot?: MensaGiornataSnapshot;
+  [key: string]: unknown;
+ }
+
+export interface MensaAccessiPage {
+  items: MensaAccesso[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface MensaPastiPage {
+  items: MensaPasto[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface MensaEccezioniPage {
+  items: MensaEccezione[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface MensaConsumiPage {
+  items: MensaConsumo[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export type MensaTrasferimentiPageItemsItem = { [key: string]: unknown };
+
+export interface MensaTrasferimentiPage {
+  items: MensaTrasferimentiPageItemsItem[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 export type MensaTrasferimentoInputRigheItem = {
   prodottoId: number;
   /** @exclusiveMinimum 0 */
   quantita: number;
-  unitaMisura: string;
+  /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
+  unitaMisura?: string;
   /** @nullable */
   note?: string | null;
 };
@@ -4745,6 +5448,95 @@ export interface MensaTrasferimentoInput {
   righe: MensaTrasferimentoInputRigheItem[];
 }
 
+export interface MensaQuantitaPerProdotto {
+  prodottoId: number;
+  prodottoNome: string;
+  unitaMisura: string;
+  quantita: number;
+}
+
+export interface MensaQuantitaPerUnitaMisura {
+  unitaMisura: string;
+  quantita: number;
+}
+
+export type MensaReportDistribuzioneSessoItemChiave = typeof MensaReportDistribuzioneSessoItemChiave[keyof typeof MensaReportDistribuzioneSessoItemChiave];
+
+
+export const MensaReportDistribuzioneSessoItemChiave = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+  ND: 'ND',
+} as const;
+
+export type MensaReportDistribuzioneSessoItem = {
+  chiave: MensaReportDistribuzioneSessoItemChiave;
+  totale: number;
+};
+
+export type MensaReportDistribuzioneFasciaEtaItemChiave = typeof MensaReportDistribuzioneFasciaEtaItemChiave[keyof typeof MensaReportDistribuzioneFasciaEtaItemChiave];
+
+
+export const MensaReportDistribuzioneFasciaEtaItemChiave = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+  ND: 'ND',
+} as const;
+
+export type MensaReportDistribuzioneFasciaEtaItem = {
+  chiave: MensaReportDistribuzioneFasciaEtaItemChiave;
+  totale: number;
+};
+
+export type MensaReportDistribuzioneTipoServizioItemChiave = typeof MensaReportDistribuzioneTipoServizioItemChiave[keyof typeof MensaReportDistribuzioneTipoServizioItemChiave];
+
+
+export const MensaReportDistribuzioneTipoServizioItemChiave = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export type MensaReportDistribuzioneTipoServizioItem = {
+  chiave: MensaReportDistribuzioneTipoServizioItemChiave;
+  totale: number;
+};
+
+export type MensaReportBeneficiariDistintiPerSessoItemChiave = typeof MensaReportBeneficiariDistintiPerSessoItemChiave[keyof typeof MensaReportBeneficiariDistintiPerSessoItemChiave];
+
+
+export const MensaReportBeneficiariDistintiPerSessoItemChiave = {
+  M: 'M',
+  F: 'F',
+  ALTRO: 'ALTRO',
+  ND: 'ND',
+} as const;
+
+export type MensaReportBeneficiariDistintiPerSessoItem = {
+  chiave: MensaReportBeneficiariDistintiPerSessoItemChiave;
+  totale: number;
+};
+
+export type MensaReportBeneficiariDistintiPerFasciaEtaItemChiave = typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave[keyof typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave];
+
+
+export const MensaReportBeneficiariDistintiPerFasciaEtaItemChiave = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+  ND: 'ND',
+} as const;
+
+export type MensaReportBeneficiariDistintiPerFasciaEtaItem = {
+  chiave: MensaReportBeneficiariDistintiPerFasciaEtaItemChiave;
+  totale: number;
+};
+
 export type MensaReportDistribuzioneItem = {
   mensaId: number;
   mensaNome: string;
@@ -4759,8 +5551,24 @@ export interface MensaReport {
   totalePasti: number;
   beneficiariDistinti: number;
   accessiOrdinari: number;
+  accessiTemporanei: number;
   accessiEccezione: number;
   accessiNegati: number;
+  pastiTemporanei: number;
+  pastiOrdinari: number;
+  pastiEccezione: number;
+  pastiOverride: number;
+  pastiTemporaneitaNonDeterminata?: number;
+  pastiAnagraficaProvvisoria?: number;
+  consumiPerProdotto: MensaQuantitaPerProdotto[];
+  scartiPerProdotto: MensaQuantitaPerProdotto[];
+  consumiPerUnitaMisura: MensaQuantitaPerUnitaMisura[];
+  scartiPerUnitaMisura: MensaQuantitaPerUnitaMisura[];
+  distribuzioneSesso?: MensaReportDistribuzioneSessoItem[];
+  distribuzioneFasciaEta?: MensaReportDistribuzioneFasciaEtaItem[];
+  distribuzioneTipoServizio?: MensaReportDistribuzioneTipoServizioItem[];
+  beneficiariDistintiPerSesso?: MensaReportBeneficiariDistintiPerSessoItem[];
+  beneficiariDistintiPerFasciaEta?: MensaReportBeneficiariDistintiPerFasciaEtaItem[];
   mediaPastiGiorno: number;
   distribuzione: MensaReportDistribuzioneItem[];
   [key: string]: unknown;
@@ -4826,7 +5634,10 @@ export interface LoginInput {
 }
 
 export interface ChangePasswordInput {
-  /** @minLength 8 */
+  /**
+     * Deve contenere almeno una lettera e un numero.
+     * @minLength 8
+     */
   newPassword: string;
 }
 
@@ -4838,7 +5649,10 @@ export interface ForgotPasswordInput {
 export interface ResetPasswordInput {
   /** @minLength 1 */
   token: string;
-  /** @minLength 8 */
+  /**
+     * Deve contenere almeno una lettera e un numero.
+     * @minLength 8
+     */
   newPassword: string;
   /** @minLength 1 */
   confirmPassword?: string;
@@ -4888,7 +5702,10 @@ export interface UtenteInput {
   username: string;
   /** @minLength 1 */
   email: string;
-  /** @minLength 6 */
+  /**
+     * Deve contenere almeno una lettera e un numero.
+     * @minLength 8
+     */
   password: string;
   /** @minLength 1 */
   nome: string;
@@ -4957,6 +5774,16 @@ export interface RuoloUpdate {
 }
 
 /**
+ * Pagina richiesta, indicizzata da 1
+ */
+export type PageParamParameter = number;
+
+/**
+ * Numero di record per pagina
+ */
+export type LimitParamParameter = number;
+
+/**
  * Data civile iniziale Europe/Rome (YYYY-MM-DD)
  */
 export type ReportDaParameter = string;
@@ -5019,6 +5846,15 @@ prodottoId?: number;
 centroAscoltoId?: number;
 da?: string;
 a?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListGiacenzeParams = {
@@ -5034,6 +5870,28 @@ magazzinoId?: number;
 
 export type ListTrasferimentiParams = {
 stato?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListScarichiParams = {
+centroAscoltoId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListFornitoriParams = {
@@ -5044,6 +5902,15 @@ export type ListApprovvigionamentiParams = {
 stato?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListTurniParams = {
@@ -5065,6 +5932,17 @@ attivo?: boolean;
  * Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
  */
 statoAnagrafica?: ListBeneficiariStatoAnagrafica;
+/**
+ * Pagina richiesta, a partire da 1.
+ * @minimum 1
+ */
+page?: number;
+/**
+ * Numero massimo di risultati per pagina.
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListBeneficiariStatoAnagrafica = typeof ListBeneficiariStatoAnagrafica[keyof typeof ListBeneficiariStatoAnagrafica];
@@ -5087,7 +5965,7 @@ soprannome?: string;
 telefono?: string;
 dataNascita?: string;
 /**
- * Required for global users; ignored for users already scoped to a città, whose own città is always used
+ * Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
  * @minimum 1
  */
 cittaId?: number;
@@ -5096,6 +5974,11 @@ excludeId?: number;
 
 export type CercaBeneficiariSimili400 = {
   error: string;
+};
+
+export type AuthorizeBeneficiariExport200 = {
+  autorizzato: boolean;
+  auditId: number;
 };
 
 export type ListInterventiParams = {
@@ -5268,6 +6151,17 @@ areaId?: number;
 magazzinoEmporioId?: number;
 statoAccessoEmporio?: AccessoEmporioStato;
 beneficiarioSearch?: string;
+/**
+ * Pagina richiesta, indicizzata da 1
+ * @minimum 1
+ */
+page?: PageParamParameter;
+/**
+ * Numero di record per pagina
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: LimitParamParameter;
 beneficiarioId?: number;
 };
 
@@ -5283,6 +6177,17 @@ cittaId?: number;
 areaId?: number;
 data?: string;
 beneficiarioSearch?: string;
+/**
+ * Pagina richiesta, indicizzata da 1
+ * @minimum 1
+ */
+page?: PageParamParameter;
+/**
+ * Numero di record per pagina
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: LimitParamParameter;
 };
 
 export type SearchBeneficiariCassaEmporioParams = {
@@ -5307,12 +6212,32 @@ magazzinoEmporioId?: number;
 centroAscoltoId?: number;
 cittaId?: number;
 areaId?: number;
+/**
+ * Pagina richiesta, indicizzata da 1
+ * @minimum 1
+ */
+page?: PageParamParameter;
+/**
+ * Numero di record per pagina
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: LimitParamParameter;
 };
 
 export type ListBolleParams = {
 stato?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type GetMapsInterventiSocialiParams = {
@@ -5414,6 +6339,24 @@ export const ListCreditoSolidaleMovimentiTipoMovimento = {
   storno: 'storno',
   consumo_spesa: 'consumo_spesa',
 } as const;
+
+export type ListCreditoSolidaleBeneficiariParams = {
+search?: string;
+centroAscoltoId?: number;
+/**
+ * Identificativo tecnico legacy dell'Area
+ */
+cittaId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
 
 export type ListVolontariParams = {
 centroAscoltoId?: number;
@@ -5792,23 +6735,84 @@ beneficiarioId: number;
 
 export type ListAccessiMensaParams = {
 mensaId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
 };
 
 export type ListPastiMensaParams = {
 mensaId?: number;
 data?: string;
 tipoServizio?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+};
+
+export type ListEccezioniMensaParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
 };
 
 export type ListGiacenzeMensaParams = {
 magazzinoId: number;
 };
 
-export type ListTrasferimentiMensa200Item = { [key: string]: unknown };
+export type ListTrasferimentiMensaParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+};
+
+export type ListTrasferimentiMensa200 = { [key: string]: unknown }[] | MensaTrasferimentiPage;
 
 export type CreateTrasferimentoMensa200 = { [key: string]: unknown };
 
 export type CreateTrasferimentoMensa201 = { [key: string]: unknown };
+
+export type ListConsumiMensaParams = {
+mensaId?: number;
+data?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+};
+
+export type ListGiornateMensaParams = {
+mensaId?: number;
+data?: string;
+};
 
 export type GetMensaReportParams = {
 dal: string;

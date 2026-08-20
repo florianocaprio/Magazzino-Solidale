@@ -45,8 +45,8 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   beneficiari: ["sociale", "uds", EMPORIO_AREA_KEY],
   interventi: ["sociale", "uds"],
   consegne: "sociale",
-  bolle: "sociale",
-  scarichi: "sociale",
+  bolle: ["sociale", "magazzino"],
+  scarichi: "magazzino",
   turni: "sociale",
 
   volontari: "logistica",

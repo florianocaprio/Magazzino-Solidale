@@ -8,7 +8,7 @@ import utentiRouter from "../src/routes/utenti";
 import scarichiRouter from "../src/routes/scarichi";
 import approvvigionamentiRouter from "../src/routes/approvvigionamenti";
 import beneficiariRouter from "../src/routes/beneficiari";
-import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentro, createMagazzino, createProdotto, createBeneficiario, createCitta, createFornitore, createVolontario, createMezzo, createRuolo, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
+import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentroRec, createMagazzino, createProdotto, createBeneficiario, createCitta, createFornitore, createVolontario, createMezzo, createRuolo, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
 
 /**
  * Centro scoping for direct-column entities: each row carries its own
@@ -33,10 +33,10 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   scope = newScope();
-  centroA = await createCentro(scope);
-  centroB = await createCentro(scope);
   cittaA = await createCitta(scope);
   cittaB = await createCitta(scope);
+  centroA = (await createCentroRec(scope, { cittaId: cittaA })).id;
+  centroB = (await createCentroRec(scope, { cittaId: cittaB })).id;
 });
 
 afterEach(async () => {
@@ -166,7 +166,7 @@ describe("Volontari — scoping per centro", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST auto-assegna e blocca il centro del caller", async () => {
+  it("POST rifiuta l'assegnazione esplicita a un altro centro", async () => {
     const res = await request(
       makeScopedApp(volontariRouter, {
         id: operatoreId,
@@ -333,9 +333,7 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
         ruoloId,
         centroAscoltoId: centroB,
       });
-    expect(res.status).toBe(201);
-    scope.utenteIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.status).toBe(403);
   });
 
   it("PATCH /:id fuori centro → 403", async () => {
@@ -366,6 +364,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     ).get("/beneficiari");
     expect(res.status).toBe(200);
@@ -393,6 +392,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     ).get(`/beneficiari/${bB}`);
     expect(res.status).toBe(403);
@@ -403,6 +403,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     )
       .post("/beneficiari")
@@ -423,10 +424,11 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     )
       .patch(`/beneficiari/${bB}`)
-      .send({ nome: "Hack" });
+      .send({ nome: "Hack", versione: 1 });
     expect(res.status).toBe(403);
   });
 
@@ -436,6 +438,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
+        cittaId: cittaA,
       }),
     ).delete(`/beneficiari/${bB}`);
     expect(res.status).toBe(403);
@@ -446,6 +449,7 @@ describe("Beneficiari — scoping per centro", () => {
     const appA = makeScopedApp(beneficiariRouter, {
       id: operatoreId,
       centroAscoltoId: centroA,
+      cittaId: cittaA,
     });
     expect((await request(appA).get(`/beneficiari/${bB}/nucleo`)).status).toBe(403);
     expect((await request(appA).post(`/beneficiari/${bB}/nucleo`).send({})).status).toBe(403);
@@ -528,7 +532,7 @@ describe("Scarichi — scoping per centro", () => {
       .send({
         magazzinoId: mag,
         dataScarico: "2026-06-24",
-        causale: "scaduta",
+        causale: "deteriorata",
         righe: [{ prodottoId: prod, quantita: 2, unitaMisura: "kg" }],
       });
     expect(res.status).toBe(201);
@@ -600,7 +604,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
   });
 
   it("POST auto-assegna il centro del caller", async () => {
-    const mag = await createMagazzino(scope, null);
+    const mag = await createMagazzino(scope, null, { cittaId: cittaA });
     const prod = await createProdotto(scope);
     const fornitore = await createFornitore(scope, cittaA);
     const res = await request(
@@ -617,7 +621,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
         magazzinoId: mag,
         righe: [{ prodottoId: prod, quantitaRichiesta: 10, unitaMisura: "kg" }],
       });
-    expect(res.status).toBe(201);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
     scope.approvvigionamentoIds.push(res.body.id);
     expect(res.body.centroAscoltoId).toBe(centroA);
   });
@@ -636,7 +640,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
       }),
     )
       .patch(`/approvvigionamenti/${ordA}`)
-      .send({ magazzinoId: magB });
+      .send({ versione: 1, magazzinoId: magB });
     expect(res.status).toBe(403);
   });
 
@@ -651,7 +655,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
         id: operatoreId,
         centroAscoltoId: centroA,
       }),
-    ).post(`/approvvigionamenti/${aB}/sottometti`);
+    ).post(`/approvvigionamenti/${aB}/sottometti`).send({ versione: 1 });
     expect(res.status).toBe(403);
   });
 });

@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import { db, passwordResetTokensTable } from "@workspace/db";
 import { getAppBaseUrl, getPasswordResetTokenTtlMinutes } from "./emailService";
+import { PASSWORD_POLICY_MESSAGE, validatePassword } from "./passwordPolicy";
 
 const PASSWORD_RESET_TOKEN_BYTES = 32;
 const FORGOT_PASSWORD_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -11,7 +12,7 @@ const FORGOT_PASSWORD_RATE_LIMIT_MAX_BUCKETS = 2000;
 export const FORGOT_PASSWORD_RESPONSE_MESSAGE = "Se l’indirizzo è presente nel sistema, riceverai una mail con le istruzioni.";
 export const RESET_PASSWORD_SUCCESS_MESSAGE = "Password modificata correttamente. Ora puoi effettuare l’accesso.";
 export const RESET_PASSWORD_INVALID_TOKEN_MESSAGE = "Link di reset non valido o scaduto.";
-export const RESET_PASSWORD_WEAK_PASSWORD_MESSAGE = "La password deve contenere almeno 8 caratteri, una lettera e un numero.";
+export const RESET_PASSWORD_WEAK_PASSWORD_MESSAGE = PASSWORD_POLICY_MESSAGE;
 export const RESET_PASSWORD_CONFIRM_MISMATCH_MESSAGE = "Le password non coincidono.";
 export const ADMIN_RESET_EMAIL_INVALID_MESSAGE = "L’utente non ha un indirizzo email valido. Aggiorna prima il profilo.";
 export const ADMIN_RESET_LINK_SENT_MESSAGE = "Link di reset password inviato all'indirizzo email dell'utente.";
@@ -42,11 +43,7 @@ export function buildPasswordResetUrl(token: string): string {
 }
 
 export function validatePasswordForReset(password: string): string | null {
-  if (password.length < 8) return RESET_PASSWORD_WEAK_PASSWORD_MESSAGE;
-  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-    return RESET_PASSWORD_WEAK_PASSWORD_MESSAGE;
-  }
-  return null;
+  return validatePassword(password);
 }
 
 export function getPasswordResetExpiresAt(now = new Date()): {

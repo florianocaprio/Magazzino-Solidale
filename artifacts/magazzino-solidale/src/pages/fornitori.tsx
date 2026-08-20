@@ -135,6 +135,9 @@ export default function Fornitori() {
     ente_pubblico: "bg-purple-500/10 text-purple-700",
     altro: "bg-gray-500/10 text-gray-700"
   };
+  const reactivate = (id: number) => updateFornitore.mutate({ id, data: { attivo: true } }, {
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getListFornitoriQueryKey() }),
+  });
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -287,7 +290,8 @@ export default function Fornitori() {
                       <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(f)}><Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(f.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}</DropdownMenuItem>
+                        {f.attivo ? <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(f.id)}><Trash2 className="mr-2 h-4 w-4" /> Disattiva</DropdownMenuItem>
+                          : <DropdownMenuItem onClick={() => reactivate(f.id)}>Riattiva Fornitore</DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -344,7 +348,7 @@ export default function Fornitori() {
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="all">{t("fornitori.tutteCitta")}</SelectItem>
-                        {citta?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                        {citta?.filter((c) => c.attivo || String(c.id) === field.value).map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -367,7 +371,10 @@ export default function Fornitori() {
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>{t("fornitori.confirmDelete")}</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disattiva Fornitore</AlertDialogTitle>
+            <AlertDialogDescription>Il Fornitore non sarà più selezionabile per nuove operazioni. Lo storico resta preservato e potrà essere riattivato.</AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
@@ -379,7 +386,7 @@ export default function Fornitori() {
                   }
                 });
               }
-            }} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
+            }} className="bg-destructive text-destructive-foreground">Disattiva</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

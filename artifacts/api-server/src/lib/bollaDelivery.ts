@@ -4,6 +4,7 @@ import {
   bolleTable,
   bollaRigheTable,
   consegneTable,
+  interventiStoricoStatiTable,
   interventiTable,
   lottiTable,
   movimentiTable,
@@ -11,7 +12,10 @@ import {
   prodottiTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
+import { dataCivileEuropeRome } from "./interventiWorkflow";
+import { requireOperationalMagazzino } from "./inventoryLedger";
 import { parseDbNumber } from "./disponibilitaMagazzino";
+import { isLottoDistribuibile } from "./lottoPolicy";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -75,7 +79,6 @@ async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
   const [esistente] = await tx.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
 
   if (righe.length === 0) {
-    if (esistente) await tx.delete(interventiTable).where(eq(interventiTable.id, esistente.id));
     return;
   }
 
@@ -115,30 +118,87 @@ export async function syncInterventoBolla(bollaId: number) {
   await db.transaction((tx) => syncInterventoBollaTx(tx, bollaId));
 }
 
-export async function removeInterventoBolla(bollaId: number) {
-  await db.delete(interventiTable).where(eq(interventiTable.bollaId, bollaId));
+export async function annullaInterventoDaBollaTx(
+  tx: Tx,
+  bollaId: number,
+  operatoreId: number,
+  motivo: string,
+): Promise<void> {
+  const [intervento] = await tx
+    .select()
+    .from(interventiTable)
+    .where(eq(interventiTable.bollaId, bollaId))
+    .for("update");
+  if (!intervento || intervento.stato === "annullato") return;
+
+  const now = new Date();
+  await tx
+    .update(interventiTable)
+    .set({
+      stato: "annullato",
+      motivoAnnullamento: motivo,
+      operatoreId,
+      dataAggiornamento: now,
+    })
+    .where(eq(interventiTable.id, intervento.id));
+  await tx.insert(interventiStoricoStatiTable).values({
+    interventoId: intervento.id,
+    statoPrecedente: intervento.stato,
+    statoNuovo: "annullato",
+    operatoreId,
+    dataTransizione: now,
+    motivo,
+  });
 }
 
-export async function stornoRigaTx(tx: Tx, riga: { id: number }, bollaId: number) {
+export async function stornoRigaTx(
+  tx: Tx,
+  riga: { id: number },
+  bollaId: number,
+  operatoreId: number,
+) {
   const movimenti = await tx.select()
     .from(movimentiTable)
     .where(and(
       eq(movimentiTable.bollaId, bollaId),
       eq(movimentiTable.bollaRigaId, riga.id),
+      eq(movimentiTable.tipoMovimento, "scarico"),
     ));
 
   for (const mov of movimenti) {
     if (!mov.lottoId) continue;
+    const [stornoEsistente] = await tx
+      .select({ id: movimentiTable.id })
+      .from(movimentiTable)
+      .where(eq(movimentiTable.movimentoOrigineId, mov.id));
+    if (stornoEsistente) {
+      throw new BollaActionError(409, "Il movimento della Bolla è già stato stornato");
+    }
     const lotto = await lockLotto(tx, mov.lottoId);
     const nuovaQta = parseDbNumber(lotto.quantitaResidua) + parseDbNumber(mov.quantita);
     await tx.update(lottiTable)
       .set({ quantitaResidua: nuovaQta.toFixed(2) })
       .where(eq(lottiTable.id, mov.lottoId));
+    await tx.insert(movimentiTable).values({
+      tipoMovimento: "storno",
+      tipoDettaglio: "storno_bolla",
+      dataMovimento: dataCivileEuropeRome(new Date()),
+      magazzinoId: mov.magazzinoId,
+      prodottoId: mov.prodottoId,
+      lottoId: mov.lottoId,
+      quantita: mov.quantita,
+      unitaMisura: mov.unitaMisura,
+      fornitoreId: mov.fornitoreId,
+      beneficiarioId: mov.beneficiarioId,
+      bollaId: mov.bollaId,
+      bollaRigaId: mov.bollaRigaId,
+      trasferimentoId: mov.trasferimentoId,
+      movimentoOrigineId: mov.id,
+      operatoreId,
+      documentoRiferimento: mov.documentoRiferimento,
+      note: `Storno del movimento #${mov.id}${mov.note ? ` — ${mov.note}` : ""}`,
+    });
   }
-
-  await tx.delete(movimentiTable).where(
-    and(eq(movimentiTable.bollaId, bollaId), eq(movimentiTable.bollaRigaId, riga.id)),
-  );
 }
 
 export async function scarichiFisiciBolla(tx: Tx, bollaId: number): Promise<number> {
@@ -152,7 +212,7 @@ export async function scarichiFisiciBolla(tx: Tx, bollaId: number): Promise<numb
 async function convertiPrenotazioniAttiveInScarico(
   tx: Tx,
   bolla: typeof bolleTable.$inferSelect,
-  opts: { dataMovimento: string },
+  opts: { dataMovimento: string; operatoreId: number },
 ): Promise<number> {
   const prenotazioni = await tx
     .select({ p: prenotazioniMagazzinoTable, r: bollaRigheTable })
@@ -167,6 +227,12 @@ async function convertiPrenotazioniAttiveInScarico(
     const prenotazione = row.p;
     const qta = parseDbNumber(prenotazione.quantita);
     const lotto = await lockLotto(tx, prenotazione.lottoId);
+    if (!isLottoDistribuibile(lotto.dataScadenza, opts.dataMovimento)) {
+      throw new BollaActionError(
+        409,
+        `Impossibile consegnare la bolla: il lotto ${lotto.codiceLotto ?? `#${lotto.id}`} è scaduto`,
+      );
+    }
     const residua = parseDbNumber(lotto.quantitaResidua);
     if (residua < qta) {
       throw new BollaActionError(
@@ -189,6 +255,7 @@ async function convertiPrenotazioniAttiveInScarico(
       quantita: prenotazione.quantita,
       unitaMisura: row.r?.unitaMisura ?? "pz",
       beneficiarioId: bolla.beneficiarioId,
+      operatoreId: opts.operatoreId,
       bollaId: bolla.id,
       bollaRigaId: prenotazione.rigaBollaId,
       documentoRiferimento: bolla.numeroBolla,
@@ -240,11 +307,12 @@ export async function completeBollaDelivery(opts: {
   confermaRicezione?: boolean;
   allowAlreadyConsegnata?: boolean;
 }): Promise<{ alreadyConsegnata: boolean }> {
-  const dataMovimento = new Date().toISOString().split("T")[0];
+  const dataMovimento = dataCivileEuropeRome(new Date());
   let alreadyConsegnata = false;
 
   await db.transaction(async (tx) => {
     const current = await lockBolla(tx, opts.bollaId);
+    await requireOperationalMagazzino(tx, current.magazzinoId);
 
     if (current.stato === "consegnato") {
       if (!opts.allowAlreadyConsegnata) {
@@ -260,7 +328,10 @@ export async function completeBollaDelivery(opts: {
       throw new BollaActionError(400, "La bolla deve essere in stato confermato per essere consegnata");
     }
 
-    const convertite = await convertiPrenotazioniAttiveInScarico(tx, current, { dataMovimento });
+    const convertite = await convertiPrenotazioniAttiveInScarico(tx, current, {
+      dataMovimento,
+      operatoreId: opts.userId,
+    });
     if (convertite === 0) {
       const scarichiLegacy = await scarichiFisiciBolla(tx, opts.bollaId);
       if (scarichiLegacy === 0) {

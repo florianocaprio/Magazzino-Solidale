@@ -108,7 +108,7 @@ function calendarInterval(filters: InterventiSocialiFilters): {
 
 export default function Interventi() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filters, setFiltersState] = useState(() =>
@@ -130,6 +130,10 @@ export default function Interventi() {
   const [pendingMaterialId, setPendingMaterialId] = useState<number | null>(
     null,
   );
+  const canCreate = hasPermission("sociale.interventi.create");
+  const canUpdate = hasPermission("sociale.interventi.update");
+  const canComplete = hasPermission("sociale.interventi.complete");
+  const canCancel = hasPermission("sociale.interventi.cancel");
   const debouncedSearch = useDebouncedValue(filters.ricerca, 300);
   const debouncedBeneficiarySearch = useDebouncedValue(beneficiarySearch, 250);
 
@@ -338,10 +342,14 @@ export default function Interventi() {
     const candidate = error as {
       data?: { error?: string };
       message?: string;
+      status?: number;
     };
     toast({
       title: t("interventi.operational.operationError"),
-      description: candidate.data?.error ?? candidate.message,
+      description:
+        candidate.status === 409
+          ? "L’intervento è stato modificato da un altro operatore. Aggiorna i dati prima di riprovare."
+          : (candidate.data?.error ?? candidate.message),
       variant: "destructive",
     });
   };
@@ -359,7 +367,8 @@ export default function Interventi() {
     if (!detailQuery.data || selectedInterventoId == null) return;
     setPlanningPending(true);
     try {
-      await updateIntervento(selectedInterventoId, {
+      const updated = await updateIntervento(selectedInterventoId, {
+        versione: detailQuery.data.dataAggiornamento!,
         dataOraPianificata: input.dataOraPianificata,
         priorita: input.priorita,
         sede: input.sede,
@@ -367,6 +376,7 @@ export default function Interventi() {
       });
       if (detailQuery.data.stato === "da_pianificare") {
         await transitionIntervento(selectedInterventoId, {
+          versione: updated.dataAggiornamento!,
           stato: "pianificato",
           dataOraPianificata: input.dataOraPianificata,
         });
@@ -399,18 +409,20 @@ export default function Interventi() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant={preparationMode ? "default" : "outline"}
-            disabled={cityRequired}
-            onClick={() => setPreparationMode((current) => !current)}
-          >
-            <PackageOpen className="mr-2 h-4 w-4" />
-            {preparationMode
-              ? t("interventi.preparation.back")
-              : t("interventi.preparation.title")}
-          </Button>
-          {!preparationMode && (
+          {canUpdate && (
+            <Button
+              type="button"
+              variant={preparationMode ? "default" : "outline"}
+              disabled={cityRequired}
+              onClick={() => setPreparationMode((current) => !current)}
+            >
+              <PackageOpen className="mr-2 h-4 w-4" />
+              {preparationMode
+                ? t("interventi.preparation.back")
+                : t("interventi.preparation.title")}
+            </Button>
+          )}
+          {!preparationMode && canCreate && (
             <ExportButtons
               rows={interventi}
               columns={[
@@ -532,7 +544,7 @@ export default function Interventi() {
       )}
 
       <InterventoSocialeFormSheet
-        open={formOpen}
+        open={formOpen && canCreate}
         mode={formMode}
         beneficiari={beneficiariesQuery.data ?? []}
         tipi={typesQuery.data ?? []}
@@ -569,6 +581,10 @@ export default function Interventi() {
           annullaIntervento.isPending ||
           mancataPresentazione.isPending
         }
+        canUpdate={canUpdate}
+        canComplete={canComplete}
+        canCancel={canCancel}
+        canCreate={canCreate}
         onOpenChange={(open) => {
           if (!open) setSelectedInterventoId(null);
         }}

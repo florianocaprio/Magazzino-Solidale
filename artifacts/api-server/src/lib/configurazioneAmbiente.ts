@@ -4,6 +4,7 @@ import { ambienteModuliTable, auditConfigurazioniTable, configurazioneAmbienteTa
 import { logger } from "./logger";
 import { ensureSuperAdminRole } from "./seedRoles";
 import { isValidUserEmail, normalizeEmail } from "./userEmail";
+import { validatePassword } from "./passwordPolicy";
 
 export const CONFIGURAZIONE_AMBIENTE_ID = 1;
 export const DEFAULT_SUPER_ADMIN_USERNAME = "sadmin";
@@ -218,6 +219,11 @@ export async function ensureDefaultSuperAdminUser(): Promise<void> {
   const initialPassword = process.env[SUPER_ADMIN_INITIAL_PASSWORD_ENV]?.trim();
   if (!initialPassword) {
     logger.warn({ env: SUPER_ADMIN_INITIAL_PASSWORD_ENV }, "Technical SuperAdmin not created; first-run setup remains enabled");
+    return;
+  }
+  const passwordError = validatePassword(initialPassword);
+  if (passwordError) {
+    logger.warn({ env: SUPER_ADMIN_INITIAL_PASSWORD_ENV }, `Technical SuperAdmin not created; ${passwordError}`);
     return;
   }
   if (!normalizedInitialEmail) {

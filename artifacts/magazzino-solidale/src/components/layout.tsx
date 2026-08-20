@@ -77,7 +77,11 @@ import {
 import { useTranslation } from "react-i18next";
 import { LANGUAGES } from "@/lib/i18n";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
-import { getGetMapsCapabilitiesQueryKey, useGetMapsCapabilities } from "@workspace/api-client-react";
+import {
+  getGetMapsCapabilitiesQueryKey,
+  useGetMapsCapabilities,
+} from "@workspace/api-client-react";
+import { canManageGlobalAdminResources } from "@/lib/admin-scope";
 
 export type NavItem = {
   key: string;
@@ -89,6 +93,7 @@ export type NavItem = {
   moduloCodiciAll?: readonly string[];
   moduloCodiciAny?: readonly string[];
   superAdmin?: boolean;
+  globalAdmin?: boolean;
   public?: boolean;
   permission?: string;
   sourceAreas?: readonly string[];
@@ -116,6 +121,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Package,
     groupKey: "magazzino",
     area: "magazzino",
+    permission: "magazzino.view",
   },
   {
     key: "lotti",
@@ -124,6 +130,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "magazzino",
     area: "magazzino",
     moduloCodice: "LOTTI",
+    permission: "magazzino.view",
   },
   {
     key: "movimenti",
@@ -131,6 +138,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ArrowRightLeft,
     groupKey: "magazzino",
     area: "magazzino",
+    permission: "magazzino.view",
   },
   {
     key: "giacenze",
@@ -138,6 +146,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: TrendingUpDown,
     groupKey: "magazzino",
     area: "magazzino",
+    permission: "magazzino.view",
   },
   {
     key: "trasferimenti",
@@ -146,6 +155,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "magazzino",
     area: "magazzino",
     moduloCodice: "TRASFERIMENTI",
+    permission: "magazzino.view",
   },
   {
     key: "preparazioneConsegne",
@@ -154,6 +164,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "magazzino",
     area: "magazzino",
     moduloCodice: "MAGAZZINO_SOLIDALE",
+    permission: "magazzino.view",
   },
 
   {
@@ -176,6 +187,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "sociale",
     area: "sociale",
     moduloCodice: "CENTRO_ASCOLTO",
+    permission: "beneficiari.view",
   },
   {
     key: "interventi",
@@ -184,6 +196,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "sociale",
     area: "sociale",
     moduloCodice: "CENTRO_ASCOLTO",
+    permission: "sociale.interventi.view",
   },
   {
     key: "consegne",
@@ -198,8 +211,9 @@ export const NAV_ITEMS: NavItem[] = [
     url: "/bolle",
     icon: FileText,
     groupKey: "magazzino",
-    area: "sociale",
+    area: ["sociale", "magazzino"],
     moduloCodiciAll: ["MAGAZZINO_SOLIDALE", "BOLLE"],
+    permission: "bolle.view",
   },
   {
     key: "turni",
@@ -216,6 +230,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "magazzino",
     area: "magazzino",
     moduloCodice: "SCARICHI",
+    permission: "magazzino.view",
   },
 
   {
@@ -225,6 +240,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
+    permission: "emporio.cassa.view",
   },
   {
     key: "emporioCreditiSaldo",
@@ -233,6 +249,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodiciAll: ["EMPORIO_SOLIDALE", "CREDITO_SOLIDALE"],
+    permission: "credito.view",
   },
   {
     key: "politicheCreditoSolidale",
@@ -249,6 +266,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
+    permission: "emporio.access.view",
   },
   {
     key: "emporioSpese",
@@ -257,6 +275,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
+    permission: "emporio.sales.view",
   },
 
   {
@@ -293,7 +312,16 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "mensa",
     area: "mensa",
     moduloCodice: "MENSA",
-    permission: "mensa.transfers.manage",
+    permission: "mensa.transfers.request",
+  },
+  {
+    key: "mensaConsumi",
+    url: "/mensa/consumi",
+    icon: PackageMinus,
+    groupKey: "mensa",
+    area: "mensa",
+    moduloCodice: "MENSA",
+    permission: "mensa.consumption.manage",
   },
   {
     key: "mensaEccezioni",
@@ -321,6 +349,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "uds",
     area: "uds",
     moduloCodice: "UDS",
+    permission: "beneficiari.view",
   },
   {
     key: "udsInterventi",
@@ -378,6 +407,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodice: "APPROVVIGIONAMENTI",
+    permission: "approvvigionamenti.view",
   },
   {
     key: "maps",
@@ -459,7 +489,14 @@ export const NAV_ITEMS: NavItem[] = [
     area: "analisi",
     sourceAreas: ["magazzino", "logistica"],
     moduloCodice: "REPORT",
-    moduloCodiciAny: ["MAGAZZINO_SOLIDALE", "LOTTI", "TRASFERIMENTI", "MEZZI", "FORNITORI", "APPROVVIGIONAMENTI"],
+    moduloCodiciAny: [
+      "MAGAZZINO_SOLIDALE",
+      "LOTTI",
+      "TRASFERIMENTI",
+      "MEZZI",
+      "FORNITORI",
+      "APPROVVIGIONAMENTI",
+    ],
   },
   {
     key: "reportFsePlus",
@@ -476,6 +513,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: MapPin,
     groupKey: "amministrazione",
     area: "amministrazione",
+    globalAdmin: true,
   },
   {
     key: "zoneUds",
@@ -498,6 +536,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     groupKey: "amministrazione",
     area: "amministrazione",
+    globalAdmin: true,
   },
   {
     key: "ruoliVolontari",
@@ -506,6 +545,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "amministrazione",
     area: "amministrazione",
     moduloCodice: "VOLONTARI",
+    globalAdmin: true,
   },
   {
     key: "tipiIntervento",
@@ -514,6 +554,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "amministrazione",
     area: "amministrazione",
     moduloCodiciAny: ["CENTRO_ASCOLTO", "UDS"],
+    globalAdmin: true,
   },
   {
     key: "tipologieFornitore",
@@ -522,6 +563,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "amministrazione",
     area: "amministrazione",
     moduloCodice: "FORNITORI",
+    globalAdmin: true,
   },
   {
     key: "impostazioniStampa",
@@ -529,6 +571,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Printer,
     groupKey: "amministrazione",
     area: "amministrazione",
+    globalAdmin: true,
   },
 
   {
@@ -604,11 +647,11 @@ function NavMenuLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
         className="flex items-center gap-3 px-4 py-2 text-sm font-medium transition-colors"
       >
         <item.icon className="h-4 w-4" />
-        <span>{
-          item.groupKey === "mensa"
+        <span>
+          {item.groupKey === "mensa"
             ? t(`mensa.nav.${item.key}`)
-            : t(`nav.items.${item.key}`)
-        }</span>
+            : t(`nav.items.${item.key}`)}
+        </span>
       </Link>
     </SidebarMenuButton>
   );
@@ -641,6 +684,23 @@ export function isNavItemEnabledByCapabilities(
   return !item.requiresMapsLayer || mapsLayerCount > 0;
 }
 
+export function isNavItemEnabledByAccess(
+  item: NavItem,
+  hasArea: (area: string) => boolean,
+  hasPermission: (permission: string) => boolean,
+): boolean {
+  const itemAreas = Array.isArray(item.area)
+    ? item.area
+    : item.area
+      ? [item.area]
+      : [];
+  return (
+    itemAreas.some(hasArea) &&
+    (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
+    (!item.permission || hasPermission(item.permission))
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, hasPermission, logout } = useAuth();
@@ -648,11 +708,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const canAskMaps = canAccessMapsApplication(user, hasArea, hasPermission);
   const { data: mapsCapabilities } = useGetMapsCapabilities({
-    query: { queryKey: getGetMapsCapabilitiesQueryKey(), enabled: canAskMaps, staleTime: 5 * 60 * 1000 },
+    query: {
+      queryKey: getGetMapsCapabilitiesQueryKey(),
+      enabled: canAskMaps,
+      staleTime: 5 * 60 * 1000,
+    },
   });
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.superAdmin) return user?.isSuperAdmin === true;
+    if (item.globalAdmin && !canManageGlobalAdminResources(user)) return false;
     if (item.public) return true;
     if (item.key === "maps") {
       return canShowMapsNavigation(
@@ -662,11 +727,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         mapsCapabilities?.layers.length ?? 0,
       );
     }
-    const itemAreas = Array.isArray(item.area) ? item.area : item.area ? [item.area] : [];
-    return itemAreas.some(hasArea) &&
-      (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
-      (!item.permission || hasPermission(item.permission)) &&
-      isNavItemEnabledByCapabilities(item, mapsCapabilities?.layers.length ?? 0);
+    return (
+      isNavItemEnabledByAccess(item, hasArea, hasPermission) &&
+      isNavItemEnabledByCapabilities(item, mapsCapabilities?.layers.length ?? 0)
+    );
   }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo));
 
   const groupedNav = visibleItems.reduce(
@@ -699,7 +763,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarGroup>
                   <SidebarGroupLabel asChild>
                     <CollapsibleTrigger className="flex w-full items-center justify-between text-xs uppercase tracking-wider text-muted-foreground font-medium px-4 py-2 hover:text-foreground transition-colors">
-                      {group === "mensa" ? t("mensa.nav.group") : t(`nav.groups.${group}`)}
+                      {group === "mensa"
+                        ? t("mensa.nav.group")
+                        : t(`nav.groups.${group}`)}
                       <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=closed]/collapsible:-rotate-90" />
                     </CollapsibleTrigger>
                   </SidebarGroupLabel>
@@ -712,7 +778,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                               item={item}
                               isActive={
                                 location === item.url ||
-                                (item.url !== "/" && item.url !== "/report" &&
+                                (item.url !== "/" &&
+                                  item.url !== "/report" &&
                                   location.startsWith(item.url))
                               }
                             />

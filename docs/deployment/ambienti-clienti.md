@@ -232,6 +232,58 @@ Gli aggiornamenti sono SQL versionati in `lib/db/updates`, eseguiti in ordine,
 in transazione e sotto lock advisory. Devono essere idempotenti: una seconda
 esecuzione deve terminare senza modificare dati o oggetti non previsti.
 
+Per l'hardening Beneficiari, `20260819_audit_beneficiari_hardening.sql` aggiunge
+esclusivamente `beneficiari.versione integer NOT NULL DEFAULT 1`. Confrontare i
+conteggi delle entità principali prima e dopo, verificare che tutte le versioni
+siano valorizzate e lanciare le query diagnostiche Area legacy/nucleo orfano
+documentate nel README. Non aggiungere la FK del nucleo finché gli eventuali
+orfani non sono stati classificati e bonificati esplicitamente.
+
+Per l'hardening Centro di Ascolto,
+`20260819_audit_centro_ascolto_hardening.sql` aggiunge soltanto Foreign Key e
+indici univoci a Interventi e Turni. Le Foreign Key vengono create `NOT VALID`:
+proteggono immediatamente ogni nuova `INSERT`/`UPDATE`, mentre gli eventuali
+riferimenti orfani storici restano disponibili per audit. Ogni FK pulita viene
+validata nello stesso aggiornamento; una FK con dati legacy incoerenti resta
+non validata e produce un `NOTICE`. Il preflight resta invece bloccante per i
+duplicati incompatibili con gli indici univoci. Prima dell'update, dopo il
+backup, eseguire almeno:
+
+```sql
+SELECT i.id, i.beneficiario_id
+FROM interventi i LEFT JOIN beneficiari b ON b.id = i.beneficiario_id
+WHERE b.id IS NULL;
+
+SELECT i.id, i.bolla_id
+FROM interventi i LEFT JOIN bolle b ON b.id = i.bolla_id
+WHERE i.bolla_id IS NOT NULL AND b.id IS NULL;
+
+SELECT turno_id, volontario_id
+FROM turni_volontari tv
+WHERE NOT EXISTS (SELECT 1 FROM turni t WHERE t.id = tv.turno_id)
+   OR NOT EXISTS (SELECT 1 FROM volontari v WHERE v.id = tv.volontario_id);
+
+SELECT centro_ascolto_id, data, fascia, count(*)
+FROM turni GROUP BY centro_ascolto_id, data, fascia HAVING count(*) > 1;
+```
+
+Eventuali righe devono essere classificate con il responsabile funzionale e
+ricollegate al record storico corretto oppure archiviate con una procedura
+auditata. La migration non inventa destinazioni, non cancella orfani e non
+deduplica turni. Dopo la bonifica approvata, validare esplicitamente ogni FK
+rimasta sospesa, per esempio:
+
+```sql
+ALTER TABLE interventi VALIDATE CONSTRAINT interventi_beneficiario_fk;
+ALTER TABLE interventi VALIDATE CONSTRAINT interventi_bolla_fk;
+ALTER TABLE turni_volontari VALIDATE CONSTRAINT turni_volontari_turno_fk;
+ALTER TABLE turni_volontari VALIDATE CONSTRAINT turni_volontari_volontario_fk;
+```
+
+Verificare lo stato con `pg_constraint.convalidated`. Una successiva esecuzione
+di `pnpm --filter @workspace/db run update` tenta automaticamente la validazione
+quando non rileva più orfani ed è idempotente anche prima della bonifica.
+
 ## Super Admin, ambiente e moduli
 
 Per ogni piattaforma il primo utente operativo deve essere un Super Admin. La

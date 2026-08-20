@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
-import { pool } from "@workspace/db";
+import { db, pool, prodottiTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import giacenzeRouter from "../src/routes/giacenze";
 import {
   makeScopedApp,
@@ -23,8 +24,11 @@ type GiacenzaBody = {
   magazzinoId: number;
   quantitaTotale: number;
   giacenzaFisica: number;
+  giacenzaScaduta: number;
+  giacenzaDistribuibile: number;
   impegnato: number;
   disponibileReale: number;
+  sottoscorta: boolean;
 };
 
 let bootScope: SeedScope;
@@ -118,6 +122,45 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
     });
   });
 
+  it("separa giacenza fisica, scaduta e distribuibile ed esclude gli impegni su lotti scaduti", async () => {
+    const scaduto = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 5,
+      dataScadenza: "2000-01-01",
+    });
+    const valido = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 9,
+      dataScadenza: "2099-12-31",
+    });
+    await prenota({
+      beneficiarioId: beneficiarioA,
+      magazzinoId: magA,
+      lottoId: scaduto,
+      quantita: 4,
+    });
+    await prenota({
+      beneficiarioId: beneficiarioA,
+      magazzinoId: magA,
+      lottoId: valido,
+      quantita: 3,
+    });
+
+    const res = await request(appAs(centroA)).get("/giacenze");
+
+    expect(res.status).toBe(200);
+    expect(rowFor(res.body, magA)).toMatchObject({
+      quantitaTotale: 14,
+      giacenzaFisica: 14,
+      giacenzaScaduta: 5,
+      giacenzaDistribuibile: 9,
+      impegnato: 3,
+      disponibileReale: 6,
+    });
+  });
+
   it("sottrae solo le prenotazioni attive dal disponibile reale", async () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
     await prenota({ beneficiarioId: beneficiarioA, magazzinoId: magA, lottoId, quantita: 4 });
@@ -130,6 +173,22 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
       giacenzaFisica: 10,
       impegnato: 4,
       disponibileReale: 6,
+    });
+  });
+
+  it("calcola la sottoscorta sul disponibile reale, non sulla sola giacenza fisica", async () => {
+    await db.update(prodottiTable).set({ scortaMinima: "20.00" }).where(eq(prodottiTable.id, prod));
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 100 });
+    await prenota({ beneficiarioId: beneficiarioA, magazzinoId: magA, lottoId, quantita: 90 });
+
+    const res = await request(appAs(centroA)).get("/giacenze");
+
+    expect(res.status).toBe(200);
+    expect(rowFor(res.body, magA)).toMatchObject({
+      giacenzaFisica: 100,
+      impegnato: 90,
+      disponibileReale: 10,
+      sottoscorta: true,
     });
   });
 

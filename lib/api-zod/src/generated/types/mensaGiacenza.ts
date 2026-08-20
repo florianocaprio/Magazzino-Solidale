@@ -12,4 +12,8 @@ export interface MensaGiacenza {
   nome: string;
   unitaMisura: string;
   quantita: number;
+  giacenzaFisica: number;
+  giacenzaDistribuibile: number;
+  impegnato: number;
+  disponibileReale: number;
 }

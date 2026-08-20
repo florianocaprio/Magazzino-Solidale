@@ -14,13 +14,19 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { utentiTable } from "./auth";
+import { beneficiariTable } from "./beneficiari";
+import { bolleTable } from "./bolle";
 
 export const interventiTable = pgTable(
   "interventi",
   {
     id: serial("id").primaryKey(),
-    beneficiarioId: integer("beneficiario_id").notNull(),
-    bollaId: integer("bolla_id"),
+    beneficiarioId: integer("beneficiario_id")
+      .notNull()
+      .references(() => beneficiariTable.id, { onDelete: "restrict" }),
+    bollaId: integer("bolla_id").references(() => bolleTable.id, {
+      onDelete: "restrict",
+    }),
     operatoreId: integer("operatore_id").references(() => utentiTable.id),
     dataIntervento: date("data_intervento"),
     tipoIntervento: varchar("tipo_intervento", { length: 120 }).notNull(),

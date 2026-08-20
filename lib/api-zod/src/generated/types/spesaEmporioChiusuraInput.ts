@@ -7,6 +7,8 @@
  */
 
 export interface SpesaEmporioChiusuraInput {
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   note?: string | null;
 }

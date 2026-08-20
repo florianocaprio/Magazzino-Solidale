@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListTrasferimentiMensa200Item = { [key: string]: unknown };
+/**
+ * @nullable
+ */
+export type MensaGiornataSnapshot = { [key: string]: unknown } | null;

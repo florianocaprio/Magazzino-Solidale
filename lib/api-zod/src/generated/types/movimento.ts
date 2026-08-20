@@ -26,6 +26,10 @@ export interface Movimento {
   /** @nullable */
   beneficiarioId?: number | null;
   /** @nullable */
+  movimentoOrigineId?: number | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
   documentoRiferimento?: string | null;
   /** @nullable */
   note?: string | null;

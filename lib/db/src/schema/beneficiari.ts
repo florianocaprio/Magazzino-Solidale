@@ -56,6 +56,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   attivo: boolean("attivo").notNull().default(true),
   dataPresaInCarico: date("data_presa_in_carico"),
   noteInterne: text("note_interne"),
+  versione: integer("versione").notNull().default(1),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
 }, (table) => [

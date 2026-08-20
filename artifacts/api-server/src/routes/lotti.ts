@@ -11,12 +11,31 @@ import {
   canAccessMagazzino,
 } from "../lib/centroScope";
 import { requireModulo } from "../lib/featureFlags";
+import { requirePermission } from "../middlewares/auth";
+import {
+  creaCaricoInventariale,
+  InventoryLedgerError,
+  rettificaInventariale,
+  RETTIFICA_CAUSALI,
+} from "../lib/inventoryLedger";
+import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
 
 router.use("/lotti", requireModulo("LOTTI"));
 
-router.get("/lotti", async (req, res) => {
+const lottoJson = (row: typeof lottiTable.$inferSelect) => ({
+  ...row,
+  quantitaCaricata: parseFloat(row.quantitaCaricata),
+  quantitaResidua: parseFloat(row.quantitaResidua),
+  dataCreazione: row.dataCreazione.toISOString(),
+});
+
+function positiveInteger(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) > 0;
+}
+
+router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
   const { prodottoId, magazzinoId, inScadenza } = req.query as Record<string, string>;
   const conditions: SQL[] = [gt(lottiTable.quantitaResidua, "0")];
   if (prodottoId) conditions.push(eq(lottiTable.prodottoId, parseInt(prodottoId)));
@@ -63,50 +82,67 @@ router.get("/lotti", async (req, res) => {
   })));
 });
 
-router.post("/lotti", async (req, res) => {
-  const body = req.body;
+router.post("/lotti", requirePermission("magazzino.stock.receive"), async (req, res) => {
+  const body = req.body ?? {};
+  if (!positiveInteger(body.prodottoId) || !positiveInteger(body.magazzinoId)) {
+    res.status(400).json({ error: "Prodotto e Magazzino devono essere validi" });
+    return;
+  }
+  const quantita = Number(body.quantitaCaricata);
+  if (!Number.isFinite(quantita) || quantita <= 0 || !isDateOnly(body.dataCarico)) {
+    res.status(400).json({ error: "Quantità e data di carico non valide" });
+    return;
+  }
   if (!(await canAccessMagazzino(body.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
-  const fsePlus = body.fsePlus ?? false;
-  if (fsePlus && body.fornitoreId != null) {
-    res.status(400).json({ error: "Un lotto FSE+ non può avere anche un fornitore" });
-    return;
+  const fsePlus = body.fsePlus === true;
+  const causale = fsePlus
+    ? "fse_plus"
+    : body.causale === "acquisto"
+      ? "acquisto"
+      : "donazione";
+  try {
+    const row = await db.transaction((tx) =>
+      creaCaricoInventariale(tx, {
+        prodottoId: body.prodottoId,
+        codiceLotto: typeof body.codiceLotto === "string" ? body.codiceLotto.trim() || null : null,
+        dataScadenza: isDateOnly(body.dataScadenza) ? body.dataScadenza : null,
+        dataCarico: body.dataCarico,
+        quantita,
+        magazzinoId: body.magazzinoId,
+        fornitoreId: positiveInteger(body.fornitoreId) ? body.fornitoreId : null,
+        fsePlus,
+        documentoCarico: typeof body.documentoCarico === "string" ? body.documentoCarico.trim() || null : null,
+        causale,
+        note: typeof body.note === "string" ? body.note.trim() || null : null,
+        operatoreId: req.user!.id,
+      }),
+    );
+    res.status(201).json(lottoJson(row));
+  } catch (error) {
+    if (error instanceof InventoryLedgerError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    throw error;
   }
-  if (!fsePlus && body.fornitoreId == null) {
-    res.status(400).json({ error: "Specificare la provenienza del lotto: FSE+ o un fornitore" });
-    return;
-  }
-  const [row] = await db.insert(lottiTable).values({
-    prodottoId: body.prodottoId,
-    codiceLotto: body.codiceLotto,
-    dataScadenza: body.dataScadenza,
-    dataCarico: body.dataCarico,
-    quantitaCaricata: body.quantitaCaricata.toString(),
-    quantitaResidua: body.quantitaCaricata.toString(),
-    magazzinoId: body.magazzinoId,
-    fornitoreId: body.fornitoreId,
-    fsePlus: body.fsePlus ?? false,
-    documentoCarico: body.documentoCarico,
-    note: body.note,
-  }).returning();
-  res.status(201).json({ ...row, quantitaCaricata: parseFloat(row.quantitaCaricata), quantitaResidua: parseFloat(row.quantitaResidua), dataCreazione: row.dataCreazione.toISOString() });
 });
 
-router.get("/lotti/:id", async (req, res) => {
-  const [row] = await db.select().from(lottiTable).where(eq(lottiTable.id, parseInt(req.params.id)));
+router.get("/lotti/:id", requirePermission("magazzino.view"), async (req, res) => {
+  const [row] = await db.select().from(lottiTable).where(eq(lottiTable.id, Number(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   if (!(await canAccessMagazzino(row.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;
   }
-  res.json({ ...row, quantitaCaricata: parseFloat(row.quantitaCaricata), quantitaResidua: parseFloat(row.quantitaResidua), dataCreazione: row.dataCreazione.toISOString() });
+  res.json(lottoJson(row));
 });
 
-router.patch("/lotti/:id", async (req, res) => {
-  const body = req.body;
-  const id = parseInt(req.params.id);
+router.patch("/lotti/:id", requirePermission("magazzino.stock.receive"), async (req, res) => {
+  const body = req.body ?? {};
+  const id = Number(req.params.id);
   const [existing] = await db.select().from(lottiTable).where(eq(lottiTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const ids = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
@@ -114,15 +150,65 @@ router.patch("/lotti/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;
   }
-  if (ids != null && body.magazzinoId != null && body.magazzinoId !== existing.magazzinoId
-      && !ids.includes(body.magazzinoId)) {
-    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
+  const allowed = new Set(["codiceLotto", "dataScadenza", "documentoCarico", "note"]);
+  const unsupported = Object.keys(body).filter((key) => !allowed.has(key));
+  if (unsupported.length > 0) {
+    res.status(400).json({
+      error: `Campi non modificabili dal PATCH Lotto: ${unsupported.join(", ")}. Usa la rettifica inventariale per cambiare la giacenza`,
+    });
     return;
   }
-  const update: Record<string, unknown> = { ...body };
-  if (body.quantitaResidua !== undefined) update.quantitaResidua = body.quantitaResidua.toString();
+  const update: Partial<typeof lottiTable.$inferInsert> = {};
+  if ("codiceLotto" in body) update.codiceLotto = typeof body.codiceLotto === "string" ? body.codiceLotto.trim() || null : null;
+  if ("dataScadenza" in body) {
+    if (body.dataScadenza != null && body.dataScadenza !== "" && !isDateOnly(body.dataScadenza)) {
+      res.status(400).json({ error: "dataScadenza non valida" });
+      return;
+    }
+    update.dataScadenza = body.dataScadenza || null;
+  }
+  if ("documentoCarico" in body) update.documentoCarico = typeof body.documentoCarico === "string" ? body.documentoCarico.trim() || null : null;
+  if ("note" in body) update.note = typeof body.note === "string" ? body.note.trim() || null : null;
   const [row] = await db.update(lottiTable).set(update).where(eq(lottiTable.id, id)).returning();
-  res.json({ ...row, quantitaCaricata: parseFloat(row.quantitaCaricata), quantitaResidua: parseFloat(row.quantitaResidua), dataCreazione: row.dataCreazione.toISOString() });
+  res.json(lottoJson(row));
+});
+
+router.post("/lotti/:id/rettifica", requirePermission("magazzino.stock.adjust"), async (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body ?? {};
+  const delta = Number(body.delta);
+  if (!positiveInteger(id) || !Number.isFinite(delta) || delta === 0) {
+    res.status(400).json({ error: "ID Lotto o delta non valido" });
+    return;
+  }
+  if (!RETTIFICA_CAUSALI.includes(body.causale)) {
+    res.status(400).json({ error: "Causale di rettifica non valida" });
+    return;
+  }
+  const [existing] = await db.select().from(lottiTable).where(eq(lottiTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Lotto non trovato" }); return; }
+  if (!(await canAccessMagazzino(existing.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
+    return;
+  }
+  try {
+    const row = await db.transaction((tx) => rettificaInventariale(tx, {
+      lottoId: id,
+      delta,
+      causale: body.causale,
+      motivazione: typeof body.motivazione === "string" ? body.motivazione : null,
+      note: typeof body.note === "string" ? body.note : null,
+      dataMovimento: isDateOnly(body.dataMovimento) ? body.dataMovimento : dataCivileEuropeRome(new Date()),
+      operatoreId: req.user!.id,
+    }));
+    res.json(lottoJson(row));
+  } catch (error) {
+    if (error instanceof InventoryLedgerError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
 });
 
 export default router;

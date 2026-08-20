@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, useCreateTesseraBeneficiarioDaAnagrafica, useListTessereBeneficiarioDaAnagrafica, getListTessereBeneficiarioDaAnagraficaQueryKey, type TesseraBeneficiario, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, useUpdateCreditoSolidaleBeneficiarioConfigurazione, useCreateTesseraBeneficiarioDaAnagrafica, useListTessereBeneficiarioDaAnagrafica, getListTessereBeneficiarioDaAnagraficaQueryKey, type TesseraBeneficiario, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { useAuthorizeBeneficiariExport } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,12 @@ export default function BeneficiarioDettaglio() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user, hasPermission } = useAuth();
+  const canManage = hasPermission("beneficiari.manage");
+  const canViewSensitive = hasPermission("beneficiari.sensitive.view");
+  const canExport = hasPermission("beneficiari.export");
+  const canViewEmporioAccess = hasPermission("emporio.access.view");
+  const canManageEmporioAccess = hasPermission("emporio.access.manage");
+  const authorizeExport = useAuthorizeBeneficiariExport();
   const createTessera = useCreateTesseraBeneficiarioDaAnagrafica();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
   const [editing, setEditing] = useState(false);
@@ -84,7 +91,7 @@ export default function BeneficiarioDettaglio() {
   const activeTessera = useMemo(() => (tessereBeneficiario ?? []).find((tessera) => tessera.stato === "attiva") ?? null, [tessereBeneficiario]);
   const { data: accessiEmporio } = useListAccessiEmporio(
     { beneficiarioId: numId },
-    { query: { queryKey: getListAccessiEmporioQueryKey({ beneficiarioId: numId }), enabled: Number.isInteger(numId) && numId > 0 } },
+    { query: { queryKey: getListAccessiEmporioQueryKey({ beneficiarioId: numId }), enabled: Number.isInteger(numId) && numId > 0 && canViewEmporioAccess } },
   );
   const prossimoAccesso = useMemo(() => {
     const now = Date.now();
@@ -102,7 +109,7 @@ export default function BeneficiarioDettaglio() {
     const next = value === NONE_VALUE ? null : parseInt(value);
     if (next === (b?.centroAscoltoId ?? null)) return;
     updateBeneficiario.mutate(
-      { id: numId, data: { centroAscoltoId: next } },
+      { id: numId, data: { centroAscoltoId: next, versione: b?.versione ?? 0 } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) });
@@ -120,7 +127,7 @@ export default function BeneficiarioDettaglio() {
       toast({ title: t("beneficiarioDettaglio.error"), description: t("common.requiredField"), variant: "destructive" });
       return;
     }
-    const data: Record<string, unknown> = { uds: next };
+    const data: Record<string, unknown> = { uds: next, versione: b?.versione };
     if (next) {
       if (b?.cittaId != null) data.cittaId = b.cittaId;
       if (b?.zonaUdsId != null) data.zonaUdsId = b.zonaUdsId;
@@ -183,7 +190,7 @@ export default function BeneficiarioDettaglio() {
           </p>
         </div>
         <div className="flex gap-2">
-          {b.statoAnagrafica === "provvisoria" && (
+          {canManage && b.statoAnagrafica === "provvisoria" && (
             <Button variant="outline" onClick={() => {
               setCompletionCentroId(String(b.centroAscoltoId ?? user?.centroAscoltoId ?? ""));
               setCompletionOpen(true);
@@ -198,10 +205,10 @@ export default function BeneficiarioDettaglio() {
                 <CreditCard className="w-4 h-4" /> {t("tessera.generate")}
               </Button>
           )}
-          <SchedaExportButtons b={b} size="default" />
-          <Button variant="outline" className="gap-2" onClick={() => setEditing(true)}>
+          {canExport && <SchedaExportButtons b={b} size="default" />}
+          {canManage && <Button variant="outline" className="gap-2" onClick={() => setEditing(true)}>
             <Pencil className="w-4 h-4" /> {t("beneficiarioDettaglio.editAnagrafica")}
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -221,7 +228,7 @@ export default function BeneficiarioDettaglio() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCompletionOpen(false)}>Annulla</Button>
             <Button disabled={!completionCentroId || updateBeneficiario.isPending} onClick={() => updateBeneficiario.mutate(
-              { id: numId, data: { statoAnagrafica: "completa", centroAscoltoId: Number(completionCentroId) } }, {
+              { id: numId, data: { statoAnagrafica: "completa", centroAscoltoId: Number(completionCentroId), versione: b.versione } }, {
                 onSuccess: () => {
                   queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) });
                   queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
@@ -264,11 +271,11 @@ export default function BeneficiarioDettaglio() {
         />
       )}
 
-      <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />
+      {hasPermission("credito.view") && <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />}
 
       <BeneficiarioMensaSection beneficiario={b} />
 
-      {b.creditoSolidaleAbilitato && (
+      {canViewEmporioAccess && b.creditoSolidaleAbilitato && (
         <Card>
           <CardHeader className="py-4">
             <CardTitle className="text-base flex items-center gap-2">
@@ -285,9 +292,9 @@ export default function BeneficiarioDettaglio() {
               <div className="text-xs text-muted-foreground">{t("accessiEmporio.ultimoAccesso")}</div>
               <div className="font-medium">{ultimoAccesso?.dataOraInizio ? new Date(ultimoAccesso.dataOraInizio).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" }) : "-"}</div>
             </div>
-            <Button asChild className="gap-2">
+            {canManageEmporioAccess && <Button asChild className="gap-2">
               <Link href={`/emporio/accessi?beneficiarioId=${b.id}`}>{t("accessiEmporio.pianificaDaBeneficiario")}</Link>
-            </Button>
+            </Button>}
           </CardContent>
         </Card>
       )}
@@ -333,7 +340,7 @@ export default function BeneficiarioDettaglio() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-border mt-4">
+            {canManage && <div className="pt-4 border-t border-border mt-4">
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-muted-foreground" /> {t("beneficiarioDettaglio.centroRiferimento")}
               </h4>
@@ -368,9 +375,9 @@ export default function BeneficiarioDettaglio() {
               {!unitaStradaAbilitata && (
                 <p className="text-xs text-muted-foreground mt-2">{UNITA_STRADA_DISABLED_MESSAGE}</p>
               )}
-            </div>
+            </div>}
 
-            <div className="pt-4 border-t border-border mt-4">
+            {canViewSensitive && <div className="pt-4 border-t border-border mt-4">
               <h4 className="text-sm font-semibold mb-2">{t("beneficiarioDettaglio.noteAssistenziali")}</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -386,11 +393,11 @@ export default function BeneficiarioDettaglio() {
                   </div>
                 )}
               </div>
-            </div>
+            </div>}
           </CardContent>
         </Card>
 
-        <div className="md:col-span-2">
+        {canViewSensitive && <div className="md:col-span-2">
           <Tabs defaultValue="nucleo">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="nucleo" className="gap-2"><Users className="w-4 h-4" /> {t("beneficiarioDettaglio.tabNucleo", { count: b.numComponenti })}</TabsTrigger>
@@ -409,7 +416,7 @@ export default function BeneficiarioDettaglio() {
               <Card>
                 <CardHeader className="py-4 flex flex-row items-center justify-between">
                   <CardTitle className="text-base">{t("beneficiarioDettaglio.storicoInterventi")}</CardTitle>
-                  <ExportButtons
+                  {canExport && <ExportButtons
                     rows={b.interventi ?? []}
                     columns={[
                       { header: t("common.date"), accessor: (i: Intervento) => interventoDataLabel(i) },
@@ -421,7 +428,8 @@ export default function BeneficiarioDettaglio() {
                     filename={`interventi_${b.cognome}`}
                     title={t("beneficiarioDettaglio.exportInterventiTitle", { name: `${b.cognome} ${b.nome}` })}
                     orientation="landscape"
-                  />
+                    beforeExport={() => authorizeExport.mutateAsync({ data: { tipo: "interventi", beneficiarioId: b.id, numeroRecord: b.interventi?.length ?? 0 } }).then(() => undefined)}
+                  />}
                 </CardHeader>
                 <CardContent className="pt-6">
                   {b.interventi && b.interventi.length > 0 ? (
@@ -485,7 +493,7 @@ export default function BeneficiarioDettaglio() {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -591,7 +599,7 @@ function CreditoSolidaleQuotaPanel({
   emporioAbilitato: boolean;
 }) {
   const { t } = useTranslation();
-  const updateBeneficiario = useUpdateBeneficiario();
+  const updateCredito = useUpdateCreditoSolidaleBeneficiarioConfigurazione();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data } = useCalcolaCreditoSolidaleBeneficiario(b.id, {
@@ -615,17 +623,17 @@ function CreditoSolidaleQuotaPanel({
   const isManuale = assignedNumber != null && suggested != null
     ? Math.round(assignedNumber * 100) !== Math.round(suggested * 100)
     : b.creditoSolidaleMensileManuale;
-  const disabled = !emporioAbilitato || updateBeneficiario.isPending;
+  const disabled = !emporioAbilitato || updateCredito.isPending;
 
   const onSave = () => {
-    updateBeneficiario.mutate(
+    updateCredito.mutate(
       {
-        id: b.id,
+        beneficiarioId: b.id,
         data: {
           creditoSolidaleMensileAssegnato: assegnato === "" ? null : Number(assegnato),
           creditoSolidaleMensileSuggerito: suggested,
           creditoSolidaleMotivoModifica: motivo.trim() ? motivo.trim() : null,
-        } as never,
+        },
       },
       {
         onSuccess: () => {
@@ -686,10 +694,12 @@ function CreditoSolidaleSaldoPanel({
   emporioAbilitato: boolean;
 }) {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
+  const canAdjust = hasPermission("credito.adjust");
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const visible = b.creditoSolidaleAbilitato || b.creditoSolidaleStato !== "non_abilitato" || b.creditoSolidaleSaldo > 0 || b.creditoSolidaleMensileAssegnato != null;
-  const canOperate = emporioAbilitato && b.attivo && b.creditoSolidaleAbilitato && b.creditoSolidaleStato === "attivo";
+  const visible = b.creditoSolidaleAbilitato || b.creditoSolidaleStato !== "non_abilitato" || (b.creditoSolidaleSaldo ?? 0) > 0 || b.creditoSolidaleMensileAssegnato != null;
+  const canOperate = canAdjust && emporioAbilitato && b.attivo && b.creditoSolidaleAbilitato && b.creditoSolidaleStato === "attivo";
   const { data: saldo } = useGetCreditoSolidaleBeneficiarioSaldo(b.id, {
     query: { queryKey: getGetCreditoSolidaleBeneficiarioSaldoQueryKey(b.id), enabled: visible },
   });
@@ -759,7 +769,7 @@ function CreditoSolidaleSaldoPanel({
     }, { onSuccess, onError });
   };
 
-  const saldoAttuale = saldo?.saldoAttuale ?? b.creditoSolidaleSaldo;
+  const saldoAttuale = saldo?.saldoAttuale ?? b.creditoSolidaleSaldo ?? 0;
   const ultimiMovimenti = (movimenti ?? []).slice(0, 5);
   const pending = createRicarica.isPending || createRettifica.isPending;
 
@@ -818,12 +828,12 @@ function CreditoSolidaleSaldoPanel({
           <Button asChild variant="outline">
             <Link href={`/emporio/crediti-saldo?beneficiarioId=${b.id}`}>{t("creditoSolidale.tornaSaldo")}</Link>
           </Button>
-          <Button type="button" variant="outline" onClick={() => openAction("ricarica")} disabled={!canOperate}>
+          {canAdjust && <Button type="button" variant="outline" onClick={() => openAction("ricarica")} disabled={!canOperate}>
             <RefreshCw className="h-4 w-4 mr-2" /> {t("creditoSolidale.ricaricaCreditoSolidale")}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => openAction("rettifica")} disabled={!canOperate}>
+          </Button>}
+          {canAdjust && <Button type="button" variant="outline" onClick={() => openAction("rettifica")} disabled={!canOperate}>
             {t("creditoSolidale.rettificaCreditoSolidale")}
-          </Button>
+          </Button>}
         </div>
 
         <div className="space-y-2">
@@ -873,9 +883,11 @@ function CreditoSolidaleSaldoPanel({
 export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: BeneficiarioDettaglioType; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
   const updateBeneficiario = useUpdateBeneficiario();
+  const updateCredito = useUpdateCreditoSolidaleBeneficiarioConfigurazione();
   const { toast } = useToast();
   const editSchema = useMemo(() => makeEditSchema(t), [t]);
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canManageCredito = hasPermission("credito.quota.manage");
   const isCittaGlobal = user?.cittaId == null;
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
@@ -935,8 +947,8 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
     { query: { queryKey: ["zoneUds", "editBenefForm", formCitta], enabled: watchUds && formCitta != null } },
   );
 
-  const onSubmit = (data: EditValues) => {
-    const { uds, cittaId, zonaUdsId, centroAscoltoId, magazzinoEmporioPreferitoId, creditoSolidaleNote, ...rest } = data;
+  const onSubmit = async (data: EditValues) => {
+    const { uds, cittaId, zonaUdsId, centroAscoltoId, magazzinoEmporioPreferitoId, creditoSolidaleAbilitato: creditoAbilitato, creditoSolidaleStato: creditoStato, creditoSolidaleNote, ...rest } = data;
     // A città-global admin must pin a città when flagging a person as UDS.
     if (uds && isCittaGlobal && !cittaId) {
       form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
@@ -948,7 +960,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
         : isCentroLocked
           ? lockedCentroId
           : null;
-    if (rest.creditoSolidaleAbilitato && centroAscoltoIdFinale == null) {
+    if (canManageCredito && creditoAbilitato && centroAscoltoIdFinale == null) {
       form.setError("centroAscoltoId", { type: "manual", message: t("beneficiari.creditoSolidaleCentroAscoltoRichiesto") });
       toast({
         title: t("beneficiari.creditoSolidaleSection"),
@@ -964,10 +976,8 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       sesso: data.sesso,
       areaProvenienza: data.areaProvenienza || undefined,
       codiceFiscale: data.codiceFiscale?.trim() ? data.codiceFiscale.trim().toUpperCase() : null,
-      creditoSolidaleAbilitato: rest.creditoSolidaleAbilitato,
-      creditoSolidaleStato: rest.creditoSolidaleAbilitato ? rest.creditoSolidaleStato : "non_abilitato",
-      creditoSolidaleNote: creditoSolidaleNote?.trim() ? creditoSolidaleNote.trim() : null,
       centroAscoltoId: centroAscoltoIdFinale,
+      versione: b.versione,
       magazzinoEmporioPreferitoId:
         magazzinoEmporioPreferitoId && magazzinoEmporioPreferitoId !== NONE_VALUE
           ? parseInt(magazzinoEmporioPreferitoId)
@@ -977,23 +987,23 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       if (isCittaGlobal && cittaId) payload.cittaId = parseInt(cittaId);
       payload.zonaUdsId = zonaUdsId && zonaUdsId !== NONE_VALUE ? parseInt(zonaUdsId) : null;
     }
-    updateBeneficiario.mutate(
-      { id: b.id, data: payload as never },
-      {
-        onSuccess: () => onSaved(),
-        onError: (err) => {
-          const message = apiErrorMessage(err, t("beneficiarioDettaglio.errorSave"));
-          if (message === t("beneficiari.creditoSolidaleCentroAscoltoRichiesto")) {
-            form.setError("centroAscoltoId", { type: "server", message });
-          }
-          toast({
-            title: t("beneficiarioDettaglio.error"),
-            description: message,
-            variant: "destructive",
-          });
-        },
-      },
-    );
+    try {
+      await updateBeneficiario.mutateAsync({ id: b.id, data: payload as never });
+      if (canManageCredito) {
+        await updateCredito.mutateAsync({
+          beneficiarioId: b.id,
+          data: {
+            creditoSolidaleAbilitato: creditoAbilitato,
+            creditoSolidaleStato: creditoAbilitato ? creditoStato : "non_abilitato",
+            creditoSolidaleNote: creditoSolidaleNote?.trim() ? creditoSolidaleNote.trim() : null,
+          },
+        });
+      }
+      onSaved();
+    } catch (err) {
+      const message = apiErrorMessage(err, t("beneficiarioDettaglio.errorSave"));
+      toast({ title: t("beneficiarioDettaglio.error"), description: message, variant: "destructive" });
+    }
   };
 
   return (
@@ -1138,7 +1148,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 <FormItem><FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>
               )} />
 
-              <div className="rounded-md border p-3 space-y-3">
+              {canManageCredito && <div className="rounded-md border p-3 space-y-3">
                 <div>
                   <h4 className="text-sm font-medium">{t("beneficiari.creditoSolidaleSection")}</h4>
                   <p className="text-xs text-muted-foreground">{t("beneficiari.creditoSolidaleHelp")}</p>
@@ -1212,7 +1222,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 )} />
                 <CreditoSolidaleCalcoloPanel beneficiarioId={b.id} enabled={creditoSolidaleAbilitato && emporioAbilitato} />
                 <CreditoSolidaleQuotaPanel b={b} enabled={creditoSolidaleAbilitato} emporioAbilitato={emporioAbilitato} />
-              </div>
+              </div>}
 
               <BeneficiarioMensaSection beneficiario={b} compact />
 
@@ -1263,7 +1273,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
 
               <div className="pt-6 flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-                <Button type="submit" disabled={updateBeneficiario.isPending}>{t("common.save")}</Button>
+                <Button type="submit" disabled={updateBeneficiario.isPending || updateCredito.isPending}>{t("common.save")}</Button>
               </div>
             </form>
           </Form>

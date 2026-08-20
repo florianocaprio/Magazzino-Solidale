@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Pencil, Trash2, KeyRound } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Power, KeyRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import { ruoliNelPerimetro } from "@/lib/admin-scope";
@@ -384,10 +384,12 @@ export default function Utenti() {
                             <KeyRound className="mr-2 h-4 w-4" />
                             {t("utenti.resetPassword")}
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" disabled={u.id === currentUser?.id || (u.isSuperAdmin && !currentUser?.isSuperAdmin)} onClick={() => setDeleting(u)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            {t("common.delete")}
-                          </DropdownMenuItem>
+                          {u.attivo && (
+                            <DropdownMenuItem className="text-destructive" disabled={u.id === currentUser?.id || (u.isSuperAdmin && !currentUser?.isSuperAdmin)} onClick={() => setDeleting(u)}>
+                              <Power className="mr-2 h-4 w-4" />
+                              {t("common.deactivate")}
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -565,7 +567,7 @@ export default function Utenti() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {t("common.delete")}
+              {t("common.deactivate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

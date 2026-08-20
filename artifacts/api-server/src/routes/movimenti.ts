@@ -1,19 +1,31 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { movimentiTable, prodottiTable, magazziniTable } from "@workspace/db";
-import { eq, and, gte, lte, desc, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerCittaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
-  canAccessMagazzino,
 } from "../lib/centroScope";
+import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-router.get("/movimenti", async (req, res) => {
+router.get("/movimenti", requirePermission("magazzino.view"), async (req, res) => {
   const { tipo, magazzinoId, prodottoId, centroAscoltoId, da, a } = req.query as Record<string, string>;
+  const page = req.query.page == null ? 1 : Number(req.query.page);
+  const limit = req.query.limit == null ? 50 : Number(req.query.limit);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: "Paginazione non valida: page >= 1 e limit tra 1 e 100" });
+    return;
+  }
+  for (const [name, raw] of [["magazzinoId", magazzinoId], ["prodottoId", prodottoId], ["centroAscoltoId", centroAscoltoId]] as const) {
+    if (raw != null && (!Number.isSafeInteger(Number(raw)) || Number(raw) <= 0)) {
+      res.status(400).json({ error: `${name} non valido` });
+      return;
+    }
+  }
   const conditions: SQL[] = [];
   if (tipo) conditions.push(eq(movimentiTable.tipoMovimento, tipo));
   if (magazzinoId) conditions.push(eq(movimentiTable.magazzinoId, parseInt(magazzinoId)));
@@ -24,6 +36,12 @@ router.get("/movimenti", async (req, res) => {
   const scope = magazzinoScopeFilter(movimentiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
   if (scope) conditions.push(scope);
 
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(movimentiTable)
+    .leftJoin(magazziniTable, eq(movimentiTable.magazzinoId, magazziniTable.id))
+    .where(where);
   const rows = await db
     .select({
       mov: movimentiTable,
@@ -33,10 +51,14 @@ router.get("/movimenti", async (req, res) => {
     .from(movimentiTable)
     .leftJoin(prodottiTable, eq(movimentiTable.prodottoId, prodottiTable.id))
     .leftJoin(magazziniTable, eq(movimentiTable.magazzinoId, magazziniTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(where)
     .orderBy(desc(movimentiTable.dataCreazione))
-    .limit(200);
+    .limit(limit)
+    .offset((page - 1) * limit);
 
+  res.setHeader("X-Total-Count", String(total));
+  res.setHeader("X-Page", String(page));
+  res.setHeader("X-Page-Size", String(limit));
   res.json(rows.map(r => ({
     id: r.mov.id,
     tipoMovimento: r.mov.tipoMovimento,
@@ -51,33 +73,18 @@ router.get("/movimenti", async (req, res) => {
     unitaMisura: r.mov.unitaMisura,
     fornitoreId: r.mov.fornitoreId ?? null,
     beneficiarioId: r.mov.beneficiarioId ?? null,
+    movimentoOrigineId: r.mov.movimentoOrigineId ?? null,
+    operatoreId: r.mov.operatoreId ?? null,
     documentoRiferimento: r.mov.documentoRiferimento ?? null,
     note: r.mov.note ?? null,
     dataCreazione: r.mov.dataCreazione.toISOString(),
   })));
 });
 
-router.post("/movimenti", async (req, res) => {
-  const body = req.body;
-  if (!(await canAccessMagazzino(body.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
-    res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
-    return;
-  }
-  const [row] = await db.insert(movimentiTable).values({
-    tipoMovimento: body.tipoMovimento,
-    tipoDettaglio: body.tipoDettaglio,
-    dataMovimento: body.dataMovimento,
-    magazzinoId: body.magazzinoId,
-    prodottoId: body.prodottoId,
-    lottoId: body.lottoId,
-    quantita: body.quantita.toString(),
-    unitaMisura: body.unitaMisura,
-    fornitoreId: body.fornitoreId,
-    beneficiarioId: body.beneficiarioId,
-    documentoRiferimento: body.documentoRiferimento,
-    note: body.note,
-  }).returning();
-  res.status(201).json({ ...row, quantita: parseFloat(row.quantita), dataCreazione: row.dataCreazione.toISOString() });
+router.post("/movimenti", requirePermission("magazzino.stock.adjust"), (_req, res) => {
+  res.status(405).json({
+    error: "Il giornale Movimenti è append-only: usa Carico, Scarico, Trasferimento o Rettifica",
+  });
 });
 
 export default router;

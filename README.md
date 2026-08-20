@@ -93,6 +93,31 @@ collaudare la migrazione su dati reali, ripristinare il dump in un database
 separato e lanciare due volte `update`: entrambe le esecuzioni devono concludersi
 senza variazioni nelle cardinalità delle entità preesistenti.
 
+### Aggiornamento hardening Beneficiari
+
+L'update `20260819_audit_beneficiari_hardening.sql` aggiunge soltanto
+`beneficiari.versione integer NOT NULL DEFAULT 1`, usata per l'optimistic
+locking. È idempotente e non modifica i dati anagrafici esistenti. Su database
+esistenti applicarlo con il normale comando `update`, mai con `push-force`.
+Prima dell'avvio verificare il backup; dopo l'update controllare almeno:
+
+```sql
+SELECT count(*) FROM beneficiari;
+SELECT data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'beneficiari' AND column_name = 'versione';
+SELECT count(*) AS beneficiari_senza_area FROM beneficiari WHERE citta_id IS NULL;
+SELECT count(*) AS membri_nucleo_orfani
+FROM nucleo_familiare nf
+LEFT JOIN beneficiari b ON b.id = nf.beneficiario_id
+WHERE b.id IS NULL;
+```
+
+I Beneficiari legacy senza Area restano leggibili secondo lo scope storico, ma
+non possono essere creati nuovamente senza Area. La FK del nucleo non viene
+aggiunta automaticamente: eventuali record orfani devono essere bonificati con
+una decisione funzionale prima di una futura migration dedicata.
+
 ## Avvio (sviluppo)
 
 Avvia i due servizi (in due terminali, oppure tramite i workflow di Replit):

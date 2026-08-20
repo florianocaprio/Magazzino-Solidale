@@ -27,11 +27,12 @@ export interface BeneficiarioDuplicate {
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
   uds: boolean;
+  versione: number;
   score: number;
 }
 
-/** Ricerca anti-duplicato condivisa. La città è sempre obbligatoria e i record
- * legacy senza città restano esclusi dall'uguaglianza SQL. */
+/** Ricerca anti-duplicato condivisa. L'Area è sempre obbligatoria e i record
+ * legacy senza Area restano esclusi dall'uguaglianza SQL. */
 export async function searchBeneficiariDuplicates(
   input: BeneficiarioDuplicateSearch,
 ): Promise<BeneficiarioDuplicate[]> {
@@ -54,7 +55,7 @@ export async function searchBeneficiariDuplicates(
         b.citta_id AS "cittaId", c.nome AS "cittaNome",
         b.zona_uds_id AS "zonaUdsId", z.nome AS "zonaUdsNome",
         b.centro_ascolto_id AS "centroAscoltoId", ca.nome AS "centroAscoltoNome",
-        b.uds AS "uds",
+        b.uds AS "uds", b.versione AS "versione",
         (
           CASE WHEN ${search} <> '' THEN GREATEST(
             similarity(lower(coalesce(b.nome, '')), ${search}),
@@ -109,6 +110,7 @@ export async function searchBeneficiariDuplicates(
     centroAscoltoId: (row.centroAscoltoId as number | null) ?? null,
     centroAscoltoNome: (row.centroAscoltoNome as string | null) ?? null,
     uds: Boolean(row.uds),
+    versione: Number(row.versione),
     score: Math.round(Number(row.score) * 100) / 100,
   }));
 }

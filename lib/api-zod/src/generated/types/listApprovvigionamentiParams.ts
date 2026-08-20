@@ -10,4 +10,13 @@ export type ListApprovvigionamentiParams = {
 stato?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };

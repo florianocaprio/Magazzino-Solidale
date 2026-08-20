@@ -289,7 +289,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
             <Select value={magazzinoId} onValueChange={setMagazzinoId}>
               <SelectTrigger><SelectValue placeholder={t("bolle.magazzinoPlaceholder")} /></SelectTrigger>
               <SelectContent>
-                {magazzini?.map(m => (
+                {magazzini?.filter((m) => m.stato === "attivo").map(m => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                 ))}
               </SelectContent>
@@ -465,7 +465,7 @@ function ModificaBollaDialog({
             <Select value={mId} onValueChange={setMId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {magazzini?.map(m => (
+                {magazzini?.filter((m) => m.stato === "attivo").map(m => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                 ))}
               </SelectContent>
@@ -703,6 +703,10 @@ function AggiungiProdottoDialog({
 // ─── Dettaglio bolla ─────────────────────────────────────────────────────────
 
 export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaActions }: { bollaId: number; onClose?: () => void; onCloseLabel?: string; hideConsegnaActions?: boolean }) {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("bolle.manage");
+  const canDeliver = hasPermission("bolle.deliver");
+  const canCancel = hasPermission("bolle.cancel");
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
@@ -933,7 +937,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const isConfermato = bolla.stato === "confermato";
   const isConsegnato = bolla.stato === "consegnato";
   const isAnnullato = bolla.stato === "annullato";
-  const modificabile = isBozza; // le prenotazioni si ricalcolano solo confermando una bozza
+  const modificabile = isBozza && canManage; // le prenotazioni si ricalcolano solo confermando una bozza
   const centroBolla = bollaCentroId != null ? centri?.find((c) => c.id === bollaCentroId) : undefined;
 
   return (
@@ -976,7 +980,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
         </div>
       </div>
 
-      {isBozza && (
+      {isBozza && canManage && (
         <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => setEditOpen(true)}>
           <Pencil className="h-3.5 w-3.5" /> {t("bolle.modificaIntestazione")}
         </Button>
@@ -1102,7 +1106,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
         <>
           <Separator />
           <div className="space-y-2">
-            {isBozza && (
+            {isBozza && canDeliver && (
               <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800 mb-3">
                 <strong>{t("bolle.confermaInfoTitle")}</strong>{t("bolle.confermaInfoText")}
               </div>
@@ -1128,7 +1132,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
                 {confermaBolla.isPending ? t("bolle.confermaInCorso") : t("bolle.confermaBolla")}
               </Button>
             )}
-            {isConfermato && !hideConsegnaActions && (
+            {isConfermato && canDeliver && !hideConsegnaActions && (
               <>
                 {!bolla.ritiroNonEffettuatoAt && <Button className="w-full gap-2 bg-green-600 hover:bg-green-700" onClick={onConsegna} disabled={consegnaBolla.isPending}><Truck className="h-4 w-4" />{consegnaBolla.isPending ? t("bolle.registrazione") : t("bolle.segnaConsegnata")}</Button>}
                 {bolla.consegnaId == null && !bolla.ritiroNonEffettuatoAt && (
@@ -1156,7 +1160,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
               </>
             )}
             {/* Annulla */}
-            <Button
+            {canCancel && <Button
               variant="outline"
               className="w-full gap-2 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
               onClick={() => setAnnullaOpen(true)}
@@ -1164,7 +1168,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
             >
               <XCircle className="h-4 w-4" />
               {t("bolle.annullaBolla")}
-            </Button>
+            </Button>}
           </div>
         </>
       )}
@@ -1316,28 +1320,31 @@ function trasferimentoStatoBadge(stato: string) {
 }
 
 export default function Bolle() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canManage = hasPermission("bolle.manage");
+  const canDeliver = hasPermission("bolle.deliver");
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
   const [filterMagazzinoId, setFilterMagazzinoId] = useState("all");
   const [filterCentroId, setFilterCentroId] = useState("all");
   const [filterStato, setFilterStato] = useState("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setFilterCentroId(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
+  useEffect(() => setPage(1), [filterMagazzinoId, filterCentroId, filterStato]);
 
-  const bolleParams: { magazzinoId?: number; centroAscoltoId?: number; stato?: string } = {};
+  const bolleParams: { magazzinoId?: number; centroAscoltoId?: number; stato?: string; page: number; limit: number } = { page, limit: pageSize };
   if (filterMagazzinoId !== "all") bolleParams.magazzinoId = parseInt(filterMagazzinoId);
   if (filterCentroId !== "all") bolleParams.centroAscoltoId = parseInt(filterCentroId);
   if (filterStato !== "all") bolleParams.stato = filterStato;
-  const hasBolleParams = Object.keys(bolleParams).length > 0;
-
-  const { data: bolle, isLoading } = useListBolle(hasBolleParams ? bolleParams : undefined);
-  const { data: trasferimenti, isLoading: loadingTrasf } = useListTrasferimenti();
-  const { data: scarichi, isLoading: loadingScar } = useListScarichi();
+  const { data: bolle, isLoading } = useListBolle(bolleParams);
+  const { data: trasferimenti, isLoading: loadingTrasf } = useListTrasferimenti({ page, limit: pageSize });
+  const { data: scarichi, isLoading: loadingScar } = useListScarichi({ page, limit: pageSize });
   const { data: centri } = useListCentriAscolto();
   const { data: magazzini } = useListMagazzini();
   const { data: beneficiari } = useListBeneficiari();
@@ -1455,6 +1462,9 @@ export default function Bolle() {
   const filtersActive = filterMagazzinoId !== "all" || filterCentroId !== "all" || filterStato !== "all";
 
   const loading = isLoading || loadingTrasf || loadingScar;
+  const hasNextPage = (bolle?.length ?? 0) === pageSize
+    || (showInterni && (trasferimenti?.length ?? 0) === pageSize)
+    || (showInterni && (scarichi?.length ?? 0) === pageSize);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -1463,9 +1473,9 @@ export default function Bolle() {
           <h1 className="text-3xl font-bold tracking-tight">{t("bolle.title")}</h1>
           <p className="text-muted-foreground">{t("bolle.subtitle")}</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+        {canManage && <Button onClick={() => setCreateOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" /> {t("bolle.newBolla")}
-        </Button>
+        </Button>}
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -1620,7 +1630,7 @@ export default function Bolle() {
                   <TableCell className="text-center">{statoBadge(row.bolla.stato)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {row.bolla.stato === "confermato" && (
+                      {row.bolla.stato === "confermato" && canDeliver && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -1692,6 +1702,16 @@ export default function Bolle() {
           </Table>
         </CardContent>
       </Card>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1 || loading}>
+          {t("common.previous", { defaultValue: "Precedente" })}
+        </Button>
+        <span className="text-sm text-muted-foreground">{t("common.page", { defaultValue: "Pagina" })} {page}</span>
+        <Button variant="outline" size="sm" onClick={() => setPage((value) => value + 1)} disabled={!hasNextPage || loading}>
+          {t("common.next", { defaultValue: "Successiva" })}
+        </Button>
+      </div>
 
       <CreaiBollaDialog open={createOpen} onClose={() => setCreateOpen(false)} />
 

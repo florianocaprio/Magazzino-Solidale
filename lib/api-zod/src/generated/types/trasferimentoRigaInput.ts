@@ -10,6 +10,7 @@ export interface TrasferimentoRigaInput {
   prodottoId: number;
   lottoId?: number;
   quantita: number;
-  unitaMisura: string;
+  /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
+  unitaMisura?: string;
   note?: string;
 }

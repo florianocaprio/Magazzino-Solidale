@@ -9,6 +9,7 @@ import {
   useListGiacenze,
   useListVolontari,
   useGetImpostazioniStampa,
+  listTrasferimenti,
   getListTrasferimentiQueryKey,
   getListGiacenzeQueryKey,
   type Trasferimento,
@@ -32,6 +33,8 @@ import { it } from "date-fns/locale";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/lib/auth";
+import { loadAllPages } from "@/lib/paged-export";
 
 interface RigaDraft {
   key: string;
@@ -266,7 +269,7 @@ function NuovoTrasferimentoForm({
               <Select value={origineId} onValueChange={(v) => { setOrigineId(v); setRighe([newRiga()]); }}>
                 <SelectTrigger><SelectValue placeholder={t("trasferimenti.selectOrigine")} /></SelectTrigger>
                 <SelectContent>
-                  {magazzini?.map((m) => (
+                  {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                   ))}
                 </SelectContent>
@@ -277,7 +280,7 @@ function NuovoTrasferimentoForm({
               <Select value={destinoId} onValueChange={setDestinoId}>
                 <SelectTrigger><SelectValue placeholder={t("trasferimenti.selectDestinazione")} /></SelectTrigger>
                 <SelectContent>
-                  {magazzini?.filter((m) => String(m.id) !== origineId).map((m) => (
+                  {magazzini?.filter((m) => m.stato === "attivo" && String(m.id) !== origineId).map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                   ))}
                 </SelectContent>
@@ -381,6 +384,7 @@ function ModificaTrasferimentoForm({
       {
         id: trasferimento.id,
         data: {
+          versione: trasferimento.versione,
           note,
           righe: righeValide.map((r) => ({
             prodottoId: parseInt(r.prodottoId),
@@ -450,7 +454,7 @@ function trasportatoreLabel(t: Trasferimento, volontarioFallback = "Volontario")
   return null;
 }
 
-function TrasportatoreCell({ t: tras }: { t: Trasferimento }) {
+function TrasportatoreCell({ t: tras, canEdit }: { t: Trasferimento; canEdit: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [trasportatore, setTrasportatore] = useState("");
@@ -487,6 +491,7 @@ function TrasportatoreCell({ t: tras }: { t: Trasferimento }) {
       {
         id: tras.id,
         data: {
+          versione: tras.versione,
           trasportatoreVolontarioId:
             trasportatore && trasportatore !== "altro" ? parseInt(trasportatore) : null,
           trasportatoreNome:
@@ -505,6 +510,9 @@ function TrasportatoreCell({ t: tras }: { t: Trasferimento }) {
     );
   };
 
+  if (!canEdit) {
+    return <div className="flex items-center gap-1.5 text-sm"><Truck className="h-3.5 w-3.5 text-muted-foreground" /><span>{label ?? "—"}</span></div>;
+  }
   return (
     <>
       <button
@@ -560,7 +568,13 @@ function TrasportatoreCell({ t: tras }: { t: Trasferimento }) {
 
 export default function Trasferimenti() {
   const { t } = useTranslation();
-  const { data: trasferimenti, isLoading } = useListTrasferimenti();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("magazzino.transfers.create");
+  const canDispatch = hasPermission("magazzino.transfers.dispatch");
+  const canReceive = hasPermission("magazzino.transfers.receive");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+  const { data: trasferimenti, isLoading } = useListTrasferimenti({ page, limit: pageSize });
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: impostazioni } = useGetImpostazioniStampa();
@@ -574,14 +588,14 @@ export default function Trasferimenti() {
 
   const handleAction = (tr: Trasferimento) => {
     if (tr.stato === "richiesto" || tr.stato === "preparato") {
-      avviaTrasferimento.mutate({ id: tr.id }, {
+      avviaTrasferimento.mutate({ id: tr.id, data: { versione: tr.versione } }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListTrasferimentiQueryKey() });
           toast({ title: t("trasferimenti.toastAvviato") });
         },
       });
     } else if (tr.stato === "in_transito") {
-      confermaTrasferimento.mutate({ id: tr.id, data: { dataConferma: new Date().toISOString() } }, {
+      confermaTrasferimento.mutate({ id: tr.id, data: { versione: tr.versione, dataConferma: new Date().toISOString() } }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListTrasferimentiQueryKey() });
           toast({ title: t("trasferimenti.toastRicezioneConfermata") });
@@ -633,6 +647,7 @@ export default function Trasferimenti() {
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={trasferimenti ?? []}
+            loadRows={() => loadAllPages((exportPage, limit) => listTrasferimenti({ page: exportPage, limit }))}
             columns={[
               { header: t("common.code"), accessor: (tr) => tr.codice },
               { header: t("trasferimenti.colDataRichiesta"), accessor: (tr) => tr.dataRichiesta ? new Date(tr.dataRichiesta).toLocaleDateString("it-IT") : "" },
@@ -646,7 +661,7 @@ export default function Trasferimenti() {
             title={t("trasferimenti.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("common.new")}</Button>
+          {canCreate && <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("common.new")}</Button>}
         </div>
       </div>
 
@@ -695,7 +710,7 @@ export default function Trasferimenti() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <TrasportatoreCell t={tr} />
+                    <TrasportatoreCell t={tr} canEdit={canCreate} />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {t("trasferimenti.articoliCount", { count: tr.righe?.length || 0 })}
@@ -714,17 +729,17 @@ export default function Trasferimenti() {
                       >
                         <Download className="h-3.5 w-3.5" /> {t("trasferimenti.bolla")}
                       </Button>
-                      {(tr.stato === "richiesto" || tr.stato === "preparato") && (
+                      {(tr.stato === "richiesto" || tr.stato === "preparato") && (canCreate || canDispatch) && (
                         <>
-                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(tr)}>
+                          {canCreate && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(tr)}>
                             <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                          </Button>
-                          <Button size="sm" variant="outline" className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handleAction(tr)} disabled={avviaTrasferimento.isPending}>
+                          </Button>}
+                          {canDispatch && <Button size="sm" variant="outline" className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handleAction(tr)} disabled={avviaTrasferimento.isPending}>
                             <Play className="h-3.5 w-3.5" /> {t("trasferimenti.avvia")}
-                          </Button>
+                          </Button>}
                         </>
                       )}
-                      {tr.stato === "in_transito" && (
+                      {tr.stato === "in_transito" && canReceive && (
                         <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => handleAction(tr)} disabled={confermaTrasferimento.isPending}>
                           <CheckCircle2 className="h-3.5 w-3.5" /> {t("trasferimenti.confermaRic")}
                         </Button>
@@ -737,6 +752,12 @@ export default function Trasferimenti() {
           </Table>
         </CardContent>
       </Card>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Precedente</Button>
+        <span className="text-sm text-muted-foreground">Pagina {page}</span>
+        <Button variant="outline" size="sm" disabled={isLoading || (trasferimenti?.length ?? 0) < pageSize} onClick={() => setPage((value) => value + 1)}>Successiva</Button>
+      </div>
 
       <NuovoTrasferimentoForm open={isFormOpen} onClose={() => setIsFormOpen(false)} onCreated={handleCreated} />
 

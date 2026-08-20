@@ -289,7 +289,7 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
       `${r.prodottoNome ?? `Prodotto #${r.prodottoId}`}${r.fsePlus ? " *" : ""}`,
       r.codiceLotto ?? "—",
       String(r.quantita),
-      r.unitaMisura,
+      r.unitaMisura ?? "—",
     ]),
     theme: template === "minimal" ? "plain" : "striped",
     headStyles: {

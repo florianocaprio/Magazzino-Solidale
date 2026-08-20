@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Map } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Power, Map } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -220,9 +220,11 @@ export default function ZoneUds() {
                         <DropdownMenuItem onClick={() => handleEdit(z2)}>
                           <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(z2.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
-                        </DropdownMenuItem>
+                        {z2.attivo && (
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(z2.id)}>
+                            <Power className="mr-2 h-4 w-4" /> {t("common.deactivate")}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -293,7 +295,7 @@ export default function ZoneUds() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.deactivate")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

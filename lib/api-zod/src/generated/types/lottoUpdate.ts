@@ -9,6 +9,6 @@
 export interface LottoUpdate {
   codiceLotto?: string;
   dataScadenza?: string;
-  quantitaResidua?: number;
+  documentoCarico?: string;
   note?: string;
 }

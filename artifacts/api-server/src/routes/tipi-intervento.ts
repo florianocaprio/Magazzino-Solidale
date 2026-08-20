@@ -5,15 +5,12 @@ import {
   CreateTipoInterventoBody,
   UpdateTipoInterventoBody,
 } from "@workspace/api-zod";
-import { requireAdmin } from "../middlewares/auth";
+import { requireGlobalAdmin } from "../lib/adminScope";
 import { requireAnyModulo } from "../lib/featureFlags";
 
 const router: IRouter = Router();
 
-router.use(
-  "/tipi-intervento",
-  requireAnyModulo(["CENTRO_ASCOLTO", "UDS"]),
-);
+router.use("/tipi-intervento", requireAnyModulo(["CENTRO_ASCOLTO", "UDS"]));
 
 function fmt(r: typeof tipiInterventoTable.$inferSelect) {
   return {
@@ -35,9 +32,15 @@ router.get("/tipi-intervento", async (_req, res) => {
   res.json(rows.map(fmt));
 });
 
-router.post("/tipi-intervento", requireAdmin, async (req, res) => {
-  const parsed = CreateTipoInterventoBody.parse(req.body);
-  const nome = parsed.nome.trim();
+router.post("/tipi-intervento", requireGlobalAdmin, async (req, res) => {
+  const parsed = CreateTipoInterventoBody.safeParse(req.body);
+  if (!parsed.success) {
+    res
+      .status(400)
+      .json({ error: "Inserimento tipo di intervento non valido" });
+    return;
+  }
+  const nome = parsed.data.nome.trim();
   if (!nome) {
     res.status(400).json({ error: "Nome obbligatorio" });
     return;
@@ -52,15 +55,21 @@ router.post("/tipi-intervento", requireAdmin, async (req, res) => {
   }
   const [row] = await db
     .insert(tipiInterventoTable)
-    .values({ ...parsed, nome })
+    .values({ ...parsed.data, nome })
     .returning();
   res.status(201).json(fmt(row));
 });
 
-router.patch("/tipi-intervento/:id", requireAdmin, async (req, res) => {
+router.patch("/tipi-intervento/:id", requireGlobalAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const parsed = UpdateTipoInterventoBody.parse(req.body);
-  const updates: Partial<typeof tipiInterventoTable.$inferInsert> = { ...parsed };
+  const parsed = UpdateTipoInterventoBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Modifica tipo di intervento non valida" });
+    return;
+  }
+  const updates: Partial<typeof tipiInterventoTable.$inferInsert> = {
+    ...parsed.data,
+  };
   if (typeof updates.nome === "string") {
     updates.nome = updates.nome.trim();
     if (!updates.nome) {
@@ -88,7 +97,7 @@ router.patch("/tipi-intervento/:id", requireAdmin, async (req, res) => {
   res.json(fmt(row));
 });
 
-router.delete("/tipi-intervento/:id", requireAdmin, async (req, res) => {
+router.delete("/tipi-intervento/:id", requireGlobalAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
   // `interventi.tipoIntervento` stores the type NAME as free text (no FK), so
   // removing a type simply retires the option; existing interventions keep their

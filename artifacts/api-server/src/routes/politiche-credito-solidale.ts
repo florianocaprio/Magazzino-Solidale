@@ -1,22 +1,10 @@
 import { Router, type IRouter, type Request } from "express";
 import { and, desc, eq } from "drizzle-orm";
-import {
-  centriAscoltoTable,
-  cittaTable,
-  db,
-  politicheCreditoSolidaleTable,
-} from "@workspace/db";
+import { centriAscoltoTable, cittaTable, db, politicheCreditoSolidaleTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
-import {
-  andScoped,
-  callerCentroId,
-  callerCittaId,
-  canAccessCentro,
-  canAccessCitta,
-  centroScopeFilter,
-  cittaScopeFilter,
-} from "../lib/centroScope";
+import { andScoped, callerCentroId, callerCittaId, centroScopeFilter, cittaScopeFilter } from "../lib/centroScope";
+import { canMutateScopedResource } from "../lib/adminScope";
 
 const router: IRouter = Router();
 
@@ -34,14 +22,7 @@ const DECIMAL_DEFAULTS = {
   creditoMinimoMensile: "0.00",
 } satisfies Partial<Record<keyof PolicyInsert, string>>;
 
-const DECIMAL_KEYS = [
-  "creditoBaseNucleo",
-  "creditoPerComponente",
-  "bonusMinore",
-  "bonusAnziano",
-  "bonusDisabile",
-  "creditoMinimoMensile",
-] as const;
+const DECIMAL_KEYS = ["creditoBaseNucleo", "creditoPerComponente", "bonusMinore", "bonusAnziano", "bonusDisabile", "creditoMinimoMensile"] as const;
 
 const NOT_FOUND_MSG = "Politica Credito Solidale non trovata.";
 const DAY_MSG = "Il giorno di ricarica mensile deve essere compreso tra 1 e 28.";
@@ -61,8 +42,7 @@ const decimalString = (v: unknown): string | null => {
   return n.toFixed(2);
 };
 
-const nullableText = (v: unknown): string | null =>
-  typeof v === "string" ? v.trim() || null : v == null ? null : String(v);
+const nullableText = (v: unknown): string | null => (typeof v === "string" ? v.trim() || null : v == null ? null : String(v));
 
 const optionalText = (v: unknown, partial: boolean): string | null | undefined => {
   if (v === undefined && partial) return undefined;
@@ -140,14 +120,19 @@ function parseBody(body: Record<string, unknown>, partial: boolean): { values?: 
   for (const key of DECIMAL_KEYS) {
     if (body[key] === undefined && partial) continue;
     const parsed = decimalString(body[key] ?? DECIMAL_DEFAULTS[key]);
-    if (parsed == null) return { error: "I valori della politica Credito Solidale devono essere maggiori o uguali a 0." };
+    if (parsed == null)
+      return {
+        error: "I valori della politica Credito Solidale devono essere maggiori o uguali a 0.",
+      };
     values[key] = parsed;
   }
 
   if (!partial || body.creditoMassimoMensile !== undefined) {
     const max = decimalString(body.creditoMassimoMensile);
     if (body.creditoMassimoMensile != null && body.creditoMassimoMensile !== "" && max == null) {
-      return { error: "I valori della politica Credito Solidale devono essere maggiori o uguali a 0." };
+      return {
+        error: "I valori della politica Credito Solidale devono essere maggiori o uguali a 0.",
+      };
     }
     values.creditoMassimoMensile = max;
   }
@@ -175,37 +160,43 @@ function parseBody(body: Record<string, unknown>, partial: boolean): { values?: 
 
 function validateMaxMin(values: Partial<PolicyInsert>, existing?: PolicySelect): string | null {
   const min = toNumber(values.creditoMinimoMensile ?? existing?.creditoMinimoMensile ?? DECIMAL_DEFAULTS.creditoMinimoMensile);
-  const max = values.creditoMassimoMensile === undefined
-    ? toNumber(existing?.creditoMassimoMensile)
-    : toNumber(values.creditoMassimoMensile);
+  const max = values.creditoMassimoMensile === undefined ? toNumber(existing?.creditoMassimoMensile) : toNumber(values.creditoMassimoMensile);
   if (min == null) return "I valori della politica Credito Solidale devono essere maggiori o uguali a 0.";
   if (max != null && max < min) return MAX_MSG;
   return null;
 }
 
-async function validateScope(
-  values: Partial<PolicyInsert>,
-  req: Request,
-): Promise<{ status: number; error: string } | null> {
+async function validateScope(values: Partial<PolicyInsert>, req: Request): Promise<{ status: number; error: string } | null> {
   if (values.cittaId != null) {
-    const [citta] = await db.select({ id: cittaTable.id }).from(cittaTable).where(eq(cittaTable.id, values.cittaId));
-    if (!citta) return { status: 404, error: "Città non trovata." };
-    if (!canAccessCitta(citta.id, callerCittaId(req))) {
-      return { status: 403, error: "Risorsa non accessibile per la tua città" };
+    const [area] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, values.cittaId));
+    if (!area || !area.attivo) return { status: 400, error: "L'Area selezionata non è disponibile." };
+    if (!canMutateScopedResource(area.id, callerCittaId(req))) {
+      return { status: 403, error: "Area non accessibile per il tuo profilo" };
     }
   }
 
   if (values.centroAscoltoId != null) {
     const [centro] = await db
-      .select({ id: centriAscoltoTable.id, cittaId: centriAscoltoTable.cittaId })
+      .select({
+        id: centriAscoltoTable.id,
+        cittaId: centriAscoltoTable.cittaId,
+        attivo: centriAscoltoTable.attivo,
+      })
       .from(centriAscoltoTable)
       .where(eq(centriAscoltoTable.id, values.centroAscoltoId));
-    if (!centro) return { status: 404, error: "Centro di Ascolto non trovato." };
-    if (!canAccessCentro(centro.id, callerCentroId(req)) || !canAccessCitta(centro.cittaId, callerCittaId(req))) {
-      return { status: 403, error: "Risorsa non accessibile per il tuo profilo" };
+    if (!centro) return { status: 400, error: "Il Centro di Ascolto selezionato non esiste." };
+    if (!centro.attivo) return { status: 400, error: "Il Centro di Ascolto selezionato non è attivo." };
+    if (!canMutateScopedResource(centro.id, callerCentroId(req)) || !canMutateScopedResource(centro.cittaId, callerCittaId(req))) {
+      return {
+        status: 403,
+        error: "Risorsa non accessibile per il tuo profilo",
+      };
     }
-    if (values.cittaId != null && centro.cittaId != null && centro.cittaId !== values.cittaId) {
-      return { status: 400, error: "Il Centro di Ascolto selezionato non appartiene alla città indicata." };
+    if (centro.cittaId !== (values.cittaId ?? null)) {
+      return {
+        status: 400,
+        error: "Il Centro di Ascolto selezionato non appartiene all'Area indicata.",
+      };
     }
   }
 
@@ -217,17 +208,34 @@ async function findPolicy(id: number, req: Request) {
     .select({
       politica: politicheCreditoSolidaleTable,
       centroAscoltoNome: centriAscoltoTable.nome,
+      centroCittaId: centriAscoltoTable.cittaId,
       cittaNome: cittaTable.nome,
     })
     .from(politicheCreditoSolidaleTable)
     .leftJoin(centriAscoltoTable, eq(politicheCreditoSolidaleTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(cittaTable, eq(politicheCreditoSolidaleTable.cittaId, cittaTable.id))
-    .where(andScoped(
-      eq(politicheCreditoSolidaleTable.id, id),
-      centroScopeFilter(politicheCreditoSolidaleTable.centroAscoltoId, callerCentroId(req)),
-      cittaScopeFilter(politicheCreditoSolidaleTable.cittaId, callerCittaId(req)),
-    ));
+    .where(andScoped(eq(politicheCreditoSolidaleTable.id, id), centroScopeFilter(politicheCreditoSolidaleTable.centroAscoltoId, callerCentroId(req)), cittaScopeFilter(politicheCreditoSolidaleTable.cittaId, callerCittaId(req))));
   return row ?? null;
+}
+
+async function findPolicyById(id: number) {
+  const [row] = await db
+    .select({
+      politica: politicheCreditoSolidaleTable,
+      centroAscoltoNome: centriAscoltoTable.nome,
+      centroCittaId: centriAscoltoTable.cittaId,
+      cittaNome: cittaTable.nome,
+    })
+    .from(politicheCreditoSolidaleTable)
+    .leftJoin(centriAscoltoTable, eq(politicheCreditoSolidaleTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(cittaTable, eq(politicheCreditoSolidaleTable.cittaId, cittaTable.id))
+    .where(eq(politicheCreditoSolidaleTable.id, id));
+  return row ?? null;
+}
+
+function canMutatePolicy(row: { politica: PolicySelect; centroCittaId: number | null }, req: Request): boolean {
+  const callerAreaId = callerCittaId(req);
+  return canMutateScopedResource(row.politica.cittaId, callerAreaId) && canMutateScopedResource(row.politica.centroAscoltoId, callerCentroId(req)) && (row.politica.centroAscoltoId == null || canMutateScopedResource(row.centroCittaId, callerAreaId));
 }
 
 router.get("/politiche-credito-solidale", async (req, res) => {
@@ -240,10 +248,7 @@ router.get("/politiche-credito-solidale", async (req, res) => {
     .from(politicheCreditoSolidaleTable)
     .leftJoin(centriAscoltoTable, eq(politicheCreditoSolidaleTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(cittaTable, eq(politicheCreditoSolidaleTable.cittaId, cittaTable.id))
-    .where(andScoped(
-      centroScopeFilter(politicheCreditoSolidaleTable.centroAscoltoId, callerCentroId(req)),
-      cittaScopeFilter(politicheCreditoSolidaleTable.cittaId, callerCittaId(req)),
-    ))
+    .where(andScoped(centroScopeFilter(politicheCreditoSolidaleTable.centroAscoltoId, callerCentroId(req)), cittaScopeFilter(politicheCreditoSolidaleTable.cittaId, callerCittaId(req))))
     .orderBy(desc(politicheCreditoSolidaleTable.attiva), desc(politicheCreditoSolidaleTable.id));
   res.json(rows.map(fmt));
 });
@@ -268,6 +273,12 @@ router.post("/politiche-credito-solidale", requireAdmin, async (req, res) => {
     res.status(400).json({ error: parsed.error });
     return;
   }
+  const callerAreaId = callerCittaId(req);
+  if (callerAreaId != null && parsed.values.cittaId != null && parsed.values.cittaId !== callerAreaId) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
+    return;
+  }
+  if (callerAreaId != null) parsed.values.cittaId = callerAreaId;
   const maxError = validateMaxMin(parsed.values);
   if (maxError) {
     res.status(400).json({ error: maxError });
@@ -279,22 +290,34 @@ router.post("/politiche-credito-solidale", requireAdmin, async (req, res) => {
     return;
   }
 
-  const [created] = await db.insert(politicheCreditoSolidaleTable).values(parsed.values as PolicyInsert).returning();
+  const [created] = await db
+    .insert(politicheCreditoSolidaleTable)
+    .values(parsed.values as PolicyInsert)
+    .returning();
   const row = await findPolicy(created.id, req);
   res.status(201).json(fmt(row!));
 });
 
 router.patch("/politiche-credito-solidale/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
-  const existing = Number.isInteger(id) ? await findPolicy(id, req) : null;
+  const existing = Number.isInteger(id) ? await findPolicyById(id) : null;
   if (!existing) {
     res.status(404).json({ error: NOT_FOUND_MSG });
+    return;
+  }
+  if (!canMutatePolicy(existing, req)) {
+    res.status(403).json({ error: "Politica non modificabile per il tuo profilo" });
     return;
   }
 
   const parsed = parseBody(req.body ?? {}, true);
   if (!parsed.values) {
     res.status(400).json({ error: parsed.error });
+    return;
+  }
+  const callerAreaId = callerCittaId(req);
+  if (callerAreaId != null && parsed.values.cittaId !== undefined && parsed.values.cittaId !== callerAreaId) {
+    res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
   if (parsed.values.attiva === true && !(await isEmporioEnabled())) {
@@ -328,15 +351,16 @@ router.patch("/politiche-credito-solidale/:id", requireAdmin, async (req, res) =
 
 router.delete("/politiche-credito-solidale/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
-  const existing = Number.isInteger(id) ? await findPolicy(id, req) : null;
+  const existing = Number.isInteger(id) ? await findPolicyById(id) : null;
   if (!existing) {
     res.status(404).json({ error: NOT_FOUND_MSG });
     return;
   }
-  await db
-    .update(politicheCreditoSolidaleTable)
-    .set({ attiva: false, dataAggiornamento: new Date() })
-    .where(eq(politicheCreditoSolidaleTable.id, id));
+  if (!canMutatePolicy(existing, req)) {
+    res.status(403).json({ error: "Politica non modificabile per il tuo profilo" });
+    return;
+  }
+  await db.update(politicheCreditoSolidaleTable).set({ attiva: false, dataAggiornamento: new Date() }).where(eq(politicheCreditoSolidaleTable.id, id));
   res.status(204).send();
 });
 

@@ -1,38 +1,20 @@
 import { useState, useEffect } from "react";
-import { useListMovimenti, useCreateMovimento, useListMagazzini, useListProdotti, useListCentriAscolto, getListMovimentiQueryKey } from "@workspace/api-client-react";
+import { listMovimenti, useListMovimenti, useListCentriAscolto } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { Label } from "@/components/ui/label";
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { useToast } from "@/hooks/use-toast";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, ArrowDownRight, ArrowUpRight, Filter, ScanLine } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { ArrowDownRight, ArrowUpRight, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
-
-const formSchema = z.object({
-  tipoMovimento: z.string().min(1),
-  tipoDettaglio: z.string().min(1),
-  dataMovimento: z.string().min(1),
-  magazzinoId: z.coerce.number().min(1),
-  prodottoId: z.coerce.number().min(1),
-  quantita: z.coerce.number().min(0.01),
-  unitaMisura: z.string().default("pz"),
-  note: z.string().optional()
-});
+import { loadAllPages } from "@/lib/paged-export";
 
 export default function Movimenti() {
   const { t } = useTranslation();
@@ -44,73 +26,27 @@ export default function Movimenti() {
   const [centroFilter, setCentroFilter] = useState(isCentroLocked ? String(lockedCentroId) : "all");
   const [da, setDa] = useState("");
   const [a, setA] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setCentroFilter(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
-  const { data: movimenti, isLoading } = useListMovimenti({
+  useEffect(() => setPage(1), [tipoFilter, centroFilter, da, a]);
+  const filterParams = {
     tipo: tipoFilter !== "all" ? tipoFilter : undefined,
     centroAscoltoId: centroFilter !== "all" ? parseInt(centroFilter) : undefined,
     da: da || undefined,
     a: a || undefined,
+  };
+  const { data: movimenti, isLoading } = useListMovimenti({
+    ...filterParams,
+    page,
+    limit: pageSize,
   });
-  const { data: magazzini } = useListMagazzini();
-  const { data: prodotti } = useListProdotti();
   const { data: centri } = useListCentriAscolto();
-
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [scanProdotto, setScanProdotto] = useState("");
-
-  const createMovimento = useCreateMovimento();
-
-  const handleScanProdotto = (codeOverride?: string) => {
-    const code = (codeOverride ?? scanProdotto).trim();
-    if (!code) return;
-    if (!prodotti) {
-      toast({ title: t("common.loading") });
-      return;
-    }
-    const lc = code.toLowerCase();
-    const p = prodotti.find(
-      x => (x.codiceBarre && x.codiceBarre.toLowerCase() === lc) || x.codice.toLowerCase() === lc,
-    );
-    if (!p) {
-      toast({ title: t("movimenti.scanNotFound"), variant: "destructive" });
-      return;
-    }
-    form.setValue("prodottoId", p.id);
-    if (p.unitaMisura) form.setValue("unitaMisura", p.unitaMisura);
-    setScanProdotto("");
-    toast({ title: t("movimenti.scanFound", { name: p.nome }) });
-  };
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      tipoMovimento: "carico",
-      tipoDettaglio: "acquisto",
-      dataMovimento: new Date().toISOString().substring(0, 10),
-      magazzinoId: 0,
-      prodottoId: 0,
-      quantita: 1,
-      unitaMisura: "pz",
-      note: ""
-    }
-  });
-
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
-    createMovimento.mutate({ data }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
-        toast({ title: t("movimenti.toastRegistered") });
-        setIsFormOpen(false);
-      }
-    });
-  };
 
   const causaleLabel = (val: string) => {
     const map: Record<string, string> = {
@@ -133,6 +69,7 @@ export default function Movimenti() {
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={movimenti ?? []}
+            loadRows={() => loadAllPages((exportPage, limit) => listMovimenti({ ...filterParams, page: exportPage, limit }))}
             columns={[
               { header: t("movimenti.colData"), accessor: (m) => m.dataMovimento ? new Date(m.dataMovimento).toLocaleDateString("it-IT") : "" },
               { header: t("movimenti.colTipo"), accessor: (m) => m.tipoMovimento },
@@ -147,7 +84,6 @@ export default function Movimenti() {
             title={t("movimenti.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("movimenti.registerMovement")}</Button>
         </div>
       </div>
 
@@ -249,111 +185,12 @@ export default function Movimenti() {
         </CardContent>
       </Card>
 
-      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{t("movimenti.registerMovement")}</SheetTitle>
-            <SheetDescription>{t("movimenti.dialogDescription")}</SheetDescription>
-          </SheetHeader>
-          <div className="mt-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="tipoMovimento" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("movimenti.fldDirezione")}</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="carico">{t("movimenti.dirCarico")}</SelectItem>
-                          <SelectItem value="scarico">{t("movimenti.dirScarico")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="tipoDettaglio" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("movimenti.fldCausale")}</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="acquisto">{t("movimenti.causaleAcquisto")}</SelectItem>
-                          <SelectItem value="donazione">{t("movimenti.causaleDonazione")}</SelectItem>
-                          <SelectItem value="rettifica_inventario">{t("movimenti.causaleRettifica")}</SelectItem>
-                          <SelectItem value="scadenza">{t("movimenti.causaleScadenza")}</SelectItem>
-                          <SelectItem value="smaltimento">{t("movimenti.causaleSmaltimento")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                </div>
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Precedente</Button>
+        <span className="text-sm text-muted-foreground">Pagina {page}</span>
+        <Button variant="outline" size="sm" disabled={isLoading || (movimenti?.length ?? 0) < pageSize} onClick={() => setPage((value) => value + 1)}>Successiva</Button>
+      </div>
 
-                <FormField control={form.control} name="dataMovimento" render={({ field }) => (
-                  <FormItem><FormLabel>{t("movimenti.fldData")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
-                )} />
-
-                <FormField control={form.control} name="magazzinoId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("movimenti.fldMagazzino")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={t("movimenti.phSeleziona")} /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {magazzini?.map(m => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-
-                <div className="space-y-2">
-                  <Label>{t("movimenti.scanLabel")}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={scanProdotto}
-                      onChange={e => setScanProdotto(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleScanProdotto(); } }}
-                      placeholder={t("movimenti.scanPlaceholder")}
-                    />
-                    <Button type="button" variant="secondary" className="gap-2" onClick={() => handleScanProdotto()} disabled={!scanProdotto.trim()}>
-                      <ScanLine className="h-4 w-4" /> {t("movimenti.scanButton")}
-                    </Button>
-                    <BarcodeScannerButton onScan={(v) => { setScanProdotto(v); handleScanProdotto(v); }} />
-                  </div>
-                </div>
-
-                <FormField control={form.control} name="prodottoId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("movimenti.fldProdotto")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={t("movimenti.phSeleziona")} /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {prodotti?.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="quantita" render={({ field }) => (
-                    <FormItem><FormLabel>{t("movimenti.fldQuantita")}</FormLabel><FormControl><Input type="number" step="0.01" min="0.01" {...field} /></FormControl></FormItem>
-                  )} />
-                  <FormField control={form.control} name="unitaMisura" render={({ field }) => (
-                    <FormItem><FormLabel>{t("movimenti.fldUM")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                  )} />
-                </div>
-
-                <FormField control={form.control} name="note" render={({ field }) => (
-                  <FormItem><FormLabel>{t("movimenti.fldNote")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                )} />
-
-                <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createMovimento.isPending}>{t("movimenti.submit")}</Button>
-                </div>
-              </form>
-            </Form>
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

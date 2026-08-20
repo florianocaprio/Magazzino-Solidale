@@ -32,6 +32,7 @@ export const trasferimentiTable = pgTable(
     operatoreId: integer("operatore_id").references(() => utentiTable.id),
     mensaId: integer("mensa_id").references(() => menseTable.id),
     idempotencyKey: varchar("idempotency_key", { length: 80 }),
+    versione: integer("versione").notNull().default(1),
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   },
   (table) => [

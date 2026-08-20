@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiarioUpdateCreditoSolidaleStato = typeof BeneficiarioUpdateCreditoSolidaleStato[keyof typeof BeneficiarioUpdateCreditoSolidaleStato];
+export type CreditoSolidaleBeneficiarioCreditoSolidaleStato = typeof CreditoSolidaleBeneficiarioCreditoSolidaleStato[keyof typeof CreditoSolidaleBeneficiarioCreditoSolidaleStato];
 
 
-export const BeneficiarioUpdateCreditoSolidaleStato = {
+export const CreditoSolidaleBeneficiarioCreditoSolidaleStato = {
   non_abilitato: 'non_abilitato',
   attivo: 'attivo',
   sospeso: 'sospeso',

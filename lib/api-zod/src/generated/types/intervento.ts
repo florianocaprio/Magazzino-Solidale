@@ -69,12 +69,12 @@ export interface Intervento {
   avviso: InterventoAvviso | null;
   /** @nullable */
   interventoPrecedenteId: number | null;
-  successoriIds: number[];
+  successoriIds?: number[];
   numeroSuccessori: number;
   /** @nullable */
   sede: string | null;
   /** @nullable */
-  motivoAnnullamento: string | null;
+  motivoAnnullamento?: string | null;
   dataCreazione: Date;
   /** @nullable */
   dataAggiornamento: Date | null;

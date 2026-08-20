@@ -9,6 +9,7 @@ import { logSystemEvent, systemLogMetaFromRequest } from "../lib/systemLog";
 import { isValidUserEmail, normalizeEmail } from "../lib/userEmail";
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from "../lib/emailService";
 import { checkForgotPasswordRateLimit, createPasswordResetLinkForUser, FORGOT_PASSWORD_RESPONSE_MESSAGE, hashPasswordResetToken, invalidateActivePasswordResetTokens, RESET_PASSWORD_CONFIRM_MISMATCH_MESSAGE, RESET_PASSWORD_INVALID_TOKEN_MESSAGE, RESET_PASSWORD_SUCCESS_MESSAGE, validatePasswordForReset } from "../lib/passwordReset";
+import { validatePassword } from "../lib/passwordPolicy";
 
 const router: IRouter = Router();
 
@@ -404,6 +405,11 @@ router.post("/auth/change-password", requireAuth, async (req, res): Promise<void
     return;
   }
   const { newPassword } = parsed.data;
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    res.status(400).json({ error: passwordError });
+    return;
+  }
 
   const [row] = await db.select().from(utentiTable).where(eq(utentiTable.id, req.user!.id));
 

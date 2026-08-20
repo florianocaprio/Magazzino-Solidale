@@ -2,6 +2,7 @@ export const impostazioniEmail = {
   it: {
     title: "Configurazione Email",
     subtitle: "Provider e mittente usati per l'invio delle email (ordini, promemoria).",
+    environmentHint: "Server e credenziali SMTP sono gestiti in modo sicuro tramite variabili MAIL_* e secret dell'ambiente.",
     providerLabel: "Provider di invio",
     providerConnector: "Connettore Gmail (consigliato)",
     providerSmtp: "Server SMTP personalizzato",
@@ -28,6 +29,7 @@ export const impostazioniEmail = {
   es: {
     title: "Configuración de Email",
     subtitle: "Proveedor y remitente usados para el envío de emails (pedidos, recordatorios).",
+    environmentHint: "El servidor y las credenciales SMTP se gestionan de forma segura mediante variables MAIL_* y secretos del entorno.",
     providerLabel: "Proveedor de envío",
     providerConnector: "Conector Gmail (recomendado)",
     providerSmtp: "Servidor SMTP personalizado",
@@ -54,6 +56,7 @@ export const impostazioniEmail = {
   en: {
     title: "Email Configuration",
     subtitle: "Provider and sender used to send emails (orders, reminders).",
+    environmentHint: "The SMTP server and credentials are securely managed through MAIL_* environment variables and secrets.",
     providerLabel: "Sending provider",
     providerConnector: "Gmail connector (recommended)",
     providerSmtp: "Custom SMTP server",
@@ -80,6 +83,7 @@ export const impostazioniEmail = {
   fr: {
     title: "Configuration Email",
     subtitle: "Fournisseur et expéditeur utilisés pour l'envoi des emails (commandes, rappels).",
+    environmentHint: "Le serveur et les identifiants SMTP sont gérés de manière sécurisée via les variables MAIL_* et les secrets de l'environnement.",
     providerLabel: "Fournisseur d'envoi",
     providerConnector: "Connecteur Gmail (recommandé)",
     providerSmtp: "Serveur SMTP personnalisé",
@@ -106,6 +110,7 @@ export const impostazioniEmail = {
   de: {
     title: "E-Mail-Konfiguration",
     subtitle: "Anbieter und Absender für den E-Mail-Versand (Bestellungen, Erinnerungen).",
+    environmentHint: "SMTP-Server und Zugangsdaten werden sicher über MAIL_*-Umgebungsvariablen und Secrets verwaltet.",
     providerLabel: "Versand-Anbieter",
     providerConnector: "Gmail-Connector (empfohlen)",
     providerSmtp: "Eigener SMTP-Server",
@@ -132,6 +137,7 @@ export const impostazioniEmail = {
   ar: {
     title: "إعدادات البريد الإلكتروني",
     subtitle: "المزود والمرسل المستخدمان لإرسال رسائل البريد (الطلبات، التذكيرات).",
+    environmentHint: "تتم إدارة خادم SMTP وبيانات الاعتماد بأمان عبر متغيرات البيئة MAIL_* والأسرار.",
     providerLabel: "مزود الإرسال",
     providerConnector: "موصّل Gmail (مُوصى به)",
     providerSmtp: "خادم SMTP مخصص",

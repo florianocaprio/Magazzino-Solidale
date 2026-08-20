@@ -9,9 +9,13 @@ import {
   interventiMaterialiTable,
   interventiStoricoStatiTable,
   interventiTable,
+  lottiTable,
   magazziniTable,
+  movimentiTable,
   pool,
   prodottiTable,
+  scarichiTable,
+  scaricoRigheTable,
   tipiInterventoTable,
   utentiTable,
 } from "@workspace/db";
@@ -27,6 +31,7 @@ const ids = {
   interventi: [] as number[],
   prodotti: [] as number[],
   magazzini: [] as number[],
+  lotti: [] as number[],
   tipi: [] as number[],
 };
 
@@ -62,6 +67,7 @@ function makeApp(
           centroAscoltoId: number;
           zonaUdsId: null;
           aree: string[];
+          permessi: string[];
           isAdmin: boolean;
           isSuperAdmin: boolean;
         };
@@ -72,6 +78,13 @@ function makeApp(
       centroAscoltoId: options.centroId ?? centroRoma,
       zonaUdsId: null,
       aree: options.aree ?? ["sociale"],
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+        "sociale.interventi.complete",
+        "sociale.interventi.cancel",
+      ],
       isAdmin: false,
       isSuperAdmin: false,
     };
@@ -209,6 +222,17 @@ beforeAll(async () => {
     .returning({ id: magazziniTable.id });
   magazzinoId = warehouse.id;
   ids.magazzini.push(warehouse.id);
+  const [lotto] = await db
+    .insert(lottiTable)
+    .values({
+      prodottoId,
+      dataCarico: "2026-08-01",
+      quantitaCaricata: "20",
+      quantitaResidua: "20",
+      magazzinoId,
+    })
+    .returning({ id: lottiTable.id });
+  ids.lotti.push(lotto.id);
   const [type] = await db
     .insert(tipiInterventoTable)
     .values({ nome: `Colloquio 53CD ${rnd()}` })
@@ -223,6 +247,33 @@ afterAll(async () => {
       .delete(interventiTable)
       .where(inArray(interventiTable.id, ids.interventi));
   }
+  if (ids.prodotti.length > 0) {
+    await db
+      .delete(movimentiTable)
+      .where(inArray(movimentiTable.prodottoId, ids.prodotti));
+  }
+  if (ids.magazzini.length > 0) {
+    const scarichi = await db
+      .select({ id: scarichiTable.id })
+      .from(scarichiTable)
+      .where(inArray(scarichiTable.magazzinoId, ids.magazzini));
+    if (scarichi.length > 0) {
+      await db.delete(scaricoRigheTable).where(
+        inArray(
+          scaricoRigheTable.scaricoId,
+          scarichi.map((row) => row.id),
+        ),
+      );
+      await db.delete(scarichiTable).where(
+        inArray(
+          scarichiTable.id,
+          scarichi.map((row) => row.id),
+        ),
+      );
+    }
+  }
+  if (ids.lotti.length > 0)
+    await db.delete(lottiTable).where(inArray(lottiTable.id, ids.lotti));
   if (ids.prodotti.length > 0)
     await db
       .delete(prodottiTable)
@@ -436,6 +487,67 @@ describe("gestione operativa degli interventi Sociali", () => {
       .from(interventiMaterialiTable)
       .where(eq(interventiMaterialiTable.interventoId, id));
     expect(materials).toHaveLength(2);
+  });
+
+  it("non distribuisce materiali Sociali quando il prodotto ha soltanto lotti scaduti", async () => {
+    const [prodottoScaduto] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `P53CD-SCAD-${rnd()}`,
+        nome: "Prodotto scaduto",
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+      })
+      .returning({ id: prodottiTable.id });
+    ids.prodotti.push(prodottoScaduto.id);
+    const [lottoScaduto] = await db
+      .insert(lottiTable)
+      .values({
+        prodottoId: prodottoScaduto.id,
+        dataCarico: "2000-01-01",
+        dataScadenza: "2000-01-02",
+        quantitaCaricata: "5",
+        quantitaResidua: "5",
+        magazzinoId,
+      })
+      .returning({ id: lottiTable.id });
+    ids.lotti.push(lottoScaduto.id);
+    const id = await createIntervento({ stato: "in_corso", avvio: new Date() });
+
+    const response = await request(makeApp())
+      .post(`/interventi/${id}/salva-operativita`)
+      .send({
+        versione: await versioneIntervento(id),
+        materiali: [
+          {
+            prodottoId: prodottoScaduto.id,
+            quantitaPrevista: 1,
+            quantitaConsegnata: 1,
+            statoPreparazione: "consegnato",
+            magazzinoId,
+          },
+        ],
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/disponibilità insufficiente/i);
+    const [lottoDopo] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lottoScaduto.id));
+    expect(lottoDopo.quantitaResidua).toBe("5.00");
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.prodottoId, prodottoScaduto.id)),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(interventiMaterialiTable)
+        .where(eq(interventiMaterialiTable.interventoId, id)),
+    ).toHaveLength(0);
   });
 
   it("conclude una sola volta e crea il successivo nella stessa transazione", async () => {

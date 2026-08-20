@@ -120,12 +120,12 @@ describe("Lotti — scoping via magazzino visibile", () => {
     scope.lottoIds.push(res.body.id);
   });
 
-  it("PATCH IDOR: spostare il lotto in un magazzino di un altro centro → 403", async () => {
+  it("PATCH: impedisce sempre lo spostamento retroattivo del lotto", async () => {
     const lA = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
     const res = await request(appAs(lottiRouter, centroA))
       .patch(`/lotti/${lA}`)
       .send({ magazzinoId: magB });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -191,7 +191,7 @@ describe("Trasferimenti — scoping via magazzini visibili (origine O destino)",
     const tHidden = await insertTrasferimento(scope, { origineId: magB, destinoId: magB2 });
     const res = await request(appAs(trasferimentiRouter, centroA))
       .patch(`/trasferimenti/${tHidden}`)
-      .send({ righe: [{ prodottoId: prod, quantita: 2, unitaMisura: "kg" }] });
+      .send({ versione: 1, righe: [{ prodottoId: prod, quantita: 2, unitaMisura: "kg" }] });
     expect(res.status).toBe(403);
   });
 
@@ -199,8 +199,8 @@ describe("Trasferimenti — scoping via magazzini visibili (origine O destino)",
     const magB2 = await createMagazzino(scope, centroB);
     const tHidden = await insertTrasferimento(scope, { origineId: magB, destinoId: magB2 });
     const appA = appAs(trasferimentiRouter, centroA);
-    expect((await request(appA).post(`/trasferimenti/${tHidden}/avvia`).send({})).status).toBe(403);
-    expect((await request(appA).post(`/trasferimenti/${tHidden}/conferma`).send({})).status).toBe(403);
+    expect((await request(appA).post(`/trasferimenti/${tHidden}/avvia`).send({ versione: 1 })).status).toBe(403);
+    expect((await request(appA).post(`/trasferimenti/${tHidden}/conferma`).send({ versione: 1 })).status).toBe(403);
   });
 });
 
@@ -258,10 +258,10 @@ describe("Movimenti — scoping via magazzino visibile", () => {
         quantita: 1,
         unitaMisura: "kg",
       });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(405);
   });
 
-  it("POST: registra un movimento su un magazzino visibile", async () => {
+  it("POST: il giornale è append-only anche su un magazzino visibile", async () => {
     const res = await request(appAs(movimentiRouter, centroA))
       .post("/movimenti")
       .send({
@@ -273,6 +273,6 @@ describe("Movimenti — scoping via magazzino visibile", () => {
         quantita: 1,
         unitaMisura: "kg",
       });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(405);
   });
 });

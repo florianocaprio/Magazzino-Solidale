@@ -73,6 +73,7 @@ function makeApp(
           centroAscoltoId: number | null;
           zonaUdsId: null;
           aree: string[];
+          permessi: string[];
           isAdmin: boolean;
           isSuperAdmin: boolean;
         };
@@ -84,6 +85,13 @@ function makeApp(
         options.centroId === undefined ? centroRoma : options.centroId,
       zonaUdsId: null,
       aree: options.aree ?? ["sociale"],
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+        "sociale.interventi.complete",
+        "sociale.interventi.cancel",
+      ],
       isAdmin: false,
       isSuperAdmin: false,
     };
@@ -346,6 +354,14 @@ afterAll(async () => {
 });
 
 describe("viste operative degli interventi Sociali", () => {
+  it("nega l'ambito Sociale a un operatore con sola area Emporio", async () => {
+    const response = await request(makeApp({ aree: ["emporio"] }))
+      .get("/interventi")
+      .query({ ambito: "sociale" });
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("Ambito sociale non consentito");
+  });
+
   it.each([
     ["da_pianificare", 2, ["da_pianificare"]],
     ["pianificati", 1, ["pianificato"]],

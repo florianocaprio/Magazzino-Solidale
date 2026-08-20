@@ -5,13 +5,16 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { LottoInputCausale } from './lottoInputCausale';
 
 export interface LottoInput {
   prodottoId: number;
   codiceLotto?: string;
   dataScadenza?: string;
   dataCarico: string;
+  /** @exclusiveMinimum 0 */
   quantitaCaricata: number;
+  causale: LottoInputCausale;
   magazzinoId: number;
   fornitoreId?: number;
   fsePlus?: boolean;

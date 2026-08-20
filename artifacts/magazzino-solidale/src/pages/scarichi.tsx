@@ -8,6 +8,7 @@ import {
   useListGiacenze,
   useListProdotti,
   useGetImpostazioniStampa,
+  listScarichi,
   getListScarichiQueryKey,
   getListGiacenzeQueryKey,
   getListLottiQueryKey,
@@ -34,6 +35,7 @@ import { it } from "date-fns/locale";
 import { generateScaricoPdf } from "@/lib/scarico-pdf";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
+import { loadAllPages } from "@/lib/paged-export";
 
 const CAUSALI = ["deteriorata", "rubata", "scaduta", "altro"] as const;
 
@@ -308,7 +310,7 @@ function NuovoScaricoForm({
             <Select value={magazzinoId} onValueChange={(v) => { setMagazzinoId(v); setRighe([newRiga()]); }}>
               <SelectTrigger><SelectValue placeholder={t("scarichi.selectMagazzino")} /></SelectTrigger>
               <SelectContent>
-                {magazzini?.map((m) => (
+                {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                 ))}
               </SelectContent>
@@ -379,11 +381,10 @@ function NuovoScaricoForm({
 
 export default function Scarichi() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
-  const { data: scarichi, isLoading } = useListScarichi();
   const { data: centri } = useListCentriAscolto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -394,11 +395,20 @@ export default function Scarichi() {
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [centroFilter, setCentroFilter] = useState("all");
   const [sortAsc, setSortAsc] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setCentroFilter(String(lockedCentroId));
     }
   }, [isCentroLocked, lockedCentroId]);
+  useEffect(() => setPage(1), [centroFilter]);
+  const listParams = {
+    centroAscoltoId: centroFilter !== "all" && centroFilter !== "none" ? Number(centroFilter) : undefined,
+    page,
+    limit: pageSize,
+  };
+  const { data: scarichi, isLoading } = useListScarichi(listParams);
 
   const displayed = (scarichi ?? [])
     .filter((s) =>
@@ -466,6 +476,7 @@ export default function Scarichi() {
           )}
           <ExportButtons
             rows={displayed}
+            loadRows={() => loadAllPages((exportPage, limit) => listScarichi({ ...listParams, page: exportPage, limit }))}
             columns={[
               { header: t("common.code"), accessor: (s) => s.codice },
               { header: t("common.date"), accessor: (s) => s.dataScarico ? new Date(s.dataScarico).toLocaleDateString("it-IT") : "" },
@@ -478,7 +489,7 @@ export default function Scarichi() {
             title={t("scarichi.exportTitle")}
             orientation="landscape"
           />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("common.new")}</Button>
+          {hasPermission("magazzino.stock.issue") && <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("common.new")}</Button>}
         </div>
       </div>
 
@@ -558,6 +569,12 @@ export default function Scarichi() {
           </Table>
         </CardContent>
       </Card>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Precedente</Button>
+        <span className="text-sm text-muted-foreground">Pagina {page}</span>
+        <Button variant="outline" size="sm" disabled={isLoading || (scarichi?.length ?? 0) < pageSize} onClick={() => setPage((value) => value + 1)}>Successiva</Button>
+      </div>
 
       <NuovoScaricoForm open={isFormOpen} onClose={() => setIsFormOpen(false)} onCreated={handleCreated} />
 

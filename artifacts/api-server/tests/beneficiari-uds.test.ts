@@ -4,6 +4,7 @@ import express, { type Express } from "express";
 import { db, pool, beneficiariTable, cittaTable, centriAscoltoTable, zoneUdsTable, magazziniTable, creditoSolidaleMovimentiTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import beneficiariRouter from "../src/routes/beneficiari";
+import creditoSolidaleRouter from "../src/routes/credito-solidale";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 import { calcolaEta, risolviFasciaEta } from "@workspace/api-zod";
 
@@ -18,11 +19,22 @@ const rnd = () => Math.random().toString(36).slice(2, 8);
 function makeApp(user: { id: number; centroAscoltoId: number | null; cittaId: number | null; zonaUdsId?: number | null }): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
-    (req as unknown as { user: typeof user }).user = user;
+  app.use(async (req, _res, next) => {
+    (req as unknown as { user: typeof user & { isAdmin: boolean; permessi: string[]; aree: string[] } }).user = {
+      ...user,
+      isAdmin: false,
+      aree: ["sociale", "uds"],
+      permessi: ["beneficiari.view", "beneficiari.manage", "beneficiari.sensitive.view", "beneficiari.deactivate", "credito.view", "credito.quota.manage"],
+    };
+    if (req.method === "PATCH" && /^\/beneficiari\/\d+$/.test(req.path) && req.body?.versione == null) {
+      const id = Number(req.path.split("/").pop());
+      const [row] = await db.select({ versione: beneficiariTable.versione }).from(beneficiariTable).where(eq(beneficiariTable.id, id));
+      if (row) req.body.versione = row.versione;
+    }
     next();
   });
   app.use(beneficiariRouter);
+  app.use(creditoSolidaleRouter);
   return app;
 }
 
@@ -153,14 +165,14 @@ describe("POST /beneficiari (uds)", () => {
   it.each([
     ["Maschio", "M", "M"],
     ["Femmina", "F", "F"],
-    ["Altro", "Altro", "ALTRO"],
+    ["Altro", "ALTRO", "ALTRO"],
   ])("crea un beneficiario con sesso valido: %s", async (_label, sesso, expected) => {
-    const res = await request(appAs(cittaA))
+    const created = await request(appAs(cittaA))
       .post("/beneficiari")
       .send({ nome: "Con", cognome: "Sesso", sesso });
-    expect(res.status).toBe(201);
-    expect(res.body.sesso).toBe(expected);
-    beneficiarioIds.push(res.body.id);
+    expect(created.status).toBe(201);
+    expect(created.body.sesso).toBe(expected);
+    beneficiarioIds.push(created.body.id);
   });
 
   it("rifiuta la creazione con sesso non valido", async () => {
@@ -361,39 +373,42 @@ describe("Credito Solidale beneficiari", () => {
     const centro = await createCentro(cittaA);
     const emporio = await createMagazzino(tipoMagazzino, cittaA, `Emporio ${tipoMagazzino} ${rnd()}`);
 
-    const res = await request(appAs(cittaA))
+    const created = await request(appAs(cittaA))
       .post("/beneficiari")
       .send({
         nome: "Credito",
         cognome: rnd(),
         sesso: "M",
         centroAscoltoId: centro,
-        creditoSolidaleAbilitato: true,
         magazzinoEmporioPreferitoId: emporio.id,
       });
-
-    expect(res.status).toBe(201);
-    expect(res.body.creditoSolidaleAbilitato).toBe(true);
-    expect(res.body.creditoSolidaleStato).toBe("attivo");
-    expect(typeof res.body.creditoSolidaleDataAbilitazione).toBe("string");
-    expect(Date.parse(res.body.creditoSolidaleDataAbilitazione)).not.toBeNaN();
-    expect(res.body.magazzinoEmporioPreferitoId).toBe(emporio.id);
-    expect(res.body.magazzinoEmporioPreferitoNome).toBe(emporio.nome);
-    beneficiarioIds.push(res.body.id);
+    expect(created.status).toBe(201);
+    beneficiarioIds.push(created.body.id);
+    const configured = await request(appAs(cittaA))
+      .patch(`/credito-solidale/beneficiari/${created.body.id}/configurazione`)
+      .send({ creditoSolidaleAbilitato: true });
+    expect(configured.status).toBe(200);
+    expect(configured.body.creditoSolidaleAbilitato).toBe(true);
+    expect(configured.body.creditoSolidaleStato).toBe("attivo");
+    expect(created.body.magazzinoEmporioPreferitoId).toBe(emporio.id);
+    expect(created.body.magazzinoEmporioPreferitoNome).toBe(emporio.nome);
   });
 
   it("rifiuta l'abilitazione Credito Solidale senza Centro di Ascolto", async () => {
-    const res = await request(appAs(cittaA))
+    const created = await request(appAs(cittaA))
       .post("/beneficiari")
       .send({
         nome: "Senza",
         cognome: "CentroCredito",
         sesso: "M",
-        creditoSolidaleAbilitato: true,
       });
-
+    expect(created.status).toBe(201);
+    beneficiarioIds.push(created.body.id);
+    const res = await request(appAs(cittaA))
+      .patch(`/credito-solidale/beneficiari/${created.body.id}/configurazione`)
+      .send({ creditoSolidaleAbilitato: true });
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe(creditoSolidaleCentroAscoltoRichiestoMsg);
+    expect(res.body.error).toMatch(/Centro di Ascolto/i);
   });
 
   it("rifiuta un magazzino logistico come emporio preferito", async () => {
@@ -407,7 +422,6 @@ describe("Credito Solidale beneficiari", () => {
         cognome: "Logistico",
         sesso: "F",
         centroAscoltoId: centro,
-        creditoSolidaleAbilitato: true,
         magazzinoEmporioPreferitoId: logistico.id,
       });
 
@@ -424,23 +438,20 @@ describe("Credito Solidale beneficiari", () => {
     beneficiarioIds.push(b.id);
 
     const enabled = await request(appAs(cittaA))
-      .patch(`/beneficiari/${b.id}`)
+      .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
       .send({ creditoSolidaleAbilitato: true });
 
     expect(enabled.status).toBe(200);
     expect(enabled.body.creditoSolidaleAbilitato).toBe(true);
     expect(enabled.body.creditoSolidaleStato).toBe("attivo");
-    expect(typeof enabled.body.creditoSolidaleDataAbilitazione).toBe("string");
-    expect(Date.parse(enabled.body.creditoSolidaleDataAbilitazione)).not.toBeNaN();
 
     const disabled = await request(appAs(cittaA))
-      .patch(`/beneficiari/${b.id}`)
-      .send({ creditoSolidaleAbilitato: false, creditoSolidaleDataAbilitazione: null });
+      .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
+      .send({ creditoSolidaleAbilitato: false });
 
     expect(disabled.status).toBe(200);
     expect(disabled.body.creditoSolidaleAbilitato).toBe(false);
     expect(disabled.body.creditoSolidaleStato).toBe("non_abilitato");
-    expect(disabled.body.creditoSolidaleDataAbilitazione).toBe(enabled.body.creditoSolidaleDataAbilitazione);
   });
 
   it("rifiuta l'abilitazione via PATCH se il beneficiario non ha Centro di Ascolto", async () => {
@@ -451,11 +462,11 @@ describe("Credito Solidale beneficiari", () => {
     beneficiarioIds.push(b.id);
 
     const res = await request(appAs(cittaA))
-      .patch(`/beneficiari/${b.id}`)
+      .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
       .send({ creditoSolidaleAbilitato: true });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe(creditoSolidaleCentroAscoltoRichiestoMsg);
+    expect(res.body.error).toMatch(/Centro di Ascolto/i);
   });
 
   it("abilita via PATCH quando assegna il Centro nello stesso payload senza creare movimenti o cambiare saldo", async () => {
@@ -466,15 +477,17 @@ describe("Credito Solidale beneficiari", () => {
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
 
-    const res = await request(appAs(cittaA))
+    const assigned = await request(appAs(cittaA))
       .patch(`/beneficiari/${b.id}`)
-      .send({ centroAscoltoId: centro, creditoSolidaleAbilitato: true });
+      .send({ centroAscoltoId: centro });
+    expect(assigned.status).toBe(200);
+    const res = await request(appAs(cittaA))
+      .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
+      .send({ creditoSolidaleAbilitato: true });
 
     expect(res.status).toBe(200);
-    expect(res.body.centroAscoltoId).toBe(centro);
     expect(res.body.creditoSolidaleAbilitato).toBe(true);
     expect(res.body.creditoSolidaleStato).toBe("attivo");
-    expect(res.body.creditoSolidaleSaldo).toBe(0);
 
     const [after] = await db
       .select({ saldo: beneficiariTable.creditoSolidaleSaldo })
@@ -494,19 +507,17 @@ describe("Credito Solidale beneficiari", () => {
     const zona = await createZona(cittaA);
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "UdsCentroCredito", cognome: rnd(), sesso: "M", cittaId: cittaA, uds: true, zonaUdsId: zona })
+      .values({ codice: `BEN-${rnd()}`, nome: "UdsCentroCredito", cognome: rnd(), sesso: "M", cittaId: cittaA, centroAscoltoId: centro, uds: true, zonaUdsId: zona })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
 
     const res = await request(appAsCentro(centro, cittaA, zona))
-      .patch(`/beneficiari/${b.id}`)
+      .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
       .send({ creditoSolidaleAbilitato: true });
 
     expect(res.status).toBe(200);
-    expect(res.body.centroAscoltoId).toBe(centro);
     expect(res.body.creditoSolidaleAbilitato).toBe(true);
     expect(res.body.creditoSolidaleStato).toBe("attivo");
-    expect(res.body.creditoSolidaleSaldo).toBe(0);
   });
 });
 
@@ -643,7 +654,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       .values({ codice: `BEN-${rnd()}`, nome: "PatchAltro", cognome: rnd(), sesso: "M", cittaId: cittaA })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(cittaA)).patch(`/beneficiari/${b.id}`).send({ sesso: "Altro" });
+    const res = await request(appAs(cittaA)).patch(`/beneficiari/${b.id}`).send({ sesso: "ALTRO" });
     expect(res.status).toBe(200);
     expect(res.body.sesso).toBe("ALTRO");
   });

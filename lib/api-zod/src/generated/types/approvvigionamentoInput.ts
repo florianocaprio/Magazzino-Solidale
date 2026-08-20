@@ -10,7 +10,7 @@ import type { ApprovvigionamentoRigaInput } from './approvvigionamentoRigaInput'
 export interface ApprovvigionamentoInput {
   fornitoreId: number;
   cittaId: number;
-  magazzinoId?: number;
+  magazzinoId: number;
   centroAscoltoId?: number;
   dataRichiesta: string;
   dataPrevista?: string;

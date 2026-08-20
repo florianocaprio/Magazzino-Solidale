@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getGetBeneficiarioQueryKey,
   getListBeneficiariQueryKey,
   getListCittaQueryKey,
-  type Beneficiario,
+  type BeneficiarioDirectory,
+  type ListBeneficiariParams,
   useListBeneficiari,
   useListCitta,
   useListZoneUds,
-  useUpdateBeneficiario,
+  useUpdateBeneficiarioStato,
+  useAuthorizeBeneficiariExport,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Footprints, Plus, Search } from "lucide-react";
@@ -39,12 +41,13 @@ import { UdsPersonaSheet } from "@/components/uds-persona-sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
+import { BENEFICIARI_PAGE_SIZE, fetchAllBeneficiariPages } from "@/lib/beneficiari-pagination";
 
 const ALL_ZONE = "__all__";
 
 export default function UdsAnagrafica() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const isGlobal = user?.cittaId == null;
@@ -53,6 +56,7 @@ export default function UdsAnagrafica() {
     user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
   );
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const { data: cittaList } = useListCitta({
@@ -68,18 +72,24 @@ export default function UdsAnagrafica() {
     { query: { queryKey: ["zoneUds", effectiveCitta], enabled: effectiveCitta != null } },
   );
 
-  const listParams = {
+  const listFilters = useMemo<ListBeneficiariParams>(() => ({
     uds: true,
     ...(search.trim() ? { search: search.trim() } : {}),
     ...(isGlobal && effectiveCitta ? { cittaId: effectiveCitta } : {}),
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
-  };
-  const { data: beneficiari, isLoading } = useListBeneficiari(listParams);
-  const updateBenef = useUpdateBeneficiario();
+  }), [effectiveCitta, filterZona, isGlobal, search]);
+  useEffect(() => setPage(1), [listFilters]);
+  const { data: beneficiari, isLoading } = useListBeneficiari({
+    ...listFilters,
+    page,
+    limit: BENEFICIARI_PAGE_SIZE,
+  });
+  const updateBenef = useUpdateBeneficiarioStato();
+  const authorizeExport = useAuthorizeBeneficiariExport();
 
-  const toggleStatus = (beneficiario: { id: number; attivo: boolean }) => {
+  const toggleStatus = (beneficiario: { id: number; attivo: boolean; versione: number }) => {
     updateBenef.mutate(
-      { id: beneficiario.id, data: { attivo: !beneficiario.attivo } as never },
+      { id: beneficiario.id, data: { attivo: !beneficiario.attivo, versione: beneficiario.versione } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
@@ -94,7 +104,7 @@ export default function UdsAnagrafica() {
     );
   };
 
-  const canale = (beneficiario: Beneficiario) => {
+  const canale = (beneficiario: BeneficiarioDirectory) => {
     const uds = beneficiario.uds;
     const centro = beneficiario.centroAscoltoId != null;
     if (uds && centro) {
@@ -115,20 +125,20 @@ export default function UdsAnagrafica() {
   const rows = beneficiari ?? [];
   const exportColumns = useMemo(
     () => [
-      { header: t("common.surname"), accessor: (b: Beneficiario) => b.cognome },
-      { header: t("common.name"), accessor: (b: Beneficiario) => b.nome },
+      { header: t("common.surname"), accessor: (b: BeneficiarioDirectory) => b.cognome },
+      { header: t("common.name"), accessor: (b: BeneficiarioDirectory) => b.nome },
       {
         header: t("udsAnagrafica.colSoprannome"),
-        accessor: (b: Beneficiario) => b.soprannome ?? "",
+        accessor: (b: BeneficiarioDirectory) => b.soprannome ?? "",
       },
-      { header: t("udsAnagrafica.colTelefono"), accessor: (b: Beneficiario) => b.telefono ?? "" },
+      { header: t("udsAnagrafica.colTelefono"), accessor: (b: BeneficiarioDirectory) => b.telefono ?? "" },
       {
         header: t("udsAnagrafica.colFasciaEta"),
-        accessor: (b: Beneficiario) =>
+        accessor: (b: BeneficiarioDirectory) =>
           `${fasciaEtaLabel(t, b.fasciaEtaCorrente)} (${fasciaEtaOrigineLabel(t, b.fasciaEtaOrigine)})`,
       },
-      { header: t("udsAnagrafica.colZona"), accessor: (b: Beneficiario) => b.zonaUdsNome ?? "" },
-      { header: t("udsAnagrafica.colCanale"), accessor: (b: Beneficiario) => canale(b).label },
+      { header: t("udsAnagrafica.colZona"), accessor: (b: BeneficiarioDirectory) => b.zonaUdsNome ?? "" },
+      { header: t("udsAnagrafica.colCanale"), accessor: (b: BeneficiarioDirectory) => canale(b).label },
     ],
     [t],
   );
@@ -148,15 +158,17 @@ export default function UdsAnagrafica() {
           <p className="text-muted-foreground">{t("udsAnagrafica.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons
+          {hasPermission("beneficiari.export") && <ExportButtons
             rows={rows}
             columns={exportColumns}
             filename="uds-anagrafica"
             title={t("udsAnagrafica.exportTitle")}
-          />
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+            loadRows={() => fetchAllBeneficiariPages(listFilters)}
+            beforeExport={(_format, exportRows) => authorizeExport.mutateAsync({ data: { tipo: "lista", numeroRecord: exportRows.length, beneficiarioId: null } }).then(() => undefined)}
+          />}
+          {hasPermission("beneficiari.manage") && <Button onClick={() => setIsFormOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> {t("udsAnagrafica.newPerson")}
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -286,6 +298,7 @@ export default function UdsAnagrafica() {
                           <Switch
                             checked={beneficiario.attivo}
                             onCheckedChange={() => toggleStatus(beneficiario)}
+                            disabled={!hasPermission("beneficiari.deactivate") || updateBenef.isPending}
                             aria-label={
                               beneficiario.attivo
                                 ? t("beneficiari.disattiva")
@@ -300,6 +313,17 @@ export default function UdsAnagrafica() {
               )}
             </TableBody>
           </Table>
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <span className="text-sm text-muted-foreground">Pagina {page}</span>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+                Precedente
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={isLoading || rows.length < BENEFICIARI_PAGE_SIZE} onClick={() => setPage((current) => current + 1)}>
+                Successiva
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

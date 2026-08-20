@@ -191,8 +191,12 @@ paths:
           schema:
             type: integer
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Product deactivated without deleting historical data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prodotto"
         "409":
           description: >-
             The warehouse is referenced by an issued delivery note or by
@@ -310,8 +314,12 @@ paths:
           schema:
             type: integer
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Product deactivated without deleting historical data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fornitore"
 
   # ─── LOTTI ───────────────────────────────────────────────────────────────────
   /lotti:
@@ -374,6 +382,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Lotto"
+
+  /lotti/{id}/rettifica:
+    post:
+      operationId: rettificaLotto
+      tags: [lotti]
+      summary: Registra una rettifica inventariale atomica e auditata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RettificaLottoInput"
+      responses:
+        "200":
+          description: Lot adjusted and movement appended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lotto"
     patch:
       operationId: updateLotto
       tags: [lotti]
@@ -427,6 +460,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of movements
@@ -436,22 +475,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Movimento"
-    post:
-      operationId: createMovimento
-      tags: [movimenti]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/MovimentoInput"
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Movimento"
 
   # ─── GIACENZE ────────────────────────────────────────────────────────────────
   /giacenze:
@@ -514,6 +537,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of transfers
@@ -591,6 +620,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
           description: Transfer started
@@ -647,6 +682,16 @@ paths:
     get:
       operationId: listScarichi
       tags: [scarichi]
+      parameters:
+        - name: centroAscoltoId
+          in: query
+          schema: { type: integer }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of warehouse discharges
@@ -794,8 +839,12 @@ paths:
           schema:
             type: integer
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Supplier deactivated without deleting historical data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fornitore"
 
   # ─── APPROVVIGIONAMENTI ──────────────────────────────────────────────────────
   /approvvigionamenti:
@@ -815,6 +864,12 @@ paths:
           in: query
           schema:
             type: integer
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of procurements
@@ -892,6 +947,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
           description: Submitted
@@ -1060,6 +1121,21 @@ paths:
           schema:
             type: string
             enum: [provvisoria, completa]
+        - name: page
+          in: query
+          description: Pagina richiesta, a partire da 1.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Numero massimo di risultati per pagina.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
       responses:
         "200":
           description: List of beneficiaries
@@ -1068,7 +1144,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Beneficiario"
+                  $ref: "#/components/schemas/BeneficiarioDirectory"
     post:
       operationId: createBeneficiario
       tags: [beneficiari]
@@ -1090,7 +1166,7 @@ paths:
     get:
       operationId: cercaBeneficiariSimili
       tags: [beneficiari]
-      summary: Person lookup and fuzzy duplicate suggestions within one città
+      summary: Ricerca persone e suggerimenti anti-duplicato all'interno di una sola Area
       parameters:
         - name: search
           in: query
@@ -1120,7 +1196,7 @@ paths:
             type: string
         - name: cittaId
           in: query
-          description: Required for global users; ignored for users already scoped to a città, whose own città is always used
+          description: Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
           schema:
             type: integer
             minimum: 1
@@ -1205,6 +1281,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Beneficiario"
+        "409":
+          description: La versione inviata non è più corrente
     delete:
       operationId: deleteBeneficiario
       tags: [beneficiari]
@@ -1216,7 +1294,56 @@ paths:
             type: integer
       responses:
         "204":
-          description: Deleted
+          description: Beneficiario disattivato; storico preservato
+
+  /beneficiari/{id}/stato:
+    patch:
+      operationId: updateBeneficiarioStato
+      tags: [beneficiari]
+      summary: Disattiva o riattiva un beneficiario preservandone lo storico
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeneficiarioStatoInput"
+      responses:
+        "200":
+          description: Stato aggiornato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beneficiario"
+        "409":
+          description: La versione inviata non è più corrente
+
+  /beneficiari/export/authorize:
+    post:
+      operationId: authorizeBeneficiariExport
+      tags: [beneficiari]
+      summary: Autorizza e registra nell'audit un'esportazione di dati beneficiari
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeneficiariExportInput"
+      responses:
+        "200":
+          description: Esportazione autorizzata e auditata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [autorizzato, auditId]
+                properties:
+                  autorizzato: { type: boolean }
+                  auditId: { type: integer }
 
   /beneficiari/{id}/nucleo:
     get:
@@ -1261,6 +1388,31 @@ paths:
                 $ref: "#/components/schemas/NucleoFamiliare"
 
   /beneficiari/{id}/nucleo/{membroId}:
+    patch:
+      operationId: updateNucleoFamiliare
+      tags: [beneficiari]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: membroId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NucleoFamiliareInput"
+      responses:
+        "200":
+          description: Membro aggiornato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NucleoFamiliare"
     delete:
       operationId: deleteNucleoFamiliare
       tags: [beneficiari]
@@ -1444,7 +1596,7 @@ paths:
             default: 200
       responses:
         "200":
-          description: List of interventions
+          description: Per l'ambito Sociale restituisce una proiezione minimale senza note, descrizione, risultato o altri contenuti estesi; il dettaglio completo è disponibile su GET /interventi/{id}. L'ambito UDS conserva il DTO storico completo.
           content:
             application/json:
               schema:
@@ -1717,7 +1869,7 @@ paths:
     post:
       operationId: concludiIntervento
       tags: [interventi]
-      description: Salva i dati operativi, conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato.
+      description: Conclude l'intervento e, se richiesto, crea atomicamente un successivo collegato. Il permesso complete consente risultato, esito e note finali; attività, materiali o documenti richiedono anche il permesso update.
       parameters:
         - name: id
           in: path
@@ -1796,7 +1948,7 @@ paths:
     post:
       operationId: transitionIntervento
       tags: [interventi]
-      description: Esegue atomicamente una transizione di stato consentita e la registra nello storico append-only.
+      description: Esegue atomicamente una transizione di pianificazione Sociale (da_pianificare ↔ pianificato) e la registra nello storico append-only. Avvio, conclusione, annullamento e mancata presentazione Sociali richiedono i rispettivi comandi dedicati; il comportamento UDS resta compatibile con il workflow esistente.
       parameters:
         - name: id
           in: path
@@ -2194,6 +2346,8 @@ paths:
           in: query
           schema:
             type: string
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
         - name: beneficiarioId
           in: query
           schema:
@@ -2341,6 +2495,8 @@ paths:
           in: query
           schema:
             type: string
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
           description: List of Emporio checkout sessions
@@ -2477,6 +2633,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioVersioneInput"
       responses:
         "200":
           description: Updated checkout session
@@ -2495,6 +2657,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioVersioneInput"
       responses:
         "200":
           description: Suspended checkout session
@@ -2513,6 +2681,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioVersioneInput"
       responses:
         "200":
           description: Resumed checkout session
@@ -2555,6 +2729,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioVersioneInput"
       responses:
         "200":
           description: Checkout session ready for later closure
@@ -2574,7 +2754,7 @@ paths:
           schema:
             type: integer
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
@@ -2683,6 +2863,8 @@ paths:
           in: query
           schema:
             type: integer
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
           description: Closed Emporio expenses
@@ -2795,6 +2977,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/BollaEmporioEmailResult"
 
+  /spese-emporio/{id}/storna:
+    post:
+      operationId: stornaSpesaEmporio
+      tags: [spese-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpesaEmporioStornoInput"
+      responses:
+        "201":
+          description: Storno compensativo creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpesaEmporioStornoResult"
+        "409":
+          description: Quantità già stornata, over-storno o double-submit concorrente
+
   # ─── BOLLE ───────────────────────────────────────────────────────────────────
   /bolle:
     get:
@@ -2813,6 +3027,12 @@ paths:
           in: query
           schema:
             type: integer
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
           description: List of delivery bills
@@ -3083,7 +3303,11 @@ paths:
           description: Interventi pianificati con sede esplicita, minimizzati e scoped
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MapsMarker" },
+                }
 
   /maps/layers/pacchi/consegne:
     get:
@@ -3097,7 +3321,11 @@ paths:
           description: Consegne domiciliari scoped con snapshot di indirizzo
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MapsMarker" },
+                }
 
   /maps/layers/pacchi/ritiri-non-effettuati:
     get:
@@ -3111,7 +3339,11 @@ paths:
           description: Ritiri non effettuati ancora da convertire e dotati di domicilio utilizzabile, scoped sul dominio Bolla
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MapsMarker" },
+                }
 
   /maps/layers/centro/punti-operativi:
     get:
@@ -3122,7 +3354,11 @@ paths:
           description: Magazzini e Centri di Ascolto attivi con indirizzo e accessibili al caller
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/MapsMarker" } }
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MapsMarker" },
+                }
 
   /maps/routes/consegne/{id}:
     get:
@@ -4037,6 +4273,40 @@ paths:
                 items:
                   $ref: "#/components/schemas/CreditoSolidaleMovimento"
 
+  /credito-solidale/beneficiari:
+    get:
+      operationId: listCreditoSolidaleBeneficiari
+      tags: [credito-solidale]
+      summary: Elenco economico dedicato ai soli utenti con permesso Credito Solidale
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+        - { name: centroAscoltoId, in: query, schema: { type: integer } }
+        - {
+            name: cittaId,
+            in: query,
+            description: Identificativo tecnico legacy dell'Area,
+            schema: { type: integer },
+          }
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
+      responses:
+        "200":
+          description: Proiezione dedicata Credito Solidale
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  { $ref: "#/components/schemas/CreditoSolidaleBeneficiario" }
+
   /credito-solidale/beneficiari/{beneficiarioId}/saldo:
     get:
       operationId: getCreditoSolidaleBeneficiarioSaldo
@@ -4054,6 +4324,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreditoSolidaleSaldo"
+
+  /credito-solidale/beneficiari/{beneficiarioId}/configurazione:
+    patch:
+      operationId: updateCreditoSolidaleBeneficiarioConfigurazione
+      tags: [credito-solidale]
+      summary: Aggiorna abilitazione e quota senza esporle al DTO anagrafico generico
+      parameters:
+        - name: beneficiarioId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditoSolidaleConfigurazioneInput"
+      responses:
+        "200":
+          description: Configurazione aggiornata e auditata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditoSolidaleConfigurazione"
 
   /credito-solidale/beneficiari/{beneficiarioId}/refresh-credito:
     post:
@@ -4857,7 +5151,17 @@ paths:
           required: true
           schema:
             type: string
-            enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+            enum:
+              [
+                generale,
+                pacchi,
+                centro-ascolto,
+                emporio,
+                mensa,
+                uds,
+                magazzino-logistica,
+                fse-plus,
+              ]
         - name: metric
           in: query
           required: true
@@ -4897,7 +5201,17 @@ paths:
           required: true
           schema:
             type: string
-            enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+            enum:
+              [
+                generale,
+                pacchi,
+                centro-ascolto,
+                emporio,
+                mensa,
+                uds,
+                magazzino-logistica,
+                fse-plus,
+              ]
         - $ref: "#/components/parameters/ReportCittaId"
       responses:
         "200":
@@ -5441,16 +5755,22 @@ paths:
       tags: [mensa]
       parameters:
         - { name: mensaId, in: query, schema: { type: integer } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
       responses:
         "200":
           description: Accessi recenti
           content:
             application/json:
               schema:
-                {
-                  type: array,
-                  items: { $ref: "#/components/schemas/MensaAccesso" },
-                }
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/MensaAccesso" }
+                  - $ref: "#/components/schemas/MensaAccessiPage"
 
   /mensa/accessi/{id}/eccezione:
     post:
@@ -5465,7 +5785,7 @@ paths:
             schema: { $ref: "#/components/schemas/MensaEccezioneInput" }
       responses:
         "200":
-          description: Eccezione autorizzata nella stessa città
+          description: Eccezione autorizzata nella stessa Area
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MensaAccesso" }
@@ -5478,16 +5798,22 @@ paths:
         - { name: mensaId, in: query, schema: { type: integer } }
         - { name: data, in: query, schema: { type: string, format: date } }
         - { name: tipoServizio, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
       responses:
         "200":
           description: Pasti operativi
           content:
             application/json:
               schema:
-                {
-                  type: array,
-                  items: { $ref: "#/components/schemas/MensaPasto" },
-                }
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/MensaPasto" }
+                  - $ref: "#/components/schemas/MensaPastiPage"
     post:
       operationId: createPastoMensa
       tags: [mensa]
@@ -5513,16 +5839,23 @@ paths:
     get:
       operationId: listEccezioniMensa
       tags: [mensa]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
       responses:
         "200":
           description: Eccezioni auditate
           content:
             application/json:
               schema:
-                {
-                  type: array,
-                  items: { $ref: "#/components/schemas/MensaEccezione" },
-                }
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/MensaEccezione" }
+                  - $ref: "#/components/schemas/MensaEccezioniPage"
 
   /mensa/logistica/magazzini:
     get:
@@ -5552,7 +5885,7 @@ paths:
           }
       responses:
         "200":
-          description: Disponibilità FEFO non scaduta
+          description: Giacenza fisica, impegnata e reale secondo il calcolo canonico di Magazzino
           content:
             application/json:
               schema:
@@ -5565,16 +5898,24 @@ paths:
     get:
       operationId: listTrasferimentiMensa
       tags: [mensa]
+      description: Richiede mensa.transfers.request (oppure il permesso legacy mensa.transfers.manage). La spedizione resta riservata a magazzino.transfers.dispatch; la ricezione richiede mensa.transfers.receive.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
       responses:
         "200":
           description: Trasferimenti associati alle Mense
           content:
             application/json:
               schema:
-                {
-                  type: array,
-                  items: { type: object, additionalProperties: true },
-                }
+                oneOf:
+                  - type: array
+                    items: { type: object, additionalProperties: true }
+                  - $ref: "#/components/schemas/MensaTrasferimentiPage"
     post:
       operationId: createTrasferimentoMensa
       tags: [mensa]
@@ -5594,6 +5935,116 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+
+  /mensa/consumi:
+    get:
+      operationId: listConsumiMensa
+      tags: [mensa]
+      parameters:
+        - { name: mensaId, in: query, schema: { type: integer } }
+        - { name: data, in: query, schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200 },
+          }
+      responses:
+        "200":
+          description: Consumi e scarti dichiarati, inclusi gli eventuali storni
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/MensaConsumo" }
+                  - $ref: "#/components/schemas/MensaConsumiPage"
+    post:
+      operationId: createConsumoMensa
+      tags: [mensa]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaConsumoInput" }
+      responses:
+        "200":
+          description: Replay idempotente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaConsumo" }
+        "201":
+          description: Consumo o scarto registrato sul ledger di Magazzino
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaConsumo" }
+        "409": { description: Giacenza insufficiente o giornata chiusa }
+
+  /mensa/consumi/{id}/storno:
+    post:
+      operationId: stornaConsumoMensa
+      tags: [mensa]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaStornoInput" }
+      responses:
+        "200": { description: Storno compensativo registrato }
+        "409": { description: Consumo già stornato o giornata chiusa }
+
+  /mensa/giornate:
+    get:
+      operationId: listGiornateMensa
+      tags: [mensa]
+      parameters:
+        - { name: mensaId, in: query, schema: { type: integer } }
+        - { name: data, in: query, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: Giornate di servizio visibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MensaGiornata" }
+
+  /mensa/giornate/{id}/chiudi:
+    post:
+      operationId: chiudiGiornataMensa
+      tags: [mensa]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaChiusuraInput" }
+      responses:
+        "200":
+          description: Giornata chiusa con snapshot riepilogativo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaGiornata" }
+
+  /mensa/giornate/{id}/riapri:
+    post:
+      operationId: riapriGiornataMensa
+      tags: [mensa]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MensaRiaperturaInput" }
+      responses:
+        "200":
+          description: Giornata riaperta con audit obbligatorio
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MensaGiornata" }
 
   /mensa/report:
     get:
@@ -5859,6 +6310,16 @@ paths:
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
   parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Pagina richiesta, indicizzata da 1
+      schema: { type: integer, minimum: 1, default: 1 }
+    LimitParam:
+      name: limit
+      in: query
+      description: Numero di record per pagina
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
     ReportDa:
       name: da
       in: query
@@ -5920,7 +6381,13 @@ components:
   schemas:
     MapsLayerCode:
       type: string
-      enum: [sociale.interventi_pianificati, pacchi.consegne, pacchi.ritiri_non_effettuati, centro.punti_operativi]
+      enum:
+        [
+          sociale.interventi_pianificati,
+          pacchi.consegne,
+          pacchi.ritiri_non_effettuati,
+          centro.punti_operativi,
+        ]
     MapsLayerCapability:
       type: object
       required: [code, domain, label, routeSupported]
@@ -5940,11 +6407,27 @@ components:
     MapsMarker:
       type: object
       description: DTO geografico minimizzato; non contiene dati sociali o anagrafici
-      required: [id, layer, entityType, entityId, title, subtitle, status, address, date, actions]
+      required:
+        [
+          id,
+          layer,
+          entityType,
+          entityId,
+          title,
+          subtitle,
+          status,
+          address,
+          date,
+          actions,
+        ]
       properties:
         id: { type: string }
         layer: { $ref: "#/components/schemas/MapsLayerCode" }
-        entityType: { type: string, enum: [intervento, consegna, bolla, magazzino, centro_ascolto] }
+        entityType:
+          {
+            type: string,
+            enum: [intervento, consegna, bolla, magazzino, centro_ascolto],
+          }
         entityId: { type: integer }
         title: { type: string }
         subtitle: { type: [string, "null"] }
@@ -5965,11 +6448,32 @@ components:
 
     ReportingDashboard:
       type: object
-      required: [section, filters, kpi, series, tables, quality, definitions, generatedAt, timezone]
+      required:
+        [
+          section,
+          filters,
+          kpi,
+          series,
+          tables,
+          quality,
+          definitions,
+          generatedAt,
+          timezone,
+        ]
       properties:
         section:
           type: string
-          enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+          enum:
+            [
+              generale,
+              pacchi,
+              centro-ascolto,
+              emporio,
+              mensa,
+              uds,
+              magazzino-logistica,
+              fse-plus,
+            ]
         filters:
           $ref: "#/components/schemas/ReportAppliedFilters"
         kpi:
@@ -5992,7 +6496,20 @@ components:
 
     ReportAppliedFilters:
       type: object
-      required: [da, a, anno, cittaId, centroAscoltoId, magazzinoId, mensaId, zonaUdsId, operatoreId, tipoIntervento, tipoServizio]
+      required:
+        [
+          da,
+          a,
+          anno,
+          cittaId,
+          centroAscoltoId,
+          magazzinoId,
+          mensaId,
+          zonaUdsId,
+          operatoreId,
+          tipoIntervento,
+          tipoServizio,
+        ]
       properties:
         da: { type: string, format: date }
         a: { type: string, format: date }
@@ -6012,7 +6529,8 @@ components:
       properties:
         key: { type: string }
         value: { type: [number, "null"] }
-        unit: { type: string, enum: [count, quantity, kg, credit, days, average] }
+        unit:
+          { type: string, enum: [count, quantity, kg, credit, days, average] }
         availability: { type: string, enum: [ok, derivable, missing] }
         drilldownMetric: { type: [string, "null"] }
 
@@ -6087,7 +6605,17 @@ components:
       properties:
         section:
           type: string
-          enum: [generale, pacchi, centro-ascolto, emporio, mensa, uds, magazzino-logistica, fse-plus]
+          enum:
+            [
+              generale,
+              pacchi,
+              centro-ascolto,
+              emporio,
+              mensa,
+              uds,
+              magazzino-logistica,
+              fse-plus,
+            ]
         cities:
           type: array
           items: { $ref: "#/components/schemas/ReportFilterOption" }
@@ -6287,6 +6815,7 @@ components:
           type: string
         nome:
           type: string
+          minLength: 1
         indirizzo:
           type: ["string", "null"]
         comune:
@@ -6385,6 +6914,7 @@ components:
           type: string
         nome:
           type: string
+          minLength: 1
         indirizzo:
           type: string
         comune:
@@ -6418,6 +6948,7 @@ components:
           type: string
         nome:
           type: string
+          minLength: 1
         indirizzo:
           type: string
         comune:
@@ -6677,6 +7208,10 @@ components:
           type: string
         quantitaCaricata:
           type: number
+          exclusiveMinimum: 0
+        causale:
+          type: string
+          enum: [acquisto, donazione, fse_plus]
         magazzinoId:
           type: integer
         fornitoreId:
@@ -6687,7 +7222,7 @@ components:
           type: string
         note:
           type: string
-      required: [prodottoId, dataCarico, quantitaCaricata, magazzinoId]
+      required: [prodottoId, dataCarico, quantitaCaricata, magazzinoId, causale]
 
     LottoUpdate:
       type: object
@@ -6696,10 +7231,25 @@ components:
           type: string
         dataScadenza:
           type: string
-        quantitaResidua:
-          type: number
+        documentoCarico:
+          type: string
         note:
           type: string
+
+    RettificaLottoInput:
+      type: object
+      properties:
+        delta:
+          type: number
+          not: { const: 0 }
+        causale:
+          type: string
+          enum: [inventario_fisico, errore_registrazione, deterioramento, altro]
+        motivazione:
+          type: string
+        note:
+          type: string
+      required: [delta, causale]
 
     # ── Movimenti ─────────────────────────────────────────────────────────
     Movimento:
@@ -6730,6 +7280,10 @@ components:
         fornitoreId:
           type: ["integer", "null"]
         beneficiarioId:
+          type: ["integer", "null"]
+        movimentoOrigineId:
+          type: ["integer", "null"]
+        operatoreId:
           type: ["integer", "null"]
         documentoRiferimento:
           type: ["string", "null"]
@@ -6810,6 +7364,13 @@ components:
           type: number
         giacenzaFisica:
           type: number
+          description: Quantità fisicamente presente, inclusi i lotti scaduti.
+        giacenzaScaduta:
+          type: number
+          description: Quantità fisicamente presente su lotti scaduti alla data civile Europe/Rome.
+        giacenzaDistribuibile:
+          type: number
+          description: Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome.
         impegnato:
           type: number
         disponibileReale:
@@ -6835,6 +7396,8 @@ components:
           magazzinoNome,
           quantitaTotale,
           giacenzaFisica,
+          giacenzaScaduta,
+          giacenzaDistribuibile,
           impegnato,
           disponibileReale,
           scortaMinima,
@@ -6922,6 +7485,8 @@ components:
           type: integer
         codice:
           type: string
+        versione:
+          type: integer
         magazzinoOrigineId:
           type: integer
         magazzinoOrigineNome:
@@ -6976,6 +7541,7 @@ components:
         [
           id,
           codice,
+          versione,
           magazzinoOrigineId,
           magazzinoDestinoId,
           dataRichiesta,
@@ -7007,10 +7573,9 @@ components:
     TrasferimentoUpdate:
       type: object
       properties:
-        stato:
-          type: string
-        dataEsecuzione:
-          type: string
+        versione:
+          type: integer
+          minimum: 1
         trasportatoreVolontarioId:
           type: ["integer", "null"]
         trasportatoreNome:
@@ -7021,6 +7586,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TrasferimentoRigaInput"
+      required: [versione]
 
     TrasferimentoRiga:
       type: object
@@ -7035,6 +7601,10 @@ components:
           type: ["integer", "null"]
         fsePlus:
           type: boolean
+        fsePlusQuantita:
+          type: number
+        nonFsePlusQuantita:
+          type: number
         quantita:
           type: number
         unitaMisura:
@@ -7054,9 +7624,12 @@ components:
           type: number
         unitaMisura:
           type: string
+          description: >-
+            Campo legacy opzionale. Se valorizzato deve coincidere con l'unità
+            canonica del Prodotto; il server persiste sempre prodotti.unita_misura.
         note:
           type: string
-      required: [prodottoId, quantita, unitaMisura]
+      required: [prodottoId, quantita]
 
     # ── Scarichi ──────────────────────────────────────────────────────────
     Scarico:
@@ -7127,6 +7700,10 @@ components:
           type: ["string", "null"]
         fsePlus:
           type: boolean
+        fsePlusQuantita:
+          type: number
+        nonFsePlusQuantita:
+          type: number
         quantita:
           type: number
         unitaMisura:
@@ -7151,10 +7728,22 @@ components:
     ConfermaRicezione:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         note:
           type: string
         dataConferma:
           type: string
+      required: [versione]
+
+    VersioneInput:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
 
     # ── Fornitori ─────────────────────────────────────────────────────────
     Fornitore:
@@ -7267,6 +7856,8 @@ components:
           type: integer
         codice:
           type: string
+        versione:
+          type: integer
         fornitoreId:
           type: ["integer", "null"]
         fornitoreNome:
@@ -7297,7 +7888,7 @@ components:
             $ref: "#/components/schemas/ApprovvigionamentoRiga"
         dataCreazione:
           type: string
-      required: [id, codice, dataRichiesta, stato, dataCreazione]
+      required: [id, codice, versione, dataRichiesta, stato, dataCreazione]
 
     ApprovvigionamentoInput:
       type: object
@@ -7320,11 +7911,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ApprovvigionamentoRigaInput"
-      required: [fornitoreId, cittaId, dataRichiesta, righe]
+      required: [fornitoreId, cittaId, magazzinoId, dataRichiesta, righe]
 
     ApprovvigionamentoUpdate:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         stato:
           type: string
         fornitoreId:
@@ -7341,6 +7935,11 @@ components:
           type: string
         note:
           type: string
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovvigionamentoRigaInput"
+      required: [versione]
 
     ApprovvigionamentoRiga:
       type: object
@@ -7493,7 +8092,7 @@ components:
     # ── Beneficiari ───────────────────────────────────────────────────────
     BeneficiarioSimile:
       type: object
-      required: [id, codice, nome, cognome, score]
+      required: [id, codice, nome, cognome, uds, versione, score]
       properties:
         id:
           type: integer
@@ -7523,10 +8122,67 @@ components:
           type: ["string", "null"]
         uds:
           type: boolean
+        versione:
+          type: integer
+          minimum: 1
         score:
           type: number
+
+    BeneficiarioDirectory:
+      type: object
+      description: Proiezione minima usata negli elenchi, priva di dati sociali ed economici sensibili.
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        statoAnagrafica: { type: string, enum: [provvisoria, completa] }
+        cognome: { type: string }
+        nome: { type: string }
+        soprannome: { type: ["string", "null"] }
+        dataNascita: { type: ["string", "null"] }
+        fasciaEtaPresunta:
+          type: ["string", "null"]
+          enum: ["0_17", "18_29", "30_64", "65_plus", null]
+        fasciaEtaCorrente:
+          type: string
+          enum: ["0_17", "18_29", "30_64", "65_plus", "non_determinata"]
+        fasciaEtaOrigine:
+          { type: string, enum: [calcolata, presunta, non_determinata] }
+        telefono: { type: ["string", "null"] }
+        centroAscoltoId: { type: ["integer", "null"] }
+        centroAscoltoNome: { type: ["string", "null"] }
+        cittaId:
+          {
+            type: ["integer", "null"],
+            description: Identificativo tecnico legacy dell'Area.,
+          }
+        cittaNome: { type: ["string", "null"] }
+        zonaUdsId: { type: ["integer", "null"] }
+        zonaUdsNome: { type: ["string", "null"] }
+        uds: { type: boolean }
+        attivo: { type: boolean }
+        priorita: { type: string, enum: [bassa, media, alta, urgente] }
+        consegnaDomicilio: { type: boolean }
+        versione: { type: integer, minimum: 1 }
+      required:
+        [
+          id,
+          codice,
+          statoAnagrafica,
+          cognome,
+          nome,
+          fasciaEtaPresunta,
+          fasciaEtaCorrente,
+          fasciaEtaOrigine,
+          uds,
+          attivo,
+          priorita,
+          consegnaDomicilio,
+          versione,
+        ]
+
     Beneficiario:
       type: object
+      description: Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
       properties:
         id:
           type: integer
@@ -7578,6 +8234,7 @@ components:
           type: integer
         priorita:
           type: string
+          enum: [bassa, media, alta, urgente]
         consegnaDomicilio:
           type: boolean
         centroAscoltoId:
@@ -7630,6 +8287,11 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
+        dataAggiornamento:
+          type: string
+        versione:
+          type: integer
+          minimum: 1
       required:
         [
           id,
@@ -7645,17 +8307,11 @@ components:
           numAnziani,
           priorita,
           consegnaDomicilio,
-          creditoSolidaleAbilitato,
-          creditoSolidaleStato,
-          creditoSolidaleMensileAssegnato,
-          creditoSolidaleSaldo,
-          creditoSolidaleDataUltimoMovimento,
-          creditoSolidaleMensileManuale,
-          creditoSolidaleMotivoModifica,
-          creditoSolidaleDataUltimaModificaQuota,
           uds,
           attivo,
           dataCreazione,
+          dataAggiornamento,
+          versione,
         ]
 
     BeneficiarioDettaglio:
@@ -7727,6 +8383,7 @@ components:
           type: ["string", "null"]
         priorita:
           type: string
+          enum: [bassa, media, alta, urgente]
         consegnaDomicilio:
           type: boolean
         motivoConsegnaDomicilio:
@@ -7795,6 +8452,11 @@ components:
             $ref: "#/components/schemas/Consegna"
         dataCreazione:
           type: string
+        dataAggiornamento:
+          type: string
+        versione:
+          type: integer
+          minimum: 1
       required:
         [
           id,
@@ -7813,20 +8475,15 @@ components:
           numDisabili,
           priorita,
           consegnaDomicilio,
-          creditoSolidaleAbilitato,
-          creditoSolidaleStato,
-          creditoSolidaleMensileAssegnato,
-          creditoSolidaleSaldo,
-          creditoSolidaleDataUltimoMovimento,
-          creditoSolidaleMensileManuale,
-          creditoSolidaleMotivoModifica,
-          creditoSolidaleDataUltimaModificaQuota,
           attivo,
           dataCreazione,
+          dataAggiornamento,
+          versione,
         ]
 
     BeneficiarioInput:
       type: object
+      additionalProperties: false
       properties:
         codice:
           type: string
@@ -7882,35 +8539,15 @@ components:
           type: string
         priorita:
           type: string
+          enum: [bassa, media, alta, urgente]
         consegnaDomicilio:
           type: boolean
         motivoConsegnaDomicilio:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
-        creditoSolidaleAbilitato:
-          type: boolean
-        creditoSolidaleStato:
-          type: string
-          enum: [non_abilitato, attivo, sospeso, revocato]
-        creditoSolidaleDataAbilitazione:
-          type: ["string", "null"]
-          format: date-time
-        creditoSolidaleNote:
-          type: ["string", "null"]
         magazzinoEmporioPreferitoId:
           type: ["integer", "null"]
-        creditoSolidaleMensileAssegnato:
-          type: ["number", "null"]
-        creditoSolidaleMensileManuale:
-          type: boolean
-        creditoSolidaleMotivoModifica:
-          type: ["string", "null"]
-        creditoSolidaleDataUltimaModificaQuota:
-          type: ["string", "null"]
-          format: date-time
-        creditoSolidaleMensileSuggerito:
-          type: ["number", "null"]
         dataPresaInCarico:
           type: string
         noteInterne:
@@ -7932,6 +8569,7 @@ components:
 
     BeneficiarioUpdate:
       type: object
+      additionalProperties: false
       properties:
         codiceFiscale:
           type: ["string", "null"]
@@ -7986,38 +8624,16 @@ components:
           type: string
         priorita:
           type: string
+          enum: [bassa, media, alta, urgente]
         consegnaDomicilio:
           type: boolean
         motivoConsegnaDomicilio:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
-        creditoSolidaleAbilitato:
-          type: boolean
-        creditoSolidaleStato:
-          type: string
-          enum: [non_abilitato, attivo, sospeso, revocato]
-        creditoSolidaleDataAbilitazione:
-          type: ["string", "null"]
-          format: date-time
-        creditoSolidaleNote:
-          type: ["string", "null"]
         magazzinoEmporioPreferitoId:
           type: ["integer", "null"]
-        creditoSolidaleMensileAssegnato:
-          type: ["number", "null"]
-        creditoSolidaleMensileManuale:
-          type: boolean
-        creditoSolidaleMotivoModifica:
-          type: ["string", "null"]
-        creditoSolidaleDataUltimaModificaQuota:
-          type: ["string", "null"]
-          format: date-time
-        creditoSolidaleMensileSuggerito:
-          type: ["number", "null"]
         uds:
-          type: boolean
-        attivo:
           type: boolean
         noteInterne:
           type: string
@@ -8032,6 +8648,27 @@ components:
           enum: [M, F, ALTRO]
         areaProvenienza:
           type: string
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
+
+    BeneficiarioStatoInput:
+      type: object
+      additionalProperties: false
+      properties:
+        attivo: { type: boolean }
+        versione: { type: integer, minimum: 1 }
+      required: [attivo, versione]
+
+    BeneficiariExportInput:
+      type: object
+      additionalProperties: false
+      properties:
+        tipo: { type: string, enum: [lista, scheda, dossier, interventi] }
+        beneficiarioId: { type: ["integer", "null"] }
+        numeroRecord: { type: integer, minimum: 0, maximum: 100000 }
+      required: [tipo, numeroRecord]
 
     PoliticaCreditoSolidale:
       type: object
@@ -8355,6 +8992,44 @@ components:
           annullatoDaMovimentoId,
         ]
 
+    CreditoSolidaleBeneficiario:
+      type: object
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        codiceFiscale: { type: ["string", "null"] }
+        cognome: { type: string }
+        nome: { type: string }
+        centroAscoltoId: { type: ["integer", "null"] }
+        centroAscoltoNome: { type: ["string", "null"] }
+        cittaId:
+          {
+            type: ["integer", "null"],
+            description: Identificativo tecnico legacy dell'Area.,
+          }
+        cittaNome: { type: ["string", "null"] }
+        attivo: { type: boolean }
+        creditoSolidaleAbilitato: { type: boolean }
+        creditoSolidaleStato:
+          { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleSaldo: { type: number }
+        creditoSolidaleMensileAssegnato: { type: ["number", "null"] }
+        creditoSolidaleDataUltimoMovimento:
+          { type: ["string", "null"], format: date-time }
+        magazzinoEmporioPreferitoId: { type: ["integer", "null"] }
+        magazzinoEmporioPreferitoNome: { type: ["string", "null"] }
+      required:
+        [
+          id,
+          codice,
+          cognome,
+          nome,
+          attivo,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          creditoSolidaleSaldo,
+        ]
+
     CreditoSolidaleSaldo:
       type: object
       properties:
@@ -8383,6 +9058,45 @@ components:
           saldoAttuale,
           creditoSolidaleMensileAssegnato,
           dataUltimoMovimento,
+        ]
+
+    CreditoSolidaleConfigurazioneInput:
+      type: object
+      additionalProperties: false
+      properties:
+        creditoSolidaleAbilitato: { type: boolean }
+        creditoSolidaleStato:
+          { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleNote: { type: ["string", "null"] }
+        creditoSolidaleMensileAssegnato:
+          { type: ["number", "null"], minimum: 0 }
+        creditoSolidaleMensileSuggerito:
+          { type: ["number", "null"], minimum: 0 }
+        creditoSolidaleMotivoModifica: { type: ["string", "null"] }
+
+    CreditoSolidaleConfigurazione:
+      type: object
+      properties:
+        beneficiarioId: { type: integer }
+        creditoSolidaleAbilitato: { type: boolean }
+        creditoSolidaleStato:
+          { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
+        creditoSolidaleNote: { type: ["string", "null"] }
+        creditoSolidaleMensileAssegnato: { type: ["number", "null"] }
+        creditoSolidaleMensileManuale: { type: boolean }
+        creditoSolidaleMotivoModifica: { type: ["string", "null"] }
+        creditoSolidaleDataUltimaModificaQuota:
+          { type: ["string", "null"], format: date-time }
+      required:
+        [
+          beneficiarioId,
+          creditoSolidaleAbilitato,
+          creditoSolidaleStato,
+          creditoSolidaleNote,
+          creditoSolidaleMensileAssegnato,
+          creditoSolidaleMensileManuale,
+          creditoSolidaleMotivoModifica,
+          creditoSolidaleDataUltimaModificaQuota,
         ]
 
     CreditoSolidaleRefreshInput:
@@ -8872,10 +9586,12 @@ components:
 
     ImpostazioniEmail:
       type: object
+      description: Le credenziali SMTP sono gestite esclusivamente tramite variabili MAIL_* e secret di ambiente; i campi SMTP restituiti sono legacy e non usati dal runtime.
       properties:
         provider:
           type: string
           enum: [connector, smtp]
+          deprecated: true
         mittenteEmail:
           type: ["string", "null"]
         mittenteNome:
@@ -8884,39 +9600,34 @@ components:
           type: ["string", "null"]
         smtpHost:
           type: ["string", "null"]
+          deprecated: true
         smtpPort:
           type: ["integer", "null"]
+          deprecated: true
         smtpSecure:
           type: boolean
+          deprecated: true
         smtpUser:
           type: ["string", "null"]
+          deprecated: true
         hasPassword:
+          type: boolean
+          deprecated: true
+        smtpManagedByEnvironment:
           type: boolean
         dataAggiornamento:
           type: string
-      required: [provider, smtpSecure, hasPassword]
+      required: [provider, smtpSecure, hasPassword, smtpManagedByEnvironment]
 
     ImpostazioniEmailUpdate:
       type: object
+      description: Aggiorna solo metadati non sensibili. Server e credenziali SMTP devono essere configurati tramite MAIL_* e secret di ambiente.
       properties:
-        provider:
-          type: string
-          enum: [connector, smtp]
         mittenteEmail:
           type: ["string", "null"]
         mittenteNome:
           type: ["string", "null"]
         adminEmail:
-          type: ["string", "null"]
-        smtpHost:
-          type: ["string", "null"]
-        smtpPort:
-          type: ["integer", "null"]
-        smtpSecure:
-          type: boolean
-        smtpUser:
-          type: ["string", "null"]
-        smtpPassword:
           type: ["string", "null"]
 
     ImpostazioniModuli:
@@ -9484,10 +10195,79 @@ components:
           dataOraConclusione,
           avviso,
           interventoPrecedenteId,
-          successoriIds,
           numeroSuccessori,
           sede,
-          motivoAnnullamento,
+          dataCreazione,
+          dataAggiornamento,
+          bisogniPianificatiTotale,
+          bisogniPianificatiAperti,
+          bisogniPianificatiScaduti,
+          bisogniPianificatiProssimaScadenza,
+        ]
+
+    InterventoListItem:
+      type: object
+      description: Proiezione minimale per liste, calendario e dashboard; non include note o contenuti sociali estesi.
+      properties:
+        id: { type: integer }
+        beneficiarioId: { type: integer }
+        beneficiarioNome: { type: [string, "null"] }
+        beneficiarioCodice: { type: [string, "null"] }
+        nucleoFamiliareSintesi: { type: [string, "null"] }
+        operatoreId: { type: [integer, "null"] }
+        operatoreCodice: { type: [string, "null"] }
+        operatoreNome: { type: [string, "null"] }
+        centroAscoltoId: { type: [integer, "null"] }
+        centroAscoltoNome: { type: [string, "null"] }
+        cittaId: { type: [integer, "null"] }
+        dataIntervento: { type: [string, "null"], format: date }
+        tipoIntervento: { type: string }
+        stato: { $ref: "#/components/schemas/InterventoStato" }
+        ambito:
+          anyOf:
+            - $ref: "#/components/schemas/InterventoAmbito"
+            - type: "null"
+        ambitoLegacy: { type: boolean }
+        priorita: { $ref: "#/components/schemas/InterventoPriorita" }
+        dataOraPianificata: { type: [string, "null"], format: date-time }
+        dataOraAvvio: { type: [string, "null"], format: date-time }
+        dataOraConclusione: { type: [string, "null"], format: date-time }
+        avviso: { $ref: "#/components/schemas/InterventoAvviso" }
+        interventoPrecedenteId: { type: [integer, "null"] }
+        numeroSuccessori: { type: integer }
+        sede: { type: [string, "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: [string, "null"], format: date-time }
+        bisogniPianificatiTotale: { type: integer }
+        bisogniPianificatiAperti: { type: integer }
+        bisogniPianificatiScaduti: { type: integer }
+        bisogniPianificatiProssimaScadenza: { type: [string, "null"] }
+      required:
+        [
+          id,
+          beneficiarioId,
+          beneficiarioNome,
+          beneficiarioCodice,
+          nucleoFamiliareSintesi,
+          operatoreId,
+          operatoreCodice,
+          operatoreNome,
+          centroAscoltoId,
+          centroAscoltoNome,
+          cittaId,
+          dataIntervento,
+          tipoIntervento,
+          stato,
+          ambito,
+          ambitoLegacy,
+          priorita,
+          dataOraPianificata,
+          dataOraAvvio,
+          dataOraConclusione,
+          avviso,
+          interventoPrecedenteId,
+          numeroSuccessori,
+          sede,
           dataCreazione,
           dataAggiornamento,
           bisogniPianificatiTotale,
@@ -9566,6 +10346,10 @@ components:
     InterventoUpdate:
       type: object
       properties:
+        versione:
+          type: string
+          format: date-time
+          description: Versione letta dal client; obbligatoria per optimistic locking.
         operatoreId:
           type: integer
           description: Modificabile soltanto per appuntamenti Sociali da pianificare o pianificati e nel territorio autorizzato.
@@ -9608,10 +10392,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BisognoPianificatoUpsert"
+      required: [versione]
 
     InterventoTransizioneInput:
       type: object
       properties:
+        versione:
+          type: string
+          format: date-time
         stato:
           $ref: "#/components/schemas/InterventoStato"
         motivo:
@@ -9625,7 +10413,7 @@ components:
           type: string
           format: date-time
           description: Obbligatorio quando la destinazione è pianificato e non esiste già una pianificazione.
-      required: [stato]
+      required: [stato, versione]
 
     InterventoStoricoStato:
       type: object
@@ -10308,8 +11096,6 @@ components:
         dataOraFine:
           type: ["string", "null"]
           format: date-time
-        statoAccessoEmporio:
-          $ref: "#/components/schemas/AccessoEmporioStato"
         noteAccessoEmporio:
           type: ["string", "null"]
       required: [beneficiarioId, magazzinoEmporioId, dataOraInizio]
@@ -10327,8 +11113,6 @@ components:
         dataOraFine:
           type: ["string", "null"]
           format: date-time
-        statoAccessoEmporio:
-          $ref: "#/components/schemas/AccessoEmporioStato"
         noteAccessoEmporio:
           type: ["string", "null"]
 
@@ -10405,17 +11189,20 @@ components:
         descrizioneProdotto:
           type: string
         quantita:
-          type: integer
+          type: number
+          multipleOf: 0.01
+        unitaMisura:
+          type: ["string", "null"]
         creditoUnitario:
           type: number
         creditoTotale:
           type: number
         giacenzaDisponibileAlMomento:
-          type: ["integer", "null"]
+          type: ["number", "null"]
         limitePerSpesa:
-          type: ["integer", "null"]
+          type: ["number", "null"]
         limiteMensile:
-          type: ["integer", "null"]
+          type: ["number", "null"]
         superaLimitePerSpesa:
           type: boolean
         superaLimiteMensile:
@@ -10437,6 +11224,7 @@ components:
           prodottoId,
           descrizioneProdotto,
           quantita,
+          unitaMisura,
           creditoUnitario,
           creditoTotale,
           superaLimitePerSpesa,
@@ -10469,6 +11257,9 @@ components:
           type: ["string", "null"]
         statoSessione:
           $ref: "#/components/schemas/SessioneCassaEmporioStato"
+        versione:
+          type: integer
+          minimum: 1
         saldoCreditoIniziale:
           type: number
         totaleCreditoPrevisto:
@@ -10524,6 +11315,7 @@ components:
           beneficiarioId,
           magazzinoEmporioId,
           statoSessione,
+          versione,
           saldoCreditoIniziale,
           totaleCreditoPrevisto,
           creditoResiduoPrevisto,
@@ -10544,10 +11336,22 @@ components:
     SessioneCassaEmporioUpdate:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         motivoAnnullamento:
           type: ["string", "null"]
         note:
           type: ["string", "null"]
+      required: [versione]
+
+    SessioneCassaEmporioVersioneInput:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
 
     SessioneCassaEmporioAperturaInput:
       type: object
@@ -10561,21 +11365,29 @@ components:
         prodottoId:
           type: integer
         quantita:
+          type: number
+          minimum: 0.01
+          multipleOf: 0.01
+        versione:
           type: integer
           minimum: 1
         note:
           type: ["string", "null"]
-      required: [prodottoId, quantita]
+      required: [prodottoId, quantita, versione]
 
     SessioneCassaEmporioAggiornaRigaInput:
       type: object
       properties:
         quantita:
+          type: number
+          minimum: 0.01
+          multipleOf: 0.01
+        versione:
           type: integer
           minimum: 1
         note:
           type: ["string", "null"]
-      required: [quantita]
+      required: [quantita, versione]
 
     SessioneCassaEmporioAccessoValido:
       type: object
@@ -10692,7 +11504,9 @@ components:
         quantitaMassimaMensile:
           type: ["number", "null"]
         giacenzaDisponibile:
-          type: ["integer", "null"]
+          type: ["number", "null"]
+        unitaMisura:
+          type: ["string", "null"]
       required: [prodottoId, codice, nome, creditoSolidaleValore]
 
     SessioneCassaEmporioValidazione:
@@ -10727,6 +11541,14 @@ components:
           type: string
         quantita:
           type: number
+        unitaMisura:
+          type: ["string", "null"]
+        quantitaStornata:
+          type: number
+          minimum: 0
+        quantitaStornabile:
+          type: number
+          minimum: 0
         creditoUnitario:
           type: number
         creditoTotale:
@@ -10735,6 +11557,8 @@ components:
           type: ["integer", "null"]
         bollaRigaId:
           type: ["integer", "null"]
+        fsePlus:
+          type: boolean
       required:
         [
           id,
@@ -10742,8 +11566,11 @@ components:
           prodottoId,
           descrizioneProdotto,
           quantita,
+          quantitaStornata,
+          quantitaStornabile,
           creditoUnitario,
           creditoTotale,
+          fsePlus,
         ]
 
     SpesaEmporio:
@@ -10794,6 +11621,7 @@ components:
           type: number
         statoSpesa:
           type: string
+          enum: [chiusa, stornata_parzialmente, stornata]
         operatoreChiusuraId:
           type: ["integer", "null"]
         operatoreCodice:
@@ -10850,14 +11678,56 @@ components:
     SpesaEmporioChiusuraInput:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         note:
           type: ["string", "null"]
+      required: [versione]
 
     BollaEmporioInvioManualeInput:
       type: object
+      description: Il server costruisce il link Bolla da configurazione trusted o same-origin validata.
+
+    SpesaEmporioStornoRigaInput:
+      type: object
       properties:
-        linkBolla:
-          type: ["string", "null"]
+        spesaRigaId:
+          type: integer
+          minimum: 1
+        quantita:
+          type: number
+          minimum: 0.01
+          multipleOf: 0.01
+      required: [spesaRigaId, quantita]
+
+    SpesaEmporioStornoInput:
+      type: object
+      properties:
+        motivo:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        righe:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SpesaEmporioStornoRigaInput"
+        idempotencyKey:
+          type: string
+          maxLength: 100
+      required: [motivo]
+
+    SpesaEmporioStornoResult:
+      type: object
+      properties:
+        stornoId:
+          type: integer
+        creditoRestituito:
+          type: number
+        spesa:
+          $ref: "#/components/schemas/SpesaEmporio"
+      required: [stornoId, creditoRestituito, spesa]
 
     BollaEmporioEmailResult:
       type: object
@@ -10919,6 +11789,9 @@ components:
         dataChiusura:
           type: string
           format: date-time
+        dataBolla:
+          type: string
+          format: date
         beneficiario:
           type: ["string", "null"]
         beneficiarioCodice:
@@ -10950,6 +11823,7 @@ components:
           intestazione,
           numeroSpesa,
           dataChiusura,
+          dataBolla,
           righe,
           totaleCreditoConsumati,
           saldoPrima,
@@ -11182,10 +12056,14 @@ components:
           type: ["string", "null"]
         fsePlus:
           type: boolean
+        fsePlusQuantita:
+          type: number
+        nonFsePlusQuantita:
+          type: number
         quantita:
           type: number
         unitaMisura:
-          type: string
+          type: ["string", "null"]
         note:
           type: ["string", "null"]
       required: [id, bollaId, prodottoId, quantita, unitaMisura, fsePlus]
@@ -11224,7 +12102,8 @@ components:
       properties:
         indirizzoConsegna: { type: string, minLength: 1, maxLength: 200 }
         dataPrevista: { type: string, format: date }
-        fasciaOraria: { type: ["string", "null"], enum: [Mattina, Pomeriggio, Sera, null] }
+        fasciaOraria:
+          { type: ["string", "null"], enum: [Mattina, Pomeriggio, Sera, null] }
         volontarioId: { type: ["integer", "null"], minimum: 1 }
         volontarioAltro: { type: ["string", "null"] }
         mezzoId: { type: ["integer", "null"], minimum: 1 }
@@ -11265,8 +12144,6 @@ components:
     BollaUpdate:
       type: object
       properties:
-        stato:
-          type: string
         beneficiarioId:
           type: integer
         magazzinoId:
@@ -11283,10 +12160,6 @@ components:
           type: string
         noteConsegna:
           type: ["string", "null"]
-        confermaRicezione:
-          type: boolean
-        noteRicezione:
-          type: string
 
     # ── Volontari ─────────────────────────────────────────────────────────
     Volontario:
@@ -11795,6 +12668,9 @@ components:
         telefono: { type: ["string", "null"] }
         email: { type: ["string", "null"] }
         stato: { type: string, enum: [attivo, inattivo] }
+        statoServizio: { type: string, enum: [attivo, inattivo] }
+        statoMagazzino:
+          { type: [string, "null"], enum: [attivo, inattivo, null] }
         attiva: { type: boolean }
         note: { type: ["string", "null"] }
         createdBy: { type: ["integer", "null"] }
@@ -11964,6 +12840,10 @@ components:
         nuovaPersona:
           { $ref: "#/components/schemas/MensaNuovaPersonaTemporaneaInput" }
         motivo: { type: ["string", "null"] }
+        tipoServizio:
+          type: string
+          enum: [pranzo, cena]
+          default: pranzo
         confermaDuplicato: { type: boolean, default: false }
         idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
 
@@ -11975,6 +12855,10 @@ components:
         modalitaAccesso: { type: string, enum: [tessera, manuale] }
         codiceTessera: { type: string }
         beneficiarioId: { type: integer }
+        tipoServizio:
+          type: string
+          enum: [pranzo, cena]
+          default: pranzo
         idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
 
     MensaAccesso:
@@ -12007,6 +12891,7 @@ components:
           { type: string, enum: [consentito, negato, consentito_eccezione] }
         motivoEsito: { type: string }
         modalitaAccesso: { type: string, enum: [tessera, manuale, temporaneo] }
+        tipoServizio: { type: [string, "null"], enum: [pranzo, cena, null] }
         temporaneo: { type: boolean }
         dataOra: { type: string, format: date-time }
         eccezioneId: { type: ["integer", "null"] }
@@ -12018,7 +12903,7 @@ components:
       required: [accessoMensaId, tipoServizio, idempotencyKey]
       properties:
         accessoMensaId: { type: integer }
-        tipoServizio: { type: string, minLength: 1, maxLength: 40 }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
         note: { type: ["string", "null"] }
         override: { type: boolean }
         motivoOverride: { type: ["string", "null"] }
@@ -12047,7 +12932,21 @@ components:
         accessoMensaId: { type: integer }
         dataOra: { type: string, format: date-time }
         dataServizio: { type: string, format: date }
-        tipoServizio: { type: string }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
+        giornataServizioId: { type: [integer, "null"] }
+        sessoSnapshot: { type: [string, "null"], enum: [M, F, ALTRO, ND, null] }
+        fasciaEtaSnapshot:
+          {
+            type: [string, "null"],
+            enum: ["0_17", "18_29", "30_64", "65_plus", non_determinata, null],
+          }
+        fasciaEtaOrigineSnapshot:
+          {
+            type: [string, "null"],
+            enum: [calcolata, presunta, non_determinata, null],
+          }
+        anagraficaProvvisoriaSnapshot: { type: [boolean, "null"] }
+        temporaneoSnapshot: { type: [boolean, "null"] }
         eccezione: { type: boolean }
         override: { type: boolean }
         operatore: { type: string }
@@ -12094,13 +12993,181 @@ components:
 
     MensaGiacenza:
       type: object
-      required: [prodottoId, codice, nome, unitaMisura, quantita]
+      required:
+        [
+          prodottoId,
+          codice,
+          nome,
+          unitaMisura,
+          quantita,
+          giacenzaFisica,
+          giacenzaDistribuibile,
+          impegnato,
+          disponibileReale,
+        ]
       properties:
         prodottoId: { type: integer }
         codice: { type: string }
         nome: { type: string }
         unitaMisura: { type: string }
         quantita: { type: number }
+        giacenzaFisica: { type: number }
+        giacenzaDistribuibile: { type: number }
+        impegnato: { type: number }
+        disponibileReale: { type: number }
+
+    MensaConsumoInput:
+      type: object
+      required:
+        [
+          mensaId,
+          dataServizio,
+          tipoServizio,
+          prodottoId,
+          quantita,
+          causale,
+          idempotencyKey,
+        ]
+      properties:
+        mensaId: { type: integer }
+        dataServizio: { type: string, format: date }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
+        prodottoId: { type: integer }
+        quantita: { type: number, exclusiveMinimum: 0 }
+        causale: { type: string, enum: [consumo, scarto] }
+        note: { type: [string, "null"], maxLength: 2000 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
+
+    MensaStornoInput:
+      type: object
+      required: [motivo]
+      properties:
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
+
+    MensaChiusuraInput:
+      type: object
+      properties:
+        note: { type: [string, "null"], maxLength: 4000 }
+
+    MensaRiaperturaInput:
+      type: object
+      required: [motivo]
+      properties:
+        motivo: { type: string, minLength: 1, maxLength: 2000 }
+
+    MensaConsumo:
+      type: object
+      additionalProperties: true
+      required:
+        [
+          id,
+          giornataServizioId,
+          mensaId,
+          scaricoId,
+          dataServizio,
+          tipoServizio,
+          prodottoId,
+          quantita,
+          unitaMisura,
+          causale,
+          operatoreId,
+          idempotencyKey,
+        ]
+      properties:
+        id: { type: integer }
+        giornataServizioId: { type: integer }
+        mensaId: { type: integer }
+        mensaNome: { type: string }
+        scaricoId: { type: integer }
+        dataServizio: { type: string, format: date }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
+        prodottoId: { type: integer }
+        prodottoNome: { type: string }
+        quantita: { type: number }
+        unitaMisura: { type: string }
+        causale: { type: string, enum: [consumo, scarto] }
+        note: { type: [string, "null"] }
+        operatoreId: { type: integer }
+        idempotencyKey: { type: string }
+        stornato: { type: boolean }
+        stornatoAt: { type: [string, "null"], format: date-time }
+        motivoStorno: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        idempotentReplay: { type: boolean }
+
+    MensaGiornata:
+      type: object
+      additionalProperties: true
+      required: [id, mensaId, dataServizio, tipoServizio, stato]
+      properties:
+        id: { type: integer }
+        mensaId: { type: integer }
+        mensaNome: { type: string }
+        dataServizio: { type: string, format: date }
+        tipoServizio: { type: string, enum: [pranzo, cena] }
+        stato: { type: string, enum: [aperta, chiusa] }
+        apertaDa: { type: [integer, "null"] }
+        apertaAt: { type: string, format: date-time }
+        chiusaDa: { type: [integer, "null"] }
+        chiusaAt: { type: [string, "null"], format: date-time }
+        riapertaDa: { type: [integer, "null"] }
+        riapertaAt: { type: [string, "null"], format: date-time }
+        motivoRiapertura: { type: [string, "null"] }
+        noteChiusura: { type: [string, "null"] }
+        snapshot: { type: [object, "null"], additionalProperties: true }
+
+    MensaAccessiPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          { type: array, items: { $ref: "#/components/schemas/MensaAccesso" } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    MensaPastiPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          { type: array, items: { $ref: "#/components/schemas/MensaPasto" } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    MensaEccezioniPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/MensaEccezione" },
+          }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    MensaConsumiPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          { type: array, items: { $ref: "#/components/schemas/MensaConsumo" } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    MensaTrasferimentiPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          { type: array, items: { type: object, additionalProperties: true } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
 
     MensaTrasferimentoInput:
       type: object
@@ -12118,12 +13185,33 @@ components:
           minItems: 1
           items:
             type: object
-            required: [prodottoId, quantita, unitaMisura]
+            required: [prodottoId, quantita]
             properties:
               prodottoId: { type: integer }
               quantita: { type: number, exclusiveMinimum: 0 }
-              unitaMisura: { type: string }
+              unitaMisura:
+                type: string
+                description: >-
+                  Campo legacy opzionale. Se valorizzato deve coincidere con
+                  l'unità canonica del Prodotto; il server persiste sempre
+                  prodotti.unita_misura.
               note: { type: ["string", "null"] }
+
+    MensaQuantitaPerProdotto:
+      type: object
+      required: [prodottoId, prodottoNome, unitaMisura, quantita]
+      properties:
+        prodottoId: { type: integer }
+        prodottoNome: { type: string }
+        unitaMisura: { type: string }
+        quantita: { type: number }
+
+    MensaQuantitaPerUnitaMisura:
+      type: object
+      required: [unitaMisura, quantita]
+      properties:
+        unitaMisura: { type: string }
+        quantita: { type: number }
 
     MensaReport:
       type: object
@@ -12135,8 +13223,17 @@ components:
           totalePasti,
           beneficiariDistinti,
           accessiOrdinari,
+          accessiTemporanei,
           accessiEccezione,
           accessiNegati,
+          pastiOrdinari,
+          pastiTemporanei,
+          pastiEccezione,
+          pastiOverride,
+          consumiPerProdotto,
+          scartiPerProdotto,
+          consumiPerUnitaMisura,
+          scartiPerUnitaMisura,
           mediaPastiGiorno,
           distribuzione,
         ]
@@ -12146,8 +13243,77 @@ components:
         totalePasti: { type: integer }
         beneficiariDistinti: { type: integer }
         accessiOrdinari: { type: integer }
+        accessiTemporanei: { type: integer }
         accessiEccezione: { type: integer }
         accessiNegati: { type: integer }
+        pastiTemporanei: { type: integer }
+        pastiOrdinari: { type: integer }
+        pastiEccezione: { type: integer }
+        pastiOverride: { type: integer }
+        pastiTemporaneitaNonDeterminata: { type: integer }
+        pastiAnagraficaProvvisoria: { type: integer }
+        consumiPerProdotto:
+          type: array
+          items: { $ref: "#/components/schemas/MensaQuantitaPerProdotto" }
+        scartiPerProdotto:
+          type: array
+          items: { $ref: "#/components/schemas/MensaQuantitaPerProdotto" }
+        consumiPerUnitaMisura:
+          type: array
+          items: { $ref: "#/components/schemas/MensaQuantitaPerUnitaMisura" }
+        scartiPerUnitaMisura:
+          type: array
+          items: { $ref: "#/components/schemas/MensaQuantitaPerUnitaMisura" }
+        distribuzioneSesso:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave: { type: string, enum: [M, F, ALTRO, ND] }
+              totale: { type: integer }
+        distribuzioneFasciaEta:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave:
+                {
+                  type: string,
+                  enum:
+                    ["0_17", "18_29", "30_64", "65_plus", non_determinata, ND],
+                }
+              totale: { type: integer }
+        distribuzioneTipoServizio:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave: { type: string, enum: [pranzo, cena] }
+              totale: { type: integer }
+        beneficiariDistintiPerSesso:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave: { type: string, enum: [M, F, ALTRO, ND] }
+              totale: { type: integer }
+        beneficiariDistintiPerFasciaEta:
+          type: array
+          items:
+            type: object
+            required: [chiave, totale]
+            properties:
+              chiave:
+                {
+                  type: string,
+                  enum:
+                    ["0_17", "18_29", "30_64", "65_plus", non_determinata, ND],
+                }
+              totale: { type: integer }
         mediaPastiGiorno: { type: number }
         distribuzione:
           type: array
@@ -12277,6 +13443,7 @@ components:
         newPassword:
           type: string
           minLength: 8
+          description: Deve contenere almeno una lettera e un numero.
       required: [newPassword]
 
     ForgotPasswordInput:
@@ -12296,6 +13463,7 @@ components:
         newPassword:
           type: string
           minLength: 8
+          description: Deve contenere almeno una lettera e un numero.
         confirmPassword:
           type: string
           minLength: 1
@@ -12371,7 +13539,8 @@ components:
           minLength: 1
         password:
           type: string
-          minLength: 6
+          minLength: 8
+          description: Deve contenere almeno una lettera e un numero.
         nome:
           type: string
           minLength: 1
