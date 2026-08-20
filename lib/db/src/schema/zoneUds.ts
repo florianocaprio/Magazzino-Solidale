@@ -1,13 +1,13 @@
 import { pgTable, serial, varchar, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { cittaTable } from "./citta";
+import { areeOperativeTable } from "./areeOperative";
 
 export const zoneUdsTable = pgTable("zone_uds", {
   id: serial("id").primaryKey(),
-  cittaId: integer("citta_id")
+  areaOperativaId: integer("area_operativa_id")
     .notNull()
-    .references(() => cittaTable.id),
+    .references(() => areeOperativeTable.id),
   nome: varchar("nome", { length: 120 }).notNull(),
   attivo: boolean("attivo").notNull().default(true),
   note: text("note"),

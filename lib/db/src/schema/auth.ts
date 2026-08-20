@@ -11,7 +11,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { centriAscoltoTable } from "./centri";
-import { cittaTable } from "./citta";
+import { areeOperativeTable } from "./areeOperative";
 import { zoneUdsTable } from "./zoneUds";
 
 export const ruoliTable = pgTable("ruoli", {
@@ -40,7 +40,7 @@ export const utentiTable = pgTable(
     centroAscoltoId: integer("centro_ascolto_id").references(
       () => centriAscoltoTable.id,
     ),
-    cittaId: integer("citta_id").references(() => cittaTable.id),
+    areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
     zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
     attivo: boolean("attivo").notNull().default(true),
     isSuperAdmin: boolean("is_super_admin").notNull().default(false),

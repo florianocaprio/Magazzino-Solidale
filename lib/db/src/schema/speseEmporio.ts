@@ -11,7 +11,7 @@ import { utentiTable } from "./auth";
 import { beneficiariTable } from "./beneficiari";
 import { bolleTable, bollaRigheTable } from "./bolle";
 import { centriAscoltoTable } from "./centri";
-import { cittaTable } from "./citta";
+import { areeOperativeTable } from "./areeOperative";
 import { consegneTable } from "./consegne";
 import { creditoSolidaleMovimentiTable } from "./creditoSolidaleMovimenti";
 import { lottiTable } from "./lotti";
@@ -36,7 +36,7 @@ export const speseEmporioTable = pgTable("spese_emporio", {
   centroAscoltoId: integer("centro_ascolto_id").references(
     () => centriAscoltoTable.id,
   ),
-  cittaId: integer("citta_id").references(() => cittaTable.id),
+  areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
   magazzinoEmporioId: integer("magazzino_emporio_id")
     .notNull()
     .references(() => magazziniTable.id),

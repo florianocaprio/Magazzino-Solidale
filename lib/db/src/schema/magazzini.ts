@@ -2,13 +2,13 @@ import { pgTable, serial, varchar, text, boolean, timestamp, integer } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { centriAscoltoTable } from "./centri";
-import { cittaTable } from "./citta";
+import { areeOperativeTable } from "./areeOperative";
 
 export const magazziniTable = pgTable("magazzini", {
   id: serial("id").primaryKey(),
   codice: varchar("codice", { length: 20 }).notNull().unique(),
   nome: varchar("nome", { length: 120 }).notNull(),
-  cittaId: integer("citta_id").references(() => cittaTable.id),
+  areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
   indirizzo: varchar("indirizzo", { length: 200 }),
   comune: varchar("comune", { length: 80 }),
   zona: varchar("zona", { length: 80 }),

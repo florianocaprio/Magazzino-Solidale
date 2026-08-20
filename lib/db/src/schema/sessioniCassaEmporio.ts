@@ -9,7 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { beneficiariTable } from "./beneficiari";
 import { centriAscoltoTable } from "./centri";
-import { cittaTable } from "./citta";
+import { areeOperativeTable } from "./areeOperative";
 import { consegneTable } from "./consegne";
 import { magazziniTable } from "./magazzini";
 
@@ -27,7 +27,7 @@ export const sessioniCassaEmporioTable = pgTable("sessioni_cassa_emporio", {
   centroAscoltoId: integer("centro_ascolto_id").references(
     () => centriAscoltoTable.id,
   ),
-  cittaId: integer("citta_id").references(() => cittaTable.id),
+  areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
   statoSessione: varchar("stato_sessione", { length: 40 })
     .notNull()
     .default("aperta"),

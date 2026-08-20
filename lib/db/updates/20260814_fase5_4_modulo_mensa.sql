@@ -48,7 +48,29 @@ CREATE UNIQUE INDEX IF NOT EXISTS mense_codice_unique
   ON public.mense (codice);
 CREATE UNIQUE INDEX IF NOT EXISTS mense_magazzino_unique
   ON public.mense (magazzino_id);
-CREATE INDEX IF NOT EXISTS mense_citta_idx ON public.mense (citta_id);
+DO $update$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'mense'
+      AND column_name = 'area_operativa_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS mense_area_operativa_idx
+      ON public.mense (area_operativa_id);
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'mense'
+      AND column_name = 'citta_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS mense_citta_idx
+      ON public.mense (citta_id);
+  ELSE
+    RAISE EXCEPTION 'Schema Mensa inatteso: colonna di Area Operativa assente';
+  END IF;
+END
+$update$;
 CREATE INDEX IF NOT EXISTS mense_attiva_idx ON public.mense (attiva);
 
 CREATE TABLE IF NOT EXISTS public.mensa_abilitazioni (

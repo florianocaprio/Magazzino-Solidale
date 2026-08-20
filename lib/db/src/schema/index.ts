@@ -8,7 +8,7 @@ export * from "./ruoliVolontari";
 export * from "./tipiIntervento";
 export * from "./tipologieFornitore";
 export * from "./mezzi";
-export * from "./citta";
+export * from "./areeOperative";
 export * from "./zoneUds";
 export * from "./centri";
 export * from "./beneficiari";
