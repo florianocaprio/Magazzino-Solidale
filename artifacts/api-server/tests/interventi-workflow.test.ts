@@ -5,7 +5,7 @@ import {
   beneficiariTable,
   bisogniPianificatiTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   interventiStoricoStatiTable,
   interventiTable,
@@ -25,11 +25,11 @@ const interventoIds: number[] = [];
 const beneficiarioIds: number[] = [];
 const centroIds: number[] = [];
 const zonaIds: number[] = [];
-const cittaIds: number[] = [];
+const areaOperativaIds: number[] = [];
 
 let operatoreId: number;
-let cittaRoma: number;
-let cittaMilano: number;
+let areaOperativaRoma: number;
+let areaOperativaMilano: number;
 let centroRoma: number;
 let altroCentroRoma: number;
 let centroMilano: number;
@@ -41,10 +41,10 @@ let socialeAltroCentroRoma: number;
 let socialeMilano: number;
 let udsRomaAltraZona: number;
 let udsMilano: number;
-let udsCittaNull: number;
+let udsAreaOperativaNull: number;
 
 function makeApp(
-  cittaId: number | null = cittaRoma,
+  areaOperativaId: number | null = areaOperativaRoma,
   centroAscoltoId: number | null = centroRoma,
   zonaUdsId: number | null = zonaRoma,
   aree: string[] = ["sociale", "uds"],
@@ -56,7 +56,7 @@ function makeApp(
       req as unknown as {
         user: {
           id: number;
-          cittaId: number | null;
+          areaOperativaId: number | null;
           centroAscoltoId: number | null;
           zonaUdsId: number | null;
           aree: string[];
@@ -65,7 +65,7 @@ function makeApp(
       }
     ).user = {
       id: operatoreId,
-      cittaId,
+      areaOperativaId,
       centroAscoltoId,
       zonaUdsId,
       aree,
@@ -83,35 +83,35 @@ function makeApp(
   return app;
 }
 
-async function createCitta(nome: string): Promise<number> {
+async function createAreaOperativa(nome: string): Promise<number> {
   const [row] = await db
-    .insert(cittaTable)
+    .insert(areeOperativeTable)
     .values({ nome })
-    .returning({ id: cittaTable.id });
-  cittaIds.push(row.id);
+    .returning({ id: areeOperativeTable.id });
+  areaOperativaIds.push(row.id);
   return row.id;
 }
 
-async function createCentro(cittaId: number): Promise<number> {
+async function createCentro(areaOperativaId: number): Promise<number> {
   const [row] = await db
     .insert(centriAscoltoTable)
-    .values({ nome: `Centro ${rnd()}`, cittaId })
+    .values({ nome: `Centro ${rnd()}`, areaOperativaId })
     .returning({ id: centriAscoltoTable.id });
   centroIds.push(row.id);
   return row.id;
 }
 
-async function createZona(cittaId: number): Promise<number> {
+async function createZona(areaOperativaId: number): Promise<number> {
   const [row] = await db
     .insert(zoneUdsTable)
-    .values({ nome: `Zona ${rnd()}`, cittaId })
+    .values({ nome: `Zona ${rnd()}`, areaOperativaId })
     .returning({ id: zoneUdsTable.id });
   zonaIds.push(row.id);
   return row.id;
 }
 
 async function createBeneficiario(input: {
-  cittaId: number | null;
+  areaOperativaId: number | null;
   centroAscoltoId?: number | null;
   zonaUdsId?: number | null;
   uds?: boolean;
@@ -124,7 +124,7 @@ async function createBeneficiario(input: {
       cognome: rnd(),
       sesso: "F",
       uds: input.uds ?? false,
-      cittaId: input.cittaId,
+      areaOperativaId: input.areaOperativaId,
       centroAscoltoId: input.centroAscoltoId ?? null,
       zonaUdsId: input.zonaUdsId ?? null,
     })
@@ -160,14 +160,14 @@ async function versioneIntervento(id: number): Promise<string> {
 }
 
 beforeAll(async () => {
-  cittaRoma = await createCitta(`Roma Workflow ${rnd()}`);
-  cittaMilano = await createCitta(`Milano Workflow ${rnd()}`);
-  centroRoma = await createCentro(cittaRoma);
-  altroCentroRoma = await createCentro(cittaRoma);
-  centroMilano = await createCentro(cittaMilano);
-  zonaRoma = await createZona(cittaRoma);
-  altraZonaRoma = await createZona(cittaRoma);
-  zonaMilano = await createZona(cittaMilano);
+  areaOperativaRoma = await createAreaOperativa(`Roma Workflow ${rnd()}`);
+  areaOperativaMilano = await createAreaOperativa(`Milano Workflow ${rnd()}`);
+  centroRoma = await createCentro(areaOperativaRoma);
+  altroCentroRoma = await createCentro(areaOperativaRoma);
+  centroMilano = await createCentro(areaOperativaMilano);
+  zonaRoma = await createZona(areaOperativaRoma);
+  altraZonaRoma = await createZona(areaOperativaRoma);
+  zonaMilano = await createZona(areaOperativaMilano);
 
   const [operatore] = await db
     .insert(utentiTable)
@@ -176,7 +176,7 @@ beforeAll(async () => {
       passwordHash: "test-only",
       nome: "Operatore Workflow",
       attivo: true,
-      cittaId: cittaRoma,
+      areaOperativaId: areaOperativaRoma,
       centroAscoltoId: centroRoma,
       zonaUdsId: zonaRoma,
     })
@@ -184,33 +184,33 @@ beforeAll(async () => {
   operatoreId = operatore.id;
 
   socialeRoma = await createBeneficiario({
-    cittaId: cittaRoma,
+    areaOperativaId: areaOperativaRoma,
     centroAscoltoId: centroRoma,
     zonaUdsId: zonaRoma,
   });
   socialeAltroCentroRoma = await createBeneficiario({
-    cittaId: cittaRoma,
+    areaOperativaId: areaOperativaRoma,
     centroAscoltoId: altroCentroRoma,
     zonaUdsId: zonaRoma,
   });
   socialeMilano = await createBeneficiario({
-    cittaId: cittaMilano,
+    areaOperativaId: areaOperativaMilano,
     centroAscoltoId: centroMilano,
     zonaUdsId: zonaMilano,
   });
   udsRomaAltraZona = await createBeneficiario({
-    cittaId: cittaRoma,
+    areaOperativaId: areaOperativaRoma,
     centroAscoltoId: altroCentroRoma,
     zonaUdsId: altraZonaRoma,
     uds: true,
   });
   udsMilano = await createBeneficiario({
-    cittaId: cittaMilano,
+    areaOperativaId: areaOperativaMilano,
     centroAscoltoId: centroMilano,
     zonaUdsId: zonaMilano,
     uds: true,
   });
-  udsCittaNull = await createBeneficiario({ cittaId: null, uds: true });
+  udsAreaOperativaNull = await createBeneficiario({ areaOperativaId: null, uds: true });
 });
 
 afterAll(async () => {
@@ -236,8 +236,8 @@ afterAll(async () => {
       .delete(centriAscoltoTable)
       .where(inArray(centriAscoltoTable.id, centroIds));
   }
-  if (cittaIds.length > 0) {
-    await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds));
+  if (areaOperativaIds.length > 0) {
+    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds));
   }
   await pool.end();
 });
@@ -796,8 +796,8 @@ describe("workflow degli interventi", () => {
 
 describe("visibilità territoriale del workflow", () => {
   it("separa le autorizzazioni degli ambiti Sociale e UDS", async () => {
-    const socialOnly = makeApp(cittaRoma, centroRoma, zonaRoma, ["sociale"]);
-    const udsOnly = makeApp(cittaRoma, centroRoma, zonaRoma, ["uds"]);
+    const socialOnly = makeApp(areaOperativaRoma, centroRoma, zonaRoma, ["sociale"]);
+    const udsOnly = makeApp(areaOperativaRoma, centroRoma, zonaRoma, ["uds"]);
 
     expect((await createWorkflow({}, socialOnly)).status).toBe(201);
     expect(
@@ -842,38 +842,38 @@ describe("visibilità territoriale del workflow", () => {
     ).toBe(200);
   });
 
-  it("consente UDS in tutta la città, ma esclude altra città e città NULL", async () => {
-    const sameCity = await createWorkflow({
+  it("consente UDS in tutta la area operativa, ma esclude altra area operativa e area operativa NULL", async () => {
+    const sameAreaOperativa = await createWorkflow({
       beneficiarioId: udsRomaAltraZona,
       ambito: "uds",
     });
-    expect(sameCity.status).toBe(201);
+    expect(sameAreaOperativa.status).toBe(201);
 
-    const otherCity = await createWorkflow(
+    const otherAreaOperativa = await createWorkflow(
       { beneficiarioId: udsMilano, ambito: "uds" },
       makeApp(),
     );
-    expect(otherCity.status).toBe(403);
+    expect(otherAreaOperativa.status).toBe(403);
 
-    const nullCity = await createWorkflow(
-      { beneficiarioId: udsCittaNull, ambito: "uds" },
+    const nullAreaOperativa = await createWorkflow(
+      { beneficiarioId: udsAreaOperativaNull, ambito: "uds" },
       makeApp(),
     );
-    expect(nullCity.status).toBe(403);
+    expect(nullAreaOperativa.status).toBe(403);
   });
 
-  it("preserva l'isolamento Sociale per centro e città", async () => {
+  it("preserva l'isolamento Sociale per centro e area operativa", async () => {
     const otherCentre = await createWorkflow({
       beneficiarioId: socialeAltroCentroRoma,
       ambito: "sociale",
     });
     expect(otherCentre.status).toBe(403);
 
-    const otherCity = await createWorkflow({
+    const otherAreaOperativa = await createWorkflow({
       beneficiarioId: socialeMilano,
       ambito: "sociale",
     });
-    expect(otherCity.status).toBe(403);
+    expect(otherAreaOperativa.status).toBe(403);
 
     const global = await createWorkflow(
       { beneficiarioId: socialeMilano, ambito: "sociale" },
@@ -882,15 +882,15 @@ describe("visibilità territoriale del workflow", () => {
     expect(global.status).toBe(201);
   });
 
-  it("obbliga il globale a scegliere la città negli elenchi UDS", async () => {
-    const missingCity = await request(makeApp(null, null, null))
+  it("obbliga il globale a scegliere la area operativa negli elenchi UDS", async () => {
+    const missingAreaOperativa = await request(makeApp(null, null, null))
       .get("/interventi")
       .query({ ambito: "uds" });
-    expect(missingCity.status).toBe(400);
+    expect(missingAreaOperativa.status).toBe(400);
 
     const scoped = await request(makeApp(null, null, null))
       .get("/interventi")
-      .query({ ambito: "uds", cittaId: cittaRoma });
+      .query({ ambito: "uds", areaOperativaId: areaOperativaRoma });
     expect(scoped.status).toBe(200);
     expect(
       scoped.body.every(
@@ -899,7 +899,7 @@ describe("visibilità territoriale del workflow", () => {
     ).toBe(true);
   });
 
-  it("protegge dettaglio, storico e transizioni da un'altra città", async () => {
+  it("protegge dettaglio, storico e transizioni da un'altra area operativa", async () => {
     const milano = await createWorkflow(
       { beneficiarioId: udsMilano, ambito: "uds" },
       makeApp(null, null, null),

@@ -10,7 +10,7 @@ import {
   cleanup,
   type SeedScope,
   createCentroRec,
-  createCitta,
+  createAreaOperativa,
   createMagazzino,
   createBeneficiario,
   createUtente,
@@ -49,12 +49,12 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   scope = newScope();
-  const cittaId = await createCitta(scope);
-  centroA = (await createCentroRec(scope, { cittaId })).id;
-  centroB = (await createCentroRec(scope, { cittaId })).id;
-  benA = await createBeneficiario(scope, centroA, { cittaId });
-  benB = await createBeneficiario(scope, centroB, { cittaId });
-  benNull = await createBeneficiario(scope, null, { cittaId });
+  const areaOperativaId = await createAreaOperativa(scope);
+  centroA = (await createCentroRec(scope, { areaOperativaId })).id;
+  centroB = (await createCentroRec(scope, { areaOperativaId })).id;
+  benA = await createBeneficiario(scope, centroA, { areaOperativaId });
+  benB = await createBeneficiario(scope, centroB, { areaOperativaId });
+  benNull = await createBeneficiario(scope, null, { areaOperativaId });
   magNull = await createMagazzino(scope, null);
   magB = await createMagazzino(scope, centroB);
 });

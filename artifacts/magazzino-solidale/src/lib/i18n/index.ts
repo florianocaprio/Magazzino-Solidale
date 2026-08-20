@@ -12,7 +12,7 @@ import { preparazioneConsegne } from "./namespaces/preparazioneConsegne";
 import { trasferimenti } from "./namespaces/trasferimenti";
 import { scarichi } from "./namespaces/scarichi";
 import { centriAscolto } from "./namespaces/centriAscolto";
-import { citta } from "./namespaces/citta";
+import { areeOperative } from "./namespaces/areeOperative";
 import { zoneUds } from "./namespaces/zoneUds";
 import { beneficiari } from "./namespaces/beneficiari";
 import { beneficiarioDettaglio } from "./namespaces/beneficiarioDettaglio";
@@ -73,7 +73,7 @@ const PAGE_NAMESPACES = {
   trasferimenti,
   scarichi,
   centriAscolto,
-  citta,
+  areeOperative,
   zoneUds,
   beneficiari,
   beneficiarioDettaglio,

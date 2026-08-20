@@ -4,7 +4,7 @@ import { lottiTable, prodottiTable, magazziniTable } from "@workspace/db";
 import { eq, and, gt, sum, min, sql } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
 } from "../lib/centroScope";
@@ -24,7 +24,7 @@ router.get("/giacenze", requirePermission("magazzino.view"), async (req, res) =>
   const conditions = [gt(lottiTable.quantitaResidua, "0")];
   if (magazzinoId) conditions.push(eq(lottiTable.magazzinoId, parseInt(magazzinoId)));
   if (fsePlusOnly === "true") conditions.push(eq(lottiTable.fsePlus, true));
-  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
+  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)));
   if (scope) conditions.push(scope);
 
     const dataOperativa = dataOperativaEuropeRome();

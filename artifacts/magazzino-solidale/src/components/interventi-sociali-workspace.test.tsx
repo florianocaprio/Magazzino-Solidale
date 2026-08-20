@@ -44,7 +44,7 @@ const sample: Intervento = {
   sede: "Sede Roma",
   centroAscoltoId: 1,
   centroAscoltoNome: "Centro Roma",
-  cittaId: 1,
+  areaOperativaId: 1,
   operatoreId: 4,
   operatoreNome: "Operatore Test",
   operatoreCodice: "OP-4",
@@ -82,8 +82,8 @@ function ControlledWorkspace({
       filters={filters}
       interventi={[sample]}
       counts={counts}
-      citta={[{ id: 1, nome: "Roma" }]}
-      centri={[{ id: 1, nome: "Centro Roma", cittaId: 1 }]}
+      areaOperativa={[{ id: 1, nome: "Roma" }]}
+      centri={[{ id: 1, nome: "Centro Roma", areaOperativaId: 1 }]}
       tipi={[{ id: 1, nome: "colloquio", attivo: true }]}
       operatori={[{ id: 4, nome: "Operatore Test", codice: "OP-4" }]}
       isGlobal={false}

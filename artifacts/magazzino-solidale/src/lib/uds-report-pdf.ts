@@ -24,7 +24,7 @@ export type UdsReportPdfLabels = {
   legend: string;
   metaDate: string;
   metaPeriod: string;
-  metaCity: string;
+  metaAreaOperativa: string;
   metaZone: string;
 };
 
@@ -33,7 +33,7 @@ export type UdsReportPdfMeta = {
   date?: string;
   /** Range (formatted "dd/mm/yyyy – dd/mm/yyyy") — set this OR date. */
   period?: string;
-  city?: string;
+  areaOperativa?: string;
   zone?: string;
 };
 
@@ -114,7 +114,7 @@ export async function exportUdsReportGiornalieroPdf(opts: {
   const metaParts: string[] = [];
   if (meta.period) metaParts.push(`${labels.metaPeriod}: ${meta.period}`);
   else if (meta.date) metaParts.push(`${labels.metaDate}: ${meta.date}`);
-  if (meta.city) metaParts.push(`${labels.metaCity}: ${meta.city}`);
+  if (meta.areaOperativa) metaParts.push(`${labels.metaAreaOperativa}: ${meta.areaOperativa}`);
   if (meta.zone) metaParts.push(`${labels.metaZone}: ${meta.zone}`);
   doc.setFontSize(9);
   doc.setTextColor(120);

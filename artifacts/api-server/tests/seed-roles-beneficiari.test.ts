@@ -13,7 +13,7 @@ function appWithAreas(aree: string[]): Express {
   app.use((req, _res, next) => {
     req.user = {
       id: 1,
-      cittaId: 1,
+      areaOperativaId: 1,
       centroAscoltoId: 1,
       zonaUdsId: null,
       aree,

@@ -10,7 +10,7 @@ import {
 import { eq, and, gte, lte, inArray, asc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   centroScopeFilter,
   canAccessCentro,
   visibleCentroIds,
@@ -62,10 +62,10 @@ async function resolveCentroAscoltoId(
     caller == null &&
     !inVisibleCentroSet(
       centroAscoltoId,
-      await visibleCentroIds(callerCittaId(req)),
+      await visibleCentroIds(callerAreaOperativaId(req)),
     )
   ) {
-    return { status: 403, error: "Centro non accessibile per la tua città" };
+    return { status: 403, error: "Centro non accessibile per la tua area operativa" };
   }
   return { centroAscoltoId };
 }
@@ -150,12 +150,12 @@ router.get("/turni", async (req, res) => {
   } else if (centroAscoltoId) {
     conditions.push(eq(turniTable.centroAscoltoId, parseInt(centroAscoltoId)));
   }
-  // Città axis: a turno's città derives from its centro (centro is NOT NULL here).
-  const cittaFilter = idSetScopeFilter(
+  // Area Operativa axis: a turno's area operativa derives from its centro (centro is NOT NULL here).
+  const areaOperativaFilter = idSetScopeFilter(
     turniTable.centroAscoltoId,
-    await visibleCentroIds(callerCittaId(req)),
+    await visibleCentroIds(callerAreaOperativaId(req)),
   );
-  if (cittaFilter) conditions.push(cittaFilter);
+  if (areaOperativaFilter) conditions.push(areaOperativaFilter);
 
   const turni = await db
     .select({
@@ -234,10 +234,10 @@ router.put("/turni", async (req, res) => {
     caller == null &&
     !inVisibleCentroSet(
       centroAscoltoId,
-      await visibleCentroIds(callerCittaId(req)),
+      await visibleCentroIds(callerAreaOperativaId(req)),
     )
   ) {
-    res.status(403).json({ error: "Centro non accessibile per la tua città" });
+    res.status(403).json({ error: "Centro non accessibile per la tua area operativa" });
     return;
   }
   const mezzoId = Number.isInteger(body.mezzoId)
@@ -572,10 +572,10 @@ router.delete("/turni/:id", async (req, res) => {
     callerCentroId(req) == null &&
     !inVisibleCentroSet(
       current.centroAscoltoId,
-      await visibleCentroIds(callerCittaId(req)),
+      await visibleCentroIds(callerAreaOperativaId(req)),
     )
   ) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   await db

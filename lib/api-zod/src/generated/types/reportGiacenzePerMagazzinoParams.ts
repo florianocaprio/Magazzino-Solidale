@@ -8,5 +8,5 @@
 
 export type ReportGiacenzePerMagazzinoParams = {
 magazzinoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 };

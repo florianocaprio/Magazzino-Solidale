@@ -114,7 +114,7 @@ export interface ReportAppliedFilters {
   a: string;
   anno: number;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
   centroAscoltoId: number | null;
   /** @nullable */
@@ -228,7 +228,7 @@ export interface ReportFilterOption {
   id: number;
   nome: string;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
 }
@@ -249,7 +249,7 @@ export const ReportFilterOptionsSection = {
 
 export interface ReportFilterOptions {
   section: ReportFilterOptionsSection;
-  cities: ReportFilterOption[];
+  areeOperative: ReportFilterOption[];
   centres: ReportFilterOption[];
   warehouses: ReportFilterOption[];
   mense: ReportFilterOption[];
@@ -358,7 +358,7 @@ export interface Magazzino {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   tipoMagazzino: MagazzinoTipoMagazzino;
   stato: string;
   /** @nullable */
@@ -421,7 +421,7 @@ export interface FornitoreInput {
   referente?: string;
   siteWeb?: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   note?: string;
   noteOperative?: string;
 }
@@ -544,7 +544,7 @@ export interface BeneficiarioInput {
   noteInterne?: string;
   soprannome?: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
   uds?: boolean;
@@ -592,7 +592,7 @@ export interface MagazzinoInput {
      * Area identifier; required when tipoMagazzino is mensa
      * @nullable
      */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   tipoMagazzino?: MagazzinoInputTipoMagazzino;
   stato?: string;
   note?: string;
@@ -624,7 +624,7 @@ export interface MagazzinoUpdate {
      * Area identifier; required when the resulting type is mensa
      * @nullable
      */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
   note?: string;
@@ -1067,9 +1067,9 @@ export interface Fornitore {
   /** @nullable */
   siteWeb?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;
@@ -1090,7 +1090,7 @@ export interface FornitoreUpdate {
   referente?: string;
   siteWeb?: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   attivo?: boolean;
   note?: string;
   noteOperative?: string;
@@ -1119,7 +1119,7 @@ export interface Approvvigionamento {
   /** @nullable */
   fornitoreEmail?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   magazzinoId?: number | null;
   /** @nullable */
@@ -1147,7 +1147,7 @@ export interface ApprovvigionamentoRigaInput {
 
 export interface ApprovvigionamentoInput {
   fornitoreId: number;
-  cittaId: number;
+  areaOperativaId: number;
   magazzinoId: number;
   centroAscoltoId?: number;
   dataRichiesta: string;
@@ -1162,7 +1162,7 @@ export interface ApprovvigionamentoUpdate {
   stato?: string;
   /** @nullable */
   fornitoreId?: number | null;
-  cittaId?: number;
+  areaOperativaId?: number;
   /** @nullable */
   magazzinoId?: number | null;
   /** @nullable */
@@ -1252,9 +1252,9 @@ export interface BeneficiarioSimile {
   /** @nullable */
   telefono?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** @nullable */
   zonaUdsId?: number | null;
   /** @nullable */
@@ -1347,9 +1347,9 @@ export interface BeneficiarioDirectory {
      * Identificativo tecnico legacy dell'Area.
      * @nullable
      */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** @nullable */
   zonaUdsId?: number | null;
   /** @nullable */
@@ -1498,9 +1498,9 @@ export interface Beneficiario {
   /** @nullable */
   soprannome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** @nullable */
   zonaUdsId?: number | null;
   /** @nullable */
@@ -1663,7 +1663,7 @@ export interface Intervento {
   /** @nullable */
   centroAscoltoNome: string | null;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
   dataIntervento: string | null;
   tipoIntervento: string;
@@ -1854,9 +1854,9 @@ export interface BeneficiarioDettaglio {
   /** @nullable */
   soprannome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** @nullable */
   zonaUdsId?: number | null;
   /** @nullable */
@@ -1958,7 +1958,7 @@ export interface BeneficiarioUpdate {
   noteInterne?: string;
   soprannome?: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
   sesso?: BeneficiarioUpdateSesso;
@@ -2014,9 +2014,9 @@ export interface PoliticaCreditoSolidale {
   /** @nullable */
   centroAscoltoNome: string | null;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
-  cittaNome: string | null;
+  areaOperativaNome: string | null;
   attiva: boolean;
   creditoBaseNucleo: number;
   creditoPerComponente: number;
@@ -2057,7 +2057,7 @@ export interface PoliticaCreditoSolidaleInput {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   attiva?: boolean;
   /** @minimum 0 */
   creditoBaseNucleo?: number;
@@ -2108,7 +2108,7 @@ export interface PoliticaCreditoSolidaleUpdate {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   attiva?: boolean;
   /** @minimum 0 */
   creditoBaseNucleo?: number;
@@ -2168,7 +2168,7 @@ export type CreditoSolidaleCalcoloPoliticaOrigine = typeof CreditoSolidaleCalcol
 
 export const CreditoSolidaleCalcoloPoliticaOrigine = {
   centro: 'centro',
-  citta: 'citta',
+  areaOperativa: 'areaOperativa',
   globale: 'globale',
   default: 'default',
 } as const;
@@ -2206,9 +2206,9 @@ export interface CreditoSolidaleMovimento {
   /** @nullable */
   centroAscoltoNome: string | null;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
-  cittaNome: string | null;
+  areaOperativaNome: string | null;
   tipoMovimento: CreditoSolidaleMovimentoTipoMovimento;
   variazioneCredito: number;
   saldoPrima: number;
@@ -2261,9 +2261,9 @@ export interface CreditoSolidaleBeneficiario {
      * Identificativo tecnico legacy dell'Area.
      * @nullable
      */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   attivo: boolean;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: CreditoSolidaleBeneficiarioCreditoSolidaleStato;
@@ -2400,7 +2400,7 @@ export interface CreditoSolidaleRicaricaMensilePreviewInput {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
 }
 
 export interface CreditoSolidaleRicaricaMensilePreviewRiga {
@@ -2411,9 +2411,9 @@ export interface CreditoSolidaleRicaricaMensilePreviewRiga {
   /** @nullable */
   centroAscoltoNome: string | null;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
-  cittaNome: string | null;
+  areaOperativaNome: string | null;
   /** @nullable */
   creditoSolidaleMensileAssegnato: number | null;
   saldoAttuale: number;
@@ -2441,7 +2441,7 @@ export interface CreditoSolidaleRicaricaMensileEsecuzioneInput {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   note?: string | null;
 }
@@ -2512,7 +2512,7 @@ export interface TipologiaFornitoreUpdate {
   attivo?: boolean;
 }
 
-export interface Citta {
+export interface AreaOperativa {
   id: number;
   nome: string;
   /** @nullable */
@@ -2525,7 +2525,7 @@ export interface Citta {
   dataCreazione: string;
 }
 
-export interface CittaInput {
+export interface AreaOperativaInput {
   /** @minLength 1 */
   nome: string;
   provincia?: string;
@@ -2535,7 +2535,7 @@ export interface CittaInput {
   note?: string;
 }
 
-export interface CittaUpdate {
+export interface AreaOperativaUpdate {
   /** @minLength 1 */
   nome?: string;
   provincia?: string;
@@ -2547,9 +2547,9 @@ export interface CittaUpdate {
 
 export interface ZonaUds {
   id: number;
-  cittaId: number;
+  areaOperativaId: number;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   nome: string;
   attivo: boolean;
   /** @nullable */
@@ -2558,7 +2558,7 @@ export interface ZonaUds {
 }
 
 export interface ZonaUdsInput {
-  cittaId: number;
+  areaOperativaId: number;
   /** @minLength 1 */
   nome: string;
   attivo?: boolean;
@@ -2566,7 +2566,7 @@ export interface ZonaUdsInput {
 }
 
 export interface ZonaUdsUpdate {
-  cittaId?: number;
+  areaOperativaId?: number;
   /** @minLength 1 */
   nome?: string;
   attivo?: boolean;
@@ -2577,7 +2577,7 @@ export interface CentroAscolto {
   id: number;
   nome: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   logoUrl?: string | null;
   /** @nullable */
@@ -2600,7 +2600,7 @@ export interface CentroAscolto {
 export interface CentroAscoltoInput {
   nome: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   logoUrl?: string | null;
   indirizzo?: string;
@@ -2615,7 +2615,7 @@ export interface CentroAscoltoInput {
 export interface CentroAscoltoUpdate {
   nome?: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   logoUrl?: string | null;
   indirizzo?: string;
@@ -3013,7 +3013,7 @@ export interface InterventoListItem {
   /** @nullable */
   centroAscoltoNome: string | null;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
   dataIntervento: string | null;
   tipoIntervento: string;
@@ -3675,9 +3675,9 @@ export interface AccessoEmporio {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   tipoPianificazione: AccessoEmporioTipoPianificazione;
   /** @nullable */
   magazzinoEmporioId: number | null;
@@ -3744,9 +3744,9 @@ export interface BeneficiarioAccessoEmporioSearchResult {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: string;
   saldoCreditoSolidale: number;
@@ -3810,7 +3810,7 @@ export interface SessioneCassaEmporio {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   magazzinoEmporioId: number;
   /** @nullable */
   magazzinoEmporioNome?: string | null;
@@ -3916,7 +3916,7 @@ export interface SessioneCassaEmporioRicercaBeneficiarioResult {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
   /** @nullable */
@@ -4034,9 +4034,9 @@ export interface SpesaEmporio {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   magazzinoEmporioId: number;
   /** @nullable */
   magazzinoEmporioNome?: string | null;
@@ -4695,10 +4695,10 @@ export interface Mensa {
   id: number;
   codice: string;
   nome: string;
-  /** Identificativo dell'Area configurata nel menu Aree; `cittaId` è il nome storico interno. */
-  cittaId: number;
+  /** Identificativo dell'Area Operativa usata come confine organizzativo dei dati. */
+  areaOperativaId: number;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa. */
   magazzinoId: number;
   /** @nullable */
@@ -4741,7 +4741,7 @@ export const MensaInputStato = {
 } as const;
 
 /**
- * Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L'Area è l'entità configurata nel menu Aree; `cittaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
+ * Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L'Area è l'entità configurata nel menu Aree; `areaOperativaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
  */
 export interface MensaInput {
   /**
@@ -4756,7 +4756,7 @@ export interface MensaInput {
      */
   nome: string;
   /** Identificativo dell'Area; per utenti territoriali prevale sempre l'Area del profilo. */
-  cittaId: number;
+  areaOperativaId: number;
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
@@ -4797,7 +4797,7 @@ export interface MensaBeneficiarioSummary {
   codice: string;
   attivo: boolean;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
 }
 
 export type MensaAbilitazioneStato = typeof MensaAbilitazioneStato[keyof typeof MensaAbilitazioneStato];
@@ -5198,7 +5198,7 @@ export interface MensaEccezione {
   beneficiarioNome?: string;
   mensaPrincipaleId: number;
   mensaDestinazioneId: number;
-  cittaId: number;
+  areaOperativaId: number;
   motivo: string;
   dataOra: string;
   [key: string]: unknown;
@@ -5217,7 +5217,7 @@ export interface MensaMagazzinoSummary {
   codice: string;
   nome: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   tipoMagazzino: string;
 }
 
@@ -5611,9 +5611,9 @@ export interface AuthUser {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** @nullable */
   zonaUdsId?: number | null;
   /** @nullable */
@@ -5677,9 +5677,9 @@ export interface Utente {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** @nullable */
   zonaUdsId?: number | null;
   /** @nullable */
@@ -5718,7 +5718,7 @@ export interface UtenteInput {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
   attivo?: boolean;
@@ -5738,7 +5738,7 @@ export interface UtenteUpdate {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
   attivo?: boolean;
@@ -5796,9 +5796,9 @@ export type ReportAParameter = string;
 export type ReportAnnoParameter = number;
 
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-export type ReportCittaIdParameter = number;
+export type ReportAreaOperativaIdParameter = number;
 
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
@@ -5864,7 +5864,7 @@ fsePlusOnly?: boolean;
 };
 
 export type GetPreparazioneConsegneParams = {
-cittaId?: number;
+areaOperativaId?: number;
 magazzinoId?: number;
 };
 
@@ -5895,7 +5895,7 @@ limit?: number;
 };
 
 export type ListFornitoriParams = {
-cittaId?: number;
+areaOperativaId?: number;
 };
 
 export type ListApprovvigionamentiParams = {
@@ -5924,7 +5924,7 @@ search?: string;
 priorita?: string;
 domicilio?: boolean;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 uds?: boolean;
 attivo?: boolean;
@@ -5968,7 +5968,7 @@ dataNascita?: string;
  * Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
  * @minimum 1
  */
-cittaId?: number;
+areaOperativaId?: number;
 excludeId?: number;
 };
 
@@ -5985,7 +5985,7 @@ export type ListInterventiParams = {
 beneficiarioId?: number;
 tipo?: string;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 /**
  * Filtra gli interventi in base ai Bisogni Pianificati collegati.
  */
@@ -6087,7 +6087,7 @@ tipo?: string;
 priorita?: InterventoPriorita;
 operatoreId?: number;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 stato?: InterventoStato;
 ambitoLegacy?: GetInterventiRiepilogoVisteAmbitoLegacy;
 da?: string;
@@ -6105,7 +6105,7 @@ export const GetInterventiRiepilogoVisteAmbitoLegacy = {
 
 export type ListInterventiOperatoriParams = {
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 };
 
 export type GetMaterialeDaPreparareParams = {
@@ -6118,7 +6118,7 @@ da?: string;
  * Data civile Europe/Rome inclusiva; massimo 31 giorni.
  */
 a?: string;
-cittaId?: number;
+areaOperativaId?: number;
 centroAscoltoId?: number;
 };
 
@@ -6146,7 +6146,7 @@ export type ListAccessiEmporioParams = {
 dataDa?: string;
 dataA?: string;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 areaId?: number;
 magazzinoEmporioId?: number;
 statoAccessoEmporio?: AccessoEmporioStato;
@@ -6173,7 +6173,7 @@ beneficiarioId?: number;
 export type ListSessioniCassaEmporioParams = {
 statoSessione?: SessioneCassaEmporioStato;
 magazzinoEmporioId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 areaId?: number;
 data?: string;
 beneficiarioSearch?: string;
@@ -6193,7 +6193,7 @@ limit?: LimitParamParameter;
 export type SearchBeneficiariCassaEmporioParams = {
 search?: string;
 data?: string;
-cittaId?: number;
+areaOperativaId?: number;
 areaId?: number;
 magazzinoEmporioId?: number;
 };
@@ -6210,7 +6210,7 @@ beneficiarioSearch?: string;
 beneficiarioId?: number;
 magazzinoEmporioId?: number;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 areaId?: number;
 /**
  * Pagina richiesta, indicizzata da 1
@@ -6274,7 +6274,7 @@ a?: MapsAParameter;
 };
 
 export type ListZoneUdsParams = {
-cittaId?: number;
+areaOperativaId?: number;
 };
 
 export type ListSuperAdminAuditConfigurazioniParams = {
@@ -6319,7 +6319,7 @@ offset?: number;
 export type ListCreditoSolidaleMovimentiParams = {
 beneficiarioId?: number;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 tipoMovimento?: ListCreditoSolidaleMovimentiTipoMovimento;
 /**
  * @pattern ^\d{4}-(0[1-9]|1[0-2])$
@@ -6346,7 +6346,7 @@ centroAscoltoId?: number;
 /**
  * Identificativo tecnico legacy dell'Area
  */
-cittaId?: number;
+areaOperativaId?: number;
 /**
  * @minimum 1
  */
@@ -6379,7 +6379,7 @@ export type GetVolontariCarico200Item = {
 
 export type ReportGiacenzePerMagazzinoParams = {
 magazzinoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 };
 
 export type ReportConsegnePerMeseParams = {
@@ -6388,25 +6388,25 @@ da?: string;
 a?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 };
 
 export type ReportConsegnePerCentroParams = {
 da?: string;
 a?: string;
-cittaId?: number;
+areaOperativaId?: number;
 };
 
 export type ReportAllocazioneMezziParams = {
 da?: string;
 a?: string;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 };
 
 export type ReportFsePlusParams = {
 anno?: number;
-cittaId?: number;
+areaOperativaId?: number;
 };
 
 export type GetReportDashboardGeneraleParams = {
@@ -6424,9 +6424,9 @@ a?: ReportAParameter;
  */
 anno?: ReportAnnoParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6444,9 +6444,9 @@ da?: ReportDaParameter;
  */
 a?: ReportAParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6464,9 +6464,9 @@ da?: ReportDaParameter;
  */
 a?: ReportAParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6486,9 +6486,9 @@ da?: ReportDaParameter;
  */
 a?: ReportAParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6506,9 +6506,9 @@ da?: ReportDaParameter;
  */
 a?: ReportAParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6529,9 +6529,9 @@ da?: ReportDaParameter;
  */
 a?: ReportAParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6551,9 +6551,9 @@ da?: ReportDaParameter;
  */
 a?: ReportAParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6576,9 +6576,9 @@ da?: ReportDaParameter;
  */
 a?: ReportAParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6612,9 +6612,9 @@ a?: ReportAParameter;
  */
 anno?: ReportAnnoParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */
@@ -6644,9 +6644,9 @@ export const GetReportDrilldownSection = {
 export type GetReportFilterOptionsParams = {
 section: GetReportFilterOptionsSection;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 };
 
 export type GetReportFilterOptionsSection = typeof GetReportFilterOptionsSection[keyof typeof GetReportFilterOptionsSection];
@@ -6666,7 +6666,7 @@ export const GetReportFilterOptionsSection = {
 export type ReportUdsInterventiPerMeseParams = {
 da?: string;
 a?: string;
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 };
 
@@ -6679,34 +6679,34 @@ da: string;
  * End date (ISO YYYY-MM-DD). Defaults to "da" (single day) when absent.
  */
 a?: string;
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 };
 
 export type ReportUdsInterventiPerTipoParams = {
 da?: string;
 a?: string;
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 };
 
 export type ReportUdsInterventiPerZonaParams = {
 da?: string;
 a?: string;
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 };
 
 export type ReportUdsPersonePerZonaParams = {
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 };
 
 export type ListMenseParams = {
 /**
- * Identificativo dell'Area configurata nel menu Aree (nome storico interno del campo).
+ * Identificativo dell'Area Operativa usata come confine organizzativo dei dati.
  */
-cittaId?: number;
+areaOperativaId?: number;
 attiva?: boolean;
 };
 
@@ -6822,7 +6822,7 @@ tipoServizio?: string;
 };
 
 export type ListUtentiParams = {
-cittaId?: number;
+areaOperativaId?: number;
 matricola?: string;
 query?: string;
 };

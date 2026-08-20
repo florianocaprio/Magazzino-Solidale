@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Citta {
+export interface AreaOperativa {
   id: number;
   nome: string;
   /** @nullable */

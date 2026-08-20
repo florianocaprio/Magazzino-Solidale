@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useListZoneUds, useCreateZonaUds, useUpdateZonaUds, useDeleteZonaUds, useListCitta, getListZoneUdsQueryKey } from "@workspace/api-client-react";
+import { useListZoneUds, useCreateZonaUds, useUpdateZonaUds, useDeleteZonaUds, useListAreeOperative, getListZoneUdsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,11 +21,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useTranslation } from "react-i18next";
 
-const ALL_CITTA = "__all__";
+const ALL_AREE_OPERATIVE = "__all__";
 
 function makeSchema(t: (k: string) => string) {
   return z.object({
-    cittaId: z.coerce.number().int().positive(t("zoneUds.selectCitta")),
+    areaOperativaId: z.coerce.number().int().positive(t("zoneUds.selectAreaOperativa")),
     nome: z.string().min(1, t("common.requiredField")),
     attivo: z.boolean().default(true),
     note: z.string().optional(),
@@ -49,11 +49,11 @@ export default function ZoneUds() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [cittaFilter, setCittaFilter] = useState<string>(ALL_CITTA);
-  const filterId = cittaFilter === ALL_CITTA ? undefined : parseInt(cittaFilter, 10);
+  const [areaOperativaFilter, setAreaOperativaFilter] = useState<string>(ALL_AREE_OPERATIVE);
+  const filterId = areaOperativaFilter === ALL_AREE_OPERATIVE ? undefined : parseInt(areaOperativaFilter, 10);
 
-  const { data: citta } = useListCitta();
-  const { data: zone, isLoading } = useListZoneUds(filterId != null ? { cittaId: filterId } : undefined);
+  const { data: areaOperativa } = useListAreeOperative();
+  const { data: zone, isLoading } = useListZoneUds(filterId != null ? { areaOperativaId: filterId } : undefined);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -65,16 +65,16 @@ export default function ZoneUds() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { cittaId: undefined as unknown as number, nome: "", attivo: true, note: "" },
+    defaultValues: { areaOperativaId: undefined as unknown as number, nome: "", attivo: true, note: "" },
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListZoneUdsQueryKey() });
-  const hasCitta = (citta?.length ?? 0) > 0;
+  const hasAreaOperativa = (areaOperativa?.length ?? 0) > 0;
 
   const handleCreate = () => {
     setEditingId(null);
     form.reset({
-      cittaId: (filterId ?? citta?.[0]?.id ?? undefined) as unknown as number,
+      areaOperativaId: (filterId ?? areaOperativa?.[0]?.id ?? undefined) as unknown as number,
       nome: "",
       attivo: true,
       note: "",
@@ -84,7 +84,7 @@ export default function ZoneUds() {
 
   const handleEdit = (z2: any) => {
     setEditingId(z2.id);
-    form.reset({ cittaId: z2.cittaId, nome: z2.nome, attivo: z2.attivo, note: z2.note || "" });
+    form.reset({ areaOperativaId: z2.areaOperativaId, nome: z2.nome, attivo: z2.attivo, note: z2.note || "" });
     setIsFormOpen(true);
   };
 
@@ -123,7 +123,7 @@ export default function ZoneUds() {
     });
   };
 
-  const cittaNameById = (id: number) => citta?.find((c) => c.id === id)?.nome ?? "-";
+  const areaOperativaNameById = (id: number) => areaOperativa?.find((c) => c.id === id)?.nome ?? "-";
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -133,13 +133,13 @@ export default function ZoneUds() {
           <p className="text-muted-foreground">{t("zoneUds.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={cittaFilter} onValueChange={setCittaFilter}>
+          <Select value={areaOperativaFilter} onValueChange={setAreaOperativaFilter}>
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder={t("zoneUds.filterCitta")} />
+              <SelectValue placeholder={t("zoneUds.filterAreaOperativa")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_CITTA}>{t("zoneUds.allCitta")}</SelectItem>
-              {citta?.map((c) => (
+              <SelectItem value={ALL_AREE_OPERATIVE}>{t("zoneUds.allAreaOperativa")}</SelectItem>
+              {areaOperativa?.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
               ))}
             </SelectContent>
@@ -148,21 +148,21 @@ export default function ZoneUds() {
             rows={zone ?? []}
             columns={[
               { header: t("common.name"), accessor: (z2) => z2.nome },
-              { header: t("zoneUds.citta"), accessor: (z2) => z2.cittaNome ?? cittaNameById(z2.cittaId) },
+              { header: t("zoneUds.areaOperativa"), accessor: (z2) => z2.areaOperativaNome ?? areaOperativaNameById(z2.areaOperativaId) },
               { header: t("zoneUds.attivoLabel"), accessor: (z2) => (z2.attivo ? t("common.yes") : t("common.no")) },
               { header: t("common.notes"), accessor: (z2) => z2.note },
             ]}
             filename="zone_uds"
             title={t("zoneUds.title")}
           />
-          <Button onClick={handleCreate} className="gap-2" disabled={!hasCitta}>
+          <Button onClick={handleCreate} className="gap-2" disabled={!hasAreaOperativa}>
             <Plus className="h-4 w-4" /> {t("zoneUds.newZona")}
           </Button>
         </div>
       </div>
 
-      {!hasCitta && !isLoading && (
-        <p className="text-sm text-muted-foreground">{t("zoneUds.noCittaFirst")}</p>
+      {!hasAreaOperativa && !isLoading && (
+        <p className="text-sm text-muted-foreground">{t("zoneUds.noAreaOperativaFirst")}</p>
       )}
 
       <Card>
@@ -171,7 +171,7 @@ export default function ZoneUds() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.name")}</TableHead>
-                <TableHead>{t("zoneUds.citta")}</TableHead>
+                <TableHead>{t("zoneUds.areaOperativa")}</TableHead>
                 <TableHead>{t("common.notes")}</TableHead>
                 <TableHead className="text-center">{t("common.status")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -201,7 +201,7 @@ export default function ZoneUds() {
                       <Map className="h-4 w-4 text-muted-foreground" /> {z2.nome}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">{z2.cittaNome ?? cittaNameById(z2.cittaId)}</TableCell>
+                  <TableCell className="text-sm">{z2.areaOperativaNome ?? areaOperativaNameById(z2.areaOperativaId)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{z2.note || "-"}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline" className={z2.attivo ? "bg-green-500/10 text-green-700 border-none" : "bg-muted text-muted-foreground"}>
@@ -243,20 +243,20 @@ export default function ZoneUds() {
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="cittaId" render={({ field }) => (
+                <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("zoneUds.citta")}</FormLabel>
+                    <FormLabel>{t("zoneUds.areaOperativa")}</FormLabel>
                     <Select
                       value={field.value != null ? String(field.value) : undefined}
                       onValueChange={(v) => field.onChange(parseInt(v, 10))}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={t("zoneUds.selectCitta")} />
+                          <SelectValue placeholder={t("zoneUds.selectAreaOperativa")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {citta?.map((c) => (
+                        {areaOperativa?.map((c) => (
                           <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                         ))}
                       </SelectContent>

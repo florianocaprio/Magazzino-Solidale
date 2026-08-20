@@ -5,7 +5,7 @@ import { desc, eq } from "drizzle-orm";
 import {
   andScoped,
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   canAccessCentro,
   centroScopeFilter,
   idSetScopeFilter,
@@ -96,7 +96,7 @@ const fmtMezzo = (r: {
 
 async function ensureVisibleCentro(rowCentroId: number | null, req: Request) {
   if (!canAccessCentro(rowCentroId, callerCentroId(req))) return false;
-  return inVisibleCentroSet(rowCentroId, await visibleCentroIds(callerCittaId(req)));
+  return inVisibleCentroSet(rowCentroId, await visibleCentroIds(callerAreaOperativaId(req)));
 }
 
 router.get("/approvazioni-logistica", async (req, res) => {
@@ -104,10 +104,10 @@ router.get("/approvazioni-logistica", async (req, res) => {
     isModuloAttivo("VOLONTARI"),
     isModuloAttivo("MEZZI"),
   ]);
-  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
+  const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const scope = andScoped(
     centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)),
-    idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds),
+    idSetScopeFilter(volontariTable.centroAscoltoId, areaOperativaCentroIds),
   );
   const volontari = volontariAttivi ? await db
     .select({
@@ -132,7 +132,7 @@ router.get("/approvazioni-logistica", async (req, res) => {
 
   const mezzoScope = andScoped(
     centroScopeFilter(mezziTable.centroAscoltoId, callerCentroId(req)),
-    idSetScopeFilter(mezziTable.centroAscoltoId, cittaCentroIds),
+    idSetScopeFilter(mezziTable.centroAscoltoId, areaOperativaCentroIds),
   );
   const mezzi = mezziAttivi ? await db
     .select({

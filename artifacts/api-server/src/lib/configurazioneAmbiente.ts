@@ -197,7 +197,7 @@ export async function ensureDefaultSuperAdminUser(): Promise<void> {
       ruoloId: superAdminRoleId,
       isSuperAdmin: true,
       centroAscoltoId: null,
-      cittaId: null,
+      areaOperativaId: null,
       zonaUdsId: null,
     };
     if (normalizedInitialEmail && !existing.email) {
@@ -248,7 +248,7 @@ export async function ensureDefaultSuperAdminUser(): Promise<void> {
     cognome: "Admin",
     ruoloId: superAdminRoleId,
     centroAscoltoId: null,
-    cittaId: null,
+    areaOperativaId: null,
     zonaUdsId: null,
     attivo: true,
     isSuperAdmin: true,

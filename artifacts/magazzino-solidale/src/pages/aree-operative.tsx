@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListCitta, useCreateCitta, useUpdateCitta, useDeleteCitta, getListCittaQueryKey } from "@workspace/api-client-react";
+import { useListAreeOperative, useCreateAreaOperativa, useUpdateAreaOperativa, useDeleteAreaOperativa, getListAreeOperativeQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,10 +33,10 @@ function makeSchema(t: (k: string) => string) {
 
 type FormValues = z.infer<ReturnType<typeof makeSchema>>;
 
-export default function Citta() {
+export default function AreeOperative() {
   const { t } = useTranslation();
   const schema = makeSchema(t);
-  const { data: citta, isLoading } = useListCitta();
+  const { data: areeOperative, isLoading } = useListAreeOperative();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -45,16 +45,16 @@ export default function Citta() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const createCitta = useCreateCitta();
-  const updateCitta = useUpdateCitta();
-  const deleteCitta = useDeleteCitta();
+  const createAreaOperativa = useCreateAreaOperativa();
+  const updateAreaOperativa = useUpdateAreaOperativa();
+  const deleteAreaOperativa = useDeleteAreaOperativa();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { nome: "", provincia: "", sigla: "", attivo: true, note: "" },
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListCittaQueryKey() });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListAreeOperativeQueryKey() });
 
   const handleCreate = () => {
     setEditingId(null);
@@ -73,36 +73,36 @@ export default function Citta() {
   const onSubmit = (data: FormValues) => {
     setFormError(null);
     if (editingId) {
-      updateCitta.mutate({ id: editingId, data }, {
+      updateAreaOperativa.mutate({ id: editingId, data }, {
         onSuccess: () => {
           invalidate();
-          toast({ title: t("citta.toastUpdated") });
+          toast({ title: t("areeOperative.toastUpdated") });
           setIsFormOpen(false);
         },
-        onError: (err) => setFormError(errorMessage(err, t("citta.saveError"))),
+        onError: (err) => setFormError(errorMessage(err, t("areeOperative.saveError"))),
       });
     } else {
-      createCitta.mutate({ data }, {
+      createAreaOperativa.mutate({ data }, {
         onSuccess: () => {
           invalidate();
-          toast({ title: t("citta.toastCreated") });
+          toast({ title: t("areeOperative.toastCreated") });
           setIsFormOpen(false);
         },
-        onError: (err) => setFormError(errorMessage(err, t("citta.saveError"))),
+        onError: (err) => setFormError(errorMessage(err, t("areeOperative.saveError"))),
       });
     }
   };
 
   const handleDelete = () => {
     if (!deletingId) return;
-    deleteCitta.mutate({ id: deletingId }, {
+    deleteAreaOperativa.mutate({ id: deletingId }, {
       onSuccess: () => {
         invalidate();
-        toast({ title: t("citta.toastDeleted") });
+        toast({ title: t("areeOperative.toastDeleted") });
         setDeletingId(null);
       },
       onError: (err) => {
-        toast({ title: t("citta.deleteTitle"), description: errorMessage(err, t("citta.deleteDescription")), variant: "destructive" });
+        toast({ title: t("areeOperative.deleteTitle"), description: errorMessage(err, t("areeOperative.deleteDescription")), variant: "destructive" });
         setDeletingId(null);
       },
     });
@@ -112,23 +112,23 @@ export default function Citta() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("citta.title")}</h1>
-          <p className="text-muted-foreground">{t("citta.subtitle")}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("areeOperative.title")}</h1>
+          <p className="text-muted-foreground">{t("areeOperative.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
-            rows={citta ?? []}
+            rows={areeOperative ?? []}
             columns={[
               { header: t("common.name"), accessor: (c) => c.nome },
-              { header: t("citta.provincia"), accessor: (c) => c.provincia },
-              { header: t("citta.attivoLabel"), accessor: (c) => (c.attivo ? t("common.yes") : t("common.no")) },
+              { header: t("areeOperative.provincia"), accessor: (c) => c.provincia },
+              { header: t("areeOperative.attivoLabel"), accessor: (c) => (c.attivo ? t("common.yes") : t("common.no")) },
               { header: t("common.notes"), accessor: (c) => c.note },
             ]}
-            filename="citta"
-            title={t("citta.title")}
+            filename="aree-operative"
+            title={t("areeOperative.title")}
           />
           <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> {t("citta.newCitta")}
+            <Plus className="h-4 w-4" /> {t("areeOperative.newAreaOperativa")}
           </Button>
         </div>
       </div>
@@ -139,7 +139,7 @@ export default function Citta() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.name")}</TableHead>
-                <TableHead>{t("citta.provincia")}</TableHead>
+                <TableHead>{t("areeOperative.provincia")}</TableHead>
                 <TableHead>{t("common.notes")}</TableHead>
                 <TableHead className="text-center">{t("common.status")}</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -156,13 +156,13 @@ export default function Citta() {
                     <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                   </TableRow>
                 ))
-              ) : citta?.length === 0 ? (
+              ) : areeOperative?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                    {t("citta.noCitta")}
+                    {t("areeOperative.noAreaOperativa")}
                   </TableCell>
                 </TableRow>
-              ) : citta?.map((c) => (
+              ) : areeOperative?.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell>
                     <div className="flex items-center gap-2 font-medium">
@@ -180,7 +180,7 @@ export default function Citta() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">{t("citta.openMenu")}</span>
+                          <span className="sr-only">{t("areeOperative.openMenu")}</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -206,7 +206,7 @@ export default function Citta() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId ? t("citta.editTitle") : t("citta.newTitle")}</SheetTitle>
+            <SheetTitle>{editingId ? t("areeOperative.editTitle") : t("areeOperative.newTitle")}</SheetTitle>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
@@ -215,17 +215,17 @@ export default function Citta() {
                   <FormItem><FormLabel>{t("common.name")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="provincia" render={({ field }) => (
-                  <FormItem><FormLabel>{t("citta.provincia")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  <FormItem><FormLabel>{t("areeOperative.provincia")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <FormField control={form.control} name="sigla" render={({ field }) => (
-                  <FormItem><FormLabel>{t("citta.sigla")}</FormLabel><FormControl><Input {...field} maxLength={2} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>{t("areeOperative.sigla")}</FormLabel><FormControl><Input {...field} maxLength={2} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="note" render={({ field }) => (
                   <FormItem><FormLabel>{t("common.notes")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                 )} />
                 <FormField control={form.control} name="attivo" render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                    <FormLabel className="m-0">{t("citta.cittaAttiva")}</FormLabel>
+                    <FormLabel className="m-0">{t("areeOperative.areaOperativaAttiva")}</FormLabel>
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
                 )} />
@@ -234,7 +234,7 @@ export default function Citta() {
 
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createCitta.isPending || updateCitta.isPending}>{t("common.save")}</Button>
+                  <Button type="submit" disabled={createAreaOperativa.isPending || updateAreaOperativa.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
             </Form>
@@ -245,8 +245,8 @@ export default function Citta() {
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("citta.deleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("citta.deleteDescription")}</AlertDialogDescription>
+            <AlertDialogTitle>{t("areeOperative.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("areeOperative.deleteDescription")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>

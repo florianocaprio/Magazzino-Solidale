@@ -4,7 +4,7 @@ import request from "supertest";
 import {
   beneficiariTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   interventiMaterialiTable,
   interventiTable,
@@ -24,7 +24,7 @@ import { dateTimeEuropeRomeToUtc } from "../src/lib/interventiViste";
 
 const rnd = () => Math.random().toString(36).slice(2, 10);
 const ids = {
-  citta: [] as number[],
+  areaOperativa: [] as number[],
   centri: [] as number[],
   beneficiari: [] as number[],
   utenti: [] as number[],
@@ -64,7 +64,7 @@ function atRome(value: string, time = "09:00"): Date {
 function makeApp(
   options: {
     userId?: number;
-    cittaId?: number;
+    areaOperativaId?: number;
     centroId?: number;
   } = {},
 ): Express {
@@ -75,7 +75,7 @@ function makeApp(
       req as unknown as {
         user: {
           id: number;
-          cittaId: number;
+          areaOperativaId: number;
           centroAscoltoId: number;
           zonaUdsId: null;
           aree: string[];
@@ -86,7 +86,7 @@ function makeApp(
       }
     ).user = {
       id: options.userId ?? operatoreRoma,
-      cittaId: options.cittaId ?? roma,
+      areaOperativaId: options.areaOperativaId ?? roma,
       centroAscoltoId: options.centroId ?? centroRoma,
       zonaUdsId: null,
       aree: ["sociale"],
@@ -156,17 +156,17 @@ beforeAll(async () => {
   today = dataCivileEuropeRome();
   tomorrow = addDays(today, 1);
   dayAfter = addDays(today, 2);
-  const cities = await db
-    .insert(cittaTable)
+  const areeOperative = await db
+    .insert(areeOperativeTable)
     .values([{ nome: `Roma Prep ${rnd()}` }, { nome: `Milano Prep ${rnd()}` }])
-    .returning({ id: cittaTable.id });
-  [roma, milano] = cities.map((row) => row.id);
-  ids.citta.push(roma, milano);
+    .returning({ id: areeOperativeTable.id });
+  [roma, milano] = areeOperative.map((row) => row.id);
+  ids.areaOperativa.push(roma, milano);
   const centers = await db
     .insert(centriAscoltoTable)
     .values([
-      { nome: `Centro Roma Prep ${rnd()}`, cittaId: roma },
-      { nome: `Centro Milano Prep ${rnd()}`, cittaId: milano },
+      { nome: `Centro Roma Prep ${rnd()}`, areaOperativaId: roma },
+      { nome: `Centro Milano Prep ${rnd()}`, areaOperativaId: milano },
     ])
     .returning({ id: centriAscoltoTable.id });
   [centroRoma, centroMilano] = centers.map((row) => row.id);
@@ -178,14 +178,14 @@ beforeAll(async () => {
         username: `prep_roma_${rnd()}`,
         passwordHash: "test",
         nome: "Prep Roma",
-        cittaId: roma,
+        areaOperativaId: roma,
         centroAscoltoId: centroRoma,
       },
       {
         username: `prep_milano_${rnd()}`,
         passwordHash: "test",
         nome: "Prep Milano",
-        cittaId: milano,
+        areaOperativaId: milano,
         centroAscoltoId: centroMilano,
       },
     ])
@@ -200,7 +200,7 @@ beforeAll(async () => {
         nome: "Persona",
         cognome: "Roma",
         sesso: "F",
-        cittaId: roma,
+        areaOperativaId: roma,
         centroAscoltoId: centroRoma,
       },
       {
@@ -208,7 +208,7 @@ beforeAll(async () => {
         nome: "Persona",
         cognome: "Milano",
         sesso: "M",
-        cittaId: milano,
+        areaOperativaId: milano,
         centroAscoltoId: centroMilano,
       },
     ])
@@ -229,8 +229,8 @@ beforeAll(async () => {
   const warehouses = await db
     .insert(magazziniTable)
     .values([
-      { codice: `PREP-M1-${rnd()}`, nome: "Magazzino Uno", cittaId: roma },
-      { codice: `PREP-M2-${rnd()}`, nome: "Magazzino Due", cittaId: roma },
+      { codice: `PREP-M1-${rnd()}`, nome: "Magazzino Uno", areaOperativaId: roma },
+      { codice: `PREP-M2-${rnd()}`, nome: "Magazzino Due", areaOperativaId: roma },
     ])
     .returning({ id: magazziniTable.id });
   [magazzinoRoma, altroMagazzinoRoma] = warehouses.map((row) => row.id);
@@ -364,7 +364,7 @@ afterAll(async () => {
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));
-  await db.delete(cittaTable).where(inArray(cittaTable.id, ids.citta));
+  await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, ids.areaOperativa));
   await pool.end();
 });
 
@@ -481,7 +481,7 @@ describe("materiale da preparare per gli interventi Sociali", () => {
     const detail = romaResponse.body.gruppi[0].interventi[0];
     const milanoApp = makeApp({
       userId: operatoreMilano,
-      cittaId: milano,
+      areaOperativaId: milano,
       centroId: centroMilano,
     });
     expect(

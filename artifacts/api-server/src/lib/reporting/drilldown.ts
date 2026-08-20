@@ -117,7 +117,7 @@ function detailDefinition(
                  COUNT(*) OVER() AS full_count
           FROM beneficiari be
           WHERE be.data_presa_in_carico BETWEEN ${filters.da} AND ${filters.a}
-            AND ${andSql(reportScope(filters, { citta: sql`be.citta_id`, centro: sql`be.centro_ascolto_id`, zona: sql`be.zona_uds_id` }))}
+            AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, zona: sql`be.zona_uds_id` }))}
           ORDER BY be.data_presa_in_carico DESC, be.id DESC ${pagination}
         `,
       };
@@ -329,7 +329,7 @@ function detailDefinition(
           JOIN beneficiari be ON be.id = b.beneficiario_id
           WHERE mv.tipo_movimento = 'scarico' AND b.stato = 'consegnato'
             AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
-            AND ${andSql(reportScope(filters, { citta: sql`be.citta_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
+            AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
             AND ${fseBollaSourceCondition(filters)}
         )`;
       if (metric === "nucleiRaggiunti") {
@@ -370,7 +370,7 @@ function detailDefinition(
           JOIN prodotti p ON p.id = br.prodotto_id
           WHERE mv.tipo_movimento = 'scarico' AND b.stato = 'consegnato'
             AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
-            AND ${andSql(reportScope(filters, { citta: sql`be.citta_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
+            AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
             AND ${fseBollaSourceCondition(filters)}
           GROUP BY p.id, p.codice, p.nome
           ORDER BY p.nome, p.id ${pagination}
@@ -395,7 +395,7 @@ function detailDefinition(
         LEFT JOIN consegne c ON c.id = b.consegna_id
         WHERE mv.tipo_movimento = 'scarico' AND b.stato = 'consegnato'
           AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
-          AND ${andSql(reportScope(filters, { citta: sql`be.citta_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
+          AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
           AND ${fseBollaSourceCondition(filters)}
         ORDER BY b.data_bolla DESC, mv.id DESC ${pagination}
       `,

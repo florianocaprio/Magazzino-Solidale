@@ -1,15 +1,15 @@
-import { db, utentiTable, cittaTable } from "@workspace/db";
+import { db, utentiTable, areeOperativeTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 /**
  * One-off maintenance: regenerate every operator matricola in the new format
  *   <InitialNome><InitialCognome><yy>-<SIGLA>-<NNNNNN>
- * where yy = 2-digit year of insertion (dataCreazione), SIGLA = città sigla (or
- * first 2 letters of the città name as a fallback, "OO" for global users), and
+ * where yy = 2-digit year of insertion (dataCreazione), SIGLA = area operativa sigla (or
+ * first 2 letters of the area operativa name as a fallback, "OO" for global users), and
  * NNNNNN = random 6-digit number. On a collision the first digit becomes a
  * letter (A, B, C, ...). Idempotent only in shape (numbers are random).
  */
-function cittaSigla(sigla: string | null, nome: string | null): string {
+function areaOperativaSigla(sigla: string | null, nome: string | null): string {
   const s = (sigla ?? "").trim().toUpperCase();
   if (s.length >= 2) return s.slice(0, 2);
   const fromName = (nome ?? "").replace(/[^A-Za-z]/g, "").toUpperCase();
@@ -28,17 +28,17 @@ function buildMatricola(
 }
 
 async function main() {
-  const citta = await db
-    .select({ id: cittaTable.id, sigla: cittaTable.sigla, nome: cittaTable.nome })
-    .from(cittaTable);
-  const cittaMap = new Map(citta.map((c) => [c.id, c]));
+  const areaOperativa = await db
+    .select({ id: areeOperativeTable.id, sigla: areeOperativeTable.sigla, nome: areeOperativeTable.nome })
+    .from(areeOperativeTable);
+  const areaOperativaMap = new Map(areaOperativa.map((c) => [c.id, c]));
 
   const utenti = await db
     .select({
       id: utentiTable.id,
       nome: utentiTable.nome,
       cognome: utentiTable.cognome,
-      cittaId: utentiTable.cittaId,
+      areaOperativaId: utentiTable.areaOperativaId,
       dataCreazione: utentiTable.dataCreazione,
     })
     .from(utentiTable)
@@ -48,8 +48,8 @@ async function main() {
   let updated = 0;
   for (const u of utenti) {
     const yy = String(new Date(u.dataCreazione).getFullYear()).slice(-2);
-    const c = u.cittaId != null ? cittaMap.get(u.cittaId) : undefined;
-    const sigla = u.cittaId != null ? cittaSigla(c?.sigla ?? null, c?.nome ?? null) : "OO";
+    const c = u.areaOperativaId != null ? areaOperativaMap.get(u.areaOperativaId) : undefined;
+    const sigla = u.areaOperativaId != null ? areaOperativaSigla(c?.sigla ?? null, c?.nome ?? null) : "OO";
 
     let matricola = "";
     for (let i = 0; i < 100 && !matricola; i++) {

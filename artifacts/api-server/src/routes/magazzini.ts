@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { cittaTable, magazziniTable, centriAscoltoTable, menseTable } from "@workspace/db";
+import { areeOperativeTable, magazziniTable, centriAscoltoTable, menseTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { CreateMagazzinoBody, UpdateMagazzinoBody } from "@workspace/api-zod";
-import { callerCentroId, callerCittaId, centroScopeFilter, cittaScopeFilter, canAccessCentro, canAccessCitta, andScoped } from "../lib/centroScope";
+import { callerCentroId, callerAreaOperativaId, centroScopeFilter, areaOperativaScopeFilter, canAccessCentro, canAccessAreaOperativa, andScoped } from "../lib/centroScope";
 import { requireAdmin } from "../middlewares/auth";
 import { canMutateScopedResource } from "../lib/adminScope";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
@@ -53,7 +53,7 @@ const fmt = (r: typeof magazziniTable.$inferSelect, centroNome?: string | null) 
   email: r.email ?? null,
   centroAscoltoId: r.centroAscoltoId ?? null,
   centroAscoltoNome: centroNome ?? null,
-  cittaId: r.cittaId ?? null,
+  areaOperativaId: r.areaOperativaId ?? null,
   tipoMagazzino: r.tipoMagazzino ?? "logistico",
   stato: r.stato,
   note: r.note ?? null,
@@ -67,33 +67,33 @@ async function centroNomeOf(id: number | null): Promise<string | null> {
 }
 
 async function validateMagazzinoAssignment(
-  cittaId: number | null,
+  areaOperativaId: number | null,
   centroAscoltoId: number | null,
   requireArea: boolean,
 ): Promise<string | null> {
-  if (requireArea && cittaId == null) {
+  if (requireArea && areaOperativaId == null) {
     return "Seleziona un'Area valida per la Mensa.";
   }
-  if (cittaId != null) {
+  if (areaOperativaId != null) {
     const [area] = await db
-      .select({ id: cittaTable.id, attivo: cittaTable.attivo })
-      .from(cittaTable)
-      .where(eq(cittaTable.id, cittaId));
-    if (!area || !area.attivo) return "L'Area selezionata non è disponibile.";
+      .select({ id: areeOperativeTable.id, attivo: areeOperativeTable.attivo })
+      .from(areeOperativeTable)
+      .where(eq(areeOperativeTable.id, areaOperativaId));
+    if (!area || !area.attivo) return "L'Area Operativa selezionata non è disponibile.";
   }
 
   if (centroAscoltoId == null) return null;
   const [centro] = await db
     .select({
-      cittaId: centriAscoltoTable.cittaId,
+      areaOperativaId: centriAscoltoTable.areaOperativaId,
       attivo: centriAscoltoTable.attivo,
     })
     .from(centriAscoltoTable)
     .where(eq(centriAscoltoTable.id, centroAscoltoId));
   if (!centro) return "Il Centro di Ascolto selezionato non esiste.";
   if (!centro.attivo) return "Il Centro di Ascolto selezionato non è attivo.";
-  if (centro.cittaId !== cittaId) {
-    return "Il Centro di Ascolto deve appartenere alla stessa Area del Magazzino.";
+  if (centro.areaOperativaId !== areaOperativaId) {
+    return "Il Centro di Ascolto deve appartenere alla stessa Area Operativa del Magazzino.";
   }
   return null;
 }
@@ -103,7 +103,7 @@ router.get("/magazzini", async (req, res) => {
     .select({ m: magazziniTable, centroNome: centriAscoltoTable.nome })
     .from(magazziniTable)
     .leftJoin(centriAscoltoTable, eq(magazziniTable.centroAscoltoId, centriAscoltoTable.id))
-    .where(andScoped(centroScopeFilter(magazziniTable.centroAscoltoId, callerCentroId(req)), cittaScopeFilter(magazziniTable.cittaId, callerCittaId(req))))
+    .where(andScoped(centroScopeFilter(magazziniTable.centroAscoltoId, callerCentroId(req)), areaOperativaScopeFilter(magazziniTable.areaOperativaId, callerAreaOperativaId(req))))
     .orderBy(magazziniTable.nome);
   res.json(rows.map((r) => fmt(r.m, r.centroNome)));
 });
@@ -116,13 +116,13 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
   }
   const body = parsed.data;
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
-  if (cid != null && body.cittaId != null && body.cittaId !== cid) {
+  const cid = callerAreaOperativaId(req);
+  if (cid != null && body.areaOperativaId != null && body.areaOperativaId !== cid) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
   const centroAscoltoId = caller != null ? caller : (body.centroAscoltoId ?? null);
-  const cittaId = cid != null ? cid : (body.cittaId ?? null);
+  const areaOperativaId = cid != null ? cid : (body.areaOperativaId ?? null);
   const tipoMagazzino = parseTipoMagazzino(body.tipoMagazzino, "logistico");
   if (!tipoMagazzino) {
     res.status(400).json({ error: "Tipo magazzino non valido." });
@@ -142,12 +142,12 @@ router.post("/magazzini", requireAdmin, async (req, res) => {
     telefono: body.telefono,
     email: body.email,
     centroAscoltoId,
-    cittaId,
+    areaOperativaId,
     tipoMagazzino,
     stato: body.stato ?? "attivo",
     note: body.note,
   };
-  const assignmentError = await validateMagazzinoAssignment(cittaId, centroAscoltoId, tipoMagazzino === "mensa");
+  const assignmentError = await validateMagazzinoAssignment(areaOperativaId, centroAscoltoId, tipoMagazzino === "mensa");
   if (assignmentError) {
     res.status(400).json({ error: assignmentError });
     return;
@@ -218,8 +218,8 @@ router.get("/magazzini/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!canAccessCitta(row.cittaId, callerCittaId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!canAccessAreaOperativa(row.areaOperativaId, callerAreaOperativaId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   res.json(fmt(row, await centroNomeOf(row.centroAscoltoId)));
@@ -228,7 +228,7 @@ router.get("/magazzini/:id", async (req, res) => {
 router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
   const id = paramId(req.params.id);
   const caller = callerCentroId(req);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const [existing] = await db.select().from(magazziniTable).where(eq(magazziniTable.id, id));
   if (!existing) {
     res.status(404).json({ error: "Not found" });
@@ -238,7 +238,7 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
     res.status(403).json({ error: "Magazzino non modificabile per il tuo centro" });
     return;
   }
-  if (!canMutateScopedResource(existing.cittaId, cid)) {
+  if (!canMutateScopedResource(existing.areaOperativaId, cid)) {
     res.status(403).json({ error: "Magazzino non modificabile per la tua Area" });
     return;
   }
@@ -248,7 +248,7 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
     return;
   }
   const updates = { ...parsed.data };
-  if (cid != null && updates.cittaId !== undefined && updates.cittaId !== cid) {
+  if (cid != null && updates.areaOperativaId !== undefined && updates.areaOperativaId !== cid) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
@@ -272,14 +272,14 @@ router.patch("/magazzini/:id", requireAdmin, async (req, res) => {
   }
   // Scoped users cannot reassign a record's centro.
   if (caller != null) delete updates.centroAscoltoId;
-  // Scoped users cannot move a record to another città.
-  if (cid != null) delete updates.cittaId;
+  // Scoped users cannot move a record to another area operativa.
+  if (cid != null) delete updates.areaOperativaId;
   const targetTipo = (updates.tipoMagazzino ?? existing.tipoMagazzino) as TipoMagazzino;
-  const targetCittaId = updates.cittaId === undefined ? existing.cittaId : updates.cittaId;
+  const targetAreaOperativaId = updates.areaOperativaId === undefined ? existing.areaOperativaId : updates.areaOperativaId;
   const targetCentroId = updates.centroAscoltoId === undefined ? existing.centroAscoltoId : updates.centroAscoltoId;
-  const assignmentChanged = parsed.data.cittaId !== undefined || parsed.data.centroAscoltoId !== undefined || parsed.data.tipoMagazzino !== undefined;
+  const assignmentChanged = parsed.data.areaOperativaId !== undefined || parsed.data.centroAscoltoId !== undefined || parsed.data.tipoMagazzino !== undefined;
   if (assignmentChanged) {
-    const assignmentError = await validateMagazzinoAssignment(targetCittaId, targetCentroId, targetTipo === "mensa");
+    const assignmentError = await validateMagazzinoAssignment(targetAreaOperativaId, targetCentroId, targetTipo === "mensa");
     if (assignmentError) {
       res.status(400).json({ error: assignmentError });
       return;
@@ -307,7 +307,7 @@ router.delete("/magazzini/:id", requireAdmin, async (req, res) => {
     res.status(403).json({ error: "Magazzino non modificabile per il tuo centro" });
     return;
   }
-  if (!canMutateScopedResource(existing.cittaId, callerCittaId(req))) {
+  if (!canMutateScopedResource(existing.areaOperativaId, callerAreaOperativaId(req))) {
     res.status(403).json({ error: "Magazzino non modificabile per la tua Area" });
     return;
   }

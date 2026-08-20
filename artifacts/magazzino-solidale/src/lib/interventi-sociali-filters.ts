@@ -20,7 +20,7 @@ export interface InterventiSocialiFilters {
   priorita: string;
   operatoreId: string;
   centroAscoltoId: string;
-  cittaId: string;
+  areaOperativaId: string;
   stato: string;
   ambitoLegacy: "tutti" | "classificati" | "legacy";
   da: string;
@@ -58,7 +58,7 @@ export function defaultInterventiSocialiFilters(
     priorita: "",
     operatoreId: "",
     centroAscoltoId: "",
-    cittaId: "",
+    areaOperativaId: "",
     stato: "",
     ambitoLegacy: "tutti",
     da: "",
@@ -103,7 +103,7 @@ export function parseInterventiSocialiFilters(
       : "",
     operatoreId: positiveId(params.get("operatore")),
     centroAscoltoId: positiveId(params.get("centro")),
-    cittaId: positiveId(params.get("citta")),
+    areaOperativaId: positiveId(params.get("areaOperativa")),
     stato: STATI.has(params.get("stato") ?? "") ? params.get("stato")! : "",
     ambitoLegacy:
       legacy === "classificati" || legacy === "legacy" ? legacy : "tutti",
@@ -129,7 +129,7 @@ export function serializeInterventiSocialiFilters(
   if (filters.priorita) params.set("priorita", filters.priorita);
   if (filters.operatoreId) params.set("operatore", filters.operatoreId);
   if (filters.centroAscoltoId) params.set("centro", filters.centroAscoltoId);
-  if (filters.cittaId) params.set("citta", filters.cittaId);
+  if (filters.areaOperativaId) params.set("areaOperativa", filters.areaOperativaId);
   if (filters.stato) params.set("stato", filters.stato);
   if (filters.ambitoLegacy !== "tutti")
     params.set("legacy", filters.ambitoLegacy);

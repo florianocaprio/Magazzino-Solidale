@@ -59,12 +59,12 @@ export function canAccessCentro(
  */
 export async function visibleMagazzinoIds(
   centroId: number | null,
-  cittaId: number | null = null,
+  areaOperativaId: number | null = null,
 ): Promise<number[] | null> {
-  if (centroId == null && cittaId == null) return null;
+  if (centroId == null && areaOperativaId == null) return null;
   const cond = andScoped(
     centroScopeFilter(magazziniTable.centroAscoltoId, centroId),
-    cittaScopeFilter(magazziniTable.cittaId, cittaId),
+    areaOperativaScopeFilter(magazziniTable.areaOperativaId, areaOperativaId),
   );
   const rows = await db
     .select({ id: magazziniTable.id })
@@ -74,22 +74,22 @@ export async function visibleMagazzinoIds(
 }
 
 /**
- * The set of centro ids visible to a caller scoped to `cittaId`: centri whose
- * città equals the caller's OR is NULL (shared). Returns `null` for a città-global
+ * The set of centro ids visible to a caller scoped to `areaOperativaId`: centri whose
+ * area operativa equals the caller's OR is NULL (shared). Returns `null` for a area operativa-global
  * caller (no restriction). Used to scope centro-linked entities (fornitori,
- * volontari, mezzi) by città when they carry no direct cittaId column.
+ * volontari, mezzi) by area operativa when they carry no direct areaOperativaId column.
  */
 export async function visibleCentroIds(
-  cittaId: number | null,
+  areaOperativaId: number | null,
 ): Promise<number[] | null> {
-  if (cittaId == null) return null;
+  if (areaOperativaId == null) return null;
   const rows = await db
     .select({ id: centriAscoltoTable.id })
     .from(centriAscoltoTable)
     .where(
       or(
-        eq(centriAscoltoTable.cittaId, cittaId),
-        isNull(centriAscoltoTable.cittaId),
+        eq(centriAscoltoTable.areaOperativaId, areaOperativaId),
+        isNull(centriAscoltoTable.areaOperativaId),
       ),
     );
   return rows.map((r) => r.id);
@@ -148,21 +148,21 @@ export async function beneficiarioCentroId(
 export async function canUseBeneficiario(
   beneficiarioId: number | null | undefined,
   centroId: number | null,
-  cittaId: number | null = null,
+  areaOperativaId: number | null = null,
   zonaUdsId: number | null = null,
 ): Promise<boolean> {
   if (beneficiarioId == null) return true;
   const [b] = await db
     .select({
       c: beneficiariTable.centroAscoltoId,
-      ci: beneficiariTable.cittaId,
+      ci: beneficiariTable.areaOperativaId,
       z: beneficiariTable.zonaUdsId,
     })
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId));
   if (!b) return false;
   return canAccessCentro(b.c, centroId)
-    && canAccessCitta(b.ci, cittaId)
+    && canAccessAreaOperativa(b.ci, areaOperativaId)
     && canAccessZonaUds(b.z, zonaUdsId);
 }
 
@@ -186,23 +186,23 @@ export async function canUseMagazzino(
 }
 
 /* ────────────────────────────────────────────────────────────────────────
- * Per-Città (city) data scoping — HARD visibility boundary.
+ * Per-Area Operativa (areaOperativa) data scoping — HARD visibility boundary.
  *
- * A user bound to a città (`req.user.cittaId != null`) may only see rows of
- * their own città plus città-unassigned (NULL) legacy/shared rows. They never
- * see another città's data. A user with no città (null) is global across
- * cities. This is ADDITIVE to the centro scoping above: an entity scoped by
+ * A user bound to a area operativa (`req.user.areaOperativaId != null`) may only see rows of
+ * their own area operativa plus area operativa-unassigned (NULL) legacy/shared rows. They never
+ * see another area operativa's data. A user with no area operativa (null) is global across
+ * areeOperative. This is ADDITIVE to the centro scoping above: an entity scoped by
  * both must satisfy BOTH filters. The optional UDS zona is also enforced when
  * present on the caller: a zona-bound caller sees only records assigned to the
  * same zona.
  * ──────────────────────────────────────────────────────────────────────── */
 
-/** The caller's città id, or null if the user is global across cities. */
-export function callerCittaId(req: Request): number | null {
-  return req.user?.cittaId ?? null;
+/** The caller's area operativa id, or null if the user is global across areeOperative. */
+export function callerAreaOperativaId(req: Request): number | null {
+  return req.user?.areaOperativaId ?? null;
 }
 
-/** The caller's preferred UDS zona id, or null = all zones of the città. */
+/** The caller's preferred UDS zona id, or null = all zones of the area operativa. */
 export function callerZonaUdsId(req: Request): number | null {
   return req.user?.zonaUdsId ?? null;
 }
@@ -220,25 +220,25 @@ export function zonaUdsScopeFilter(
 }
 
 /**
- * HARD città boundary: rows whose città column equals the caller's città OR is
+ * HARD area operativa boundary: rows whose area operativa column equals the caller's area operativa OR is
  * NULL (unassigned/shared legacy data, so existing rows stay visible until a
- * città is assigned). Returns `undefined` for a global caller (no filtering).
+ * area operativa is assigned). Returns `undefined` for a global caller (no filtering).
  */
-export function cittaScopeFilter(
+export function areaOperativaScopeFilter(
   column: Column,
-  cittaId: number | null,
+  areaOperativaId: number | null,
 ): SQL | undefined {
-  if (cittaId == null) return undefined;
-  return or(eq(column, cittaId), isNull(column));
+  if (areaOperativaId == null) return undefined;
+  return or(eq(column, areaOperativaId), isNull(column));
 }
 
-/** Whether a stored città value is visible to a caller scoped to `cittaId`. */
-export function canAccessCitta(
-  rowCittaId: number | null | undefined,
-  cittaId: number | null,
+/** Whether a stored area operativa value is visible to a caller scoped to `areaOperativaId`. */
+export function canAccessAreaOperativa(
+  rowAreaOperativaId: number | null | undefined,
+  areaOperativaId: number | null,
 ): boolean {
-  if (cittaId == null) return true;
-  return rowCittaId == null || rowCittaId === cittaId;
+  if (areaOperativaId == null) return true;
+  return rowAreaOperativaId == null || rowAreaOperativaId === areaOperativaId;
 }
 
 /** Whether a stored UDS zona value is visible to a caller scoped to `zonaUdsId`. */
@@ -250,13 +250,13 @@ export function canAccessZonaUds(
   return rowZonaUdsId === zonaUdsId;
 }
 
-/** The città of a beneficiario, used to scope indirect-link entities. */
-export async function beneficiarioCittaId(
+/** The area operativa of a beneficiario, used to scope indirect-link entities. */
+export async function beneficiarioAreaOperativaId(
   beneficiarioId: number | null | undefined,
 ): Promise<number | null> {
   if (beneficiarioId == null) return null;
   const [b] = await db
-    .select({ c: beneficiariTable.cittaId })
+    .select({ c: beneficiariTable.areaOperativaId })
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId));
   return b?.c ?? null;
@@ -278,7 +278,7 @@ export async function beneficiarioZonaUdsId(
  * WHERE condition limiting an entity to rows whose (centro-like) column is in a
  * visible id set OR is NULL (shared). `null` ids → no filtering; empty ids →
  * only shared (NULL) rows. Used to scope centro-linked entities (fornitori,
- * volontari, mezzi) by città via `visibleCentroIds`.
+ * volontari, mezzi) by area operativa via `visibleCentroIds`.
  */
 export function idSetScopeFilter(
   column: Column,
@@ -291,29 +291,29 @@ export function idSetScopeFilter(
 
 /**
  * Whether a centro-linked row (fornitore, volontario, mezzo) is visible to a
- * caller restricted to a città's centro set (`visibleCentroIds`). A NULL centro
- * is shared/visible. `null` set → città-global caller → always visible.
+ * caller restricted to a area operativa's centro set (`visibleCentroIds`). A NULL centro
+ * is shared/visible. `null` set → area operativa-global caller → always visible.
  */
 export function inVisibleCentroSet(
   centroAscoltoId: number | null | undefined,
-  cittaCentroIds: number[] | null,
+  areaOperativaCentroIds: number[] | null,
 ): boolean {
-  if (cittaCentroIds == null) return true;
-  return centroAscoltoId == null || cittaCentroIds.includes(centroAscoltoId);
+  if (areaOperativaCentroIds == null) return true;
+  return centroAscoltoId == null || areaOperativaCentroIds.includes(centroAscoltoId);
 }
 
 /**
- * Whether a caller (scoped by centro and/or città) may access a given magazzino.
+ * Whether a caller (scoped by centro and/or area operativa) may access a given magazzino.
  * Global on both axes → always true. Otherwise the warehouse must be in the
  * visible set computed from both axes.
  */
 export async function canAccessMagazzino(
   magazzinoId: number,
   centroId: number | null,
-  cittaId: number | null = null,
+  areaOperativaId: number | null = null,
 ): Promise<boolean> {
-  if (centroId == null && cittaId == null) return true;
-  const ids = await visibleMagazzinoIds(centroId, cittaId);
+  if (centroId == null && areaOperativaId == null) return true;
+  const ids = await visibleMagazzinoIds(centroId, areaOperativaId);
   return ids == null || ids.includes(magazzinoId);
 }
 

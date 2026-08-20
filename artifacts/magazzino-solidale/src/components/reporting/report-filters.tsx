@@ -13,7 +13,7 @@ import { todayEuropeRome } from "@/lib/europe-rome";
 export type ReportingFilterState = {
   da: string;
   a: string;
-  cittaId: number | null;
+  areaOperativaId: number | null;
   centroAscoltoId: number | null;
   magazzinoId: number | null;
   mensaId: number | null;
@@ -23,12 +23,12 @@ export type ReportingFilterState = {
 const ALL = "all";
 
 export function getReportingFilterLocks(user: {
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   centroAscoltoId?: number | null;
   zonaUdsId?: number | null;
 } | null) {
   return {
-    cityLocked: user?.cittaId != null,
+    areaOperativaLocked: user?.areaOperativaId != null,
     centreLocked: user?.centroAscoltoId != null,
     zoneLocked: user?.zonaUdsId != null,
   };
@@ -47,14 +47,14 @@ export function ReportFilters({
   const { user } = useAuth();
   const { data: options } = useGetReportFilterOptions({
     section,
-    cittaId: value.cittaId ?? undefined,
+    areaOperativaId: value.areaOperativaId ?? undefined,
   });
-  const cities = options?.cities ?? [];
+  const areeOperative = options?.areeOperative ?? [];
   const centres = options?.centres ?? [];
   const warehouses = options?.warehouses ?? [];
   const mense = options?.mense ?? [];
   const zones = options?.zones ?? [];
-  const { cityLocked, centreLocked, zoneLocked } = getReportingFilterLocks(user);
+  const { areaOperativaLocked, centreLocked, zoneLocked } = getReportingFilterLocks(user);
   const showWarehouse = ["generale", "pacchi", "emporio", "magazzino-logistica", "fse-plus"].includes(section);
   const showMensa = section === "mensa";
   const showZone = section === "uds";
@@ -93,16 +93,16 @@ export function ReportFilters({
           </>
         )}
         <div className="space-y-1.5">
-          <Label>{t("reporting.filters.city")}</Label>
+          <Label>{t("reporting.filters.areaOperativa")}</Label>
           <Select
-            value={value.cittaId?.toString() ?? ALL}
-            disabled={cityLocked}
-            onValueChange={(next) => update({ cittaId: next === ALL ? null : Number(next), centroAscoltoId: centreLocked ? value.centroAscoltoId : null, magazzinoId: null, mensaId: null, zonaUdsId: zoneLocked ? value.zonaUdsId : null })}
+            value={value.areaOperativaId?.toString() ?? ALL}
+            disabled={areaOperativaLocked}
+            onValueChange={(next) => update({ areaOperativaId: next === ALL ? null : Number(next), centroAscoltoId: centreLocked ? value.centroAscoltoId : null, magazzinoId: null, mensaId: null, zonaUdsId: zoneLocked ? value.zonaUdsId : null })}
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>{t("reporting.filters.allCities")}</SelectItem>
-              {cities.map((city) => <SelectItem key={city.id} value={String(city.id)}>{city.nome}</SelectItem>)}
+              <SelectItem value={ALL}>{t("reporting.filters.allAreeOperative")}</SelectItem>
+              {areeOperative.map((areaOperativa) => <SelectItem key={areaOperativa.id} value={String(areaOperativa.id)}>{areaOperativa.nome}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

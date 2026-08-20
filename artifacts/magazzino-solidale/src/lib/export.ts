@@ -216,7 +216,7 @@ export function buildReportingWorkbook(
     [labels.title],
     [labels.metadata.from, report.filters.da],
     [labels.metadata.to, report.filters.a],
-    [labels.metadata.city, scopeValue(report.filters.cittaId, scopeNames.city, labels.metadata.allCities)],
+    [labels.metadata.areaOperativa, scopeValue(report.filters.areaOperativaId, scopeNames.areaOperativa, labels.metadata.allAreeOperative)],
     [labels.metadata.centre, scopeValue(report.filters.centroAscoltoId, scopeNames.centre, labels.metadata.allCentres)],
     [labels.metadata.warehouse, scopeValue(report.filters.magazzinoId, scopeNames.warehouse, labels.metadata.allWarehouses)],
     [labels.metadata.mensa, scopeValue(report.filters.mensaId, scopeNames.mensa, labels.metadata.allMense)],
@@ -344,7 +344,7 @@ export async function exportReportingPdf(opts: {
     disponibilita: item.availability,
   }));
   const scope = [
-    opts.report.filters.cittaId != null ? `${opts.labels.metadata.city}: ${opts.scopeNames?.city ?? opts.report.filters.cittaId}` : null,
+    opts.report.filters.areaOperativaId != null ? `${opts.labels.metadata.areaOperativa}: ${opts.scopeNames?.areaOperativa ?? opts.report.filters.areaOperativaId}` : null,
     opts.report.filters.centroAscoltoId != null ? `${opts.labels.metadata.centre}: ${opts.scopeNames?.centre ?? opts.report.filters.centroAscoltoId}` : null,
     opts.report.filters.magazzinoId != null ? `${opts.labels.metadata.warehouse}: ${opts.scopeNames?.warehouse ?? opts.report.filters.magazzinoId}` : null,
     opts.report.filters.mensaId != null ? `${opts.labels.metadata.mensa}: ${opts.scopeNames?.mensa ?? opts.report.filters.mensaId}` : null,
@@ -374,7 +374,7 @@ export async function exportReportingPdf(opts: {
 }
 
 export type ReportingScopeNames = {
-  city?: string | null;
+  areaOperativa?: string | null;
   centre?: string | null;
   warehouse?: string | null;
   mensa?: string | null;
@@ -395,12 +395,12 @@ export type ReportingExportLabels = {
   metadata: {
     from: string;
     to: string;
-    city: string;
+    areaOperativa: string;
     centre: string;
     warehouse: string;
     mensa: string;
     zone: string;
-    allCities: string;
+    allAreeOperative: string;
     allCentres: string;
     allWarehouses: string;
     allMense: string;

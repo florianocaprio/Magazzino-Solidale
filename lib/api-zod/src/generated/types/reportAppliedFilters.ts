@@ -11,7 +11,7 @@ export interface ReportAppliedFilters {
   a: Date;
   anno: number;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
   centroAscoltoId: number | null;
   /** @nullable */

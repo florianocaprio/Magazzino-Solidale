@@ -2,7 +2,7 @@ import { pgTable, serial, varchar, text, boolean, timestamp } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const cittaTable = pgTable("citta", {
+export const areeOperativeTable = pgTable("aree_operative", {
   id: serial("id").primaryKey(),
   nome: varchar("nome", { length: 120 }).notNull(),
   provincia: varchar("provincia", { length: 80 }),
@@ -12,6 +12,6 @@ export const cittaTable = pgTable("citta", {
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 
-export const insertCittaSchema = createInsertSchema(cittaTable).omit({ id: true, dataCreazione: true });
-export type InsertCitta = z.infer<typeof insertCittaSchema>;
-export type Citta = typeof cittaTable.$inferSelect;
+export const insertAreaOperativaSchema = createInsertSchema(areeOperativeTable).omit({ id: true, dataCreazione: true });
+export type InsertAreaOperativa = z.infer<typeof insertAreaOperativaSchema>;
+export type AreaOperativa = typeof areeOperativeTable.$inferSelect;

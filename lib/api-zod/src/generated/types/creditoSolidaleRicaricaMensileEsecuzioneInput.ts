@@ -12,7 +12,7 @@ export interface CreditoSolidaleRicaricaMensileEsecuzioneInput {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   note?: string | null;
 }

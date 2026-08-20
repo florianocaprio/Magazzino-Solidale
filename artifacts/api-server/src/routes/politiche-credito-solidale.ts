@@ -1,9 +1,9 @@
 import { Router, type IRouter, type Request } from "express";
 import { and, desc, eq } from "drizzle-orm";
-import { centriAscoltoTable, cittaTable, db, politicheCreditoSolidaleTable } from "@workspace/db";
+import { centriAscoltoTable, areeOperativeTable, db, politicheCreditoSolidaleTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { EMPORIO_DISABLED_MSG, isEmporioEnabled } from "../lib/impostazioniModuli";
-import { andScoped, callerCentroId, callerCittaId, centroScopeFilter, cittaScopeFilter } from "../lib/centroScope";
+import { andScoped, callerCentroId, callerAreaOperativaId, centroScopeFilter, areaOperativaScopeFilter } from "../lib/centroScope";
 import { canMutateScopedResource } from "../lib/adminScope";
 
 const router: IRouter = Router();
@@ -69,7 +69,7 @@ const optionalBool = (v: unknown, partial: boolean, fallback: boolean): boolean 
   return fallback;
 };
 
-function fmt(row: { politica: PolicySelect; centroAscoltoNome: string | null; cittaNome: string | null }) {
+function fmt(row: { politica: PolicySelect; centroAscoltoNome: string | null; areaOperativaNome: string | null }) {
   const r = row.politica;
   return {
     id: r.id,
@@ -77,8 +77,8 @@ function fmt(row: { politica: PolicySelect; centroAscoltoNome: string | null; ci
     descrizione: r.descrizione ?? null,
     centroAscoltoId: r.centroAscoltoId ?? null,
     centroAscoltoNome: row.centroAscoltoNome ?? null,
-    cittaId: r.cittaId ?? null,
-    cittaNome: row.cittaNome ?? null,
+    areaOperativaId: r.areaOperativaId ?? null,
+    areaOperativaNome: row.areaOperativaNome ?? null,
     attiva: r.attiva,
     creditoBaseNucleo: Number(r.creditoBaseNucleo),
     creditoPerComponente: Number(r.creditoPerComponente),
@@ -111,8 +111,8 @@ function parseBody(body: Record<string, unknown>, partial: boolean): { values?: 
   const centroAscoltoId = optionalId(body.centroAscoltoId, partial);
   if (centroAscoltoId !== undefined) values.centroAscoltoId = centroAscoltoId;
 
-  const cittaId = optionalId(body.cittaId, partial);
-  if (cittaId !== undefined) values.cittaId = cittaId;
+  const areaOperativaId = optionalId(body.areaOperativaId, partial);
+  if (areaOperativaId !== undefined) values.areaOperativaId = areaOperativaId;
 
   const attiva = optionalBool(body.attiva, partial, true);
   if (attiva !== undefined) values.attiva = attiva;
@@ -167,10 +167,10 @@ function validateMaxMin(values: Partial<PolicyInsert>, existing?: PolicySelect):
 }
 
 async function validateScope(values: Partial<PolicyInsert>, req: Request): Promise<{ status: number; error: string } | null> {
-  if (values.cittaId != null) {
-    const [area] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, values.cittaId));
-    if (!area || !area.attivo) return { status: 400, error: "L'Area selezionata non è disponibile." };
-    if (!canMutateScopedResource(area.id, callerCittaId(req))) {
+  if (values.areaOperativaId != null) {
+    const [area] = await db.select({ id: areeOperativeTable.id, attivo: areeOperativeTable.attivo }).from(areeOperativeTable).where(eq(areeOperativeTable.id, values.areaOperativaId));
+    if (!area || !area.attivo) return { status: 400, error: "L'Area Operativa selezionata non è disponibile." };
+    if (!canMutateScopedResource(area.id, callerAreaOperativaId(req))) {
       return { status: 403, error: "Area non accessibile per il tuo profilo" };
     }
   }
@@ -179,20 +179,20 @@ async function validateScope(values: Partial<PolicyInsert>, req: Request): Promi
     const [centro] = await db
       .select({
         id: centriAscoltoTable.id,
-        cittaId: centriAscoltoTable.cittaId,
+        areaOperativaId: centriAscoltoTable.areaOperativaId,
         attivo: centriAscoltoTable.attivo,
       })
       .from(centriAscoltoTable)
       .where(eq(centriAscoltoTable.id, values.centroAscoltoId));
     if (!centro) return { status: 400, error: "Il Centro di Ascolto selezionato non esiste." };
     if (!centro.attivo) return { status: 400, error: "Il Centro di Ascolto selezionato non è attivo." };
-    if (!canMutateScopedResource(centro.id, callerCentroId(req)) || !canMutateScopedResource(centro.cittaId, callerCittaId(req))) {
+    if (!canMutateScopedResource(centro.id, callerCentroId(req)) || !canMutateScopedResource(centro.areaOperativaId, callerAreaOperativaId(req))) {
       return {
         status: 403,
         error: "Risorsa non accessibile per il tuo profilo",
       };
     }
-    if (centro.cittaId !== (values.cittaId ?? null)) {
+    if (centro.areaOperativaId !== (values.areaOperativaId ?? null)) {
       return {
         status: 400,
         error: "Il Centro di Ascolto selezionato non appartiene all'Area indicata.",
@@ -208,13 +208,13 @@ async function findPolicy(id: number, req: Request) {
     .select({
       politica: politicheCreditoSolidaleTable,
       centroAscoltoNome: centriAscoltoTable.nome,
-      centroCittaId: centriAscoltoTable.cittaId,
-      cittaNome: cittaTable.nome,
+      centroAreaOperativaId: centriAscoltoTable.areaOperativaId,
+      areaOperativaNome: areeOperativeTable.nome,
     })
     .from(politicheCreditoSolidaleTable)
     .leftJoin(centriAscoltoTable, eq(politicheCreditoSolidaleTable.centroAscoltoId, centriAscoltoTable.id))
-    .leftJoin(cittaTable, eq(politicheCreditoSolidaleTable.cittaId, cittaTable.id))
-    .where(andScoped(eq(politicheCreditoSolidaleTable.id, id), centroScopeFilter(politicheCreditoSolidaleTable.centroAscoltoId, callerCentroId(req)), cittaScopeFilter(politicheCreditoSolidaleTable.cittaId, callerCittaId(req))));
+    .leftJoin(areeOperativeTable, eq(politicheCreditoSolidaleTable.areaOperativaId, areeOperativeTable.id))
+    .where(andScoped(eq(politicheCreditoSolidaleTable.id, id), centroScopeFilter(politicheCreditoSolidaleTable.centroAscoltoId, callerCentroId(req)), areaOperativaScopeFilter(politicheCreditoSolidaleTable.areaOperativaId, callerAreaOperativaId(req))));
   return row ?? null;
 }
 
@@ -223,19 +223,19 @@ async function findPolicyById(id: number) {
     .select({
       politica: politicheCreditoSolidaleTable,
       centroAscoltoNome: centriAscoltoTable.nome,
-      centroCittaId: centriAscoltoTable.cittaId,
-      cittaNome: cittaTable.nome,
+      centroAreaOperativaId: centriAscoltoTable.areaOperativaId,
+      areaOperativaNome: areeOperativeTable.nome,
     })
     .from(politicheCreditoSolidaleTable)
     .leftJoin(centriAscoltoTable, eq(politicheCreditoSolidaleTable.centroAscoltoId, centriAscoltoTable.id))
-    .leftJoin(cittaTable, eq(politicheCreditoSolidaleTable.cittaId, cittaTable.id))
+    .leftJoin(areeOperativeTable, eq(politicheCreditoSolidaleTable.areaOperativaId, areeOperativeTable.id))
     .where(eq(politicheCreditoSolidaleTable.id, id));
   return row ?? null;
 }
 
-function canMutatePolicy(row: { politica: PolicySelect; centroCittaId: number | null }, req: Request): boolean {
-  const callerAreaId = callerCittaId(req);
-  return canMutateScopedResource(row.politica.cittaId, callerAreaId) && canMutateScopedResource(row.politica.centroAscoltoId, callerCentroId(req)) && (row.politica.centroAscoltoId == null || canMutateScopedResource(row.centroCittaId, callerAreaId));
+function canMutatePolicy(row: { politica: PolicySelect; centroAreaOperativaId: number | null }, req: Request): boolean {
+  const callerAreaId = callerAreaOperativaId(req);
+  return canMutateScopedResource(row.politica.areaOperativaId, callerAreaId) && canMutateScopedResource(row.politica.centroAscoltoId, callerCentroId(req)) && (row.politica.centroAscoltoId == null || canMutateScopedResource(row.centroAreaOperativaId, callerAreaId));
 }
 
 router.get("/politiche-credito-solidale", async (req, res) => {
@@ -243,12 +243,12 @@ router.get("/politiche-credito-solidale", async (req, res) => {
     .select({
       politica: politicheCreditoSolidaleTable,
       centroAscoltoNome: centriAscoltoTable.nome,
-      cittaNome: cittaTable.nome,
+      areaOperativaNome: areeOperativeTable.nome,
     })
     .from(politicheCreditoSolidaleTable)
     .leftJoin(centriAscoltoTable, eq(politicheCreditoSolidaleTable.centroAscoltoId, centriAscoltoTable.id))
-    .leftJoin(cittaTable, eq(politicheCreditoSolidaleTable.cittaId, cittaTable.id))
-    .where(andScoped(centroScopeFilter(politicheCreditoSolidaleTable.centroAscoltoId, callerCentroId(req)), cittaScopeFilter(politicheCreditoSolidaleTable.cittaId, callerCittaId(req))))
+    .leftJoin(areeOperativeTable, eq(politicheCreditoSolidaleTable.areaOperativaId, areeOperativeTable.id))
+    .where(andScoped(centroScopeFilter(politicheCreditoSolidaleTable.centroAscoltoId, callerCentroId(req)), areaOperativaScopeFilter(politicheCreditoSolidaleTable.areaOperativaId, callerAreaOperativaId(req))))
     .orderBy(desc(politicheCreditoSolidaleTable.attiva), desc(politicheCreditoSolidaleTable.id));
   res.json(rows.map(fmt));
 });
@@ -273,12 +273,12 @@ router.post("/politiche-credito-solidale", requireAdmin, async (req, res) => {
     res.status(400).json({ error: parsed.error });
     return;
   }
-  const callerAreaId = callerCittaId(req);
-  if (callerAreaId != null && parsed.values.cittaId != null && parsed.values.cittaId !== callerAreaId) {
+  const callerAreaId = callerAreaOperativaId(req);
+  if (callerAreaId != null && parsed.values.areaOperativaId != null && parsed.values.areaOperativaId !== callerAreaId) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
-  if (callerAreaId != null) parsed.values.cittaId = callerAreaId;
+  if (callerAreaId != null) parsed.values.areaOperativaId = callerAreaId;
   const maxError = validateMaxMin(parsed.values);
   if (maxError) {
     res.status(400).json({ error: maxError });
@@ -315,8 +315,8 @@ router.patch("/politiche-credito-solidale/:id", requireAdmin, async (req, res) =
     res.status(400).json({ error: parsed.error });
     return;
   }
-  const callerAreaId = callerCittaId(req);
-  if (callerAreaId != null && parsed.values.cittaId !== undefined && parsed.values.cittaId !== callerAreaId) {
+  const callerAreaId = callerAreaOperativaId(req);
+  if (callerAreaId != null && parsed.values.areaOperativaId !== undefined && parsed.values.areaOperativaId !== callerAreaId) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }

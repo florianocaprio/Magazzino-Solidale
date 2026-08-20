@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { eq } from "drizzle-orm";
-import { db, utentiTable, ruoliTable, centriAscoltoTable, cittaTable, zoneUdsTable } from "@workspace/db";
+import { db, utentiTable, ruoliTable, centriAscoltoTable, areeOperativeTable, zoneUdsTable } from "@workspace/db";
 import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
@@ -18,8 +18,8 @@ export interface SessionUser {
   ruoloNome: string | null;
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
-  cittaId: number | null;
-  cittaNome: string | null;
+  areaOperativaId: number | null;
+  areaOperativaNome: string | null;
   zonaUdsId: number | null;
   zonaUdsNome: string | null;
   isSuperAdmin: boolean;
@@ -60,8 +60,8 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
       ruoloNome: ruoliTable.nome,
       centroAscoltoId: utentiTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
-      cittaId: utentiTable.cittaId,
-      cittaNome: cittaTable.nome,
+      areaOperativaId: utentiTable.areaOperativaId,
+      areaOperativaNome: areeOperativeTable.nome,
       zonaUdsId: utentiTable.zonaUdsId,
       zonaUdsNome: zoneUdsTable.nome,
       isSuperAdmin: utentiTable.isSuperAdmin,
@@ -72,7 +72,7 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
     .from(utentiTable)
     .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
     .leftJoin(centriAscoltoTable, eq(utentiTable.centroAscoltoId, centriAscoltoTable.id))
-    .leftJoin(cittaTable, eq(utentiTable.cittaId, cittaTable.id))
+    .leftJoin(areeOperativeTable, eq(utentiTable.areaOperativaId, areeOperativeTable.id))
     .leftJoin(zoneUdsTable, eq(utentiTable.zonaUdsId, zoneUdsTable.id))
     .where(eq(utentiTable.id, userId));
 
@@ -90,8 +90,8 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
     ruoloNome: row.ruoloNome ?? null,
     centroAscoltoId: row.centroAscoltoId ?? null,
     centroAscoltoNome: row.centroAscoltoNome ?? null,
-    cittaId: row.cittaId ?? null,
-    cittaNome: row.cittaNome ?? null,
+    areaOperativaId: row.areaOperativaId ?? null,
+    areaOperativaNome: row.areaOperativaNome ?? null,
     zonaUdsId: row.zonaUdsId ?? null,
     zonaUdsNome: row.zonaUdsNome ?? null,
     isSuperAdmin: (row.isSuperAdmin ?? false) || row.ruoloNome === SUPER_ADMIN_ROLE_NAME,
@@ -122,8 +122,8 @@ const BOOTSTRAP_ADMIN: SessionUser = {
   ruoloNome: null,
   centroAscoltoId: null,
   centroAscoltoNome: null,
-  cittaId: null,
-  cittaNome: null,
+  areaOperativaId: null,
+  areaOperativaNome: null,
   zonaUdsId: null,
   zonaUdsNome: null,
   isSuperAdmin: false,

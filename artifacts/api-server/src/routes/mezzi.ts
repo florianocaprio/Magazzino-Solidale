@@ -5,7 +5,7 @@ import { runBulk } from "../lib/bulk";
 import { eq, sql, inArray, or, desc, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   canAccessCentro,
   visibleCentroIds,
   inVisibleCentroSet,
@@ -64,16 +64,16 @@ function effectiveCentroFilter(centroId: number | null): SQL | undefined {
 }
 
 /**
- * Città boundary applied to the effective centro: the effective centro must be
- * NULL (shared) or belong to the set of centri visible to the caller's città.
- * `null` ids → città-global caller (no filtering); empty ids → only NULL.
+ * Area Operativa boundary applied to the effective centro: the effective centro must be
+ * NULL (shared) or belong to the set of centri visible to the caller's area operativa.
+ * `null` ids → area operativa-global caller (no filtering); empty ids → only NULL.
  */
-function effectiveCittaFilter(cittaCentroIds: number[] | null): SQL | undefined {
-  if (cittaCentroIds == null) return undefined;
-  if (cittaCentroIds.length === 0) return sql`${effectiveCentroExpr} IS NULL`;
+function effectiveAreaOperativaFilter(areaOperativaCentroIds: number[] | null): SQL | undefined {
+  if (areaOperativaCentroIds == null) return undefined;
+  if (areaOperativaCentroIds.length === 0) return sql`${effectiveCentroExpr} IS NULL`;
   return or(
     sql`${effectiveCentroExpr} IS NULL`,
-    inArray(effectiveCentroExpr, cittaCentroIds),
+    inArray(effectiveCentroExpr, areaOperativaCentroIds),
   );
 }
 
@@ -140,12 +140,12 @@ async function volontarioCentroId(volontarioId: number): Promise<number | null> 
 
 router.get("/mezzi", async (req, res) => {
   const caller = callerCentroId(req);
-  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
+  const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const rows = await baseSelect()
     .where(
       andScoped(
         effectiveCentroFilter(caller),
-        effectiveCittaFilter(cittaCentroIds),
+        effectiveAreaOperativaFilter(areaOperativaCentroIds),
       ),
     )
     .orderBy(desc(mezziTable.id));
@@ -169,7 +169,7 @@ router.get("/mezzi", async (req, res) => {
 async function resolveCentro(
   body: { volontarioId?: number | null; centroAscoltoId?: number | null },
   caller: number | null,
-  cittaCentroIds: number[] | null,
+  areaOperativaCentroIds: number[] | null,
 ): Promise<{ ownCentro: number | null } | { error: string }> {
   let ownCentro: number | null = body.centroAscoltoId ?? null;
   if (body.volontarioId != null) {
@@ -184,8 +184,8 @@ async function resolveCentro(
   if (!canAccessCentro(effective, caller)) {
     return { error: "Mezzo non accessibile per il tuo centro" };
   }
-  if (!inVisibleCentroSet(effective, cittaCentroIds)) {
-    return { error: "Mezzo non accessibile per la tua città" };
+  if (!inVisibleCentroSet(effective, areaOperativaCentroIds)) {
+    return { error: "Mezzo non accessibile per la tua area operativa" };
   }
   return { ownCentro };
 }
@@ -198,8 +198,8 @@ async function createMezzoOne(
   const capacitaError = validateCapacita(b);
   if (capacitaError) return { error: capacitaError, status: 400 };
   const caller = callerCentroId(req);
-  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
-  const resolved = await resolveCentro(b, caller, cittaCentroIds);
+  const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
+  const resolved = await resolveCentro(b, caller, areaOperativaCentroIds);
   if ("error" in resolved) return { error: resolved.error, status: 403 };
   const baseValues = {
     ...(b as typeof mezziTable.$inferInsert),
@@ -263,8 +263,8 @@ router.get("/mezzi/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!inVisibleCentroSet(effectiveCentroOf(r), await visibleCentroIds(callerCittaId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!inVisibleCentroSet(effectiveCentroOf(r), await visibleCentroIds(callerAreaOperativaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   res.json(fmt(r, await centroNomeOf(effectiveCentroOf(r))));
@@ -273,15 +273,15 @@ router.get("/mezzi/:id", async (req, res) => {
 router.patch("/mezzi/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const caller = callerCentroId(req);
-  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
+  const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const [existing] = await baseSelect().where(eq(mezziTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(effectiveCentroOf(existing), caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!inVisibleCentroSet(effectiveCentroOf(existing), cittaCentroIds)) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!inVisibleCentroSet(effectiveCentroOf(existing), areaOperativaCentroIds)) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   const body = req.body;
@@ -297,7 +297,7 @@ router.patch("/mezzi/:id", async (req, res) => {
         body.centroAscoltoId !== undefined ? body.centroAscoltoId : existing.m.centroAscoltoId,
     },
     caller,
-    cittaCentroIds,
+    areaOperativaCentroIds,
   );
   if ("error" in resolved) {
     res.status(403).json({ error: resolved.error });
@@ -320,8 +320,8 @@ router.delete("/mezzi/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!inVisibleCentroSet(effectiveCentroOf(existing), await visibleCentroIds(callerCittaId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!inVisibleCentroSet(effectiveCentroOf(existing), await visibleCentroIds(callerAreaOperativaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   await db.delete(mezziTable).where(eq(mezziTable.id, id));

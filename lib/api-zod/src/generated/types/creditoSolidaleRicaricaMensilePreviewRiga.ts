@@ -14,9 +14,9 @@ export interface CreditoSolidaleRicaricaMensilePreviewRiga {
   /** @nullable */
   centroAscoltoNome: string | null;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
-  cittaNome: string | null;
+  areaOperativaNome: string | null;
   /** @nullable */
   creditoSolidaleMensileAssegnato: number | null;
   saldoAttuale: number;

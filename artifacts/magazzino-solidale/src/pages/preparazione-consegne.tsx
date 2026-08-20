@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import {
   useGetPreparazioneConsegne,
   useListMagazzini,
-  useListCitta,
+  useListAreeOperative,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -36,29 +36,29 @@ import { useTranslation } from "react-i18next";
 
 export default function PreparazioneConsegne() {
   const { t } = useTranslation();
-  const [cittaId, setCittaId] = useState<string>("all");
+  const [areaOperativaId, setAreaOperativaId] = useState<string>("all");
   const [magazzinoId, setMagazzinoId] = useState<string>("all");
 
-  const { data: citta } = useListCitta();
+  const { data: areaOperativa } = useListAreeOperative();
   const { data: magazzini } = useListMagazzini();
 
   const magazziniFiltrati = useMemo(() => {
     if (!magazzini) return [];
-    if (cittaId === "all") return magazzini;
-    return magazzini.filter((m) => m.cittaId?.toString() === cittaId);
-  }, [magazzini, cittaId]);
+    if (areaOperativaId === "all") return magazzini;
+    return magazzini.filter((m) => m.areaOperativaId?.toString() === areaOperativaId);
+  }, [magazzini, areaOperativaId]);
 
   const hasMagazzino = magazzinoId !== "all";
 
   const queryParams = {
-    cittaId: cittaId !== "all" ? Number(cittaId) : undefined,
+    areaOperativaId: areaOperativaId !== "all" ? Number(areaOperativaId) : undefined,
     magazzinoId: hasMagazzino ? Number(magazzinoId) : undefined,
   };
 
   const { data, isLoading } = useGetPreparazioneConsegne(queryParams, {
     query: {
       enabled: hasMagazzino,
-      queryKey: ["preparazione-consegne", cittaId, magazzinoId],
+      queryKey: ["preparazione-consegne", areaOperativaId, magazzinoId],
     },
   });
 
@@ -73,8 +73,8 @@ export default function PreparazioneConsegne() {
         .toLowerCase()}`
     : t("preparazioneConsegne.exportFile");
 
-  const handleCittaChange = (v: string) => {
-    setCittaId(v);
+  const handleAreaOperativaChange = (v: string) => {
+    setAreaOperativaId(v);
     setMagazzinoId("all");
   };
 
@@ -138,17 +138,17 @@ export default function PreparazioneConsegne() {
           <div className="flex flex-col sm:flex-row flex-wrap gap-4 items-end sm:items-center">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={cittaId} onValueChange={handleCittaChange}>
+              <Select value={areaOperativaId} onValueChange={handleAreaOperativaChange}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue
-                    placeholder={t("preparazioneConsegne.selectCitta")}
+                    placeholder={t("preparazioneConsegne.selectAreaOperativa")}
                   />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">
-                    {t("preparazioneConsegne.allCitta")}
+                    {t("preparazioneConsegne.allAreaOperativa")}
                   </SelectItem>
-                  {citta?.map((c) => (
+                  {areaOperativa?.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
                       {c.nome}
                     </SelectItem>

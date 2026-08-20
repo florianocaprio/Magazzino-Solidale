@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { centriAscoltoTable, beneficiariTable, cittaTable } from "@workspace/db";
+import { centriAscoltoTable, beneficiariTable, areeOperativeTable } from "@workspace/db";
 import { eq, count } from "drizzle-orm";
 import { CreateCentroAscoltoBody, UpdateCentroAscoltoBody } from "@workspace/api-zod";
-import { callerCittaId, cittaScopeFilter, canAccessCitta } from "../lib/centroScope";
+import { callerAreaOperativaId, areaOperativaScopeFilter, canAccessAreaOperativa } from "../lib/centroScope";
 import { requireAdmin } from "../middlewares/auth";
 import { canMutateScopedResource } from "../lib/adminScope";
 import express from "express";
@@ -27,7 +27,7 @@ function fmt(r: typeof centriAscoltoTable.$inferSelect, beneficiariCount = 0) {
   return {
     id: r.id,
     nome: r.nome,
-    cittaId: r.cittaId ?? null,
+    areaOperativaId: r.areaOperativaId ?? null,
     logoUrl: r.logoUrl ?? null,
     indirizzo: r.indirizzo ?? null,
     comune: r.comune ?? null,
@@ -41,10 +41,10 @@ function fmt(r: typeof centriAscoltoTable.$inferSelect, beneficiariCount = 0) {
   };
 }
 
-async function validateAreaAssignment(cittaId: number): Promise<string | null> {
-  const [row] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, cittaId));
-  if (!row) return "L'Area selezionata non esiste";
-  if (!row.attivo) return "L'Area selezionata non è attiva";
+async function validateAreaAssignment(areaOperativaId: number): Promise<string | null> {
+  const [row] = await db.select({ id: areeOperativeTable.id, attivo: areeOperativeTable.attivo }).from(areeOperativeTable).where(eq(areeOperativeTable.id, areaOperativaId));
+  if (!row) return "L'Area Operativa selezionata non esiste";
+  if (!row.attivo) return "L'Area Operativa selezionata non è attiva";
   return null;
 }
 
@@ -52,7 +52,7 @@ router.get("/centri-ascolto", async (req, res) => {
   const rows = await db
     .select()
     .from(centriAscoltoTable)
-    .where(cittaScopeFilter(centriAscoltoTable.cittaId, callerCittaId(req)))
+    .where(areaOperativaScopeFilter(centriAscoltoTable.areaOperativaId, callerAreaOperativaId(req)))
     .orderBy(centriAscoltoTable.nome);
   const counts = await db.select({ centroId: beneficiariTable.centroAscoltoId, n: count() }).from(beneficiariTable).groupBy(beneficiariTable.centroAscoltoId);
   const countMap = new Map(counts.map((c) => [c.centroId, c.n]));
@@ -65,15 +65,15 @@ router.post("/centri-ascolto", requireAdmin, async (req, res) => {
     res.status(400).json({ error: "Inserimento centro di ascolto non valido" });
     return;
   }
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const values = { ...parsed.data };
-  if (cid != null && values.cittaId != null && values.cittaId !== cid) {
+  if (cid != null && values.areaOperativaId != null && values.areaOperativaId !== cid) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
-  if (cid != null) values.cittaId = cid;
-  if (values.cittaId != null) {
-    const areaError = await validateAreaAssignment(values.cittaId);
+  if (cid != null) values.areaOperativaId = cid;
+  if (values.areaOperativaId != null) {
+    const areaError = await validateAreaAssignment(values.areaOperativaId);
     if (areaError) {
       res.status(400).json({ error: areaError });
       return;
@@ -90,8 +90,8 @@ router.get("/centri-ascolto/:id", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  if (!canAccessCitta(row.cittaId, callerCittaId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!canAccessAreaOperativa(row.areaOperativaId, callerAreaOperativaId(req))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   const [c] = await db.select({ n: count() }).from(beneficiariTable).where(eq(beneficiariTable.centroAscoltoId, id));
@@ -100,13 +100,13 @@ router.get("/centri-ascolto/:id", async (req, res) => {
 
 router.patch("/centri-ascolto/:id", requireAdmin, async (req, res) => {
   const id = paramId(req.params.id);
-  const cid = callerCittaId(req);
+  const cid = callerAreaOperativaId(req);
   const [existing] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, id));
   if (!existing) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  if (!canMutateScopedResource(existing.cittaId, cid)) {
+  if (!canMutateScopedResource(existing.areaOperativaId, cid)) {
     res.status(403).json({ error: "Centro non modificabile per il tuo profilo" });
     return;
   }
@@ -116,13 +116,13 @@ router.patch("/centri-ascolto/:id", requireAdmin, async (req, res) => {
     return;
   }
   const updates = { ...parsed.data };
-  if (cid != null && updates.cittaId !== undefined && updates.cittaId !== cid) {
+  if (cid != null && updates.areaOperativaId !== undefined && updates.areaOperativaId !== cid) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
-  if (cid != null) delete updates.cittaId;
-  if (updates.cittaId != null) {
-    const areaError = await validateAreaAssignment(updates.cittaId);
+  if (cid != null) delete updates.areaOperativaId;
+  if (updates.areaOperativaId != null) {
+    const areaError = await validateAreaAssignment(updates.areaOperativaId);
     if (areaError) {
       res.status(400).json({ error: areaError });
       return;
@@ -150,7 +150,7 @@ router.post(
       res.status(404).json({ error: "Centro di ascolto non trovato" });
       return;
     }
-    if (!canMutateScopedResource(existing.cittaId, callerCittaId(req))) {
+    if (!canMutateScopedResource(existing.areaOperativaId, callerAreaOperativaId(req))) {
       res.status(403).json({ error: "Centro non modificabile per il tuo profilo" });
       return;
     }
@@ -181,7 +181,7 @@ router.delete("/centri-ascolto/:id", requireAdmin, async (req, res) => {
     res.status(204).send();
     return;
   }
-  if (!canMutateScopedResource(existing.cittaId, callerCittaId(req))) {
+  if (!canMutateScopedResource(existing.areaOperativaId, callerAreaOperativaId(req))) {
     res.status(403).json({ error: "Centro non modificabile per il tuo profilo" });
     return;
   }

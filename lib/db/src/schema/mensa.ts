@@ -15,7 +15,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { beneficiariTable } from "./beneficiari";
-import { cittaTable } from "./citta";
+import { areeOperativeTable } from "./areeOperative";
 import { magazziniTable } from "./magazzini";
 import { prodottiTable } from "./prodotti";
 import { scarichiTable } from "./scarichi";
@@ -27,9 +27,9 @@ export const menseTable = pgTable(
     id: serial("id").primaryKey(),
     codice: varchar("codice", { length: 30 }).notNull(),
     nome: varchar("nome", { length: 160 }).notNull(),
-    cittaId: integer("citta_id")
+    areaOperativaId: integer("area_operativa_id")
       .notNull()
-      .references(() => cittaTable.id),
+      .references(() => areeOperativeTable.id),
     magazzinoId: integer("magazzino_id")
       .notNull()
       .references(() => magazziniTable.id),
@@ -47,7 +47,7 @@ export const menseTable = pgTable(
   (table) => [
     uniqueIndex("mense_codice_unique").on(table.codice),
     uniqueIndex("mense_magazzino_unique").on(table.magazzinoId),
-    index("mense_citta_idx").on(table.cittaId),
+    index("mense_area_operativa_idx").on(table.areaOperativaId),
     index("mense_attiva_idx").on(table.attiva),
   ],
 );
@@ -234,9 +234,9 @@ export const mensaEccezioniTable = pgTable(
     mensaDestinazioneId: integer("mensa_destinazione_id")
       .notNull()
       .references(() => menseTable.id),
-    cittaId: integer("citta_id")
+    areaOperativaId: integer("area_operativa_id")
       .notNull()
-      .references(() => cittaTable.id),
+      .references(() => areeOperativeTable.id),
     motivo: text("motivo").notNull(),
     operatoreId: integer("operatore_id")
       .notNull()

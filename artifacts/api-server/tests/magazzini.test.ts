@@ -13,10 +13,10 @@ function makeApp(isAdmin = true): Express {
   const a = express();
   a.use(express.json());
   a.use((req, _res, next) => {
-    (req as unknown as { user: { isAdmin: boolean; centroAscoltoId: null; cittaId: null } }).user = {
+    (req as unknown as { user: { isAdmin: boolean; centroAscoltoId: null; areaOperativaId: null } }).user = {
       isAdmin,
       centroAscoltoId: null,
-      cittaId: null,
+      areaOperativaId: null,
     };
     next();
   });

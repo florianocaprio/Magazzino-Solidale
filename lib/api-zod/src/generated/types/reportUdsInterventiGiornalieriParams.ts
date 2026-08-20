@@ -15,6 +15,6 @@ da: string;
  * End date (ISO YYYY-MM-DD). Defaults to "da" (single day) when absent.
  */
 a?: string;
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 };

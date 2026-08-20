@@ -18,7 +18,7 @@ export interface Approvvigionamento {
   /** @nullable */
   fornitoreEmail?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   magazzinoId?: number | null;
   /** @nullable */

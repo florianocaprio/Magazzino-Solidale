@@ -17,9 +17,9 @@ export interface BeneficiarioAccessoEmporioSearchResult {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: string;
   saldoCreditoSolidale: number;

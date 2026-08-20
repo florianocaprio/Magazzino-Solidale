@@ -20,14 +20,14 @@ export function ReportExportActions({ report }: { report: ReportingDashboard }) 
   const [excelLoading, setExcelLoading] = useState(false);
   const { data: options } = useGetReportFilterOptions({
     section: report.section,
-    cittaId: report.filters.cittaId ?? undefined,
+    areaOperativaId: report.filters.areaOperativaId ?? undefined,
   });
   const title = t(`reporting.sections.${report.section}.title`);
   const filename = `report_${report.section}_${report.filters.da}_${report.filters.a}`;
   const kpiLabel = (key: string) => t(`reporting.kpi.${key}`);
   const unavailable = t("reporting.unavailable");
   const scopeNames = {
-    city: options?.cities.find((item) => item.id === report.filters.cittaId)?.nome,
+    areaOperativa: options?.areeOperative.find((item) => item.id === report.filters.areaOperativaId)?.nome,
     centre: options?.centres.find((item) => item.id === report.filters.centroAscoltoId)?.nome,
     warehouse: options?.warehouses.find((item) => item.id === report.filters.magazzinoId)?.nome,
     mensa: options?.mense.find((item) => item.id === report.filters.mensaId)?.nome,
@@ -46,9 +46,9 @@ export function ReportExportActions({ report }: { report: ReportingDashboard }) 
     locale: i18n.resolvedLanguage ?? i18n.language,
     metadata: {
       from: t("reporting.export.from"), to: t("reporting.export.to"),
-      city: t("reporting.export.city"), centre: t("reporting.export.centre"),
+      areaOperativa: t("reporting.export.areaOperativa"), centre: t("reporting.export.centre"),
       warehouse: t("reporting.export.warehouse"), mensa: t("reporting.export.mensa"),
-      zone: t("reporting.export.zone"), allCities: t("reporting.filters.allCities"),
+      zone: t("reporting.export.zone"), allAreeOperative: t("reporting.filters.allAreeOperative"),
       allCentres: t("reporting.filters.allCentres"), allWarehouses: t("reporting.filters.allWarehouses"),
       allMense: t("reporting.filters.allMense"), allZones: t("reporting.filters.allZones"),
       generatedAt: t("reporting.export.generatedAt"), application: t("reporting.export.application"),
@@ -69,7 +69,7 @@ export function ReportExportActions({ report }: { report: ReportingDashboard }) 
       result = await getReportDrilldown({
         section: "fse-plus", metric: "prodottiFse", page, pageSize: 100,
         da: report.filters.da, a: report.filters.a, anno: report.filters.anno,
-        cittaId: report.filters.cittaId ?? undefined,
+        areaOperativaId: report.filters.areaOperativaId ?? undefined,
         centroAscoltoId: report.filters.centroAscoltoId ?? undefined,
         magazzinoId: report.filters.magazzinoId ?? undefined,
       });

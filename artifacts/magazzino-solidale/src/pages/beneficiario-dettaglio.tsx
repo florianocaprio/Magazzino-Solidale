@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListCitta, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListCittaQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, useUpdateCreditoSolidaleBeneficiarioConfigurazione, useCreateTesseraBeneficiarioDaAnagrafica, useListTessereBeneficiarioDaAnagrafica, getListTessereBeneficiarioDaAnagraficaQueryKey, type TesseraBeneficiario, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListAreeOperative, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListAreeOperativeQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, useUpdateCreditoSolidaleBeneficiarioConfigurazione, useCreateTesseraBeneficiarioDaAnagrafica, useListTessereBeneficiarioDaAnagrafica, getListTessereBeneficiarioDaAnagraficaQueryKey, type TesseraBeneficiario, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useAuthorizeBeneficiariExport } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -122,14 +122,14 @@ export default function BeneficiarioDettaglio() {
   };
 
   const onToggleUds = (next: boolean) => {
-    if (next && b?.cittaId == null && user?.cittaId == null) {
+    if (next && b?.areaOperativaId == null && user?.areaOperativaId == null) {
       setEditing(true);
       toast({ title: t("beneficiarioDettaglio.error"), description: t("common.requiredField"), variant: "destructive" });
       return;
     }
     const data: Record<string, unknown> = { uds: next, versione: b?.versione };
     if (next) {
-      if (b?.cittaId != null) data.cittaId = b.cittaId;
+      if (b?.areaOperativaId != null) data.areaOperativaId = b.areaOperativaId;
       if (b?.zonaUdsId != null) data.zonaUdsId = b.zonaUdsId;
     }
     updateBeneficiario.mutate(
@@ -524,7 +524,7 @@ const makeEditSchema = (t: (k: string) => string) => z.object({
   creditoSolidaleNote: z.string().optional(),
   magazzinoEmporioPreferitoId: z.string().optional(),
   uds: z.boolean().default(false),
-  cittaId: z.string().optional(),
+  areaOperativaId: z.string().optional(),
   zonaUdsId: z.string().optional(),
 });
 
@@ -888,10 +888,10 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   const editSchema = useMemo(() => makeEditSchema(t), [t]);
   const { user, hasPermission } = useAuth();
   const canManageCredito = hasPermission("credito.quota.manage");
-  const isCittaGlobal = user?.cittaId == null;
+  const isAreaOperativaGlobal = user?.areaOperativaId == null;
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
-  const { data: cittaList } = useListCitta({ query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal } });
+  const { data: areaOperativaList } = useListAreeOperative({ query: { queryKey: getListAreeOperativeQueryKey(), enabled: isAreaOperativaGlobal } });
   const { data: centri } = useListCentriAscolto();
   const { data: magazzini } = useListMagazzini();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
@@ -927,7 +927,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
       creditoSolidaleNote: b.creditoSolidaleNote ?? "",
       magazzinoEmporioPreferitoId: b.magazzinoEmporioPreferitoId != null ? String(b.magazzinoEmporioPreferitoId) : NONE_VALUE,
       uds: b.uds ?? false,
-      cittaId: b.cittaId != null ? String(b.cittaId) : "",
+      areaOperativaId: b.areaOperativaId != null ? String(b.areaOperativaId) : "",
       zonaUdsId: b.zonaUdsId != null ? String(b.zonaUdsId) : "",
     },
   });
@@ -939,19 +939,19 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
     creditoSolidaleAbilitato &&
     !isCentroLocked &&
     (!centroAscoltoIdSelezionato || centroAscoltoIdSelezionato === NONE_VALUE);
-  const formCitta = isCittaGlobal
-    ? (form.watch("cittaId") ? parseInt(form.watch("cittaId")!) : undefined)
-    : (user?.cittaId ?? undefined);
+  const formAreaOperativa = isAreaOperativaGlobal
+    ? (form.watch("areaOperativaId") ? parseInt(form.watch("areaOperativaId")!) : undefined)
+    : (user?.areaOperativaId ?? undefined);
   const { data: udsZone } = useListZoneUds(
-    formCitta ? { cittaId: formCitta } : undefined,
-    { query: { queryKey: ["zoneUds", "editBenefForm", formCitta], enabled: watchUds && formCitta != null } },
+    formAreaOperativa ? { areaOperativaId: formAreaOperativa } : undefined,
+    { query: { queryKey: ["zoneUds", "editBenefForm", formAreaOperativa], enabled: watchUds && formAreaOperativa != null } },
   );
 
   const onSubmit = async (data: EditValues) => {
-    const { uds, cittaId, zonaUdsId, centroAscoltoId, magazzinoEmporioPreferitoId, creditoSolidaleAbilitato: creditoAbilitato, creditoSolidaleStato: creditoStato, creditoSolidaleNote, ...rest } = data;
-    // A città-global admin must pin a città when flagging a person as UDS.
-    if (uds && isCittaGlobal && !cittaId) {
-      form.setError("cittaId", { type: "manual", message: t("common.requiredField") });
+    const { uds, areaOperativaId, zonaUdsId, centroAscoltoId, magazzinoEmporioPreferitoId, creditoSolidaleAbilitato: creditoAbilitato, creditoSolidaleStato: creditoStato, creditoSolidaleNote, ...rest } = data;
+    // A area operativa-global admin must pin a area operativa when flagging a person as UDS.
+    if (uds && isAreaOperativaGlobal && !areaOperativaId) {
+      form.setError("areaOperativaId", { type: "manual", message: t("common.requiredField") });
       return;
     }
     const centroAscoltoIdFinale =
@@ -984,7 +984,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
           : null,
     };
     if (uds) {
-      if (isCittaGlobal && cittaId) payload.cittaId = parseInt(cittaId);
+      if (isAreaOperativaGlobal && areaOperativaId) payload.areaOperativaId = parseInt(areaOperativaId);
       payload.zonaUdsId = zonaUdsId && zonaUdsId !== NONE_VALUE ? parseInt(zonaUdsId) : null;
     }
     try {
@@ -1241,14 +1241,14 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 )} />
                 {watchUds && (
                   <>
-                    {isCittaGlobal && (
-                      <FormField control={form.control} name="cittaId" render={({ field }) => (
+                    {isAreaOperativaGlobal && (
+                      <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t("udsAnagrafica.fCitta")}</FormLabel>
+                          <FormLabel>{t("udsAnagrafica.fAreaOperativa")}</FormLabel>
                           <Select value={field.value || ""} onValueChange={(v) => { field.onChange(v); form.setValue("zonaUdsId", NONE_VALUE); }} disabled={!unitaStradaAbilitata}>
-                            <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fCitta")} /></SelectTrigger></FormControl>
+                            <FormControl><SelectTrigger><SelectValue placeholder={t("udsAnagrafica.fAreaOperativa")} /></SelectTrigger></FormControl>
                             <SelectContent>
-                              {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                              {areaOperativaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <FormMessage />

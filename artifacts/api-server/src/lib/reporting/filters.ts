@@ -81,10 +81,10 @@ export function parseReportFilters(req: Request): ReportFilters {
   if (!isCivilDate(a)) throw new ReportingError(400, "a non è una data valida");
   if (da > a) throw new ReportingError(400, "da non può essere successiva ad a");
 
-  const city = scopedId(
-    optionalPositiveInt(req.query.cittaId, "cittaId"),
-    req.user?.cittaId ?? null,
-    "cittaId",
+  const areaOperativa = scopedId(
+    optionalPositiveInt(req.query.areaOperativaId, "areaOperativaId"),
+    req.user?.areaOperativaId ?? null,
+    "areaOperativaId",
   );
   const centre = scopedId(
     optionalPositiveInt(req.query.centroAscoltoId, "centroAscoltoId"),
@@ -101,7 +101,7 @@ export function parseReportFilters(req: Request): ReportFilters {
     da,
     a,
     anno,
-    cittaId: city.value,
+    areaOperativaId: areaOperativa.value,
     centroAscoltoId: centre.value,
     magazzinoId: optionalPositiveInt(req.query.magazzinoId, "magazzinoId"),
     mensaId: optionalPositiveInt(req.query.mensaId, "mensaId"),
@@ -109,7 +109,7 @@ export function parseReportFilters(req: Request): ReportFilters {
     operatoreId: optionalPositiveInt(req.query.operatoreId, "operatoreId"),
     tipoIntervento: optionalText(req.query.tipoIntervento, "tipoIntervento"),
     tipoServizio: optionalText(req.query.tipoServizio, "tipoServizio"),
-    cittaMode: city.mode,
+    areaOperativaMode: areaOperativa.mode,
     centroMode: centre.mode,
     zonaMode: zone.mode,
     callerAreas: req.user?.aree ?? [],

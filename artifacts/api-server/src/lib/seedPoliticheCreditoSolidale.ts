@@ -15,7 +15,7 @@ export async function seedPoliticheCreditoSolidale(): Promise<void> {
       nome: DEFAULT_POLICY_NAME,
       descrizione: "Politica demo globale per il calcolo della quota mensile suggerita.",
       centroAscoltoId: null,
-      cittaId: null,
+      areaOperativaId: null,
       attiva: true,
       creditoBaseNucleo: "50.00",
       creditoPerComponente: "10.00",

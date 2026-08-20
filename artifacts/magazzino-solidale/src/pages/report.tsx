@@ -8,7 +8,7 @@ import {
   useReportFsePlus,
   useListMagazzini,
   useListCentriAscolto,
-  useListCitta,
+  useListAreeOperative,
   getReportGiacenzePerMagazzinoQueryKey,
   getReportConsegnePerMeseQueryKey,
   getReportConsegnePerCentroQueryKey,
@@ -34,11 +34,11 @@ export default function Report() {
   const { user } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
-  const isGlobalCitta = (user?.cittaId ?? null) == null;
+  const isGlobalAreaOperativa = (user?.areaOperativaId ?? null) == null;
   const currentYear = new Date().getFullYear();
   const [da, setDa] = useState(`${currentYear}-01-01`);
   const [a, setA] = useState(new Date().toISOString().slice(0, 10));
-  const [cittaId, setCittaId] = useState<string>(ALL);
+  const [areaOperativaId, setAreaOperativaId] = useState<string>(ALL);
   const [magazzinoId, setMagazzinoId] = useState<string>(ALL);
   const [centroId, setCentroId] = useState<string>(ALL);
   const [fseAnno, setFseAnno] = useState(currentYear);
@@ -48,39 +48,39 @@ export default function Report() {
     }
   }, [isCentroLocked, lockedCentroId]);
 
-  const { data: citta } = useListCitta();
+  const { data: areaOperativa } = useListAreeOperative();
   const { data: magazzini } = useListMagazzini();
   const { data: centri } = useListCentriAscolto();
 
-  const cittaParam = cittaId === ALL ? null : parseInt(cittaId);
-  const magazziniVisibili = (magazzini ?? []).filter((m) => cittaParam == null || m.cittaId === cittaParam);
-  const centriVisibili = (centri ?? []).filter((c) => cittaParam == null || c.cittaId === cittaParam);
+  const areaOperativaParam = areaOperativaId === ALL ? null : parseInt(areaOperativaId);
+  const magazziniVisibili = (magazzini ?? []).filter((m) => areaOperativaParam == null || m.areaOperativaId === areaOperativaParam);
+  const centriVisibili = (centri ?? []).filter((c) => areaOperativaParam == null || c.areaOperativaId === areaOperativaParam);
 
   const magParam = magazzinoId === ALL ? undefined : parseInt(magazzinoId);
   const centroParam = centroId === ALL ? undefined : parseInt(centroId);
-  const cittaQuery = cittaParam ?? undefined;
+  const areaOperativaQuery = areaOperativaParam ?? undefined;
 
-  const consegneParams = { da, a, magazzinoId: magParam, centroAscoltoId: centroParam, cittaId: cittaQuery };
+  const consegneParams = { da, a, magazzinoId: magParam, centroAscoltoId: centroParam, areaOperativaId: areaOperativaQuery };
   const { data: consegne, isLoading: isLoadingConsegne } = useReportConsegnePerMese(consegneParams, {
     query: { queryKey: getReportConsegnePerMeseQueryKey(consegneParams) },
   });
 
-  const giacenzeParams = { magazzinoId: magParam, cittaId: cittaQuery };
+  const giacenzeParams = { magazzinoId: magParam, areaOperativaId: areaOperativaQuery };
   const { data: giacenze, isLoading: isLoadingGiacenze } = useReportGiacenzePerMagazzino(giacenzeParams, {
     query: { queryKey: getReportGiacenzePerMagazzinoQueryKey(giacenzeParams) },
   });
 
-  const perCentroParams = { da, a, cittaId: cittaQuery };
+  const perCentroParams = { da, a, areaOperativaId: areaOperativaQuery };
   const { data: perCentro, isLoading: isLoadingPerCentro } = useReportConsegnePerCentro(perCentroParams, {
     query: { queryKey: getReportConsegnePerCentroQueryKey(perCentroParams) },
   });
 
-  const allocazioneParams = { da, a, centroAscoltoId: centroParam, cittaId: cittaQuery };
+  const allocazioneParams = { da, a, centroAscoltoId: centroParam, areaOperativaId: areaOperativaQuery };
   const { data: allocazione, isLoading: isLoadingAllocazione } = useReportAllocazioneMezzi(allocazioneParams, {
     query: { queryKey: getReportAllocazioneMezziQueryKey(allocazioneParams) },
   });
 
-  const fseParams = { anno: fseAnno, cittaId: cittaQuery };
+  const fseParams = { anno: fseAnno, areaOperativaId: areaOperativaQuery };
   const { data: fse, isLoading: isLoadingFse } = useReportFsePlus(
     fseParams,
     { query: { queryKey: getReportFsePlusQueryKey(fseParams) } },
@@ -120,13 +120,13 @@ export default function Report() {
               <Input id="a" type="date" value={a} min={da} onChange={(e) => setA(e.target.value)} className="w-40" />
             </div>
           </div>
-          {isGlobalCitta && (
+          {isGlobalAreaOperativa && (
             <div className="space-y-1.5">
               <Label className="text-xs">{t("report.area")}</Label>
               <Select
-                value={cittaId}
+                value={areaOperativaId}
                 onValueChange={(v) => {
-                  setCittaId(v);
+                  setAreaOperativaId(v);
                   setMagazzinoId(ALL);
                   if (!isCentroLocked) setCentroId(ALL);
                 }}
@@ -134,7 +134,7 @@ export default function Report() {
                 <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>{t("report.allAreas")}</SelectItem>
-                  {(citta ?? []).map((c) => (
+                  {(areaOperativa ?? []).map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                   ))}
                 </SelectContent>

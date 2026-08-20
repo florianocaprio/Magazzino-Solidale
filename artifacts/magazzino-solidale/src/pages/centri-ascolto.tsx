@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListCentriAscolto, useCreateCentroAscolto, useUpdateCentroAscolto, useDeleteCentroAscolto, useListCitta, getListCentriAscoltoQueryKey } from "@workspace/api-client-react";
+import { useListCentriAscolto, useCreateCentroAscolto, useUpdateCentroAscolto, useDeleteCentroAscolto, useListAreeOperative, getListCentriAscoltoQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,11 +23,11 @@ import * as z from "zod";
 import { useTranslation } from "react-i18next";
 import { errorMessage } from "@/lib/api-error";
 
-const NO_CITTA = "__none__";
+const NO_AREA_OPERATIVA = "__none__";
 
 const formSchema = z.object({
   nome: z.string().min(2, "Nome obbligatorio"),
-  cittaId: z.string().optional(),
+  areaOperativaId: z.string().optional(),
   logoUrl: z.string().optional(),
   indirizzo: z.string().optional(),
   comune: z.string().optional(),
@@ -41,10 +41,10 @@ const formSchema = z.object({
 export default function CentriAscolto() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const isCittaGlobal = user?.cittaId == null;
+  const isAreaOperativaGlobal = user?.areaOperativaId == null;
   const { data: centri, isLoading } = useListCentriAscolto();
-  const { data: cittaList } = useListCitta();
-  const cittaMap = new Map((cittaList ?? []).map((c) => [c.id, c.nome]));
+  const { data: areaOperativaList } = useListAreeOperative();
+  const areaOperativaMap = new Map((areaOperativaList ?? []).map((c) => [c.id, c.nome]));
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -62,7 +62,7 @@ export default function CentriAscolto() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      nome: "", cittaId: NO_CITTA, logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: ""
+      nome: "", areaOperativaId: NO_AREA_OPERATIVA, logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: ""
     }
   });
 
@@ -71,7 +71,7 @@ export default function CentriAscolto() {
     setFormError(null);
     setLogoFile(null);
     setLogoPreview(null);
-    form.reset({ nome: "", cittaId: NO_CITTA, logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: "" });
+    form.reset({ nome: "", areaOperativaId: NO_AREA_OPERATIVA, logoUrl: "", indirizzo: "", comune: "", responsabile: "", telefono: "", email: "", attivo: true, note: "" });
     setIsFormOpen(true);
   };
 
@@ -82,7 +82,7 @@ export default function CentriAscolto() {
     setLogoPreview(c.logoUrl || null);
     form.reset({
       nome: c.nome,
-      cittaId: c.cittaId != null ? String(c.cittaId) : NO_CITTA,
+      areaOperativaId: c.areaOperativaId != null ? String(c.areaOperativaId) : NO_AREA_OPERATIVA,
       logoUrl: c.logoUrl || "",
       indirizzo: c.indirizzo || "",
       comune: c.comune || "",
@@ -111,11 +111,11 @@ export default function CentriAscolto() {
 
   const onSubmit = (formData: z.infer<typeof formSchema>) => {
     setFormError(null);
-    const { cittaId: cittaIdRaw, ...rest } = formData;
+    const { areaOperativaId: areaOperativaIdRaw, ...rest } = formData;
     const data = {
       ...rest,
       logoUrl: rest.logoUrl?.trim() || null,
-      cittaId: cittaIdRaw && cittaIdRaw !== NO_CITTA ? parseInt(cittaIdRaw, 10) : null,
+      areaOperativaId: areaOperativaIdRaw && areaOperativaIdRaw !== NO_AREA_OPERATIVA ? parseInt(areaOperativaIdRaw, 10) : null,
     };
     if (editingId) {
       updateCentro.mutate({ id: editingId, data }, {
@@ -192,7 +192,7 @@ export default function CentriAscolto() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.name")}</TableHead>
-                <TableHead>{t("centriAscolto.cittaCol")}</TableHead>
+                <TableHead>{t("centriAscolto.areaOperativaCol")}</TableHead>
                 <TableHead>{t("centriAscolto.comune")}</TableHead>
                 <TableHead>{t("centriAscolto.responsabile")}</TableHead>
                 <TableHead>{t("centriAscolto.contatti")}</TableHead>
@@ -229,7 +229,7 @@ export default function CentriAscolto() {
                     </div>
                     {c.indirizzo && <div className="text-xs text-muted-foreground ml-6">{c.indirizzo}</div>}
                   </TableCell>
-                  <TableCell className="text-sm">{c.cittaId != null ? (cittaMap.get(c.cittaId) ?? '-') : '-'}</TableCell>
+                  <TableCell className="text-sm">{c.areaOperativaId != null ? (areaOperativaMap.get(c.areaOperativaId) ?? '-') : '-'}</TableCell>
                   <TableCell className="text-sm">{c.comune || '-'}</TableCell>
                   <TableCell className="text-sm">{c.responsabile || '-'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -285,17 +285,17 @@ export default function CentriAscolto() {
                 <FormField control={form.control} name="nome" render={({ field }) => (
                   <FormItem><FormLabel>{t("common.name")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                {isCittaGlobal && (
-                  <FormField control={form.control} name="cittaId" render={({ field }) => (
+                {isAreaOperativaGlobal && (
+                  <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("centriAscolto.cittaLabel")}</FormLabel>
+                      <FormLabel>{t("centriAscolto.areaOperativaLabel")}</FormLabel>
                       <Select value={field.value} onValueChange={field.onChange}>
                         <FormControl>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={NO_CITTA}>{t("centriAscolto.nessunaCitta")}</SelectItem>
-                          {(cittaList ?? []).map((c) => (
+                          <SelectItem value={NO_AREA_OPERATIVA}>{t("centriAscolto.nessunaAreaOperativa")}</SelectItem>
+                          {(areaOperativaList ?? []).map((c) => (
                             <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                           ))}
                         </SelectContent>

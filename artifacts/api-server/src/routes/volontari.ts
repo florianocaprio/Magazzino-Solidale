@@ -5,7 +5,7 @@ import { runBulk } from "../lib/bulk";
 import { eq, and, ne, isNull, getTableColumns, desc, ilike, or } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   centroScopeFilter,
   canAccessCentro,
   visibleCentroIds,
@@ -60,7 +60,7 @@ const selectVolontario = () =>
 
 router.get("/volontari", async (req, res) => {
   const caller = callerCentroId(req);
-  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
+  const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   let requestedCentroScope: ReturnType<typeof centroScopeFilter>;
   let searchScope: ReturnType<typeof or>;
   if (req.query.centroAscoltoId != null) {
@@ -69,7 +69,7 @@ router.get("/volontari", async (req, res) => {
       res.status(400).json({ error: "centroAscoltoId non valido" });
       return;
     }
-    if (!canAccessCentro(requestedCentroId, caller) || !inVisibleCentroSet(requestedCentroId, cittaCentroIds)) {
+    if (!canAccessCentro(requestedCentroId, caller) || !inVisibleCentroSet(requestedCentroId, areaOperativaCentroIds)) {
       res.status(403).json({ error: "Centro non accessibile per il tuo perimetro" });
       return;
     }
@@ -88,7 +88,7 @@ router.get("/volontari", async (req, res) => {
     .where(
       andScoped(
         centroScopeFilter(volontariTable.centroAscoltoId, caller),
-        idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds),
+        idSetScopeFilter(volontariTable.centroAscoltoId, areaOperativaCentroIds),
         requestedCentroScope,
         searchScope,
       ),
@@ -110,9 +110,9 @@ async function createVolontarioOne(
   if (
     caller == null &&
     values.centroAscoltoId != null &&
-    !inVisibleCentroSet(values.centroAscoltoId as number, await visibleCentroIds(callerCittaId(req)))
+    !inVisibleCentroSet(values.centroAscoltoId as number, await visibleCentroIds(callerAreaOperativaId(req)))
   ) {
-    return { error: "Centro non accessibile per la tua città", status: 403 };
+    return { error: "Centro non accessibile per la tua area operativa", status: 403 };
   }
   if (await matricolaVolontarioGiaUsata(matricola)) {
     return { ...(await matricolaVolontarioDuplicataPayload(matricola)), status: 409 };
@@ -190,16 +190,16 @@ router.get("/volontari/carico", async (req, res) => {
   }
 
   // Le RIGHE restituite sono però limitate ai volontari visibili al chiamante
-  // (confine centro + città HARD): il conteggio resta globale, ma non si espone
+  // (confine centro + area operativa HARD): il conteggio resta globale, ma non si espone
   // l'attività di volontari fuori perimetro.
-  const cittaCentroIds = await visibleCentroIds(callerCittaId(req));
+  const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const visibili = await db
     .select({ id: volontariTable.id })
     .from(volontariTable)
     .where(
       andScoped(
         centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)),
-        idSetScopeFilter(volontariTable.centroAscoltoId, cittaCentroIds),
+        idSetScopeFilter(volontariTable.centroAscoltoId, areaOperativaCentroIds),
       ),
     );
   const visibileSet = new Set(visibili.map((v) => v.id));
@@ -218,8 +218,8 @@ router.get("/volontari/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!inVisibleCentroSet(row.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!inVisibleCentroSet(row.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   res.json(fmt(row));
@@ -233,8 +233,8 @@ router.patch("/volontari/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   const updates = { ...req.body };
@@ -270,8 +270,8 @@ router.delete("/volontari/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerCittaId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua città" });
+  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
+    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
   await db.delete(volontariTable).where(eq(volontariTable.id, parseInt(req.params.id)));

@@ -1,14 +1,14 @@
 import { boolean, decimal, integer, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { beneficiariTable } from "./beneficiari";
 import { centriAscoltoTable } from "./centri";
-import { cittaTable } from "./citta";
+import { areeOperativeTable } from "./areeOperative";
 import { politicheCreditoSolidaleTable } from "./politicheCreditoSolidale";
 
 export const creditoSolidaleMovimentiTable = pgTable("credito_solidale_movimenti", {
   id: serial("id").primaryKey(),
   beneficiarioId: integer("beneficiario_id").notNull().references(() => beneficiariTable.id),
   centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
-  cittaId: integer("citta_id").references(() => cittaTable.id),
+  areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
   tipoMovimento: varchar("tipo_movimento", { length: 40 }).notNull(),
   variazioneCredito: decimal("variazione_credito", { precision: 10, scale: 2 }).notNull(),
   saldoPrima: decimal("saldo_prima", { precision: 10, scale: 2 }).notNull(),

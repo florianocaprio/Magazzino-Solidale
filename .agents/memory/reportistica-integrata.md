@@ -37,7 +37,7 @@ relativo modulo e la relativa area sono disponibili al caller; i dati Mensa
 richiedono anche `mensa.reports.view`.
 
 `parseReportFilters` valida date civili ISO, anno e ID positivi. `da > a` è 400.
-Un caller con città, Centro o Zona UDS assegnati viene sempre fissato al proprio
+Un caller con Area Operativa, Centro o Zona UDS assegnati viene sempre fissato al proprio
 scope; un parametro diverso è 403. Gli scope SQL seguono la compatibilità
 corrente: in modalità caller includono i record condivisi `NULL`, mentre un
 filtro esplicito globale richiede corrispondenza esatta. La UI locked è solo UX:

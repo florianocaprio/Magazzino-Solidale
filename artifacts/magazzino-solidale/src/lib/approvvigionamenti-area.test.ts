@@ -3,9 +3,9 @@ import { fornitoriAttiviPerArea } from "./approvvigionamenti-area";
 
 describe("filtro fornitori per Area", () => {
   const fornitori = [
-    { id: 1, cittaId: 10, attivo: true },
-    { id: 2, cittaId: 20, attivo: true },
-    { id: 3, cittaId: 10, attivo: false },
+    { id: 1, areaOperativaId: 10, attivo: true },
+    { id: 2, areaOperativaId: 20, attivo: true },
+    { id: 3, areaOperativaId: 10, attivo: false },
   ];
 
   it("non propone fornitori prima di scegliere l'Area", () => {

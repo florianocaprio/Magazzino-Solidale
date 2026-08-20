@@ -1,11 +1,12 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
 import {
   beneficiariTable,
+  auditConfigurazioniTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   impostazioniModuliTable,
   magazziniTable,
@@ -13,6 +14,7 @@ import {
   pool,
   prodottiTable,
   zoneUdsTable,
+  utentiTable,
 } from "@workspace/db";
 import beneficiariRouter from "../src/routes/beneficiari";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
@@ -30,18 +32,19 @@ const rnd = () => Math.random().toString(36).slice(2, 8);
 
 const beneficiarioIds: number[] = [];
 const centroIds: number[] = [];
-const cittaIds: number[] = [];
+const areaOperativaIds: number[] = [];
 const magazzinoIds: number[] = [];
 const politicaIds: number[] = [];
 const prodottoIds: number[] = [];
 const zonaIds: number[] = [];
+let testUserId: number;
 
 function makeApp(isSuperAdmin = false): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = {
-      id: 1,
+      id: testUserId,
       username: "admin",
       nome: "Admin",
       cognome: null,
@@ -50,8 +53,8 @@ function makeApp(isSuperAdmin = false): Express {
       ruoloNome: null,
       centroAscoltoId: null,
       centroAscoltoNome: null,
-      cittaId: null,
-      cittaNome: null,
+      areaOperativaId: null,
+      areaOperativaNome: null,
       zonaUdsId: null,
       zonaUdsNome: null,
       isSuperAdmin,
@@ -76,20 +79,28 @@ async function setModuli(emporioAbilitato: boolean, unitaStradaAbilitata: boolea
   await updateModuloAmbiente("UDS", unitaStradaAbilitata, null);
 }
 
-async function createCitta(): Promise<number> {
-  const [citta] = await db.insert(cittaTable).values({ nome: `Citta ${rnd()}` }).returning({ id: cittaTable.id });
-  cittaIds.push(citta.id);
-  return citta.id;
+async function createAreaOperativa(): Promise<number> {
+  const [areaOperativa] = await db.insert(areeOperativeTable).values({ nome: `AreaOperativa ${rnd()}` }).returning({ id: areeOperativeTable.id });
+  areaOperativaIds.push(areaOperativa.id);
+  return areaOperativa.id;
 }
 
-async function createCentro(cittaId: number): Promise<number> {
+async function createCentro(areaOperativaId: number): Promise<number> {
   const [centro] = await db
     .insert(centriAscoltoTable)
-    .values({ nome: `Centro ${rnd()}`, cittaId })
+    .values({ nome: `Centro ${rnd()}`, areaOperativaId })
     .returning({ id: centriAscoltoTable.id });
   centroIds.push(centro.id);
   return centro.id;
 }
+
+beforeAll(async () => {
+  const [testUser] = await db
+    .insert(utentiTable)
+    .values({ username: `impostazioni_moduli_${rnd()}`, passwordHash: "x", nome: "Test Impostazioni Moduli" })
+    .returning({ id: utentiTable.id });
+  testUserId = testUser.id;
+});
 
 beforeEach(async () => {
   await setModuli(false, true);
@@ -102,12 +113,15 @@ afterEach(async () => {
   if (prodottoIds.length > 0) await db.delete(prodottiTable).where(inArray(prodottiTable.id, prodottoIds.splice(0)));
   if (magazzinoIds.length > 0) await db.delete(magazziniTable).where(inArray(magazziniTable.id, magazzinoIds.splice(0)));
   if (centroIds.length > 0) await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds.splice(0)));
-  if (cittaIds.length > 0) await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds.splice(0)));
+  if (areaOperativaIds.length > 0) await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds.splice(0)));
   await db.delete(impostazioniModuliTable).where(eq(impostazioniModuliTable.id, 1));
+  await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.utenteId, testUserId));
   await setModuli(false, true);
 });
 
 afterAll(async () => {
+  await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.utenteId, testUserId));
+  await db.delete(utentiTable).where(eq(utentiTable.id, testUserId));
   await setModuli(true, true);
   await pool.end();
 });
@@ -140,8 +154,8 @@ describe("Impostazioni moduli", () => {
 
   it("blocca nuove configurazioni Emporio quando il modulo è disabilitato", async () => {
     const app = makeApp();
-    const cittaId = await createCitta();
-    const centroId = await createCentro(cittaId);
+    const areaOperativaId = await createAreaOperativa();
+    const centroId = await createCentro(areaOperativaId);
 
     const magazzino = await request(app)
       .post("/magazzini")
@@ -157,7 +171,7 @@ describe("Impostazioni moduli", () => {
 
     const beneficiario = await request(app)
       .post("/beneficiari")
-      .send({ nome: "Credito", cognome: rnd(), sesso: "M", cittaId, centroAscoltoId: centroId });
+      .send({ nome: "Credito", cognome: rnd(), sesso: "M", areaOperativaId, centroAscoltoId: centroId });
     expect(beneficiario.status).toBe(201);
     beneficiarioIds.push(beneficiario.body.id);
     const beneficiarioCredito = await request(app)
@@ -181,8 +195,8 @@ describe("Impostazioni moduli", () => {
 
   it("salva la quota mensile assegnata e marca la modifica manuale quando Emporio è abilitato", async () => {
     await setModuli(true, true);
-    const cittaId = await createCitta();
-    const centroId = await createCentro(cittaId);
+    const areaOperativaId = await createAreaOperativa();
+    const centroId = await createCentro(areaOperativaId);
 
     const app = makeApp();
     const created = await request(app)
@@ -191,7 +205,7 @@ describe("Impostazioni moduli", () => {
         nome: "Quota",
         cognome: rnd(),
         sesso: "M",
-        cittaId,
+        areaOperativaId,
         centroAscoltoId: centroId,
       });
     expect(created.status).toBe(201);
@@ -214,30 +228,30 @@ describe("Impostazioni moduli", () => {
 
   it("blocca nuove operazioni UDS quando Unità di Strada è disabilitata", async () => {
     await setModuli(false, false);
-    const cittaId = await createCitta();
+    const areaOperativaId = await createAreaOperativa();
     const app = makeApp();
 
     const zona = await request(app)
       .post("/zone-uds")
-      .send({ nome: `Zona ${rnd()}`, cittaId });
+      .send({ nome: `Zona ${rnd()}`, areaOperativaId });
     expect(zona.status).toBe(403);
     expect(zona.body.error).toBe("Modulo UDS non abilitato per questo ambiente");
 
     const createUds = await request(app)
       .post("/beneficiari")
-      .send({ nome: "Uds", cognome: rnd(), sesso: "M", uds: true, cittaId });
+      .send({ nome: "Uds", cognome: rnd(), sesso: "M", uds: true, areaOperativaId });
     expect(createUds.status).toBe(403);
     expect(createUds.body.error).toBe(UDS_DISABLED_MSG);
 
     const [beneficiario] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "Patch", cognome: rnd(), sesso: "F", cittaId })
+      .values({ codice: `BEN-${rnd()}`, nome: "Patch", cognome: rnd(), sesso: "F", areaOperativaId })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(beneficiario.id);
 
     const patchUds = await request(app)
       .patch(`/beneficiari/${beneficiario.id}`)
-      .send({ uds: true, cittaId, versione: 1 });
+      .send({ uds: true, areaOperativaId, versione: 1 });
     expect(patchUds.status).toBe(403);
     expect(patchUds.body.error).toBe(UDS_DISABLED_MSG);
   });

@@ -19,7 +19,7 @@ tipo?: string;
 priorita?: InterventoPriorita;
 operatoreId?: number;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 stato?: InterventoStato;
 ambitoLegacy?: GetInterventiRiepilogoVisteAmbitoLegacy;
 da?: Date;

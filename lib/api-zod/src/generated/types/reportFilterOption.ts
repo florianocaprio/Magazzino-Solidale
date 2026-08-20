@@ -10,7 +10,7 @@ export interface ReportFilterOption {
   id: number;
   nome: string;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
 }

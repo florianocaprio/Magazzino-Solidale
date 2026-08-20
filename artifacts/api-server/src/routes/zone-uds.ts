@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
-import { db, zoneUdsTable, cittaTable } from "@workspace/db";
+import { db, zoneUdsTable, areeOperativeTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { CreateZonaUdsBody, UpdateZonaUdsBody } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/auth";
-import { callerCittaId, canAccessCitta } from "../lib/centroScope";
+import { callerAreaOperativaId, canAccessAreaOperativa } from "../lib/centroScope";
 import { canMutateScopedResource } from "../lib/adminScope";
 import { requireModulo } from "../lib/featureFlags";
 import { UNITA_STRADA_DISABLED_MSG, isUnitaStradaEnabled } from "../lib/impostazioniModuli";
@@ -14,11 +14,11 @@ router.use("/zone-uds", requireModulo("UDS"));
 
 type ZonaRow = typeof zoneUdsTable.$inferSelect;
 
-function fmt(r: ZonaRow, cittaNome: string | null = null) {
+function fmt(r: ZonaRow, areaOperativaNome: string | null = null) {
   return {
     id: r.id,
-    cittaId: r.cittaId,
-    cittaNome,
+    areaOperativaId: r.areaOperativaId,
+    areaOperativaNome,
     nome: r.nome,
     attivo: r.attivo,
     note: r.note ?? null,
@@ -26,35 +26,35 @@ function fmt(r: ZonaRow, cittaNome: string | null = null) {
   };
 }
 
-// Zones belong to a città (HARD boundary). A città-scoped caller sees only the
-// zones of their own città; a global caller sees all (optionally filtered by
-// the cittaId query param).
+// Zones belong to a area operativa (HARD boundary). A area operativa-scoped caller sees only the
+// zones of their own area operativa; a global caller sees all (optionally filtered by
+// the areaOperativaId query param).
 router.get("/zone-uds", async (req, res) => {
-  const cittaId = callerCittaId(req);
-  const queryCitta = req.query.cittaId ? Number(req.query.cittaId) : null;
-  if (queryCitta != null && (!Number.isInteger(queryCitta) || queryCitta <= 0)) {
+  const areaOperativaId = callerAreaOperativaId(req);
+  const queryAreaOperativa = req.query.areaOperativaId ? Number(req.query.areaOperativaId) : null;
+  if (queryAreaOperativa != null && (!Number.isInteger(queryAreaOperativa) || queryAreaOperativa <= 0)) {
     res.status(400).json({ error: "Area non valida" });
     return;
   }
-  const effectiveCitta = cittaId ?? queryCitta;
+  const effectiveAreaOperativa = areaOperativaId ?? queryAreaOperativa;
 
-  const rows = effectiveCitta == null ? await db.select({ z: zoneUdsTable, cittaNome: cittaTable.nome }).from(zoneUdsTable).leftJoin(cittaTable, eq(zoneUdsTable.cittaId, cittaTable.id)).orderBy(zoneUdsTable.nome) : await db.select({ z: zoneUdsTable, cittaNome: cittaTable.nome }).from(zoneUdsTable).leftJoin(cittaTable, eq(zoneUdsTable.cittaId, cittaTable.id)).where(eq(zoneUdsTable.cittaId, effectiveCitta)).orderBy(zoneUdsTable.nome);
+  const rows = effectiveAreaOperativa == null ? await db.select({ z: zoneUdsTable, areaOperativaNome: areeOperativeTable.nome }).from(zoneUdsTable).leftJoin(areeOperativeTable, eq(zoneUdsTable.areaOperativaId, areeOperativeTable.id)).orderBy(zoneUdsTable.nome) : await db.select({ z: zoneUdsTable, areaOperativaNome: areeOperativeTable.nome }).from(zoneUdsTable).leftJoin(areeOperativeTable, eq(zoneUdsTable.areaOperativaId, areeOperativeTable.id)).where(eq(zoneUdsTable.areaOperativaId, effectiveAreaOperativa)).orderBy(zoneUdsTable.nome);
 
-  res.json(rows.map((r) => fmt(r.z, r.cittaNome ?? null)));
+  res.json(rows.map((r) => fmt(r.z, r.areaOperativaNome ?? null)));
 });
 
 router.get("/zone-uds/:id", async (req, res) => {
   const id = parseInt(req.params.id as string);
-  const [row] = await db.select({ z: zoneUdsTable, cittaNome: cittaTable.nome }).from(zoneUdsTable).leftJoin(cittaTable, eq(zoneUdsTable.cittaId, cittaTable.id)).where(eq(zoneUdsTable.id, id));
+  const [row] = await db.select({ z: zoneUdsTable, areaOperativaNome: areeOperativeTable.nome }).from(zoneUdsTable).leftJoin(areeOperativeTable, eq(zoneUdsTable.areaOperativaId, areeOperativeTable.id)).where(eq(zoneUdsTable.id, id));
   if (!row) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  if (!canAccessCitta(row.z.cittaId, callerCittaId(req))) {
+  if (!canAccessAreaOperativa(row.z.areaOperativaId, callerAreaOperativaId(req))) {
     res.status(403).json({ error: "Zona non accessibile per il tuo profilo" });
     return;
   }
-  res.json(fmt(row.z, row.cittaNome ?? null));
+  res.json(fmt(row.z, row.areaOperativaNome ?? null));
 });
 
 router.post("/zone-uds", requireAdmin, async (req, res) => {
@@ -67,14 +67,14 @@ router.post("/zone-uds", requireAdmin, async (req, res) => {
     res.status(400).json({ error: "Inserimento zona UDS non valido" });
     return;
   }
-  const callerAreaId = callerCittaId(req);
-  if (!canMutateScopedResource(parsed.data.cittaId, callerAreaId)) {
+  const callerAreaId = callerAreaOperativaId(req);
+  if (!canMutateScopedResource(parsed.data.areaOperativaId, callerAreaId)) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
-  const [area] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, parsed.data.cittaId));
+  const [area] = await db.select({ id: areeOperativeTable.id, attivo: areeOperativeTable.attivo }).from(areeOperativeTable).where(eq(areeOperativeTable.id, parsed.data.areaOperativaId));
   if (!area || !area.attivo) {
-    res.status(400).json({ error: "L'Area selezionata non è disponibile" });
+    res.status(400).json({ error: "L'Area Operativa selezionata non è disponibile" });
     return;
   }
   const [row] = await db.insert(zoneUdsTable).values(parsed.data).returning();
@@ -92,8 +92,8 @@ router.patch("/zone-uds/:id", requireAdmin, async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const callerAreaId = callerCittaId(req);
-  if (!canMutateScopedResource(existing.cittaId, callerAreaId)) {
+  const callerAreaId = callerAreaOperativaId(req);
+  if (!canMutateScopedResource(existing.areaOperativaId, callerAreaId)) {
     res.status(403).json({ error: "Zona non modificabile per il tuo profilo" });
     return;
   }
@@ -102,14 +102,14 @@ router.patch("/zone-uds/:id", requireAdmin, async (req, res) => {
     res.status(400).json({ error: "Modifica zona UDS non valida" });
     return;
   }
-  if (parsed.data.cittaId !== undefined && !canMutateScopedResource(parsed.data.cittaId, callerAreaId)) {
+  if (parsed.data.areaOperativaId !== undefined && !canMutateScopedResource(parsed.data.areaOperativaId, callerAreaId)) {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
-  if (parsed.data.cittaId !== undefined) {
-    const [area] = await db.select({ id: cittaTable.id, attivo: cittaTable.attivo }).from(cittaTable).where(eq(cittaTable.id, parsed.data.cittaId));
+  if (parsed.data.areaOperativaId !== undefined) {
+    const [area] = await db.select({ id: areeOperativeTable.id, attivo: areeOperativeTable.attivo }).from(areeOperativeTable).where(eq(areeOperativeTable.id, parsed.data.areaOperativaId));
     if (!area || !area.attivo) {
-      res.status(400).json({ error: "L'Area selezionata non è disponibile" });
+      res.status(400).json({ error: "L'Area Operativa selezionata non è disponibile" });
       return;
     }
   }
@@ -132,7 +132,7 @@ router.delete("/zone-uds/:id", requireAdmin, async (req, res) => {
     res.status(204).send();
     return;
   }
-  if (!canMutateScopedResource(existing.cittaId, callerCittaId(req))) {
+  if (!canMutateScopedResource(existing.areaOperativaId, callerAreaOperativaId(req))) {
     res.status(403).json({ error: "Zona non modificabile per il tuo profilo" });
     return;
   }

@@ -7,7 +7,7 @@
  */
 
 export interface ZonaUdsInput {
-  cittaId: number;
+  areaOperativaId: number;
   /** @minLength 1 */
   nome: string;
   attivo?: boolean;

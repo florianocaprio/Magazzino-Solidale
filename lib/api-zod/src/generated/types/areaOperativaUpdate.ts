@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CittaInput {
+export interface AreaOperativaUpdate {
   /** @minLength 1 */
-  nome: string;
+  nome?: string;
   provincia?: string;
   /** @maxLength 2 */
   sigla?: string;

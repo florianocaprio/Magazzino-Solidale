@@ -17,6 +17,6 @@ da?: Date;
  * Data civile Europe/Rome inclusiva; massimo 31 giorni.
  */
 a?: Date;
-cittaId?: number;
+areaOperativaId?: number;
 centroAscoltoId?: number;
 };

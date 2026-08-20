@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListCitta, getListCittaQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListAreeOperative, getListAreeOperativeQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -52,8 +52,8 @@ export default function Consegne() {
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
-  const isCittaGlobal = user?.cittaId == null;
-  const [cittaFilter, setCittaFilter] = useState("all");
+  const isAreaOperativaGlobal = user?.areaOperativaId == null;
+  const [areaOperativaFilter, setAreaOperativaFilter] = useState("all");
   const [centroFilter, setCentroFilter] = useState("all");
   const [statoFilter, setStatoFilter] = useState("all");
   const [createCentroId, setCreateCentroId] = useState("all");
@@ -89,23 +89,23 @@ export default function Consegne() {
   const { data: volontari } = useListVolontari();
   const { data: mezzi } = useListMezzi();
   const { data: centri } = useListCentriAscolto();
-  const { data: cittaList } = useListCitta({
-    query: { queryKey: getListCittaQueryKey(), enabled: isCittaGlobal },
+  const { data: areaOperativaList } = useListAreeOperative({
+    query: { queryKey: getListAreeOperativeQueryKey(), enabled: isAreaOperativaGlobal },
   });
 
-  // Global (multi-città) users MUST pick a città first; the centro pickers then
-  // only show centri belonging to that città (empty until a città is chosen).
-  // Città-scoped users already receive only their own città's centri from the
+  // Global (multi-area operativa) users MUST pick a area operativa first; the centro pickers then
+  // only show centri belonging to that area operativa (empty until a area operativa is chosen).
+  // Area Operativa-scoped users already receive only their own area operativa's centri from the
   // API, so no extra filtering is needed.
-  const cittaNotChosen = isCittaGlobal && cittaFilter === "all";
+  const areaOperativaNotChosen = isAreaOperativaGlobal && areaOperativaFilter === "all";
   const centriFiltrati = (centri ?? []).filter((c) => {
-    if (!isCittaGlobal) return true;
-    if (cittaFilter === "all") return false;
-    return c.cittaId != null && String(c.cittaId) === cittaFilter;
+    if (!isAreaOperativaGlobal) return true;
+    if (areaOperativaFilter === "all") return false;
+    return c.areaOperativaId != null && String(c.areaOperativaId) === areaOperativaFilter;
   });
 
-  const handleCittaFilterChange = (v: string) => {
-    setCittaFilter(v);
+  const handleAreaOperativaFilterChange = (v: string) => {
+    setAreaOperativaFilter(v);
     setCentroFilter("all");
     setCreateCentroId("all");
   };
@@ -459,21 +459,21 @@ export default function Consegne() {
         <CardHeader className="py-4 border-b">
           <div className="flex flex-wrap items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            {isGlobal && isCittaGlobal && (
-              <Select value={cittaFilter} onValueChange={handleCittaFilterChange}>
+            {isGlobal && isAreaOperativaGlobal && (
+              <Select value={areaOperativaFilter} onValueChange={handleAreaOperativaFilterChange}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder={t("consegne.filterCitta")} />
+                  <SelectValue placeholder={t("consegne.filterAreaOperativa")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{t("consegne.filterAllCitta")}</SelectItem>
-                  {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                  <SelectItem value="all">{t("consegne.filterAllAreaOperativa")}</SelectItem>
+                  {areaOperativaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {isGlobal && (
-              <Select value={centroFilter} onValueChange={setCentroFilter} disabled={cittaNotChosen}>
+              <Select value={centroFilter} onValueChange={setCentroFilter} disabled={areaOperativaNotChosen}>
                 <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder={cittaNotChosen ? t("consegne.selectCittaFirst") : t("consegne.filterAllCenters")} />
+                  <SelectValue placeholder={areaOperativaNotChosen ? t("consegne.selectAreaOperativaFirst") : t("consegne.filterAllCenters")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("consegne.filterAllCenters")}</SelectItem>
@@ -732,22 +732,22 @@ export default function Consegne() {
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                {isGlobal && isCittaGlobal && (
+                {isGlobal && isAreaOperativaGlobal && (
                   <div className="space-y-2">
-                    <Label>{t("consegne.filterCitta")}</Label>
-                    <Select value={cittaFilter} onValueChange={handleCittaFilterChange}>
-                      <SelectTrigger><SelectValue placeholder={t("consegne.filterCitta")} /></SelectTrigger>
+                    <Label>{t("consegne.filterAreaOperativa")}</Label>
+                    <Select value={areaOperativaFilter} onValueChange={handleAreaOperativaFilterChange}>
+                      <SelectTrigger><SelectValue placeholder={t("consegne.filterAreaOperativa")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">{t("consegne.filterAllCitta")}</SelectItem>
-                        {cittaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                        <SelectItem value="all">{t("consegne.filterAllAreaOperativa")}</SelectItem>
+                        {areaOperativaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                 )}
                 <div className="space-y-2">
                   <Label>{t("consegne.centroFilterLabel")}</Label>
-                  <Select value={createCentroId} onValueChange={(v) => { setCreateCentroId(v); form.setValue("beneficiarioId", 0); }} disabled={isCentroLocked || cittaNotChosen}>
-                    <SelectTrigger><SelectValue placeholder={cittaNotChosen ? t("consegne.selectCittaFirst") : undefined} /></SelectTrigger>
+                  <Select value={createCentroId} onValueChange={(v) => { setCreateCentroId(v); form.setValue("beneficiarioId", 0); }} disabled={isCentroLocked || areaOperativaNotChosen}>
+                    <SelectTrigger><SelectValue placeholder={areaOperativaNotChosen ? t("consegne.selectAreaOperativaFirst") : undefined} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("consegne.allBeneficiari")}</SelectItem>
                       {centriFiltrati.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}

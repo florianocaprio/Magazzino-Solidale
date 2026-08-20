@@ -12,7 +12,7 @@ export interface MensaEccezione {
   beneficiarioNome?: string;
   mensaPrincipaleId: number;
   mensaDestinazioneId: number;
-  cittaId: number;
+  areaOperativaId: number;
   motivo: string;
   dataOra: Date;
   [key: string]: unknown;

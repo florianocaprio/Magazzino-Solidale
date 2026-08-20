@@ -18,7 +18,7 @@ export interface PoliticaCreditoSolidaleUpdate {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   attiva?: boolean;
   /** @minimum 0 */
   creditoBaseNucleo?: number;

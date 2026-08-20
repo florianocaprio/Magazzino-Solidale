@@ -11,7 +11,7 @@ import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 import {
   cleanup,
   createBeneficiario,
-  createCitta,
+  createAreaOperativa,
   createCentro,
   createMagazzino,
   createZona,
@@ -34,7 +34,7 @@ afterEach(async () => { await cleanup(scope); });
 afterAll(async () => { await pool.end(); });
 
 function app(opts: {
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   centroId?: number | null;
   zonaId?: number | null;
   aree?: string[];
@@ -45,7 +45,7 @@ function app(opts: {
   return makeScopedApp(mapsRouter, {
     id: 1,
     centroAscoltoId: opts.centroId ?? null,
-    cittaId: opts.cittaId ?? null,
+    areaOperativaId: opts.areaOperativaId ?? null,
     zonaUdsId: opts.zonaId ?? null,
     aree: opts.aree ?? ["sociale"],
     permessi: opts.permessi ?? [],
@@ -85,26 +85,26 @@ describe("MAPS — capability, scope e routing", () => {
     expect((await request(app({ aree: ["sociale"] })).get("/maps/layers/pacchi/consegne")).status).toBe(403);
   });
 
-  it("separa il bypass applicativo Admin dagli scope città, centro e zona", async () => {
-    const cityA = await createCitta(scope);
-    const cityB = await createCitta(scope);
+  it("separa il bypass applicativo Admin dagli scope area operativa, centro e zona", async () => {
+    const areaOperativaA = await createAreaOperativa(scope);
+    const areaOperativaB = await createAreaOperativa(scope);
     const centreA = await createCentro(scope);
     const centreB = await createCentro(scope);
-    const zoneA = await createZona(scope, cityA);
-    const zoneB = await createZona(scope, cityB);
+    const zoneA = await createZona(scope, areaOperativaA);
+    const zoneB = await createZona(scope, areaOperativaB);
     const today = dataCivileEuropeRome();
 
     const combinations = [
-      { cityId: cityA, centreId: centreA, zoneId: zoneA.id },
-      { cityId: cityA, centreId: centreB, zoneId: zoneA.id },
-      { cityId: cityB, centreId: centreA, zoneId: zoneB.id },
-      { cityId: cityB, centreId: centreB, zoneId: zoneB.id },
+      { areaOperativaId: areaOperativaA, centreId: centreA, zoneId: zoneA.id },
+      { areaOperativaId: areaOperativaA, centreId: centreB, zoneId: zoneA.id },
+      { areaOperativaId: areaOperativaB, centreId: centreA, zoneId: zoneB.id },
+      { areaOperativaId: areaOperativaB, centreId: centreB, zoneId: zoneB.id },
     ];
     const deliveryIds: number[] = [];
     for (const combination of combinations) {
-      const warehouse = await createMagazzino(scope, combination.centreId, { cittaId: combination.cityId });
+      const warehouse = await createMagazzino(scope, combination.centreId, { areaOperativaId: combination.areaOperativaId });
       const beneficiary = await createBeneficiario(scope, combination.centreId, {
-        cittaId: combination.cityId,
+        areaOperativaId: combination.areaOperativaId,
         zonaUdsId: combination.zoneId,
       });
       const delivery = await insertConsegna(scope, {
@@ -127,44 +127,44 @@ describe("MAPS — capability, scope e routing", () => {
     const sorted = (values: number[]) => [...values].sort((a, b) => a - b);
 
     expect(await visibleIds({ aree: [], isAdmin: true })).toEqual(sorted(deliveryIds));
-    expect(await visibleIds({ aree: [], isAdmin: true, cittaId: cityA }))
+    expect(await visibleIds({ aree: [], isAdmin: true, areaOperativaId: areaOperativaA }))
       .toEqual(sorted([deliveryIds[0], deliveryIds[1]]));
     expect(await visibleIds({ aree: [], isAdmin: true, centroId: centreA }))
       .toEqual(sorted([deliveryIds[0], deliveryIds[2]]));
-    expect(await visibleIds({ aree: [], isAdmin: true, cittaId: cityA, centroId: centreA }))
+    expect(await visibleIds({ aree: [], isAdmin: true, areaOperativaId: areaOperativaA, centroId: centreA }))
       .toEqual([deliveryIds[0]]);
     expect(await visibleIds({ aree: [], isSuperAdmin: true, zonaId: zoneA.id }))
       .toEqual(sorted([deliveryIds[0], deliveryIds[1]]));
     expect(await visibleIds({
       aree: ["sociale"],
       permessi: ["maps.operational"],
-      cittaId: cityA,
+      areaOperativaId: areaOperativaA,
     })).toEqual(sorted([deliveryIds[0], deliveryIds[1]]));
 
-    const standardDenied = await request(app({ aree: ["sociale"], cittaId: cityA }))
+    const standardDenied = await request(app({ aree: ["sociale"], areaOperativaId: areaOperativaA }))
       .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
     expect(standardDenied.status).toBe(403);
   });
 
   it("applica gli scope anche alle route di Admin e SuperAdmin, lasciando globali solo i caller senza scope", async () => {
-    const cityA = await createCitta(scope);
-    const cityB = await createCitta(scope);
+    const areaOperativaA = await createAreaOperativa(scope);
+    const areaOperativaB = await createAreaOperativa(scope);
     const centreA = await createCentro(scope);
     const centreB = await createCentro(scope);
-    const warehouseA = await createMagazzino(scope, centreA, { cittaId: cityA });
-    const warehouseB = await createMagazzino(scope, centreB, { cittaId: cityB });
+    const warehouseA = await createMagazzino(scope, centreA, { areaOperativaId: areaOperativaA });
+    const warehouseB = await createMagazzino(scope, centreB, { areaOperativaId: areaOperativaB });
     await db.update(magazziniTable).set({ indirizzo: "Via Origine A 1" }).where(eq(magazziniTable.id, warehouseA));
     await db.update(magazziniTable).set({ indirizzo: "Via Origine B 1" }).where(eq(magazziniTable.id, warehouseB));
-    const beneficiaryA = await createBeneficiario(scope, centreA, { cittaId: cityA });
-    const beneficiaryB = await createBeneficiario(scope, centreB, { cittaId: cityB });
+    const beneficiaryA = await createBeneficiario(scope, centreA, { areaOperativaId: areaOperativaA });
+    const beneficiaryB = await createBeneficiario(scope, centreB, { areaOperativaId: areaOperativaB });
     const deliveryA = await insertConsegna(scope, { beneficiarioId: beneficiaryA, magazzinoId: warehouseA });
     const deliveryB = await insertConsegna(scope, { beneficiarioId: beneficiaryB, magazzinoId: warehouseB });
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione A 1" }).where(eq(consegneTable.id, deliveryA));
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione B 1" }).where(eq(consegneTable.id, deliveryB));
 
-    expect((await request(app({ aree: [], isAdmin: true, cittaId: cityA }))
+    expect((await request(app({ aree: [], isAdmin: true, areaOperativaId: areaOperativaA }))
       .get(`/maps/routes/consegne/${deliveryA}`)).status).toBe(200);
-    expect((await request(app({ aree: [], isAdmin: true, cittaId: cityA }))
+    expect((await request(app({ aree: [], isAdmin: true, areaOperativaId: areaOperativaA }))
       .get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(403);
     expect((await request(app({ aree: [], isSuperAdmin: true, centroId: centreA }))
       .get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(403);
@@ -175,28 +175,28 @@ describe("MAPS — capability, scope e routing", () => {
     expect((await request(app({
       aree: ["sociale"],
       permessi: ["maps.route"],
-      cittaId: cityA,
+      areaOperativaId: areaOperativaA,
     })).get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(403);
   });
 
-  it("restituisce solo consegne della città e del centro del caller", async () => {
-    const cityA = await createCitta(scope);
-    const cityB = await createCitta(scope);
+  it("restituisce solo consegne della area operativa e del centro del caller", async () => {
+    const areaOperativaA = await createAreaOperativa(scope);
+    const areaOperativaB = await createAreaOperativa(scope);
     const centreA = await createCentro(scope);
     const centreB = await createCentro(scope);
-    const warehouseA = await createMagazzino(scope, centreA, { cittaId: cityA });
-    const warehouseB = await createMagazzino(scope, centreB, { cittaId: cityB });
+    const warehouseA = await createMagazzino(scope, centreA, { areaOperativaId: areaOperativaA });
+    const warehouseB = await createMagazzino(scope, centreB, { areaOperativaId: areaOperativaB });
     await db.update(magazziniTable).set({ indirizzo: "Via Roma 1", comune: "Roma" }).where(eq(magazziniTable.id, warehouseA));
     await db.update(magazziniTable).set({ indirizzo: "Via Milano 1", comune: "Milano" }).where(eq(magazziniTable.id, warehouseB));
-    const beneficiaryA = await createBeneficiario(scope, centreA, { cittaId: cityA });
-    const beneficiaryB = await createBeneficiario(scope, centreB, { cittaId: cityB });
+    const beneficiaryA = await createBeneficiario(scope, centreA, { areaOperativaId: areaOperativaA });
+    const beneficiaryB = await createBeneficiario(scope, centreB, { areaOperativaId: areaOperativaB });
     const today = dataCivileEuropeRome();
     const deliveryA = await insertConsegna(scope, { beneficiarioId: beneficiaryA, magazzinoId: warehouseA, dataPrevista: today });
     await insertConsegna(scope, { beneficiarioId: beneficiaryB, magazzinoId: warehouseB, dataPrevista: today });
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione 10" }).where(eq(consegneTable.id, deliveryA));
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Segreta 20" }).where(eq(consegneTable.beneficiarioId, beneficiaryB));
 
-    const response = await request(app({ cittaId: cityA, centroId: centreA, permessi: ["maps.operational", "maps.route"] }))
+    const response = await request(app({ areaOperativaId: areaOperativaA, centroId: centreA, permessi: ["maps.operational", "maps.route"] }))
       .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -205,16 +205,16 @@ describe("MAPS — capability, scope e routing", () => {
   });
 
   it("costruisce un URL minimizzato con i soli indirizzi e nega una consegna fuori scope", async () => {
-    const cityA = await createCitta(scope);
-    const cityB = await createCitta(scope);
+    const areaOperativaA = await createAreaOperativa(scope);
+    const areaOperativaB = await createAreaOperativa(scope);
     const centre = await createCentro(scope);
-    const warehouse = await createMagazzino(scope, centre, { cittaId: cityA });
+    const warehouse = await createMagazzino(scope, centre, { areaOperativaId: areaOperativaA });
     await db.update(magazziniTable).set({ indirizzo: "Via dell'Origine 1", comune: "Roma" }).where(eq(magazziniTable.id, warehouse));
-    const beneficiary = await createBeneficiario(scope, centre, { cittaId: cityA });
+    const beneficiary = await createBeneficiario(scope, centre, { areaOperativaId: areaOperativaA });
     const delivery = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse });
     await db.update(consegneTable).set({ indirizzoConsegna: "Via A & B 2" }).where(eq(consegneTable.id, delivery));
 
-    const allowed = await request(app({ cittaId: cityA, centroId: centre, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);
+    const allowed = await request(app({ areaOperativaId: areaOperativaA, centroId: centre, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);
     expect(allowed.status).toBe(200);
     const url = new URL(allowed.body.url);
     expect(url.searchParams.get("origin")).toBe("Via dell'Origine 1, Roma");
@@ -222,7 +222,7 @@ describe("MAPS — capability, scope e routing", () => {
     expect(allowed.body.url).not.toContain("Test");
     expect(Object.keys(allowed.body).sort()).toEqual(["destination", "origin", "provider", "url"]);
 
-    const denied = await request(app({ cittaId: cityB, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);
+    const denied = await request(app({ areaOperativaId: areaOperativaB, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);
     expect(denied.status).toBe(403);
   });
 

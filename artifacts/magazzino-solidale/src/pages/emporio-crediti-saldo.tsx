@@ -8,7 +8,7 @@ import {
   useExecuteCreditoSolidaleRicaricaMensile,
   useListCreditoSolidaleBeneficiari,
   useListCentriAscolto,
-  useListCitta,
+  useListAreeOperative,
   useListCreditoSolidaleBeneficiarioMovimenti,
   useListCreditoSolidaleMovimenti,
   useListMagazzini,
@@ -105,7 +105,7 @@ export default function EmporioCreditiSaldo() {
 
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState(ALL);
-  const [cittaFilter, setCittaFilter] = useState(ALL);
+  const [areaOperativaFilter, setAreaOperativaFilter] = useState(ALL);
   const [statoFilter, setStatoFilter] = useState(ALL);
   const [emporioFilter, setEmporioFilter] = useState(ALL);
   const [soloSaldoPositivo, setSoloSaldoPositivo] = useState(false);
@@ -123,11 +123,11 @@ export default function EmporioCreditiSaldo() {
   const beneficiariParams = {
     search: normalizedSearch || undefined,
     centroAscoltoId: optionalId(centroFilter),
-    cittaId: optionalId(cittaFilter),
+    areaOperativaId: optionalId(areaOperativaFilter),
   };
   const { data: beneficiari, isLoading } = useListCreditoSolidaleBeneficiari(beneficiariParams);
   const { data: centri } = useListCentriAscolto();
-  const { data: citta } = useListCitta();
+  const { data: areaOperativa } = useListAreeOperative();
   const { data: magazzini } = useListMagazzini();
   const empori = useMemo(
     () => (magazzini ?? []).filter((m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto"),
@@ -151,7 +151,7 @@ export default function EmporioCreditiSaldo() {
   const { data: movimentiRecenti } = useListCreditoSolidaleMovimenti({
     beneficiarioId: selectedId,
     centroAscoltoId: optionalId(centroFilter),
-    cittaId: optionalId(cittaFilter),
+    areaOperativaId: optionalId(areaOperativaFilter),
   });
 
   const createRicarica = useCreateCreditoSolidaleRicaricaManuale();
@@ -202,7 +202,7 @@ export default function EmporioCreditiSaldo() {
       data: {
         periodoRiferimento: currentPeriodo(),
         centroAscoltoId: null,
-        cittaId: null,
+        areaOperativaId: null,
         note: null,
       },
     }, {
@@ -365,11 +365,11 @@ export default function EmporioCreditiSaldo() {
               {centri?.map((centro) => <SelectItem key={centro.id} value={String(centro.id)}>{centro.nome}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={cittaFilter} onValueChange={setCittaFilter}>
+          <Select value={areaOperativaFilter} onValueChange={setAreaOperativaFilter}>
             <SelectTrigger><SelectValue placeholder={t("creditoSolidale.tutteLeAree")} /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>{t("creditoSolidale.tutteLeAree")}</SelectItem>
-              {citta?.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.nome}</SelectItem>)}
+              {areaOperativa?.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.nome}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={statoFilter} onValueChange={setStatoFilter}>

@@ -8,7 +8,7 @@ import utentiRouter from "../src/routes/utenti";
 import scarichiRouter from "../src/routes/scarichi";
 import approvvigionamentiRouter from "../src/routes/approvvigionamenti";
 import beneficiariRouter from "../src/routes/beneficiari";
-import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentroRec, createMagazzino, createProdotto, createBeneficiario, createCitta, createFornitore, createVolontario, createMezzo, createRuolo, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
+import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentroRec, createMagazzino, createProdotto, createBeneficiario, createAreaOperativa, createFornitore, createVolontario, createMezzo, createRuolo, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
 
 /**
  * Centro scoping for direct-column entities: each row carries its own
@@ -21,8 +21,8 @@ let bootScope: SeedScope;
 let operatoreId: number;
 let centroA: number;
 let centroB: number;
-let cittaA: number;
-let cittaB: number;
+let areaOperativaA: number;
+let areaOperativaB: number;
 
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 
@@ -33,10 +33,10 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   scope = newScope();
-  cittaA = await createCitta(scope);
-  cittaB = await createCitta(scope);
-  centroA = (await createCentroRec(scope, { cittaId: cittaA })).id;
-  centroB = (await createCentroRec(scope, { cittaId: cittaB })).id;
+  areaOperativaA = await createAreaOperativa(scope);
+  areaOperativaB = await createAreaOperativa(scope);
+  centroA = (await createCentroRec(scope, { areaOperativaId: areaOperativaA })).id;
+  centroB = (await createCentroRec(scope, { areaOperativaId: areaOperativaB })).id;
 });
 
 afterEach(async () => {
@@ -48,12 +48,12 @@ afterAll(async () => {
   await pool.end();
 });
 
-describe("Fornitori — scoping per città", () => {
-  it("lista: il caller della città A vede A + comuni (NULL), non B", async () => {
-    const fA = await createFornitore(scope, cittaA);
-    const fB = await createFornitore(scope, cittaB);
+describe("Fornitori — scoping per area operativa", () => {
+  it("lista: il caller della area operativa A vede A + comuni (NULL), non B", async () => {
+    const fA = await createFornitore(scope, areaOperativaA);
+    const fB = await createFornitore(scope, areaOperativaB);
     const fNull = await createFornitore(scope, null);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA })).get("/fornitori");
+    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA })).get("/fornitori");
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(fA);
@@ -62,38 +62,38 @@ describe("Fornitori — scoping per città", () => {
   });
 
   it("lista: il caller globale vede tutti", async () => {
-    const fA = await createFornitore(scope, cittaA);
-    const fB = await createFornitore(scope, cittaB);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: null })).get("/fornitori");
+    const fA = await createFornitore(scope, areaOperativaA);
+    const fB = await createFornitore(scope, areaOperativaB);
+    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null })).get("/fornitori");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([fA, fB]));
   });
 
-  it("GET /:id fuori città → 403", async () => {
-    const fB = await createFornitore(scope, cittaB);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA })).get(`/fornitori/${fB}`);
+  it("GET /:id fuori area operativa → 403", async () => {
+    const fB = await createFornitore(scope, areaOperativaB);
+    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA })).get(`/fornitori/${fB}`);
     expect(res.status).toBe(403);
   });
 
-  it("POST auto-assegna e blocca la città del caller", async () => {
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA }))
+  it("POST auto-assegna e blocca la area operativa del caller", async () => {
+    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA }))
       .post("/fornitori")
-      .send({ nome: "Fornitore X", tipo: "azienda", cittaId: cittaB });
+      .send({ nome: "Fornitore X", tipo: "azienda", areaOperativaId: areaOperativaB });
     expect(res.status).toBe(201);
     scope.fornitoreIds.push(res.body.id);
-    expect(res.body.cittaId).toBe(cittaA);
+    expect(res.body.areaOperativaId).toBe(areaOperativaA);
   });
 
-  it("PATCH /:id fuori città → 403", async () => {
-    const fB = await createFornitore(scope, cittaB);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA }))
+  it("PATCH /:id fuori area operativa → 403", async () => {
+    const fB = await createFornitore(scope, areaOperativaB);
+    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA }))
       .patch(`/fornitori/${fB}`)
       .send({ nome: "Hack" });
     expect(res.status).toBe(403);
   });
 
-  it("DELETE /:id fuori città → 403", async () => {
-    const fB = await createFornitore(scope, cittaB);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, cittaId: cittaA })).delete(`/fornitori/${fB}`);
+  it("DELETE /:id fuori area operativa → 403", async () => {
+    const fB = await createFornitore(scope, areaOperativaB);
+    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA })).delete(`/fornitori/${fB}`);
     expect(res.status).toBe(403);
   });
 });
@@ -364,7 +364,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
-        cittaId: cittaA,
+        areaOperativaId: areaOperativaA,
       }),
     ).get("/beneficiari");
     expect(res.status).toBe(200);
@@ -392,7 +392,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
-        cittaId: cittaA,
+        areaOperativaId: areaOperativaA,
       }),
     ).get(`/beneficiari/${bB}`);
     expect(res.status).toBe(403);
@@ -403,7 +403,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
-        cittaId: cittaA,
+        areaOperativaId: areaOperativaA,
       }),
     )
       .post("/beneficiari")
@@ -424,7 +424,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
-        cittaId: cittaA,
+        areaOperativaId: areaOperativaA,
       }),
     )
       .patch(`/beneficiari/${bB}`)
@@ -438,7 +438,7 @@ describe("Beneficiari — scoping per centro", () => {
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: centroA,
-        cittaId: cittaA,
+        areaOperativaId: areaOperativaA,
       }),
     ).delete(`/beneficiari/${bB}`);
     expect(res.status).toBe(403);
@@ -449,7 +449,7 @@ describe("Beneficiari — scoping per centro", () => {
     const appA = makeScopedApp(beneficiariRouter, {
       id: operatoreId,
       centroAscoltoId: centroA,
-      cittaId: cittaA,
+      areaOperativaId: areaOperativaA,
     });
     expect((await request(appA).get(`/beneficiari/${bB}/nucleo`)).status).toBe(403);
     expect((await request(appA).post(`/beneficiari/${bB}/nucleo`).send({})).status).toBe(403);
@@ -604,9 +604,9 @@ describe("Approvvigionamenti — scoping per centro", () => {
   });
 
   it("POST auto-assegna il centro del caller", async () => {
-    const mag = await createMagazzino(scope, null, { cittaId: cittaA });
+    const mag = await createMagazzino(scope, null, { areaOperativaId: areaOperativaA });
     const prod = await createProdotto(scope);
-    const fornitore = await createFornitore(scope, cittaA);
+    const fornitore = await createFornitore(scope, areaOperativaA);
     const res = await request(
       makeScopedApp(approvvigionamentiRouter, {
         id: operatoreId,
@@ -616,7 +616,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
       .post("/approvvigionamenti")
       .send({
         dataRichiesta: "2026-06-24",
-        cittaId: cittaA,
+        areaOperativaId: areaOperativaA,
         fornitoreId: fornitore,
         magazzinoId: mag,
         righe: [{ prodottoId: prod, quantitaRichiesta: 10, unitaMisura: "kg" }],

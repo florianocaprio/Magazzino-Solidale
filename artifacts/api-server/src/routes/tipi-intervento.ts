@@ -21,7 +21,7 @@ function fmt(r: typeof tipiInterventoTable.$inferSelect) {
   };
 }
 
-// Intervention types are a GLOBAL configurable lookup (no città/centro scoping),
+// Intervention types are a GLOBAL configurable lookup (no area operativa/centro scoping),
 // readable by sociale/uds staff (to fill the interventi forms) and editable only
 // by admins (mutations are guarded with requireAdmin).
 router.get("/tipi-intervento", async (_req, res) => {

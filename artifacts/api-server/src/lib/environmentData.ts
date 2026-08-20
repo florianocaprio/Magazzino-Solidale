@@ -7,7 +7,7 @@ import {
   bolleTable,
   bollaRigheTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   consegneTable,
   creditoSolidaleMovimentiTable,
   db,
@@ -227,20 +227,20 @@ export async function seedDemoWarehouseData(
     let createdMovimenti = 0;
 
     let [area] = await tx
-      .select({ id: cittaTable.id, note: cittaTable.note })
-      .from(cittaTable)
-      .where(eq(cittaTable.nome, DEMO_AREA_NAME));
+      .select({ id: areeOperativeTable.id, note: areeOperativeTable.note })
+      .from(areeOperativeTable)
+      .where(eq(areeOperativeTable.nome, DEMO_AREA_NAME));
     if (area) assertDemoOwned(`l'area "${DEMO_AREA_NAME}"`, area.note);
     if (!area) {
       [area] = await tx
-        .insert(cittaTable)
+        .insert(areeOperativeTable)
         .values({
           nome: DEMO_AREA_NAME,
           provincia: "DE",
           sigla: "DE",
           note: `${DEMO_MARKER}: dato territoriale sintetico`,
         })
-        .returning({ id: cittaTable.id, note: cittaTable.note });
+        .returning({ id: areeOperativeTable.id, note: areeOperativeTable.note });
       createdAree += 1;
     }
 
@@ -254,7 +254,7 @@ export async function seedDemoWarehouseData(
         .insert(centriAscoltoTable)
         .values({
           nome: DEMO_CENTRO_NAME,
-          cittaId: area.id,
+          areaOperativaId: area.id,
           comune: "Comune Demo",
           email: "centro.demo@example.org",
           note: `${DEMO_MARKER}: nessun dato personale reale`,
@@ -278,7 +278,7 @@ export async function seedDemoWarehouseData(
           .insert(magazziniTable)
           .values({
             ...warehouse,
-            cittaId: area.id,
+            areaOperativaId: area.id,
             centroAscoltoId: centro.id,
             comune: "Comune Demo",
             email: `${warehouse.codice.toLowerCase()}@example.org`,
@@ -302,7 +302,7 @@ export async function seedDemoWarehouseData(
           .insert(fornitoriTable)
           .values({
             ...supplier,
-            cittaId: area.id,
+            areaOperativaId: area.id,
             referente: "Referente Demo",
             note: `${DEMO_MARKER}: fornitore sintetico`,
           })
@@ -719,61 +719,61 @@ async function demoAreaHasReferences(
       tx
         .select({ id: utentiTable.id })
         .from(utentiTable)
-        .where(eq(utentiTable.cittaId, areaId))
+        .where(eq(utentiTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: beneficiariTable.id })
         .from(beneficiariTable)
-        .where(eq(beneficiariTable.cittaId, areaId))
+        .where(eq(beneficiariTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: centriAscoltoTable.id })
         .from(centriAscoltoTable)
-        .where(eq(centriAscoltoTable.cittaId, areaId))
+        .where(eq(centriAscoltoTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: magazziniTable.id })
         .from(magazziniTable)
-        .where(eq(magazziniTable.cittaId, areaId))
+        .where(eq(magazziniTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: fornitoriTable.id })
         .from(fornitoriTable)
-        .where(eq(fornitoriTable.cittaId, areaId))
+        .where(eq(fornitoriTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: zoneUdsTable.id })
         .from(zoneUdsTable)
-        .where(eq(zoneUdsTable.cittaId, areaId))
+        .where(eq(zoneUdsTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: politicheCreditoSolidaleTable.id })
         .from(politicheCreditoSolidaleTable)
-        .where(eq(politicheCreditoSolidaleTable.cittaId, areaId))
+        .where(eq(politicheCreditoSolidaleTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: sessioniCassaEmporioTable.id })
         .from(sessioniCassaEmporioTable)
-        .where(eq(sessioniCassaEmporioTable.cittaId, areaId))
+        .where(eq(sessioniCassaEmporioTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: speseEmporioTable.id })
         .from(speseEmporioTable)
-        .where(eq(speseEmporioTable.cittaId, areaId))
+        .where(eq(speseEmporioTable.areaOperativaId, areaId))
         .limit(1),
     async () =>
       tx
         .select({ id: creditoSolidaleMovimentiTable.id })
         .from(creditoSolidaleMovimentiTable)
-        .where(eq(creditoSolidaleMovimentiTable.cittaId, areaId))
+        .where(eq(creditoSolidaleMovimentiTable.areaOperativaId, areaId))
         .limit(1),
   ];
   for (const check of checks) {
@@ -923,21 +923,21 @@ export async function resetDemoWarehouseData(
     }
 
     const [demoArea] = await tx
-      .select({ id: cittaTable.id })
-      .from(cittaTable)
+      .select({ id: areeOperativeTable.id })
+      .from(areeOperativeTable)
       .where(
         and(
-          eq(cittaTable.nome, DEMO_AREA_NAME),
-          like(cittaTable.note, `%${DEMO_MARKER}%`),
+          eq(areeOperativeTable.nome, DEMO_AREA_NAME),
+          like(areeOperativeTable.note, `%${DEMO_MARKER}%`),
         ),
       );
     let deletedAree = 0;
     if (demoArea) {
       if (!(await demoAreaHasReferences(tx, demoArea.id))) {
         const rows = await tx
-          .delete(cittaTable)
-          .where(eq(cittaTable.id, demoArea.id))
-          .returning({ id: cittaTable.id });
+          .delete(areeOperativeTable)
+          .where(eq(areeOperativeTable.id, demoArea.id))
+          .returning({ id: areeOperativeTable.id });
         deletedAree = rows.length;
       }
     }
@@ -1110,14 +1110,14 @@ export async function resetOperationalEnvironment(
       .where(ne(politicheCreditoSolidaleTable.nome, DEFAULT_POLICY_NAME));
     await tx
       .update(politicheCreditoSolidaleTable)
-      .set({ cittaId: null, centroAscoltoId: null })
+      .set({ areaOperativaId: null, centroAscoltoId: null })
       .where(eq(politicheCreditoSolidaleTable.nome, DEFAULT_POLICY_NAME));
 
     // Preserve every technical/application user and all roles, but remove
     // territorial links that would otherwise prevent the environment reset.
     await tx
       .update(utentiTable)
-      .set({ centroAscoltoId: null, cittaId: null, zonaUdsId: null });
+      .set({ centroAscoltoId: null, areaOperativaId: null, zonaUdsId: null });
     const deletedSessioniUtente = await tx
       .delete(userSessionsTable)
       .returning({ sid: userSessionsTable.sid });
@@ -1128,8 +1128,8 @@ export async function resetOperationalEnvironment(
       .delete(centriAscoltoTable)
       .returning({ id: centriAscoltoTable.id });
     const deletedAree = await tx
-      .delete(cittaTable)
-      .returning({ id: cittaTable.id });
+      .delete(areeOperativeTable)
+      .returning({ id: areeOperativeTable.id });
 
     const summary: EnvironmentDataSummary = {
       ...warehouseSummary,

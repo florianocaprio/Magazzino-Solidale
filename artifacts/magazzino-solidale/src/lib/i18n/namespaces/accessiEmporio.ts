@@ -26,7 +26,7 @@ const it = {
   cercaBeneficiarioPlaceholder: "Cerca beneficiario per nome, codice o codice a barre",
   tuttiGliEmpori: "Tutti gli empori",
   tuttiGliStati: "Tutti gli stati",
-  tutteLeAree: "Tutte le aree",
+  tutteLeAree: "Tutte le Aree Operative",
   riepilogoGiornaliero: "Riepilogo giornaliero",
   totalePianificati: "Pianificati",
   totaleConfermati: "Confermati",

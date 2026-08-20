@@ -6,7 +6,7 @@ import {
   auditConfigurazioniTable,
   beneficiariTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   pool,
   ruoliTable,
@@ -39,10 +39,10 @@ let limitedUserId: number;
 let limitedRoleId: number;
 let roleWithEmporioId: number;
 let secondRoleId: number;
-let createdCittaId: number;
+let createdAreaOperativaId: number;
 let createdZoneId: number;
 let createdCentroId: number;
-let sentinelCittaId: number;
+let sentinelAreaOperativaId: number;
 let superAgent: ReturnType<typeof request.agent>;
 let limitedAgent: ReturnType<typeof request.agent>;
 
@@ -130,11 +130,11 @@ afterAll(async () => {
   if (createdZoneId) {
     await db.delete(zoneUdsTable).where(eq(zoneUdsTable.id, createdZoneId));
   }
-  if (createdCittaId) {
-    await db.delete(cittaTable).where(eq(cittaTable.id, createdCittaId));
+  if (createdAreaOperativaId) {
+    await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, createdAreaOperativaId));
   }
-  if (sentinelCittaId) {
-    await db.delete(cittaTable).where(eq(cittaTable.id, sentinelCittaId));
+  if (sentinelAreaOperativaId) {
+    await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, sentinelAreaOperativaId));
   }
   await db
     .delete(auditConfigurazioniTable)
@@ -227,9 +227,9 @@ describe("BUG-PROD-01 - catalogo aree e autenticazione", () => {
     secondRoleId = response.body.id;
   });
 
-  it("8. sadmin crea Area/Citta e Zona UDS", async () => {
+  it("8. sadmin crea Area/AreaOperativa e Zona UDS", async () => {
     const area = await superAgent
-      .post("/api/citta")
+      .post("/api/aree-operative")
       .set("Origin", testOrigin)
       .send({
         nome: `Area BUG-PROD-01 ${suffix}`,
@@ -237,14 +237,14 @@ describe("BUG-PROD-01 - catalogo aree e autenticazione", () => {
         sigla: "bp",
       });
     expect(area.status).toBe(201);
-    createdCittaId = area.body.id;
+    createdAreaOperativaId = area.body.id;
 
     const zone = await superAgent
       .post("/api/zone-uds")
       .set("Origin", testOrigin)
       .send({
         nome: `Zona BUG-PROD-01 ${suffix}`,
-        cittaId: createdCittaId,
+        areaOperativaId: createdAreaOperativaId,
       });
     expect(zone.status).toBe(201);
     createdZoneId = zone.body.id;
@@ -256,10 +256,10 @@ describe("BUG-PROD-01 - catalogo aree e autenticazione", () => {
       .set("Origin", testOrigin)
       .send({
         nome: `Centro BUG-PROD-01 ${suffix}`,
-        cittaId: createdCittaId,
+        areaOperativaId: createdAreaOperativaId,
       });
     expect(response.status).toBe(201);
-    expect(response.body.cittaId).toBe(createdCittaId);
+    expect(response.body.areaOperativaId).toBe(createdAreaOperativaId);
     createdCentroId = response.body.id;
   });
 
@@ -283,7 +283,7 @@ describe("BUG-PROD-01 - catalogo aree e autenticazione", () => {
 
   it("12. un payload non valido riceve 400", async () => {
     const response = await superAgent
-      .post("/api/citta")
+      .post("/api/aree-operative")
       .set("Origin", testOrigin)
       .send({});
     expect(response.status).toBe(400);
@@ -326,10 +326,10 @@ describe("BUG-PROD-01 - seed e reset demo", () => {
 
   it("15. il reset demo elimina solo dati marcati demo", async () => {
     const [sentinel] = await db
-      .insert(cittaTable)
+      .insert(areeOperativeTable)
       .values({ nome: `Dato non demo ${suffix}` })
-      .returning({ id: cittaTable.id });
-    sentinelCittaId = sentinel.id;
+      .returning({ id: areeOperativeTable.id });
+    sentinelAreaOperativaId = sentinel.id;
 
     const reset = await runEnvironmentDataCli([
       "reset-demo",
@@ -343,9 +343,9 @@ describe("BUG-PROD-01 - seed e reset demo", () => {
     });
     expect(
       await db
-        .select({ id: cittaTable.id })
-        .from(cittaTable)
-        .where(eq(cittaTable.id, sentinelCittaId)),
+        .select({ id: areeOperativeTable.id })
+        .from(areeOperativeTable)
+        .where(eq(areeOperativeTable.id, sentinelAreaOperativaId)),
     ).toHaveLength(1);
     expect(await previewDemoReset()).toMatchObject({
       demoUsers: 0,

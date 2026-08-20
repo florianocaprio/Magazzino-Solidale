@@ -8,9 +8,9 @@
 
 export interface ZonaUds {
   id: number;
-  cittaId: number;
+  areaOperativaId: number;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   nome: string;
   attivo: boolean;
   /** @nullable */

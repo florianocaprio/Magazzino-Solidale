@@ -17,9 +17,9 @@ export interface PoliticaCreditoSolidale {
   /** @nullable */
   centroAscoltoNome: string | null;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
-  cittaNome: string | null;
+  areaOperativaNome: string | null;
   attiva: boolean;
   creditoBaseNucleo: number;
   creditoPerComponente: number;

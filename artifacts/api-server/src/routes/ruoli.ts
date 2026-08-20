@@ -13,7 +13,7 @@ const permissionKeys = new Set<string>(ALL_PERMISSION_KEYS);
 router.use("/ruoli", requireAuth, requireAdmin);
 
 function rejectLimitedAdminRoleMutation(req: Request, res: Response): boolean {
-  if (req.user?.isSuperAdmin || req.user?.cittaId == null) return false;
+  if (req.user?.isSuperAdmin || req.user?.areaOperativaId == null) return false;
   res.status(403).json({ error: "Un amministratore limitato non può modificare ruoli e permessi condivisi" });
   return true;
 }

@@ -19,7 +19,7 @@ function socialConditions(filters: ReportFilters): SQL[] {
     sql`(i.ambito = 'sociale' OR i.ambito IS NULL)`,
     sql`${eventDate} BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      citta: sql`be.citta_id`,
+      areaOperativa: sql`be.area_operativa_id`,
       centro: sql`be.centro_ascolto_id`,
       zona: sql`be.zona_uds_id`,
       operatore: sql`i.operatore_id`,
@@ -81,7 +81,7 @@ export async function socialMetrics(filters: ReportFilters) {
     FROM beneficiari be
     WHERE be.data_presa_in_carico BETWEEN ${filters.da} AND ${filters.a}
       AND ${andSql(reportScope(filters, {
-        citta: sql`be.citta_id`,
+        areaOperativa: sql`be.area_operativa_id`,
         centro: sql`be.centro_ascolto_id`,
         zona: sql`be.zona_uds_id`,
       }))}

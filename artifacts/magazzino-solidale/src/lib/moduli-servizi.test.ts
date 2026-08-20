@@ -144,7 +144,7 @@ describe("moduli-servizio e navigazione", () => {
   it("non altera le altre voci amministrative senza feature flag", () => {
     const keys = enabledKeys([]);
     expect(keys).toEqual(
-      expect.arrayContaining(["citta", "utenti", "ruoli", "impostazioniStampa"]),
+      expect.arrayContaining(["areeOperative", "utenti", "ruoli", "impostazioniStampa"]),
     );
   });
 

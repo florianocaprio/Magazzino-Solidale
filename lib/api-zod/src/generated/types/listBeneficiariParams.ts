@@ -12,7 +12,7 @@ search?: string;
 priorita?: string;
 domicilio?: boolean;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 uds?: boolean;
 attivo?: boolean;

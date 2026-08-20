@@ -8,8 +8,8 @@
 
 export type ListMenseParams = {
 /**
- * Identificativo dell'Area configurata nel menu Aree (nome storico interno del campo).
+ * Identificativo dell'Area Operativa usata come confine organizzativo dei dati.
  */
-cittaId?: number;
+areaOperativaId?: number;
 attiva?: boolean;
 };

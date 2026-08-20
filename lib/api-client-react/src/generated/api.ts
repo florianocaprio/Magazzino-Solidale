@@ -34,6 +34,9 @@ import type {
   ApprovvigionamentoInput,
   ApprovvigionamentoUpdate,
   Area,
+  AreaOperativa,
+  AreaOperativaInput,
+  AreaOperativaUpdate,
   AssociaBollaInput,
   AuditConfigurazione,
   AuthMessageResponse,
@@ -69,9 +72,6 @@ import type {
   CercaBeneficiariSimili400,
   CercaBeneficiariSimiliParams,
   ChangePasswordInput,
-  Citta,
-  CittaInput,
-  CittaUpdate,
   ConfermaRicezione,
   ConfigurazioneAmbiente,
   ConfigurazioneAmbientePubblica,
@@ -732,7 +732,7 @@ export const getCreateMagazzinoUrl = () => {
 }
 
 /**
- * Creates a warehouse. When tipoMagazzino is mensa, cittaId (the Area) is required and the operational Mensa detail is created atomically.
+ * Creates a warehouse. When tipoMagazzino is mensa, areaOperativaId (the Area) is required and the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
 export const createMagazzino = async (magazzinoInput: MagazzinoInput, options?: RequestInit): Promise<Magazzino> => {
@@ -11017,17 +11017,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getDeleteTipologiaFornitoreMutationOptions(options));
     }
 
-export const getListCittaUrl = () => {
+export const getListAreeOperativeUrl = () => {
 
 
 
 
-  return `/api/citta`
+  return `/api/aree-operative`
 }
 
-export const listCitta = async ( options?: RequestInit): Promise<Citta[]> => {
+export const listAreeOperative = async ( options?: RequestInit): Promise<AreaOperativa[]> => {
 
-  return customFetch<Citta[]>(getListCittaUrl(),
+  return customFetch<AreaOperativa[]>(getListAreeOperativeUrl(),
   {
     ...options,
     method: 'GET'
@@ -11040,42 +11040,42 @@ export const listCitta = async ( options?: RequestInit): Promise<Citta[]> => {
 
 
 
-export const getListCittaQueryKey = () => {
+export const getListAreeOperativeQueryKey = () => {
     return [
-    `/api/citta`
+    `/api/aree-operative`
     ] as const;
     }
 
 
-export const getListCittaQueryOptions = <TData = Awaited<ReturnType<typeof listCitta>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCitta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAreeOperativeQueryOptions = <TData = Awaited<ReturnType<typeof listAreeOperative>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAreeOperative>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListCittaQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListAreeOperativeQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCitta>>> = ({ signal }) => listCitta({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAreeOperative>>> = ({ signal }) => listAreeOperative({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCitta>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAreeOperative>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type ListCittaQueryResult = NonNullable<Awaited<ReturnType<typeof listCitta>>>
-export type ListCittaQueryError = ErrorType<unknown>
+export type ListAreeOperativeQueryResult = NonNullable<Awaited<ReturnType<typeof listAreeOperative>>>
+export type ListAreeOperativeQueryError = ErrorType<unknown>
 
 
 
-export function useListCitta<TData = Awaited<ReturnType<typeof listCitta>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCitta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useListAreeOperative<TData = Awaited<ReturnType<typeof listAreeOperative>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAreeOperative>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListCittaQueryOptions(options)
+  const queryOptions = getListAreeOperativeQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -11088,34 +11088,34 @@ export function useListCitta<TData = Awaited<ReturnType<typeof listCitta>>, TErr
 
 
 
-export const getCreateCittaUrl = () => {
+export const getCreateAreaOperativaUrl = () => {
 
 
 
 
-  return `/api/citta`
+  return `/api/aree-operative`
 }
 
-export const createCitta = async (cittaInput: CittaInput, options?: RequestInit): Promise<Citta> => {
+export const createAreaOperativa = async (areaOperativaInput: AreaOperativaInput, options?: RequestInit): Promise<AreaOperativa> => {
 
-  return customFetch<Citta>(getCreateCittaUrl(),
+  return customFetch<AreaOperativa>(getCreateAreaOperativaUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      cittaInput,)
+      areaOperativaInput,)
   }
 );}
 
 
 
 
-export const getCreateCittaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCitta>>, TError,{data: BodyType<CittaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createCitta>>, TError,{data: BodyType<CittaInput>}, TContext> => {
+export const getCreateAreaOperativaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAreaOperativa>>, TError,{data: BodyType<AreaOperativaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAreaOperativa>>, TError,{data: BodyType<AreaOperativaInput>}, TContext> => {
 
-const mutationKey = ['createCitta'];
+const mutationKey = ['createAreaOperativa'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -11125,10 +11125,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCitta>>, {data: BodyType<CittaInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAreaOperativa>>, {data: BodyType<AreaOperativaInput>}> = (props) => {
           const {data} = props ?? {};
 
-          return  createCitta(data,requestOptions)
+          return  createAreaOperativa(data,requestOptions)
         }
 
 
@@ -11138,32 +11138,32 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type CreateCittaMutationResult = NonNullable<Awaited<ReturnType<typeof createCitta>>>
-    export type CreateCittaMutationBody = BodyType<CittaInput>
-    export type CreateCittaMutationError = ErrorType<unknown>
+    export type CreateAreaOperativaMutationResult = NonNullable<Awaited<ReturnType<typeof createAreaOperativa>>>
+    export type CreateAreaOperativaMutationBody = BodyType<AreaOperativaInput>
+    export type CreateAreaOperativaMutationError = ErrorType<unknown>
 
-    export const useCreateCitta = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCitta>>, TError,{data: BodyType<CittaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    export const useCreateAreaOperativa = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAreaOperativa>>, TError,{data: BodyType<AreaOperativaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof createCitta>>,
+        Awaited<ReturnType<typeof createAreaOperativa>>,
         TError,
-        {data: BodyType<CittaInput>},
+        {data: BodyType<AreaOperativaInput>},
         TContext
       > => {
-      return useMutation(getCreateCittaMutationOptions(options));
+      return useMutation(getCreateAreaOperativaMutationOptions(options));
     }
 
-export const getGetCittaUrl = (id: number,) => {
+export const getGetAreaOperativaUrl = (id: number,) => {
 
 
 
 
-  return `/api/citta/${id}`
+  return `/api/aree-operative/${id}`
 }
 
-export const getCitta = async (id: number, options?: RequestInit): Promise<Citta> => {
+export const getAreaOperativa = async (id: number, options?: RequestInit): Promise<AreaOperativa> => {
 
-  return customFetch<Citta>(getGetCittaUrl(id),
+  return customFetch<AreaOperativa>(getGetAreaOperativaUrl(id),
   {
     ...options,
     method: 'GET'
@@ -11176,42 +11176,42 @@ export const getCitta = async (id: number, options?: RequestInit): Promise<Citta
 
 
 
-export const getGetCittaQueryKey = (id: number,) => {
+export const getGetAreaOperativaQueryKey = (id: number,) => {
     return [
-    `/api/citta/${id}`
+    `/api/aree-operative/${id}`
     ] as const;
     }
 
 
-export const getGetCittaQueryOptions = <TData = Awaited<ReturnType<typeof getCitta>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCitta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAreaOperativaQueryOptions = <TData = Awaited<ReturnType<typeof getAreaOperativa>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAreaOperativa>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCittaQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetAreaOperativaQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCitta>>> = ({ signal }) => getCitta(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAreaOperativa>>> = ({ signal }) => getAreaOperativa(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCitta>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAreaOperativa>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetCittaQueryResult = NonNullable<Awaited<ReturnType<typeof getCitta>>>
-export type GetCittaQueryError = ErrorType<unknown>
+export type GetAreaOperativaQueryResult = NonNullable<Awaited<ReturnType<typeof getAreaOperativa>>>
+export type GetAreaOperativaQueryError = ErrorType<unknown>
 
 
 
-export function useGetCitta<TData = Awaited<ReturnType<typeof getCitta>>, TError = ErrorType<unknown>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCitta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetAreaOperativa<TData = Awaited<ReturnType<typeof getAreaOperativa>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAreaOperativa>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetCittaQueryOptions(id,options)
+  const queryOptions = getGetAreaOperativaQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -11224,35 +11224,35 @@ export function useGetCitta<TData = Awaited<ReturnType<typeof getCitta>>, TError
 
 
 
-export const getUpdateCittaUrl = (id: number,) => {
+export const getUpdateAreaOperativaUrl = (id: number,) => {
 
 
 
 
-  return `/api/citta/${id}`
+  return `/api/aree-operative/${id}`
 }
 
-export const updateCitta = async (id: number,
-    cittaUpdate: CittaUpdate, options?: RequestInit): Promise<Citta> => {
+export const updateAreaOperativa = async (id: number,
+    areaOperativaUpdate: AreaOperativaUpdate, options?: RequestInit): Promise<AreaOperativa> => {
 
-  return customFetch<Citta>(getUpdateCittaUrl(id),
+  return customFetch<AreaOperativa>(getUpdateAreaOperativaUrl(id),
   {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      cittaUpdate,)
+      areaOperativaUpdate,)
   }
 );}
 
 
 
 
-export const getUpdateCittaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCitta>>, TError,{id: number;data: BodyType<CittaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateCitta>>, TError,{id: number;data: BodyType<CittaUpdate>}, TContext> => {
+export const getUpdateAreaOperativaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAreaOperativa>>, TError,{id: number;data: BodyType<AreaOperativaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAreaOperativa>>, TError,{id: number;data: BodyType<AreaOperativaUpdate>}, TContext> => {
 
-const mutationKey = ['updateCitta'];
+const mutationKey = ['updateAreaOperativa'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -11262,10 +11262,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCitta>>, {id: number;data: BodyType<CittaUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAreaOperativa>>, {id: number;data: BodyType<AreaOperativaUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  updateCitta(id,data,requestOptions)
+          return  updateAreaOperativa(id,data,requestOptions)
         }
 
 
@@ -11275,32 +11275,32 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UpdateCittaMutationResult = NonNullable<Awaited<ReturnType<typeof updateCitta>>>
-    export type UpdateCittaMutationBody = BodyType<CittaUpdate>
-    export type UpdateCittaMutationError = ErrorType<unknown>
+    export type UpdateAreaOperativaMutationResult = NonNullable<Awaited<ReturnType<typeof updateAreaOperativa>>>
+    export type UpdateAreaOperativaMutationBody = BodyType<AreaOperativaUpdate>
+    export type UpdateAreaOperativaMutationError = ErrorType<unknown>
 
-    export const useUpdateCitta = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCitta>>, TError,{id: number;data: BodyType<CittaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    export const useUpdateAreaOperativa = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAreaOperativa>>, TError,{id: number;data: BodyType<AreaOperativaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof updateCitta>>,
+        Awaited<ReturnType<typeof updateAreaOperativa>>,
         TError,
-        {id: number;data: BodyType<CittaUpdate>},
+        {id: number;data: BodyType<AreaOperativaUpdate>},
         TContext
       > => {
-      return useMutation(getUpdateCittaMutationOptions(options));
+      return useMutation(getUpdateAreaOperativaMutationOptions(options));
     }
 
-export const getDeleteCittaUrl = (id: number,) => {
+export const getDeleteAreaOperativaUrl = (id: number,) => {
 
 
 
 
-  return `/api/citta/${id}`
+  return `/api/aree-operative/${id}`
 }
 
-export const deleteCitta = async (id: number, options?: RequestInit): Promise<void> => {
+export const deleteAreaOperativa = async (id: number, options?: RequestInit): Promise<void> => {
 
-  return customFetch<void>(getDeleteCittaUrl(id),
+  return customFetch<void>(getDeleteAreaOperativaUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -11312,11 +11312,11 @@ export const deleteCitta = async (id: number, options?: RequestInit): Promise<vo
 
 
 
-export const getDeleteCittaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCitta>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteCitta>>, TError,{id: number}, TContext> => {
+export const getDeleteAreaOperativaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAreaOperativa>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAreaOperativa>>, TError,{id: number}, TContext> => {
 
-const mutationKey = ['deleteCitta'];
+const mutationKey = ['deleteAreaOperativa'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -11326,10 +11326,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCitta>>, {id: number}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAreaOperativa>>, {id: number}> = (props) => {
           const {id} = props ?? {};
 
-          return  deleteCitta(id,requestOptions)
+          return  deleteAreaOperativa(id,requestOptions)
         }
 
 
@@ -11339,19 +11339,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type DeleteCittaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCitta>>>
+    export type DeleteAreaOperativaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAreaOperativa>>>
 
-    export type DeleteCittaMutationError = ErrorType<unknown>
+    export type DeleteAreaOperativaMutationError = ErrorType<unknown>
 
-    export const useDeleteCitta = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCitta>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    export const useDeleteAreaOperativa = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAreaOperativa>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof deleteCitta>>,
+        Awaited<ReturnType<typeof deleteAreaOperativa>>,
         TError,
         {id: number},
         TContext
       > => {
-      return useMutation(getDeleteCittaMutationOptions(options));
+      return useMutation(getDeleteAreaOperativaMutationOptions(options));
     }
 
 export const getListZoneUdsUrl = (params?: ListZoneUdsParams,) => {

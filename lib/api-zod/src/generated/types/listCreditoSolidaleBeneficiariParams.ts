@@ -12,7 +12,7 @@ centroAscoltoId?: number;
 /**
  * Identificativo tecnico legacy dell'Area
  */
-cittaId?: number;
+areaOperativaId?: number;
 /**
  * @minimum 1
  */

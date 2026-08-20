@@ -8,7 +8,7 @@ import {
   getListInterventiOperatoriQueryKey,
   getListInterventiQueryKey,
   getListInterventoStoricoStatiQueryKey,
-  getListCittaQueryKey,
+  getListAreeOperativeQueryKey,
   useCreateIntervento,
   useAggiornaStatoPreparazioneMateriale,
   useAnnullaIntervento,
@@ -21,7 +21,7 @@ import {
   useListBeneficiari,
   useListBisogniPianificati,
   useListCentriAscolto,
-  useListCitta,
+  useListAreeOperative,
   useListInterventi,
   useListInterventiOperatori,
   useListInterventoStoricoStati,
@@ -137,13 +137,13 @@ export default function Interventi() {
   const debouncedSearch = useDebouncedValue(filters.ricerca, 300);
   const debouncedBeneficiarySearch = useDebouncedValue(beneficiarySearch, 250);
 
-  const isGlobal = user?.cittaId == null;
+  const isGlobal = user?.areaOperativaId == null;
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
-  const cityRequired = isGlobal && !filters.cittaId;
-  const effectiveCittaId = isGlobal
-    ? optionalId(filters.cittaId)
-    : (user?.cittaId ?? undefined);
+  const areaOperativaRequired = isGlobal && !filters.areaOperativaId;
+  const effectiveAreaOperativaId = isGlobal
+    ? optionalId(filters.areaOperativaId)
+    : (user?.areaOperativaId ?? undefined);
   const effectiveCentroId = isCentroLocked
     ? lockedCentroId
     : optionalId(filters.centroAscoltoId);
@@ -173,7 +173,7 @@ export default function Interventi() {
         undefined) as ListInterventiParams["priorita"],
       operatoreId: optionalId(filters.operatoreId),
       centroAscoltoId: effectiveCentroId,
-      cittaId: effectiveCittaId,
+      areaOperativaId: effectiveAreaOperativaId,
       stato: (filters.stato || undefined) as ListInterventiParams["stato"],
       ambitoLegacy: filters.ambitoLegacy,
       da: interval.da,
@@ -182,7 +182,7 @@ export default function Interventi() {
     [
       debouncedSearch,
       effectiveCentroId,
-      effectiveCittaId,
+      effectiveAreaOperativaId,
       filters.ambitoLegacy,
       filters.operatoreId,
       filters.priorita,
@@ -207,13 +207,13 @@ export default function Interventi() {
       undefined) as GetInterventiRiepilogoVisteParams["priorita"],
     operatoreId: optionalId(filters.operatoreId),
     centroAscoltoId: effectiveCentroId,
-    cittaId: effectiveCittaId,
+    areaOperativaId: effectiveAreaOperativaId,
     stato: (filters.stato ||
       undefined) as GetInterventiRiepilogoVisteParams["stato"],
     ambitoLegacy: filters.ambitoLegacy,
     ...(filters.da && filters.a ? { da: filters.da, a: filters.a } : {}),
   };
-  const queryEnabled = !cityRequired && interval.valid;
+  const queryEnabled = !areaOperativaRequired && interval.valid;
 
   const interventiQuery = useListInterventi(listParams, {
     query: {
@@ -225,33 +225,33 @@ export default function Interventi() {
     query: {
       queryKey: getGetInterventiRiepilogoVisteQueryKey(summaryParams),
       enabled:
-        !cityRequired && (!filters.da || !filters.a || filters.da <= filters.a),
+        !areaOperativaRequired && (!filters.da || !filters.a || filters.da <= filters.a),
     },
   });
   const operatorParams = {
-    cittaId: effectiveCittaId,
+    areaOperativaId: effectiveAreaOperativaId,
     centroAscoltoId: effectiveCentroId,
   };
   const operatorsQuery = useListInterventiOperatori(operatorParams, {
     query: {
       queryKey: getListInterventiOperatoriQueryKey(operatorParams),
-      enabled: !cityRequired,
+      enabled: !areaOperativaRequired,
     },
   });
   const beneficiaryParams = {
     attivo: true,
     search: debouncedBeneficiarySearch || undefined,
-    cittaId: effectiveCittaId,
+    areaOperativaId: effectiveAreaOperativaId,
     centroAscoltoId: effectiveCentroId,
   };
   const beneficiariesQuery = useListBeneficiari(beneficiaryParams, {
     query: {
       queryKey: getListBeneficiariQueryKey(beneficiaryParams),
-      enabled: !cityRequired,
+      enabled: !areaOperativaRequired,
     },
   });
-  const cittaQuery = useListCitta({
-    query: { queryKey: getListCittaQueryKey(), enabled: isGlobal },
+  const areaOperativaQuery = useListAreeOperative({
+    query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal },
   });
   const centersQuery = useListCentriAscolto();
   const typesQuery = useListTipiIntervento();
@@ -298,13 +298,13 @@ export default function Interventi() {
     ...(preparationPeriod === "personalizzato"
       ? { da: preparationFrom, a: preparationTo }
       : {}),
-    cittaId: effectiveCittaId,
+    areaOperativaId: effectiveAreaOperativaId,
     centroAscoltoId: effectiveCentroId,
   };
   const preparationQuery = useGetMaterialeDaPreparare(preparationParams, {
     query: {
       queryKey: getGetMaterialeDaPreparareQueryKey(preparationParams),
-      enabled: preparationMode && !cityRequired && preparationIntervalValid,
+      enabled: preparationMode && !areaOperativaRequired && preparationIntervalValid,
     },
   });
 
@@ -393,8 +393,8 @@ export default function Interventi() {
   const allCenters = centersQuery.data ?? [];
   const centers = allCenters.filter((center) => {
     if (isCentroLocked) return center.id === lockedCentroId;
-    if (!effectiveCittaId) return true;
-    return center.cittaId == null || center.cittaId === effectiveCittaId;
+    if (!effectiveAreaOperativaId) return true;
+    return center.areaOperativaId == null || center.areaOperativaId === effectiveAreaOperativaId;
   });
 
   return (
@@ -413,7 +413,7 @@ export default function Interventi() {
             <Button
               type="button"
               variant={preparationMode ? "default" : "outline"}
-              disabled={cityRequired}
+              disabled={areaOperativaRequired}
               onClick={() => setPreparationMode((current) => !current)}
             >
               <PackageOpen className="mr-2 h-4 w-4" />
@@ -455,7 +455,7 @@ export default function Interventi() {
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button disabled={cityRequired} className="gap-2">
+              <Button disabled={areaOperativaRequired} className="gap-2">
                 <Plus className="h-4 w-4" /> {t("interventi.newAction")}
                 <ChevronDown className="h-4 w-4" />
               </Button>
@@ -526,13 +526,13 @@ export default function Interventi() {
           filters={filters}
           interventi={interventi}
           counts={summaryQuery.data}
-          citta={cittaQuery.data ?? []}
+          areaOperativa={areaOperativaQuery.data ?? []}
           centri={centers}
           tipi={typesQuery.data ?? []}
           operatori={operatorsQuery.data ?? []}
           isGlobal={isGlobal}
           isCentroLocked={isCentroLocked}
-          cityRequired={cityRequired}
+          areaOperativaRequired={areaOperativaRequired}
           isLoading={interventiQuery.isLoading}
           isError={interventiQuery.isError || !interval.valid}
           onFiltersChange={setFilters}

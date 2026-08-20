@@ -22,7 +22,7 @@ import {
 import {
   cleanup,
   createBeneficiario,
-  createCitta,
+  createAreaOperativa,
   createCentro,
   createMagazzino,
   createUtente,
@@ -88,20 +88,20 @@ afterAll(async () => {
 
 describe("prerequisiti combinati sulle route reali", () => {
   it("applica Centro di Ascolto e UDS all'ambito reale degli interventi", async () => {
-    const cittaId = await createCitta(scope);
+    const areaOperativaId = await createAreaOperativa(scope);
     const centroId = await createCentro(scope);
-    const zona = await createZona(scope, cittaId);
+    const zona = await createZona(scope, areaOperativaId);
     const operatoreId = await createUtente(scope, { centroId });
-    const socialeId = await createBeneficiario(scope, centroId, { cittaId });
+    const socialeId = await createBeneficiario(scope, centroId, { areaOperativaId });
     const udsId = await createBeneficiario(scope, centroId, {
-      cittaId,
+      areaOperativaId,
       zonaUdsId: zona.id,
       uds: true,
     });
     const app = makeScopedApp(interventiRouter, {
       id: operatoreId,
       centroAscoltoId: centroId,
-      cittaId,
+      areaOperativaId,
       aree: ["sociale", "uds"],
     });
     const sociale = await request(app).post("/interventi").send({
@@ -191,7 +191,7 @@ describe("prerequisiti combinati sulle route reali", () => {
     const app = makeScopedApp(reportRouter, {
       id: 0,
       centroAscoltoId: null,
-      cittaId: null,
+      areaOperativaId: null,
     });
 
     await setModulo("CENTRO_ASCOLTO", false);
@@ -235,7 +235,7 @@ describe("prerequisiti combinati sulle route reali", () => {
     const app = makeScopedApp(bolleRouter, {
       id: 0,
       centroAscoltoId: null,
-      cittaId: null,
+      areaOperativaId: null,
     });
 
     await setModulo("MAGAZZINO_SOLIDALE", false);
@@ -261,7 +261,7 @@ describe("prerequisiti combinati sulle route reali", () => {
     const app = makeScopedApp(consegneRouter, {
       id: 0,
       centroAscoltoId: null,
-      cittaId: null,
+      areaOperativaId: null,
     });
 
     await setModulo("CENTRO_ASCOLTO", false);

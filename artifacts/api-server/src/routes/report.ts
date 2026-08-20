@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
-import { callerCentroId, callerCittaId, callerZonaUdsId } from "../lib/centroScope";
+import { callerCentroId, callerAreaOperativaId, callerZonaUdsId } from "../lib/centroScope";
 import { requireAllModuli } from "../lib/featureFlags";
 
 const router: IRouter = Router();
@@ -18,7 +18,7 @@ router.use("/report", (req, res, next) => {
 
 /**
  * Generic "own value OR shared/null" SQL fragment for a scoping column. Used for
- * both the centro axis and the città axis (pass the relevant column + caller id).
+ * both the centro axis and the area operativa axis (pass the relevant column + caller id).
  * Returns `undefined` for a global caller (no restriction on that axis).
  */
 function ownOrNullSql(col: SQL, caller: number | null): SQL | undefined {
@@ -56,16 +56,16 @@ function parseDateRange(req: { query: Record<string, unknown> }): DateRange {
 router.get("/report/giacenze-per-magazzino", async (req, res) => {
   const magazzinoId = parseIntParam(req.query.magazzinoId);
   const caller = callerCentroId(req);
-  const citta = callerCittaId(req);
+  const areaOperativa = callerAreaOperativaId(req);
 
   const conds: SQL[] = [];
   if (magazzinoId) conds.push(sql`mg.id = ${magazzinoId}`);
   const centroCond = ownOrNullSql(sql`mg.centro_ascolto_id`, caller);
   if (centroCond) conds.push(centroCond);
-  const cittaCond = ownOrNullSql(sql`mg.citta_id`, citta);
-  if (cittaCond) conds.push(cittaCond);
-  const qCitta = parseIntParam(req.query.cittaId);
-  if (qCitta) conds.push(sql`mg.citta_id = ${qCitta}`);
+  const areaOperativaCond = ownOrNullSql(sql`mg.area_operativa_id`, areaOperativa);
+  if (areaOperativaCond) conds.push(areaOperativaCond);
+  const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
+  if (qAreaOperativa) conds.push(sql`mg.area_operativa_id = ${qAreaOperativa}`);
   const where = conds.length ? sql`WHERE ${sql.join(conds, sql` AND `)}` : sql``;
 
   const result1 = await db.execute(sql`
@@ -100,17 +100,17 @@ router.get("/report/consegne-per-mese", async (req, res) => {
   const magazzinoId = parseIntParam(req.query.magazzinoId);
   const centroAscoltoId = parseIntParam(req.query.centroAscoltoId);
   const caller = callerCentroId(req);
-  const citta = callerCittaId(req);
+  const areaOperativa = callerAreaOperativaId(req);
 
   const conds = [sql`c.data_prevista::date BETWEEN ${da} AND ${a}`];
   if (magazzinoId) conds.push(sql`c.magazzino_id = ${magazzinoId}`);
   if (centroAscoltoId) conds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
   const centroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
   if (centroCond) conds.push(centroCond);
-  const cittaCond = ownOrNullSql(sql`be.citta_id`, citta);
-  if (cittaCond) conds.push(cittaCond);
-  const qCitta = parseIntParam(req.query.cittaId);
-  if (qCitta) conds.push(sql`be.citta_id = ${qCitta}`);
+  const areaOperativaCond = ownOrNullSql(sql`be.area_operativa_id`, areaOperativa);
+  if (areaOperativaCond) conds.push(areaOperativaCond);
+  const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
+  if (qAreaOperativa) conds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
   const where = sql.join(conds, sql` AND `);
 
   const result2 = await db.execute(sql`
@@ -142,14 +142,14 @@ router.get("/report/consegne-per-centro", async (req, res) => {
   }
   const { da, a } = range;
   const caller = callerCentroId(req);
-  const citta = callerCittaId(req);
+  const areaOperativa = callerAreaOperativaId(req);
   const scopeConds: SQL[] = [];
   const centroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
   if (centroCond) scopeConds.push(centroCond);
-  const cittaCond = ownOrNullSql(sql`be.citta_id`, citta);
-  if (cittaCond) scopeConds.push(cittaCond);
-  const qCitta = parseIntParam(req.query.cittaId);
-  if (qCitta) scopeConds.push(sql`be.citta_id = ${qCitta}`);
+  const areaOperativaCond = ownOrNullSql(sql`be.area_operativa_id`, areaOperativa);
+  if (areaOperativaCond) scopeConds.push(areaOperativaCond);
+  const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
+  if (qAreaOperativa) scopeConds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
   const extraCentro = scopeConds.length ? sql` AND ${sql.join(scopeConds, sql` AND `)}` : sql``;
 
   const result = await db.execute(sql`
@@ -186,43 +186,43 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
   const { da, a } = range;
   const centroAscoltoId = parseIntParam(req.query.centroAscoltoId);
   const caller = callerCentroId(req);
-  const citta = callerCittaId(req);
-  const qCitta = parseIntParam(req.query.cittaId);
+  const areaOperativa = callerAreaOperativaId(req);
+  const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
 
   // ── Per-mezzo usage ──────────────────────────────────────────────────────
-  // Scope mezzi by their own centro (own OR universal/NULL) and, for the città
-  // axis, by their centro's città (derived via centri_di_ascolto; NULL = a
-  // universal mezzo or a centro without città, kept visible like magazzini).
+  // Scope mezzi by their own centro (own OR universal/NULL) and, for the area operativa
+  // axis, by their centro's area operativa (derived via centri_di_ascolto; NULL = a
+  // universal mezzo or a centro without area operativa, kept visible like magazzini).
   const mezzoConds: SQL[] = [];
   if (centroAscoltoId) mezzoConds.push(sql`m.centro_ascolto_id = ${centroAscoltoId}`);
   const mCentroCond = ownOrNullSql(sql`m.centro_ascolto_id`, caller);
   if (mCentroCond) mezzoConds.push(mCentroCond);
-  const mCittaCond = ownOrNullSql(sql`ca.citta_id`, citta);
-  if (mCittaCond) mezzoConds.push(mCittaCond);
-  if (qCitta) mezzoConds.push(sql`ca.citta_id = ${qCitta}`);
+  const mAreaOperativaCond = ownOrNullSql(sql`ca.area_operativa_id`, areaOperativa);
+  if (mAreaOperativaCond) mezzoConds.push(mAreaOperativaCond);
+  if (qAreaOperativa) mezzoConds.push(sql`ca.area_operativa_id = ${qAreaOperativa}`);
   const mezzoWhere = mezzoConds.length ? sql`WHERE ${sql.join(mezzoConds, sql` AND `)}` : sql``;
 
   // Records counted per mezzo must respect the caller's perimeter too: otherwise
   // a visible mezzo (especially a universal one, centro_ascolto_id NULL) would
-  // leak aggregate usage from centri/città the caller can't see. consegne/bolle
+  // leak aggregate usage from centri/area operativa the caller can't see. consegne/bolle
   // scope via beneficiario (same as the other reports); turni scope via their
-  // own centro_ascolto_id and that centro's città.
+  // own centro_ascolto_id and that centro's area operativa.
   const beScopeConds: SQL[] = [];
   if (centroAscoltoId) beScopeConds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
   const beCentroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
   if (beCentroCond) beScopeConds.push(beCentroCond);
-  const beCittaCond = ownOrNullSql(sql`be.citta_id`, citta);
-  if (beCittaCond) beScopeConds.push(beCittaCond);
-  if (qCitta) beScopeConds.push(sql`be.citta_id = ${qCitta}`);
+  const beAreaOperativaCond = ownOrNullSql(sql`be.area_operativa_id`, areaOperativa);
+  if (beAreaOperativaCond) beScopeConds.push(beAreaOperativaCond);
+  if (qAreaOperativa) beScopeConds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
   const beScope = beScopeConds.length ? sql` AND ${sql.join(beScopeConds, sql` AND `)}` : sql``;
 
   const turniScopeConds: SQL[] = [];
   if (centroAscoltoId) turniScopeConds.push(sql`tu.centro_ascolto_id = ${centroAscoltoId}`);
   const tuCentroCond = ownOrNullSql(sql`tu.centro_ascolto_id`, caller);
   if (tuCentroCond) turniScopeConds.push(tuCentroCond);
-  const tuCittaCond = ownOrNullSql(sql`tca.citta_id`, citta);
-  if (tuCittaCond) turniScopeConds.push(tuCittaCond);
-  if (qCitta) turniScopeConds.push(sql`tca.citta_id = ${qCitta}`);
+  const tuAreaOperativaCond = ownOrNullSql(sql`tca.area_operativa_id`, areaOperativa);
+  if (tuAreaOperativaCond) turniScopeConds.push(tuAreaOperativaCond);
+  if (qAreaOperativa) turniScopeConds.push(sql`tca.area_operativa_id = ${qAreaOperativa}`);
   const turniScope = turniScopeConds.length ? sql` AND ${sql.join(turniScopeConds, sql` AND `)}` : sql``;
 
   const mezziResult = await db.execute(sql`
@@ -252,7 +252,7 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
 
   // ── External transport ("altro") ─────────────────────────────────────────
   // Free-text/external transport (mezzo_altro flag) on consegne + bolle, scoped
-  // via beneficiario (centro + città) — reuses the per-record beScope above.
+  // via beneficiario (centro + area operativa) — reuses the per-record beScope above.
   const altroConsResult = await db.execute(sql`
     SELECT COUNT(*) as n
     FROM consegne c
@@ -299,18 +299,18 @@ router.get("/report/fse-plus", async (req, res) => {
   }
   const anno = parsedAnno;
   const caller = callerCentroId(req);
-  const citta = callerCittaId(req);
+  const areaOperativa = callerAreaOperativaId(req);
   const centroSub = caller == null
     ? sql``
     : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
-  const cittaSub = citta == null
+  const areaOperativaSub = areaOperativa == null
     ? sql``
-    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE citta_id = ${citta} OR citta_id IS NULL)`;
-  const qCitta = parseIntParam(req.query.cittaId);
-  const cittaQSub = qCitta == null
+    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${areaOperativa} OR area_operativa_id IS NULL)`;
+  const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
+  const areaOperativaQSub = qAreaOperativa == null
     ? sql``
-    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE citta_id = ${qCitta})`;
-  const centroCond = sql`${centroSub}${cittaSub}${cittaQSub}`;
+    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${qAreaOperativa})`;
+  const centroCond = sql`${centroSub}${areaOperativaSub}${areaOperativaQSub}`;
 
   const prodRes = await db.execute(sql`
     SELECT p.id as prodotto_id,
@@ -421,18 +421,18 @@ router.get("/report/fse-plus", async (req, res) => {
 
 /* ────────────────────────────────────────────────────────────────────────
  * UDS (Unità di Strada) reports. Street-outreach interventions / people.
- * Always restricted to UDS persons (beneficiari.uds = true). Città is a HARD
- * scope (caller's città OR NULL legacy), optionally narrowed via ?cittaId for a
+ * Always restricted to UDS persons (beneficiari.uds = true). Area Operativa is a HARD
+ * scope (caller's area operativa OR NULL legacy), optionally narrowed via ?areaOperativaId for a
  * global caller; zona is HARD when present on the caller and can be narrowed
  * via ?zonaUdsId by a zona-global caller.
  * ──────────────────────────────────────────────────────────────────────── */
 
-function udsScopeConds(req: { query: Record<string, unknown> }, callerCitta: number | null, callerZona: number | null): SQL[] {
+function udsScopeConds(req: { query: Record<string, unknown> }, callerAreaOperativa: number | null, callerZona: number | null): SQL[] {
   const conds: SQL[] = [sql`be.uds = true`];
-  const cittaCond = ownOrNullSql(sql`be.citta_id`, callerCitta);
-  if (cittaCond) conds.push(cittaCond);
-  const qCitta = parseIntParam(req.query.cittaId);
-  if (qCitta) conds.push(sql`be.citta_id = ${qCitta}`);
+  const areaOperativaCond = ownOrNullSql(sql`be.area_operativa_id`, callerAreaOperativa);
+  if (areaOperativaCond) conds.push(areaOperativaCond);
+  const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
+  if (qAreaOperativa) conds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
   const zonaId = callerZona ?? parseIntParam(req.query.zonaUdsId);
   if (zonaId) conds.push(sql`be.zona_uds_id = ${zonaId}`);
   return conds;
@@ -445,7 +445,7 @@ router.get("/report/uds/interventi-per-mese", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
   conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
@@ -488,7 +488,7 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
   // Normalize so callers can pass the range in either order.
   const from = da <= aRaw ? da : aRaw;
   const to = da <= aRaw ? aRaw : da;
-  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
   conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
   const where = sql.join(conds, sql` AND `);
 
@@ -552,7 +552,7 @@ router.get("/report/uds/interventi-per-tipo", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
   conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
@@ -580,7 +580,7 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
   conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
@@ -605,7 +605,7 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
 });
 
 router.get("/report/uds/persone-per-zona", async (req, res) => {
-  const conds = udsScopeConds(req, callerCittaId(req), callerZonaUdsId(req));
+  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
   const where = sql.join(conds, sql` AND `);
 
   const result = await db.execute(sql`

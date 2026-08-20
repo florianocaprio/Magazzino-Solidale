@@ -508,8 +508,8 @@ export const NAV_ITEMS: NavItem[] = [
   },
 
   {
-    key: "citta",
-    url: "/citta",
+    key: "areeOperative",
+    url: "/aree-operative",
     icon: MapPin,
     groupKey: "amministrazione",
     area: "amministrazione",

@@ -106,7 +106,7 @@ SELECT count(*) FROM beneficiari;
 SELECT data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name = 'beneficiari' AND column_name = 'versione';
-SELECT count(*) AS beneficiari_senza_area FROM beneficiari WHERE citta_id IS NULL;
+SELECT count(*) AS beneficiari_senza_area FROM beneficiari WHERE area_operativa_id IS NULL;
 SELECT count(*) AS membri_nucleo_orfani
 FROM nucleo_familiare nf
 LEFT JOIN beneficiari b ON b.id = nf.beneficiario_id
@@ -159,7 +159,7 @@ Il modulo `REPORT` espone in `/report` la landing della reportistica integrata:
 Dashboard generale, Pacchi Alimentari, Centro di Ascolto, Emporio, Mensa, UDS,
 Magazzino/Logistica e rendicontazione trasversale FSE+. I calcoli sono eseguiti
 dal reporting service server-side; grafici, tabelle, drill-down paginato ed
-export XLSX/PDF consumano lo stesso payload aggregato. Città, Centro e Zona UDS
+export XLSX/PDF consumano lo stesso payload aggregato. Area Operativa, Centro e Zona UDS
 sono sempre riapplicati dal backend; per Mensa resta necessario anche il
 permesso `mensa.reports.view`.
 
@@ -172,7 +172,7 @@ come dati mancanti, mai convertite in zeri o inferenze da note libere.
 
 MAPS è un adapter tecnico trasversale: non è un'area di business e non amplia
 la visibilità dei dati. L'API restituisce solo i layer consentiti da aree,
-moduli, permission e scope Centro/Città/Zona del chiamante. I ruoli operativi
+moduli, permission e scope Centro/Area Operativa/Zona del chiamante. I ruoli operativi
 esistenti non ricevono automaticamente i permessi `maps.route` e
 `maps.operational`: l'amministratore deve assegnarli esplicitamente.
 

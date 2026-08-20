@@ -29,7 +29,7 @@ function testSessionUser(userId: number, overrides: Partial<TestSessionUser> = {
     isAdmin: true,
     aree: ["magazzino"],
     permessi: [],
-    cittaId: null,
+    areaOperativaId: null,
     centroAscoltoId: null,
     zonaUdsId: null,
     ...overrides,

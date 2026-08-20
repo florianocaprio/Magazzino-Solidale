@@ -13,7 +13,7 @@ import {
   createCentro,
   createMagazzino,
   createBeneficiario,
-  createCitta,
+  createAreaOperativa,
   insertConsegna,
   insertBolla,
 } from "./scope-helpers";
@@ -26,7 +26,7 @@ import {
 
 let scope: SeedScope;
 
-const appGlobal = () => makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: null, cittaId: null });
+const appGlobal = () => makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
 
 beforeEach(() => {
   scope = newScope();
@@ -72,7 +72,7 @@ describe("DELETE /consegne/:id", () => {
     const ben = await createBeneficiario(scope, centroA);
     const consegnaId = await insertConsegna(scope, { beneficiarioId: ben, magazzinoId: mag });
 
-    const appScoped = makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: centroB, cittaId: null });
+    const appScoped = makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: centroB, areaOperativaId: null });
     const res = await request(appScoped).delete(`/consegne/${consegnaId}`).send();
     expect(res.status).toBe(403);
 
@@ -80,15 +80,15 @@ describe("DELETE /consegne/:id", () => {
     expect(consegna).toBeDefined();
   });
 
-  it("ritorna 403 per una consegna di un'altra città", async () => {
-    const cittaA = await createCitta(scope);
-    const cittaB = await createCitta(scope);
+  it("ritorna 403 per una consegna di un'altra area operativa", async () => {
+    const areaOperativaA = await createAreaOperativa(scope);
+    const areaOperativaB = await createAreaOperativa(scope);
     const centro = await createCentro(scope);
     const mag = await createMagazzino(scope, centro);
-    const ben = await createBeneficiario(scope, centro, { cittaId: cittaA });
+    const ben = await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaA });
     const consegnaId = await insertConsegna(scope, { beneficiarioId: ben, magazzinoId: mag });
 
-    const appScoped = makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: null, cittaId: cittaB });
+    const appScoped = makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: null, areaOperativaId: areaOperativaB });
     const res = await request(appScoped).delete(`/consegne/${consegnaId}`).send();
     expect(res.status).toBe(403);
 

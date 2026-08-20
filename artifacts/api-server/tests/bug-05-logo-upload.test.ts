@@ -14,7 +14,7 @@ const centroIds: number[] = [];
 
 function auth(isAdmin = true) {
   return (req: express.Request, _res: express.Response, next: express.NextFunction) => {
-    req.user = { id: 900001, isAdmin, isSuperAdmin: false, cittaId: null } as NonNullable<typeof req.user>;
+    req.user = { id: 900001, isAdmin, isSuperAdmin: false, areaOperativaId: null } as NonNullable<typeof req.user>;
     next();
   };
 }

@@ -29,7 +29,7 @@ import {
 } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   visibleMagazzinoIds,
   trasferimentoScopeFilter,
 } from "../lib/centroScope";
@@ -154,14 +154,14 @@ async function enforceMensaTransfer(
   if (!isMensaOnly(req)) return null;
   if (!canManageMensaTransfers(req)) return "Permesso Mensa non consentito";
   if (mensaId == null) return "Trasferimento non associato a una Mensa";
-  const ownCity = callerCittaId(req);
-  if (ownCity != null) {
+  const ownAreaOperativa = callerAreaOperativaId(req);
+  if (ownAreaOperativa != null) {
     const [mensa] = await db
-      .select({ cittaId: menseTable.cittaId })
+      .select({ areaOperativaId: menseTable.areaOperativaId })
       .from(menseTable)
       .where(eq(menseTable.id, mensaId));
-    if (!mensa || mensa.cittaId !== ownCity) {
-      return "Trasferimento non accessibile per la tua città";
+    if (!mensa || mensa.areaOperativaId !== ownAreaOperativa) {
+      return "Trasferimento non accessibile per la tua area operativa";
     }
   }
   return null;
@@ -472,12 +472,12 @@ router.get("/trasferimenti", async (req, res) => {
       return;
     }
     conditions.push(sql`${trasferimentiTable.mensaId} is not null`);
-    const ownCity = callerCittaId(req);
-    if (ownCity != null) {
+    const ownAreaOperativa = callerAreaOperativaId(req);
+    if (ownAreaOperativa != null) {
       const visibleMense = await db
         .select({ id: menseTable.id })
         .from(menseTable)
-        .where(eq(menseTable.cittaId, ownCity));
+        .where(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const ids = visibleMense.map((row) => row.id);
       conditions.push(
         ids.length ? inArray(trasferimentiTable.mensaId, ids) : sql`false`,
@@ -487,7 +487,7 @@ router.get("/trasferimenti", async (req, res) => {
   const scope = trasferimentoScopeFilter(
     trasferimentiTable.magazzinoOrigineId,
     trasferimentiTable.magazzinoDestinoId,
-    await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)),
+    await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)),
   );
   if (scope) conditions.push(scope);
 
@@ -674,7 +674,7 @@ router.post("/trasferimenti", async (req, res) => {
   }
   const visIds = await visibleMagazzinoIds(
     callerCentroId(req),
-    callerCittaId(req),
+    callerAreaOperativaId(req),
   );
   if (
     visIds != null &&
@@ -765,7 +765,7 @@ router.get("/trasferimenti/:id", async (req, res) => {
   }
   const visIds = await visibleMagazzinoIds(
     callerCentroId(req),
-    callerCittaId(req),
+    callerAreaOperativaId(req),
   );
   if (
     visIds != null &&
@@ -795,7 +795,7 @@ router.get("/trasferimenti/:id/documento", async (req, res) => {
   }
   const visible = await visibleMagazzinoIds(
     callerCentroId(req),
-    callerCittaId(req),
+    callerAreaOperativaId(req),
   );
   if (
     visible != null &&
@@ -850,7 +850,7 @@ router.patch("/trasferimenti/:id", async (req, res) => {
   }
   const visIds = await visibleMagazzinoIds(
     callerCentroId(req),
-    callerCittaId(req),
+    callerAreaOperativaId(req),
   );
   if (
     visIds != null &&
@@ -1026,7 +1026,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     return;
   const visIds = await visibleMagazzinoIds(
     callerCentroId(req),
-    callerCittaId(req),
+    callerAreaOperativaId(req),
   );
   if (visIds != null && !visIds.includes(current.magazzinoOrigineId)) {
     res
@@ -1197,7 +1197,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
     return;
   const visIds = await visibleMagazzinoIds(
     callerCentroId(req),
-    callerCittaId(req),
+    callerAreaOperativaId(req),
   );
   if (visIds != null && !visIds.includes(current.magazzinoDestinoId)) {
     res

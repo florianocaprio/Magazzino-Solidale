@@ -21,7 +21,7 @@ vi.mock("@workspace/api-client-react", () => ({
     creditoSolidaleMensileAssegnato: null, creditoSolidaleMensileManuale: false,
     creditoSolidaleMotivoModifica: null, creditoSolidaleDataUltimaModificaQuota: null,
     creditoSolidaleSaldo: 0, creditoSolidaleDataUltimoMovimento: null,
-    uds: false, cittaId: 1, cittaNome: "Roma", zonaUdsId: null, attivo: true,
+    uds: false, areaOperativaId: 1, areaOperativaNome: "Roma", zonaUdsId: null, attivo: true,
     dataPresaInCarico: null, noteInterne: null, nucleo: [], interventi: [], consegne: [],
     dataCreazione: "2026-08-15T00:00:00.000Z",
   }, isLoading: false }),
@@ -43,7 +43,7 @@ vi.mock("@workspace/api-client-react", () => ({
   useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn().mockResolvedValue({ autorizzato: true }) }),
   useAddNucleoFamiliare: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteNucleoFamiliare: () => ({ mutate: vi.fn(), isPending: false }),
-  useListCitta: () => ({ data: [] }),
+  useListAreeOperative: () => ({ data: [] }),
   useListZoneUds: () => ({ data: [] }),
   useCalcolaCreditoSolidaleBeneficiario: () => ({ data: undefined, isLoading: false, isError: false }),
   useGetCreditoSolidaleBeneficiarioSaldo: () => ({ data: undefined }),
@@ -54,7 +54,7 @@ vi.mock("@workspace/api-client-react", () => ({
   getListAccessiEmporioQueryKey: () => ["accessi"],
   getListTessereBeneficiarioDaAnagraficaQueryKey: () => ["tessere", 42],
   getListBeneficiariQueryKey: () => ["beneficiari"],
-  getListCittaQueryKey: () => ["citta"],
+  getListAreeOperativeQueryKey: () => ["areaOperativa"],
   getCalcolaCreditoSolidaleBeneficiarioQueryKey: () => ["calcolo"],
   getGetCreditoSolidaleBeneficiarioSaldoQueryKey: () => ["saldo"],
   getListCreditoSolidaleBeneficiarioMovimentiQueryKey: () => ["movimenti"],
@@ -69,7 +69,7 @@ vi.mock("wouter", () => ({
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
-vi.mock("@/lib/auth", () => ({ useAuth: () => ({ user: { id: 1, cittaId: 1, centroAscoltoId: 7 }, hasArea: () => true, hasPermission: () => true }) }));
+vi.mock("@/lib/auth", () => ({ useAuth: () => ({ user: { id: 1, areaOperativaId: 1, centroAscoltoId: 7 }, hasArea: () => true, hasPermission: () => true }) }));
 vi.mock("@/lib/use-moduli", () => ({ EMPORIO_DISABLED_MESSAGE: "", UNITA_STRADA_DISABLED_MESSAGE: "", useModuloFlags: () => ({ emporioAbilitato: true, unitaStradaAbilitata: true, mensaAbilitato: true }) }));
 vi.mock("@/lib/branding-ambiente", () => ({ loadTesseraBrandingForPdf: vi.fn() }));
 vi.mock("@/lib/tessera-pdf", () => ({ generateTesseraPdf: vi.fn(), buildTesseraLabels: vi.fn() }));

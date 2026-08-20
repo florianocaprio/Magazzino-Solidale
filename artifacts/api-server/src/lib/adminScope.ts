@@ -1,17 +1,17 @@
 import type { RequestHandler } from "express";
 import type { SessionUser } from "../middlewares/auth";
 
-type AdminScopeUser = Pick<SessionUser, "isAdmin" | "isSuperAdmin" | "cittaId">;
+type AdminScopeUser = Pick<SessionUser, "isAdmin" | "isSuperAdmin" | "areaOperativaId">;
 
 /**
- * Nel modello corrente un amministratore senza cittaId opera globalmente;
- * cittaId e la tabella `citta` rappresentano l'Area operativa (naming legacy).
+ * Nel modello corrente un amministratore senza areaOperativaId opera globalmente;
+ * areaOperativaId e `areeOperativeTable` rappresentano l'Area Operativa.
  */
 export function isGlobalAdmin(
   user: AdminScopeUser | null | undefined,
 ): boolean {
   return Boolean(
-    user && (user.isAdmin || user.isSuperAdmin) && user.cittaId == null,
+    user && (user.isAdmin || user.isSuperAdmin) && user.areaOperativaId == null,
   );
 }
 

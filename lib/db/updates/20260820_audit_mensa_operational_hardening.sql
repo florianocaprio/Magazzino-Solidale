@@ -55,10 +55,26 @@ BEGIN
   WHERE a.eccezione_id IS NOT NULL AND e.id IS NULL;
   RAISE NOTICE 'Preflight Mensa: % accessi hanno eccezione_id orfano; restano preservati e la FK rimarrà NOT VALID.', orphan_exception_count;
 
-  SELECT count(*) INTO inconsistent_warehouse_count
-  FROM public.mense m
-  LEFT JOIN public.magazzini w ON w.id = m.magazzino_id
-  WHERE w.id IS NULL OR w.tipo_magazzino <> 'mensa' OR w.citta_id IS DISTINCT FROM m.citta_id;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'mense'
+      AND column_name = 'area_operativa_id'
+  ) THEN
+    SELECT count(*) INTO inconsistent_warehouse_count
+    FROM public.mense m
+    LEFT JOIN public.magazzini w ON w.id = m.magazzino_id
+    WHERE w.id IS NULL
+      OR w.tipo_magazzino <> 'mensa'
+      OR w.area_operativa_id IS DISTINCT FROM m.area_operativa_id;
+  ELSE
+    SELECT count(*) INTO inconsistent_warehouse_count
+    FROM public.mense m
+    LEFT JOIN public.magazzini w ON w.id = m.magazzino_id
+    WHERE w.id IS NULL
+      OR w.tipo_magazzino <> 'mensa'
+      OR w.citta_id IS DISTINCT FROM m.citta_id;
+  END IF;
   RAISE NOTICE 'Preflight Mensa: % associazioni Mensa/Magazzino legacy sono incoerenti; nessuna viene modificata automaticamente.', inconsistent_warehouse_count;
 END
 $audit$;

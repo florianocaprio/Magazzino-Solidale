@@ -32,8 +32,8 @@ const fase53BEn = {
   },
   filters: {
     search: "Search name, surname or beneficiary code",
-    city: "City",
-    chooseCity: "Select a city",
+    areaOperativa: "Operational Area",
+    chooseAreaOperativa: "Select an Operational Area",
     center: "Listening centre",
     type: "Intervention type",
     priority: "Priority",
@@ -254,8 +254,8 @@ const fase53B = {
     filters: {
       ...fase53BEn.filters,
       search: "Cerca nome, cognome o codice beneficiario",
-      city: "Città",
-      chooseCity: "Seleziona una città",
+      areaOperativa: "Area Operativa",
+      chooseAreaOperativa: "Seleziona una area operativa",
       center: "Centro di ascolto",
       type: "Tipologia intervento",
       priority: "Priorità",
@@ -474,7 +474,7 @@ const fase53B = {
     filters: {
       ...fase53BEn.filters,
       search: "Buscar nombre, apellido o código",
-      chooseCity: "Selecciona una ciudad",
+      chooseAreaOperativa: "Selecciona una ciudad",
       reset: "Restablecer filtros",
       allPriorities: "Todas las prioridades",
       allOperators: "Todos los operadores",
@@ -521,7 +521,7 @@ const fase53B = {
     filters: {
       ...fase53BEn.filters,
       search: "Rechercher nom, prénom ou code",
-      chooseCity: "Sélectionnez une ville",
+      chooseAreaOperativa: "Sélectionnez une ville",
       reset: "Réinitialiser les filtres",
       allPriorities: "Toutes les priorités",
       allOperators: "Tous les opérateurs",
@@ -567,7 +567,7 @@ const fase53B = {
     filters: {
       ...fase53BEn.filters,
       search: "Name oder Begünstigtencode suchen",
-      chooseCity: "Stadt auswählen",
+      chooseAreaOperativa: "Betriebsbereich auswählen",
       reset: "Filter zurücksetzen",
       allPriorities: "Alle Prioritäten",
       allOperators: "Alle Bearbeiter",
@@ -612,7 +612,7 @@ const fase53B = {
     filters: {
       ...fase53BEn.filters,
       search: "البحث بالاسم أو رمز المستفيد",
-      chooseCity: "اختر مدينة",
+      chooseAreaOperativa: "اختر مدينة",
       reset: "مسح عوامل التصفية",
       allPriorities: "كل الأولويات",
       allOperators: "كل المشغلين",

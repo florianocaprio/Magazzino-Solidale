@@ -9,7 +9,7 @@
 export interface CentroAscoltoInput {
   nome: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   logoUrl?: string | null;
   indirizzo?: string;

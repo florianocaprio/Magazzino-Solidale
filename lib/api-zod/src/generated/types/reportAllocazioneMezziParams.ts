@@ -10,5 +10,5 @@ export type ReportAllocazioneMezziParams = {
 da?: string;
 a?: string;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 };

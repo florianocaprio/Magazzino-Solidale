@@ -52,7 +52,7 @@ export interface BeneficiarioInput {
   noteInterne?: string;
   soprannome?: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
   uds?: boolean;

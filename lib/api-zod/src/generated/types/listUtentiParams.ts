@@ -7,7 +7,7 @@
  */
 
 export type ListUtentiParams = {
-cittaId?: number;
+areaOperativaId?: number;
 matricola?: string;
 query?: string;
 };

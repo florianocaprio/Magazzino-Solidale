@@ -4,7 +4,7 @@ import { movimentiTable, prodottiTable, magazziniTable } from "@workspace/db";
 import { eq, and, gte, lte, desc, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
 } from "../lib/centroScope";
@@ -33,7 +33,7 @@ router.get("/movimenti", requirePermission("magazzino.view"), async (req, res) =
   if (centroAscoltoId) conditions.push(eq(magazziniTable.centroAscoltoId, parseInt(centroAscoltoId)));
   if (da) conditions.push(gte(movimentiTable.dataMovimento, da));
   if (a) conditions.push(lte(movimentiTable.dataMovimento, a));
-  const scope = magazzinoScopeFilter(movimentiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
+  const scope = magazzinoScopeFilter(movimentiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)));
   if (scope) conditions.push(scope);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;

@@ -19,9 +19,9 @@ const DUPLICATE_MSG = "La matricola indicata è già associata a un altro volont
 
 let scope: SeedScope;
 
-const appVolontari = () => makeScopedApp(volontariRouter, { id: 0, centroAscoltoId: null, cittaId: null });
-const appTurni = () => makeScopedApp(turniRouter, { id: 0, centroAscoltoId: null, cittaId: null });
-const appApprovazioni = () => makeScopedApp(approvazioniLogisticaRouter, { id: 0, centroAscoltoId: null, cittaId: null });
+const appVolontari = () => makeScopedApp(volontariRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
+const appTurni = () => makeScopedApp(turniRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
+const appApprovazioni = () => makeScopedApp(approvazioniLogisticaRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
 
 beforeEach(() => {
   scope = newScope();

@@ -7,7 +7,7 @@ import { dashboard, kpi, quality } from "./shared";
 
 function fseScope(filters: ReportFilters) {
   return andSql(reportScope(filters, {
-    citta: sql`be.citta_id`,
+    areaOperativa: sql`be.area_operativa_id`,
     centro: sql`be.centro_ascolto_id`,
     magazzino: sql`b.magazzino_id`,
   }));
@@ -251,7 +251,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         ${sources.mensa ? sql`(SELECT COUNT(*) FROM mensa_pasti mp JOIN mense m ON m.id = mp.mensa_id
           JOIN magazzini mg ON mg.id = m.magazzino_id
           WHERE mp.data_servizio BETWEEN ${filters.da} AND ${filters.a}
-            AND ${andSql(reportScope(filters, { citta: sql`m.citta_id`, centro: sql`mg.centro_ascolto_id` }))})` : sql`NULL`} AS pasti
+            AND ${andSql(reportScope(filters, { areaOperativa: sql`m.area_operativa_id`, centro: sql`mg.centro_ascolto_id` }))})` : sql`NULL`} AS pasti
     `),
   ]);
   const persons = people[0] ?? {};

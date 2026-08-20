@@ -1,5 +1,5 @@
 import {
-  cittaTable,
+  areeOperativeTable,
   centriAscoltoTable,
   db,
   magazziniTable,
@@ -14,13 +14,13 @@ import type { ReportSection } from "./types";
 export type ReportFilterOption = {
   id: number;
   nome: string;
-  cittaId: number | null;
+  areaOperativaId: number | null;
   centroAscoltoId?: number | null;
 };
 
 export type ReportFilterOptions = {
   section: ReportSection;
-  cities: ReportFilterOption[];
+  areeOperative: ReportFilterOption[];
   centres: ReportFilterOption[];
   warehouses: ReportFilterOption[];
   mense: ReportFilterOption[];
@@ -32,20 +32,20 @@ function where(...conditions: Array<SQL | undefined>): SQL | undefined {
   return present.length > 1 ? and(...present) : present[0];
 }
 
-function cityCondition(column: Column, cityId: number | null): SQL | undefined {
-  return cityId == null ? undefined : eq(column, cityId);
+function areaOperativaCondition(column: Column, areaOperativaId: number | null): SQL | undefined {
+  return areaOperativaId == null ? undefined : eq(column, areaOperativaId);
 }
 
 export async function buildReportFilterOptions(
   req: Request,
   section: ReportSection,
-  requestedCityId: number | null,
+  requestedAreaOperativaId: number | null,
 ): Promise<ReportFilterOptions> {
   const user = req.user;
-  const ownCityId = user?.cittaId ?? null;
+  const ownAreaOperativaId = user?.areaOperativaId ?? null;
   const ownCentreId = user?.centroAscoltoId ?? null;
   const ownZoneId = user?.zonaUdsId ?? null;
-  const effectiveCityId = ownCityId ?? requestedCityId;
+  const effectiveAreaOperativaId = ownAreaOperativaId ?? requestedAreaOperativaId;
   const isAdmin = user?.isAdmin ?? false;
   const hasArea = (area: string) => isAdmin || Boolean(user?.aree.includes(area));
   const hasPermission = (permission: string) =>
@@ -98,22 +98,22 @@ export async function buildReportFilterOptions(
   const includeMense = section === "mensa" && mensaSource;
   const includeZones = section === "uds" && udsSource;
 
-  const [cities, centres, warehouses, canteens, zones] = await Promise.all([
+  const [areeOperative, centres, warehouses, canteens, zones] = await Promise.all([
     sectionSourceEnabled
       ? db
-          .select({ id: cittaTable.id, nome: cittaTable.nome, cittaId: cittaTable.id })
-          .from(cittaTable)
-          .where(ownCityId == null ? undefined : eq(cittaTable.id, ownCityId))
-          .orderBy(asc(cittaTable.nome))
+          .select({ id: areeOperativeTable.id, nome: areeOperativeTable.nome, areaOperativaId: areeOperativeTable.id })
+          .from(areeOperativeTable)
+          .where(ownAreaOperativaId == null ? undefined : eq(areeOperativeTable.id, ownAreaOperativaId))
+          .orderBy(asc(areeOperativeTable.nome))
       : Promise.resolve([]),
     sectionSourceEnabled
       ? db
-          .select({ id: centriAscoltoTable.id, nome: centriAscoltoTable.nome, cittaId: centriAscoltoTable.cittaId })
+          .select({ id: centriAscoltoTable.id, nome: centriAscoltoTable.nome, areaOperativaId: centriAscoltoTable.areaOperativaId })
           .from(centriAscoltoTable)
           .where(
             ownCentreId != null
               ? eq(centriAscoltoTable.id, ownCentreId)
-              : cityCondition(centriAscoltoTable.cittaId, effectiveCityId),
+              : areaOperativaCondition(centriAscoltoTable.areaOperativaId, effectiveAreaOperativaId),
           )
           .orderBy(asc(centriAscoltoTable.nome))
       : Promise.resolve([]),
@@ -122,13 +122,13 @@ export async function buildReportFilterOptions(
           .select({
             id: magazziniTable.id,
             nome: magazziniTable.nome,
-            cittaId: magazziniTable.cittaId,
+            areaOperativaId: magazziniTable.areaOperativaId,
             centroAscoltoId: magazziniTable.centroAscoltoId,
           })
           .from(magazziniTable)
           .where(
             where(
-              cityCondition(magazziniTable.cittaId, effectiveCityId),
+              areaOperativaCondition(magazziniTable.areaOperativaId, effectiveAreaOperativaId),
               ownCentreId == null
                 ? undefined
                 : or(eq(magazziniTable.centroAscoltoId, ownCentreId), isNull(magazziniTable.centroAscoltoId)),
@@ -141,14 +141,14 @@ export async function buildReportFilterOptions(
           .select({
             id: menseTable.id,
             nome: menseTable.nome,
-            cittaId: menseTable.cittaId,
+            areaOperativaId: menseTable.areaOperativaId,
             centroAscoltoId: magazziniTable.centroAscoltoId,
           })
           .from(menseTable)
           .innerJoin(magazziniTable, eq(menseTable.magazzinoId, magazziniTable.id))
           .where(
             where(
-              effectiveCityId == null ? undefined : eq(menseTable.cittaId, effectiveCityId),
+              effectiveAreaOperativaId == null ? undefined : eq(menseTable.areaOperativaId, effectiveAreaOperativaId),
               ownCentreId == null
                 ? undefined
                 : or(eq(magazziniTable.centroAscoltoId, ownCentreId), isNull(magazziniTable.centroAscoltoId)),
@@ -158,14 +158,14 @@ export async function buildReportFilterOptions(
       : Promise.resolve([]),
     includeZones
       ? db
-          .select({ id: zoneUdsTable.id, nome: zoneUdsTable.nome, cittaId: zoneUdsTable.cittaId })
+          .select({ id: zoneUdsTable.id, nome: zoneUdsTable.nome, areaOperativaId: zoneUdsTable.areaOperativaId })
           .from(zoneUdsTable)
           .where(
             ownZoneId != null
               ? eq(zoneUdsTable.id, ownZoneId)
-              : effectiveCityId == null
+              : effectiveAreaOperativaId == null
                 ? undefined
-                : eq(zoneUdsTable.cittaId, effectiveCityId),
+                : eq(zoneUdsTable.areaOperativaId, effectiveAreaOperativaId),
           )
           .orderBy(asc(zoneUdsTable.nome))
       : Promise.resolve([]),
@@ -173,7 +173,7 @@ export async function buildReportFilterOptions(
 
   return {
     section,
-    cities,
+    areeOperative,
     centres,
     warehouses,
     mense: canteens,

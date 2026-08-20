@@ -5,7 +5,7 @@ import { eq, and, lte, gt, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   visibleMagazzinoIds,
   magazzinoScopeFilter,
   canAccessMagazzino,
@@ -40,7 +40,7 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
   const conditions: SQL[] = [gt(lottiTable.quantitaResidua, "0")];
   if (prodottoId) conditions.push(eq(lottiTable.prodottoId, parseInt(prodottoId)));
   if (magazzinoId) conditions.push(eq(lottiTable.magazzinoId, parseInt(magazzinoId)));
-  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)));
+  const scope = magazzinoScopeFilter(lottiTable.magazzinoId, await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)));
   if (scope) conditions.push(scope);
   if (inScadenza === "true") {
     const in30 = new Date();
@@ -93,7 +93,7 @@ router.post("/lotti", requirePermission("magazzino.stock.receive"), async (req, 
     res.status(400).json({ error: "Quantità e data di carico non valide" });
     return;
   }
-  if (!(await canAccessMagazzino(body.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+  if (!(await canAccessMagazzino(body.magazzinoId, callerCentroId(req), callerAreaOperativaId(req)))) {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo profilo" });
     return;
   }
@@ -133,7 +133,7 @@ router.post("/lotti", requirePermission("magazzino.stock.receive"), async (req, 
 router.get("/lotti/:id", requirePermission("magazzino.view"), async (req, res) => {
   const [row] = await db.select().from(lottiTable).where(eq(lottiTable.id, Number(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  if (!(await canAccessMagazzino(row.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+  if (!(await canAccessMagazzino(row.magazzinoId, callerCentroId(req), callerAreaOperativaId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;
   }
@@ -145,7 +145,7 @@ router.patch("/lotti/:id", requirePermission("magazzino.stock.receive"), async (
   const id = Number(req.params.id);
   const [existing] = await db.select().from(lottiTable).where(eq(lottiTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  const ids = await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req));
+  const ids = await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req));
   if (ids != null && !ids.includes(existing.magazzinoId)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;
@@ -187,7 +187,7 @@ router.post("/lotti/:id/rettifica", requirePermission("magazzino.stock.adjust"),
   }
   const [existing] = await db.select().from(lottiTable).where(eq(lottiTable.id, id));
   if (!existing) { res.status(404).json({ error: "Lotto non trovato" }); return; }
-  if (!(await canAccessMagazzino(existing.magazzinoId, callerCentroId(req), callerCittaId(req)))) {
+  if (!(await canAccessMagazzino(existing.magazzinoId, callerCentroId(req), callerAreaOperativaId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo profilo" });
     return;
   }

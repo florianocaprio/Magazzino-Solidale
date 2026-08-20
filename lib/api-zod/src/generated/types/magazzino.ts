@@ -29,7 +29,7 @@ export interface Magazzino {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   tipoMagazzino: MagazzinoTipoMagazzino;
   stato: string;
   /** @nullable */

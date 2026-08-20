@@ -4,7 +4,7 @@ import request from "supertest";
 import {
   bolleTable,
   centriAscoltoTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   magazziniTable,
   menseTable,
@@ -16,7 +16,7 @@ import magazziniRouter from "../src/routes/magazzini";
 let app: Express;
 const magazzinoIds: number[] = [];
 const centroIds: number[] = [];
-const cittaIds: number[] = [];
+const areaOperativaIds: number[] = [];
 const bollaIds: number[] = [];
 
 function makeApp(): Express {
@@ -28,7 +28,7 @@ function makeApp(): Express {
       isAdmin: true,
       isSuperAdmin: true,
       centroAscoltoId: null,
-      cittaId: null,
+      areaOperativaId: null,
     };
     next();
   });
@@ -38,18 +38,18 @@ function makeApp(): Express {
 
 async function createArea(nome: string): Promise<number> {
   const [row] = await db
-    .insert(cittaTable)
+    .insert(areeOperativeTable)
     .values({ nome })
-    .returning({ id: cittaTable.id });
-  cittaIds.push(row.id);
+    .returning({ id: areeOperativeTable.id });
+  areaOperativaIds.push(row.id);
   return row.id;
 }
 
-async function createMensaMagazzino(cittaId: number) {
+async function createMensaMagazzino(areaOperativaId: number) {
   const response = await request(app).post("/magazzini").send({
     nome: "Mensa gestita dai Magazzini",
     tipoMagazzino: "mensa",
-    cittaId,
+    areaOperativaId,
     indirizzo: "Via Test 1",
   });
   expect(response.status).toBe(201);
@@ -81,9 +81,9 @@ afterEach(async () => {
       .where(inArray(centriAscoltoTable.id, centroIds));
     centroIds.length = 0;
   }
-  if (cittaIds.length > 0) {
-    await db.delete(cittaTable).where(inArray(cittaTable.id, cittaIds));
-    cittaIds.length = 0;
+  if (areaOperativaIds.length > 0) {
+    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds));
+    areaOperativaIds.length = 0;
   }
 });
 
@@ -93,8 +93,8 @@ afterAll(async () => {
 
 describe("Magazzino con tag Mensa", () => {
   it("crea automaticamente e atomicamente il dettaglio operativo Mensa", async () => {
-    const cittaId = await createArea(`Area Mensa ${Date.now()}`);
-    const magazzino = await createMensaMagazzino(cittaId);
+    const areaOperativaId = await createArea(`Area Mensa ${Date.now()}`);
+    const magazzino = await createMensaMagazzino(areaOperativaId);
 
     expect(magazzino.codice).toMatch(/^MAG-\d+$/);
     const [mensa] = await db
@@ -103,7 +103,7 @@ describe("Magazzino con tag Mensa", () => {
       .where(eq(menseTable.magazzinoId, magazzino.id));
     expect(mensa).toMatchObject({
       nome: "Mensa gestita dai Magazzini",
-      cittaId,
+      areaOperativaId,
       indirizzo: "Via Test 1",
       attiva: true,
     });
@@ -120,18 +120,18 @@ describe("Magazzino con tag Mensa", () => {
   });
 
   it("rifiuta un Centro inattivo o appartenente a un'altra Area", async () => {
-    const cittaId = await createArea(`Area A ${Date.now()}`);
-    const altraCittaId = await createArea(`Area B ${Date.now()}`);
+    const areaOperativaId = await createArea(`Area A ${Date.now()}`);
+    const altraAreaOperativaId = await createArea(`Area B ${Date.now()}`);
     const [centro] = await db
       .insert(centriAscoltoTable)
-      .values({ nome: `Centro Mensa ${Date.now()}`, cittaId: altraCittaId })
+      .values({ nome: `Centro Mensa ${Date.now()}`, areaOperativaId: altraAreaOperativaId })
       .returning({ id: centriAscoltoTable.id });
     centroIds.push(centro.id);
 
     const wrongArea = await request(app).post("/magazzini").send({
       nome: "Mensa Centro fuori Area",
       tipoMagazzino: "mensa",
-      cittaId,
+      areaOperativaId,
       centroAscoltoId: centro.id,
     });
     expect(wrongArea.status).toBe(400);
@@ -139,12 +139,12 @@ describe("Magazzino con tag Mensa", () => {
 
     await db
       .update(centriAscoltoTable)
-      .set({ cittaId, attivo: false })
+      .set({ areaOperativaId, attivo: false })
       .where(eq(centriAscoltoTable.id, centro.id));
     const inactive = await request(app).post("/magazzini").send({
       nome: "Mensa Centro inattivo",
       tipoMagazzino: "mensa",
-      cittaId,
+      areaOperativaId,
       centroAscoltoId: centro.id,
     });
     expect(inactive.status).toBe(400);
@@ -152,8 +152,8 @@ describe("Magazzino con tag Mensa", () => {
   });
 
   it("sincronizza modifiche e disattivazione senza consentire il cambio di tipo", async () => {
-    const cittaId = await createArea(`Area Sync ${Date.now()}`);
-    const magazzino = await createMensaMagazzino(cittaId);
+    const areaOperativaId = await createArea(`Area Sync ${Date.now()}`);
+    const magazzino = await createMensaMagazzino(areaOperativaId);
 
     const updated = await request(app)
       .patch(`/magazzini/${magazzino.id}`)
@@ -181,8 +181,8 @@ describe("Magazzino con tag Mensa", () => {
   });
 
   it("elimina insieme il dettaglio Mensa quando non esiste alcuno storico", async () => {
-    const cittaId = await createArea(`Area Delete ${Date.now()}`);
-    const magazzino = await createMensaMagazzino(cittaId);
+    const areaOperativaId = await createArea(`Area Delete ${Date.now()}`);
+    const magazzino = await createMensaMagazzino(areaOperativaId);
 
     const response = await request(app).delete(`/magazzini/${magazzino.id}`);
     expect(response.status).toBe(204);
@@ -200,8 +200,8 @@ describe("Magazzino con tag Mensa", () => {
   });
 
   it("non elimina una Mensa presente in una bolla ma consente di disattivarla", async () => {
-    const cittaId = await createArea(`Area Bolla ${Date.now()}`);
-    const magazzino = await createMensaMagazzino(cittaId);
+    const areaOperativaId = await createArea(`Area Bolla ${Date.now()}`);
+    const magazzino = await createMensaMagazzino(areaOperativaId);
     const [bolla] = await db
       .insert(bolleTable)
       .values({

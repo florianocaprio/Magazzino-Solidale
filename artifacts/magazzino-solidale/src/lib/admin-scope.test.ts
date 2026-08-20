@@ -19,12 +19,12 @@ describe("amministratore limitato", () => {
 
 describe("canManageGlobalAdminResources", () => {
   it("consente Admin globale e SuperAdmin", () => {
-    expect(canManageGlobalAdminResources({ isAdmin: true, cittaId: null })).toBe(true);
-    expect(canManageGlobalAdminResources({ isSuperAdmin: true, cittaId: null })).toBe(true);
+    expect(canManageGlobalAdminResources({ isAdmin: true, areaOperativaId: null })).toBe(true);
+    expect(canManageGlobalAdminResources({ isSuperAdmin: true, areaOperativaId: null })).toBe(true);
   });
 
   it("nega Admin di Area e operatori", () => {
-    expect(canManageGlobalAdminResources({ isAdmin: true, cittaId: 1 })).toBe(false);
-    expect(canManageGlobalAdminResources({ isAdmin: false, cittaId: null })).toBe(false);
+    expect(canManageGlobalAdminResources({ isAdmin: true, areaOperativaId: 1 })).toBe(false);
+    expect(canManageGlobalAdminResources({ isAdmin: false, areaOperativaId: null })).toBe(false);
   });
 });

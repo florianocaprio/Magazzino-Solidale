@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ReportAParameter } from './reportAParameter';
+import type { ReportAreaOperativaIdParameter } from './reportAreaOperativaIdParameter';
 import type { ReportCentroIdParameter } from './reportCentroIdParameter';
-import type { ReportCittaIdParameter } from './reportCittaIdParameter';
 import type { ReportDaParameter } from './reportDaParameter';
 import type { ReportMagazzinoIdParameter } from './reportMagazzinoIdParameter';
 
@@ -21,9 +21,9 @@ da?: ReportDaParameter;
  */
 a?: ReportAParameter;
 /**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+ * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
  */
-cittaId?: ReportCittaIdParameter;
+areaOperativaId?: ReportAreaOperativaIdParameter;
 /**
  * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
  */

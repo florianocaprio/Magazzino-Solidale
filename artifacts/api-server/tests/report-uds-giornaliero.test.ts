@@ -9,7 +9,7 @@ import {
   newScope,
   cleanup,
   type SeedScope,
-  createCitta,
+  createAreaOperativa,
   createZona,
   createBeneficiario,
   createUtente,
@@ -27,8 +27,8 @@ let bootScope: SeedScope;
 let operatoreId: number;
 
 const appGlobal = () => makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: null });
-const appCitta = (cittaId: number) =>
-  makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: null, cittaId });
+const appAreaOperativa = (areaOperativaId: number) =>
+  makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: null, areaOperativaId });
 
 beforeAll(async () => {
   bootScope = newScope();
@@ -60,8 +60,8 @@ describe("Report UDS — interventi-giornalieri", () => {
   });
 
   it("supporta un intervallo di date (da..a) e ordina per data", async () => {
-    const citta = await createCitta(scope);
-    const ben = await createBeneficiario(scope, null, { uds: true, cittaId: citta });
+    const areaOperativa = await createAreaOperativa(scope);
+    const ben = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa });
     await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-01" });
     await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-03" });
 
@@ -91,8 +91,8 @@ describe("Report UDS — interventi-giornalieri", () => {
   });
 
   it("numera gli interventi per persona e segna il primo come primoIntervento", async () => {
-    const citta = await createCitta(scope);
-    const ben = await createBeneficiario(scope, null, { uds: true, cittaId: citta });
+    const areaOperativa = await createAreaOperativa(scope);
+    const ben = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa });
     await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-06-01" });
     await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-06-02" });
 
@@ -114,8 +114,8 @@ describe("Report UDS — interventi-giornalieri", () => {
   });
 
   it("conta solo le persone UDS", async () => {
-    const citta = await createCitta(scope);
-    const plain = await createBeneficiario(scope, null, { uds: false, cittaId: citta });
+    const areaOperativa = await createAreaOperativa(scope);
+    const plain = await createBeneficiario(scope, null, { uds: false, areaOperativaId: areaOperativa });
     await insertIntervento(scope, { beneficiarioId: plain, dataIntervento: "2026-06-03" });
 
     const res = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-06-03");
@@ -124,11 +124,11 @@ describe("Report UDS — interventi-giornalieri", () => {
   });
 
   it("filtra per zonaUdsId", async () => {
-    const citta = await createCitta(scope);
-    const zonaA = await createZona(scope, citta);
-    const zonaB = await createZona(scope, citta);
-    const benA = await createBeneficiario(scope, null, { uds: true, cittaId: citta, zonaUdsId: zonaA.id });
-    const benB = await createBeneficiario(scope, null, { uds: true, cittaId: citta, zonaUdsId: zonaB.id });
+    const areaOperativa = await createAreaOperativa(scope);
+    const zonaA = await createZona(scope, areaOperativa);
+    const zonaB = await createZona(scope, areaOperativa);
+    const benA = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa, zonaUdsId: zonaA.id });
+    const benB = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa, zonaUdsId: zonaB.id });
     await insertIntervento(scope, { beneficiarioId: benA, dataIntervento: "2026-06-04" });
     await insertIntervento(scope, { beneficiarioId: benB, dataIntervento: "2026-06-04" });
 
@@ -141,13 +141,13 @@ describe("Report UDS — interventi-giornalieri", () => {
     expect(ids).not.toContain(benB);
   });
 
-  it("applica lo scope HARD per città", async () => {
-    const cittaA = await createCitta(scope);
-    const cittaB = await createCitta(scope);
-    const benB = await createBeneficiario(scope, null, { uds: true, cittaId: cittaB });
+  it("applica lo scope HARD per area operativa", async () => {
+    const areaOperativaA = await createAreaOperativa(scope);
+    const areaOperativaB = await createAreaOperativa(scope);
+    const benB = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativaB });
     await insertIntervento(scope, { beneficiarioId: benB, dataIntervento: "2026-06-05" });
 
-    const fromA = await request(appCitta(cittaA)).get("/report/uds/interventi-giornalieri?da=2026-06-05");
+    const fromA = await request(appAreaOperativa(areaOperativaA)).get("/report/uds/interventi-giornalieri?da=2026-06-05");
     expect(fromA.status).toBe(200);
     expect((fromA.body as Array<{ beneficiarioId: number }>).find((r) => r.beneficiarioId === benB)).toBeUndefined();
 

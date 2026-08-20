@@ -9,5 +9,5 @@
 export type ReportConsegnePerCentroParams = {
 da?: string;
 a?: string;
-cittaId?: number;
+areaOperativaId?: number;
 };

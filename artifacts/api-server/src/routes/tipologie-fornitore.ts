@@ -18,7 +18,7 @@ function fmt(r: typeof tipologieFornitoreTable.$inferSelect) {
   };
 }
 
-// Supplier types are a GLOBAL configurable lookup (no città/centro scoping),
+// Supplier types are a GLOBAL configurable lookup (no area operativa/centro scoping),
 // readable by logistica staff (to fill the fornitori form) and editable only by
 // admins (mutations are guarded with requireAdmin).
 router.get("/tipologie-fornitore", async (_req, res) => {

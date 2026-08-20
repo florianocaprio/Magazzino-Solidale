@@ -23,7 +23,7 @@ import {
 
 let scope: SeedScope;
 
-const appGlobal = () => makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: null, cittaId: null });
+const appGlobal = () => makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
 
 beforeEach(() => {
   scope = newScope();
@@ -74,7 +74,7 @@ describe("POST /consegne/:id/invia-email-*", () => {
     const ben = await createBeneficiario(scope, centroA);
     const consegnaId = await insertConsegna(scope, { beneficiarioId: ben, magazzinoId: mag });
 
-    const appScoped = makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: centroB, cittaId: null });
+    const appScoped = makeScopedApp(consegneRouter, { id: 0, centroAscoltoId: centroB, areaOperativaId: null });
     const res = await request(appScoped).post(`/consegne/${consegnaId}/invia-email-beneficiario`).send({});
     expect(res.status).toBe(403);
   });

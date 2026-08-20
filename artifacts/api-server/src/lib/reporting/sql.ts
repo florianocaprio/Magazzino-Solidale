@@ -26,7 +26,7 @@ export function scopeCondition(
 export function reportScope(
   filters: ReportFilters,
   columns: {
-    citta?: SQL;
+    areaOperativa?: SQL;
     centro?: SQL;
     magazzino?: SQL;
     mensa?: SQL;
@@ -35,11 +35,11 @@ export function reportScope(
   },
 ): SQL[] {
   const conditions: SQL[] = [];
-  if (columns.citta) {
+  if (columns.areaOperativa) {
     const condition = scopeCondition(
-      columns.citta,
-      filters.cittaId,
-      filters.cittaMode,
+      columns.areaOperativa,
+      filters.areaOperativaId,
+      filters.areaOperativaMode,
     );
     if (condition) conditions.push(condition);
   }

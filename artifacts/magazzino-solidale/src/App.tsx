@@ -48,7 +48,7 @@ import ReportingLanding from "@/pages/reporting-landing";
 import ReportingDashboardPage from "@/pages/reporting-dashboard";
 import Utenti from "@/pages/utenti";
 import Ruoli from "@/pages/ruoli";
-import Citta from "@/pages/citta";
+import AreeOperative from "@/pages/aree-operative";
 import ZoneUds from "@/pages/zone-uds";
 import RuoliVolontari from "@/pages/ruoli-volontari";
 import TipiIntervento from "@/pages/tipi-intervento";
@@ -710,10 +710,10 @@ function AppRoutes() {
             </Guard>
           )}
         </Route>
-        <Route path="/citta">
+        <Route path="/aree-operative">
           {() => (
             <Guard area="amministrazione">
-              <Citta />
+              <AreeOperative />
             </Guard>
           )}
         </Route>

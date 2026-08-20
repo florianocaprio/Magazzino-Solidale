@@ -8,7 +8,7 @@ function mealConditions(filters: ReportFilters): SQL[] {
   const conditions = [
     sql`mp.data_servizio BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      citta: sql`m.citta_id`,
+      areaOperativa: sql`m.area_operativa_id`,
       centro: sql`mg.centro_ascolto_id`,
       magazzino: sql`m.magazzino_id`,
       mensa: sql`mp.mensa_id`,
@@ -25,7 +25,7 @@ function mensaAccessConditions(filters: ReportFilters): SQL[] {
   return [
     sql`(ma.data_ora AT TIME ZONE 'Europe/Rome')::date BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      citta: sql`m.citta_id`,
+      areaOperativa: sql`m.area_operativa_id`,
       centro: sql`mg.centro_ascolto_id`,
       magazzino: sql`m.magazzino_id`,
       mensa: sql`ma.mensa_id`,

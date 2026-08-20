@@ -3,7 +3,7 @@ import {
   beneficiariTable,
   centriAscoltoTable,
   consegneTable,
-  cittaTable,
+  areeOperativeTable,
   db,
   magazziniTable,
   sessioniCassaEmporioTable,
@@ -24,12 +24,12 @@ import {
 } from "drizzle-orm";
 import {
   callerCentroId,
-  callerCittaId,
+  callerAreaOperativaId,
   callerZonaUdsId,
   canAccessMagazzino,
   canUseBeneficiario,
   centroScopeFilter,
-  cittaScopeFilter,
+  areaOperativaScopeFilter,
   magazzinoScopeFilter,
   visibleMagazzinoIds,
   zonaUdsScopeFilter,
@@ -162,13 +162,13 @@ async function canAccessAccessoEmporio(
     (await canUseBeneficiario(
       accesso.beneficiarioId,
       callerCentroId(req),
-      callerCittaId(req),
+      callerAreaOperativaId(req),
       callerZonaUdsId(req),
     )) &&
     (await canAccessMagazzino(
       accesso.magazzinoEmporioId,
       callerCentroId(req),
-      callerCittaId(req),
+      callerAreaOperativaId(req),
     ))
   );
 }
@@ -201,7 +201,7 @@ async function validateMagazzinoEmporio(
     return { error: MSG_MAGAZZINO_EMPORIO, status: 400 };
   }
   if (
-    !(await canAccessMagazzino(id, callerCentroId(req), callerCittaId(req)))
+    !(await canAccessMagazzino(id, callerCentroId(req), callerAreaOperativaId(req)))
   ) {
     return {
       error: "Magazzino non accessibile per il tuo profilo",
@@ -210,9 +210,9 @@ async function validateMagazzinoEmporio(
   }
   if (magazzino.stato !== "attivo")
     return { error: "L'Emporio selezionato non è attivo.", status: 400 };
-  if (beneficiario && magazzino.cittaId !== beneficiario.cittaId) {
+  if (beneficiario && magazzino.areaOperativaId !== beneficiario.areaOperativaId) {
     return {
-      error: "L'Emporio deve appartenere alla stessa Area del Beneficiario.",
+      error: "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
       status: 400,
     };
   }
@@ -258,8 +258,8 @@ function formatAccesso(row: {
   beneficiarioCodiceFiscale: string | null;
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
-  cittaId: number | null;
-  cittaNome: string | null;
+  areaOperativaId: number | null;
+  areaOperativaNome: string | null;
   magazzinoEmporioNome: string | null;
   creditoSolidaleSaldo: string | null;
   creditoSolidaleMensileAssegnato: string | null;
@@ -276,8 +276,8 @@ function formatAccesso(row: {
     beneficiarioCodiceFiscale: row.beneficiarioCodiceFiscale,
     centroAscoltoId: row.centroAscoltoId,
     centroAscoltoNome: row.centroAscoltoNome,
-    cittaId: row.cittaId,
-    cittaNome: row.cittaNome,
+    areaOperativaId: row.areaOperativaId,
+    areaOperativaNome: row.areaOperativaNome,
     tipoPianificazione: row.c.tipoPianificazione,
     magazzinoEmporioId: row.c.magazzinoEmporioId,
     magazzinoEmporioNome: row.magazzinoEmporioNome,
@@ -311,8 +311,8 @@ function selectAccessi(conditions: SQL[] = []) {
       beneficiarioCodiceFiscale: beneficiariTable.codiceFiscale,
       centroAscoltoId: beneficiariTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
-      cittaId: beneficiariTable.cittaId,
-      cittaNome: cittaTable.nome,
+      areaOperativaId: beneficiariTable.areaOperativaId,
+      areaOperativaNome: areeOperativeTable.nome,
       magazzinoEmporioNome: magazziniTable.nome,
       creditoSolidaleSaldo: beneficiariTable.creditoSolidaleSaldo,
       creditoSolidaleMensileAssegnato:
@@ -327,7 +327,7 @@ function selectAccessi(conditions: SQL[] = []) {
       centriAscoltoTable,
       eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
     )
-    .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+    .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
     .leftJoin(
       magazziniTable,
       eq(consegneTable.magazzinoEmporioId, magazziniTable.id),
@@ -412,14 +412,14 @@ router.get(
         eq(beneficiariTable.centroAscoltoId, Number(q.centroAscoltoId)),
       );
     }
-    const requestedCitta = q.cittaId ?? q.areaId;
-    if (requestedCitta)
-      conditions.push(eq(beneficiariTable.cittaId, Number(requestedCitta)));
-    const cittaFilter = cittaScopeFilter(
-      beneficiariTable.cittaId,
-      callerCittaId(req),
+    const requestedAreaOperativa = q.areaOperativaId ?? q.areaId;
+    if (requestedAreaOperativa)
+      conditions.push(eq(beneficiariTable.areaOperativaId, Number(requestedAreaOperativa)));
+    const areaOperativaFilter = areaOperativaScopeFilter(
+      beneficiariTable.areaOperativaId,
+      callerAreaOperativaId(req),
     );
-    if (cittaFilter) conditions.push(cittaFilter);
+    if (areaOperativaFilter) conditions.push(areaOperativaFilter);
     const zonaFilter = zonaUdsScopeFilter(
       beneficiariTable.zonaUdsId,
       callerZonaUdsId(req),
@@ -427,7 +427,7 @@ router.get(
     if (zonaFilter) conditions.push(zonaFilter);
     const magazzinoFilter = magazzinoScopeFilter(
       consegneTable.magazzinoEmporioId,
-      await visibleMagazzinoIds(callerCentroId(req), callerCittaId(req)),
+      await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)),
     );
     if (magazzinoFilter) conditions.push(magazzinoFilter);
 
@@ -446,7 +446,7 @@ router.get(
         centriAscoltoTable,
         eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
       )
-      .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+      .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
       .leftJoin(
         magazziniTable,
         eq(consegneTable.magazzinoEmporioId, magazziniTable.id),
@@ -500,11 +500,11 @@ router.get(
       callerCentroId(req),
     );
     if (centroFilter) conditions.push(centroFilter);
-    const cittaFilter = cittaScopeFilter(
-      beneficiariTable.cittaId,
-      callerCittaId(req),
+    const areaOperativaFilter = areaOperativaScopeFilter(
+      beneficiariTable.areaOperativaId,
+      callerAreaOperativaId(req),
     );
-    if (cittaFilter) conditions.push(cittaFilter);
+    if (areaOperativaFilter) conditions.push(areaOperativaFilter);
     const zonaFilter = zonaUdsScopeFilter(
       beneficiariTable.zonaUdsId,
       callerZonaUdsId(req),
@@ -515,7 +515,7 @@ router.get(
       .select({
         beneficiario: beneficiariTable,
         centroAscoltoNome: centriAscoltoTable.nome,
-        cittaNome: cittaTable.nome,
+        areaOperativaNome: areeOperativeTable.nome,
         magazzinoEmporioPreferitoNome: magazziniTable.nome,
       })
       .from(beneficiariTable)
@@ -523,7 +523,7 @@ router.get(
         centriAscoltoTable,
         eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
       )
-      .leftJoin(cittaTable, eq(beneficiariTable.cittaId, cittaTable.id))
+      .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
       .leftJoin(
         magazziniTable,
         eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id),
@@ -540,8 +540,8 @@ router.get(
         beneficiarioCodiceFiscale: row.beneficiario.codiceFiscale,
         centroAscoltoId: row.beneficiario.centroAscoltoId,
         centroAscoltoNome: row.centroAscoltoNome,
-        cittaId: row.beneficiario.cittaId,
-        cittaNome: row.cittaNome,
+        areaOperativaId: row.beneficiario.areaOperativaId,
+        areaOperativaNome: row.areaOperativaNome,
         creditoSolidaleAbilitato: row.beneficiario.creditoSolidaleAbilitato,
         creditoSolidaleStato: row.beneficiario.creditoSolidaleStato,
         saldoCreditoSolidale: Number(
@@ -617,7 +617,7 @@ router.post(
       !(await canUseBeneficiario(
         beneficiarioId,
         callerCentroId(req),
-        callerCittaId(req),
+        callerAreaOperativaId(req),
         callerZonaUdsId(req),
       ))
     ) {
@@ -761,7 +761,7 @@ router.patch(
       !(await canUseBeneficiario(
         beneficiarioId,
         callerCentroId(req),
-        callerCittaId(req),
+        callerAreaOperativaId(req),
         callerZonaUdsId(req),
       ))
     ) {

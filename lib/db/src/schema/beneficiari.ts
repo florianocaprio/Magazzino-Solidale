@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, serial, varchar, text, boolean, timestamp, integer, date, decimal, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { cittaTable } from "./citta";
+import { areeOperativeTable } from "./areeOperative";
 import { zoneUdsTable } from "./zoneUds";
 import { magazziniTable } from "./magazzini";
 
@@ -51,7 +51,7 @@ export const beneficiariTable = pgTable("beneficiari", {
   creditoSolidaleSaldo: decimal("credito_solidale_saldo", { precision: 10, scale: 2 }).notNull().default("0"),
   creditoSolidaleDataUltimoMovimento: timestamp("credito_solidale_data_ultimo_movimento"),
   uds: boolean("uds").notNull().default(false),
-  cittaId: integer("citta_id").references(() => cittaTable.id),
+  areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
   zonaUdsId: integer("zona_uds_id").references(() => zoneUdsTable.id),
   attivo: boolean("attivo").notNull().default(true),
   dataPresaInCarico: date("data_presa_in_carico"),

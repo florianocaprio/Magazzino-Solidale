@@ -12,7 +12,7 @@ function pacchiConditions(filters: ReportFilters): SQL[] {
     )`,
     sql`b.data_bolla::date BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      citta: sql`be.citta_id`,
+      areaOperativa: sql`be.area_operativa_id`,
       centro: sql`be.centro_ascolto_id`,
       magazzino: sql`b.magazzino_id`,
     }),

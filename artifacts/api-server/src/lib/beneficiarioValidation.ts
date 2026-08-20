@@ -47,7 +47,7 @@ const beneficiarioFields = {
   centroAscoltoId: nullableId,
   magazzinoEmporioPreferitoId: nullableId,
   uds: booleanValue.optional(),
-  cittaId: nullableId,
+  areaOperativaId: nullableId,
   zonaUdsId: nullableId,
   dataPresaInCarico: nullableDate,
   noteInterne: nullableText(10_000),

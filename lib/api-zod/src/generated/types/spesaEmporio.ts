@@ -23,9 +23,9 @@ export interface SpesaEmporio {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   magazzinoEmporioId: number;
   /** @nullable */
   magazzinoEmporioNome?: string | null;

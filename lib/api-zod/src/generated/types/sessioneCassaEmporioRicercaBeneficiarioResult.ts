@@ -16,7 +16,7 @@ export interface SessioneCassaEmporioRicercaBeneficiarioResult {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   magazzinoEmporioPreferitoId?: number | null;
   /** @nullable */

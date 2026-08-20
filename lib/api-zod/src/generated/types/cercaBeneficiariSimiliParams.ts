@@ -21,6 +21,6 @@ dataNascita?: string;
  * Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
  * @minimum 1
  */
-cittaId?: number;
+areaOperativaId?: number;
 excludeId?: number;
 };

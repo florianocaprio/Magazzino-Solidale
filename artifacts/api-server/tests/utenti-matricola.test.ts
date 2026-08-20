@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, utentiTable, ruoliTable, cittaTable, zoneUdsTable } from "@workspace/db";
+import { db, pool, utentiTable, ruoliTable, areeOperativeTable, zoneUdsTable } from "@workspace/db";
 import { inArray, eq } from "drizzle-orm";
 import utentiRouter from "../src/routes/utenti";
 
 let app: Express;
 let adminId: number;
-let cittaId: number;
+let areaOperativaId: number;
 let zonaUdsId: number;
 let ruoloId: number;
 const createdUserIds: number[] = [];
@@ -27,7 +27,7 @@ function makeApp(sessionUserId: number): Express {
 }
 
 /** Inserts a user directly in the DB (bypassing the API) and tracks cleanup. */
-async function insertUser(values: { username: string; nome: string; cognome?: string | null; matricola?: string | null; cittaId?: number | null; zonaUdsId?: number | null; dataCreazione?: Date }): Promise<number> {
+async function insertUser(values: { username: string; nome: string; cognome?: string | null; matricola?: string | null; areaOperativaId?: number | null; zonaUdsId?: number | null; dataCreazione?: Date }): Promise<number> {
   const [row] = await db
     .insert(utentiTable)
     .values({
@@ -37,7 +37,7 @@ async function insertUser(values: { username: string; nome: string; cognome?: st
       cognome: values.cognome ?? null,
       matricola: values.matricola ?? null,
       ruoloId,
-      cittaId: values.cittaId ?? null,
+      areaOperativaId: values.areaOperativaId ?? null,
       zonaUdsId: values.zonaUdsId ?? null,
       attivo: true,
       ...(values.dataCreazione ? { dataCreazione: values.dataCreazione } : {}),
@@ -50,14 +50,14 @@ async function insertUser(values: { username: string; nome: string; cognome?: st
 beforeAll(async () => {
   const suffix = Date.now();
   const [c] = await db
-    .insert(cittaTable)
+    .insert(areeOperativeTable)
     .values({ nome: `Milano Test ${suffix}`, sigla: "MI" })
-    .returning({ id: cittaTable.id });
-  cittaId = c.id;
+    .returning({ id: areeOperativeTable.id });
+  areaOperativaId = c.id;
 
   const [z] = await db
     .insert(zoneUdsTable)
-    .values({ nome: `Zona Test ${suffix}`, cittaId })
+    .values({ nome: `Zona Test ${suffix}`, areaOperativaId })
     .returning({ id: zoneUdsTable.id });
   zonaUdsId = z.id;
 
@@ -67,12 +67,12 @@ beforeAll(async () => {
     .returning({ id: ruoliTable.id });
   ruoloId = r.id;
 
-  // Global admin caller (cittaId null → can edit users of any città).
+  // Global admin caller (areaOperativaId null → can edit users of any area operativa).
   adminId = await insertUser({
     username: `admin-test-${suffix}`,
     nome: "Super",
     cognome: "Admin",
-    cittaId: null,
+    areaOperativaId: null,
   });
 
   app = makeApp(adminId);
@@ -84,18 +84,18 @@ afterAll(async () => {
   }
   await db.delete(ruoliTable).where(eq(ruoliTable.id, ruoloId));
   await db.delete(zoneUdsTable).where(eq(zoneUdsTable.id, zonaUdsId));
-  await db.delete(cittaTable).where(eq(cittaTable.id, cittaId));
+  await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, areaOperativaId));
   await pool.end();
 });
 
 describe("PATCH /utenti/:id — auto-generazione matricola in modifica", () => {
-  it("genera la matricola quando l'utente non ne ha una (anno di creazione + sigla città)", async () => {
+  it("genera la matricola quando l'utente non ne ha una (anno di creazione + sigla area operativa)", async () => {
     const id = await insertUser({
       username: `mario-${Date.now()}`,
       nome: "Mario",
       cognome: "Rossi",
       matricola: null,
-      cittaId,
+      areaOperativaId,
       dataCreazione: new Date("2024-06-15T10:00:00Z"),
     });
 
@@ -108,13 +108,13 @@ describe("PATCH /utenti/:id — auto-generazione matricola in modifica", () => {
     expect(row.matricola).toBe(res.body.matricola);
   });
 
-  it("usa 'OO' come sigla per un utente senza città", async () => {
+  it("usa 'OO' come sigla per un utente senza area operativa", async () => {
     const id = await insertUser({
       username: `luca-${Date.now()}`,
       nome: "Luca",
       cognome: "Bianchi",
       matricola: null,
-      cittaId: null,
+      areaOperativaId: null,
       dataCreazione: new Date("2025-03-01T10:00:00Z"),
     });
 
@@ -129,7 +129,7 @@ describe("PATCH /utenti/:id — auto-generazione matricola in modifica", () => {
       nome: "Anna",
       cognome: "Verdi",
       matricola: "CUSTOM-001",
-      cittaId,
+      areaOperativaId,
     });
 
     const res = await request(app).patch(`/utenti/${id}`).send({ nome: "Anna" });
@@ -143,7 +143,7 @@ describe("PATCH /utenti/:id — auto-generazione matricola in modifica", () => {
       nome: "Paolo",
       cognome: "Neri",
       matricola: null,
-      cittaId,
+      areaOperativaId,
     });
 
     const res = await request(app).patch(`/utenti/${id}`).send({ matricola: "MANUALE-9" });
@@ -172,7 +172,7 @@ describe("POST /utenti — accesso immediato", () => {
     expect(row.mustChangePassword).toBe(true);
   });
 
-  it("persiste e restituisce città e zona UDS", async () => {
+  it("persiste e restituisce area operativa e zona UDS", async () => {
     const res = await request(app)
       .post("/utenti")
       .send({
@@ -182,24 +182,24 @@ describe("POST /utenti — accesso immediato", () => {
         nome: "Utente",
         cognome: "Zona",
         ruoloId,
-        cittaId,
+        areaOperativaId,
         zonaUdsId,
       });
     expect(res.status).toBe(201);
     createdUserIds.push(res.body.id);
-    expect(res.body.cittaId).toBe(cittaId);
-    expect(res.body.cittaNome).toContain("Milano Test");
+    expect(res.body.areaOperativaId).toBe(areaOperativaId);
+    expect(res.body.areaOperativaNome).toContain("Milano Test");
     expect(res.body.zonaUdsId).toBe(zonaUdsId);
     expect(res.body.zonaUdsNome).toContain("Zona Test");
 
     const [row] = await db
       .select({
-        cittaId: utentiTable.cittaId,
+        areaOperativaId: utentiTable.areaOperativaId,
         zonaUdsId: utentiTable.zonaUdsId,
       })
       .from(utentiTable)
       .where(eq(utentiTable.id, res.body.id));
-    expect(row.cittaId).toBe(cittaId);
+    expect(row.areaOperativaId).toBe(areaOperativaId);
     expect(row.zonaUdsId).toBe(zonaUdsId);
   });
 });
@@ -212,7 +212,7 @@ describe("Utenti — matricola univoca", () => {
       nome: "Dup",
       cognome: "Uno",
       matricola,
-      cittaId,
+      areaOperativaId,
     });
 
     const res = await request(app)
@@ -225,7 +225,7 @@ describe("Utenti — matricola univoca", () => {
         cognome: "Due",
         matricola: ` ${matricola} `,
         ruoloId,
-        cittaId,
+        areaOperativaId,
       });
 
     expect(res.status).toBe(409);
@@ -240,14 +240,14 @@ describe("Utenti — matricola univoca", () => {
       nome: "Patch",
       cognome: "Uno",
       matricola: matricolaA,
-      cittaId,
+      areaOperativaId,
     });
     const id = await insertUser({
       username: `dup-patch-b-${Date.now()}`,
       nome: "Patch",
       cognome: "Due",
       matricola: matricolaB,
-      cittaId,
+      areaOperativaId,
     });
 
     const res = await request(app).patch(`/utenti/${id}`).send({ matricola: matricolaA });

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import {
   useReportUdsInterventiGiornalieri,
-  useListCitta,
+  useListAreeOperative,
   useListZoneUds,
   getReportUdsInterventiGiornalieriQueryKey,
   getListZoneUdsQueryKey,
@@ -26,31 +26,31 @@ type Mode = "day" | "range";
 export default function UdsReportGiornaliero() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const isGlobalCitta = (user?.cittaId ?? null) == null;
+  const isGlobalAreaOperativa = (user?.areaOperativaId ?? null) == null;
   const lockedZonaId = user?.zonaUdsId ?? null;
 
   const today = new Date().toISOString().slice(0, 10);
   const [mode, setMode] = useState<Mode>("day");
   const [da, setDa] = useState(today);
   const [a, setA] = useState(today);
-  const [cittaId, setCittaId] = useState<string>(ALL);
+  const [areaOperativaId, setAreaOperativaId] = useState<string>(ALL);
   const [zonaId, setZonaId] = useState<string>(lockedZonaId != null ? String(lockedZonaId) : ALL);
 
   useEffect(() => {
     if (lockedZonaId != null) setZonaId(String(lockedZonaId));
   }, [lockedZonaId]);
 
-  const { data: citta } = useListCitta();
-  const cittaParam = cittaId === ALL ? undefined : parseInt(cittaId);
+  const { data: areaOperativa } = useListAreeOperative();
+  const areaOperativaParam = areaOperativaId === ALL ? undefined : parseInt(areaOperativaId);
 
-  const zoneParams = isGlobalCitta && cittaParam ? { cittaId: cittaParam } : undefined;
+  const zoneParams = isGlobalAreaOperativa && areaOperativaParam ? { areaOperativaId: areaOperativaParam } : undefined;
   const { data: zone } = useListZoneUds(zoneParams, {
     query: { queryKey: getListZoneUdsQueryKey(zoneParams) },
   });
   const zonaParam = zonaId === ALL ? undefined : parseInt(zonaId);
 
   const effectiveA = mode === "range" ? a : undefined;
-  const params = { da, a: effectiveA, cittaId: cittaParam, zonaUdsId: zonaParam };
+  const params = { da, a: effectiveA, areaOperativaId: areaOperativaParam, zonaUdsId: zonaParam };
   const { data: rows, isLoading } = useReportUdsInterventiGiornalieri(params, {
     query: { queryKey: getReportUdsInterventiGiornalieriQueryKey(params), enabled: !!da },
   });
@@ -64,9 +64,9 @@ export default function UdsReportGiornaliero() {
     [r.descrizione, r.note, r.noteUds].filter(Boolean).join(" · ");
 
   const list = rows ?? [];
-  const selectedCittaNome = isGlobalCitta
-    ? (citta ?? []).find((c) => c.id === cittaParam)?.nome
-    : (user?.cittaNome ?? undefined);
+  const selectedAreaOperativaNome = isGlobalAreaOperativa
+    ? (areaOperativa ?? []).find((c) => c.id === areaOperativaParam)?.nome
+    : (user?.areaOperativaNome ?? undefined);
   const selectedZonaNome = (zone ?? []).find((z) => z.id === zonaParam)?.nome;
 
   const periodoLabel = mode === "range" ? `${formatIt(da)} – ${formatIt(a)}` : formatIt(da);
@@ -79,7 +79,7 @@ export default function UdsReportGiornaliero() {
       meta: {
         date: mode === "day" ? formatIt(da) : undefined,
         period: mode === "range" ? `${formatIt(da)} – ${formatIt(a)}` : undefined,
-        city: selectedCittaNome,
+        areaOperativa: selectedAreaOperativaNome,
         zone: selectedZonaNome,
       },
       labels: {
@@ -93,7 +93,7 @@ export default function UdsReportGiornaliero() {
         legend: t("udsReportGiornaliero.legend"),
         metaDate: t("udsReportGiornaliero.pdfMetaDate"),
         metaPeriod: t("udsReportGiornaliero.pdfMetaPeriod"),
-        metaCity: t("udsReportGiornaliero.pdfMetaCity"),
+        metaAreaOperativa: t("udsReportGiornaliero.pdfMetaAreaOperativa"),
         metaZone: t("udsReportGiornaliero.pdfMetaZone"),
       },
       rows: list.map((r) => ({
@@ -174,20 +174,20 @@ export default function UdsReportGiornaliero() {
             </div>
           )}
 
-          {isGlobalCitta && (
+          {isGlobalAreaOperativa && (
             <div className="space-y-1.5">
-              <Label className="text-xs">{t("udsReportGiornaliero.city")}</Label>
+              <Label className="text-xs">{t("udsReportGiornaliero.areaOperativa")}</Label>
               <Select
-                value={cittaId}
+                value={areaOperativaId}
                 onValueChange={(v) => {
-                  setCittaId(v);
+                  setAreaOperativaId(v);
                   setZonaId(ALL);
                 }}
               >
                 <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>{t("udsReportGiornaliero.allCities")}</SelectItem>
-                  {(citta ?? []).map((c) => (
+                  <SelectItem value={ALL}>{t("udsReportGiornaliero.allAreeOperative")}</SelectItem>
+                  {(areaOperativa ?? []).map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                   ))}
                 </SelectContent>
