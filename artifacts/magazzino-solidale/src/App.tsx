@@ -339,7 +339,9 @@ function AppRoutes() {
           {() => (
             <Guard area="emporio">
               <RequireModulo codice="EMPORIO_SOLIDALE">
-                <EmporioCassa />
+                <RequirePermission permission="emporio.cassa.view">
+                  <EmporioCassa />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -372,7 +374,9 @@ function AppRoutes() {
           {() => (
             <Guard area="emporio">
               <RequireModulo codice="EMPORIO_SOLIDALE">
-                <EmporioSpese />
+                <RequirePermission permission="emporio.sales.view">
+                  <EmporioSpese />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}

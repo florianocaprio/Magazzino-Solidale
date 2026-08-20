@@ -6,9 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SpesaEmporioChiusuraInput {
-  /** @minimum 1 */
-  versione: number;
-  /** @nullable */
-  note?: string | null;
-}
+/**
+ * Pagina richiesta, indicizzata da 1
+ */
+export type PageParamParameter = number;

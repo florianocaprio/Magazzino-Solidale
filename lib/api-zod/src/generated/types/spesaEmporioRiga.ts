@@ -22,6 +22,12 @@ export interface SpesaEmporioRiga {
   codiceProdotto?: string | null;
   descrizioneProdotto: string;
   quantita: number;
+  /** @nullable */
+  unitaMisura?: string | null;
+  /** @minimum 0 */
+  quantitaStornata: number;
+  /** @minimum 0 */
+  quantitaStornabile: number;
   creditoUnitario: number;
   creditoTotale: number;
   /** @nullable */

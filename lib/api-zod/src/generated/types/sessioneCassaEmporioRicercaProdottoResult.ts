@@ -21,4 +21,6 @@ export interface SessioneCassaEmporioRicercaProdottoResult {
   quantitaMassimaMensile?: number | null;
   /** @nullable */
   giacenzaDisponibile?: number | null;
+  /** @nullable */
+  unitaMisura?: string | null;
 }

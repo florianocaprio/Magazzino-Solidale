@@ -2230,6 +2230,11 @@ export const CreateTesseraBeneficiarioDaAnagraficaBody = zod.object({
 })
 
 
+export const listInterventiQueryPageDefault = 1;
+
+export const listInterventiQueryLimitDefault = 50;
+export const listInterventiQueryLimitMax = 100;
+
 export const listInterventiQueryIncludiStoriciDefault = false;
 export const listInterventiQueryRicercaMax = 120;
 
@@ -2242,6 +2247,8 @@ export const listInterventiQueryLimiteMax = 200;
 
 export const ListInterventiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
+  "page": zod.coerce.number().min(1).default(listInterventiQueryPageDefault).describe('Pagina richiesta, indicizzata da 1'),
+  "limit": zod.coerce.number().min(1).max(listInterventiQueryLimitMax).default(listInterventiQueryLimitDefault).describe('Numero di record per pagina'),
   "tipo": zod.coerce.string().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
   "cittaId": zod.coerce.number().optional(),
@@ -3722,6 +3729,13 @@ export const AssociaBollaResponse = zod.object({
 })
 
 
+export const listAccessiEmporioQueryPageDefault = 1;
+
+export const listAccessiEmporioQueryLimitDefault = 50;
+export const listAccessiEmporioQueryLimitMax = 100;
+
+
+
 export const ListAccessiEmporioQueryParams = zod.object({
   "dataDa": zod.coerce.string().optional(),
   "dataA": zod.coerce.string().optional(),
@@ -3731,6 +3745,8 @@ export const ListAccessiEmporioQueryParams = zod.object({
   "magazzinoEmporioId": zod.coerce.number().optional(),
   "statoAccessoEmporio": zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']).optional(),
   "beneficiarioSearch": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).default(listAccessiEmporioQueryPageDefault).describe('Pagina richiesta, indicizzata da 1'),
+  "limit": zod.coerce.number().min(1).max(listAccessiEmporioQueryLimitMax).default(listAccessiEmporioQueryLimitDefault).describe('Numero di record per pagina'),
   "beneficiarioId": zod.coerce.number().optional()
 })
 
@@ -3770,7 +3786,6 @@ export const CreateAccessoEmporioBody = zod.object({
   "magazzinoEmporioId": zod.number(),
   "dataOraInizio": zod.coerce.date(),
   "dataOraFine": zod.coerce.date().nullish(),
-  "statoAccessoEmporio": zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']).optional(),
   "noteAccessoEmporio": zod.string().nullish()
 })
 
@@ -3843,7 +3858,6 @@ export const UpdateAccessoEmporioBody = zod.object({
   "magazzinoEmporioId": zod.number().optional(),
   "dataOraInizio": zod.coerce.date().optional(),
   "dataOraFine": zod.coerce.date().nullish(),
-  "statoAccessoEmporio": zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']).optional(),
   "noteAccessoEmporio": zod.string().nullish()
 })
 
@@ -3916,14 +3930,28 @@ export const UpdateAccessoEmporioStatoResponse = zod.object({
 })
 
 
+export const listSessioniCassaEmporioQueryPageDefault = 1;
+
+export const listSessioniCassaEmporioQueryLimitDefault = 50;
+export const listSessioniCassaEmporioQueryLimitMax = 100;
+
+
+
 export const ListSessioniCassaEmporioQueryParams = zod.object({
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']).optional(),
   "magazzinoEmporioId": zod.coerce.number().optional(),
   "cittaId": zod.coerce.number().optional(),
   "areaId": zod.coerce.number().optional(),
   "data": zod.coerce.string().optional(),
-  "beneficiarioSearch": zod.coerce.string().optional()
+  "beneficiarioSearch": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).default(listSessioniCassaEmporioQueryPageDefault).describe('Pagina richiesta, indicizzata da 1'),
+  "limit": zod.coerce.number().min(1).max(listSessioniCassaEmporioQueryLimitMax).default(listSessioniCassaEmporioQueryLimitDefault).describe('Numero di record per pagina')
 })
+
+
+export const listSessioniCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+
+
 
 export const ListSessioniCassaEmporioResponseItem = zod.object({
   "id": zod.number(),
@@ -3936,6 +3964,7 @@ export const ListSessioniCassaEmporioResponseItem = zod.object({
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "versione": zod.number().min(1),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -3961,7 +3990,8 @@ export const ListSessioniCassaEmporioResponseItem = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(listSessioniCassaEmporioResponseRigheItemQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -3982,6 +4012,11 @@ export const GetSessioneCassaEmporioParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+export const getSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+
+
+
 export const GetSessioneCassaEmporioResponse = zod.object({
   "id": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -3993,6 +4028,7 @@ export const GetSessioneCassaEmporioResponse = zod.object({
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "versione": zod.number().min(1),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -4018,7 +4054,8 @@ export const GetSessioneCassaEmporioResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(getSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -4057,12 +4094,16 @@ export const AddSessioneCassaEmporioRigaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const addSessioneCassaEmporioRigaBodyQuantitaMin = 0.01;
+export const addSessioneCassaEmporioRigaBodyQuantitaMultipleOf = 0.01;
+
 
 
 
 export const AddSessioneCassaEmporioRigaBody = zod.object({
   "prodottoId": zod.number(),
-  "quantita": zod.number().min(1),
+  "quantita": zod.number().min(addSessioneCassaEmporioRigaBodyQuantitaMin).multipleOf(addSessioneCassaEmporioRigaBodyQuantitaMultipleOf),
+  "versione": zod.number().min(1),
   "note": zod.string().nullish()
 })
 
@@ -4072,13 +4113,21 @@ export const UpdateSessioneCassaEmporioRigaParams = zod.object({
   "rigaId": zod.coerce.number()
 })
 
+export const updateSessioneCassaEmporioRigaBodyQuantitaMin = 0.01;
+export const updateSessioneCassaEmporioRigaBodyQuantitaMultipleOf = 0.01;
+
 
 
 
 export const UpdateSessioneCassaEmporioRigaBody = zod.object({
-  "quantita": zod.number().min(1),
+  "quantita": zod.number().min(updateSessioneCassaEmporioRigaBodyQuantitaMin).multipleOf(updateSessioneCassaEmporioRigaBodyQuantitaMultipleOf),
+  "versione": zod.number().min(1),
   "note": zod.string().nullish()
 })
+
+export const updateSessioneCassaEmporioRigaResponseQuantitaMultipleOf = 0.01;
+
+
 
 export const UpdateSessioneCassaEmporioRigaResponse = zod.object({
   "id": zod.number(),
@@ -4087,7 +4136,8 @@ export const UpdateSessioneCassaEmporioRigaResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(updateSessioneCassaEmporioRigaResponseQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -4107,6 +4157,18 @@ export const DeleteSessioneCassaEmporioRigaParams = zod.object({
   "rigaId": zod.coerce.number()
 })
 
+
+
+
+export const DeleteSessioneCassaEmporioRigaBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
+
+export const deleteSessioneCassaEmporioRigaResponseRigheItemQuantitaMultipleOf = 0.01;
+
+
+
 export const DeleteSessioneCassaEmporioRigaResponse = zod.object({
   "id": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -4118,6 +4180,7 @@ export const DeleteSessioneCassaEmporioRigaResponse = zod.object({
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "versione": zod.number().min(1),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -4143,7 +4206,8 @@ export const DeleteSessioneCassaEmporioRigaResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(deleteSessioneCassaEmporioRigaResponseRigheItemQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -4163,6 +4227,18 @@ export const SospendiSessioneCassaEmporioParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+export const SospendiSessioneCassaEmporioBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
+
+export const sospendiSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+
+
+
 export const SospendiSessioneCassaEmporioResponse = zod.object({
   "id": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -4174,6 +4250,7 @@ export const SospendiSessioneCassaEmporioResponse = zod.object({
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "versione": zod.number().min(1),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -4199,7 +4276,8 @@ export const SospendiSessioneCassaEmporioResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(sospendiSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -4219,6 +4297,18 @@ export const RiprendiSessioneCassaEmporioParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+export const RiprendiSessioneCassaEmporioBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
+
+export const riprendiSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+
+
+
 export const RiprendiSessioneCassaEmporioResponse = zod.object({
   "id": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -4230,6 +4320,7 @@ export const RiprendiSessioneCassaEmporioResponse = zod.object({
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "versione": zod.number().min(1),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -4255,7 +4346,8 @@ export const RiprendiSessioneCassaEmporioResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(riprendiSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -4275,10 +4367,19 @@ export const AnnullaSessioneCassaEmporioParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const AnnullaSessioneCassaEmporioBody = zod.object({
+  "versione": zod.number().min(1),
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish()
 })
+
+
+export const annullaSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+
+
 
 export const AnnullaSessioneCassaEmporioResponse = zod.object({
   "id": zod.number(),
@@ -4291,6 +4392,7 @@ export const AnnullaSessioneCassaEmporioResponse = zod.object({
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "versione": zod.number().min(1),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -4316,7 +4418,8 @@ export const AnnullaSessioneCassaEmporioResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(annullaSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -4336,6 +4439,18 @@ export const PreparaChiusuraSessioneCassaEmporioParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+export const PreparaChiusuraSessioneCassaEmporioBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
+
+export const preparaChiusuraSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+
+
+
 export const PreparaChiusuraSessioneCassaEmporioResponse = zod.object({
   "id": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -4347,6 +4462,7 @@ export const PreparaChiusuraSessioneCassaEmporioResponse = zod.object({
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "versione": zod.number().min(1),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -4372,7 +4488,8 @@ export const PreparaChiusuraSessioneCassaEmporioResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(preparaChiusuraSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -4392,9 +4509,26 @@ export const ChiudiSessioneCassaEmporioParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const ChiudiSessioneCassaEmporioBody = zod.object({
+  "versione": zod.number().min(1),
   "note": zod.string().nullish()
 })
+
+
+export const chiudiSessioneCassaEmporioResponseSessioneOneRigheItemQuantitaMultipleOf = 0.01;
+
+export const chiudiSessioneCassaEmporioResponseSpesaOneRigheItemQuantitaStornataMin = 0;
+
+export const chiudiSessioneCassaEmporioResponseSpesaOneRigheItemQuantitaStornabileMin = 0;
+
+export const chiudiSessioneCassaEmporioResponseEmailBollaSpesaOneRigheItemQuantitaStornataMin = 0;
+
+export const chiudiSessioneCassaEmporioResponseEmailBollaSpesaOneRigheItemQuantitaStornabileMin = 0;
+
+
 
 export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "sessione": zod.union([zod.object({
@@ -4408,6 +4542,7 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
+  "versione": zod.number().min(1),
   "saldoCreditoIniziale": zod.number(),
   "totaleCreditoPrevisto": zod.number(),
   "creditoResiduoPrevisto": zod.number(),
@@ -4433,7 +4568,8 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "lottoId": zod.number().nullish(),
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
-  "quantita": zod.number(),
+  "quantita": zod.number().multipleOf(chiudiSessioneCassaEmporioResponseSessioneOneRigheItemQuantitaMultipleOf),
+  "unitaMisura": zod.string().nullable(),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "giacenzaDisponibileAlMomento": zod.number().nullish(),
@@ -4469,7 +4605,7 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "totaleCreditoConsumati": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
-  "statoSpesa": zod.string(),
+  "statoSpesa": zod.enum(['chiusa', 'stornata_parzialmente', 'stornata']),
   "operatoreChiusuraId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4491,6 +4627,9 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
   "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(chiudiSessioneCassaEmporioResponseSpesaOneRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(chiudiSessioneCassaEmporioResponseSpesaOneRigheItemQuantitaStornabileMin),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
@@ -4531,7 +4670,7 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "totaleCreditoConsumati": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
-  "statoSpesa": zod.string(),
+  "statoSpesa": zod.enum(['chiusa', 'stornata_parzialmente', 'stornata']),
   "operatoreChiusuraId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4553,6 +4692,9 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
   "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(chiudiSessioneCassaEmporioResponseEmailBollaSpesaOneRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(chiudiSessioneCassaEmporioResponseEmailBollaSpesaOneRigheItemQuantitaStornabileMin),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
@@ -4613,9 +4755,17 @@ export const SearchProdottiCassaEmporioResponseItem = zod.object({
   "creditoSolidaleValore": zod.number(),
   "quantitaMassimaPerSpesa": zod.number().nullish(),
   "quantitaMassimaMensile": zod.number().nullish(),
-  "giacenzaDisponibile": zod.number().nullish()
+  "giacenzaDisponibile": zod.number().nullish(),
+  "unitaMisura": zod.string().nullish()
 })
 export const SearchProdottiCassaEmporioResponse = zod.array(SearchProdottiCassaEmporioResponseItem)
+
+
+export const listSpeseEmporioQueryPageDefault = 1;
+
+export const listSpeseEmporioQueryLimitDefault = 50;
+export const listSpeseEmporioQueryLimitMax = 100;
+
 
 
 export const ListSpeseEmporioQueryParams = zod.object({
@@ -4626,8 +4776,16 @@ export const ListSpeseEmporioQueryParams = zod.object({
   "magazzinoEmporioId": zod.coerce.number().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
   "cittaId": zod.coerce.number().optional(),
-  "areaId": zod.coerce.number().optional()
+  "areaId": zod.coerce.number().optional(),
+  "page": zod.coerce.number().min(1).default(listSpeseEmporioQueryPageDefault).describe('Pagina richiesta, indicizzata da 1'),
+  "limit": zod.coerce.number().min(1).max(listSpeseEmporioQueryLimitMax).default(listSpeseEmporioQueryLimitDefault).describe('Numero di record per pagina')
 })
+
+export const listSpeseEmporioResponseRigheItemQuantitaStornataMin = 0;
+
+export const listSpeseEmporioResponseRigheItemQuantitaStornabileMin = 0;
+
+
 
 export const ListSpeseEmporioResponseItem = zod.object({
   "id": zod.number(),
@@ -4651,7 +4809,7 @@ export const ListSpeseEmporioResponseItem = zod.object({
   "totaleCreditoConsumati": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
-  "statoSpesa": zod.string(),
+  "statoSpesa": zod.enum(['chiusa', 'stornata_parzialmente', 'stornata']),
   "operatoreChiusuraId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4673,6 +4831,9 @@ export const ListSpeseEmporioResponseItem = zod.object({
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
   "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(listSpeseEmporioResponseRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(listSpeseEmporioResponseRigheItemQuantitaStornabileMin),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
@@ -4687,6 +4848,12 @@ export const ListSpeseEmporioResponse = zod.array(ListSpeseEmporioResponseItem)
 export const GetSpesaEmporioBySessioneParams = zod.object({
   "sessioneCassaId": zod.coerce.number()
 })
+
+export const getSpesaEmporioBySessioneResponseRigheItemQuantitaStornataMin = 0;
+
+export const getSpesaEmporioBySessioneResponseRigheItemQuantitaStornabileMin = 0;
+
+
 
 export const GetSpesaEmporioBySessioneResponse = zod.object({
   "id": zod.number(),
@@ -4710,7 +4877,7 @@ export const GetSpesaEmporioBySessioneResponse = zod.object({
   "totaleCreditoConsumati": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
-  "statoSpesa": zod.string(),
+  "statoSpesa": zod.enum(['chiusa', 'stornata_parzialmente', 'stornata']),
   "operatoreChiusuraId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4732,6 +4899,9 @@ export const GetSpesaEmporioBySessioneResponse = zod.object({
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
   "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(getSpesaEmporioBySessioneResponseRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(getSpesaEmporioBySessioneResponseRigheItemQuantitaStornabileMin),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
@@ -4745,6 +4915,12 @@ export const GetSpesaEmporioBySessioneResponse = zod.object({
 export const GetSpesaEmporioParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const getSpesaEmporioResponseRigheItemQuantitaStornataMin = 0;
+
+export const getSpesaEmporioResponseRigheItemQuantitaStornabileMin = 0;
+
+
 
 export const GetSpesaEmporioResponse = zod.object({
   "id": zod.number(),
@@ -4768,7 +4944,7 @@ export const GetSpesaEmporioResponse = zod.object({
   "totaleCreditoConsumati": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
-  "statoSpesa": zod.string(),
+  "statoSpesa": zod.enum(['chiusa', 'stornata_parzialmente', 'stornata']),
   "operatoreChiusuraId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4790,6 +4966,9 @@ export const GetSpesaEmporioResponse = zod.object({
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
   "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(getSpesaEmporioResponseRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(getSpesaEmporioResponseRigheItemQuantitaStornabileMin),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
@@ -4803,6 +4982,12 @@ export const GetSpesaEmporioResponse = zod.object({
 export const GetBollaStampaSpesaEmporioParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const getBollaStampaSpesaEmporioResponseRigheItemQuantitaStornataMin = 0;
+
+export const getBollaStampaSpesaEmporioResponseRigheItemQuantitaStornabileMin = 0;
+
+
 
 export const GetBollaStampaSpesaEmporioResponse = zod.object({
   "intestazione": zod.string(),
@@ -4827,6 +5012,9 @@ export const GetBollaStampaSpesaEmporioResponse = zod.object({
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
   "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(getBollaStampaSpesaEmporioResponseRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(getBollaStampaSpesaEmporioResponseRigheItemQuantitaStornabileMin),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
@@ -4844,8 +5032,14 @@ export const RegistraInvioManualeBollaSpesaEmporioParams = zod.object({
 })
 
 export const RegistraInvioManualeBollaSpesaEmporioBody = zod.object({
-  "linkBolla": zod.string().nullish()
-})
+
+}).passthrough().describe('Il server costruisce il link Bolla da configurazione trusted o same-origin validata.')
+
+export const registraInvioManualeBollaSpesaEmporioResponseSpesaOneRigheItemQuantitaStornataMin = 0;
+
+export const registraInvioManualeBollaSpesaEmporioResponseSpesaOneRigheItemQuantitaStornabileMin = 0;
+
+
 
 export const RegistraInvioManualeBollaSpesaEmporioResponse = zod.object({
   "stato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4879,7 +5073,7 @@ export const RegistraInvioManualeBollaSpesaEmporioResponse = zod.object({
   "totaleCreditoConsumati": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
-  "statoSpesa": zod.string(),
+  "statoSpesa": zod.enum(['chiusa', 'stornata_parzialmente', 'stornata']),
   "operatoreChiusuraId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4901,6 +5095,9 @@ export const RegistraInvioManualeBollaSpesaEmporioResponse = zod.object({
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
   "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(registraInvioManualeBollaSpesaEmporioResponseSpesaOneRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(registraInvioManualeBollaSpesaEmporioResponseSpesaOneRigheItemQuantitaStornabileMin),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
@@ -4917,8 +5114,14 @@ export const InviaBollaEmailSpesaEmporioParams = zod.object({
 })
 
 export const InviaBollaEmailSpesaEmporioBody = zod.object({
-  "linkBolla": zod.string().nullish()
-})
+
+}).passthrough().describe('Il server costruisce il link Bolla da configurazione trusted o same-origin validata.')
+
+export const inviaBollaEmailSpesaEmporioResponseSpesaOneRigheItemQuantitaStornataMin = 0;
+
+export const inviaBollaEmailSpesaEmporioResponseSpesaOneRigheItemQuantitaStornabileMin = 0;
+
+
 
 export const InviaBollaEmailSpesaEmporioResponse = zod.object({
   "stato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4952,7 +5155,7 @@ export const InviaBollaEmailSpesaEmporioResponse = zod.object({
   "totaleCreditoConsumati": zod.number(),
   "saldoPrima": zod.number(),
   "saldoDopo": zod.number(),
-  "statoSpesa": zod.string(),
+  "statoSpesa": zod.enum(['chiusa', 'stornata_parzialmente', 'stornata']),
   "operatoreChiusuraId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
@@ -4974,6 +5177,9 @@ export const InviaBollaEmailSpesaEmporioResponse = zod.object({
   "codiceProdotto": zod.string().nullish(),
   "descrizioneProdotto": zod.string(),
   "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(inviaBollaEmailSpesaEmporioResponseSpesaOneRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(inviaBollaEmailSpesaEmporioResponseSpesaOneRigheItemQuantitaStornabileMin),
   "creditoUnitario": zod.number(),
   "creditoTotale": zod.number(),
   "scaricoId": zod.number().nullish(),
@@ -4982,6 +5188,39 @@ export const InviaBollaEmailSpesaEmporioResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }),zod.null()]).optional()
+})
+
+
+export const StornaSpesaEmporioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const stornaSpesaEmporioHeaderIdempotencyKeyMax = 100;
+
+
+
+export const StornaSpesaEmporioHeader = zod.object({
+  "Idempotency-Key": zod.string().max(stornaSpesaEmporioHeaderIdempotencyKeyMax).optional()
+})
+
+export const stornaSpesaEmporioBodyMotivoMax = 2000;
+
+
+export const stornaSpesaEmporioBodyRigheItemQuantitaMin = 0.01;
+export const stornaSpesaEmporioBodyRigheItemQuantitaMultipleOf = 0.01;
+
+
+export const stornaSpesaEmporioBodyIdempotencyKeyMax = 100;
+
+
+
+export const StornaSpesaEmporioBody = zod.object({
+  "motivo": zod.string().min(1).max(stornaSpesaEmporioBodyMotivoMax),
+  "righe": zod.array(zod.object({
+  "spesaRigaId": zod.number().min(1),
+  "quantita": zod.number().min(stornaSpesaEmporioBodyRigheItemQuantitaMin).multipleOf(stornaSpesaEmporioBodyRigheItemQuantitaMultipleOf)
+})).min(1).optional(),
+  "idempotencyKey": zod.string().max(stornaSpesaEmporioBodyIdempotencyKeyMax).optional()
 })
 
 

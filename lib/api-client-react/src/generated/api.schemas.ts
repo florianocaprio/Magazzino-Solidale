@@ -3713,7 +3713,6 @@ export interface AccessoEmporioInput {
   dataOraInizio: string;
   /** @nullable */
   dataOraFine?: string | null;
-  statoAccessoEmporio?: AccessoEmporioStato;
   /** @nullable */
   noteAccessoEmporio?: string | null;
 }
@@ -3724,7 +3723,6 @@ export interface AccessoEmporioUpdate {
   dataOraInizio?: string;
   /** @nullable */
   dataOraFine?: string | null;
-  statoAccessoEmporio?: AccessoEmporioStato;
   /** @nullable */
   noteAccessoEmporio?: string | null;
 }
@@ -3782,6 +3780,8 @@ export interface SessioneCassaEmporioRiga {
   codiceProdotto?: string | null;
   descrizioneProdotto: string;
   quantita: number;
+  /** @nullable */
+  unitaMisura: string | null;
   creditoUnitario: number;
   creditoTotale: number;
   /** @nullable */
@@ -3815,6 +3815,8 @@ export interface SessioneCassaEmporio {
   /** @nullable */
   magazzinoEmporioNome?: string | null;
   statoSessione: SessioneCassaEmporioStato;
+  /** @minimum 1 */
+  versione: number;
   saldoCreditoIniziale: number;
   totaleCreditoPrevisto: number;
   creditoResiduoPrevisto: number;
@@ -3855,10 +3857,17 @@ export interface SessioneCassaEmporioInput {
 }
 
 export interface SessioneCassaEmporioUpdate {
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   motivoAnnullamento?: string | null;
   /** @nullable */
   note?: string | null;
+}
+
+export interface SessioneCassaEmporioVersioneInput {
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface SessioneCassaEmporioAperturaInput {
@@ -3868,15 +3877,19 @@ export interface SessioneCassaEmporioAperturaInput {
 
 export interface SessioneCassaEmporioAggiungiProdottoInput {
   prodottoId: number;
-  /** @minimum 1 */
+  /** @minimum 0.01 */
   quantita: number;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   note?: string | null;
 }
 
 export interface SessioneCassaEmporioAggiornaRigaInput {
-  /** @minimum 1 */
+  /** @minimum 0.01 */
   quantita: number;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   note?: string | null;
 }
@@ -3947,6 +3960,8 @@ export interface SessioneCassaEmporioRicercaProdottoResult {
   quantitaMassimaMensile?: number | null;
   /** @nullable */
   giacenzaDisponibile?: number | null;
+  /** @nullable */
+  unitaMisura?: string | null;
 }
 
 export interface SessioneCassaEmporioValidazione {
@@ -3971,6 +3986,12 @@ export interface SpesaEmporioRiga {
   codiceProdotto?: string | null;
   descrizioneProdotto: string;
   quantita: number;
+  /** @nullable */
+  unitaMisura?: string | null;
+  /** @minimum 0 */
+  quantitaStornata: number;
+  /** @minimum 0 */
+  quantitaStornabile: number;
   creditoUnitario: number;
   creditoTotale: number;
   /** @nullable */
@@ -3978,6 +3999,15 @@ export interface SpesaEmporioRiga {
   /** @nullable */
   bollaRigaId?: number | null;
 }
+
+export type SpesaEmporioStatoSpesa = typeof SpesaEmporioStatoSpesa[keyof typeof SpesaEmporioStatoSpesa];
+
+
+export const SpesaEmporioStatoSpesa = {
+  chiusa: 'chiusa',
+  stornata_parzialmente: 'stornata_parzialmente',
+  stornata: 'stornata',
+} as const;
 
 export type SpesaEmporioEmailBollaStato = typeof SpesaEmporioEmailBollaStato[keyof typeof SpesaEmporioEmailBollaStato];
 
@@ -4022,7 +4052,7 @@ export interface SpesaEmporio {
   totaleCreditoConsumati: number;
   saldoPrima: number;
   saldoDopo: number;
-  statoSpesa: string;
+  statoSpesa: SpesaEmporioStatoSpesa;
   /** @nullable */
   operatoreChiusuraId?: number | null;
   /** @nullable */
@@ -4048,13 +4078,40 @@ export interface SpesaEmporio {
 }
 
 export interface SpesaEmporioChiusuraInput {
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   note?: string | null;
 }
 
-export interface BollaEmporioInvioManualeInput {
-  /** @nullable */
-  linkBolla?: string | null;
+/**
+ * Il server costruisce il link Bolla da configurazione trusted o same-origin validata.
+ */
+export interface BollaEmporioInvioManualeInput { [key: string]: unknown }
+
+export interface SpesaEmporioStornoRigaInput {
+  /** @minimum 1 */
+  spesaRigaId: number;
+  /** @minimum 0.01 */
+  quantita: number;
+}
+
+export interface SpesaEmporioStornoInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+  /** @minItems 1 */
+  righe?: SpesaEmporioStornoRigaInput[];
+  /** @maxLength 100 */
+  idempotencyKey?: string;
+}
+
+export interface SpesaEmporioStornoResult {
+  stornoId: number;
+  creditoRestituito: number;
+  spesa: SpesaEmporio;
 }
 
 export type BollaEmporioEmailResultStato = typeof BollaEmporioEmailResultStato[keyof typeof BollaEmporioEmailResultStato];
@@ -5714,6 +5771,16 @@ export interface RuoloUpdate {
 }
 
 /**
+ * Pagina richiesta, indicizzata da 1
+ */
+export type PageParamParameter = number;
+
+/**
+ * Numero di record per pagina
+ */
+export type LimitParamParameter = number;
+
+/**
  * Data civile iniziale Europe/Rome (YYYY-MM-DD)
  */
 export type ReportDaParameter = string;
@@ -5913,6 +5980,17 @@ export type AuthorizeBeneficiariExport200 = {
 
 export type ListInterventiParams = {
 beneficiarioId?: number;
+/**
+ * Pagina richiesta, indicizzata da 1
+ * @minimum 1
+ */
+page?: PageParamParameter;
+/**
+ * Numero di record per pagina
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: LimitParamParameter;
 tipo?: string;
 centroAscoltoId?: number;
 cittaId?: number;
@@ -6081,6 +6159,17 @@ areaId?: number;
 magazzinoEmporioId?: number;
 statoAccessoEmporio?: AccessoEmporioStato;
 beneficiarioSearch?: string;
+/**
+ * Pagina richiesta, indicizzata da 1
+ * @minimum 1
+ */
+page?: PageParamParameter;
+/**
+ * Numero di record per pagina
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: LimitParamParameter;
 beneficiarioId?: number;
 };
 
@@ -6096,6 +6185,17 @@ cittaId?: number;
 areaId?: number;
 data?: string;
 beneficiarioSearch?: string;
+/**
+ * Pagina richiesta, indicizzata da 1
+ * @minimum 1
+ */
+page?: PageParamParameter;
+/**
+ * Numero di record per pagina
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: LimitParamParameter;
 };
 
 export type SearchBeneficiariCassaEmporioParams = {
@@ -6120,6 +6220,17 @@ magazzinoEmporioId?: number;
 centroAscoltoId?: number;
 cittaId?: number;
 areaId?: number;
+/**
+ * Pagina richiesta, indicizzata da 1
+ * @minimum 1
+ */
+page?: PageParamParameter;
+/**
+ * Numero di record per pagina
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: LimitParamParameter;
 };
 
 export type ListBolleParams = {

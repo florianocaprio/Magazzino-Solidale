@@ -1486,6 +1486,8 @@ paths:
           in: query
           schema:
             type: integer
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
         - name: tipo
           in: query
           schema:
@@ -2346,6 +2348,8 @@ paths:
           in: query
           schema:
             type: string
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
         - name: beneficiarioId
           in: query
           schema:
@@ -2493,6 +2497,8 @@ paths:
           in: query
           schema:
             type: string
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
           description: List of Emporio checkout sessions
@@ -2629,6 +2635,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioVersioneInput"
       responses:
         "200":
           description: Updated checkout session
@@ -2647,6 +2659,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioVersioneInput"
       responses:
         "200":
           description: Suspended checkout session
@@ -2665,6 +2683,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioVersioneInput"
       responses:
         "200":
           description: Resumed checkout session
@@ -2707,6 +2731,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessioneCassaEmporioVersioneInput"
       responses:
         "200":
           description: Checkout session ready for later closure
@@ -2726,7 +2756,7 @@ paths:
           schema:
             type: integer
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
@@ -2835,6 +2865,8 @@ paths:
           in: query
           schema:
             type: integer
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
           description: Closed Emporio expenses
@@ -2946,6 +2978,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BollaEmporioEmailResult"
+
+  /spese-emporio/{id}/storna:
+    post:
+      operationId: stornaSpesaEmporio
+      tags: [spese-emporio]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpesaEmporioStornoInput"
+      responses:
+        "201":
+          description: Storno compensativo creato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpesaEmporioStornoResult"
+        "409":
+          description: Quantità già stornata, over-storno o double-submit concorrente
 
   # ─── BOLLE ───────────────────────────────────────────────────────────────────
   /bolle:
@@ -6248,6 +6312,16 @@ paths:
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
   parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Pagina richiesta, indicizzata da 1
+      schema: { type: integer, minimum: 1, default: 1 }
+    LimitParam:
+      name: limit
+      in: query
+      description: Numero di record per pagina
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
     ReportDa:
       name: da
       in: query
@@ -11024,8 +11098,6 @@ components:
         dataOraFine:
           type: ["string", "null"]
           format: date-time
-        statoAccessoEmporio:
-          $ref: "#/components/schemas/AccessoEmporioStato"
         noteAccessoEmporio:
           type: ["string", "null"]
       required: [beneficiarioId, magazzinoEmporioId, dataOraInizio]
@@ -11043,8 +11115,6 @@ components:
         dataOraFine:
           type: ["string", "null"]
           format: date-time
-        statoAccessoEmporio:
-          $ref: "#/components/schemas/AccessoEmporioStato"
         noteAccessoEmporio:
           type: ["string", "null"]
 
@@ -11121,17 +11191,20 @@ components:
         descrizioneProdotto:
           type: string
         quantita:
-          type: integer
+          type: number
+          multipleOf: 0.01
+        unitaMisura:
+          type: ["string", "null"]
         creditoUnitario:
           type: number
         creditoTotale:
           type: number
         giacenzaDisponibileAlMomento:
-          type: ["integer", "null"]
+          type: ["number", "null"]
         limitePerSpesa:
-          type: ["integer", "null"]
+          type: ["number", "null"]
         limiteMensile:
-          type: ["integer", "null"]
+          type: ["number", "null"]
         superaLimitePerSpesa:
           type: boolean
         superaLimiteMensile:
@@ -11153,6 +11226,7 @@ components:
           prodottoId,
           descrizioneProdotto,
           quantita,
+          unitaMisura,
           creditoUnitario,
           creditoTotale,
           superaLimitePerSpesa,
@@ -11185,6 +11259,9 @@ components:
           type: ["string", "null"]
         statoSessione:
           $ref: "#/components/schemas/SessioneCassaEmporioStato"
+        versione:
+          type: integer
+          minimum: 1
         saldoCreditoIniziale:
           type: number
         totaleCreditoPrevisto:
@@ -11240,6 +11317,7 @@ components:
           beneficiarioId,
           magazzinoEmporioId,
           statoSessione,
+          versione,
           saldoCreditoIniziale,
           totaleCreditoPrevisto,
           creditoResiduoPrevisto,
@@ -11260,10 +11338,22 @@ components:
     SessioneCassaEmporioUpdate:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         motivoAnnullamento:
           type: ["string", "null"]
         note:
           type: ["string", "null"]
+      required: [versione]
+
+    SessioneCassaEmporioVersioneInput:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
 
     SessioneCassaEmporioAperturaInput:
       type: object
@@ -11277,21 +11367,29 @@ components:
         prodottoId:
           type: integer
         quantita:
+          type: number
+          minimum: 0.01
+          multipleOf: 0.01
+        versione:
           type: integer
           minimum: 1
         note:
           type: ["string", "null"]
-      required: [prodottoId, quantita]
+      required: [prodottoId, quantita, versione]
 
     SessioneCassaEmporioAggiornaRigaInput:
       type: object
       properties:
         quantita:
+          type: number
+          minimum: 0.01
+          multipleOf: 0.01
+        versione:
           type: integer
           minimum: 1
         note:
           type: ["string", "null"]
-      required: [quantita]
+      required: [quantita, versione]
 
     SessioneCassaEmporioAccessoValido:
       type: object
@@ -11408,7 +11506,9 @@ components:
         quantitaMassimaMensile:
           type: ["number", "null"]
         giacenzaDisponibile:
-          type: ["integer", "null"]
+          type: ["number", "null"]
+        unitaMisura:
+          type: ["string", "null"]
       required: [prodottoId, codice, nome, creditoSolidaleValore]
 
     SessioneCassaEmporioValidazione:
@@ -11443,6 +11543,14 @@ components:
           type: string
         quantita:
           type: number
+        unitaMisura:
+          type: ["string", "null"]
+        quantitaStornata:
+          type: number
+          minimum: 0
+        quantitaStornabile:
+          type: number
+          minimum: 0
         creditoUnitario:
           type: number
         creditoTotale:
@@ -11458,6 +11566,8 @@ components:
           prodottoId,
           descrizioneProdotto,
           quantita,
+          quantitaStornata,
+          quantitaStornabile,
           creditoUnitario,
           creditoTotale,
         ]
@@ -11510,6 +11620,7 @@ components:
           type: number
         statoSpesa:
           type: string
+          enum: [chiusa, stornata_parzialmente, stornata]
         operatoreChiusuraId:
           type: ["integer", "null"]
         operatoreCodice:
@@ -11566,14 +11677,56 @@ components:
     SpesaEmporioChiusuraInput:
       type: object
       properties:
+        versione:
+          type: integer
+          minimum: 1
         note:
           type: ["string", "null"]
+      required: [versione]
 
     BollaEmporioInvioManualeInput:
       type: object
+      description: Il server costruisce il link Bolla da configurazione trusted o same-origin validata.
+
+    SpesaEmporioStornoRigaInput:
+      type: object
       properties:
-        linkBolla:
-          type: ["string", "null"]
+        spesaRigaId:
+          type: integer
+          minimum: 1
+        quantita:
+          type: number
+          minimum: 0.01
+          multipleOf: 0.01
+      required: [spesaRigaId, quantita]
+
+    SpesaEmporioStornoInput:
+      type: object
+      properties:
+        motivo:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        righe:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SpesaEmporioStornoRigaInput"
+        idempotencyKey:
+          type: string
+          maxLength: 100
+      required: [motivo]
+
+    SpesaEmporioStornoResult:
+      type: object
+      properties:
+        stornoId:
+          type: integer
+        creditoRestituito:
+          type: number
+        spesa:
+          $ref: "#/components/schemas/SpesaEmporio"
+      required: [stornoId, creditoRestituito, spesa]
 
     BollaEmporioEmailResult:
       type: object

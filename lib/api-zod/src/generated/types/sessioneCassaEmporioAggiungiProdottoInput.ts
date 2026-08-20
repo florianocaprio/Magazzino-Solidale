@@ -8,8 +8,10 @@
 
 export interface SessioneCassaEmporioAggiungiProdottoInput {
   prodottoId: number;
-  /** @minimum 1 */
+  /** @minimum 0.01 */
   quantita: number;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   note?: string | null;
 }

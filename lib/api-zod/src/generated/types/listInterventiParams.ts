@@ -9,13 +9,26 @@ import type { InterventoAmbito } from './interventoAmbito';
 import type { InterventoPriorita } from './interventoPriorita';
 import type { InterventoStato } from './interventoStato';
 import type { InterventoVista } from './interventoVista';
+import type { LimitParamParameter } from './limitParamParameter';
 import type { ListInterventiAmbitoLegacy } from './listInterventiAmbitoLegacy';
 import type { ListInterventiBisogni } from './listInterventiBisogni';
 import type { ListInterventiDirezione } from './listInterventiDirezione';
 import type { ListInterventiOrdina } from './listInterventiOrdina';
+import type { PageParamParameter } from './pageParamParameter';
 
 export type ListInterventiParams = {
 beneficiarioId?: number;
+/**
+ * Pagina richiesta, indicizzata da 1
+ * @minimum 1
+ */
+page?: PageParamParameter;
+/**
+ * Numero di record per pagina
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: LimitParamParameter;
 tipo?: string;
 centroAscoltoId?: number;
 cittaId?: number;

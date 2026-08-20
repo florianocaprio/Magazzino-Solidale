@@ -240,6 +240,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
+    permission: "emporio.cassa.view",
   },
   {
     key: "emporioCreditiSaldo",
@@ -274,6 +275,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "emporio",
     area: "emporio",
     moduloCodice: "EMPORIO_SOLIDALE",
+    permission: "emporio.sales.view",
   },
 
   {

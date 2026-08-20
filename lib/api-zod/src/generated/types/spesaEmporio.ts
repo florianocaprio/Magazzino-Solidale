@@ -7,6 +7,7 @@
  */
 import type { SpesaEmporioEmailBollaStato } from './spesaEmporioEmailBollaStato';
 import type { SpesaEmporioRiga } from './spesaEmporioRiga';
+import type { SpesaEmporioStatoSpesa } from './spesaEmporioStatoSpesa';
 
 export interface SpesaEmporio {
   id: number;
@@ -41,7 +42,7 @@ export interface SpesaEmporio {
   totaleCreditoConsumati: number;
   saldoPrima: number;
   saldoDopo: number;
-  statoSpesa: string;
+  statoSpesa: SpesaEmporioStatoSpesa;
   /** @nullable */
   operatoreChiusuraId?: number | null;
   /** @nullable */

@@ -16,6 +16,8 @@ export interface SessioneCassaEmporioRiga {
   codiceProdotto?: string | null;
   descrizioneProdotto: string;
   quantita: number;
+  /** @nullable */
+  unitaMisura: string | null;
   creditoUnitario: number;
   creditoTotale: number;
   /** @nullable */

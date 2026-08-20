@@ -7,6 +7,8 @@
  */
 
 export interface SessioneCassaEmporioUpdate {
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   motivoAnnullamento?: string | null;
   /** @nullable */

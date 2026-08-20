@@ -42,32 +42,92 @@ import {
   type SpesaEmporio,
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
-import { Barcode, CheckCircle2, Copy, Download, FileText, Mail, Minus, Pause, Play, Plus, RefreshCw, Search, ShieldAlert, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import {
+  Barcode,
+  CheckCircle2,
+  Copy,
+  Download,
+  FileText,
+  Mail,
+  Minus,
+  Pause,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  ShoppingCart,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useModuloFlags } from "@/lib/use-moduli";
+import { useAuth } from "@/lib/auth";
+import { cassaEmporioCapabilities } from "@/lib/emporio-permissions";
 import { downloadBollaPdf } from "@/pages/bolle";
 import type { BollaTemplate } from "@/lib/bolla-pdf";
 
 const ALL = "__all__";
-const STATI_SESSIONE: SessioneCassaEmporioStato[] = ["aperta", "sospesa", "pronta_per_chiusura"];
+const STATI_SESSIONE: SessioneCassaEmporioStato[] = [
+  "aperta",
+  "sospesa",
+  "pronta_per_chiusura",
+];
 
 function formatCredito(value: number | null | undefined): string {
-  return value == null ? "-" : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+  return value == null
+    ? "-"
+    : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(
+        value,
+      );
+}
+
+function formatQuantita(value: number, unitaMisura?: string | null): string {
+  const quantita = new Intl.NumberFormat("it-IT", {
+    maximumFractionDigits: 2,
+  }).format(value);
+  return unitaMisura ? `${quantita} ${unitaMisura}` : quantita;
 }
 
 function todayInput(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function optionalId(value: string): number | undefined {
@@ -75,23 +135,34 @@ function optionalId(value: string): number | undefined {
 }
 
 function normalizeSearchToken(value: string | null | undefined): string {
-  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "-";
-  return new Date(value).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
+  return new Date(value).toLocaleString("it-IT", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 }
 
 function isToday(value: string | null | undefined): boolean {
   if (!value) return false;
-  const d = new Date(value);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+  return date === todayInput();
 }
 
 function extractError(err: unknown, fallback: string): string {
-  const data = (err as { data?: unknown })?.data ?? (err as { response?: { data?: unknown } })?.response?.data;
+  const data =
+    (err as { data?: unknown })?.data ??
+    (err as { response?: { data?: unknown } })?.response?.data;
   if (data && typeof data === "object" && "error" in data) {
     const msg = (data as { error?: unknown }).error;
     if (typeof msg === "string") return msg;
@@ -109,16 +180,20 @@ function escapeHtml(value: unknown): string {
 }
 
 function buildBollaPrintHtml(data: BollaEmporioStampa): string {
-  const rows = data.righe.map((riga) => `
+  const rows = data.righe
+    .map(
+      (riga) => `
     <tr>
       <td>${escapeHtml(riga.descrizioneProdotto)}</td>
       <td>${escapeHtml(riga.codiceProdotto ?? "")}</td>
       <td>${escapeHtml(riga.codiceLotto ?? "")}</td>
-      <td class="num">${escapeHtml(riga.quantita)}</td>
+      <td class="num">${escapeHtml(formatQuantita(riga.quantita, riga.unitaMisura))}</td>
       <td class="num">${escapeHtml(formatCredito(riga.creditoUnitario))}</td>
       <td class="num">${escapeHtml(formatCredito(riga.creditoTotale))}</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
   return `<!doctype html>
 <html lang="it">
 <head>
@@ -218,14 +293,22 @@ async function copyText(value: string): Promise<void> {
   textarea.remove();
 }
 
-function sessioneModificabile(sessione: SessioneCassaEmporio | undefined): boolean {
-  return sessione?.statoSessione === "aperta" || sessione?.statoSessione === "sospesa" || sessione?.statoSessione === "pronta_per_chiusura";
+function sessioneModificabile(
+  sessione: SessioneCassaEmporio | undefined,
+): boolean {
+  return (
+    sessione?.statoSessione === "aperta" ||
+    sessione?.statoSessione === "pronta_per_chiusura"
+  );
 }
 
 function statusClass(stato: string | null | undefined): string {
-  if (stato === "aperta") return "bg-emerald-500/10 text-emerald-700 border-emerald-200";
-  if (stato === "sospesa") return "bg-amber-500/10 text-amber-700 border-amber-200";
-  if (stato === "pronta_per_chiusura") return "bg-sky-500/10 text-sky-700 border-sky-200";
+  if (stato === "aperta")
+    return "bg-emerald-500/10 text-emerald-700 border-emerald-200";
+  if (stato === "sospesa")
+    return "bg-amber-500/10 text-amber-700 border-amber-200";
+  if (stato === "pronta_per_chiusura")
+    return "bg-sky-500/10 text-sky-700 border-sky-200";
   if (stato === "annullata") return "bg-red-500/10 text-red-700 border-red-200";
   return "bg-muted text-muted-foreground";
 }
@@ -235,20 +318,29 @@ export default function EmporioCassa() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { emporioAbilitato } = useModuloFlags();
+  const { hasPermission } = useAuth();
+  const { canOperate, canForce, canAdjustCredito } =
+    cassaEmporioCapabilities(hasPermission);
   const { data: impostazioniStampa } = useGetImpostazioniStampa();
   const initialAccessoEmporioId = useMemo(() => {
-    const raw = new URLSearchParams(window.location.search).get("accessoEmporioId");
+    const raw = new URLSearchParams(window.location.search).get(
+      "accessoEmporioId",
+    );
     const id = raw ? Number(raw) : NaN;
     return Number.isInteger(id) && id > 0 ? id : null;
   }, []);
 
   const [beneficiarioSearch, setBeneficiarioSearch] = useState("");
-  const [selectedBeneficiario, setSelectedBeneficiario] = useState<SessioneCassaEmporioRicercaBeneficiarioResult | null>(null);
-  const [selectedSessioneId, setSelectedSessioneId] = useState<number | null>(null);
+  const [selectedBeneficiario, setSelectedBeneficiario] =
+    useState<SessioneCassaEmporioRicercaBeneficiarioResult | null>(null);
+  const [selectedSessioneId, setSelectedSessioneId] = useState<number | null>(
+    null,
+  );
   const [cassaDate, setCassaDate] = useState(todayInput());
   const [areaFilter, setAreaFilter] = useState(ALL);
   const [emporioFilter, setEmporioFilter] = useState(ALL);
   const [sessioneSearch, setSessioneSearch] = useState("");
+  const [sessioniPage, setSessioniPage] = useState(1);
   const [statoFilter, setStatoFilter] = useState<string>(ALL);
   const [prodottoSearch, setProdottoSearch] = useState("");
   const [annullaOpen, setAnnullaOpen] = useState(false);
@@ -258,7 +350,8 @@ export default function EmporioCassa() {
   const [forzaEmporioId, setForzaEmporioId] = useState("");
   const [chiudiOpen, setChiudiOpen] = useState(false);
   const [chiusuraSpesa, setChiusuraSpesa] = useState<SpesaEmporio | null>(null);
-  const [emailDraftBolla, setEmailDraftBolla] = useState<BollaEmporioEmailResult | null>(null);
+  const [emailDraftBolla, setEmailDraftBolla] =
+    useState<BollaEmporioEmailResult | null>(null);
   const [autoAccessoOpened, setAutoAccessoOpened] = useState(false);
 
   const beneficiarioQuery = beneficiarioSearch.trim();
@@ -267,16 +360,23 @@ export default function EmporioCassa() {
   const { data: citta = [] } = useListCitta();
   const { data: magazzini = [] } = useListMagazzini();
   const empori = useMemo(
-    () => magazzini.filter((m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto"),
+    () =>
+      magazzini.filter(
+        (m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto",
+      ),
     [magazzini],
   );
   const areaId = optionalId(areaFilter);
   const emporiFiltrati = useMemo(
-    () => areaId == null ? empori : empori.filter((m) => m.cittaId === areaId),
+    () =>
+      areaId == null ? empori : empori.filter((m) => m.cittaId === areaId),
     [areaId, empori],
   );
   const contestoCassaCompleto = areaFilter !== ALL && emporioFilter !== ALL;
-  const contestoSelezioneBloccato = selectedBeneficiario != null || selectedSessioneId != null || chiusuraSpesa != null;
+  const contestoSelezioneBloccato =
+    selectedBeneficiario != null ||
+    selectedSessioneId != null ||
+    chiusuraSpesa != null;
 
   useEffect(() => {
     if (emporioFilter === ALL) return;
@@ -296,23 +396,43 @@ export default function EmporioCassa() {
     ...searchContext,
   };
   const sessioniSearchParams = {
-    statoSessione: statoFilter === ALL ? undefined : (statoFilter as SessioneCassaEmporioStato),
+    statoSessione:
+      statoFilter === ALL
+        ? undefined
+        : (statoFilter as SessioneCassaEmporioStato),
     beneficiarioSearch: sessioneSearch.trim() || undefined,
     ...searchContext,
+    page: sessioniPage,
+    limit: 50,
   };
 
-  const { data: beneficiari = [] } = useSearchBeneficiariCassaEmporio(beneficiariSearchParams, {
-    query: {
-      queryKey: getSearchBeneficiariCassaEmporioQueryKey(beneficiariSearchParams),
-      enabled: emporioAbilitato && contestoCassaCompleto && !contestoSelezioneBloccato,
+  useEffect(() => {
+    setSessioniPage(1);
+  }, [cassaDate, areaFilter, emporioFilter, sessioneSearch, statoFilter]);
+
+  const { data: beneficiari = [] } = useSearchBeneficiariCassaEmporio(
+    beneficiariSearchParams,
+    {
+      query: {
+        queryKey: getSearchBeneficiariCassaEmporioQueryKey(
+          beneficiariSearchParams,
+        ),
+        enabled:
+          emporioAbilitato &&
+          contestoCassaCompleto &&
+          !contestoSelezioneBloccato,
+      },
     },
-  });
-  const { data: sessioni = [] } = useListSessioniCassaEmporio(sessioniSearchParams, {
-    query: {
-      queryKey: getListSessioniCassaEmporioQueryKey(sessioniSearchParams),
-      refetchInterval: 5000,
+  );
+  const { data: sessioni = [] } = useListSessioniCassaEmporio(
+    sessioniSearchParams,
+    {
+      query: {
+        queryKey: getListSessioniCassaEmporioQueryKey(sessioniSearchParams),
+        refetchInterval: 5000,
+      },
     },
-  });
+  );
   const sessioneQuery = useGetSessioneCassaEmporio(selectedSessioneId ?? 0, {
     query: {
       queryKey: getGetSessioneCassaEmporioQueryKey(selectedSessioneId ?? 0),
@@ -325,18 +445,28 @@ export default function EmporioCassa() {
     search: prodottoQuery || undefined,
     magazzinoEmporioId: sessione?.magazzinoEmporioId,
   };
-  const { data: prodotti = [] } = useSearchProdottiCassaEmporio(prodottiSearchParams, {
-    query: {
-      queryKey: getSearchProdottiCassaEmporioQueryKey(prodottiSearchParams),
-      enabled: emporioAbilitato && sessione != null && sessioneModificabile(sessione),
+  const { data: prodotti = [] } = useSearchProdottiCassaEmporio(
+    prodottiSearchParams,
+    {
+      query: {
+        queryKey: getSearchProdottiCassaEmporioQueryKey(prodottiSearchParams),
+        enabled:
+          emporioAbilitato &&
+          sessione != null &&
+          sessioneModificabile(sessione),
+      },
     },
-  });
+  );
   const beneficiariVisibili = contestoSelezioneBloccato ? [] : beneficiari;
 
   const invalidate = () => {
     void queryClient.invalidateQueries();
-    void queryClient.invalidateQueries({ queryKey: getListAccessiEmporioQueryKey() });
-    void queryClient.invalidateQueries({ queryKey: getListSpeseEmporioQueryKey() });
+    void queryClient.invalidateQueries({
+      queryKey: getListAccessiEmporioQueryKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: getListSpeseEmporioQueryKey(),
+    });
   };
 
   const refreshSessione = () => {
@@ -345,16 +475,25 @@ export default function EmporioCassa() {
   };
 
   const onError = (err: unknown) => {
-    toast({ variant: "destructive", title: extractError(err, t("common.error")) });
+    toast({
+      variant: "destructive",
+      title: extractError(err, t("common.error")),
+    });
+    refreshSessione();
   };
 
   const apriSessione = useApriSessioneCassaEmporio({
     mutation: {
       onSuccess: (data) => {
         setSelectedSessioneId(data.id);
-        if (data.cittaId != null && areaFilter === ALL) setAreaFilter(String(data.cittaId));
-        if (data.magazzinoEmporioId != null && emporioFilter === ALL) setEmporioFilter(String(data.magazzinoEmporioId));
-        queryClient.setQueryData(getGetSessioneCassaEmporioQueryKey(data.id), data);
+        if (data.cittaId != null && areaFilter === ALL)
+          setAreaFilter(String(data.cittaId));
+        if (data.magazzinoEmporioId != null && emporioFilter === ALL)
+          setEmporioFilter(String(data.magazzinoEmporioId));
+        queryClient.setQueryData(
+          getGetSessioneCassaEmporioQueryKey(data.id),
+          data,
+        );
         invalidate();
         toast({ title: t("cassaEmporio.sessioneAperta") });
       },
@@ -370,19 +509,28 @@ export default function EmporioCassa() {
       onError,
     },
   });
-  const updateRiga = useUpdateSessioneCassaEmporioRiga({ mutation: { onSuccess: refreshSessione, onError } });
+  const updateRiga = useUpdateSessioneCassaEmporioRiga({
+    mutation: { onSuccess: refreshSessione, onError },
+  });
   const deleteRiga = useDeleteSessioneCassaEmporioRiga({
     mutation: {
       onSuccess: (data) => {
         setSelectedSessioneId(data.id);
-        queryClient.setQueryData(getGetSessioneCassaEmporioQueryKey(data.id), data);
+        queryClient.setQueryData(
+          getGetSessioneCassaEmporioQueryKey(data.id),
+          data,
+        );
         refreshSessione();
       },
       onError,
     },
   });
-  const sospendi = useSospendiSessioneCassaEmporio({ mutation: { onSuccess: invalidate, onError } });
-  const riprendi = useRiprendiSessioneCassaEmporio({ mutation: { onSuccess: invalidate, onError } });
+  const sospendi = useSospendiSessioneCassaEmporio({
+    mutation: { onSuccess: invalidate, onError },
+  });
+  const riprendi = useRiprendiSessioneCassaEmporio({
+    mutation: { onSuccess: invalidate, onError },
+  });
   const annulla = useAnnullaSessioneCassaEmporio({
     mutation: {
       onSuccess: () => {
@@ -409,9 +557,14 @@ export default function EmporioCassa() {
         setMotivoForzatura("");
         setForzaEmporioId("");
         setSelectedSessioneId(data.sessione.id);
-        queryClient.setQueryData(getGetSessioneCassaEmporioQueryKey(data.sessione.id), data.sessione);
+        queryClient.setQueryData(
+          getGetSessioneCassaEmporioQueryKey(data.sessione.id),
+          data.sessione,
+        );
         invalidate();
-        toast({ title: data.messaggio ?? t("cassaEmporio.accessoForzatoCreato") });
+        toast({
+          title: data.messaggio ?? t("cassaEmporio.accessoForzatoCreato"),
+        });
       },
       onError,
     },
@@ -423,7 +576,10 @@ export default function EmporioCassa() {
         setChiusuraSpesa(data.spesa ?? null);
         if (data.sessione?.id) {
           setSelectedSessioneId(data.sessione.id);
-          queryClient.setQueryData(getGetSessioneCassaEmporioQueryKey(data.sessione.id), data.sessione);
+          queryClient.setQueryData(
+            getGetSessioneCassaEmporioQueryKey(data.sessione.id),
+            data.sessione,
+          );
         }
         invalidate();
         toast({ title: data.messaggio ?? t("cassaEmporio.spesaChiusa") });
@@ -439,34 +595,63 @@ export default function EmporioCassa() {
   }, [chiusuraSpesa?.id]);
 
   useEffect(() => {
-    if (!emporioAbilitato || autoAccessoOpened || initialAccessoEmporioId == null) return;
+    if (
+      !emporioAbilitato ||
+      !canOperate ||
+      autoAccessoOpened ||
+      initialAccessoEmporioId == null
+    )
+      return;
     setAutoAccessoOpened(true);
-    apriSessione.mutate({ accessoEmporioId: initialAccessoEmporioId, data: {} });
-  }, [apriSessione, autoAccessoOpened, emporioAbilitato, initialAccessoEmporioId]);
+    apriSessione.mutate({
+      accessoEmporioId: initialAccessoEmporioId,
+      data: {},
+    });
+  }, [
+    apriSessione,
+    autoAccessoOpened,
+    canOperate,
+    emporioAbilitato,
+    initialAccessoEmporioId,
+  ]);
 
   const activeAccessi = useMemo(
-    () => selectedBeneficiario?.accessi.filter((a) => a.statoAccessoEmporio !== "annullato" && a.statoAccessoEmporio !== "non_presentato") ?? [],
+    () =>
+      selectedBeneficiario?.accessi.filter(
+        (a) =>
+          a.statoAccessoEmporio !== "annullato" &&
+          a.statoAccessoEmporio !== "non_presentato",
+      ) ?? [],
     [selectedBeneficiario],
   );
   const activeSessione = sessione ?? undefined;
-  const canEdit = emporioAbilitato && sessioneModificabile(activeSessione);
+  const canEdit =
+    emporioAbilitato && canOperate && sessioneModificabile(activeSessione);
   const saldoInsufficiente = (activeSessione?.creditoResiduoPrevisto ?? 0) < 0;
 
-  const findExistingOpenSession = async (b: SessioneCassaEmporioRicercaBeneficiarioResult) => {
+  const findExistingOpenSession = async (
+    b: SessioneCassaEmporioRicercaBeneficiarioResult,
+  ) => {
     const liveSessioni = await listSessioniCassaEmporio({
       beneficiarioSearch: b.beneficiarioCodice,
       magazzinoEmporioId: optionalId(emporioFilter),
       cittaId: areaId ?? b.cittaId ?? undefined,
     }).catch(() => sessioni);
-    return liveSessioni.find((s) =>
-      s.beneficiarioId === b.beneficiarioId &&
-      ["aperta", "sospesa", "pronta_per_chiusura"].includes(s.statoSessione)
+    return liveSessioni.find(
+      (s) =>
+        s.beneficiarioId === b.beneficiarioId &&
+        ["aperta", "sospesa", "pronta_per_chiusura"].includes(s.statoSessione),
     );
   };
 
-  const selectBeneficiario = async (b: SessioneCassaEmporioRicercaBeneficiarioResult) => {
+  const selectBeneficiario = async (
+    b: SessioneCassaEmporioRicercaBeneficiarioResult,
+  ) => {
     if (!contestoCassaCompleto) {
-      toast({ variant: "destructive", title: t("cassaEmporio.selezionaEmporioPrima") });
+      toast({
+        variant: "destructive",
+        title: t("cassaEmporio.selezionaEmporioPrima"),
+      });
       return;
     }
     setSelectedBeneficiario(b);
@@ -474,31 +659,55 @@ export default function EmporioCassa() {
     const existing = await findExistingOpenSession(b);
     if (existing) {
       setSelectedSessioneId(existing.id);
-      void queryClient.invalidateQueries({ queryKey: getGetSessioneCassaEmporioQueryKey(existing.id) });
+      void queryClient.invalidateQueries({
+        queryKey: getGetSessioneCassaEmporioQueryKey(existing.id),
+      });
       toast({ title: t("cassaEmporio.sessioneGiaApertaUtente") });
     }
   };
 
   const openAccesso = (accesso: SessioneCassaEmporioAccessoValido) => {
-    if (!emporioAbilitato || accesso.id == null) return;
+    if (!emporioAbilitato || !canOperate || accesso.id == null) return;
     apriSessione.mutate({ accessoEmporioId: accesso.id, data: {} });
   };
 
   const addProduct = (prodotto: SessioneCassaEmporioRicercaProdottoResult) => {
     if (!activeSessione || !canEdit) return;
-    addRiga.mutate({ id: activeSessione.id, data: { prodottoId: prodotto.prodottoId, quantita: 1 } });
+    addRiga.mutate({
+      id: activeSessione.id,
+      data: {
+        prodottoId: prodotto.prodottoId,
+        quantita: 1,
+        versione: activeSessione.versione,
+      },
+    });
   };
 
   const updateQuantity = (rigaId: number, quantita: number) => {
-    if (!activeSessione || !canEdit || quantita < 1) return;
-    updateRiga.mutate({ id: activeSessione.id, rigaId, data: { quantita } });
+    if (
+      !activeSessione ||
+      !canEdit ||
+      !Number.isFinite(quantita) ||
+      quantita <= 0
+    )
+      return;
+    updateRiga.mutate({
+      id: activeSessione.id,
+      rigaId,
+      data: { quantita, versione: activeSessione.versione },
+    });
   };
 
-  const onBeneficiarioKeyDown = async (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const onBeneficiarioKeyDown = async (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (event.key !== "Enter") return;
     const currentSearch = event.currentTarget.value.trim();
     if (!contestoCassaCompleto) {
-      toast({ variant: "destructive", title: t("cassaEmporio.selezionaEmporioPrima") });
+      toast({
+        variant: "destructive",
+        title: t("cassaEmporio.selezionaEmporioPrima"),
+      });
       return;
     }
     const liveResults = await searchBeneficiariCassaEmporio({
@@ -506,16 +715,21 @@ export default function EmporioCassa() {
       ...searchContext,
     }).catch(() => beneficiari);
     const normalized = normalizeSearchToken(currentSearch);
-    const exact = liveResults.find((b) =>
-      normalizeSearchToken(b.beneficiarioCodice) === normalized ||
-      normalizeSearchToken(b.beneficiarioCodiceFiscale) === normalized
-    ) ?? liveResults[0];
+    const exact =
+      liveResults.find(
+        (b) =>
+          normalizeSearchToken(b.beneficiarioCodice) === normalized ||
+          normalizeSearchToken(b.beneficiarioCodiceFiscale) === normalized,
+      ) ?? liveResults[0];
     if (exact) void selectBeneficiario(exact);
   };
 
   const onBeneficiarioScan = (value: string) => {
     if (!contestoCassaCompleto) {
-      toast({ variant: "destructive", title: t("cassaEmporio.selezionaEmporioPrima") });
+      toast({
+        variant: "destructive",
+        title: t("cassaEmporio.selezionaEmporioPrima"),
+      });
       return;
     }
     setBeneficiarioSearch(value);
@@ -525,12 +739,18 @@ export default function EmporioCassa() {
     })
       .then((results) => {
         const normalized = normalizeSearchToken(value);
-        const exact = results.find((b) =>
-          normalizeSearchToken(b.beneficiarioCodice) === normalized ||
-          normalizeSearchToken(b.beneficiarioCodiceFiscale) === normalized
-        ) ?? results[0];
+        const exact =
+          results.find(
+            (b) =>
+              normalizeSearchToken(b.beneficiarioCodice) === normalized ||
+              normalizeSearchToken(b.beneficiarioCodiceFiscale) === normalized,
+          ) ?? results[0];
         if (exact) void selectBeneficiario(exact);
-        else toast({ title: t("cassaEmporio.nessunRisultato"), variant: "destructive" });
+        else
+          toast({
+            title: t("cassaEmporio.nessunRisultato"),
+            variant: "destructive",
+          });
       })
       .catch(() => toast({ title: t("common.error"), variant: "destructive" }));
   };
@@ -544,17 +764,21 @@ export default function EmporioCassa() {
       magazzinoEmporioId: activeSessione.magazzinoEmporioId,
     }).catch(() => prodotti);
     const normalized = normalizeSearchToken(currentSearch);
-    const exact = liveResults.find((p) =>
-      normalizeSearchToken(p.codice) === normalized ||
-      normalizeSearchToken(p.codiceBarre) === normalized ||
-      normalizeSearchToken(p.nome) === normalized
+    const exact = liveResults.find(
+      (p) =>
+        normalizeSearchToken(p.codice) === normalized ||
+        normalizeSearchToken(p.codiceBarre) === normalized ||
+        normalizeSearchToken(p.nome) === normalized,
     );
     const prodotto = exact ?? liveResults[0];
     if (prodotto) {
       addProduct(prodotto);
       return;
     }
-    toast({ title: t("cassaEmporio.prodottoNonTrovato"), variant: "destructive" });
+    toast({
+      title: t("cassaEmporio.prodottoNonTrovato"),
+      variant: "destructive",
+    });
   };
 
   const onProdottoKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -581,9 +805,13 @@ export default function EmporioCassa() {
   };
 
   const openForzaDialog = () => {
+    if (!canForce) return;
     const currentEmporioId = optionalId(emporioFilter);
     if (!currentEmporioId) {
-      toast({ variant: "destructive", title: t("cassaEmporio.selezionaEmporioPrima") });
+      toast({
+        variant: "destructive",
+        title: t("cassaEmporio.selezionaEmporioPrima"),
+      });
       return;
     }
     setForzaEmporioId(String(currentEmporioId));
@@ -592,7 +820,8 @@ export default function EmporioCassa() {
   };
 
   const submitForzaAccesso = () => {
-    if (!selectedBeneficiario || !forzaEmporioId || !motivoForzatura.trim()) return;
+    if (!selectedBeneficiario || !forzaEmporioId || !motivoForzatura.trim())
+      return;
     forzaAccesso.mutate({
       data: {
         beneficiarioId: selectedBeneficiario.beneficiarioId,
@@ -605,26 +834,40 @@ export default function EmporioCassa() {
   };
 
   const refreshCreditoBeneficiario = async (beneficiarioId: number) => {
+    if (!canAdjustCredito) return;
     try {
       const result = await refreshCredito.mutateAsync({
         beneficiarioId,
         data: { note: t("cassaEmporio.refreshCreditoNote") },
       });
-      if (result.saldo && selectedBeneficiario?.beneficiarioId === beneficiarioId) {
+      if (
+        result.saldo &&
+        selectedBeneficiario?.beneficiarioId === beneficiarioId
+      ) {
         setSelectedBeneficiario({
           ...selectedBeneficiario,
           saldoCreditoSolidale: result.saldo.saldoAttuale,
         });
       }
-      void queryClient.invalidateQueries({ queryKey: getSearchBeneficiariCassaEmporioQueryKey(beneficiariSearchParams) });
-      void queryClient.invalidateQueries({ queryKey: getListSessioniCassaEmporioQueryKey(sessioniSearchParams) });
       void queryClient.invalidateQueries({
-        predicate: (query) => String(query.queryKey[0] ?? "").includes("/api/credito-solidale"),
+        queryKey: getSearchBeneficiariCassaEmporioQueryKey(
+          beneficiariSearchParams,
+        ),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: getListSessioniCassaEmporioQueryKey(sessioniSearchParams),
+      });
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          String(query.queryKey[0] ?? "").includes("/api/credito-solidale"),
       });
       refreshSessione();
       toast({ title: result.messaggio ?? t("cassaEmporio.creditoAggiornato") });
     } catch (err) {
-      toast({ variant: "destructive", title: extractError(err, t("cassaEmporio.creditoRefreshErrore")) });
+      toast({
+        variant: "destructive",
+        title: extractError(err, t("cassaEmporio.creditoRefreshErrore")),
+      });
     }
   };
 
@@ -633,32 +876,47 @@ export default function EmporioCassa() {
       if (spesa.bollaId != null) {
         await downloadBollaPdf(spesa.bollaId, {
           footer: impostazioniStampa?.footerBolla ?? null,
-          template: (impostazioniStampa?.templateBolla as BollaTemplate) ?? "standard",
+          template:
+            (impostazioniStampa?.templateBolla as BollaTemplate) ?? "standard",
         });
         return;
       }
       const data = await getBollaStampaSpesaEmporio(spesa.id);
-      downloadHtmlFile(buildBollaPrintHtml(data), `${safeFilename(data.numeroBolla ?? data.numeroSpesa)}.html`);
+      downloadHtmlFile(
+        buildBollaPrintHtml(data),
+        `${safeFilename(data.numeroBolla ?? data.numeroSpesa)}.html`,
+      );
     } catch {
       toast({ title: t("common.error"), variant: "destructive" });
     }
   };
 
-  const prepareEmailBolla = async (spesa: SpesaEmporio, openClient: boolean): Promise<BollaEmporioEmailResult | null> => {
+  const prepareEmailBolla = async (
+    spesa: SpesaEmporio,
+    openClient: boolean,
+  ): Promise<BollaEmporioEmailResult | null> => {
     try {
       const result = await registraInvioManualeBolla.mutateAsync({
         id: spesa.id,
-        data: { linkBolla: buildBollaLink(spesa) },
+        data: {},
       });
       setEmailDraftBolla(result);
       if (result.spesa) {
         setChiusuraSpesa(result.spesa);
-        queryClient.setQueryData(getGetSpesaEmporioQueryKey(spesa.id), result.spesa);
+        queryClient.setQueryData(
+          getGetSpesaEmporioQueryKey(spesa.id),
+          result.spesa,
+        );
       }
-      void queryClient.invalidateQueries({ queryKey: getListSpeseEmporioQueryKey() });
+      void queryClient.invalidateQueries({
+        queryKey: getListSpeseEmporioQueryKey(),
+      });
       if (openClient && result.mailtoHref) {
         openMailClient(result.mailtoHref);
-        toast({ title: t("cassaEmporio.emailClientAperto"), description: t("cassaEmporio.emailClientApertoDescrizione") });
+        toast({
+          title: t("cassaEmporio.emailClientAperto"),
+          description: t("cassaEmporio.emailClientApertoDescrizione"),
+        });
       } else if (openClient) {
         toast({
           title: t("cassaEmporio.nessunDestinatarioEmail"),
@@ -668,7 +926,10 @@ export default function EmporioCassa() {
       }
       return result;
     } catch (err) {
-      toast({ variant: "destructive", title: extractError(err, t("cassaEmporio.emailPreparazioneErrore")) });
+      toast({
+        variant: "destructive",
+        title: extractError(err, t("cassaEmporio.emailPreparazioneErrore")),
+      });
       return null;
     }
   };
@@ -679,7 +940,9 @@ export default function EmporioCassa() {
   };
 
   const copyEmailText = async (spesa: SpesaEmporio) => {
-    const draft = emailDraftBolla?.corpo ? emailDraftBolla : await prepareEmailBolla(spesa, false);
+    const draft = emailDraftBolla?.corpo
+      ? emailDraftBolla
+      : await prepareEmailBolla(spesa, false);
     if (!draft?.corpo) return;
     await copyText(draft.corpo);
     toast({ title: t("cassaEmporio.testoEmailCopiato") });
@@ -689,16 +952,29 @@ export default function EmporioCassa() {
     <div className="space-y-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-normal">{t("cassaEmporio.titolo")}</h1>
-          <p className="text-sm text-muted-foreground">{t("cassaEmporio.sottotitolo")}</p>
+          <h1 className="text-2xl font-semibold tracking-normal">
+            {t("cassaEmporio.titolo")}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {t("cassaEmporio.sottotitolo")}
+          </p>
         </div>
-        {activeSessione && <Badge variant="outline" className={statusClass(activeSessione.statoSessione)}>{t(`cassaEmporio.${activeSessione.statoSessione}`)}</Badge>}
+        {activeSessione && (
+          <Badge
+            variant="outline"
+            className={statusClass(activeSessione.statoSessione)}
+          >
+            {t(`cassaEmporio.${activeSessione.statoSessione}`)}
+          </Badge>
+        )}
       </div>
 
       {!emporioAbilitato && (
         <Alert variant="destructive">
           <ShieldAlert className="h-4 w-4" />
-          <AlertDescription>{t("cassaEmporio.emporioDisabilitato")}</AlertDescription>
+          <AlertDescription>
+            {t("cassaEmporio.emporioDisabilitato")}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -706,11 +982,15 @@ export default function EmporioCassa() {
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t("cassaEmporio.contestoCassa")}</CardTitle>
+              <CardTitle className="text-base">
+                {t("cassaEmporio.contestoCassa")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t("cassaEmporio.area")}</label>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  {t("cassaEmporio.area")}
+                </label>
                 <Select
                   value={areaFilter}
                   onValueChange={(value) => {
@@ -719,15 +999,25 @@ export default function EmporioCassa() {
                   }}
                   disabled={!emporioAbilitato || contestoSelezioneBloccato}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ALL}>{t("cassaEmporio.tutteLeAree")}</SelectItem>
-                    {citta.map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}
+                    <SelectItem value={ALL}>
+                      {t("cassaEmporio.tutteLeAree")}
+                    </SelectItem>
+                    {citta.map((area) => (
+                      <SelectItem key={area.id} value={String(area.id)}>
+                        {area.nome}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t("cassaEmporio.dataCassa")}</label>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  {t("cassaEmporio.dataCassa")}
+                </label>
                 <Input
                   type="date"
                   value={cassaDate}
@@ -739,7 +1029,9 @@ export default function EmporioCassa() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t("cassaEmporio.emporio")}</label>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  {t("cassaEmporio.emporio")}
+                </label>
                 <Select
                   value={emporioFilter}
                   onValueChange={(value) => {
@@ -748,15 +1040,27 @@ export default function EmporioCassa() {
                   }}
                   disabled={!emporioAbilitato || contestoSelezioneBloccato}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ALL}>{t("cassaEmporio.tuttiGliEmpori")}</SelectItem>
-                    {emporiFiltrati.map((emporio) => <SelectItem key={emporio.id} value={String(emporio.id)}>{emporio.nome}</SelectItem>)}
+                    <SelectItem value={ALL}>
+                      {t("cassaEmporio.tuttiGliEmpori")}
+                    </SelectItem>
+                    {emporiFiltrati.map((emporio) => (
+                      <SelectItem key={emporio.id} value={String(emporio.id)}>
+                        {emporio.nome}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               {contestoSelezioneBloccato && (
-                <Button type="button" variant="outline" onClick={exitCassaContext}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={exitCassaContext}
+                >
                   {t("cassaEmporio.esciCassa")}
                 </Button>
               )}
@@ -765,7 +1069,10 @@ export default function EmporioCassa() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base"><Barcode className="h-4 w-4" />{t("cassaEmporio.scansionaBeneficiario")}</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Barcode className="h-4 w-4" />
+                {t("cassaEmporio.scansionaBeneficiario")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex gap-2">
@@ -773,12 +1080,24 @@ export default function EmporioCassa() {
                   value={beneficiarioSearch}
                   onChange={(e) => setBeneficiarioSearch(e.target.value)}
                   onKeyDown={onBeneficiarioKeyDown}
-                  placeholder={!contestoCassaCompleto ? t("cassaEmporio.selezionaEmporioPrima") : t("cassaEmporio.cercaBeneficiarioPlaceholder")}
-                  disabled={!emporioAbilitato || !contestoCassaCompleto || contestoSelezioneBloccato}
+                  placeholder={
+                    !contestoCassaCompleto
+                      ? t("cassaEmporio.selezionaEmporioPrima")
+                      : t("cassaEmporio.cercaBeneficiarioPlaceholder")
+                  }
+                  disabled={
+                    !emporioAbilitato ||
+                    !contestoCassaCompleto ||
+                    contestoSelezioneBloccato
+                  }
                 />
                 <BarcodeScannerButton
                   onScan={onBeneficiarioScan}
-                  disabled={!emporioAbilitato || !contestoCassaCompleto || contestoSelezioneBloccato}
+                  disabled={
+                    !emporioAbilitato ||
+                    !contestoCassaCompleto ||
+                    contestoSelezioneBloccato
+                  }
                 />
               </div>
               <div className="max-h-64 space-y-2 overflow-auto">
@@ -787,63 +1106,135 @@ export default function EmporioCassa() {
                     key={b.beneficiarioId}
                     type="button"
                     className="w-full rounded-md border p-3 text-left text-sm hover:bg-muted"
-                    onClick={() => { void selectBeneficiario(b); }}
+                    onClick={() => {
+                      void selectBeneficiario(b);
+                    }}
                     disabled={!emporioAbilitato}
                   >
                     <div className="font-medium">{b.beneficiarioNome}</div>
-                    <div className="text-muted-foreground">{b.beneficiarioCodice}</div>
-                    <div className="mt-1 text-xs">{t("cassaEmporio.saldoCreditoDisponibile")}: {formatCredito(b.saldoCreditoSolidale)}</div>
+                    <div className="text-muted-foreground">
+                      {b.beneficiarioCodice}
+                    </div>
+                    <div className="mt-1 text-xs">
+                      {t("cassaEmporio.saldoCreditoDisponibile")}:{" "}
+                      {formatCredito(b.saldoCreditoSolidale)}
+                    </div>
                   </button>
                 ))}
-                {!contestoCassaCompleto && <p className="text-sm text-muted-foreground">{t("cassaEmporio.selezionaEmporioPrima")}</p>}
-                {contestoSelezioneBloccato && <p className="text-sm text-muted-foreground">{t("cassaEmporio.contestoCassaBloccato")}</p>}
-                {beneficiarioQuery && beneficiariVisibili.length === 0 && contestoCassaCompleto && !contestoSelezioneBloccato && <p className="text-sm text-muted-foreground">{t("cassaEmporio.nessunRisultato")}</p>}
+                {!contestoCassaCompleto && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("cassaEmporio.selezionaEmporioPrima")}
+                  </p>
+                )}
+                {contestoSelezioneBloccato && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("cassaEmporio.contestoCassaBloccato")}
+                  </p>
+                )}
+                {beneficiarioQuery &&
+                  beneficiariVisibili.length === 0 &&
+                  contestoCassaCompleto &&
+                  !contestoSelezioneBloccato && (
+                    <p className="text-sm text-muted-foreground">
+                      {t("cassaEmporio.nessunRisultato")}
+                    </p>
+                  )}
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t("cassaEmporio.accessoEmporio")}</CardTitle>
+              <CardTitle className="text-base">
+                {t("cassaEmporio.accessoEmporio")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {selectedBeneficiario ? (
                 <>
                   <div className="rounded-md border p-3 text-sm">
-                    <div className="font-medium">{selectedBeneficiario.beneficiarioNome}</div>
-                    <div className="text-muted-foreground">{selectedBeneficiario.beneficiarioCodice}</div>
-                    <div>{t("cassaEmporio.saldoCreditoDisponibile")}: {formatCredito(selectedBeneficiario.saldoCreditoSolidale)}</div>
-                    {selectedBeneficiario.saldoCreditoSolidale === 0 && <div className="mt-1 text-amber-700">{t("cassaEmporio.saldoZero")}</div>}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 w-full"
-                      onClick={() => { void refreshCreditoBeneficiario(selectedBeneficiario.beneficiarioId); }}
-                      disabled={!emporioAbilitato || refreshCredito.isPending}
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />{t("cassaEmporio.refreshCredito")}
-                    </Button>
+                    <div className="font-medium">
+                      {selectedBeneficiario.beneficiarioNome}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {selectedBeneficiario.beneficiarioCodice}
+                    </div>
+                    <div>
+                      {t("cassaEmporio.saldoCreditoDisponibile")}:{" "}
+                      {formatCredito(selectedBeneficiario.saldoCreditoSolidale)}
+                    </div>
+                    {selectedBeneficiario.saldoCreditoSolidale === 0 && (
+                      <div className="mt-1 text-amber-700">
+                        {t("cassaEmporio.saldoZero")}
+                      </div>
+                    )}
+                    {canAdjustCredito && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() => {
+                          void refreshCreditoBeneficiario(
+                            selectedBeneficiario.beneficiarioId,
+                          );
+                        }}
+                        disabled={!emporioAbilitato || refreshCredito.isPending}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t("cassaEmporio.refreshCredito")}
+                      </Button>
+                    )}
                   </div>
                   <div className="space-y-2">
                     {activeAccessi.map((accesso) => (
-                      <div key={accesso.id} className="rounded-md border p-3 text-sm">
+                      <div
+                        key={accesso.id}
+                        className="rounded-md border p-3 text-sm"
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <div>
-                            <div className="font-medium">{formatDateTime(accesso.dataOraInizio)}</div>
-                            <div className="text-muted-foreground">{accesso.magazzinoEmporioNome ?? "-"}</div>
+                            <div className="font-medium">
+                              {formatDateTime(accesso.dataOraInizio)}
+                            </div>
+                            <div className="text-muted-foreground">
+                              {accesso.magazzinoEmporioNome ?? "-"}
+                            </div>
                           </div>
-                          {isToday(accesso.dataOraInizio) && <Badge variant="secondary">{t("cassaEmporio.oggi")}</Badge>}
+                          {isToday(accesso.dataOraInizio) && (
+                            <Badge variant="secondary">
+                              {t("cassaEmporio.oggi")}
+                            </Badge>
+                          )}
                         </div>
-                        <Button className="mt-3 w-full" size="sm" onClick={() => openAccesso(accesso)} disabled={!emporioAbilitato || !contestoCassaCompleto || apriSessione.isPending}>
+                        <Button
+                          className="mt-3 w-full"
+                          size="sm"
+                          onClick={() => openAccesso(accesso)}
+                          disabled={
+                            !emporioAbilitato ||
+                            !canOperate ||
+                            !contestoCassaCompleto ||
+                            apriSessione.isPending
+                          }
+                        >
                           {t("cassaEmporio.apriSessione")}
                         </Button>
                       </div>
                     ))}
-                    {activeAccessi.length === 0 && (
+                    {activeAccessi.length === 0 && canForce && (
                       <div className="space-y-2 text-sm text-muted-foreground">
                         <p>{t("cassaEmporio.nessunAccessoValido")}</p>
-                        <Button variant="outline" className="w-full" onClick={openForzaDialog} disabled={!emporioAbilitato || !selectedBeneficiario || !contestoCassaCompleto}>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={openForzaDialog}
+                          disabled={
+                            !emporioAbilitato ||
+                            !selectedBeneficiario ||
+                            !contestoCassaCompleto
+                          }
+                        >
                           {t("cassaEmporio.forzaAccesso")}
                         </Button>
                       </div>
@@ -851,37 +1242,92 @@ export default function EmporioCassa() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">{t("cassaEmporio.cercaBeneficiario")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("cassaEmporio.cercaBeneficiario")}
+                </p>
               )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t("cassaEmporio.sessioniRecenti")}</CardTitle>
+              <CardTitle className="text-base">
+                {t("cassaEmporio.sessioniRecenti")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                <Input value={sessioneSearch} onChange={(e) => setSessioneSearch(e.target.value)} placeholder={t("cassaEmporio.cercaBeneficiarioPlaceholder")} />
+                <Input
+                  value={sessioneSearch}
+                  onChange={(e) => setSessioneSearch(e.target.value)}
+                  placeholder={t("cassaEmporio.cercaBeneficiarioPlaceholder")}
+                />
                 <Select value={statoFilter} onValueChange={setStatoFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>{t("common.all")}</SelectItem>
-                    {STATI_SESSIONE.map((stato) => <SelectItem key={stato} value={stato}>{t(`cassaEmporio.${stato}`)}</SelectItem>)}
+                    {STATI_SESSIONE.map((stato) => (
+                      <SelectItem key={stato} value={stato}>
+                        {t(`cassaEmporio.${stato}`)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="max-h-72 space-y-2 overflow-auto">
                 {sessioni.map((s) => (
-                  <button key={s.id} type="button" className="w-full rounded-md border p-3 text-left text-sm hover:bg-muted" onClick={() => setSelectedSessioneId(s.id)}>
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="w-full rounded-md border p-3 text-left text-sm hover:bg-muted"
+                    onClick={() => setSelectedSessioneId(s.id)}
+                  >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{s.beneficiarioNome ?? "-"}</span>
-                      <Badge variant="outline" className={statusClass(s.statoSessione)}>{t(`cassaEmporio.${s.statoSessione}`)}</Badge>
+                      <span className="font-medium">
+                        {s.beneficiarioNome ?? "-"}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={statusClass(s.statoSessione)}
+                      >
+                        {t(`cassaEmporio.${s.statoSessione}`)}
+                      </Badge>
                     </div>
-                    <div className="text-muted-foreground">{formatDateTime(s.dataUltimaModifica)}</div>
+                    <div className="text-muted-foreground">
+                      {formatDateTime(s.dataUltimaModifica)}
+                    </div>
                   </button>
                 ))}
-                {sessioni.length === 0 && <p className="text-sm text-muted-foreground">{t("cassaEmporio.nessunaSessione")}</p>}
+                {sessioni.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("cassaEmporio.nessunaSessione")}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setSessioniPage((page) => Math.max(1, page - 1))
+                  }
+                  disabled={sessioniPage === 1}
+                >
+                  Precedente
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Pagina {sessioniPage}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSessioniPage((page) => page + 1)}
+                  disabled={sessioni.length < 50}
+                >
+                  Successiva
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -892,46 +1338,133 @@ export default function EmporioCassa() {
             <>
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">{t("cassaEmporio.sessioneAperta")}</CardTitle>
+                  <CardTitle className="text-base">
+                    {t("cassaEmporio.sessioneAperta")}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
-                  <div><div className="text-muted-foreground">{t("cassaEmporio.beneficiario")}</div><div className="font-medium">{activeSessione.beneficiarioNome ?? "-"}</div></div>
-                  <div><div className="text-muted-foreground">{t("cassaEmporio.codice")}</div><div className="font-medium">{activeSessione.beneficiarioCodice ?? "-"}</div></div>
-                  <div><div className="text-muted-foreground">{t("cassaEmporio.emporio")}</div><div className="font-medium">{activeSessione.magazzinoEmporioNome ?? "-"}</div></div>
-                  <div><div className="text-muted-foreground">{t("cassaEmporio.accessoEmporio")}</div><div className="font-medium">{formatDateTime(activeSessione.dataOraAccesso)}</div></div>
-                  <div><div className="text-muted-foreground">{t("cassaEmporio.saldoCreditoDisponibile")}</div><div className="font-medium">{formatCredito(activeSessione.saldoCreditoIniziale)}</div></div>
-                  <div><div className="text-muted-foreground">{t("cassaEmporio.totaleCreditoPrevisto")}</div><div className="font-medium">{formatCredito(activeSessione.totaleCreditoPrevisto)}</div></div>
-                  <div><div className="text-muted-foreground">{t("cassaEmporio.creditoResiduoPrevisto")}</div><div className={saldoInsufficiente ? "font-medium text-red-700" : "font-medium"}>{formatCredito(activeSessione.creditoResiduoPrevisto)}</div></div>
-                  <div><div className="text-muted-foreground">{t("cassaEmporio.statoSessione")}</div><Badge variant="outline" className={statusClass(activeSessione.statoSessione)}>{t(`cassaEmporio.${activeSessione.statoSessione}`)}</Badge></div>
-                  <div className="md:col-span-2 xl:col-span-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { void refreshCreditoBeneficiario(activeSessione.beneficiarioId); }}
-                      disabled={!emporioAbilitato || refreshCredito.isPending || activeSessione.statoSessione === "chiusa"}
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />{t("cassaEmporio.refreshCredito")}
-                    </Button>
+                  <div>
+                    <div className="text-muted-foreground">
+                      {t("cassaEmporio.beneficiario")}
+                    </div>
+                    <div className="font-medium">
+                      {activeSessione.beneficiarioNome ?? "-"}
+                    </div>
                   </div>
+                  <div>
+                    <div className="text-muted-foreground">
+                      {t("cassaEmporio.codice")}
+                    </div>
+                    <div className="font-medium">
+                      {activeSessione.beneficiarioCodice ?? "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">
+                      {t("cassaEmporio.emporio")}
+                    </div>
+                    <div className="font-medium">
+                      {activeSessione.magazzinoEmporioNome ?? "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">
+                      {t("cassaEmporio.accessoEmporio")}
+                    </div>
+                    <div className="font-medium">
+                      {formatDateTime(activeSessione.dataOraAccesso)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">
+                      {t("cassaEmporio.saldoCreditoDisponibile")}
+                    </div>
+                    <div className="font-medium">
+                      {formatCredito(activeSessione.saldoCreditoIniziale)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">
+                      {t("cassaEmporio.totaleCreditoPrevisto")}
+                    </div>
+                    <div className="font-medium">
+                      {formatCredito(activeSessione.totaleCreditoPrevisto)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">
+                      {t("cassaEmporio.creditoResiduoPrevisto")}
+                    </div>
+                    <div
+                      className={
+                        saldoInsufficiente
+                          ? "font-medium text-red-700"
+                          : "font-medium"
+                      }
+                    >
+                      {formatCredito(activeSessione.creditoResiduoPrevisto)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">
+                      {t("cassaEmporio.statoSessione")}
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={statusClass(activeSessione.statoSessione)}
+                    >
+                      {t(`cassaEmporio.${activeSessione.statoSessione}`)}
+                    </Badge>
+                  </div>
+                  {canAdjustCredito && (
+                    <div className="md:col-span-2 xl:col-span-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          void refreshCreditoBeneficiario(
+                            activeSessione.beneficiarioId,
+                          );
+                        }}
+                        disabled={
+                          !emporioAbilitato ||
+                          refreshCredito.isPending ||
+                          activeSessione.statoSessione === "chiusa"
+                        }
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t("cassaEmporio.refreshCredito")}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
               {saldoInsufficiente && (
                 <Alert variant="destructive">
                   <ShieldAlert className="h-4 w-4" />
-                  <AlertDescription>{t("cassaEmporio.saldoInsufficiente")}</AlertDescription>
+                  <AlertDescription>
+                    {t("cassaEmporio.saldoInsufficiente")}
+                  </AlertDescription>
                 </Alert>
               )}
-              {!canEdit && activeSessione.statoSessione !== "aperta" && activeSessione.statoSessione !== "sospesa" && (
-                <Alert>
-                  <AlertDescription>{t("cassaEmporio.soloLettura")}</AlertDescription>
-                </Alert>
-              )}
+              {!canEdit &&
+                activeSessione.statoSessione !== "aperta" &&
+                activeSessione.statoSessione !== "sospesa" && (
+                  <Alert>
+                    <AlertDescription>
+                      {t("cassaEmporio.soloLettura")}
+                    </AlertDescription>
+                  </Alert>
+                )}
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base"><Search className="h-4 w-4" />{t("cassaEmporio.scansionaProdotto")}</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Search className="h-4 w-4" />
+                    {t("cassaEmporio.scansionaProdotto")}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex gap-2">
@@ -942,7 +1475,10 @@ export default function EmporioCassa() {
                       placeholder={t("cassaEmporio.cercaProdottoPlaceholder")}
                       disabled={!canEdit}
                     />
-                    <BarcodeScannerButton onScan={onProdottoScan} disabled={!canEdit} />
+                    <BarcodeScannerButton
+                      onScan={onProdottoScan}
+                      disabled={!canEdit}
+                    />
                   </div>
                   <div className="rounded-md border">
                     {prodotti.map((p) => (
@@ -955,24 +1491,48 @@ export default function EmporioCassa() {
                       >
                         <span>
                           <span className="block font-medium">{p.nome}</span>
-                          <span className="block text-muted-foreground">{p.codiceBarre ?? p.codice}</span>
-                          <span className="block text-xs text-muted-foreground">{t("cassaEmporio.creditoUnitario")}: {formatCredito(p.creditoSolidaleValore)}</span>
+                          <span className="block text-muted-foreground">
+                            {p.codiceBarre ?? p.codice}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {t("cassaEmporio.creditoUnitario")}:{" "}
+                            {formatCredito(p.creditoSolidaleValore)}
+                          </span>
                         </span>
                         <span className="flex shrink-0 items-center gap-2">
-                          <Badge variant="outline">{t("cassaEmporio.giacenzaDisponibile")}: {p.giacenzaDisponibile ?? "-"}</Badge>
+                          <Badge variant="outline">
+                            {t("cassaEmporio.giacenzaDisponibile")}:{" "}
+                            {p.giacenzaDisponibile == null
+                              ? "-"
+                              : formatQuantita(
+                                  p.giacenzaDisponibile,
+                                  p.unitaMisura,
+                                )}
+                          </Badge>
                           <Plus className="h-4 w-4 text-muted-foreground" />
                         </span>
                       </button>
                     ))}
-                    {prodottoQuery && prodotti.length === 0 && <p className="p-3 text-sm font-medium text-red-600">{t("cassaEmporio.prodottoNonTrovato")}</p>}
-                    {!prodottoQuery && prodotti.length === 0 && <p className="p-3 text-sm text-muted-foreground">{t("cassaEmporio.nessunProdottoEmporio")}</p>}
+                    {prodottoQuery && prodotti.length === 0 && (
+                      <p className="p-3 text-sm font-medium text-red-600">
+                        {t("cassaEmporio.prodottoNonTrovato")}
+                      </p>
+                    )}
+                    {!prodottoQuery && prodotti.length === 0 && (
+                      <p className="p-3 text-sm text-muted-foreground">
+                        {t("cassaEmporio.nessunProdottoEmporio")}
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base"><ShoppingCart className="h-4 w-4" />{t("cassaEmporio.carrello")}</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ShoppingCart className="h-4 w-4" />
+                    {t("cassaEmporio.carrello")}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="overflow-x-auto">
@@ -981,54 +1541,211 @@ export default function EmporioCassa() {
                         <TableRow>
                           <TableHead>{t("cassaEmporio.prodotto")}</TableHead>
                           <TableHead>{t("cassaEmporio.quantita")}</TableHead>
-                          <TableHead>{t("cassaEmporio.creditoUnitario")}</TableHead>
-                          <TableHead>{t("cassaEmporio.creditoTotale")}</TableHead>
-                          <TableHead>{t("cassaEmporio.giacenzaDisponibile")}</TableHead>
+                          <TableHead>
+                            {t("cassaEmporio.creditoUnitario")}
+                          </TableHead>
+                          <TableHead>
+                            {t("cassaEmporio.creditoTotale")}
+                          </TableHead>
+                          <TableHead>
+                            {t("cassaEmporio.giacenzaDisponibile")}
+                          </TableHead>
                           <TableHead>{t("cassaEmporio.limiti")}</TableHead>
-                          <TableHead className="text-right">{t("cassaEmporio.azioni")}</TableHead>
+                          <TableHead className="text-right">
+                            {t("cassaEmporio.azioni")}
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {activeSessione.righe.map((riga) => (
                           <TableRow key={riga.id}>
                             <TableCell>
-                              <div className="font-medium">{riga.descrizioneProdotto}</div>
-                              <div className="text-xs text-muted-foreground">{riga.codiceProdotto ?? "-"}</div>
+                              <div className="font-medium">
+                                {riga.descrizioneProdotto}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {riga.codiceProdotto ?? "-"}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
-                                <Button variant="outline" size="icon" onClick={() => updateQuantity(riga.id, riga.quantita - 1)} disabled={!canEdit || riga.quantita <= 1}><Minus className="h-4 w-4" /></Button>
-                                <Input className="h-9 w-16 text-center" value={riga.quantita} onChange={(e) => updateQuantity(riga.id, Number(e.target.value))} disabled={!canEdit} />
-                                <Button variant="outline" size="icon" onClick={() => updateQuantity(riga.id, riga.quantita + 1)} disabled={!canEdit}><Plus className="h-4 w-4" /></Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    updateQuantity(
+                                      riga.id,
+                                      Math.round((riga.quantita - 0.25) * 100) /
+                                        100,
+                                    )
+                                  }
+                                  disabled={!canEdit || riga.quantita <= 0.25}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <Input
+                                  key={`${riga.id}-${riga.quantita}`}
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  className="h-9 w-24 text-center"
+                                  defaultValue={riga.quantita}
+                                  onBlur={(e) =>
+                                    updateQuantity(
+                                      riga.id,
+                                      Number(e.currentTarget.value),
+                                    )
+                                  }
+                                  disabled={!canEdit}
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    updateQuantity(
+                                      riga.id,
+                                      Math.round((riga.quantita + 0.25) * 100) /
+                                        100,
+                                    )
+                                  }
+                                  disabled={!canEdit}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                                <span className="text-xs text-muted-foreground">
+                                  {riga.unitaMisura ?? "UOM legacy"}
+                                </span>
                               </div>
                             </TableCell>
-                            <TableCell>{formatCredito(riga.creditoUnitario)}</TableCell>
-                            <TableCell>{formatCredito(riga.creditoTotale)}</TableCell>
-                            <TableCell>{riga.giacenzaDisponibileAlMomento ?? "-"}</TableCell>
+                            <TableCell>
+                              {formatCredito(riga.creditoUnitario)}
+                            </TableCell>
+                            <TableCell>
+                              {formatCredito(riga.creditoTotale)}
+                            </TableCell>
+                            <TableCell>
+                              {riga.giacenzaDisponibileAlMomento == null
+                                ? "-"
+                                : formatQuantita(
+                                    riga.giacenzaDisponibileAlMomento,
+                                    riga.unitaMisura,
+                                  )}
+                            </TableCell>
                             <TableCell className="text-xs">
-                              <div>{t("cassaEmporio.limitePerSpesa")}: {riga.limitePerSpesa ?? "-"}</div>
-                              <div>{t("cassaEmporio.limiteMensile")}: {riga.limiteMensile ?? "-"}</div>
+                              <div>
+                                {t("cassaEmporio.limitePerSpesa")}:{" "}
+                                {riga.limitePerSpesa ?? "-"}
+                              </div>
+                              <div>
+                                {t("cassaEmporio.limiteMensile")}:{" "}
+                                {riga.limiteMensile ?? "-"}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" onClick={() => deleteRiga.mutate({ id: activeSessione.id, rigaId: riga.id })} disabled={!canEdit}><Trash2 className="h-4 w-4" /></Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  deleteRiga.mutate({
+                                    id: activeSessione.id,
+                                    rigaId: riga.id,
+                                    data: { versione: activeSessione.versione },
+                                  })
+                                }
+                                disabled={!canEdit}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
                         {activeSessione.righe.length === 0 && (
-                          <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">{t("cassaEmporio.carrelloVuoto")}</TableCell></TableRow>
+                          <TableRow>
+                            <TableCell
+                              colSpan={7}
+                              className="text-center text-muted-foreground"
+                            >
+                              {t("cassaEmporio.carrelloVuoto")}
+                            </TableCell>
+                          </TableRow>
                         )}
                       </TableBody>
                     </Table>
                   </div>
 
                   <div className="flex flex-col gap-2 md:flex-row md:justify-end">
-                    <Button variant="outline" onClick={() => sospendi.mutate({ id: activeSessione.id })} disabled={!canEdit || activeSessione.statoSessione === "sospesa"}><Pause className="mr-2 h-4 w-4" />{t("cassaEmporio.sospendiSessione")}</Button>
-                    <Button variant="outline" onClick={() => riprendi.mutate({ id: activeSessione.id })} disabled={!emporioAbilitato || activeSessione.statoSessione !== "sospesa"}><Play className="mr-2 h-4 w-4" />{t("cassaEmporio.riprendiSessione")}</Button>
-                    <Button variant="outline" onClick={() => setAnnullaOpen(true)} disabled={!emporioAbilitato || activeSessione.statoSessione === "annullata"}><XCircle className="mr-2 h-4 w-4" />{t("cassaEmporio.annullaSessione")}</Button>
-                    <Button onClick={() => prepara.mutate({ id: activeSessione.id })} disabled={!canEdit || activeSessione.righe.length === 0 || saldoInsufficiente}><CheckCircle2 className="mr-2 h-4 w-4" />{t("cassaEmporio.preparaChiusura")}</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        sospendi.mutate({
+                          id: activeSessione.id,
+                          data: { versione: activeSessione.versione },
+                        })
+                      }
+                      disabled={
+                        !canEdit || activeSessione.statoSessione !== "aperta"
+                      }
+                    >
+                      <Pause className="mr-2 h-4 w-4" />
+                      {t("cassaEmporio.sospendiSessione")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        riprendi.mutate({
+                          id: activeSessione.id,
+                          data: { versione: activeSessione.versione },
+                        })
+                      }
+                      disabled={
+                        !canOperate ||
+                        !emporioAbilitato ||
+                        activeSessione.statoSessione !== "sospesa"
+                      }
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      {t("cassaEmporio.riprendiSessione")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setAnnullaOpen(true)}
+                      disabled={
+                        !canOperate ||
+                        !emporioAbilitato ||
+                        !["aperta", "sospesa", "pronta_per_chiusura"].includes(
+                          activeSessione.statoSessione,
+                        )
+                      }
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      {t("cassaEmporio.annullaSessione")}
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        prepara.mutate({
+                          id: activeSessione.id,
+                          data: { versione: activeSessione.versione },
+                        })
+                      }
+                      disabled={
+                        !canEdit ||
+                        activeSessione.statoSessione !== "aperta" ||
+                        activeSessione.righe.length === 0 ||
+                        saldoInsufficiente
+                      }
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {t("cassaEmporio.preparaChiusura")}
+                    </Button>
                     {activeSessione.statoSessione === "pronta_per_chiusura" && (
-                      <Button onClick={() => setChiudiOpen(true)} disabled={!emporioAbilitato || chiudi.isPending}>
-                        <FileText className="mr-2 h-4 w-4" />{t("cassaEmporio.chiudiSpesa")}
+                      <Button
+                        onClick={() => setChiudiOpen(true)}
+                        disabled={
+                          !canOperate || !emporioAbilitato || chiudi.isPending
+                        }
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        {t("cassaEmporio.chiudiSpesa")}
                       </Button>
                     )}
                   </div>
@@ -1038,46 +1755,154 @@ export default function EmporioCassa() {
               {chiusuraSpesa && (
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{t("cassaEmporio.spesaChiusa")}</CardTitle>
+                    <CardTitle className="text-base">
+                      {t("cassaEmporio.spesaChiusa")}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4 text-sm">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <div><div className="text-muted-foreground">{t("cassaEmporio.numeroSpesa")}</div><div className="font-medium">{chiusuraSpesa.numeroSpesa}</div></div>
-                      <div><div className="text-muted-foreground">{t("cassaEmporio.numeroBolla")}</div><div className="font-medium">{chiusuraSpesa.bollaNumero ?? "-"}</div></div>
-                      <div><div className="text-muted-foreground">{t("cassaEmporio.creditoConsumati")}</div><div className="font-medium">{formatCredito(chiusuraSpesa.totaleCreditoConsumati)}</div></div>
-                      <div><div className="text-muted-foreground">{t("cassaEmporio.saldoResiduo")}</div><div className="font-medium">{formatCredito(chiusuraSpesa.saldoDopo)}</div></div>
-                      <div><div className="text-muted-foreground">{t("cassaEmporio.statoInvioEmailBolla")}</div><div className="font-medium">{t(`cassaEmporio.email.${chiusuraSpesa.emailBollaStato}`)}</div></div>
-                      <div><div className="text-muted-foreground">{t("cassaEmporio.emailDataUltimoClick")}</div><div className="font-medium">{formatDateTime(chiusuraSpesa.emailBollaDataUltimoClick)}</div></div>
-                      <div><div className="text-muted-foreground">{t("cassaEmporio.emailOperatore")}</div><div className="font-medium">{chiusuraSpesa.emailBollaOperatoreId ?? "-"}</div></div>
-                      <div className="xl:col-span-2"><div className="text-muted-foreground">{t("cassaEmporio.emailOggetto")}</div><div className="font-medium">{chiusuraSpesa.emailBollaOggetto ?? emailDraftBolla?.oggetto ?? "-"}</div></div>
+                      <div>
+                        <div className="text-muted-foreground">
+                          {t("cassaEmporio.numeroSpesa")}
+                        </div>
+                        <div className="font-medium">
+                          {chiusuraSpesa.numeroSpesa}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">
+                          {t("cassaEmporio.numeroBolla")}
+                        </div>
+                        <div className="font-medium">
+                          {chiusuraSpesa.bollaNumero ?? "-"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">
+                          {t("cassaEmporio.creditoConsumati")}
+                        </div>
+                        <div className="font-medium">
+                          {formatCredito(chiusuraSpesa.totaleCreditoConsumati)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">
+                          {t("cassaEmporio.saldoResiduo")}
+                        </div>
+                        <div className="font-medium">
+                          {formatCredito(chiusuraSpesa.saldoDopo)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">
+                          {t("cassaEmporio.statoInvioEmailBolla")}
+                        </div>
+                        <div className="font-medium">
+                          {t(
+                            `cassaEmporio.email.${chiusuraSpesa.emailBollaStato}`,
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">
+                          {t("cassaEmporio.emailDataUltimoClick")}
+                        </div>
+                        <div className="font-medium">
+                          {formatDateTime(
+                            chiusuraSpesa.emailBollaDataUltimoClick,
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">
+                          {t("cassaEmporio.emailOperatore")}
+                        </div>
+                        <div className="font-medium">
+                          {chiusuraSpesa.emailBollaOperatoreId ?? "-"}
+                        </div>
+                      </div>
+                      <div className="xl:col-span-2">
+                        <div className="text-muted-foreground">
+                          {t("cassaEmporio.emailOggetto")}
+                        </div>
+                        <div className="font-medium">
+                          {chiusuraSpesa.emailBollaOggetto ??
+                            emailDraftBolla?.oggetto ??
+                            "-"}
+                        </div>
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2 md:flex-row">
-                      <Button type="button" variant="outline" onClick={() => { void downloadBolla(chiusuraSpesa); }}>
-                        <Download className="mr-2 h-4 w-4" />{t("cassaEmporio.stampaBolla")}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          void downloadBolla(chiusuraSpesa);
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        {t("cassaEmporio.stampaBolla")}
                       </Button>
                       {emailDraftBolla?.mailtoHref ? (
                         <Button type="button" variant="outline" asChild>
-                          <a href={emailDraftBolla.mailtoHref} onClick={() => toast({ title: t("cassaEmporio.emailClientAperto") })}>
-                            <Mail className="mr-2 h-4 w-4" />{t("cassaEmporio.ritentaInvioEmailBolla")}
+                          <a
+                            href={emailDraftBolla.mailtoHref}
+                            onClick={() =>
+                              toast({
+                                title: t("cassaEmporio.emailClientAperto"),
+                              })
+                            }
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            {t("cassaEmporio.ritentaInvioEmailBolla")}
                           </a>
                         </Button>
                       ) : (
-                        <Button type="button" variant="outline" onClick={() => { void prepareEmailBolla(chiusuraSpesa, true); }} disabled={registraInvioManualeBolla.isPending}>
-                          <Mail className="mr-2 h-4 w-4" />{t("cassaEmporio.ritentaInvioEmailBolla")}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            void prepareEmailBolla(chiusuraSpesa, true);
+                          }}
+                          disabled={registraInvioManualeBolla.isPending}
+                        >
+                          <Mail className="mr-2 h-4 w-4" />
+                          {t("cassaEmporio.ritentaInvioEmailBolla")}
                         </Button>
                       )}
-                      <Button type="button" variant="outline" onClick={() => { void copyBollaLink(chiusuraSpesa); }}>
-                        <Copy className="mr-2 h-4 w-4" />{t("cassaEmporio.copiaLinkBolla")}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          void copyBollaLink(chiusuraSpesa);
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        {t("cassaEmporio.copiaLinkBolla")}
                       </Button>
-                      <Button type="button" variant="outline" onClick={() => { void copyEmailText(chiusuraSpesa); }} disabled={registraInvioManualeBolla.isPending}>
-                        <Copy className="mr-2 h-4 w-4" />{t("cassaEmporio.copiaTestoEmail")}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          void copyEmailText(chiusuraSpesa);
+                        }}
+                        disabled={registraInvioManualeBolla.isPending}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        {t("cassaEmporio.copiaTestoEmail")}
                       </Button>
                       <Button type="button" variant="outline" asChild>
-                        <Link href={`/emporio/spese?spesaId=${chiusuraSpesa.id}`}>{t("cassaEmporio.apriDettaglioSpesa")}</Link>
+                        <Link
+                          href={`/emporio/spese?spesaId=${chiusuraSpesa.id}`}
+                        >
+                          {t("cassaEmporio.apriDettaglioSpesa")}
+                        </Link>
                       </Button>
                     </div>
                     {chiusuraSpesa.emailBollaErrore && (
-                      <p className="text-sm font-medium text-red-600">{chiusuraSpesa.emailBollaErrore}</p>
+                      <p className="text-sm font-medium text-red-600">
+                        {chiusuraSpesa.emailBollaErrore}
+                      </p>
                     )}
                   </CardContent>
                 </Card>
@@ -1085,7 +1910,9 @@ export default function EmporioCassa() {
             </>
           ) : (
             <Card>
-              <CardContent className="py-10 text-center text-muted-foreground">{t("cassaEmporio.selezionaSessione")}</CardContent>
+              <CardContent className="py-10 text-center text-muted-foreground">
+                {t("cassaEmporio.selezionaSessione")}
+              </CardContent>
             </Card>
           )}
         </div>
@@ -1093,12 +1920,22 @@ export default function EmporioCassa() {
 
       <Dialog open={forzaOpen} onOpenChange={setForzaOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{t("cassaEmporio.pianificazioneNonPresente")}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              {t("cassaEmporio.pianificazioneNonPresente")}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
             <Select value={forzaEmporioId} onValueChange={setForzaEmporioId}>
-              <SelectTrigger><SelectValue placeholder={t("cassaEmporio.selezionaEmporio")} /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder={t("cassaEmporio.selezionaEmporio")} />
+              </SelectTrigger>
               <SelectContent>
-                {emporiFiltrati.map((emporio) => <SelectItem key={emporio.id} value={String(emporio.id)}>{emporio.nome}</SelectItem>)}
+                {emporiFiltrati.map((emporio) => (
+                  <SelectItem key={emporio.id} value={String(emporio.id)}>
+                    {emporio.nome}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Textarea
@@ -1108,8 +1945,17 @@ export default function EmporioCassa() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setForzaOpen(false)}>{t("common.no")}</Button>
-            <Button onClick={submitForzaAccesso} disabled={!forzaEmporioId || !motivoForzatura.trim() || forzaAccesso.isPending}>
+            <Button variant="outline" onClick={() => setForzaOpen(false)}>
+              {t("common.no")}
+            </Button>
+            <Button
+              onClick={submitForzaAccesso}
+              disabled={
+                !forzaEmporioId ||
+                !motivoForzatura.trim() ||
+                forzaAccesso.isPending
+              }
+            >
               {t("cassaEmporio.forzaAccesso")}
             </Button>
           </DialogFooter>
@@ -1118,12 +1964,26 @@ export default function EmporioCassa() {
 
       <Dialog open={chiudiOpen} onOpenChange={setChiudiOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{t("cassaEmporio.confermaChiusuraTitolo")}</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">{t("cassaEmporio.confermaChiusuraDescrizione")}</p>
+          <DialogHeader>
+            <DialogTitle>
+              {t("cassaEmporio.confermaChiusuraTitolo")}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {t("cassaEmporio.confermaChiusuraDescrizione")}
+          </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setChiudiOpen(false)}>{t("common.cancel")}</Button>
+            <Button variant="outline" onClick={() => setChiudiOpen(false)}>
+              {t("common.cancel")}
+            </Button>
             <Button
-              onClick={() => activeSessione && chiudi.mutate({ id: activeSessione.id, data: {} })}
+              onClick={() =>
+                activeSessione &&
+                chiudi.mutate({
+                  id: activeSessione.id,
+                  data: { versione: activeSessione.versione },
+                })
+              }
               disabled={!activeSessione || chiudi.isPending}
             >
               {t("cassaEmporio.chiudiSpesa")}
@@ -1134,12 +1994,29 @@ export default function EmporioCassa() {
 
       <Dialog open={annullaOpen} onOpenChange={setAnnullaOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{t("cassaEmporio.confermaAnnullamento")}</DialogTitle></DialogHeader>
-          <Textarea value={motivoAnnullamento} onChange={(e) => setMotivoAnnullamento(e.target.value)} placeholder={t("cassaEmporio.motivoAnnullamento")} />
+          <DialogHeader>
+            <DialogTitle>{t("cassaEmporio.confermaAnnullamento")}</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={motivoAnnullamento}
+            onChange={(e) => setMotivoAnnullamento(e.target.value)}
+            placeholder={t("cassaEmporio.motivoAnnullamento")}
+          />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAnnullaOpen(false)}>{t("cassaEmporio.annulla")}</Button>
+            <Button variant="outline" onClick={() => setAnnullaOpen(false)}>
+              {t("cassaEmporio.annulla")}
+            </Button>
             <Button
-              onClick={() => activeSessione && annulla.mutate({ id: activeSessione.id, data: { motivoAnnullamento } })}
+              onClick={() =>
+                activeSessione &&
+                annulla.mutate({
+                  id: activeSessione.id,
+                  data: {
+                    motivoAnnullamento,
+                    versione: activeSessione.versione,
+                  },
+                })
+              }
               disabled={!motivoAnnullamento.trim() || annulla.isPending}
             >
               {t("cassaEmporio.salvaMotivo")}

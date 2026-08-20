@@ -5,7 +5,6 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AccessoEmporioStato } from './accessoEmporioStato';
 
 export interface AccessoEmporioInput {
   beneficiarioId: number;
@@ -13,7 +12,6 @@ export interface AccessoEmporioInput {
   dataOraInizio: Date;
   /** @nullable */
   dataOraFine?: Date | null;
-  statoAccessoEmporio?: AccessoEmporioStato;
   /** @nullable */
   noteAccessoEmporio?: string | null;
 }

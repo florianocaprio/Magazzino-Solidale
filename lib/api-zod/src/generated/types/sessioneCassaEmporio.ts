@@ -25,6 +25,8 @@ export interface SessioneCassaEmporio {
   /** @nullable */
   magazzinoEmporioNome?: string | null;
   statoSessione: SessioneCassaEmporioStato;
+  /** @minimum 1 */
+  versione: number;
   saldoCreditoIniziale: number;
   totaleCreditoPrevisto: number;
   creditoResiduoPrevisto: number;
