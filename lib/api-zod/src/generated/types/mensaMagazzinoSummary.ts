@@ -11,6 +11,6 @@ export interface MensaMagazzinoSummary {
   codice: string;
   nome: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   tipoMagazzino: string;
 }

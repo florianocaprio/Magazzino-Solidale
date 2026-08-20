@@ -12,5 +12,5 @@ export interface CreditoSolidaleRicaricaMensilePreviewInput {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
 }

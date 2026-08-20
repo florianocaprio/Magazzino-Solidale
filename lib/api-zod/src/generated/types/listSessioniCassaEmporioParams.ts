@@ -12,7 +12,7 @@ import type { SessioneCassaEmporioStato } from './sessioneCassaEmporioStato';
 export type ListSessioniCassaEmporioParams = {
 statoSessione?: SessioneCassaEmporioStato;
 magazzinoEmporioId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 areaId?: number;
 data?: string;
 beneficiarioSearch?: string;

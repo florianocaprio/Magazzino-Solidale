@@ -23,9 +23,9 @@ export interface AccessoEmporio {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   tipoPianificazione: AccessoEmporioTipoPianificazione;
   /** @nullable */
   magazzinoEmporioId: number | null;

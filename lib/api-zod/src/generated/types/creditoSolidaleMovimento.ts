@@ -16,9 +16,9 @@ export interface CreditoSolidaleMovimento {
   /** @nullable */
   centroAscoltoNome: string | null;
   /** @nullable */
-  cittaId: number | null;
+  areaOperativaId: number | null;
   /** @nullable */
-  cittaNome: string | null;
+  areaOperativaNome: string | null;
   tipoMovimento: CreditoSolidaleMovimentoTipoMovimento;
   variazioneCredito: number;
   saldoPrima: number;

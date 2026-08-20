@@ -81,7 +81,7 @@ export const ListMagazziniResponseItem = zod.object({
   "email": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']),
   "stato": zod.string(),
   "note": zod.string().nullish(),
@@ -91,7 +91,7 @@ export const ListMagazziniResponse = zod.array(ListMagazziniResponseItem)
 
 
 /**
- * Creates a warehouse. When tipoMagazzino is mensa, cittaId (the Area) is required and the operational Mensa detail is created atomically.
+ * Creates a warehouse. When tipoMagazzino is mensa, areaOperativaId (the Area) is required and the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
 
@@ -107,7 +107,7 @@ export const CreateMagazzinoBody = zod.object({
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish().describe('Area identifier; required when tipoMagazzino is mensa'),
+  "areaOperativaId": zod.number().nullish().describe('Area identifier; required when tipoMagazzino is mensa'),
   "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']).optional(),
   "stato": zod.string().optional(),
   "note": zod.string().optional()
@@ -133,7 +133,7 @@ export const GetMagazzinoResponse = zod.object({
   "email": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']),
   "stato": zod.string(),
   "note": zod.string().nullish(),
@@ -161,7 +161,7 @@ export const UpdateMagazzinoBody = zod.object({
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish().describe('Area identifier; required when the resulting type is mensa'),
+  "areaOperativaId": zod.number().nullish().describe('Area identifier; required when the resulting type is mensa'),
   "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']).optional(),
   "stato": zod.string().optional(),
   "note": zod.string().optional()
@@ -182,7 +182,7 @@ export const UpdateMagazzinoResponse = zod.object({
   "email": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "tipoMagazzino": zod.enum(['logistico', 'emporio', 'misto', 'mensa']),
   "stato": zod.string(),
   "note": zod.string().nullish(),
@@ -432,8 +432,8 @@ export const DeleteProdottoResponse = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
@@ -650,7 +650,7 @@ export const ListGiacenzeResponse = zod.array(ListGiacenzeResponseItem)
  * @summary Goods to prepare for planned deliveries of a warehouse
  */
 export const GetPreparazioneConsegneQueryParams = zod.object({
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "magazzinoId": zod.coerce.number().optional()
 })
 
@@ -1114,7 +1114,7 @@ export const GetScaricoResponse = zod.object({
 
 
 export const ListFornitoriQueryParams = zod.object({
-  "cittaId": zod.coerce.number().optional()
+  "areaOperativaId": zod.coerce.number().optional()
 })
 
 export const ListFornitoriResponseItem = zod.object({
@@ -1129,8 +1129,8 @@ export const ListFornitoriResponseItem = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
@@ -1150,7 +1150,7 @@ export const CreateFornitoreBody = zod.object({
   "email": zod.string().optional(),
   "referente": zod.string().optional(),
   "siteWeb": zod.string().optional(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "note": zod.string().optional(),
   "noteOperative": zod.string().optional()
 })
@@ -1168,7 +1168,7 @@ export const BulkFornitoriBody = zod.object({
   "email": zod.string().optional(),
   "referente": zod.string().optional(),
   "siteWeb": zod.string().optional(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "note": zod.string().optional(),
   "noteOperative": zod.string().optional()
 }))
@@ -1199,8 +1199,8 @@ export const GetFornitoreResponse = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
@@ -1223,7 +1223,7 @@ export const UpdateFornitoreBody = zod.object({
   "email": zod.string().optional(),
   "referente": zod.string().optional(),
   "siteWeb": zod.string().optional(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional(),
   "noteOperative": zod.string().optional()
@@ -1241,8 +1241,8 @@ export const UpdateFornitoreResponse = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
@@ -1266,8 +1266,8 @@ export const DeleteFornitoreResponse = zod.object({
   "email": zod.string().nullish(),
   "referente": zod.string().nullish(),
   "siteWeb": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "noteOperative": zod.string().nullish(),
@@ -1297,7 +1297,7 @@ export const ListApprovvigionamentiResponseItem = zod.object({
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fornitoreEmail": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoId": zod.number().nullish(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -1322,7 +1322,7 @@ export const ListApprovvigionamentiResponse = zod.array(ListApprovvigionamentiRe
 
 export const CreateApprovvigionamentoBody = zod.object({
   "fornitoreId": zod.number(),
-  "cittaId": zod.number(),
+  "areaOperativaId": zod.number(),
   "magazzinoId": zod.number(),
   "centroAscoltoId": zod.number().optional(),
   "dataRichiesta": zod.string(),
@@ -1348,7 +1348,7 @@ export const GetApprovvigionamentoResponse = zod.object({
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fornitoreEmail": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoId": zod.number().nullish(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -1381,7 +1381,7 @@ export const UpdateApprovvigionamentoBody = zod.object({
   "versione": zod.number().min(1),
   "stato": zod.string().optional(),
   "fornitoreId": zod.number().nullish(),
-  "cittaId": zod.number().optional(),
+  "areaOperativaId": zod.number().optional(),
   "magazzinoId": zod.number().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "dataRichiesta": zod.string().optional(),
@@ -1402,7 +1402,7 @@ export const UpdateApprovvigionamentoResponse = zod.object({
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fornitoreEmail": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoId": zod.number().nullish(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -1445,7 +1445,7 @@ export const SubmitApprovvigionamentoResponse = zod.object({
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fornitoreEmail": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoId": zod.number().nullish(),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -1589,7 +1589,7 @@ export const ListBeneficiariQueryParams = zod.object({
   "priorita": zod.coerce.string().optional(),
   "domicilio": zod.coerce.boolean().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional(),
   "uds": zod.coerce.boolean().optional(),
   "attivo": zod.coerce.boolean().optional(),
@@ -1615,8 +1615,8 @@ export const ListBeneficiariResponseItem = zod.object({
   "telefono": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish().describe('Identificativo tecnico legacy dell\'Area.'),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish().describe('Identificativo tecnico legacy dell\'Area.'),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "uds": zod.boolean(),
@@ -1661,7 +1661,7 @@ export const CreateBeneficiarioBody = zod.object({
   "dataPresaInCarico": zod.string().optional(),
   "noteInterne": zod.string().optional(),
   "soprannome": zod.string().optional(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "uds": zod.boolean().optional(),
   "sesso": zod.enum(['M', 'F', 'ALTRO']),
@@ -1684,7 +1684,7 @@ export const CercaBeneficiariSimiliQueryParams = zod.object({
   "soprannome": zod.coerce.string().optional(),
   "telefono": zod.coerce.string().optional(),
   "dataNascita": zod.coerce.string().optional(),
-  "cittaId": zod.coerce.number().min(1).optional().describe('Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.'),
+  "areaOperativaId": zod.coerce.number().min(1).optional().describe('Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.'),
   "excludeId": zod.coerce.number().optional()
 })
 
@@ -1699,8 +1699,8 @@ export const CercaBeneficiariSimiliResponseItem = zod.object({
   "soprannome": zod.string().nullish(),
   "dataNascita": zod.string().nullish(),
   "telefono": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -1746,7 +1746,7 @@ export const BulkBeneficiariBody = zod.object({
   "dataPresaInCarico": zod.string().optional(),
   "noteInterne": zod.string().optional(),
   "soprannome": zod.string().optional(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "uds": zod.boolean().optional(),
   "sesso": zod.enum(['M', 'F', 'ALTRO']),
@@ -1821,8 +1821,8 @@ export const GetBeneficiarioResponse = zod.object({
   "attivo": zod.boolean(),
   "dataPresaInCarico": zod.string().nullish(),
   "soprannome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "noteInterne": zod.string().nullish(),
@@ -1852,7 +1852,7 @@ export const GetBeneficiarioResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -1958,7 +1958,7 @@ export const UpdateBeneficiarioBody = zod.object({
   "uds": zod.boolean().optional(),
   "noteInterne": zod.string().optional(),
   "soprannome": zod.string().optional(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "sesso": zod.enum(['M', 'F', 'ALTRO']).optional(),
   "areaProvenienza": zod.string().optional(),
@@ -2009,8 +2009,8 @@ export const UpdateBeneficiarioResponse = zod.object({
   "uds": zod.boolean(),
   "attivo": zod.boolean(),
   "soprannome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "dataPresaInCarico": zod.string().nullish(),
@@ -2084,8 +2084,8 @@ export const UpdateBeneficiarioStatoResponse = zod.object({
   "uds": zod.boolean(),
   "attivo": zod.boolean(),
   "soprannome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "dataPresaInCarico": zod.string().nullish(),
@@ -2244,7 +2244,7 @@ export const ListInterventiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
   "tipo": zod.coerce.string().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "bisogni": zod.enum(['aperti', 'scaduti', 'nessuno']).optional().describe('Filtra gli interventi in base ai Bisogni Pianificati collegati.'),
   "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).optional(),
   "ambito": zod.enum(['sociale', 'uds']).optional(),
@@ -2277,7 +2277,7 @@ export const ListInterventiResponseItem = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -2374,7 +2374,7 @@ export const GetInterventiRiepilogoVisteQueryParams = zod.object({
   "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
   "operatoreId": zod.coerce.number().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).optional(),
   "ambitoLegacy": zod.enum(['tutti', 'classificati', 'legacy']).optional(),
   "da": zod.date().optional(),
@@ -2398,7 +2398,7 @@ export const GetInterventiRiepilogoVisteResponse = zod.object({
  */
 export const ListInterventiOperatoriQueryParams = zod.object({
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional()
+  "areaOperativaId": zod.coerce.number().optional()
 })
 
 export const ListInterventiOperatoriResponseItem = zod.object({
@@ -2418,7 +2418,7 @@ export const GetMaterialeDaPreparareQueryParams = zod.object({
   "periodo": zod.enum(['oggi', '3', '7', '14', 'personalizzato']).default(getMaterialeDaPreparareQueryPeriodoDefault),
   "da": zod.date().optional().describe('Data civile Europe\/Rome, obbligatoria per periodo personalizzato.'),
   "a": zod.date().optional().describe('Data civile Europe\/Rome inclusiva; massimo 31 giorni.'),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "centroAscoltoId": zod.coerce.number().optional()
 })
 
@@ -2485,7 +2485,7 @@ export const GetInterventoResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -2574,7 +2574,7 @@ export const UpdateInterventoResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -2726,7 +2726,7 @@ export const AvviaInterventoResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -3019,7 +3019,7 @@ export const ConcludiInterventoResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -3107,7 +3107,7 @@ export const ConcludiInterventoResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -3172,7 +3172,7 @@ export const AnnullaInterventoResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -3236,7 +3236,7 @@ export const RegistraMancataPresentazioneResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -3302,7 +3302,7 @@ export const TransitionInterventoResponse = zod.object({
   "operatoreNome": zod.string().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "dataIntervento": zod.coerce.date().nullable(),
   "tipoIntervento": zod.string(),
   "descrizione": zod.string().nullish(),
@@ -3733,7 +3733,7 @@ export const ListAccessiEmporioQueryParams = zod.object({
   "dataDa": zod.coerce.string().optional(),
   "dataA": zod.coerce.string().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "areaId": zod.coerce.number().optional(),
   "magazzinoEmporioId": zod.coerce.number().optional(),
   "statoAccessoEmporio": zod.enum(['pianificato', 'confermato', 'effettuato', 'annullato', 'non_presentato']).optional(),
@@ -3752,8 +3752,8 @@ export const ListAccessiEmporioResponseItem = zod.object({
   "beneficiarioCodiceFiscale": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "tipoPianificazione": zod.enum(['accesso_emporio']),
   "magazzinoEmporioId": zod.number().nullable(),
   "magazzinoEmporioNome": zod.string().nullish(),
@@ -3795,8 +3795,8 @@ export const SearchBeneficiariAccessiEmporioResponseItem = zod.object({
   "beneficiarioCodiceFiscale": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "creditoSolidaleAbilitato": zod.boolean(),
   "creditoSolidaleStato": zod.string(),
   "saldoCreditoSolidale": zod.number(),
@@ -3821,8 +3821,8 @@ export const GetAccessoEmporioResponse = zod.object({
   "beneficiarioCodiceFiscale": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "tipoPianificazione": zod.enum(['accesso_emporio']),
   "magazzinoEmporioId": zod.number().nullable(),
   "magazzinoEmporioNome": zod.string().nullish(),
@@ -3863,8 +3863,8 @@ export const UpdateAccessoEmporioResponse = zod.object({
   "beneficiarioCodiceFiscale": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "tipoPianificazione": zod.enum(['accesso_emporio']),
   "magazzinoEmporioId": zod.number().nullable(),
   "magazzinoEmporioNome": zod.string().nullish(),
@@ -3902,8 +3902,8 @@ export const UpdateAccessoEmporioStatoResponse = zod.object({
   "beneficiarioCodiceFiscale": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "tipoPianificazione": zod.enum(['accesso_emporio']),
   "magazzinoEmporioId": zod.number().nullable(),
   "magazzinoEmporioNome": zod.string().nullish(),
@@ -3933,7 +3933,7 @@ export const listSessioniCassaEmporioQueryLimitMax = 100;
 export const ListSessioniCassaEmporioQueryParams = zod.object({
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']).optional(),
   "magazzinoEmporioId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "areaId": zod.coerce.number().optional(),
   "data": zod.coerce.string().optional(),
   "beneficiarioSearch": zod.coerce.string().optional(),
@@ -3953,7 +3953,7 @@ export const ListSessioniCassaEmporioResponseItem = zod.object({
   "beneficiarioNome": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
@@ -4017,7 +4017,7 @@ export const GetSessioneCassaEmporioResponse = zod.object({
   "beneficiarioNome": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
@@ -4169,7 +4169,7 @@ export const DeleteSessioneCassaEmporioRigaResponse = zod.object({
   "beneficiarioNome": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
@@ -4239,7 +4239,7 @@ export const SospendiSessioneCassaEmporioResponse = zod.object({
   "beneficiarioNome": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
@@ -4309,7 +4309,7 @@ export const RiprendiSessioneCassaEmporioResponse = zod.object({
   "beneficiarioNome": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
@@ -4381,7 +4381,7 @@ export const AnnullaSessioneCassaEmporioResponse = zod.object({
   "beneficiarioNome": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
@@ -4451,7 +4451,7 @@ export const PreparaChiusuraSessioneCassaEmporioResponse = zod.object({
   "beneficiarioNome": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
@@ -4531,7 +4531,7 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "beneficiarioNome": zod.string().nullish(),
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "statoSessione": zod.enum(['aperta', 'sospesa', 'annullata', 'pronta_per_chiusura', 'chiusa']),
@@ -4585,8 +4585,8 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "scaricoId": zod.number().nullish(),
@@ -4651,8 +4651,8 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "scaricoId": zod.number().nullish(),
@@ -4706,7 +4706,7 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
 export const SearchBeneficiariCassaEmporioQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
   "data": zod.coerce.string().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "areaId": zod.coerce.number().optional(),
   "magazzinoEmporioId": zod.coerce.number().optional()
 })
@@ -4717,7 +4717,7 @@ export const SearchBeneficiariCassaEmporioResponseItem = zod.object({
   "beneficiarioCodice": zod.string(),
   "beneficiarioCodiceFiscale": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
   "saldoCreditoSolidale": zod.number(),
@@ -4770,7 +4770,7 @@ export const ListSpeseEmporioQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
   "magazzinoEmporioId": zod.coerce.number().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "areaId": zod.coerce.number().optional(),
   "page": zod.coerce.number().min(1).default(listSpeseEmporioQueryPageDefault).describe('Pagina richiesta, indicizzata da 1'),
   "limit": zod.coerce.number().min(1).max(listSpeseEmporioQueryLimitMax).default(listSpeseEmporioQueryLimitDefault).describe('Numero di record per pagina')
@@ -4791,8 +4791,8 @@ export const ListSpeseEmporioResponseItem = zod.object({
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "scaricoId": zod.number().nullish(),
@@ -4860,8 +4860,8 @@ export const GetSpesaEmporioBySessioneResponse = zod.object({
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "scaricoId": zod.number().nullish(),
@@ -4928,8 +4928,8 @@ export const GetSpesaEmporioResponse = zod.object({
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "scaricoId": zod.number().nullish(),
@@ -5060,8 +5060,8 @@ export const RegistraInvioManualeBollaSpesaEmporioResponse = zod.object({
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "scaricoId": zod.number().nullish(),
@@ -5143,8 +5143,8 @@ export const InviaBollaEmailSpesaEmporioResponse = zod.object({
   "beneficiarioCodice": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoEmporioId": zod.number(),
   "magazzinoEmporioNome": zod.string().nullish(),
   "scaricoId": zod.number().nullish(),
@@ -5940,7 +5940,7 @@ export const DeleteTipologiaFornitoreParams = zod.object({
 })
 
 
-export const ListCittaResponseItem = zod.object({
+export const ListAreeOperativeResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
@@ -5949,28 +5949,28 @@ export const ListCittaResponseItem = zod.object({
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
 })
-export const ListCittaResponse = zod.array(ListCittaResponseItem)
+export const ListAreeOperativeResponse = zod.array(ListAreeOperativeResponseItem)
 
 
 
-export const createCittaBodySiglaMax = 2;
+export const createAreaOperativaBodySiglaMax = 2;
 
 
 
-export const CreateCittaBody = zod.object({
+export const CreateAreaOperativaBody = zod.object({
   "nome": zod.string().min(1),
   "provincia": zod.string().optional(),
-  "sigla": zod.string().max(createCittaBodySiglaMax).optional(),
+  "sigla": zod.string().max(createAreaOperativaBodySiglaMax).optional(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional()
 })
 
 
-export const GetCittaParams = zod.object({
+export const GetAreaOperativaParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const GetCittaResponse = zod.object({
+export const GetAreaOperativaResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
@@ -5981,24 +5981,24 @@ export const GetCittaResponse = zod.object({
 })
 
 
-export const UpdateCittaParams = zod.object({
+export const UpdateAreaOperativaParams = zod.object({
   "id": zod.coerce.number()
 })
 
 
-export const updateCittaBodySiglaMax = 2;
+export const updateAreaOperativaBodySiglaMax = 2;
 
 
 
-export const UpdateCittaBody = zod.object({
+export const UpdateAreaOperativaBody = zod.object({
   "nome": zod.string().min(1).optional(),
   "provincia": zod.string().optional(),
-  "sigla": zod.string().max(updateCittaBodySiglaMax).optional(),
+  "sigla": zod.string().max(updateAreaOperativaBodySiglaMax).optional(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional()
 })
 
-export const UpdateCittaResponse = zod.object({
+export const UpdateAreaOperativaResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
@@ -6009,19 +6009,19 @@ export const UpdateCittaResponse = zod.object({
 })
 
 
-export const DeleteCittaParams = zod.object({
+export const DeleteAreaOperativaParams = zod.object({
   "id": zod.coerce.number()
 })
 
 
 export const ListZoneUdsQueryParams = zod.object({
-  "cittaId": zod.coerce.number().optional()
+  "areaOperativaId": zod.coerce.number().optional()
 })
 
 export const ListZoneUdsResponseItem = zod.object({
   "id": zod.number(),
-  "cittaId": zod.number(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number(),
+  "areaOperativaNome": zod.string().nullish(),
   "nome": zod.string(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
@@ -6034,7 +6034,7 @@ export const ListZoneUdsResponse = zod.array(ListZoneUdsResponseItem)
 
 
 export const CreateZonaUdsBody = zod.object({
-  "cittaId": zod.number(),
+  "areaOperativaId": zod.number(),
   "nome": zod.string().min(1),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional()
@@ -6047,8 +6047,8 @@ export const GetZonaUdsParams = zod.object({
 
 export const GetZonaUdsResponse = zod.object({
   "id": zod.number(),
-  "cittaId": zod.number(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number(),
+  "areaOperativaNome": zod.string().nullish(),
   "nome": zod.string(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
@@ -6064,7 +6064,7 @@ export const UpdateZonaUdsParams = zod.object({
 
 
 export const UpdateZonaUdsBody = zod.object({
-  "cittaId": zod.number().optional(),
+  "areaOperativaId": zod.number().optional(),
   "nome": zod.string().min(1).optional(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional()
@@ -6072,8 +6072,8 @@ export const UpdateZonaUdsBody = zod.object({
 
 export const UpdateZonaUdsResponse = zod.object({
   "id": zod.number(),
-  "cittaId": zod.number(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number(),
+  "areaOperativaNome": zod.string().nullish(),
   "nome": zod.string(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
@@ -6089,7 +6089,7 @@ export const DeleteZonaUdsParams = zod.object({
 export const ListCentriAscoltoResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
@@ -6106,7 +6106,7 @@ export const ListCentriAscoltoResponse = zod.array(ListCentriAscoltoResponseItem
 
 export const CreateCentroAscoltoBody = zod.object({
   "nome": zod.string(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
@@ -6125,7 +6125,7 @@ export const GetCentroAscoltoParams = zod.object({
 export const GetCentroAscoltoResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
@@ -6145,7 +6145,7 @@ export const UpdateCentroAscoltoParams = zod.object({
 
 export const UpdateCentroAscoltoBody = zod.object({
   "nome": zod.string().optional(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().optional(),
   "comune": zod.string().optional(),
@@ -6159,7 +6159,7 @@ export const UpdateCentroAscoltoBody = zod.object({
 export const UpdateCentroAscoltoResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
@@ -6185,7 +6185,7 @@ export const UploadCentroAscoltoLogoParams = zod.object({
 export const UploadCentroAscoltoLogoResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "logoUrl": zod.string().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
@@ -6508,8 +6508,8 @@ export const ListPoliticheCreditoSolidaleResponseItem = zod.object({
   "descrizione": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
-  "cittaNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
   "attiva": zod.boolean(),
   "creditoBaseNucleo": zod.number(),
   "creditoPerComponente": zod.number(),
@@ -6552,7 +6552,7 @@ export const CreatePoliticaCreditoSolidaleBody = zod.object({
   "nome": zod.string().min(1).max(createPoliticaCreditoSolidaleBodyNomeMax),
   "descrizione": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "attiva": zod.boolean().optional(),
   "creditoBaseNucleo": zod.number().min(createPoliticaCreditoSolidaleBodyCreditoBaseNucleoMin).optional(),
   "creditoPerComponente": zod.number().min(createPoliticaCreditoSolidaleBodyCreditoPerComponenteMin).optional(),
@@ -6578,8 +6578,8 @@ export const GetPoliticaCreditoSolidaleResponse = zod.object({
   "descrizione": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
-  "cittaNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
   "attiva": zod.boolean(),
   "creditoBaseNucleo": zod.number(),
   "creditoPerComponente": zod.number(),
@@ -6625,7 +6625,7 @@ export const UpdatePoliticaCreditoSolidaleBody = zod.object({
   "nome": zod.string().min(1).max(updatePoliticaCreditoSolidaleBodyNomeMax).optional(),
   "descrizione": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "attiva": zod.boolean().optional(),
   "creditoBaseNucleo": zod.number().min(updatePoliticaCreditoSolidaleBodyCreditoBaseNucleoMin).optional(),
   "creditoPerComponente": zod.number().min(updatePoliticaCreditoSolidaleBodyCreditoPerComponenteMin).optional(),
@@ -6646,8 +6646,8 @@ export const UpdatePoliticaCreditoSolidaleResponse = zod.object({
   "descrizione": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
-  "cittaNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
   "attiva": zod.boolean(),
   "creditoBaseNucleo": zod.number(),
   "creditoPerComponente": zod.number(),
@@ -6678,7 +6678,7 @@ export const CalcolaCreditoSolidaleBeneficiarioResponse = zod.object({
   "beneficiarioId": zod.number(),
   "politicaId": zod.number().nullable(),
   "politicaNome": zod.string(),
-  "politicaOrigine": zod.enum(['centro', 'citta', 'globale', 'default']),
+  "politicaOrigine": zod.enum(['centro', 'areaOperativa', 'globale', 'default']),
   "giornoRicaricaMensile": zod.number(),
   "ricaricaAutomaticaAbilitata": zod.boolean(),
   "totaleSuggerito": zod.number(),
@@ -6703,7 +6703,7 @@ export const listCreditoSolidaleMovimentiQueryPeriodoRiferimentoRegExp = new Reg
 export const ListCreditoSolidaleMovimentiQueryParams = zod.object({
   "beneficiarioId": zod.coerce.number().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']).optional(),
   "periodoRiferimento": zod.coerce.string().regex(listCreditoSolidaleMovimentiQueryPeriodoRiferimentoRegExp).optional(),
   "annullato": zod.coerce.boolean().optional()
@@ -6715,8 +6715,8 @@ export const ListCreditoSolidaleMovimentiResponseItem = zod.object({
   "beneficiarioNome": zod.string(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
-  "cittaNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
   "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
   "variazioneCredito": zod.number(),
   "saldoPrima": zod.number(),
@@ -6750,7 +6750,7 @@ export const listCreditoSolidaleBeneficiariQueryLimitMax = 100;
 export const ListCreditoSolidaleBeneficiariQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional().describe('Identificativo tecnico legacy dell\'Area'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Identificativo tecnico legacy dell\'Area'),
   "page": zod.coerce.number().min(1).default(listCreditoSolidaleBeneficiariQueryPageDefault),
   "limit": zod.coerce.number().min(1).max(listCreditoSolidaleBeneficiariQueryLimitMax).default(listCreditoSolidaleBeneficiariQueryLimitDefault)
 })
@@ -6763,8 +6763,8 @@ export const ListCreditoSolidaleBeneficiariResponseItem = zod.object({
   "nome": zod.string(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish().describe('Identificativo tecnico legacy dell\'Area.'),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish().describe('Identificativo tecnico legacy dell\'Area.'),
+  "areaOperativaNome": zod.string().nullish(),
   "attivo": zod.boolean(),
   "creditoSolidaleAbilitato": zod.boolean(),
   "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
@@ -6847,8 +6847,8 @@ export const RefreshCreditoSolidaleBeneficiarioResponse = zod.object({
   "beneficiarioNome": zod.string(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
-  "cittaNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
   "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
   "variazioneCredito": zod.number(),
   "saldoPrima": zod.number(),
@@ -6889,8 +6889,8 @@ export const ListCreditoSolidaleBeneficiarioMovimentiResponseItem = zod.object({
   "beneficiarioNome": zod.string(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
-  "cittaNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
   "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
   "variazioneCredito": zod.number(),
   "saldoPrima": zod.number(),
@@ -6953,7 +6953,7 @@ export const previewCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp =
 export const PreviewCreditoSolidaleRicaricaMensileBody = zod.object({
   "periodoRiferimento": zod.string().regex(previewCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish()
+  "areaOperativaId": zod.number().nullish()
 })
 
 export const PreviewCreditoSolidaleRicaricaMensileResponse = zod.object({
@@ -6968,8 +6968,8 @@ export const PreviewCreditoSolidaleRicaricaMensileResponse = zod.object({
   "beneficiarioNome": zod.string(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
-  "cittaNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
   "creditoSolidaleMensileAssegnato": zod.number().nullable(),
   "saldoAttuale": zod.number(),
   "ricaricabile": zod.boolean(),
@@ -6986,7 +6986,7 @@ export const executeCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp =
 export const ExecuteCreditoSolidaleRicaricaMensileBody = zod.object({
   "periodoRiferimento": zod.string().regex(executeCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "note": zod.string().nullish()
 })
 
@@ -7002,8 +7002,8 @@ export const ExecuteCreditoSolidaleRicaricaMensileResponse = zod.object({
   "beneficiarioNome": zod.string(),
   "centroAscoltoId": zod.number().nullable(),
   "centroAscoltoNome": zod.string().nullable(),
-  "cittaId": zod.number().nullable(),
-  "cittaNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
   "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
   "variazioneCredito": zod.number(),
   "saldoPrima": zod.number(),
@@ -7404,7 +7404,7 @@ export const RespingiMezzoLogisticaResponse = zod.object({
  */
 export const ReportGiacenzePerMagazzinoQueryParams = zod.object({
   "magazzinoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional()
+  "areaOperativaId": zod.coerce.number().optional()
 })
 
 export const ReportGiacenzePerMagazzinoResponseItem = zod.object({
@@ -7422,7 +7422,7 @@ export const ReportConsegnePerMeseQueryParams = zod.object({
   "a": zod.coerce.string().optional(),
   "magazzinoId": zod.coerce.number().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional()
+  "areaOperativaId": zod.coerce.number().optional()
 })
 
 export const ReportConsegnePerMeseResponseItem = zod.object({
@@ -7440,7 +7440,7 @@ export const ReportConsegnePerMeseResponse = zod.array(ReportConsegnePerMeseResp
 export const ReportConsegnePerCentroQueryParams = zod.object({
   "da": zod.coerce.string().optional(),
   "a": zod.coerce.string().optional(),
-  "cittaId": zod.coerce.number().optional()
+  "areaOperativaId": zod.coerce.number().optional()
 })
 
 export const ReportConsegnePerCentroResponseItem = zod.object({
@@ -7460,7 +7460,7 @@ export const ReportAllocazioneMezziQueryParams = zod.object({
   "da": zod.coerce.string().optional(),
   "a": zod.coerce.string().optional(),
   "centroAscoltoId": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional()
+  "areaOperativaId": zod.coerce.number().optional()
 })
 
 export const ReportAllocazioneMezziResponse = zod.object({
@@ -7487,7 +7487,7 @@ export const ReportAllocazioneMezziResponse = zod.object({
  */
 export const ReportFsePlusQueryParams = zod.object({
   "anno": zod.coerce.number().optional(),
-  "cittaId": zod.coerce.number().optional()
+  "areaOperativaId": zod.coerce.number().optional()
 })
 
 export const ReportFsePlusResponse = zod.object({
@@ -7531,7 +7531,7 @@ export const GetReportDashboardGeneraleQueryParams = zod.object({
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
   "anno": zod.coerce.number().min(getReportDashboardGeneraleQueryAnnoMin).max(getReportDashboardGeneraleQueryAnnoMax).optional(),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "magazzinoId": zod.coerce.number().optional()
 })
@@ -7542,7 +7542,7 @@ export const GetReportDashboardGeneraleResponse = zod.object({
   "da": zod.coerce.date(),
   "a": zod.coerce.date(),
   "anno": zod.number(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "magazzinoId": zod.number().nullable(),
   "mensaId": zod.number().nullable(),
@@ -7589,7 +7589,7 @@ export const GetReportDashboardGeneraleResponse = zod.object({
 export const GetReportPacchiQueryParams = zod.object({
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "magazzinoId": zod.coerce.number().optional()
 })
@@ -7600,7 +7600,7 @@ export const GetReportPacchiResponse = zod.object({
   "da": zod.coerce.date(),
   "a": zod.coerce.date(),
   "anno": zod.number(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "magazzinoId": zod.number().nullable(),
   "mensaId": zod.number().nullable(),
@@ -7647,7 +7647,7 @@ export const GetReportPacchiResponse = zod.object({
 export const GetReportCentroAscoltoQueryParams = zod.object({
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "zonaUdsId": zod.coerce.number().optional(),
   "operatoreId": zod.coerce.number().optional(),
@@ -7660,7 +7660,7 @@ export const GetReportCentroAscoltoResponse = zod.object({
   "da": zod.coerce.date(),
   "a": zod.coerce.date(),
   "anno": zod.number(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "magazzinoId": zod.number().nullable(),
   "mensaId": zod.number().nullable(),
@@ -7707,7 +7707,7 @@ export const GetReportCentroAscoltoResponse = zod.object({
 export const GetReportEmporioQueryParams = zod.object({
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "magazzinoId": zod.coerce.number().optional()
 })
@@ -7718,7 +7718,7 @@ export const GetReportEmporioResponse = zod.object({
   "da": zod.coerce.date(),
   "a": zod.coerce.date(),
   "anno": zod.number(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "magazzinoId": zod.number().nullable(),
   "mensaId": zod.number().nullable(),
@@ -7765,7 +7765,7 @@ export const GetReportEmporioResponse = zod.object({
 export const GetReportMensaIntegratoQueryParams = zod.object({
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "magazzinoId": zod.coerce.number().optional(),
   "mensaId": zod.coerce.number().optional(),
@@ -7779,7 +7779,7 @@ export const GetReportMensaIntegratoResponse = zod.object({
   "da": zod.coerce.date(),
   "a": zod.coerce.date(),
   "anno": zod.number(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "magazzinoId": zod.number().nullable(),
   "mensaId": zod.number().nullable(),
@@ -7826,7 +7826,7 @@ export const GetReportMensaIntegratoResponse = zod.object({
 export const GetReportUdsIntegratoQueryParams = zod.object({
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "zonaUdsId": zod.coerce.number().optional(),
   "operatoreId": zod.coerce.number().optional(),
@@ -7839,7 +7839,7 @@ export const GetReportUdsIntegratoResponse = zod.object({
   "da": zod.coerce.date(),
   "a": zod.coerce.date(),
   "anno": zod.number(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "magazzinoId": zod.number().nullable(),
   "mensaId": zod.number().nullable(),
@@ -7886,7 +7886,7 @@ export const GetReportUdsIntegratoResponse = zod.object({
 export const GetReportMagazzinoLogisticaQueryParams = zod.object({
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "magazzinoId": zod.coerce.number().optional()
 })
@@ -7897,7 +7897,7 @@ export const GetReportMagazzinoLogisticaResponse = zod.object({
   "da": zod.coerce.date(),
   "a": zod.coerce.date(),
   "anno": zod.number(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "magazzinoId": zod.number().nullable(),
   "mensaId": zod.number().nullable(),
@@ -7950,7 +7950,7 @@ export const GetReportFsePlusIntegratoQueryParams = zod.object({
   "anno": zod.coerce.number().min(getReportFsePlusIntegratoQueryAnnoMin).max(getReportFsePlusIntegratoQueryAnnoMax).optional(),
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "magazzinoId": zod.coerce.number().optional()
 })
@@ -7961,7 +7961,7 @@ export const GetReportFsePlusIntegratoResponse = zod.object({
   "da": zod.coerce.date(),
   "a": zod.coerce.date(),
   "anno": zod.number(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullable(),
   "magazzinoId": zod.number().nullable(),
   "mensaId": zod.number().nullable(),
@@ -8023,7 +8023,7 @@ export const GetReportDrilldownQueryParams = zod.object({
   "da": zod.date().optional().describe('Data civile iniziale Europe\/Rome (YYYY-MM-DD)'),
   "a": zod.date().optional().describe('Data civile finale Europe\/Rome (YYYY-MM-DD)'),
   "anno": zod.coerce.number().min(getReportDrilldownQueryAnnoMin).max(getReportDrilldownQueryAnnoMax).optional(),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa'),
   "centroAscoltoId": zod.coerce.number().optional().describe('Gli utenti con Centro assegnato restano vincolati al proprio perimetro'),
   "magazzinoId": zod.coerce.number().optional(),
   "mensaId": zod.coerce.number().optional(),
@@ -8049,39 +8049,39 @@ export const GetReportDrilldownResponse = zod.object({
  */
 export const GetReportFilterOptionsQueryParams = zod.object({
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
-  "cittaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città')
+  "areaOperativaId": zod.coerce.number().optional().describe('Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa')
 })
 
 export const GetReportFilterOptionsResponse = zod.object({
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
-  "cities": zod.array(zod.object({
+  "areeOperative": zod.array(zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullish()
 })),
   "centres": zod.array(zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullish()
 })),
   "warehouses": zod.array(zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullish()
 })),
   "mense": zod.array(zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullish()
 })),
   "zones": zod.array(zod.object({
   "id": zod.number(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullable(),
+  "areaOperativaId": zod.number().nullable(),
   "centroAscoltoId": zod.number().nullish()
 }))
 })
@@ -8093,7 +8093,7 @@ export const GetReportFilterOptionsResponse = zod.object({
 export const ReportUdsInterventiPerMeseQueryParams = zod.object({
   "da": zod.coerce.string().optional(),
   "a": zod.coerce.string().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional()
 })
 
@@ -8110,7 +8110,7 @@ export const ReportUdsInterventiPerMeseResponse = zod.array(ReportUdsInterventiP
 export const ReportUdsInterventiGiornalieriQueryParams = zod.object({
   "da": zod.coerce.string().describe('Start date (ISO YYYY-MM-DD). For a single day, omit \"a\".'),
   "a": zod.coerce.string().optional().describe('End date (ISO YYYY-MM-DD). Defaults to \"da\" (single day) when absent.'),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional()
 })
 
@@ -8139,7 +8139,7 @@ export const ReportUdsInterventiGiornalieriResponse = zod.array(ReportUdsInterve
 export const ReportUdsInterventiPerTipoQueryParams = zod.object({
   "da": zod.coerce.string().optional(),
   "a": zod.coerce.string().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional()
 })
 
@@ -8156,7 +8156,7 @@ export const ReportUdsInterventiPerTipoResponse = zod.array(ReportUdsInterventiP
 export const ReportUdsInterventiPerZonaQueryParams = zod.object({
   "da": zod.coerce.string().optional(),
   "a": zod.coerce.string().optional(),
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional()
 })
 
@@ -8172,7 +8172,7 @@ export const ReportUdsInterventiPerZonaResponse = zod.array(ReportUdsInterventiP
  * @summary UDS people grouped by zona and channel
  */
 export const ReportUdsPersonePerZonaQueryParams = zod.object({
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "zonaUdsId": zod.coerce.number().optional()
 })
 
@@ -8206,8 +8206,8 @@ export const LoginUserResponse = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "isSuperAdmin": zod.boolean(),
@@ -8230,8 +8230,8 @@ export const GetCurrentUserResponse = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "isSuperAdmin": zod.boolean(),
@@ -8287,7 +8287,7 @@ export const ChangePasswordBody = zod.object({
 
 
 export const ListMenseQueryParams = zod.object({
-  "cittaId": zod.coerce.number().optional().describe('Identificativo dell\'Area configurata nel menu Aree (nome storico interno del campo).'),
+  "areaOperativaId": zod.coerce.number().optional().describe('Identificativo dell\'Area Operativa usata come confine organizzativo dei dati.'),
   "attiva": zod.coerce.boolean().optional()
 })
 
@@ -8295,8 +8295,8 @@ export const ListMenseResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "nome": zod.string(),
-  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().describe('Identificativo dell\'Area Operativa usata come confine organizzativo dei dati.'),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -8328,7 +8328,7 @@ export const createMensaBodyStatoDefault = `attivo`;
 export const CreateMensaBody = zod.object({
   "codice": zod.string().min(1).max(createMensaBodyCodiceMax).optional().describe('Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.'),
   "nome": zod.string().min(1).max(createMensaBodyNomeMax),
-  "cittaId": zod.number().describe('Identificativo dell\'Area; per utenti territoriali prevale sempre l\'Area del profilo.'),
+  "areaOperativaId": zod.number().describe('Identificativo dell\'Area; per utenti territoriali prevale sempre l\'Area del profilo.'),
   "centroAscoltoId": zod.number().nullish(),
   "indirizzo": zod.string().nullish(),
   "comune": zod.string().nullish(),
@@ -8338,7 +8338,7 @@ export const CreateMensaBody = zod.object({
   "email": zod.string().nullish(),
   "stato": zod.enum(['attivo', 'inattivo']).default(createMensaBodyStatoDefault),
   "note": zod.string().nullish()
-}).describe('Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L\'Area è l\'entità configurata nel menu Aree; `cittaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.')
+}).describe('Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L\'Area è l\'entità configurata nel menu Aree; `areaOperativaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.')
 
 
 export const GetMensaParams = zod.object({
@@ -8349,8 +8349,8 @@ export const GetMensaResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "nome": zod.string(),
-  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().describe('Identificativo dell\'Area Operativa usata come confine organizzativo dei dati.'),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -8392,8 +8392,8 @@ export const UpdateMensaResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "nome": zod.string(),
-  "cittaId": zod.number().describe('Identificativo dell\'Area configurata nel menu Aree; `cittaId` è il nome storico interno.'),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().describe('Identificativo dell\'Area Operativa usata come confine organizzativo dei dati.'),
+  "areaOperativaNome": zod.string().nullish(),
   "magazzinoId": zod.number().describe('Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.'),
   "magazzinoNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
@@ -8429,7 +8429,7 @@ export const SearchMensaBeneficiariResponseItem = zod.object({
   "cognome": zod.string(),
   "codice": zod.string(),
   "attivo": zod.boolean(),
-  "cittaId": zod.number().nullish()
+  "areaOperativaId": zod.number().nullish()
 })
 export const SearchMensaBeneficiariResponse = zod.array(SearchMensaBeneficiariResponseItem)
 
@@ -8874,7 +8874,7 @@ export const ListEccezioniMensaResponse = zod.union([zod.array(zod.object({
   "beneficiarioNome": zod.string().optional(),
   "mensaPrincipaleId": zod.number(),
   "mensaDestinazioneId": zod.number(),
-  "cittaId": zod.number(),
+  "areaOperativaId": zod.number(),
   "motivo": zod.string(),
   "dataOra": zod.coerce.date()
 })),zod.object({
@@ -8884,7 +8884,7 @@ export const ListEccezioniMensaResponse = zod.union([zod.array(zod.object({
   "beneficiarioNome": zod.string().optional(),
   "mensaPrincipaleId": zod.number(),
   "mensaDestinazioneId": zod.number(),
-  "cittaId": zod.number(),
+  "areaOperativaId": zod.number(),
   "motivo": zod.string(),
   "dataOra": zod.coerce.date()
 })),
@@ -8898,7 +8898,7 @@ export const ListMagazziniMensaResponseItem = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "nome": zod.string(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "tipoMagazzino": zod.string()
 })
 export const ListMagazziniMensaResponse = zod.array(ListMagazziniMensaResponseItem)
@@ -9334,7 +9334,7 @@ export const DeleteRuoloParams = zod.object({
 
 
 export const ListUtentiQueryParams = zod.object({
-  "cittaId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
   "matricola": zod.coerce.string().optional(),
   "query": zod.coerce.string().optional()
 })
@@ -9350,8 +9350,8 @@ export const ListUtentiResponseItem = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "isSuperAdmin": zod.boolean(),
@@ -9383,7 +9383,7 @@ export const CreateUtenteBody = zod.object({
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "attivo": zod.boolean().optional()
 })
@@ -9404,8 +9404,8 @@ export const GetUtenteResponse = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "isSuperAdmin": zod.boolean(),
@@ -9434,7 +9434,7 @@ export const UpdateUtenteBody = zod.object({
   "matricola": zod.string().nullish(),
   "ruoloId": zod.number().nullish(),
   "centroAscoltoId": zod.number().nullish(),
-  "cittaId": zod.number().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "attivo": zod.boolean().optional()
 })
@@ -9450,8 +9450,8 @@ export const UpdateUtenteResponse = zod.object({
   "ruoloNome": zod.string().nullish(),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
-  "cittaId": zod.number().nullish(),
-  "cittaNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
   "zonaUdsId": zod.number().nullish(),
   "zonaUdsNome": zod.string().nullish(),
   "isSuperAdmin": zod.boolean(),

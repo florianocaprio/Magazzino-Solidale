@@ -23,7 +23,7 @@ export interface MagazzinoUpdate {
      * Area identifier; required when the resulting type is mensa
      * @nullable
      */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
   note?: string;

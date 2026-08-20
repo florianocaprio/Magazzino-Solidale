@@ -83,9 +83,9 @@ export interface Beneficiario {
   /** @nullable */
   soprannome?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** @nullable */
   zonaUdsId?: number | null;
   /** @nullable */

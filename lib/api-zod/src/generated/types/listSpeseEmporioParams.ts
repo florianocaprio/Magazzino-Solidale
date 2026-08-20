@@ -15,7 +15,7 @@ beneficiarioSearch?: string;
 beneficiarioId?: number;
 magazzinoEmporioId?: number;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 areaId?: number;
 /**
  * Pagina richiesta, indicizzata da 1

@@ -12,5 +12,5 @@ da?: string;
 a?: string;
 magazzinoId?: number;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 };

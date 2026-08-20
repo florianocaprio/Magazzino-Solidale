@@ -10,7 +10,7 @@ import type { ListCreditoSolidaleMovimentiTipoMovimento } from './listCreditoSol
 export type ListCreditoSolidaleMovimentiParams = {
 beneficiarioId?: number;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 tipoMovimento?: ListCreditoSolidaleMovimentiTipoMovimento;
 /**
  * @pattern ^\d{4}-(0[1-9]|1[0-2])$

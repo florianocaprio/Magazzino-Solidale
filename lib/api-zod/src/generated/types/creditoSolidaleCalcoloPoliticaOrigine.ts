@@ -11,7 +11,7 @@ export type CreditoSolidaleCalcoloPoliticaOrigine = typeof CreditoSolidaleCalcol
 
 export const CreditoSolidaleCalcoloPoliticaOrigine = {
   centro: 'centro',
-  citta: 'citta',
+  areaOperativa: 'areaOperativa',
   globale: 'globale',
   default: 'default',
 } as const;

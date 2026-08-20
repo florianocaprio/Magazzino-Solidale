@@ -20,7 +20,7 @@ export interface SessioneCassaEmporio {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   magazzinoEmporioId: number;
   /** @nullable */
   magazzinoEmporioNome?: string | null;

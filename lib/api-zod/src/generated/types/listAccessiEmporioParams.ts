@@ -13,7 +13,7 @@ export type ListAccessiEmporioParams = {
 dataDa?: string;
 dataA?: string;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 areaId?: number;
 magazzinoEmporioId?: number;
 statoAccessoEmporio?: AccessoEmporioStato;

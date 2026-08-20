@@ -13,10 +13,10 @@ export interface Mensa {
   id: number;
   codice: string;
   nome: string;
-  /** Identificativo dell'Area configurata nel menu Aree; `cittaId` è il nome storico interno. */
-  cittaId: number;
+  /** Identificativo dell'Area Operativa usata come confine organizzativo dei dati. */
+  areaOperativaId: number;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa. */
   magazzinoId: number;
   /** @nullable */

@@ -31,7 +31,7 @@ tags:
   - name: utenti
   - name: ruoli
   - name: aree
-  - name: citta
+  - name: aree-operative
   - name: zone-uds
   - name: politiche-credito-solidale
   - name: credito-solidale
@@ -120,7 +120,7 @@ paths:
       tags: [magazzini]
       summary: Create a warehouse
       description: >-
-        Creates a warehouse. When tipoMagazzino is mensa, cittaId (the Area)
+        Creates a warehouse. When tipoMagazzino is mensa, areaOperativaId (the Area)
         is required and the operational Mensa detail is created atomically.
       requestBody:
         required: true
@@ -511,7 +511,7 @@ paths:
       tags: [preparazione-consegne]
       summary: Goods to prepare for planned deliveries of a warehouse
       parameters:
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -742,7 +742,7 @@ paths:
       operationId: listFornitori
       tags: [fornitori]
       parameters:
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -1099,7 +1099,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -1194,7 +1194,7 @@ paths:
           in: query
           schema:
             type: string
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           description: Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
           schema:
@@ -1214,7 +1214,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/BeneficiarioSimile"
         "400":
-          description: A global user omitted cittaId or supplied an invalid value
+          description: A global user omitted areaOperativaId or supplied an invalid value
           content:
             application/json:
               schema:
@@ -1494,7 +1494,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -1644,7 +1644,7 @@ paths:
         - name: centroAscoltoId
           in: query
           schema: { type: integer }
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema: { type: integer }
         - name: stato
@@ -1678,7 +1678,7 @@ paths:
         - name: centroAscoltoId
           in: query
           schema: { type: integer }
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema: { type: integer }
       responses:
@@ -1711,7 +1711,7 @@ paths:
           in: query
           description: Data civile Europe/Rome inclusiva; massimo 31 giorni.
           schema: { type: string, format: date }
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema: { type: integer }
         - name: centroAscoltoId
@@ -2050,7 +2050,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/BisognoPianificato"
         "403":
-          description: Intervento non accessibile per la città dell'operatore
+          description: Intervento non accessibile per la area operativa dell'operatore
         "404":
           description: Intervento non trovato
     post:
@@ -2078,7 +2078,7 @@ paths:
         "400":
           description: Dati non validi
         "403":
-          description: Intervento non accessibile per la città dell'operatore
+          description: Intervento non accessibile per la area operativa dell'operatore
         "404":
           description: Intervento non trovato
 
@@ -2113,7 +2113,7 @@ paths:
         "400":
           description: Dati non validi
         "403":
-          description: Intervento non accessibile per la città dell'operatore
+          description: Intervento non accessibile per la area operativa dell'operatore
         "404":
           description: Intervento o Bisogno Pianificato non trovato
 
@@ -2326,7 +2326,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -2479,7 +2479,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -2780,7 +2780,7 @@ paths:
           in: query
           schema:
             type: string
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -2855,7 +2855,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -3579,40 +3579,40 @@ paths:
         "204":
           description: Deleted
 
-  /citta:
+  /aree-operative:
     get:
-      operationId: listCitta
-      tags: [citta]
+      operationId: listAreeOperative
+      tags: [aree-operative]
       responses:
         "200":
-          description: List of cities
+          description: List of operational areas
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Citta"
+                  $ref: "#/components/schemas/AreaOperativa"
     post:
-      operationId: createCitta
-      tags: [citta]
+      operationId: createAreaOperativa
+      tags: [aree-operative]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CittaInput"
+              $ref: "#/components/schemas/AreaOperativaInput"
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Citta"
+                $ref: "#/components/schemas/AreaOperativa"
 
-  /citta/{id}:
+  /aree-operative/{id}:
     get:
-      operationId: getCitta
-      tags: [citta]
+      operationId: getAreaOperativa
+      tags: [aree-operative]
       parameters:
         - name: id
           in: path
@@ -3621,14 +3621,14 @@ paths:
             type: integer
       responses:
         "200":
-          description: City
+          description: Operational area
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Citta"
+                $ref: "#/components/schemas/AreaOperativa"
     patch:
-      operationId: updateCitta
-      tags: [citta]
+      operationId: updateAreaOperativa
+      tags: [aree-operative]
       parameters:
         - name: id
           in: path
@@ -3640,17 +3640,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CittaUpdate"
+              $ref: "#/components/schemas/AreaOperativaUpdate"
       responses:
         "200":
           description: Updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Citta"
+                $ref: "#/components/schemas/AreaOperativa"
     delete:
-      operationId: deleteCitta
-      tags: [citta]
+      operationId: deleteAreaOperativa
+      tags: [aree-operative]
       parameters:
         - name: id
           in: path
@@ -3666,7 +3666,7 @@ paths:
       operationId: listZoneUds
       tags: [zone-uds]
       parameters:
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -4233,7 +4233,7 @@ paths:
           required: false
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           required: false
           schema:
@@ -4282,7 +4282,7 @@ paths:
         - { name: search, in: query, schema: { type: string } }
         - { name: centroAscoltoId, in: query, schema: { type: integer } }
         - {
-            name: cittaId,
+            name: areaOperativaId,
             in: query,
             description: Identificativo tecnico legacy dell'Area,
             schema: { type: integer },
@@ -4854,7 +4854,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -4893,7 +4893,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -4921,7 +4921,7 @@ paths:
           in: query
           schema:
             type: string
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -4953,7 +4953,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -4975,7 +4975,7 @@ paths:
           in: query
           schema:
             type: integer
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -4996,7 +4996,7 @@ paths:
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
         - $ref: "#/components/parameters/ReportAnno"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportMagazzinoId"
       responses:
@@ -5014,7 +5014,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportMagazzinoId"
       responses:
@@ -5032,7 +5032,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportZonaUdsId"
         - $ref: "#/components/parameters/ReportOperatoreId"
@@ -5052,7 +5052,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportMagazzinoId"
       responses:
@@ -5070,7 +5070,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportMagazzinoId"
         - $ref: "#/components/parameters/ReportMensaId"
@@ -5091,7 +5091,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportZonaUdsId"
         - $ref: "#/components/parameters/ReportOperatoreId"
@@ -5111,7 +5111,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportMagazzinoId"
       responses:
@@ -5130,7 +5130,7 @@ paths:
         - $ref: "#/components/parameters/ReportAnno"
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportMagazzinoId"
       responses:
@@ -5175,7 +5175,7 @@ paths:
         - $ref: "#/components/parameters/ReportDa"
         - $ref: "#/components/parameters/ReportA"
         - $ref: "#/components/parameters/ReportAnno"
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
         - $ref: "#/components/parameters/ReportCentroId"
         - $ref: "#/components/parameters/ReportMagazzinoId"
         - $ref: "#/components/parameters/ReportMensaId"
@@ -5212,7 +5212,7 @@ paths:
                 magazzino-logistica,
                 fse-plus,
               ]
-        - $ref: "#/components/parameters/ReportCittaId"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
       responses:
         "200":
           description: Opzioni filtrate per scope, aree, moduli e permessi del chiamante
@@ -5234,7 +5234,7 @@ paths:
           in: query
           schema:
             type: string
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -5270,7 +5270,7 @@ paths:
           description: End date (ISO YYYY-MM-DD). Defaults to "da" (single day) when absent.
           schema:
             type: string
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -5302,7 +5302,7 @@ paths:
           in: query
           schema:
             type: string
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -5334,7 +5334,7 @@ paths:
           in: query
           schema:
             type: string
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -5358,7 +5358,7 @@ paths:
       tags: [report]
       summary: UDS people grouped by zona and channel
       parameters:
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           schema:
             type: integer
@@ -5494,9 +5494,9 @@ paths:
       operationId: listMense
       tags: [mensa]
       parameters:
-        - name: cittaId
+        - name: areaOperativaId
           in: query
-          description: Identificativo dell'Area configurata nel menu Aree (nome storico interno del campo).
+          description: Identificativo dell'Area Operativa usata come confine organizzativo dei dati.
           schema: { type: integer }
         - { name: attiva, in: query, schema: { type: boolean } }
       responses:
@@ -5785,7 +5785,7 @@ paths:
             schema: { $ref: "#/components/schemas/MensaEccezioneInput" }
       responses:
         "200":
-          description: Eccezione autorizzata nella stessa Area
+          description: Eccezione autorizzata nella stessa Area Operativa
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MensaAccesso" }
@@ -6190,7 +6190,7 @@ paths:
       operationId: listUtenti
       tags: [utenti]
       parameters:
-        - name: cittaId
+        - name: areaOperativaId
           in: query
           required: false
           schema:
@@ -6334,10 +6334,10 @@ components:
       name: anno
       in: query
       schema: { type: integer, minimum: 2000, maximum: 2100 }
-    ReportCittaId:
-      name: cittaId
+    ReportAreaOperativaId:
+      name: areaOperativaId
       in: query
-      description: Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria città
+      description: Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
       schema: { type: integer }
     ReportCentroId:
       name: centroAscoltoId
@@ -6501,7 +6501,7 @@ components:
           da,
           a,
           anno,
-          cittaId,
+          areaOperativaId,
           centroAscoltoId,
           magazzinoId,
           mensaId,
@@ -6514,7 +6514,7 @@ components:
         da: { type: string, format: date }
         a: { type: string, format: date }
         anno: { type: integer }
-        cittaId: { type: [integer, "null"] }
+        areaOperativaId: { type: [integer, "null"] }
         centroAscoltoId: { type: [integer, "null"] }
         magazzinoId: { type: [integer, "null"] }
         mensaId: { type: [integer, "null"] }
@@ -6592,16 +6592,16 @@ components:
 
     ReportFilterOption:
       type: object
-      required: [id, nome, cittaId]
+      required: [id, nome, areaOperativaId]
       properties:
         id: { type: integer }
         nome: { type: string }
-        cittaId: { type: [integer, "null"] }
+        areaOperativaId: { type: [integer, "null"] }
         centroAscoltoId: { type: [integer, "null"] }
 
     ReportFilterOptions:
       type: object
-      required: [section, cities, centres, warehouses, mense, zones]
+      required: [section, areeOperative, centres, warehouses, mense, zones]
       properties:
         section:
           type: string
@@ -6616,7 +6616,7 @@ components:
               magazzino-logistica,
               fse-plus,
             ]
-        cities:
+        areeOperative:
           type: array
           items: { $ref: "#/components/schemas/ReportFilterOption" }
         centres:
@@ -6832,7 +6832,7 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         tipoMagazzino:
           type: string
@@ -6929,7 +6929,7 @@ components:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
           description: Area identifier; required when tipoMagazzino is mensa
         tipoMagazzino:
@@ -6963,7 +6963,7 @@ components:
           type: string
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
           description: Area identifier; required when the resulting type is mensa
         tipoMagazzino:
@@ -7771,9 +7771,9 @@ components:
           type: ["string", "null"]
         siteWeb:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         attivo:
           type: boolean
@@ -7808,7 +7808,7 @@ components:
           type: string
         siteWeb:
           type: string
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         note:
           type: string
@@ -7839,7 +7839,7 @@ components:
           type: string
         siteWeb:
           type: string
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         attivo:
           type: boolean
@@ -7864,7 +7864,7 @@ components:
           type: ["string", "null"]
         fornitoreEmail:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         magazzinoId:
           type: ["integer", "null"]
@@ -7895,7 +7895,7 @@ components:
       properties:
         fornitoreId:
           type: integer
-        cittaId:
+        areaOperativaId:
           type: integer
         magazzinoId:
           type: integer
@@ -7911,7 +7911,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ApprovvigionamentoRigaInput"
-      required: [fornitoreId, cittaId, magazzinoId, dataRichiesta, righe]
+      required: [fornitoreId, areaOperativaId, magazzinoId, dataRichiesta, righe]
 
     ApprovvigionamentoUpdate:
       type: object
@@ -7923,7 +7923,7 @@ components:
           type: string
         fornitoreId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: integer
         magazzinoId:
           type: ["integer", "null"]
@@ -8108,9 +8108,9 @@ components:
           type: ["string", "null"]
         telefono:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
           type: ["integer", "null"]
@@ -8150,12 +8150,12 @@ components:
         telefono: { type: ["string", "null"] }
         centroAscoltoId: { type: ["integer", "null"] }
         centroAscoltoNome: { type: ["string", "null"] }
-        cittaId:
+        areaOperativaId:
           {
             type: ["integer", "null"],
             description: Identificativo tecnico legacy dell'Area.,
           }
-        cittaNome: { type: ["string", "null"] }
+        areaOperativaNome: { type: ["string", "null"] }
         zonaUdsId: { type: ["integer", "null"] }
         zonaUdsNome: { type: ["string", "null"] }
         uds: { type: boolean }
@@ -8275,9 +8275,9 @@ components:
           type: boolean
         soprannome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
           type: ["integer", "null"]
@@ -8428,9 +8428,9 @@ components:
           type: ["string", "null"]
         soprannome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
           type: ["integer", "null"]
@@ -8554,7 +8554,7 @@ components:
           type: string
         soprannome:
           type: string
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         zonaUdsId:
           type: ["integer", "null"]
@@ -8639,7 +8639,7 @@ components:
           type: string
         soprannome:
           type: string
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         zonaUdsId:
           type: ["integer", "null"]
@@ -8683,9 +8683,9 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         attiva:
           type: boolean
@@ -8722,8 +8722,8 @@ components:
           nome,
           centroAscoltoId,
           centroAscoltoNome,
-          cittaId,
-          cittaNome,
+          areaOperativaId,
+          areaOperativaNome,
           attiva,
           creditoBaseNucleo,
           creditoPerComponente,
@@ -8749,7 +8749,7 @@ components:
           type: ["string", "null"]
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         attiva:
           type: boolean
@@ -8798,7 +8798,7 @@ components:
           type: ["string", "null"]
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         attiva:
           type: boolean
@@ -8884,7 +8884,7 @@ components:
           type: string
         politicaOrigine:
           type: string
-          enum: [centro, citta, globale, default]
+          enum: [centro, areaOperativa, globale, default]
         giornoRicaricaMensile:
           type: integer
         ricaricaAutomaticaAbilitata:
@@ -8918,9 +8918,9 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         tipoMovimento:
           type: string
@@ -8972,8 +8972,8 @@ components:
           beneficiarioNome,
           centroAscoltoId,
           centroAscoltoNome,
-          cittaId,
-          cittaNome,
+          areaOperativaId,
+          areaOperativaNome,
           tipoMovimento,
           variazioneCredito,
           saldoPrima,
@@ -9002,12 +9002,12 @@ components:
         nome: { type: string }
         centroAscoltoId: { type: ["integer", "null"] }
         centroAscoltoNome: { type: ["string", "null"] }
-        cittaId:
+        areaOperativaId:
           {
             type: ["integer", "null"],
             description: Identificativo tecnico legacy dell'Area.,
           }
-        cittaNome: { type: ["string", "null"] }
+        areaOperativaNome: { type: ["string", "null"] }
         attivo: { type: boolean }
         creditoSolidaleAbilitato: { type: boolean }
         creditoSolidaleStato:
@@ -9168,7 +9168,7 @@ components:
           pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
       required: [periodoRiferimento]
 
@@ -9183,9 +9183,9 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         creditoSolidaleMensileAssegnato:
           type: ["number", "null"]
@@ -9205,8 +9205,8 @@ components:
           beneficiarioNome,
           centroAscoltoId,
           centroAscoltoNome,
-          cittaId,
-          cittaNome,
+          areaOperativaId,
+          areaOperativaNome,
           creditoSolidaleMensileAssegnato,
           saldoAttuale,
           ricaricabile,
@@ -9253,7 +9253,7 @@ components:
           pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         note:
           type: ["string", "null"]
@@ -9383,8 +9383,8 @@ components:
         attivo:
           type: boolean
 
-    # ── Città / Zone UDS ─────────────────────────────────────────────────
-    Citta:
+    # ── Area Operativa / Zone UDS ─────────────────────────────────────────────────
+    AreaOperativa:
       type: object
       properties:
         id:
@@ -9403,7 +9403,7 @@ components:
           type: string
       required: [id, nome, attivo, dataCreazione]
 
-    CittaInput:
+    AreaOperativaInput:
       type: object
       properties:
         nome:
@@ -9420,7 +9420,7 @@ components:
           type: string
       required: [nome]
 
-    CittaUpdate:
+    AreaOperativaUpdate:
       type: object
       properties:
         nome:
@@ -9441,9 +9441,9 @@ components:
       properties:
         id:
           type: integer
-        cittaId:
+        areaOperativaId:
           type: integer
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         nome:
           type: string
@@ -9453,12 +9453,12 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, cittaId, nome, attivo, dataCreazione]
+      required: [id, areaOperativaId, nome, attivo, dataCreazione]
 
     ZonaUdsInput:
       type: object
       properties:
-        cittaId:
+        areaOperativaId:
           type: integer
         nome:
           type: string
@@ -9467,12 +9467,12 @@ components:
           type: boolean
         note:
           type: string
-      required: [cittaId, nome]
+      required: [areaOperativaId, nome]
 
     ZonaUdsUpdate:
       type: object
       properties:
-        cittaId:
+        areaOperativaId:
           type: integer
         nome:
           type: string
@@ -9490,7 +9490,7 @@ components:
           type: integer
         nome:
           type: string
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         logoUrl:
           type: ["string", "null"]
@@ -9519,7 +9519,7 @@ components:
       properties:
         nome:
           type: string
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         logoUrl:
           type: ["string", "null"]
@@ -9544,7 +9544,7 @@ components:
       properties:
         nome:
           type: string
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         logoUrl:
           type: ["string", "null"]
@@ -10100,7 +10100,7 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         dataIntervento:
           type: ["string", "null"]
@@ -10183,7 +10183,7 @@ components:
           operatoreNome,
           centroAscoltoId,
           centroAscoltoNome,
-          cittaId,
+          areaOperativaId,
           dataIntervento,
           tipoIntervento,
           stato,
@@ -10219,7 +10219,7 @@ components:
         operatoreNome: { type: [string, "null"] }
         centroAscoltoId: { type: [integer, "null"] }
         centroAscoltoNome: { type: [string, "null"] }
-        cittaId: { type: [integer, "null"] }
+        areaOperativaId: { type: [integer, "null"] }
         dataIntervento: { type: [string, "null"], format: date }
         tipoIntervento: { type: string }
         stato: { $ref: "#/components/schemas/InterventoStato" }
@@ -10254,7 +10254,7 @@ components:
           operatoreNome,
           centroAscoltoId,
           centroAscoltoNome,
-          cittaId,
+          areaOperativaId,
           dataIntervento,
           tipoIntervento,
           stato,
@@ -11026,9 +11026,9 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         tipoPianificazione:
           type: string
@@ -11140,9 +11140,9 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         creditoSolidaleAbilitato:
           type: boolean
@@ -11249,7 +11249,7 @@ components:
           type: ["string", "null"]
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         magazzinoEmporioId:
           type: integer
@@ -11423,7 +11423,7 @@ components:
           type: ["string", "null"]
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         magazzinoEmporioPreferitoId:
           type: ["integer", "null"]
@@ -11592,9 +11592,9 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         magazzinoEmporioId:
           type: integer
@@ -12646,15 +12646,15 @@ components:
     Mensa:
       type: object
       required:
-        [id, codice, nome, cittaId, magazzinoId, attiva, createdAt, versione]
+        [id, codice, nome, areaOperativaId, magazzinoId, attiva, createdAt, versione]
       properties:
         id: { type: integer }
         codice: { type: string }
         nome: { type: string }
-        cittaId:
+        areaOperativaId:
           type: integer
-          description: Identificativo dell'Area configurata nel menu Aree; `cittaId` è il nome storico interno.
-        cittaNome: { type: ["string", "null"] }
+          description: Identificativo dell'Area Operativa usata come confine organizzativo dei dati.
+        areaOperativaNome: { type: ["string", "null"] }
         magazzinoId:
           type: integer
           description: Magazzino dedicato di tipo `mensa`, creato atomicamente insieme alla Mensa.
@@ -12681,9 +12681,9 @@ components:
       type: object
       description: >-
         Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`.
-        L'Area è l'entità configurata nel menu Aree; `cittaId` è il nome storico
+        L'Area è l'entità configurata nel menu Aree; `areaOperativaId` è il nome storico
         interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
-      required: [nome, cittaId]
+      required: [nome, areaOperativaId]
       properties:
         codice:
           type: string
@@ -12691,7 +12691,7 @@ components:
           maxLength: 30
           description: Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.
         nome: { type: string, minLength: 1, maxLength: 160 }
-        cittaId:
+        areaOperativaId:
           type: integer
           description: Identificativo dell'Area; per utenti territoriali prevale sempre l'Area del profilo.
         centroAscoltoId: { type: ["integer", "null"] }
@@ -12723,7 +12723,7 @@ components:
         cognome: { type: string }
         codice: { type: string }
         attivo: { type: boolean }
-        cittaId: { type: ["integer", "null"] }
+        areaOperativaId: { type: ["integer", "null"] }
 
     MensaAbilitazione:
       type: object
@@ -12961,7 +12961,7 @@ components:
           beneficiarioId,
           mensaPrincipaleId,
           mensaDestinazioneId,
-          cittaId,
+          areaOperativaId,
           motivo,
           dataOra,
         ]
@@ -12971,7 +12971,7 @@ components:
         beneficiarioNome: { type: string }
         mensaPrincipaleId: { type: integer }
         mensaDestinazioneId: { type: integer }
-        cittaId: { type: integer }
+        areaOperativaId: { type: integer }
         motivo: { type: string }
         dataOra: { type: string, format: date-time }
 
@@ -12988,7 +12988,7 @@ components:
         id: { type: integer }
         codice: { type: string }
         nome: { type: string }
-        cittaId: { type: ["integer", "null"] }
+        areaOperativaId: { type: ["integer", "null"] }
         tipoMagazzino: { type: string }
 
     MensaGiacenza:
@@ -13389,9 +13389,9 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
           type: ["integer", "null"]
@@ -13492,9 +13492,9 @@ components:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
-        cittaNome:
+        areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
           type: ["integer", "null"]
@@ -13553,7 +13553,7 @@ components:
           type: ["integer", "null"]
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         zonaUdsId:
           type: ["integer", "null"]
@@ -13578,7 +13578,7 @@ components:
           type: ["integer", "null"]
         centroAscoltoId:
           type: ["integer", "null"]
-        cittaId:
+        areaOperativaId:
           type: ["integer", "null"]
         zonaUdsId:
           type: ["integer", "null"]

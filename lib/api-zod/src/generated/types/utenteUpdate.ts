@@ -20,7 +20,7 @@ export interface UtenteUpdate {
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
   zonaUdsId?: number | null;
   attivo?: boolean;

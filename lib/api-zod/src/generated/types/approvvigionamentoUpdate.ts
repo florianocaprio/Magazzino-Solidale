@@ -13,7 +13,7 @@ export interface ApprovvigionamentoUpdate {
   stato?: string;
   /** @nullable */
   fornitoreId?: number | null;
-  cittaId?: number;
+  areaOperativaId?: number;
   /** @nullable */
   magazzinoId?: number | null;
   /** @nullable */

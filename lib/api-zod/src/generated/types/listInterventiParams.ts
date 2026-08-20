@@ -18,7 +18,7 @@ export type ListInterventiParams = {
 beneficiarioId?: number;
 tipo?: string;
 centroAscoltoId?: number;
-cittaId?: number;
+areaOperativaId?: number;
 /**
  * Filtra gli interventi in base ai Bisogni Pianificati collegati.
  */

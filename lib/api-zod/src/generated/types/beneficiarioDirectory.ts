@@ -38,9 +38,9 @@ export interface BeneficiarioDirectory {
      * Identificativo tecnico legacy dell'Area.
      * @nullable
      */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   /** @nullable */
   zonaUdsId?: number | null;
   /** @nullable */

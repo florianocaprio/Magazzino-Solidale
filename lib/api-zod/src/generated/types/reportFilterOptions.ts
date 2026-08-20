@@ -10,7 +10,7 @@ import type { ReportFilterOptionsSection } from './reportFilterOptionsSection';
 
 export interface ReportFilterOptions {
   section: ReportFilterOptionsSection;
-  cities: ReportFilterOption[];
+  areeOperative: ReportFilterOption[];
   centres: ReportFilterOption[];
   warehouses: ReportFilterOption[];
   mense: ReportFilterOption[];

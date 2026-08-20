@@ -13,5 +13,5 @@ export interface MensaBeneficiarioSummary {
   codice: string;
   attivo: boolean;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
 }

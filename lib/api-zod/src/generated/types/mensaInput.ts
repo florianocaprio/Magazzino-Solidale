@@ -8,7 +8,7 @@
 import type { MensaInputStato } from './mensaInputStato';
 
 /**
- * Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L'Area è l'entità configurata nel menu Aree; `cittaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
+ * Crea atomicamente la Mensa e un nuovo magazzino dedicato di tipo `mensa`. L'Area è l'entità configurata nel menu Aree; `areaOperativaId` è il nome storico interno. Non viene selezionato né convertito alcun magazzino logistico esistente.
  */
 export interface MensaInput {
   /**
@@ -23,7 +23,7 @@ export interface MensaInput {
      */
   nome: string;
   /** Identificativo dell'Area; per utenti territoriali prevale sempre l'Area del profilo. */
-  cittaId: number;
+  areaOperativaId: number;
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */

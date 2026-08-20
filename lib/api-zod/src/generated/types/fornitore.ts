@@ -27,9 +27,9 @@ export interface Fornitore {
   /** @nullable */
   siteWeb?: string | null;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;

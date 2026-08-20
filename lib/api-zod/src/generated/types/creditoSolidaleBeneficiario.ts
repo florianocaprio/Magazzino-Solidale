@@ -22,9 +22,9 @@ export interface CreditoSolidaleBeneficiario {
      * Identificativo tecnico legacy dell'Area.
      * @nullable
      */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   /** @nullable */
-  cittaNome?: string | null;
+  areaOperativaNome?: string | null;
   attivo: boolean;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: CreditoSolidaleBeneficiarioCreditoSolidaleStato;

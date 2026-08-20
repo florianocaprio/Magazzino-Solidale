@@ -9,7 +9,7 @@
 export type SearchBeneficiariCassaEmporioParams = {
 search?: string;
 data?: string;
-cittaId?: number;
+areaOperativaId?: number;
 areaId?: number;
 magazzinoEmporioId?: number;
 };

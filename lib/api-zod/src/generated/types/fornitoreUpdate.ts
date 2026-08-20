@@ -18,7 +18,7 @@ export interface FornitoreUpdate {
   referente?: string;
   siteWeb?: string;
   /** @nullable */
-  cittaId?: number | null;
+  areaOperativaId?: number | null;
   attivo?: boolean;
   note?: string;
   noteOperative?: string;

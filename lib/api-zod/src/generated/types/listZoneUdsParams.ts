@@ -7,5 +7,5 @@
  */
 
 export type ListZoneUdsParams = {
-cittaId?: number;
+areaOperativaId?: number;
 };

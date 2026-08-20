@@ -7,5 +7,5 @@
  */
 
 export type ListFornitoriParams = {
-cittaId?: number;
+areaOperativaId?: number;
 };

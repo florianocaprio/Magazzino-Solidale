@@ -7,6 +7,6 @@
  */
 
 export type ReportUdsPersonePerZonaParams = {
-cittaId?: number;
+areaOperativaId?: number;
 zonaUdsId?: number;
 };
