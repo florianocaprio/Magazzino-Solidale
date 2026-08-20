@@ -70,6 +70,18 @@ export const EMPORIO_ACCESS_PERMISSIONS = [
   { key: "emporio.access.manage", label: "Emporio: gestione accessi" },
 ] as const;
 
+export const EMPORIO_CASSA_SALES_PERMISSIONS = [
+  { key: "emporio.cassa.view", label: "Emporio: consultazione Cassa" },
+  { key: "emporio.cassa.operate", label: "Emporio: operatività Cassa" },
+  { key: "emporio.cassa.force", label: "Emporio: accesso forzato da Cassa" },
+  { key: "emporio.sales.view", label: "Emporio: consultazione Spese" },
+  {
+    key: "emporio.sales.manage",
+    label: "Emporio: operazioni documentali Spese",
+  },
+  { key: "emporio.sales.reverse", label: "Emporio: storno Spese" },
+] as const;
+
 export const SOCIALE_INTERVENTI_PERMISSIONS = [
   {
     key: "sociale.interventi.view",
@@ -151,6 +163,7 @@ export const ALL_PERMISSIONS = [
   ...BENEFICIARI_PERMISSIONS,
   ...CREDITO_PERMISSIONS,
   ...EMPORIO_ACCESS_PERMISSIONS,
+  ...EMPORIO_CASSA_SALES_PERMISSIONS,
   ...SOCIALE_INTERVENTI_PERMISSIONS,
   ...MAPS_PERMISSIONS,
   ...MAGAZZINO_PERMISSIONS,

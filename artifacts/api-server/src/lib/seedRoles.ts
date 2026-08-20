@@ -44,6 +44,10 @@ const EMPORIO_OPERATOR_PERMISSIONS = [
   "credito.view",
   "emporio.access.view",
   "emporio.access.manage",
+  "emporio.cassa.view",
+  "emporio.cassa.operate",
+  "emporio.sales.view",
+  "emporio.sales.manage",
 ] as const;
 const LOGISTICA_OPERATOR_PERMISSIONS = [
   "approvvigionamenti.view",
