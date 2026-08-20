@@ -49,11 +49,23 @@ describe("permessi del ruolo Emporio standard", () => {
         "credito.view",
         "emporio.access.view",
         "emporio.access.manage",
+        "emporio.cassa.view",
+        "emporio.cassa.operate",
+        "emporio.sales.view",
+        "emporio.sales.manage",
         "permesso.custom",
       ]),
     );
     expect(defaultEmporioPermissions(["beneficiari.view"])).not.toContain(
       "beneficiari.view",
+    );
+    expect(defaultEmporioPermissions([])).not.toEqual(
+      expect.arrayContaining([
+        "emporio.cassa.force",
+        "credito.adjust",
+        "credito.monthly.execute",
+        "emporio.sales.reverse",
+      ]),
     );
   });
 

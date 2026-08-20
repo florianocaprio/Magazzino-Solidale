@@ -8,6 +8,8 @@ describe("permission gate della navigazione operativa", () => {
     ["interventi", "sociale.interventi.view"],
     ["emporioCreditiSaldo", "credito.view"],
     ["emporioAccessi", "emporio.access.view"],
+    ["emporioCassa", "emporio.cassa.view"],
+    ["emporioSpese", "emporio.sales.view"],
     ["prodotti", "magazzino.view"],
     ["lotti", "magazzino.view"],
     ["movimenti", "magazzino.view"],
@@ -29,6 +31,10 @@ describe("permission gate della navigazione operativa", () => {
       "credito.view",
       "emporio.access.view",
       "emporio.access.manage",
+      "emporio.cassa.view",
+      "emporio.cassa.operate",
+      "emporio.sales.view",
+      "emporio.sales.manage",
     ]);
     const visible = NAV_ITEMS.filter((item) =>
       isNavItemEnabledByAccess(
