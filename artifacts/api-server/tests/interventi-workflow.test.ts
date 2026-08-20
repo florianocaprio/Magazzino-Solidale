@@ -542,7 +542,10 @@ describe("workflow degli interventi", () => {
   });
 
   it("mantiene l'ordine causale senza alterare i timestamp operativi", async () => {
-    const created = await createWorkflow();
+    const created = await createWorkflow({
+      stato: "pianificato",
+      dataOraPianificata: "2026-09-01T10:00:00+02:00",
+    });
     const initialHistory = await request(makeApp()).get(
       `/interventi/${created.body.id}/storico-stati`,
     );
@@ -553,16 +556,6 @@ describe("workflow degli interventi", () => {
       Date.parse(technicalCreationTimestamp) - 60_000,
     ).toISOString();
 
-    const planned = await request(makeApp())
-      .post(`/interventi/${created.body.id}/transizioni`)
-      .send({
-        versione: await versioneIntervento(created.body.id),
-        stato: "pianificato",
-        dataOraPianificata: retroactiveTransitionTimestamp,
-        dataOraTransizione: retroactiveTransitionTimestamp,
-      });
-    expect(planned.status).toBe(200);
-
     const started = await request(makeApp())
       .post(`/interventi/${created.body.id}/avvia`)
       .send({
@@ -571,13 +564,23 @@ describe("workflow degli interventi", () => {
       });
     expect(started.status).toBe(200);
 
+    const concluded = await request(makeApp())
+      .post(`/interventi/${created.body.id}/concludi`)
+      .send({
+        versione: await versioneIntervento(created.body.id),
+        conferma: true,
+        risultato: "Attività completata",
+        dataOraConclusione: retroactiveTransitionTimestamp,
+      });
+    expect(concluded.status).toBe(200);
+
     const history = await request(makeApp()).get(
       `/interventi/${created.body.id}/storico-stati`,
     );
     expect(history.status).toBe(200);
     expect(
       history.body.map((row: { statoNuovo: string }) => row.statoNuovo),
-    ).toEqual(["da_pianificare", "pianificato", "in_corso"]);
+    ).toEqual(["pianificato", "in_corso", "concluso"]);
     expect(
       history.body.map(
         (row: { dataTransizione: string }) => row.dataTransizione,
