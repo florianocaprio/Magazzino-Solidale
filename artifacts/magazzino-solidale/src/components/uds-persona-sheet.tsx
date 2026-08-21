@@ -4,14 +4,17 @@ import {
   getListBeneficiariQueryKey,
   getListAreeOperativeQueryKey,
   getListUdsDirectoryQueryKey,
+  getListUdsLinkCandidatesQueryKey,
   type BeneficiarioSimile,
   type UdsDirectoryItem,
+  type UdsLinkCandidateItem,
   useCercaBeneficiariSimili,
   useCreateBeneficiario,
   useListCentriAscolto,
   useListAreeOperative,
   useListZoneUds,
   useListUdsDirectory,
+  useListUdsLinkCandidates,
   useUpdateBeneficiario,
 } from "@workspace/api-client-react";
 import {
@@ -223,9 +226,9 @@ export function UdsPersonaSheet({
   const { toast } = useToast();
   const isGlobal = user?.areaOperativaId == null;
   const schema = useMemo(() => makeSchema(t, isGlobal), [t, isGlobal]);
-  const [linkCandidate, setLinkCandidate] = useState<BeneficiarioSimile | null>(
-    null,
-  );
+  const [linkCandidate, setLinkCandidate] = useState<
+    BeneficiarioSimile | UdsLinkCandidateItem | null
+  >(null);
   const [dupDismissed, setDupDismissed] = useState(false);
   const [existingSearch, setExistingSearch] = useState("");
   const [debouncedExistingSearch, setDebouncedExistingSearch] = useState("");
@@ -354,7 +357,6 @@ export function UdsPersonaSheet({
           dupScopeReady,
       },
     });
-  const suggestions = canUseFullDuplicateSearch ? (dupMatches ?? []) : [];
   const directorySearch =
     debouncedExistingSearch.length >= 2
       ? debouncedExistingSearch
@@ -380,6 +382,27 @@ export function UdsPersonaSheet({
           open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
       },
     });
+  const linkCandidateParams = {
+    search: directorySearch,
+    ...(dupAreaOperativa != null ? { areaOperativaId: dupAreaOperativa } : {}),
+  };
+  const {
+    data: linkCandidateMatches,
+    isFetching: isLinkCandidatesFetching,
+  } = useListUdsLinkCandidates(linkCandidateParams, {
+    query: {
+      queryKey: getListUdsLinkCandidatesQueryKey(linkCandidateParams),
+      enabled:
+        open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
+    },
+  });
+  const minimizedMatchIds = new Set([
+    ...(directoryMatches ?? []).map((item) => item.id),
+    ...(linkCandidateMatches ?? []).map((item) => item.id),
+  ]);
+  const suggestions = canUseFullDuplicateSearch
+    ? (dupMatches ?? []).filter((item) => !minimizedMatchIds.has(item.id))
+    : [];
 
   const formAreaOperativa = isGlobal
     ? selectedAreaOperativa
@@ -422,6 +445,10 @@ export function UdsPersonaSheet({
       },
       "existing",
     );
+  };
+
+  const handleLinkCandidate = (suggestion: UdsLinkCandidateItem) => {
+    setLinkCandidate(suggestion);
   };
 
   const confirmLinkToUds = () => {
@@ -474,7 +501,9 @@ export function UdsPersonaSheet({
       (dupDebouncing ||
         isDupFetching ||
         isDirectoryFetching ||
+        isLinkCandidatesFetching ||
         suggestions.length > 0 ||
+        (linkCandidateMatches?.length ?? 0) > 0 ||
         (directoryMatches?.length ?? 0) > 0)
     ) {
       toast({
@@ -551,7 +580,11 @@ export function UdsPersonaSheet({
 
   const watchUds = form.watch("uds");
   const duplicateCheckPending =
-    !dupDismissed && (dupDebouncing || isDupFetching || isDirectoryFetching);
+    !dupDismissed &&
+    (dupDebouncing ||
+      isDupFetching ||
+      isDirectoryFetching ||
+      isLinkCandidatesFetching);
 
   return (
     <>
@@ -699,6 +732,61 @@ export function UdsPersonaSheet({
                   </div>
                 )}
 
+                {!dupDismissed &&
+                  (linkCandidateMatches?.length ?? 0) > 0 && (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                        <AlertTriangle className="h-4 w-4" />
+                        {t("udsAnagrafica.dupTitle")}
+                      </div>
+                      <p className="text-xs text-amber-700">
+                        {t("udsAnagrafica.dupHint")}
+                      </p>
+                      <div className="space-y-2">
+                        {linkCandidateMatches?.map((suggestion) => (
+                          <div
+                            key={`link-candidate-${suggestion.id}`}
+                            className="flex items-center justify-between gap-2 rounded bg-white px-2 py-1.5 text-sm"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium truncate">
+                                  {suggestion.cognome} {suggestion.nome}
+                                  {suggestion.soprannome
+                                    ? ` (${suggestion.soprannome})`
+                                    : ""}
+                                </span>
+                                <Badge variant="outline" className="shrink-0">
+                                  {t("udsAnagrafica.dupStatusShared")}
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {[
+                                  suggestion.codice,
+                                  fasciaEtaLabel(
+                                    t,
+                                    suggestion.fasciaEtaCorrente,
+                                  ),
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleLinkCandidate(suggestion)}
+                              disabled={updateBenef.isPending}
+                            >
+                              {t("udsAnagrafica.dupAdd")}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 {!dupDismissed && suggestions.length > 0 && (
                   <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
@@ -766,6 +854,7 @@ export function UdsPersonaSheet({
 
                 {!dupDismissed &&
                   ((directoryMatches?.length ?? 0) > 0 ||
+                    (linkCandidateMatches?.length ?? 0) > 0 ||
                     suggestions.length > 0) && (
                     <Button
                       type="button"
@@ -1257,7 +1346,9 @@ export function UdsPersonaSheet({
                         (dupDebouncing ||
                           isDupFetching ||
                           isDirectoryFetching ||
+                          isLinkCandidatesFetching ||
                           suggestions.length > 0 ||
+                          (linkCandidateMatches?.length ?? 0) > 0 ||
                           (directoryMatches?.length ?? 0) > 0))
                     }
                   >

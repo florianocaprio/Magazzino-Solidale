@@ -29,6 +29,39 @@ const mocks = vi.hoisted(() => ({
     zonaUdsId: number;
   }>,
   directoryFetching: false,
+  linkCandidateMatches: [] as Array<{
+    id: number;
+    codice: string;
+    nome: string;
+    cognome: string;
+    soprannome: null;
+    fasciaEtaCorrente: string;
+    versione: number;
+    codiceFiscale?: string;
+    telefono?: string;
+    dataNascita?: string;
+    centroAscoltoNome?: string;
+  }>,
+  linkCandidateFetching: false,
+  fullDuplicateOptions: null as null | {
+    query?: { enabled?: boolean };
+  },
+  linkCandidateParams: null as null | {
+    search: string;
+    areaOperativaId?: number;
+  },
+  linkCandidateOptions: null as null | {
+    query?: { enabled?: boolean };
+  },
+  user: {
+    id: 1,
+    isAdmin: true,
+    isSuperAdmin: false,
+    areaOperativaId: 1,
+    zonaUdsId: 10,
+    aree: [] as string[],
+    permessi: [] as string[],
+  },
   update: vi.fn(),
   toast: vi.fn(),
 }));
@@ -38,10 +71,17 @@ vi.mock("@workspace/api-client-react", () => ({
   getListBeneficiariQueryKey: () => ["beneficiari"],
   getListAreeOperativeQueryKey: () => ["areaOperativa"],
   getListUdsDirectoryQueryKey: () => ["uds", "directory"],
-  useCercaBeneficiariSimili: () => ({
-    data: mocks.duplicateMatches,
-    isFetching: false,
-  }),
+  getListUdsLinkCandidatesQueryKey: () => ["uds", "link-candidates"],
+  useCercaBeneficiariSimili: (
+    _params: unknown,
+    options: { query?: { enabled?: boolean } },
+  ) => {
+    mocks.fullDuplicateOptions = options;
+    return {
+      data: mocks.duplicateMatches,
+      isFetching: false,
+    };
+  },
   useCreateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useListCentriAscolto: () => ({ data: [] }),
   useListAreeOperative: () => ({ data: [{ id: 1, nome: "Roma" }] }),
@@ -50,6 +90,18 @@ vi.mock("@workspace/api-client-react", () => ({
     data: mocks.directoryMatches,
     isFetching: mocks.directoryFetching,
   }),
+  useListUdsLinkCandidates: (
+    params: { search: string; areaOperativaId?: number },
+    options: { query?: { enabled?: boolean } },
+  ) => {
+    mocks.linkCandidateParams = params;
+    mocks.linkCandidateOptions = options;
+    return {
+      data: options.query?.enabled ? mocks.linkCandidateMatches : undefined,
+      isFetching:
+        Boolean(options.query?.enabled) && mocks.linkCandidateFetching,
+    };
+  },
   useUpdateBeneficiario: () => ({ mutate: mocks.update, isPending: false }),
 }));
 
@@ -66,17 +118,11 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
-  useAuth: () => ({
-    user: {
-      id: 1,
-      isAdmin: true,
-      areaOperativaId: 1,
-      zonaUdsId: 10,
-    },
-  }),
+  useAuth: () => ({ user: mocks.user }),
 }));
 
 import { UdsPersonaSheet } from "./uds-persona-sheet";
+import { udsAnagrafica } from "@/lib/i18n/namespaces/udsAnagrafica";
 
 describe("UdsPersonaSheet", () => {
   let container: HTMLDivElement;
@@ -89,6 +135,20 @@ describe("UdsPersonaSheet", () => {
     mocks.duplicateMatches = [];
     mocks.directoryMatches = [];
     mocks.directoryFetching = false;
+    mocks.linkCandidateMatches = [];
+    mocks.linkCandidateFetching = false;
+    mocks.fullDuplicateOptions = null;
+    mocks.linkCandidateParams = null;
+    mocks.linkCandidateOptions = null;
+    mocks.user = {
+      id: 1,
+      isAdmin: true,
+      isSuperAdmin: false,
+      areaOperativaId: 1,
+      zonaUdsId: 10,
+      aree: [],
+      permessi: [],
+    };
     mocks.update.mockReset();
     mocks.toast.mockReset();
     container = document.createElement("div");
@@ -184,6 +244,25 @@ describe("UdsPersonaSheet", () => {
       );
     });
     return onOpenChange;
+  };
+
+  const usePureUdsUser = () => {
+    mocks.user = {
+      id: 1,
+      isAdmin: false,
+      isSuperAdmin: false,
+      areaOperativaId: 1,
+      zonaUdsId: 10,
+      aree: ["uds"],
+      permessi: ["uds.directory.view", "beneficiari.manage"],
+    };
+  };
+
+  const searchExistingPerson = async (search: string): Promise<void> => {
+    await setInputValue("#uds-persona-existing-search", search);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
   };
 
   afterEach(async () => {
@@ -472,5 +551,204 @@ describe("UdsPersonaSheet", () => {
         variant: "destructive",
       }),
     );
+  });
+
+  it("un operatore UDS puro usa i link candidates minimizzati e non la full duplicate search", async () => {
+    usePureUdsUser();
+    mocks.linkCandidateMatches = [
+      {
+        id: 301,
+        codice: "SOC-301",
+        nome: "Lucia",
+        cognome: "Riservata",
+        soprannome: null,
+        fasciaEtaCorrente: "30_64",
+        versione: 4,
+        codiceFiscale: "RSSLCU80A01H501X",
+        telefono: "3331234567",
+        dataNascita: "1980-01-01",
+        centroAscoltoNome: "Centro Sociale Segreto",
+      },
+    ];
+    await act(async () => {
+      root.render(
+        <UdsPersonaSheet
+          open
+          onOpenChange={vi.fn()}
+          initialAreaOperativaId={1}
+          initialZonaUdsId={10}
+        />,
+      );
+    });
+
+    await searchExistingPerson("Lucia");
+
+    expect(mocks.fullDuplicateOptions?.query?.enabled).toBe(false);
+    expect(mocks.linkCandidateParams).toEqual({ search: "Lucia" });
+    expect(mocks.linkCandidateOptions?.query?.enabled).toBe(true);
+    expect(document.body.textContent).toContain("Lucia");
+    expect(document.body.textContent).toContain("Riservata");
+    expect(document.body.textContent).toContain("SOC-301");
+    expect(document.body.textContent).toContain(
+      "udsAnagrafica.dupStatusShared",
+    );
+    expect(udsAnagrafica.it.dupStatusShared).toBe(
+      "Già presente nel sistema",
+    );
+    for (const forbidden of [
+      "RSSLCU80A01H501X",
+      "3331234567",
+      "1980-01-01",
+      "Centro Sociale Segreto",
+    ]) {
+      expect(document.body.textContent).not.toContain(forbidden);
+    }
+    const save = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "common.save",
+    );
+    expect(save?.hasAttribute("disabled")).toBe(true);
+    const continueNew = Array.from(document.querySelectorAll("button")).find(
+      (button) =>
+        button.textContent?.trim() === "udsAnagrafica.dupContinueNew",
+    );
+    expect(continueNew).toBeDefined();
+    await act(async () => continueNew?.click());
+    expect(save?.hasAttribute("disabled")).toBe(false);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("collega il candidato minimizzato riutilizzando il PATCH con data di nascita autorevole", async () => {
+    usePureUdsUser();
+    mocks.linkCandidateMatches = [
+      {
+        id: 302,
+        codice: "SOC-302",
+        nome: "Anna",
+        cognome: "Esistente",
+        soprannome: null,
+        fasciaEtaCorrente: "non_determinata",
+        versione: 9,
+      },
+    ];
+    await act(async () => {
+      root.render(
+        <UdsPersonaSheet
+          open
+          onOpenChange={vi.fn()}
+          initialAreaOperativaId={1}
+          initialZonaUdsId={10}
+        />,
+      );
+    });
+    await searchExistingPerson("Anna");
+    await selectFormOption("beneficiarioDettaglio.areaProvenienza", "UE");
+    await setInputValue('input[name="dataNascita"]', "2000-01-01");
+
+    await openSocialLinkConfirmation();
+
+    expect(mocks.update).toHaveBeenCalledWith(
+      {
+        id: 302,
+        data: {
+          uds: true,
+          versione: 9,
+          zonaUdsId: 10,
+          areaProvenienza: "UE",
+          dataNascita: "2000-01-01",
+          fasciaEtaPresunta: null,
+        },
+      },
+      expect.any(Object),
+    );
+  });
+
+  it("include il caricamento link-candidates nello stato di verifica duplicati", async () => {
+    usePureUdsUser();
+    mocks.linkCandidateFetching = true;
+    await act(async () => {
+      root.render(
+        <UdsPersonaSheet
+          open
+          onOpenChange={vi.fn()}
+          initialAreaOperativaId={1}
+          initialZonaUdsId={10}
+        />,
+      );
+    });
+
+    await searchExistingPerson("Mario");
+
+    expect(document.body.textContent).toContain(
+      "udsAnagrafica.duplicateCheckInProgress",
+    );
+  });
+
+  it("non richiede override di Area e non mostra candidati esclusi dallo scope server", async () => {
+    usePureUdsUser();
+    mocks.linkCandidateMatches = [];
+    await act(async () => {
+      root.render(
+        <UdsPersonaSheet
+          open
+          onOpenChange={vi.fn()}
+          initialAreaOperativaId={1}
+          initialZonaUdsId={10}
+        />,
+      );
+    });
+
+    await searchExistingPerson("Milano");
+
+    expect(mocks.linkCandidateParams).toEqual({ search: "Milano" });
+    expect(
+      Array.from(document.querySelectorAll("button")).some(
+        (button) => button.textContent?.trim() === "udsAnagrafica.dupAdd",
+      ),
+    ).toBe(false);
+  });
+
+  it("continua a selezionare una persona già UDS dalla directory normale", async () => {
+    usePureUdsUser();
+    mocks.directoryMatches = [
+      {
+        id: 401,
+        nome: "Persona",
+        cognome: "GiaUds",
+        soprannome: null,
+        zonaUdsId: 10,
+      },
+    ];
+    const onOpenChange = vi.fn();
+    const onPersonReady = vi.fn();
+    await act(async () => {
+      root.render(
+        <UdsPersonaSheet
+          open
+          onOpenChange={onOpenChange}
+          initialAreaOperativaId={1}
+          initialZonaUdsId={10}
+          onPersonReady={onPersonReady}
+        />,
+      );
+    });
+    const select = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "udsAnagrafica.dupSelect",
+    );
+    expect(select).toBeDefined();
+
+    await act(async () => select?.click());
+
+    expect(onPersonReady).toHaveBeenCalledWith(
+      {
+        id: 401,
+        nome: "Persona",
+        cognome: "GiaUds",
+        soprannome: null,
+        zonaUdsId: 10,
+      },
+      "existing",
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });

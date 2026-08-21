@@ -3566,6 +3566,35 @@ export const ListUdsDirectoryResponse = zod.array(ListUdsDirectoryResponseItem)
 
 
 /**
+ * Ricerca anti-duplicazione Area-wide di persone attive non ancora UDS, con risposta anagrafica minimizzata.
+ */
+export const listUdsLinkCandidatesQuerySearchMin = 2;
+export const listUdsLinkCandidatesQuerySearchMax = 120;
+
+
+
+
+export const ListUdsLinkCandidatesQueryParams = zod.object({
+  "search": zod.coerce.string().min(listUdsLinkCandidatesQuerySearchMin).max(listUdsLinkCandidatesQuerySearchMax),
+  "areaOperativaId": zod.coerce.number().min(1).optional().describe('Disponibile soltanto ai profili amministrativi globali.')
+})
+
+
+
+
+export const ListUdsLinkCandidatesResponseItem = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "soprannome": zod.string().nullable(),
+  "fasciaEtaCorrente": zod.enum(['0_17', '18_29', '30_64', '65_plus', 'non_determinata']),
+  "versione": zod.number().min(1)
+}).describe('Candidato attivo non ancora UDS; non contiene dossier, Centro o PII estesa.')
+export const ListUdsLinkCandidatesResponse = zod.array(ListUdsLinkCandidatesResponseItem).max(20)
+
+
+/**
  * Esporta server-side la stessa proiezione minimizzata della directory, applicando permessi e scope Area UDS.
  */
 export const exportUdsDirectoryBodySearchMin = 2;

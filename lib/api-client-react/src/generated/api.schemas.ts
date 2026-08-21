@@ -2637,6 +2637,32 @@ export interface UdsDirectoryItem {
   accessoCompleto: boolean;
 }
 
+export type UdsLinkCandidateItemFasciaEtaCorrente = typeof UdsLinkCandidateItemFasciaEtaCorrente[keyof typeof UdsLinkCandidateItemFasciaEtaCorrente];
+
+
+export const UdsLinkCandidateItemFasciaEtaCorrente = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+/**
+ * Candidato attivo non ancora UDS; non contiene dossier, Centro o PII estesa.
+ */
+export interface UdsLinkCandidateItem {
+  id: number;
+  codice: string;
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  soprannome: string | null;
+  fasciaEtaCorrente: UdsLinkCandidateItemFasciaEtaCorrente;
+  /** @minimum 1 */
+  versione: number;
+}
+
 export type UdsInterventoStato = typeof UdsInterventoStato[keyof typeof UdsInterventoStato];
 
 
@@ -6371,6 +6397,19 @@ limit?: number;
  */
 areaOperativaId?: number;
 zonaUdsId?: number;
+};
+
+export type ListUdsLinkCandidatesParams = {
+/**
+ * @minLength 2
+ * @maxLength 120
+ */
+search: string;
+/**
+ * Disponibile soltanto ai profili amministrativi globali.
+ * @minimum 1
+ */
+areaOperativaId?: number;
 };
 
 export type ListConsegneParams = {

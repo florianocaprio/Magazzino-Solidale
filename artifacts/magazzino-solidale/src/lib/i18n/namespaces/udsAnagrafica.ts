@@ -40,7 +40,7 @@ export const udsAnagrafica = {
     selectAreaOperativaForSearch:
       "Seleziona prima la area operativa in cui cercare",
     dupStatusUds: "Già presente in UDS",
-    dupStatusShared: "Anagrafica condivisa",
+    dupStatusShared: "Già presente nel sistema",
     dupConfirmTitle: "Collegare la persona all'UDS?",
     dupConfirmDescription:
       "Confermi di collegare {{nome}} all'Unità di Strada senza creare una nuova anagrafica?",
@@ -130,7 +130,7 @@ export const udsAnagrafica = {
       "Introduce al menos 2 caracteres. La búsqueda abarca toda la ciudad, sin límites de zona o centro.",
     selectAreaOperativaForSearch: "Primero selecciona la ciudad donde buscar",
     dupStatusUds: "Ya está en UDS",
-    dupStatusShared: "Registro compartido",
+    dupStatusShared: "Ya está en el sistema",
     dupConfirmTitle: "¿Vincular la persona a la UDS?",
     dupConfirmDescription:
       "¿Confirmas vincular a {{nome}} a la Unidad de Calle sin crear un nuevo registro?",
@@ -220,7 +220,7 @@ export const udsAnagrafica = {
       "Enter at least 2 characters. The search covers the whole Operational Area, without zone or centre limits.",
     selectAreaOperativaForSearch: "First select the Operational Area to search",
     dupStatusUds: "Already in street unit",
-    dupStatusShared: "Shared registry",
+    dupStatusShared: "Already in the system",
     dupConfirmTitle: "Link this person to the street unit?",
     dupConfirmDescription:
       "Confirm linking {{nome}} to the street unit without creating a new record?",
@@ -311,7 +311,7 @@ export const udsAnagrafica = {
       "Saisissez au moins 2 caractères. La recherche couvre toute la ville, sans limite de zone ou de centre.",
     selectAreaOperativaForSearch: "Sélectionnez d'abord la ville où rechercher",
     dupStatusUds: "Déjà présente dans l'UDS",
-    dupStatusShared: "Registre partagé",
+    dupStatusShared: "Déjà présente dans le système",
     dupConfirmTitle: "Relier cette personne à l'UDS ?",
     dupConfirmDescription:
       "Confirmez-vous le rattachement de {{nome}} à l'UDS sans créer une nouvelle fiche ?",
@@ -403,7 +403,7 @@ export const udsAnagrafica = {
     selectAreaOperativaForSearch:
       "Zuerst den Betriebsbereich für die Suche auswählen",
     dupStatusUds: "Bereits im Straßendienst",
-    dupStatusShared: "Gemeinsames Register",
+    dupStatusShared: "Bereits im System vorhanden",
     dupConfirmTitle: "Person mit dem Straßendienst verknüpfen?",
     dupConfirmDescription:
       "Bestätigst du die Verknüpfung von {{nome}} mit dem Straßendienst, ohne einen neuen Datensatz anzulegen?",
@@ -493,7 +493,7 @@ export const udsAnagrafica = {
       "أدخل حرفين على الأقل. يشمل البحث المنطقة التشغيلية بأكملها دون قيود المنطقة أو المركز.",
     selectAreaOperativaForSearch: "اختر أولاً المنطقة التشغيلية للبحث",
     dupStatusUds: "مسجل بالفعل في وحدة الشارع",
-    dupStatusShared: "سجل مشترك",
+    dupStatusShared: "موجود بالفعل في النظام",
     dupConfirmTitle: "ربط الشخص بوحدة الشارع؟",
     dupConfirmDescription:
       "هل تؤكد ربط {{nome}} بوحدة الشارع دون إنشاء سجل جديد؟",

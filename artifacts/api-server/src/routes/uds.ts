@@ -125,6 +125,41 @@ function buildUdsDirectoryScope(req: Request, source: Record<string, unknown>) {
   };
 }
 
+function buildUdsLinkCandidatesScope(
+  req: Request,
+  source: Record<string, unknown>,
+) {
+  const callerArea = requireOperationalArea(req);
+  let requestedArea: number | null = null;
+  if (source.areaOperativaId != null && source.areaOperativaId !== "") {
+    requestedArea = positiveInteger(source.areaOperativaId);
+    if (requestedArea == null) {
+      throw new UdsError(400, "areaOperativaId non valido");
+    }
+  }
+  const effectiveArea = callerArea ?? requestedArea;
+  const search = String(source.search ?? "").trim();
+  if (search.length < 2 || search.length > 120) {
+    throw new UdsError(400, "La ricerca deve contenere da 2 a 120 caratteri");
+  }
+  const like = `%${search}%`;
+  return and(
+    eq(beneficiariTable.uds, false),
+    eq(beneficiariTable.attivo, true),
+    effectiveArea != null
+      ? eq(beneficiariTable.areaOperativaId, effectiveArea)
+      : undefined,
+    or(
+      ilike(beneficiariTable.codice, like),
+      ilike(beneficiariTable.nome, like),
+      ilike(beneficiariTable.cognome, like),
+      ilike(beneficiariTable.soprannome, like),
+      ilike(beneficiariTable.codiceFiscale, like),
+      ilike(beneficiariTable.telefono, like),
+    ),
+  );
+}
+
 async function selectUdsDirectoryRows(
   where: SQL | undefined,
   pagination?: { limit: number; offset: number },
@@ -344,6 +379,56 @@ router.get(
       res.setHeader("X-Page", String(page));
       res.setHeader("X-Page-Size", String(limit));
       res.json(rows.map((row) => formatUdsDirectoryItem(row, req)));
+    } catch (error) {
+      if (sendUdsError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.get(
+  "/uds/directory/link-candidates",
+  requirePermission("uds.directory.view"),
+  requirePermission("beneficiari.manage"),
+  async (req, res) => {
+    try {
+      const where = buildUdsLinkCandidatesScope(
+        req,
+        req.query as Record<string, unknown>,
+      );
+      const rows = await db
+        .select({
+          id: beneficiariTable.id,
+          codice: beneficiariTable.codice,
+          nome: beneficiariTable.nome,
+          cognome: beneficiariTable.cognome,
+          soprannome: beneficiariTable.soprannome,
+          dataNascita: beneficiariTable.dataNascita,
+          fasciaEtaPresunta: beneficiariTable.fasciaEtaPresunta,
+          versione: beneficiariTable.versione,
+        })
+        .from(beneficiariTable)
+        .where(where)
+        .orderBy(
+          beneficiariTable.cognome,
+          beneficiariTable.nome,
+          beneficiariTable.id,
+        )
+        .limit(20);
+      res.json(
+        rows.map((row) => ({
+          id: row.id,
+          codice: row.codice,
+          nome: row.nome,
+          cognome: row.cognome,
+          soprannome: row.soprannome ?? null,
+          fasciaEtaCorrente: risolviFasciaEta(
+            row.dataNascita,
+            row.fasciaEtaPresunta,
+          ).fascia,
+          versione: row.versione,
+        })),
+      );
     } catch (error) {
       if (sendUdsError(error, res)) return;
       throw error;

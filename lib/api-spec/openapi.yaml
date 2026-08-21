@@ -2183,6 +2183,33 @@ paths:
                 items: { $ref: "#/components/schemas/UdsDirectoryItem" }
         "403": { description: Area o permesso UDS non disponibile }
 
+  /uds/directory/link-candidates:
+    get:
+      operationId: listUdsLinkCandidates
+      tags: [uds]
+      description: Ricerca anti-duplicazione Area-wide di persone attive non ancora UDS, con risposta anagrafica minimizzata.
+      parameters:
+        - name: search
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 120 }
+        - name: areaOperativaId
+          in: query
+          description: Disponibile soltanto ai profili amministrativi globali.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Candidati non-UDS minimizzati nella stessa Area Operativa
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items: { $ref: "#/components/schemas/UdsLinkCandidateItem" }
+        "400": { description: Ricerca obbligatoria da 2 a 120 caratteri }
+        "403":
+          description: "Richiesti Area UDS, uds.directory.view e beneficiari.manage"
+
   /uds/directory/export:
     post:
       operationId: exportUdsDirectory
@@ -9748,6 +9775,23 @@ components:
           canale,
           accessoCompleto,
         ]
+
+    UdsLinkCandidateItem:
+      type: object
+      additionalProperties: false
+      description: Candidato attivo non ancora UDS; non contiene dossier, Centro o PII estesa.
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        nome: { type: string }
+        cognome: { type: string }
+        soprannome: { type: [string, "null"] }
+        fasciaEtaCorrente:
+          type: string
+          enum: ["0_17", "18_29", "30_64", "65_plus", non_determinata]
+        versione: { type: integer, minimum: 1 }
+      required:
+        [id, codice, nome, cognome, soprannome, fasciaEtaCorrente, versione]
 
     UdsIntervento:
       type: object

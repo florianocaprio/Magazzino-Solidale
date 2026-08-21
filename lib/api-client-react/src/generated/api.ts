@@ -187,6 +187,7 @@ import type {
   ListTrasferimentiParams,
   ListTurniParams,
   ListUdsDirectoryParams,
+  ListUdsLinkCandidatesParams,
   ListUtentiParams,
   ListVolontariParams,
   ListZoneUdsParams,
@@ -320,6 +321,7 @@ import type {
   UdsInterventoInput,
   UdsInterventoNotaInput,
   UdsInterventoRettificaInput,
+  UdsLinkCandidateItem,
   UdsPersonePerZonaReport,
   Utente,
   UtenteInput,
@@ -6541,6 +6543,87 @@ export function useListUdsDirectory<TData = Awaited<ReturnType<typeof listUdsDir
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListUdsDirectoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListUdsLinkCandidatesUrl = (params: ListUdsLinkCandidatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/uds/directory/link-candidates?${stringifiedParams}` : `/api/uds/directory/link-candidates`
+}
+
+/**
+ * Ricerca anti-duplicazione Area-wide di persone attive non ancora UDS, con risposta anagrafica minimizzata.
+ */
+export const listUdsLinkCandidates = async (params: ListUdsLinkCandidatesParams, options?: RequestInit): Promise<UdsLinkCandidateItem[]> => {
+
+  return customFetch<UdsLinkCandidateItem[]>(getListUdsLinkCandidatesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListUdsLinkCandidatesQueryKey = (params?: ListUdsLinkCandidatesParams,) => {
+    return [
+    `/api/uds/directory/link-candidates`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListUdsLinkCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof listUdsLinkCandidates>>, TError = ErrorType<void>>(params: ListUdsLinkCandidatesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUdsLinkCandidates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListUdsLinkCandidatesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUdsLinkCandidates>>> = ({ signal }) => listUdsLinkCandidates(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUdsLinkCandidates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListUdsLinkCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof listUdsLinkCandidates>>>
+export type ListUdsLinkCandidatesQueryError = ErrorType<void>
+
+
+
+export function useListUdsLinkCandidates<TData = Awaited<ReturnType<typeof listUdsLinkCandidates>>, TError = ErrorType<void>>(
+ params: ListUdsLinkCandidatesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUdsLinkCandidates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListUdsLinkCandidatesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

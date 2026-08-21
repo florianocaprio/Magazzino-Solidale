@@ -34,6 +34,7 @@ import {
   cleanup,
   createAreaOperativa,
   createBeneficiario,
+  createCentro,
   createUtente,
   createZona,
   insertIntervento,
@@ -92,6 +93,30 @@ function appWithRealAreaGuard(aree: string[], permessi: readonly string[]) {
       id: userId,
       centroAscoltoId: null,
       areaOperativaId: null,
+      zonaUdsId: null,
+      aree,
+      permessi: [...permessi],
+    },
+    [areaGuard],
+  );
+}
+
+function appAsPureUds(
+  areaOperativaId: number,
+  centroAscoltoId: number | null,
+  permessi: readonly string[] = [
+    "uds.directory.view",
+    "beneficiari.manage",
+    "beneficiari.view",
+  ],
+  aree: string[] = ["uds"],
+) {
+  return makeScopedApp(
+    combinedRouter(),
+    {
+      id: userId,
+      centroAscoltoId,
+      areaOperativaId,
       zonaUdsId: null,
       aree,
       permessi: [...permessi],
@@ -245,6 +270,233 @@ describe("UDS hardening territoriale e storico", () => {
       fasciaEtaCorrente: "30_64",
     });
 
+  });
+
+  it("espone a un operatore UDS puro solo candidati non-UDS attivi della stessa Area con DTO minimizzato", async () => {
+    const areaA = await createAreaOperativa(scope);
+    const areaB = await createAreaOperativa(scope);
+    const centroOperatore = await createCentro(scope, areaA);
+    const centroSociale = await createCentro(scope, areaA);
+    const candidateId = await createBeneficiario(scope, centroSociale, {
+      areaOperativaId: areaA,
+    });
+    const crossAreaId = await createBeneficiario(scope, null, {
+      areaOperativaId: areaB,
+    });
+    const alreadyUdsId = await createBeneficiario(scope, null, {
+      uds: true,
+      areaOperativaId: areaA,
+    });
+    const inactiveId = await createBeneficiario(scope, null, {
+      areaOperativaId: areaA,
+    });
+    const codiceFiscale = "RSSMRA80A01H501U";
+    const telefono = "3339876543";
+    await db
+      .update(beneficiariTable)
+      .set({
+        codiceFiscale,
+        nome: "Mario",
+        cognome: "Riservato",
+        soprannome: "Mimmo",
+        telefono,
+        email: "mario.riservato@example.org",
+        dataNascita: "1980-01-01",
+        areaProvenienza: "UE",
+        residenza: "Via Riservata 1",
+        domicilio: "Via Segreta 2",
+        noteInterne: "Nota sociale riservata",
+      })
+      .where(eq(beneficiariTable.id, candidateId));
+    await db
+      .update(beneficiariTable)
+      .set({ nome: "Mario", cognome: "AltraArea" })
+      .where(eq(beneficiariTable.id, crossAreaId));
+    await db
+      .update(beneficiariTable)
+      .set({ nome: "Mario", cognome: "GiaUds" })
+      .where(eq(beneficiariTable.id, alreadyUdsId));
+    await db
+      .update(beneficiariTable)
+      .set({ nome: "Mario", cognome: "Inattivo", attivo: false })
+      .where(eq(beneficiariTable.id, inactiveId));
+
+    const udsOnly = appAsPureUds(areaA, centroOperatore);
+    const byName = await request(udsOnly)
+      .get("/uds/directory/link-candidates")
+      .query({ search: "Mario" });
+    expect(byName.status).toBe(200);
+    expect(byName.body.map((item: { id: number }) => item.id)).toEqual([
+      candidateId,
+    ]);
+    expect(Object.keys(byName.body[0]).sort()).toEqual(
+      [
+        "id",
+        "codice",
+        "nome",
+        "cognome",
+        "soprannome",
+        "fasciaEtaCorrente",
+        "versione",
+      ].sort(),
+    );
+    expect(byName.body[0]).toMatchObject({
+      id: candidateId,
+      nome: "Mario",
+      cognome: "Riservato",
+      soprannome: "Mimmo",
+      fasciaEtaCorrente: "30_64",
+      versione: 1,
+    });
+    for (const forbidden of [
+      "codiceFiscale",
+      "telefono",
+      "email",
+      "dataNascita",
+      "centroAscoltoId",
+      "centroAscoltoNome",
+      "domicilio",
+      "residenza",
+      "note",
+      "noteInterne",
+    ]) {
+      expect(byName.body[0]).not.toHaveProperty(forbidden);
+    }
+
+    for (const search of [codiceFiscale, telefono]) {
+      const internalMatch = await request(udsOnly)
+        .get("/uds/directory/link-candidates")
+        .query({ search });
+      expect(internalMatch.status).toBe(200);
+      expect(internalMatch.body.map((item: { id: number }) => item.id)).toEqual([
+        candidateId,
+      ]);
+      expect(internalMatch.body[0]).not.toHaveProperty("codiceFiscale");
+      expect(internalMatch.body[0]).not.toHaveProperty("telefono");
+    }
+
+    const normalDirectory = await request(udsOnly)
+      .get("/uds/directory")
+      .query({ search: "Mario", page: 1, limit: 20 });
+    expect(normalDirectory.status).toBe(200);
+    expect(
+      normalDirectory.body.map((item: { id: number }) => item.id),
+    ).toContain(alreadyUdsId);
+    expect(
+      normalDirectory.body.map((item: { id: number }) => item.id),
+    ).not.toContain(candidateId);
+
+    expect(
+      (await request(udsOnly).get("/uds/directory/link-candidates")).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(udsOnly)
+          .get("/uds/directory/link-candidates")
+          .query({ search: "M" })
+      ).status,
+    ).toBe(400);
+  });
+
+  it("richiede Area UDS e i due permessi dedicati senza concedere la full duplicate search", async () => {
+    const area = await createAreaOperativa(scope);
+    const path = "/uds/directory/link-candidates?search=Mario";
+
+    expect(
+      (
+        await request(
+          appAsPureUds(area, null, ["beneficiari.manage"]),
+        ).get(path)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(
+          appAsPureUds(area, null, ["uds.directory.view"]),
+        ).get(path)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(
+          appAsPureUds(
+            area,
+            null,
+            ["uds.directory.view", "beneficiari.manage"],
+            ["sociale"],
+          ),
+        ).get(path)
+      ).status,
+    ).toBe(403);
+
+    const udsOnly = appAsPureUds(area, null, [
+      "uds.directory.view",
+      "beneficiari.manage",
+    ]);
+    expect((await request(udsOnly).get(path)).status).toBe(200);
+    expect(
+      (
+        await request(udsOnly)
+          .get("/beneficiari/cerca-simili")
+          .query({ nome: "Mario" })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("scopre il candidato senza aprire il dossier e lo collega sullo stesso id preservando il Centro", async () => {
+    const area = await createAreaOperativa(scope);
+    const centroOperatore = await createCentro(scope, area);
+    const centroSociale = await createCentro(scope, area);
+    const candidateId = await createBeneficiario(scope, centroSociale, {
+      areaOperativaId: area,
+    });
+    const [candidate] = await db
+      .update(beneficiariTable)
+      .set({
+        nome: "Lucia",
+        cognome: "DaCollegare",
+        areaProvenienza: "UE",
+        fasciaEtaPresunta: "30_64",
+      })
+      .where(eq(beneficiariTable.id, candidateId))
+      .returning({ codice: beneficiariTable.codice });
+    const udsOnly = appAsPureUds(area, centroOperatore);
+
+    const discovery = await request(udsOnly)
+      .get("/uds/directory/link-candidates")
+      .query({ search: "Lucia" });
+    expect(discovery.status).toBe(200);
+    expect(discovery.body).toHaveLength(1);
+    expect(discovery.body[0].id).toBe(candidateId);
+
+    expect(
+      (await request(udsOnly).get(`/beneficiari/${candidateId}`)).status,
+    ).toBe(403);
+
+    const linked = await request(udsOnly)
+      .patch(`/beneficiari/${candidateId}`)
+      .send({ uds: true, versione: discovery.body[0].versione });
+    expect(linked.status).toBe(200);
+    expect(linked.body).toMatchObject({
+      id: candidateId,
+      uds: true,
+      centroAscoltoId: centroSociale,
+    });
+    const rows = await db
+      .select({
+        id: beneficiariTable.id,
+        uds: beneficiariTable.uds,
+        centroAscoltoId: beneficiariTable.centroAscoltoId,
+      })
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.codice, candidate.codice));
+    expect(rows).toEqual([
+      {
+        id: candidateId,
+        uds: true,
+        centroAscoltoId: centroSociale,
+      },
+    ]);
   });
 
   it("classifica i report UDS attraverso areaGuard reale senza ampliare gli altri report", async () => {
