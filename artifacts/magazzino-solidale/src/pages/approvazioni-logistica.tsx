@@ -22,11 +22,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { volontarioLabel } from "@/lib/volontari-label";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
+import { useAuth } from "@/lib/auth";
 import { Check, X } from "lucide-react";
 
 export default function ApprovazioniLogistica() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("logistica.approvazioni.manage");
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const volontariAttivi = isModuloAttivo("VOLONTARI");
   const mezziAttivi = isModuloAttivo("MEZZI");
@@ -47,10 +50,15 @@ export default function ApprovazioniLogistica() {
   };
 
   const onError = (e: unknown) => {
-    const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+    const error = e as { status?: number; data?: { error?: string }; response?: { status?: number; data?: { error?: string } } };
+    const status = error.status ?? error.response?.status;
+    const msg = error.data?.error ?? error.response?.data?.error;
+    if (status === 409) refresh();
     toast({
       variant: "destructive",
-      description: msg ?? t("approvazioniLogistica.error", { defaultValue: "Operazione non riuscita" }),
+      description: status === 409
+        ? t("approvazioniLogistica.stale", { defaultValue: "La richiesta è stata aggiornata da un altro operatore. I dati sono stati ricaricati." })
+        : (msg ?? t("approvazioniLogistica.error", { defaultValue: "Operazione non riuscita" })),
     });
   };
 
@@ -83,7 +91,7 @@ export default function ApprovazioniLogistica() {
                   <TableHead>{t("volontari.matricola", { defaultValue: "Matricola" })}</TableHead>
                   <TableHead>{t("common.centro")}</TableHead>
                   <TableHead>{t("common.notes")}</TableHead>
-                  <TableHead className="text-right">{t("common.actions")}</TableHead>
+                  {canManage && <TableHead className="text-right">{t("common.actions")}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -101,11 +109,11 @@ export default function ApprovazioniLogistica() {
                         <span className="text-sm">{v.note ?? "—"}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    {canManage && <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           size="sm"
-                          onClick={() => approvaVolontario.mutate({ id: v.id }, { onSuccess: () => onDone(t("approvazioniLogistica.volApproved", { defaultValue: "Volontario approvato" })), onError })}
+                          onClick={() => approvaVolontario.mutate({ id: v.id, data: { versione: v.versione } }, { onSuccess: () => onDone(t("approvazioniLogistica.volApproved", { defaultValue: "Volontario approvato" })), onError })}
                           disabled={pending}
                         >
                           <Check className="me-1 h-4 w-4" /> {t("common.confirm")}
@@ -113,13 +121,13 @@ export default function ApprovazioniLogistica() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => respingiVolontario.mutate({ id: v.id }, { onSuccess: () => onDone(t("approvazioniLogistica.volRejected", { defaultValue: "Volontario respinto" })) })}
+                          onClick={() => respingiVolontario.mutate({ id: v.id, data: { versione: v.versione } }, { onSuccess: () => onDone(t("approvazioniLogistica.volRejected", { defaultValue: "Volontario respinto" })), onError })}
                           disabled={pending}
                         >
                           <X className="me-1 h-4 w-4" /> {t("approvazioniLogistica.reject", { defaultValue: "Respingi" })}
                         </Button>
                       </div>
-                    </TableCell>
+                    </TableCell>}
                   </TableRow>
                 ))}
               </TableBody>
@@ -147,7 +155,7 @@ export default function ApprovazioniLogistica() {
                   <TableHead>{t("common.type")}</TableHead>
                   <TableHead>{t("common.centro")}</TableHead>
                   <TableHead>{t("common.notes")}</TableHead>
-                  <TableHead className="text-right">{t("common.actions")}</TableHead>
+                  {canManage && <TableHead className="text-right">{t("common.actions")}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -165,11 +173,11 @@ export default function ApprovazioniLogistica() {
                         <span className="text-sm">{m.note ?? m.descrizione ?? "—"}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    {canManage && <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           size="sm"
-                          onClick={() => approvaMezzo.mutate({ id: m.id }, { onSuccess: () => onDone(t("approvazioniLogistica.mezzoApproved", { defaultValue: "Mezzo approvato" })) })}
+                          onClick={() => approvaMezzo.mutate({ id: m.id, data: { versione: m.versione } }, { onSuccess: () => onDone(t("approvazioniLogistica.mezzoApproved", { defaultValue: "Mezzo approvato" })), onError })}
                           disabled={pending}
                         >
                           <Check className="me-1 h-4 w-4" /> {t("common.confirm")}
@@ -177,13 +185,13 @@ export default function ApprovazioniLogistica() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => respingiMezzo.mutate({ id: m.id }, { onSuccess: () => onDone(t("approvazioniLogistica.mezzoRejected", { defaultValue: "Mezzo respinto" })) })}
+                          onClick={() => respingiMezzo.mutate({ id: m.id, data: { versione: m.versione } }, { onSuccess: () => onDone(t("approvazioniLogistica.mezzoRejected", { defaultValue: "Mezzo respinto" })), onError })}
                           disabled={pending}
                         >
                           <X className="me-1 h-4 w-4" /> {t("approvazioniLogistica.reject", { defaultValue: "Respingi" })}
                         </Button>
                       </div>
-                    </TableCell>
+                    </TableCell>}
                   </TableRow>
                 ))}
               </TableBody>

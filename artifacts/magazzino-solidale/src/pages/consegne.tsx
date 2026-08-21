@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListAreeOperative, getListAreeOperativeQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListAreeOperative, getListAreeOperativeQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, useListRuoliVolontari, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -48,11 +48,13 @@ const formSchema = z.object({
 
 export default function Consegne() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
   const isAreaOperativaGlobal = user?.areaOperativaId == null;
+  const canCreateVolontario = hasPermission("logistica.volontari.manage");
+  const canCreateMezzo = hasPermission("logistica.mezzi.manage");
   const [areaOperativaFilter, setAreaOperativaFilter] = useState("all");
   const [centroFilter, setCentroFilter] = useState("all");
   const [statoFilter, setStatoFilter] = useState("all");
@@ -88,6 +90,7 @@ export default function Consegne() {
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari();
   const { data: mezzi } = useListMezzi();
+  const { data: ruoliVolontari } = useListRuoliVolontari();
   const { data: centri } = useListCentriAscolto();
   const { data: areaOperativaList } = useListAreeOperative({
     query: { queryKey: getListAreeOperativeQueryKey(), enabled: isAreaOperativaGlobal },
@@ -133,7 +136,7 @@ export default function Consegne() {
   const [pendingMezzi, setPendingMezzi] = useState<Mezzo[]>([]);
   const [volontarioDialogOpen, setVolontarioDialogOpen] = useState(false);
   const [mezzoDialogOpen, setMezzoDialogOpen] = useState(false);
-  const [nuovoVolontario, setNuovoVolontario] = useState({ nome: "", cognome: "", matricola: "", telefono: "", patente: false, note: "" });
+  const [nuovoVolontario, setNuovoVolontario] = useState({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null as number | null, telefono: "", patente: false, note: "" });
   const [volontarioError, setVolontarioError] = useState<string | null>(null);
   const [nuovoMezzo, setNuovoMezzo] = useState({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
 
@@ -198,10 +201,13 @@ export default function Consegne() {
   });
 
   const dataPrevistaWatch = form.watch("dataPrevista");
+  const fasciaOrariaWatch = form.watch("fasciaOraria");
+  const fasciaCanonica = fasciaOrariaWatch === "Mattina" ? "09-13" : fasciaOrariaWatch === "Pomeriggio" ? "14-18" : fasciaOrariaWatch === "Sera" ? "18-20" : null;
   const validData = /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? "");
+  const caricoParams = { data: dataPrevistaWatch, fascia: (fasciaCanonica ?? "09-13") as "09-13" | "14-18" | "18-20" };
   const { data: caricoTurno } = useGetVolontariCarico(
-    { data: dataPrevistaWatch },
-    { query: { queryKey: getGetVolontariCaricoQueryKey({ data: dataPrevistaWatch }), enabled: validData } },
+    caricoParams,
+    { query: { queryKey: getGetVolontariCaricoQueryKey(caricoParams), enabled: validData && fasciaCanonica != null } },
   );
   const caricoMap = new Map((caricoTurno ?? []).map((c) => [c.volontarioId, c.count]));
   const selectedBeneficiarioId = form.watch("beneficiarioId");
@@ -212,24 +218,23 @@ export default function Consegne() {
   const effectiveConsegnaCentroId = beneficiarioSelezionato?.centroAscoltoId
     ?? (createCentroId !== "all" ? parseInt(createCentroId) : lockedCentroId);
   const volontariConsegna = useMemo(
-    () => [...pendingVolontari, ...(volontari ?? [])].filter((v, idx, all) => {
+    () => (volontari ?? []).filter((v, idx, all) => {
       if (all.findIndex((item) => item.id === v.id) !== idx) return false;
-      const isPendingLocal = pendingVolontari.some((p) => p.id === v.id);
-      if (!isPendingLocal && (!v.attivo || (v.statoApprovazione ?? "approvato") !== "approvato")) return false;
+      if (!v.attivo || (v.statoApprovazione ?? "approvato") !== "approvato") return false;
       if (v.centroAscoltoId == null) return true;
       return effectiveConsegnaCentroId != null && v.centroAscoltoId === effectiveConsegnaCentroId;
     }),
-    [effectiveConsegnaCentroId, pendingVolontari, volontari],
+    [effectiveConsegnaCentroId, volontari],
   );
   const mezziConsegna = useMemo(
-    () => [...pendingMezzi, ...(mezzi ?? [])].filter((m, idx, all) => {
+    () => (mezzi ?? []).filter((m, idx, all) => {
       if (all.findIndex((item) => item.id === m.id) !== idx) return false;
-      const isPendingLocal = pendingMezzi.some((p) => p.id === m.id);
-      if (!isPendingLocal && (m.stato !== "disponibile" || (m.statoApprovazione ?? "approvato") !== "approvato")) return false;
+      if (m.stato !== "disponibile" || (m.statoApprovazione ?? "approvato") !== "approvato") return false;
+      if ((m.scadenzaAssicurazione != null && m.scadenzaAssicurazione.slice(0, 10) < dataPrevistaWatch) || (m.scadenzaRevisione != null && m.scadenzaRevisione.slice(0, 10) < dataPrevistaWatch)) return false;
       if (m.effectiveCentroId == null) return true;
       return effectiveConsegnaCentroId != null && m.effectiveCentroId === effectiveConsegnaCentroId;
     }),
-    [effectiveConsegnaCentroId, mezzi, pendingMezzi],
+    [dataPrevistaWatch, effectiveConsegnaCentroId, mezzi],
   );
 
   const onSubmit = (raw: z.infer<typeof formSchema>) => {
@@ -262,7 +267,7 @@ export default function Consegne() {
   };
 
   const creaVolontarioPending = () => {
-    if (effectiveConsegnaCentroId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
+    if (effectiveConsegnaCentroId == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
       return;
     }
     setVolontarioError(null);
@@ -273,6 +278,7 @@ export default function Consegne() {
           nome: nuovoVolontario.nome.trim(),
           cognome: nuovoVolontario.cognome.trim(),
           matricola: nuovoVolontario.matricola.trim(),
+          ruoloVolontarioId: nuovoVolontario.ruoloVolontarioId,
           telefono: nuovoVolontario.telefono.trim() || undefined,
           patente: nuovoVolontario.patente,
           note: nuovoVolontario.note.trim() || "Inserito da pianificazione consegne",
@@ -281,13 +287,9 @@ export default function Consegne() {
       {
         onSuccess: (created) => {
           setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
-          form.setValue("volontarioId", created.id);
-          form.setValue("volontarioAltro", undefined);
-          form.setValue("mezzoId", 0);
-          form.setValue("mezzoAltro", false);
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
-          setNuovoVolontario({ nome: "", cognome: "", matricola: "", telefono: "", patente: false, note: "" });
+          setNuovoVolontario({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
           setVolontarioError(null);
           setVolontarioDialogOpen(false);
         },
@@ -316,8 +318,6 @@ export default function Consegne() {
       {
         onSuccess: (created) => {
           setPendingMezzi((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
-          form.setValue("mezzoId", created.id);
-          form.setValue("mezzoAltro", false);
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
           toast({ description: t("turni.pendingMezzoCreated", { defaultValue: "Mezzo inserito in attesa di approvazione" }) });
           setNuovoMezzo({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
@@ -867,11 +867,9 @@ export default function Consegne() {
                             <SelectItem value="altro">{t("consegne.volontarioAltro", { defaultValue: "Altro" })}</SelectItem>
                             {volontariConsegna.map(v => {
                               const overLimit = v.maxConsegneTurno > 0 && (caricoMap.get(v.id) ?? 0) >= v.maxConsegneTurno;
-                              const isPending = v.statoApprovazione === "in_attesa";
                               return (
-                                <SelectItem key={v.id} value={String(v.id)} disabled={overLimit} className={isPending ? "text-muted-foreground" : undefined}>
+                                <SelectItem key={v.id} value={String(v.id)} disabled={overLimit}>
                                   {volontarioLabel(v)}
-                                  {isPending ? ` · ${t("turni.pendingLabel", { defaultValue: "in attesa" })}` : ""}
                                   {overLimit ? ` — ${t("consegne.limiteRaggiunto")}` : ""}
                                 </SelectItem>
                               );
@@ -881,7 +879,7 @@ export default function Consegne() {
                       </FormItem>
                     )} />
                     <div className="flex flex-wrap gap-2">
-                      <Button
+                      {canCreateVolontario && <Button
                         type="button"
                         variant="outline"
                         size="sm"
@@ -889,8 +887,8 @@ export default function Consegne() {
                         disabled={effectiveConsegnaCentroId == null}
                       >
                         <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontarioNonCensito", { defaultValue: "Nuovo Volontario" })}
-                      </Button>
-                      <Button
+                      </Button>}
+                      {canCreateMezzo && <Button
                         type="button"
                         variant="outline"
                         size="sm"
@@ -898,8 +896,18 @@ export default function Consegne() {
                         disabled={effectiveConsegnaCentroId == null}
                       >
                         <Plus className="me-1 h-4 w-4" /> {t("turni.addMezzoNonCensito", { defaultValue: "Nuovo Mezzo" })}
-                      </Button>
+                      </Button>}
                     </div>
+                    {pendingVolontari.length > 0 && (
+                      <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700">
+                        {pendingVolontari.map(volontarioLabel).join(", ")} · {t("turni.pendingNotSelectable", { defaultValue: "In attesa di approvazione, non selezionabile" })}
+                      </p>
+                    )}
+                    {pendingMezzi.length > 0 && (
+                      <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700">
+                        {pendingMezzi.map((mezzo) => mezzo.codice).join(", ")} · {t("turni.pendingNotSelectable", { defaultValue: "In attesa di approvazione, non selezionabile" })}
+                      </p>
+                    )}
                     {form.watch("volontarioAltro") !== undefined && (
                       <FormField control={form.control} name="volontarioAltro" render={({ field }) => (
                         <FormItem>
@@ -932,9 +940,8 @@ export default function Consegne() {
                             <SelectContent>
                               <SelectItem value="0">{t("common.none")}</SelectItem>
                               {mezziConsegna.map(m => (
-                                <SelectItem key={m.id} value={String(m.id)} className={m.statoApprovazione === "in_attesa" ? "text-muted-foreground" : undefined}>
+                                <SelectItem key={m.id} value={String(m.id)}>
                                   {m.codice}{m.targa ? ` (${m.targa})` : ""} — {m.tipo}
-                                  {m.statoApprovazione === "in_attesa" ? ` · ${t("turni.pendingLabel", { defaultValue: "in attesa" })}` : ""}
                                 </SelectItem>
                               ))}
                               <SelectItem value="altro">{t("consegne.mezzoAltro")}</SelectItem>
@@ -1018,6 +1025,20 @@ export default function Consegne() {
               />
             </div>
             <div className="space-y-2">
+              <Label>{t("volontari.ruoloPrincipale", { defaultValue: "Ruolo principale" })}</Label>
+              <Select
+                value={nuovoVolontario.ruoloVolontarioId != null ? String(nuovoVolontario.ruoloVolontarioId) : ""}
+                onValueChange={(value) => setNuovoVolontario((v) => ({ ...v, ruoloVolontarioId: Number(value) }))}
+              >
+                <SelectTrigger><SelectValue placeholder={t("volontari.valRuolo")} /></SelectTrigger>
+                <SelectContent>
+                  {(ruoliVolontari ?? []).filter((ruolo) => ruolo.attivo).map((ruolo) => (
+                    <SelectItem key={ruolo.id} value={String(ruolo.id)}>{ruolo.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>{t("common.notes")}</Label>
               <Input value={nuovoVolontario.note} onChange={(e) => setNuovoVolontario((v) => ({ ...v, note: e.target.value }))} />
             </div>
@@ -1033,7 +1054,8 @@ export default function Consegne() {
                 effectiveConsegnaCentroId == null ||
                 !nuovoVolontario.nome.trim() ||
                 !nuovoVolontario.cognome.trim() ||
-                !nuovoVolontario.matricola.trim()
+                !nuovoVolontario.matricola.trim() ||
+                nuovoVolontario.ruoloVolontarioId == null
               }
             >
               {t("common.save")}

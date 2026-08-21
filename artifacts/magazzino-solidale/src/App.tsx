@@ -464,7 +464,9 @@ function AppRoutes() {
           {() => (
             <Guard area="sociale">
               <RequireModulo codice="CENTRO_ASCOLTO">
-                <Turni />
+                <RequirePermission permission="logistica.turni.view">
+                  <Turni />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -544,7 +546,9 @@ function AppRoutes() {
           {() => (
             <Guard area="logistica">
               <RequireModulo codice="VOLONTARI">
-                <Volontari />
+                <RequirePermission permission="logistica.volontari.view">
+                  <Volontari />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -553,7 +557,9 @@ function AppRoutes() {
           {() => (
             <Guard area="logistica">
               <RequireModulo codice="MEZZI">
-                <Mezzi />
+                <RequirePermission permission="logistica.mezzi.view">
+                  <Mezzi />
+                </RequirePermission>
               </RequireModulo>
             </Guard>
           )}
@@ -562,7 +568,9 @@ function AppRoutes() {
           {() => (
             <Guard area="logistica">
               <RequireAnyModulo codici={["VOLONTARI", "MEZZI"]}>
-                <ApprovazioniLogistica />
+                <RequirePermission permission="logistica.approvazioni.view">
+                  <ApprovazioniLogistica />
+                </RequirePermission>
               </RequireAnyModulo>
             </Guard>
           )}

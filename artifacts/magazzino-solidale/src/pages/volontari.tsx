@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useListVolontari, useCreateVolontario, useUpdateVolontario, useDeleteVolontario, useBulkVolontari, getListVolontariQueryKey, useListCentriAscolto, useListRuoliVolontari } from "@workspace/api-client-react";
+import { useListVolontari, useCreateVolontario, useUpdateVolontario, useBulkVolontari, getListVolontariQueryKey, useListCentriAscolto, useListRuoliVolontari } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -10,14 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ExportButtons } from "@/components/export-buttons";
-import { MoreHorizontal, Plus, Pencil, Trash2, Mail, Phone, CheckCircle2, XCircle, Upload } from "lucide-react";
+import { MoreHorizontal, Plus, Pencil, Mail, Phone, CheckCircle2, XCircle, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,22 +24,28 @@ import { useTranslation } from "react-i18next";
 
 export default function Volontari() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
+  const canCreateGlobal = user?.areaOperativaId == null && !isCentroLocked;
+  const canManage = hasPermission("logistica.volontari.manage");
+  const canExport = hasPermission("logistica.volontari.export");
   const formSchema = z.object({
     nome: z.string().min(2, t("volontari.valNome")),
     cognome: z.string().min(2, t("volontari.valCognome")),
     matricola: z.string().min(1, t("volontari.valMatricola")),
     telefono: z.string().optional(),
     email: z.string().email(t("volontari.valEmail")).optional().or(z.literal("")),
-    ruolo: z.string().min(1, t("volontari.valRuolo")),
+    ruoloVolontarioId: z.number().int().positive(t("volontari.valRuolo")),
     patente: z.boolean().default(false),
     mezzoPersonale: z.boolean().default(false),
-    maxConsegneTurno: z.coerce.number().min(1).default(5),
+    maxConsegneTurno: z.coerce.number().min(0).default(5),
     centroAscoltoId: z.number().nullable().default(null),
     note: z.string().optional()
+  }).refine((value) => canCreateGlobal || value.centroAscoltoId != null, {
+    path: ["centroAscoltoId"],
+    message: t("volontari.centroRequired", { defaultValue: "Seleziona un Centro della tua Area Operativa" }),
   });
   const [search, setSearch] = useState("");
   const [centroFilter, setCentroFilter] = useState<string>("all");
@@ -60,11 +65,10 @@ export default function Volontari() {
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingVersion, setEditingVersion] = useState<number | null>(null);
 
   const createVolontario = useCreateVolontario();
   const updateVolontario = useUpdateVolontario();
-  const deleteVolontario = useDeleteVolontario();
   const bulkVolontari = useBulkVolontari();
   const [isImportOpen, setIsImportOpen] = useState(false);
 
@@ -72,20 +76,21 @@ export default function Volontari() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       nome: "", cognome: "", matricola: "", telefono: "", email: "",
-      ruolo: "magazziniere", patente: false, mezzoPersonale: false,
+      ruoloVolontarioId: 0, patente: false, mezzoPersonale: false,
       maxConsegneTurno: 5, centroAscoltoId: null, note: ""
     }
   });
 
   const handleEdit = (volontario: any) => {
     setEditingId(volontario.id);
+    setEditingVersion(volontario.versione);
     form.reset({
       nome: volontario.nome,
       cognome: volontario.cognome,
       matricola: volontario.matricola || "",
       telefono: volontario.telefono || "",
       email: volontario.email || "",
-      ruolo: volontario.ruolo,
+      ruoloVolontarioId: volontario.ruoloVolontarioId ?? 0,
       patente: volontario.patente,
       mezzoPersonale: volontario.mezzoPersonale,
       maxConsegneTurno: volontario.maxConsegneTurno,
@@ -97,9 +102,10 @@ export default function Volontari() {
 
   const handleCreate = () => {
     setEditingId(null);
+    setEditingVersion(null);
     form.reset({
       nome: "", cognome: "", matricola: "", telefono: "", email: "",
-      ruolo: "magazziniere", patente: false, mezzoPersonale: false,
+      ruoloVolontarioId: 0, patente: false, mezzoPersonale: false,
       maxConsegneTurno: 5, centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : null, note: ""
     });
     setIsFormOpen(true);
@@ -122,8 +128,8 @@ export default function Volontari() {
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     form.clearErrors("matricola");
-    if (editingId) {
-      updateVolontario.mutate({ id: editingId, data }, {
+    if (editingId && editingVersion != null) {
+      updateVolontario.mutate({ id: editingId, data: { ...data, versione: editingVersion } }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ title: t("volontari.toastUpdated") });
@@ -135,7 +141,10 @@ export default function Volontari() {
       createVolontario.mutate({ data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
-          toast({ title: t("volontari.toastCreated") });
+          toast({
+            title: t("volontari.toastCreated"),
+            description: t("volontari.pendingCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }),
+          });
           setIsFormOpen(false);
         },
         onError: handleSaveError,
@@ -143,19 +152,8 @@ export default function Volontari() {
     }
   };
 
-  const handleDelete = () => {
-    if (!deletingId) return;
-    deleteVolontario.mutate({ id: deletingId }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
-        toast({ title: t("volontari.toastDeleted") });
-        setDeletingId(null);
-      }
-    });
-  };
-
   const toggleStatus = (volontario: any) => {
-    updateVolontario.mutate({ id: volontario.id, data: { attivo: !volontario.attivo } }, {
+    updateVolontario.mutate({ id: volontario.id, data: { attivo: !volontario.attivo, versione: volontario.versione } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
       }
@@ -197,7 +195,7 @@ export default function Volontari() {
           <p className="text-muted-foreground">{t("volontari.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons
+          {canExport && <ExportButtons
             rows={volontari ?? []}
             columns={[
               { header: t("common.name"), accessor: (v) => v.nome },
@@ -206,20 +204,20 @@ export default function Volontari() {
               { header: t("volontari.centroAscolto"), accessor: (v) => v.centroAscoltoNome ?? t("volontari.tuttiCentri") },
               { header: t("common.email"), accessor: (v) => v.email },
               { header: t("common.phone"), accessor: (v) => v.telefono },
-              { header: t("volontari.ruolo"), accessor: (v) => roleLabel(v.ruolo) },
+              { header: t("volontari.ruolo"), accessor: (v) => roleLabel(v.ruoloCatalogoNome ?? v.ruolo) },
               { header: t("volontari.patente"), accessor: (v) => (v.patente ? t("common.yes") : t("common.no")) },
               { header: t("common.active"), accessor: (v) => (v.attivo ? t("common.yes") : t("common.no")) },
             ]}
             filename="volontari"
             title={t("volontari.exportTitle")}
             orientation="landscape"
-          />
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+          />}
+          {canManage && <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" /> {t("bulkImport.button")}
-          </Button>
-          <Button onClick={handleCreate} className="gap-2">
+          </Button>}
+          {canManage && <Button onClick={handleCreate} className="gap-2">
             <Plus className="h-4 w-4" /> {t("volontari.newVolontario")}
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -246,11 +244,16 @@ export default function Volontari() {
           if (!r.cognome) return { error: t("bulkImport.requiredMissing", { field: t("common.surname") }) };
           if (!r.matricola) return { error: t("bulkImport.requiredMissing", { field: t("volontari.matricola") }) };
           if (!r.ruolo) return { error: t("bulkImport.requiredMissing", { field: t("volontari.ruolo") }) };
+          const ruolo = matchByName(ruoliVolontari?.filter((item) => item.attivo), r.ruolo, (item) => item.nome);
+          if (!ruolo) return { error: t("bulkImport.unknownRef", { field: t("volontari.ruolo"), value: r.ruolo }) };
           let centroAscoltoId: number | null = null;
           if (r.centro) {
             const c = matchByName(centri, r.centro, (x) => x.nome);
             if (!c) return { error: t("bulkImport.unknownRef", { field: t("volontari.centroAscolto"), value: r.centro }) };
             centroAscoltoId = c.id;
+          }
+          if (!isCentroLocked && !canCreateGlobal && centroAscoltoId == null) {
+            return { error: t("volontari.centroRequired", { defaultValue: "Seleziona un Centro della tua Area Operativa" }) };
           }
           let maxConsegneTurno: number | undefined;
           if (r.maxConsegneTurno) {
@@ -263,13 +266,13 @@ export default function Volontari() {
               nome: r.nome,
               cognome: r.cognome,
               matricola: r.matricola,
-              ruolo: r.ruolo,
+              ruoloVolontarioId: ruolo.id,
               telefono: r.telefono || undefined,
               email: r.email || undefined,
               patente: parseBoolCell(r.patente),
               mezzoPersonale: parseBoolCell(r.mezzoPersonale),
               maxConsegneTurno,
-              centroAscoltoId,
+              centroAscoltoId: isCentroLocked ? lockedCentroId : centroAscoltoId,
               note: r.note || undefined,
             },
           };
@@ -357,7 +360,7 @@ export default function Volontari() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="capitalize">
-                      {roleLabel(v.ruolo)}
+                      {roleLabel(v.ruoloCatalogoNome ?? v.ruolo)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">
@@ -371,11 +374,13 @@ export default function Volontari() {
                       <Badge variant="secondary" className={statoClassName(v)}>
                         {statoLabel(v)}
                       </Badge>
-                      <Switch checked={v.attivo} onCheckedChange={() => toggleStatus(v)} />
+                      {canManage && v.statoApprovazione === "approvato" && (
+                        <Switch checked={v.attivo} onCheckedChange={() => toggleStatus(v)} />
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
+                    {canManage && <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
                           <span className="sr-only">{t("volontari.openMenu")}</span>
@@ -386,11 +391,8 @@ export default function Volontari() {
                         <DropdownMenuItem onClick={() => handleEdit(v)}>
                           <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(v.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                    </DropdownMenu>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -451,16 +453,16 @@ export default function Volontari() {
                   )} />
                 </div>
 
-                <FormField control={form.control} name="ruolo" render={({ field }) => (
+                <FormField control={form.control} name="ruoloVolontarioId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("volontari.ruoloPrincipale")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value > 0 ? String(field.value) : undefined}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         {ruoliVolontari
-                          ?.filter((r) => r.attivo || r.nome === field.value)
+                          ?.filter((r) => r.attivo)
                           .map((r) => (
-                            <SelectItem key={r.id} value={r.nome}>{roleLabel(r.nome)}</SelectItem>
+                            <SelectItem key={r.id} value={String(r.id)}>{roleLabel(r.nome)}</SelectItem>
                           ))}
                       </SelectContent>
                     </Select>
@@ -478,7 +480,7 @@ export default function Volontari() {
                     >
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="all">{t("volontari.tuttiCentri")}</SelectItem>
+                        {canCreateGlobal && <SelectItem value="all">{t("volontari.tuttiCentri")}</SelectItem>}
                         {centri?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -505,7 +507,7 @@ export default function Volontari() {
                 <FormField control={form.control} name="maxConsegneTurno" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("volontari.maxConsegne")}</FormLabel>
-                    <FormControl><Input type="number" min="1" {...field} /></FormControl>
+                    <FormControl><Input type="number" min="0" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -522,18 +524,6 @@ export default function Volontari() {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("volontari.confirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("volontari.confirmDesc")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

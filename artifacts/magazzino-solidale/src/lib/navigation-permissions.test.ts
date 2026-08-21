@@ -50,6 +50,10 @@ describe("permission gate della navigazione operativa", () => {
     ["scarichi", "magazzino.view"],
     ["bolle", "bolle.view"],
     ["approvvigionamenti", "approvvigionamenti.view"],
+    ["turni", "logistica.turni.view"],
+    ["volontari", "logistica.volontari.view"],
+    ["mezzi", "logistica.mezzi.view"],
+    ["approvazioniLogistica", "logistica.approvazioni.view"],
   ])("protegge %s con %s", (key, permission) => {
     expect(NAV_ITEMS.find((item) => item.key === key)?.permission).toBe(
       permission,

@@ -222,6 +222,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "sociale",
     area: "sociale",
     moduloCodice: "CENTRO_ASCOLTO",
+    permission: "logistica.turni.view",
   },
   {
     key: "scarichi",
@@ -377,6 +378,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodice: "VOLONTARI",
+    permission: "logistica.volontari.view",
   },
   {
     key: "mezzi",
@@ -385,6 +387,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodice: "MEZZI",
+    permission: "logistica.mezzi.view",
   },
   {
     key: "approvazioniLogistica",
@@ -393,6 +396,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodiciAny: ["VOLONTARI", "MEZZI"],
+    permission: "logistica.approvazioni.view",
   },
   {
     key: "fornitori",

@@ -12,6 +12,9 @@ import {
   getListVolontariQueryKey,
   useListMezzi,
   getListMezziQueryKey,
+  useListRuoliVolontari,
+  useGetVolontariCarico,
+  getGetVolontariCaricoQueryKey,
   type Volontario,
   type Mezzo,
 } from "@workspace/api-client-react";
@@ -56,6 +59,16 @@ const FASCE = [
   { key: "18-20", labelKey: "fasciaSera", time: "18:00–20:00" },
 ] as const;
 
+function mezzoScadutoAllaData(
+  mezzo: Pick<Mezzo, "scadenzaAssicurazione" | "scadenzaRevisione">,
+  data: string,
+): boolean {
+  return Boolean(
+    (mezzo.scadenzaAssicurazione != null && mezzo.scadenzaAssicurazione.slice(0, 10) < data) ||
+    (mezzo.scadenzaRevisione != null && mezzo.scadenzaRevisione.slice(0, 10) < data),
+  );
+}
+
 function toISODate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -81,11 +94,14 @@ type VolRow = { volontarioId: number | ""; ruolo: string };
 
 export default function Turni() {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const isScoped = user?.centroAscoltoId != null;
+  const canManage = hasPermission("logistica.turni.manage");
+  const canManageVolontari = hasPermission("logistica.volontari.manage");
+  const canManageMezzi = hasPermission("logistica.mezzi.manage");
   const [selectedCentro, setSelectedCentro] = useState<number | null>(
     user?.centroAscoltoId ?? null,
   );
@@ -97,6 +113,7 @@ export default function Turni() {
     nome: "",
     cognome: "",
     matricola: "",
+    ruoloVolontarioId: null as number | null,
     telefono: "",
     patente: false,
     note: "",
@@ -120,38 +137,37 @@ export default function Turni() {
   const a = toISODate(days[6]);
 
   const { data: centri } = useListCentriAscolto();
+  const { data: ruoliVolontari } = useListRuoliVolontari();
   const { data: volontari } = useListVolontari();
   const volontariCentro = useMemo(
     () =>
-      [...(volontari ?? []), ...pendingVolontari].filter((v, idx, all) => {
+      (volontari ?? []).filter((v, idx, all) => {
         if (all.findIndex((x) => x.id === v.id) !== idx) return false;
         const centroOk =
           v.centroAscoltoId == null ||
           effectiveCentro == null ||
           v.centroAscoltoId === effectiveCentro;
-        const isPendingLocal = pendingVolontari.some((p) => p.id === v.id);
         const approved = (v.statoApprovazione ?? "approvato") === "approvato" && v.attivo;
-        return centroOk && (approved || isPendingLocal);
+        return centroOk && approved;
       }),
-    [volontari, pendingVolontari, effectiveCentro],
+    [volontari, effectiveCentro],
   );
 
   const { data: mezzi } = useListMezzi();
   const mezziCentro = useMemo(
     () =>
-      [...(mezzi ?? []), ...pendingMezzi].filter((m, idx, all) => {
+      (mezzi ?? []).filter((m, idx, all) => {
         if (all.findIndex((x) => x.id === m.id) !== idx) return false;
         const centroOk =
-          m.centroAscoltoId == null ||
+          m.effectiveCentroId == null ||
           effectiveCentro == null ||
-          m.centroAscoltoId === effectiveCentro;
-        const isPendingLocal = pendingMezzi.some((p) => p.id === m.id);
+          m.effectiveCentroId === effectiveCentro;
         const approved =
           (m.statoApprovazione ?? "approvato") === "approvato" &&
           m.stato === "disponibile";
-        return centroOk && (approved || isPendingLocal);
+        return centroOk && approved;
       }),
-    [mezzi, pendingMezzi, effectiveCentro],
+    [mezzi, effectiveCentro],
   );
 
   const { data: turni } = useListTurni(
@@ -177,6 +193,7 @@ export default function Turni() {
   const bookedElsewhere = useMemo(() => {
     const m = new Map<string, Set<number>>();
     for (const turno of allTurni ?? []) {
+      if (turno.stato === "annullato") continue;
       if (turno.mezzoId == null) continue;
       if (turno.centroAscoltoId === effectiveCentro) continue;
       const k = `${turno.data}|${turno.fascia}`;
@@ -199,15 +216,53 @@ export default function Turni() {
   const [dialog, setDialog] = useState<{ data: string; fascia: string } | null>(null);
   const [rows, setRows] = useState<VolRow[]>([]);
   const [mezzoId, setMezzoId] = useState<number | null>(null);
+  const caricoParams = {
+    data: dialog?.data ?? "",
+    fascia: (dialog?.fascia ?? "09-13") as "09-13" | "14-18" | "18-20",
+  };
+  const { data: caricoTurno } = useGetVolontariCarico(caricoParams, {
+    query: {
+      enabled: dialog != null,
+      queryKey: getGetVolontariCaricoQueryKey(caricoParams),
+    },
+  });
+  const caricoMap = useMemo(
+    () => new Map((caricoTurno ?? []).map((item) => [item.volontarioId, item.count])),
+    [caricoTurno],
+  );
+
+  const bookedVolontari = useMemo(() => {
+    if (!dialog) return new Set<number>();
+    const result = new Set<number>();
+    for (const turno of allTurni ?? []) {
+      if (turno.stato === "annullato") continue;
+      if (turno.data !== dialog.data || turno.fascia !== dialog.fascia) continue;
+      if (turno.centroAscoltoId === effectiveCentro) continue;
+      for (const volontario of turno.volontari) result.add(volontario.volontarioId);
+    }
+    return result;
+  }, [allTurni, dialog, effectiveCentro]);
 
   // Mezzi selectable for the open cell: hide those already booked by another centro
   // in this exact data+fascia, but always keep the currently selected mezzo visible.
   const mezziDisponibili = useMemo(() => {
     if (!dialog) return mezziCentro;
     const booked = bookedElsewhere.get(`${dialog.data}|${dialog.fascia}`);
-    if (!booked) return mezziCentro;
-    return mezziCentro.filter((m) => !booked.has(m.id) || m.id === mezzoId);
+    const operationalDate = dialog.data;
+    return mezziCentro.filter((m) => {
+      const bookedElsewhere = booked?.has(m.id) && m.id !== mezzoId;
+      const expired = mezzoScadutoAllaData(m, operationalDate);
+      return !bookedElsewhere && (!expired || m.id === mezzoId);
+    });
   }, [mezziCentro, bookedElsewhere, dialog, mezzoId]);
+
+  const volontariDisponibili = useMemo(
+    () => volontariCentro.filter((v) => {
+      const atLimit = v.maxConsegneTurno > 0 && (caricoMap.get(v.id) ?? 0) >= v.maxConsegneTurno;
+      return !bookedVolontari.has(v.id) && !atLimit;
+    }),
+    [bookedVolontari, caricoMap, volontariCentro],
+  );
 
   function openCell(dataISO: string, fascia: string) {
     if (effectiveCentro == null) return;
@@ -226,8 +281,9 @@ export default function Turni() {
     const volontari = rows
       .filter((r) => r.volontarioId !== "")
       .map((r) => ({ volontarioId: Number(r.volontarioId), ruolo: r.ruolo.trim() || undefined }));
+    const existing = turnoMap.get(`${dialog.data}|${dialog.fascia}`);
     upsert.mutate(
-      { data: { centroAscoltoId: effectiveCentro, data: dialog.data, fascia: dialog.fascia, mezzoId, volontari } },
+      { data: { centroAscoltoId: effectiveCentro, data: dialog.data, fascia: dialog.fascia as "09-13" | "14-18" | "18-20", mezzoId, volontari, ...(existing ? { versione: existing.versione } : {}) } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListTurniQueryKey() });
@@ -235,10 +291,14 @@ export default function Turni() {
           setDialog(null);
         },
         onError: (err: unknown) => {
-          const status = (err as { response?: { status?: number } })?.response?.status;
+          const error = err as { status?: number; response?: { status?: number } };
+          const status = error.status ?? error.response?.status;
+          if (status === 409) queryClient.invalidateQueries({ queryKey: getListTurniQueryKey() });
           toast({
             variant: "destructive",
-            description: status === 409 ? t("turni.mezzoBookedElsewhere") : t("turni.error"),
+            description: status === 409
+              ? t("turni.stale", { defaultValue: "La pianificazione è stata aggiornata da un altro operatore. Ricarica i dati prima di salvare." })
+              : apiErrorMessage(err),
           });
         },
       },
@@ -246,7 +306,7 @@ export default function Turni() {
   }
 
   function creaVolontarioPending() {
-    if (effectiveCentro == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
+    if (effectiveCentro == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
       return;
     }
     setVolontarioError(null);
@@ -257,6 +317,7 @@ export default function Turni() {
           nome: nuovoVolontario.nome.trim(),
           cognome: nuovoVolontario.cognome.trim(),
           matricola: nuovoVolontario.matricola.trim(),
+          ruoloVolontarioId: nuovoVolontario.ruoloVolontarioId,
           telefono: nuovoVolontario.telefono.trim() || undefined,
           patente: nuovoVolontario.patente,
           note: nuovoVolontario.note.trim() || undefined,
@@ -265,16 +326,9 @@ export default function Turni() {
       {
         onSuccess: (created) => {
           setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
-          setRows((current) => {
-            const next = [...current];
-            const emptyIndex = next.findIndex((r) => r.volontarioId === "");
-            if (emptyIndex >= 0) next[emptyIndex] = { ...next[emptyIndex], volontarioId: created.id };
-            else next.push({ volontarioId: created.id, ruolo: "" });
-            return next;
-          });
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
-          setNuovoVolontario({ nome: "", cognome: "", matricola: "", telefono: "", patente: false, note: "" });
+          setNuovoVolontario({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
           setVolontarioError(null);
           setVolontarioDialogOpen(false);
         },
@@ -303,7 +357,6 @@ export default function Turni() {
       {
         onSuccess: (created) => {
           setPendingMezzi((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
-          setMezzoId(created.id);
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
           toast({ description: t("turni.pendingMezzoCreated", { defaultValue: "Mezzo inserito in attesa di approvazione" }) });
           setNuovoMezzo({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
@@ -338,6 +391,7 @@ export default function Turni() {
       { codice: string; tipo: string | null; byDay: Map<string, { fascia: string; centroNome: string | null }[]> }
     >();
     for (const turno of allTurni ?? []) {
+      if (turno.stato === "annullato") continue;
       if (turno.mezzoId == null) continue;
       let m = map.get(turno.mezzoId);
       if (!m) {
@@ -360,6 +414,7 @@ export default function Turni() {
       { centroNome: string; turni: number; assegnazioni: number; distinti: Set<number> }
     >();
     for (const turno of allTurni ?? []) {
+      if (turno.stato === "annullato") continue;
       let c = map.get(turno.centroAscoltoId);
       if (!c) {
         c = { centroNome: turno.centroAscoltoNome ?? `#${turno.centroAscoltoId}`, turni: 0, assegnazioni: 0, distinti: new Set() };
@@ -461,8 +516,10 @@ export default function Turni() {
                         <button
                           key={`${iso}|${f.key}`}
                           onClick={() => openCell(iso, f.key)}
-                          className="bg-background hover:bg-accent min-h-[72px] p-1.5 text-left align-top transition-colors"
+                          disabled={!canManage || turno?.stato === "completato"}
+                          className="bg-background hover:bg-accent min-h-[72px] p-1.5 text-left align-top transition-colors disabled:cursor-default disabled:hover:bg-background"
                         >
+                          {turno && <div className="mb-1 text-[9px] uppercase tracking-wide text-muted-foreground">{turno.stato}</div>}
                           {turno && (turno.volontari.length || turno.mezzoCodice) ? (
                             <div className="space-y-1">
                               {turno.volontari.map((v) => (
@@ -655,10 +712,9 @@ export default function Turni() {
                       <SelectValue placeholder={t("turni.volontarioPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      {volontariCentro.map((v) => (
-                        <SelectItem key={v.id} value={String(v.id)} className={v.statoApprovazione === "in_attesa" ? "text-muted-foreground" : undefined}>
+                      {volontariCentro.filter((v) => volontariDisponibili.some((available) => available.id === v.id) || v.id === row.volontarioId).map((v) => (
+                        <SelectItem key={v.id} value={String(v.id)}>
                           {volontarioLabel(v)}
-                          {v.statoApprovazione === "in_attesa" ? ` · ${t("turni.pendingLabel", { defaultValue: "in attesa approvazione" })}` : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -692,15 +748,20 @@ export default function Turni() {
               >
                 <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontario")}
               </Button>
-              <Button
+              {canManageVolontari && <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setVolontarioDialogOpen(true)}
                 disabled={effectiveCentro == null}
               >
                 <Plus className="me-1 h-4 w-4" /> {t("turni.addVolontarioNonCensito", { defaultValue: "Nuovo Volontario" })}
-              </Button>
+              </Button>}
             </div>
+            {pendingVolontari.length > 0 && (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700">
+                {pendingVolontari.map(volontarioLabel).join(", ")} · {t("turni.pendingNotSelectable", { defaultValue: "In attesa di approvazione, non selezionabile" })}
+              </p>
+            )}
 
             <div className="border-t pt-3">
               <Label className="text-xs">{t("turni.mezzo")}</Label>
@@ -713,16 +774,17 @@ export default function Turni() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">{t("turni.nessunMezzo")}</SelectItem>
-                  {mezziDisponibili.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)} className={m.statoApprovazione === "in_attesa" ? "text-muted-foreground" : undefined}>
+                  {mezziDisponibili.map((m) => {
+                    const scaduto = dialog != null && mezzoScadutoAllaData(m, dialog.data);
+                    return <SelectItem key={m.id} value={String(m.id)} disabled={scaduto}>
                       {m.codice}
                       {m.tipo ? ` · ${m.tipo}` : ""}
-                      {m.statoApprovazione === "in_attesa" ? ` · ${t("turni.pendingLabel", { defaultValue: "in attesa approvazione" })}` : ""}
-                    </SelectItem>
-                  ))}
+                      {scaduto ? " · Scaduto" : ""}
+                    </SelectItem>;
+                  })}
                 </SelectContent>
               </Select>
-              <Button
+              {canManageMezzi && <Button
                 type="button"
                 variant="outline"
                 size="sm"
@@ -731,7 +793,12 @@ export default function Turni() {
                 disabled={effectiveCentro == null}
               >
                 <Plus className="me-1 h-4 w-4" /> {t("turni.addMezzoNonCensito", { defaultValue: "Nuovo Mezzo" })}
-              </Button>
+              </Button>}
+              {pendingMezzi.length > 0 && (
+                <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700">
+                  {pendingMezzi.map((m) => m.codice).join(", ")} · {t("turni.pendingNotSelectable", { defaultValue: "In attesa di approvazione, non selezionabile" })}
+                </p>
+              )}
             </div>
           </div>
 
@@ -739,7 +806,7 @@ export default function Turni() {
             <Button variant="outline" onClick={() => setDialog(null)}>
               {t("turni.cancel")}
             </Button>
-            <Button onClick={save} disabled={upsert.isPending}>
+            <Button onClick={save} disabled={upsert.isPending || !canManage}>
               {t("turni.save")}
             </Button>
           </DialogFooter>
@@ -790,6 +857,20 @@ export default function Turni() {
                 onChange={(e) => setNuovoVolontario((v) => ({ ...v, telefono: e.target.value }))}
               />
             </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>{t("volontari.ruoloPrincipale", { defaultValue: "Ruolo principale" })}</Label>
+              <Select
+                value={nuovoVolontario.ruoloVolontarioId != null ? String(nuovoVolontario.ruoloVolontarioId) : ""}
+                onValueChange={(value) => setNuovoVolontario((v) => ({ ...v, ruoloVolontarioId: Number(value) }))}
+              >
+                <SelectTrigger><SelectValue placeholder={t("volontari.valRuolo")} /></SelectTrigger>
+                <SelectContent>
+                  {(ruoliVolontari ?? []).filter((ruolo) => ruolo.attivo).map((ruolo) => (
+                    <SelectItem key={ruolo.id} value={String(ruolo.id)}>{ruolo.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 sm:col-span-2">
               <Label htmlFor="turni-patente-b">{t("volontari.patenteB", { defaultValue: "Patente B" })}</Label>
               <Switch
@@ -816,7 +897,8 @@ export default function Turni() {
                 createPendingVolontario.isPending ||
                 !nuovoVolontario.nome.trim() ||
                 !nuovoVolontario.cognome.trim() ||
-                !nuovoVolontario.matricola.trim()
+                !nuovoVolontario.matricola.trim() ||
+                nuovoVolontario.ruoloVolontarioId == null
               }
             >
               {t("common.save")}
