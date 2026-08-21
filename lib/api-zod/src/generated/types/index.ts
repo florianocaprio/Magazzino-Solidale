@@ -155,6 +155,8 @@ export * from './creditoSolidaleSaldo';
 export * from './creditoSolidaleSaldoCreditoSolidaleStato';
 export * from './creditoSolidaleStornoInput';
 export * from './dashboardStats';
+export * from './deleteMezzo200';
+export * from './deleteVolontario200';
 export * from './emailSendResult';
 export * from './forgotPasswordInput';
 export * from './fornitore';

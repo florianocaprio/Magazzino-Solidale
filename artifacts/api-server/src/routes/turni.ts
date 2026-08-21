@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import {
   turniTable,
+  turniConsegneTable,
   turniVolontariTable,
   volontariTable,
   centriAscoltoTable,
@@ -272,8 +273,6 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
   for (const v of rawVolontari) {
     if (Number.isInteger(v.volontarioId)) dedupMap.set(v.volontarioId, v);
   }
-  const volontari = [...dedupMap.values()];
-  const volIds = [...dedupMap.keys()];
 
   let turnoId: number | null;
   try {
@@ -302,6 +301,16 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
             .from(turniVolontariTable)
             .where(eq(turniVolontariTable.turnoId, existing.id))
         : [];
+      const sources = existing ? await tx.select().from(turniConsegneTable).where(eq(turniConsegneTable.turnoId, existing.id)) : [];
+      const effectiveVolontariMap = new Map(dedupMap);
+      for (const source of sources) if (source.volontarioId != null && !effectiveVolontariMap.has(source.volontarioId)) {
+        effectiveVolontariMap.set(source.volontarioId, { volontarioId: source.volontarioId, ruolo: "Consegna" });
+      }
+      const effectiveVolontari = [...effectiveVolontariMap.values()];
+      const sourceMezzi = [...new Set(sources.flatMap((source) => source.mezzoId == null ? [] : [source.mezzoId]))];
+      if (sourceMezzi.length > 1) throw new LogisticaPolicyError(409, "Il turno riceve mezzi diversi da più consegne");
+      if (sourceMezzi[0] != null && mezzoId != null && sourceMezzi[0] !== mezzoId) throw new LogisticaPolicyError(409, "Il mezzo richiesto è vincolato da una consegna pianificata");
+      const effectiveMezzoId = sourceMezzi[0] ?? mezzoId;
 
       if (existing?.stato === "completato") {
         throw new LogisticaPolicyError(409, "Un turno completato non può essere riscritto");
@@ -316,26 +325,20 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
         }
       }
 
-      for (const volontarioId of volIds) {
-        await assertVolontarioAssignableTx(tx, {
-          volontarioId,
-          centroAscoltoId,
-          data: body.data!,
-          fascia: body.fascia as "09-13" | "14-18" | "18-20",
-          excludeTurnoId: existing?.id,
-        });
-      }
-      if (mezzoId != null) {
+      if (effectiveMezzoId != null) {
         await assertMezzoAssignableTx(tx, {
-          mezzoId,
+          mezzoId: effectiveMezzoId,
           centroAscoltoId,
           data: body.data!,
           fascia: body.fascia as "09-13" | "14-18" | "18-20",
           excludeTurnoId: existing?.id,
         });
       }
+      for (const volontarioId of effectiveVolontariMap.keys()) await assertVolontarioAssignableTx(tx, {
+        volontarioId, centroAscoltoId, data: body.data!, fascia: body.fascia as "09-13" | "14-18" | "18-20", excludeTurnoId: existing?.id,
+      });
 
-      if (!existing && volontari.length === 0 && mezzoId == null) return null;
+      if (!existing && effectiveVolontari.length === 0 && effectiveMezzoId == null) return null;
 
       let id: number;
       if (existing) {
@@ -343,10 +346,11 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
         const [updated] = await tx
           .update(turniTable)
           .set({
-            mezzoId,
-            stato: volontari.length === 0 && mezzoId == null ? "annullato" : "pianificato",
+            mezzoId: effectiveMezzoId,
+            mezzoManuale: mezzoId != null,
+            stato: effectiveVolontari.length === 0 && effectiveMezzoId == null ? "annullato" : "pianificato",
             motivoAnnullamento:
-              volontari.length === 0 && mezzoId == null
+              effectiveVolontari.length === 0 && effectiveMezzoId == null
                 ? "Tutte le assegnazioni sono state rimosse"
                 : null,
             versione: sql`${turniTable.versione} + 1`,
@@ -364,7 +368,8 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
             centroAscoltoId,
             data: body.data!,
             fascia: body.fascia!,
-            mezzoId,
+            mezzoId: effectiveMezzoId,
+            mezzoManuale: mezzoId != null,
             stato: "pianificato",
           })
           .returning();
@@ -374,14 +379,15 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
       await tx
         .delete(turniVolontariTable)
         .where(eq(turniVolontariTable.turnoId, id));
-      if (volontari.length > 0) {
+      if (effectiveVolontari.length > 0) {
         await tx
           .insert(turniVolontariTable)
           .values(
-            volontari.map((v) => ({
+            effectiveVolontari.map((v) => ({
               turnoId: id,
               volontarioId: v.volontarioId,
               ruolo: v.ruolo ?? null,
+              manuale: dedupMap.has(v.volontarioId),
             })),
           );
       }
@@ -389,7 +395,7 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
         entita: "turno",
         id,
         azione: existing
-          ? volontari.length === 0 && mezzoId == null
+          ? effectiveVolontari.length === 0 && effectiveMezzoId == null
             ? "annullamento"
             : existing.stato === "annullato"
               ? "riattivazione"
@@ -404,9 +410,9 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
             }
           : null,
         nuovo: {
-          stato: volontari.length === 0 && mezzoId == null ? "annullato" : "pianificato",
-          mezzoId,
-          volontari: volontari.map((v) => ({ volontarioId: v.volontarioId, ruolo: v.ruolo ?? null })),
+          stato: effectiveVolontari.length === 0 && effectiveMezzoId == null ? "annullato" : "pianificato",
+          mezzoId: effectiveMezzoId,
+          volontari: effectiveVolontari.map((v) => ({ volontarioId: v.volontarioId, ruolo: v.ruolo ?? null })),
           versione: existing ? existing.versione + 1 : 1,
         },
       });
@@ -431,11 +437,6 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
     res.status(204).end();
     return;
   }
-  if (volontari.length || mezzoId != null) {
-    res.json(await buildTurno(turnoId));
-    return;
-  }
-
   res.json(await buildTurno(turnoId));
 });
 

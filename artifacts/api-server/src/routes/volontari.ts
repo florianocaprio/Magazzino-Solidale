@@ -370,44 +370,26 @@ router.patch("/volontari/:id", requirePermission("logistica.volontari.manage"), 
 
 router.delete("/volontari/:id", requirePermission("logistica.volontari.manage"), async (req, res) => {
   const caller = callerCentroId(req);
-  const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, parseInt(String(req.params.id))));
-  if (!existing) { res.status(204).send(); return; }
-  if (!canAccessCentro(existing.centroAscoltoId, caller)) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
-    return;
-  }
-  if (!inVisibleCentroSet(existing.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
-    return;
-  }
-  const versione = parseRequiredVersion(req.body?.versione);
-  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
-  const historical = await db.execute(sql`
-    SELECT EXISTS (
-      SELECT 1 FROM ${turniVolontariTable} WHERE ${turniVolontariTable.volontarioId} = ${existing.id}
-      UNION ALL SELECT 1 FROM ${consegneTable} WHERE ${consegneTable.volontarioId} = ${existing.id}
-      UNION ALL SELECT 1 FROM ${bolleTable} WHERE ${bolleTable.volontarioConsegnaId} = ${existing.id}
-      UNION ALL SELECT 1 FROM ${mezziTable} WHERE ${mezziTable.volontarioId} = ${existing.id}
-    ) AS used
-  `);
-  const used = Boolean((historical.rows[0] as { used?: boolean } | undefined)?.used);
-  const changed = await db.transaction(async (tx) => {
-    if (used) {
-      const [row] = await tx.update(volontariTable).set({
-        attivo: false,
-        versione: sql`${volontariTable.versione} + 1`,
-        dataAggiornamento: new Date(),
-      }).where(and(eq(volontariTable.id, existing.id), eq(volontariTable.versione, versione))).returning({ id: volontariTable.id, versione: volontariTable.versione });
-      if (!row) return false;
-      await auditLogistica(tx, req, { entita: "volontario", id: row.id, azione: "disattivazione", precedente: { versione }, nuovo: { versione: row.versione, attivo: false } });
-      return true;
-    }
-    const [row] = await tx.delete(volontariTable).where(and(eq(volontariTable.id, existing.id), eq(volontariTable.versione, versione))).returning({ id: volontariTable.id });
-    return Boolean(row);
+  const id = parseInt(String(req.params.id));
+  const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx.select().from(volontariTable).where(eq(volontariTable.id, id)).for("update");
+    if (!existing) return { status: 204 as const };
+    if (!canAccessCentro(existing.centroAscoltoId, caller) || !inVisibleCentroSet(existing.centroAscoltoId, visibleIds)) return { status: 403 as const };
+    const versione = parseRequiredVersion(req.body?.versione);
+    if (versione == null) return { status: 400 as const };
+    const [row] = await tx.update(volontariTable).set({ attivo: false, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() })
+      .where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione)))
+      .returning({ id: volontariTable.id, versione: volontariTable.versione });
+    if (!row) return { status: 409 as const };
+    await auditLogistica(tx, req, { entita: "volontario", id: row.id, azione: "disattivazione", precedente: { versione: existing.versione, attivo: existing.attivo }, nuovo: { versione: row.versione, attivo: false } });
+    return { status: 200 as const, versione: row.versione };
   });
-  if (!changed) { res.status(409).json({ error: "La risorsa è stata aggiornata da un altro operatore" }); return; }
-  if (used) { res.status(200).json({ disattivato: true }); return; }
-  res.status(204).send();
+  if (result.status === 204) { res.status(204).send(); return; }
+  if (result.status === 403) { res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" }); return; }
+  if (result.status === 400) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
+  if (result.status === 409) { res.status(409).json({ error: "La risorsa è stata aggiornata da un altro operatore" }); return; }
+  res.status(200).json({ disattivato: true, versione: result.versione });
 });
 
 export default router;

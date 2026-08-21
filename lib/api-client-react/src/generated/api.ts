@@ -104,6 +104,8 @@ import type {
   CreditoSolidaleSaldo,
   CreditoSolidaleStornoInput,
   DashboardStats,
+  DeleteMezzo200,
+  DeleteVolontario200,
   EmailSendResult,
   ForgotPasswordInput,
   Fornitore,
@@ -15356,9 +15358,9 @@ export const getDeleteVolontarioUrl = (id: number,) => {
 }
 
 export const deleteVolontario = async (id: number,
-    versioneInput: VersioneInput, options?: RequestInit): Promise<void> => {
+    versioneInput: VersioneInput, options?: RequestInit): Promise<DeleteVolontario200 | void> => {
 
-  return customFetch<void>(getDeleteVolontarioUrl(id),
+  return customFetch<DeleteVolontario200 | void>(getDeleteVolontarioUrl(id),
   {
     ...options,
     method: 'DELETE',
@@ -15760,9 +15762,9 @@ export const getDeleteMezzoUrl = (id: number,) => {
 }
 
 export const deleteMezzo = async (id: number,
-    versioneInput: VersioneInput, options?: RequestInit): Promise<void> => {
+    versioneInput: VersioneInput, options?: RequestInit): Promise<DeleteMezzo200 | void> => {
 
-  return customFetch<void>(getDeleteMezzoUrl(id),
+  return customFetch<DeleteMezzo200 | void>(getDeleteMezzoUrl(id),
   {
     ...options,
     method: 'DELETE',

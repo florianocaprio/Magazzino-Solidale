@@ -6794,6 +6794,16 @@ export type GetVolontariCarico200Item = {
   count: number;
 };
 
+export type DeleteVolontario200 = {
+  disattivato: true;
+  versione: number;
+};
+
+export type DeleteMezzo200 = {
+  ritirato: true;
+  versione: number;
+};
+
 export type ReportGiacenzePerMagazzinoParams = {
 magazzinoId?: number;
 areaOperativaId?: number;

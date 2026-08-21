@@ -43,9 +43,9 @@ import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
   ConsegnaPlanningError,
   isFasciaConsegna,
-  syncTurnoDaConsegnaTx,
   validateConsegnaPlanningTx,
 } from "../lib/consegneTurni";
+import { reconcileConsegnaPlanningTx } from "../lib/consegneReconciliation";
 import { logger } from "../lib/logger";
 import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 import { requirePermission } from "../middlewares/auth";
@@ -1042,8 +1042,8 @@ router.post(
       if (current.consegnaId != null) {
         const [linked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, current.consegnaId));
         if (!linked) throw new BollaActionError(409, "La bolla risulta già convertita ma la consegna collegata non è disponibile");
-        const planning = await validateConsegnaPlanningTx(tx, linked, { excludeConsegnaId: linked.id });
-        await syncTurnoDaConsegnaTx(tx, linked, planning.centroAscoltoId, req);
+        await validateConsegnaPlanningTx(tx, linked, { excludeConsegnaId: linked.id });
+        await reconcileConsegnaPlanningTx(tx, linked, linked, req);
         return { consegna: linked, existing: true };
       }
       const volontarioId = requestedVolontarioId === undefined ? current.volontarioConsegnaId : requestedVolontarioId;
@@ -1072,7 +1072,7 @@ router.post(
         mezzoId,
         mezzoAltro,
       };
-      const planning = await validateConsegnaPlanningTx(tx, planningInput);
+      await validateConsegnaPlanningTx(tx, planningInput);
       const codice = `CON-${Date.now()}-${bollaId}`.slice(0, 30);
       const [created] = await tx.insert(consegneTable).values({
         codice,
@@ -1096,7 +1096,7 @@ router.post(
         indirizzoConsegna,
         operatoreId: req.user!.id,
       }).where(eq(bolleTable.id, bollaId));
-      await syncTurnoDaConsegnaTx(tx, created, planning.centroAscoltoId, req);
+      await reconcileConsegnaPlanningTx(tx, null, created, req);
       return { consegna: created, existing: false };
     });
   } catch (error) {

@@ -30,6 +30,7 @@ import {
   trasferimentiTable,
   trasferimentoRigheTable,
   turniTable,
+  turniConsegneTable,
   turniVolontariTable,
   userSessionsTable,
   utentiTable,
@@ -1012,6 +1013,7 @@ async function resetWarehouseOperationalData(
   const deletedApprovvigionamenti = await tx
     .delete(approvvigionamentiTable)
     .returning({ id: approvvigionamentiTable.id });
+  await tx.delete(turniConsegneTable);
   const deletedConsegne = await tx
     .delete(consegneTable)
     .returning({ id: consegneTable.id });

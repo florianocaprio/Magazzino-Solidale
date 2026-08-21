@@ -4939,9 +4939,24 @@ paths:
               $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
-          description: Historical volunteer deactivated instead of deleted
+          description: Volunteer deactivated; the historical record is always retained
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [disattivato, versione]
+                properties:
+                  disattivato:
+                    type: boolean
+                    enum: [true]
+                  versione:
+                    type: integer
         "204":
-          description: Never-used volunteer deleted
+          description: Volunteer already absent
+        "400":
+          description: Missing or invalid version
+        "403":
+          description: Volunteer outside the caller scope
         "409":
           description: Stale version
 
@@ -5050,9 +5065,24 @@ paths:
               $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
-          description: Historical vehicle retired instead of deleted
+          description: Vehicle retired; the historical record is always retained
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ritirato, versione]
+                properties:
+                  ritirato:
+                    type: boolean
+                    enum: [true]
+                  versione:
+                    type: integer
         "204":
-          description: Never-used vehicle deleted
+          description: Vehicle already absent
+        "400":
+          description: Missing or invalid version
+        "403":
+          description: Vehicle outside the caller scope
         "409":
           description: Stale version
 

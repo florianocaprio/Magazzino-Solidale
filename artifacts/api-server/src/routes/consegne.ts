@@ -31,9 +31,9 @@ import { completeBollaDelivery, handleBollaActionError } from "../lib/bollaDeliv
 import { requireAllModuli } from "../lib/featureFlags";
 import {
   ConsegnaPlanningError,
-  syncTurnoDaConsegnaTx,
   validateConsegnaPlanningTx,
 } from "../lib/consegneTurni";
+import { reconcileConsegnaPlanningTx } from "../lib/consegneReconciliation";
 import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
@@ -209,7 +209,7 @@ router.post("/consegne", async (req, res) => {
   const codice = `CON-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   try {
     const row = await db.transaction(async (tx) => {
-      const planning = await validateConsegnaPlanningTx(tx, {
+      await validateConsegnaPlanningTx(tx, {
         beneficiarioId: Number(body.beneficiarioId),
         dataPrevista: String(body.dataPrevista),
         fasciaOraria: body.fasciaOraria ?? null,
@@ -218,7 +218,7 @@ router.post("/consegne", async (req, res) => {
         mezzoAltro: Boolean(body.mezzoAltro),
       });
       const [created] = await tx.insert(consegneTable).values({ ...body, codice, tipoPianificazione: TIPO_CONSEGNA_PACCO } as typeof consegneTable.$inferInsert).returning();
-      await syncTurnoDaConsegnaTx(tx, created, planning.centroAscoltoId, req);
+      await reconcileConsegnaPlanningTx(tx, null, created, req);
       return created;
     });
     res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
@@ -277,9 +277,9 @@ router.patch("/consegne/:id", async (req, res) => {
       const [locked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, id)).for("update");
       if (!locked) throw new ConsegnaPlanningError(404, "Not found");
       const next = { ...locked, ...body };
-      const planning = await validateConsegnaPlanningTx(tx, next, { excludeConsegnaId: id });
+      await validateConsegnaPlanningTx(tx, next, { excludeConsegnaId: id });
       const [updated] = await tx.update(consegneTable).set(body).where(eq(consegneTable.id, id)).returning();
-      await syncTurnoDaConsegnaTx(tx, updated, planning.centroAscoltoId, req);
+      await reconcileConsegnaPlanningTx(tx, locked, updated, req);
       return updated;
     });
     res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
@@ -303,9 +303,19 @@ router.delete("/consegne/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  await db.update(bolleTable).set({ consegnaId: null }).where(eq(bolleTable.consegnaId, id));
-  await db.delete(consegneTable).where(eq(consegneTable.id, id));
-  res.status(204).end();
+  try {
+    await db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, id)).for("update");
+      if (!locked) throw new ConsegnaPlanningError(404, "Not found");
+      await reconcileConsegnaPlanningTx(tx, locked, null, req);
+      await tx.update(bolleTable).set({ consegnaId: null }).where(eq(bolleTable.consegnaId, id));
+      await tx.delete(consegneTable).where(eq(consegneTable.id, id));
+    });
+    res.status(204).end();
+  } catch (error) {
+    if (handlePlanningError(error, res)) return;
+    throw error;
+  }
 });
 
 // ─── ASSOCIA / DISSOCIA BOLLA ────────────────────────────────────────────────

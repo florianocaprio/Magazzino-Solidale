@@ -7661,6 +7661,11 @@ export const DeleteVolontarioBody = zod.object({
   "versione": zod.number().min(1)
 })
 
+export const DeleteVolontarioResponse = zod.object({
+  "disattivato": zod.literal(true),
+  "versione": zod.number()
+})
+
 
 
 
@@ -7847,6 +7852,11 @@ export const DeleteMezzoParams = zod.object({
 
 export const DeleteMezzoBody = zod.object({
   "versione": zod.number().min(1)
+})
+
+export const DeleteMezzoResponse = zod.object({
+  "ritirato": zod.literal(true),
+  "versione": zod.number()
 })
 
 

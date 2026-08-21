@@ -11,6 +11,12 @@ export type LogisticaTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export const FASCE_TURNO = ["09-13", "14-18", "18-20"] as const;
 export type FasciaTurno = (typeof FASCE_TURNO)[number];
+export const FASCE_CONSEGNA_TURNO = {
+  Mattina: FASCE_TURNO[0],
+  Pomeriggio: FASCE_TURNO[1],
+  Sera: FASCE_TURNO[2],
+} as const;
+export type FasciaConsegna = keyof typeof FASCE_CONSEGNA_TURNO;
 
 export const STATI_APPROVAZIONE = ["in_attesa", "approvato", "respinto"] as const;
 export const STATI_MEZZO = [
@@ -33,6 +39,22 @@ export class LogisticaPolicyError extends Error {
 
 export function isFasciaTurno(value: unknown): value is FasciaTurno {
   return typeof value === "string" && FASCE_TURNO.includes(value as FasciaTurno);
+}
+
+export function isFasciaConsegna(value: unknown): value is FasciaConsegna {
+  return typeof value === "string" && value in FASCE_CONSEGNA_TURNO;
+}
+
+export function fasciaTurnoFromConsegna(fascia: string | null | undefined): FasciaTurno | null {
+  return fascia != null && isFasciaConsegna(fascia) ? FASCE_CONSEGNA_TURNO[fascia] : null;
+}
+
+export function fasciaTurnoConsegnaSql(fasciaOraria: SQL): SQL<string> {
+  return sql<string>`CASE ${fasciaOraria}
+    WHEN ${"Mattina"} THEN ${FASCE_CONSEGNA_TURNO.Mattina}
+    WHEN ${"Pomeriggio"} THEN ${FASCE_CONSEGNA_TURNO.Pomeriggio}
+    WHEN ${"Sera"} THEN ${FASCE_CONSEGNA_TURNO.Sera}
+    ELSE NULL END`;
 }
 
 export function parseRequiredVersion(value: unknown): number | null {
@@ -97,6 +119,33 @@ export async function effectiveCentroMezzoTx(
     .from(volontariTable)
     .where(eq(volontariTable.id, mezzo.volontarioId));
   return effectiveCentroFromMezzo(mezzo, owner?.centroAscoltoId ?? null);
+}
+
+export async function loadAndLockEffectiveMezzoTx(
+  tx: LogisticaTx,
+  mezzoId: number,
+  additionalOwnerIds: number[] = [],
+): Promise<{
+  mezzo: typeof mezziTable.$inferSelect;
+  effectiveCentroId: number | null;
+  owners: Map<number, typeof volontariTable.$inferSelect>;
+}> {
+  const [mezzo] = await tx.select().from(mezziTable).where(eq(mezziTable.id, mezzoId)).for("update");
+  if (!mezzo) throw new LogisticaPolicyError(404, "Mezzo non trovato");
+  const ownerIds = [...new Set([
+    ...(mezzo.volontarioId == null ? [] : [mezzo.volontarioId]),
+    ...additionalOwnerIds.filter(Number.isInteger),
+  ])].sort((a, b) => a - b);
+  const ownerRows = ownerIds.length > 0
+    ? await tx.select().from(volontariTable).where(inArray(volontariTable.id, ownerIds)).orderBy(volontariTable.id).for("update")
+    : [];
+  const owners = new Map(ownerRows.map((owner) => [owner.id, owner]));
+  const currentOwner = mezzo.volontarioId == null ? null : owners.get(mezzo.volontarioId);
+  return {
+    mezzo,
+    effectiveCentroId: effectiveCentroFromMezzo(mezzo, currentOwner?.centroAscoltoId ?? null),
+    owners,
+  };
 }
 
 function compatibleCentro(resourceCentroId: number | null, targetCentroId: number): boolean {
@@ -168,13 +217,16 @@ export async function assertMezzoAssignableTx(
     excludeTurnoId?: number;
   },
 ): Promise<typeof mezziTable.$inferSelect> {
-  const [mezzo] = await tx
-    .select()
-    .from(mezziTable)
-    .where(eq(mezziTable.id, input.mezzoId))
-    .for("update");
-  if (!mezzo) throw new LogisticaPolicyError(403, "Mezzo non assegnabile al centro");
-  const effectiveCentroId = await effectiveCentroMezzoTx(tx, mezzo);
+  let locked;
+  try {
+    locked = await loadAndLockEffectiveMezzoTx(tx, input.mezzoId);
+  } catch (error) {
+    if (error instanceof LogisticaPolicyError && error.status === 404) {
+      throw new LogisticaPolicyError(403, "Mezzo non assegnabile al centro");
+    }
+    throw error;
+  }
+  const { mezzo, effectiveCentroId } = locked;
   const scaduto =
     (mezzo.scadenzaAssicurazione != null && mezzo.scadenzaAssicurazione < input.data) ||
     (mezzo.scadenzaRevisione != null && mezzo.scadenzaRevisione < input.data);

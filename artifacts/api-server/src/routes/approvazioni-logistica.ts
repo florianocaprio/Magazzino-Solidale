@@ -30,6 +30,8 @@ import {
   effectiveMezzoCentroExpr,
   effectiveCentroFilter,
   effectiveCentroMezzoTx,
+  loadAndLockEffectiveMezzoTx,
+  LogisticaPolicyError,
   parseRequiredVersion,
 } from "../lib/logisticaPolicy";
 import { auditLogistica } from "../lib/logisticaAudit";
@@ -249,12 +251,19 @@ router.post("/approvazioni-logistica/mezzi/:id/approva", requireModulo("MEZZI"),
   const versione = parseRequiredVersion(req.body?.versione);
   if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
   if (existing.statoApprovazione !== PENDING) { res.status(409).json({ error: "Transizione di approvazione non consentita" }); return; }
-  const [updated] = await db.transaction(async (tx) => {
+  let updated;
+  try { [updated] = await db.transaction(async (tx) => {
+    const locked = await loadAndLockEffectiveMezzoTx(tx, id);
+    if (!(await ensureVisibleCentro(locked.effectiveCentroId, req))) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+    if (locked.mezzo.statoApprovazione !== PENDING) throw new LogisticaPolicyError(409, "Transizione di approvazione non consentita");
     const [row] = await tx.update(mezziTable).set({ statoApprovazione: "approvato", stato: "disponibile", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione), eq(mezziTable.statoApprovazione, PENDING))).returning({ versione: mezziTable.versione });
     if (!row) return [];
     await auditLogistica(tx, req, { entita: "mezzo", id, azione: "approvazione", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "approvato", stato: "disponibile", versione: row.versione } });
     return [row];
-  });
+  }); } catch (error) {
+    if (error instanceof LogisticaPolicyError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
   if (!updated) { res.status(409).json({ error: "La richiesta è stata aggiornata da un altro operatore" }); return; }
   res.json({ ok: true, versione: updated.versione });
 });
@@ -271,12 +280,19 @@ router.post("/approvazioni-logistica/mezzi/:id/respingi", requireModulo("MEZZI")
   const versione = parseRequiredVersion(req.body?.versione);
   if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
   if (existing.statoApprovazione !== PENDING) { res.status(409).json({ error: "Transizione di approvazione non consentita" }); return; }
-  const [updated] = await db.transaction(async (tx) => {
+  let updated;
+  try { [updated] = await db.transaction(async (tx) => {
+    const locked = await loadAndLockEffectiveMezzoTx(tx, id);
+    if (!(await ensureVisibleCentro(locked.effectiveCentroId, req))) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+    if (locked.mezzo.statoApprovazione !== PENDING) throw new LogisticaPolicyError(409, "Transizione di approvazione non consentita");
     const [row] = await tx.update(mezziTable).set({ statoApprovazione: "respinto", stato: "respinto", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione), eq(mezziTable.statoApprovazione, PENDING))).returning({ versione: mezziTable.versione });
     if (!row) return [];
     await auditLogistica(tx, req, { entita: "mezzo", id, azione: "rifiuto", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "respinto", stato: "respinto", versione: row.versione } });
     return [row];
-  });
+  }); } catch (error) {
+    if (error instanceof LogisticaPolicyError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
   if (!updated) { res.status(409).json({ error: "La richiesta è stata aggiornata da un altro operatore" }); return; }
   res.json({ ok: true, versione: updated.versione });
 });

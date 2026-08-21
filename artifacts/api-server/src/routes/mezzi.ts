@@ -25,6 +25,8 @@ import {
   effectiveAreaOperativaFilter,
   effectiveCentroFilter,
   effectiveCentroFromMezzo,
+  loadAndLockEffectiveMezzoTx,
+  LogisticaPolicyError,
   normalizeTarga,
   parseRequiredVersion,
   STATI_MEZZO,
@@ -216,6 +218,32 @@ async function createMezzoOne(
   delete (baseValues as Record<string, unknown>).versione;
   delete (baseValues as Record<string, unknown>).dataAggiornamento;
   const providedCodice = typeof b.codice === "string" ? b.codice.trim() : "";
+  const insertWithLockedScope = async (
+    tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+    codice: string,
+  ) => {
+    const requestedOwnerId = b.volontarioId != null ? Number(b.volontarioId) : null;
+    const [owner] = requestedOwnerId != null
+      ? await tx.select().from(volontariTable).where(eq(volontariTable.id, requestedOwnerId)).for("update")
+      : [];
+    if (requestedOwnerId != null && !owner) throw new LogisticaPolicyError(400, "Volontario proprietario non trovato");
+    const effectiveCentroId = effectiveCentroFromMezzo(
+      { volontarioId: requestedOwnerId, centroAscoltoId: resolved.ownCentro },
+      owner?.centroAscoltoId ?? null,
+    );
+    if (caller == null && areaOperativaCentroIds != null && effectiveCentroId == null) {
+      throw new LogisticaPolicyError(400, "Seleziona un Centro della tua Area Operativa");
+    }
+    if (!canAccessCentro(effectiveCentroId, caller) || !inVisibleCentroSet(effectiveCentroId, areaOperativaCentroIds)) {
+      throw new LogisticaPolicyError(403, "Mezzo non accessibile per il tuo perimetro");
+    }
+    const [row] = await tx
+      .insert(mezziTable)
+      .values({ ...baseValues, codice })
+      .returning({ id: mezziTable.id, versione: mezziTable.versione });
+    await auditLogistica(tx, req, { entita: "mezzo", id: row.id, azione: "creazione", nuovo: { statoApprovazione: "in_attesa", stato: "non_disponibile", versione: row.versione } });
+    return row;
+  };
 
   // Caller-provided codice: a duplicate is a clear client error, not a 500.
   if (providedCodice) {
@@ -231,18 +259,14 @@ async function createMezzoOne(
           .where(sql`upper(trim(${mezziTable.codice})) = ${codice}`)
           .limit(1);
         if (duplicate) throw new Error("DUPLICATE_MEZZO_CODICE");
-        const [row] = await tx
-          .insert(mezziTable)
-          .values({ ...baseValues, codice })
-          .returning({ id: mezziTable.id, versione: mezziTable.versione });
-        await auditLogistica(tx, req, { entita: "mezzo", id: row.id, azione: "creazione", nuovo: { statoApprovazione: "in_attesa", stato: "non_disponibile", versione: row.versione } });
-        return [row];
+        return [await insertWithLockedScope(tx, codice)];
       });
       return { id: created.id };
     } catch (e) {
       if (e instanceof Error && e.message === "DUPLICATE_MEZZO_CODICE") {
         return { error: `Codice "${providedCodice}" già in uso`, status: 409 };
       }
+      if (e instanceof LogisticaPolicyError) return { error: e.message, status: e.status };
       if (isUniqueViolation(e)) return { error: `Codice "${providedCodice}" già in uso`, status: 409 };
       throw e;
     }
@@ -263,12 +287,7 @@ async function createMezzoOne(
           .where(eq(mezziTable.codice, codice))
           .limit(1);
         if (duplicate) throw new Error("AUTO_MEZZO_CODICE_COLLISION");
-        const [row] = await tx
-          .insert(mezziTable)
-          .values({ ...baseValues, codice })
-          .returning({ id: mezziTable.id, versione: mezziTable.versione });
-        await auditLogistica(tx, req, { entita: "mezzo", id: row.id, azione: "creazione", nuovo: { statoApprovazione: "in_attesa", stato: "non_disponibile", versione: row.versione } });
-        return [row];
+        return [await insertWithLockedScope(tx, codice)];
       });
       return { id: created.id };
     } catch (e) {
@@ -276,6 +295,7 @@ async function createMezzoOne(
         if (attempt < MAX_ATTEMPTS - 1) continue;
         return { error: "Impossibile generare un codice univoco per il mezzo, riprova", status: 409 };
       }
+      if (e instanceof LogisticaPolicyError) return { error: e.message, status: e.status };
       if (isUniqueViolation(e) && attempt < MAX_ATTEMPTS - 1) continue;
       if (isUniqueViolation(e)) return { error: "Impossibile generare un codice univoco per il mezzo, riprova", status: 409 };
       throw e;
@@ -367,7 +387,23 @@ router.patch("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (r
     res.status(409).json({ error: "Il mezzo deve essere approvato prima di diventare disponibile" });
     return;
   }
-  const [changed] = await db.transaction(async (tx) => {
+  let changed;
+  try {
+    [changed] = await db.transaction(async (tx) => {
+    const requestedOwnerId = volontarioId != null ? Number(volontarioId) : null;
+    const locked = await loadAndLockEffectiveMezzoTx(tx, id, requestedOwnerId != null ? [requestedOwnerId] : []);
+    if (!canAccessCentro(locked.effectiveCentroId, caller) || !inVisibleCentroSet(locked.effectiveCentroId, areaOperativaCentroIds)) {
+      throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+    }
+    if (requestedOwnerId != null && !locked.owners.has(requestedOwnerId)) throw new LogisticaPolicyError(400, "Volontario proprietario non trovato");
+    const effectiveNext = effectiveCentroFromMezzo(
+      { volontarioId: requestedOwnerId, centroAscoltoId: resolved.ownCentro },
+      requestedOwnerId == null ? null : locked.owners.get(requestedOwnerId)!.centroAscoltoId,
+    );
+    if (!canAccessCentro(effectiveNext, caller) || !inVisibleCentroSet(effectiveNext, areaOperativaCentroIds)) {
+      throw new LogisticaPolicyError(403, "Mezzo non accessibile per il tuo perimetro");
+    }
+    if (body.stato === "disponibile" && locked.mezzo.statoApprovazione !== "approvato") throw new LogisticaPolicyError(409, "Il mezzo deve essere approvato prima di diventare disponibile");
     const [row] = await tx.update(mezziTable).set({
       ...update,
       versione: sql`${mezziTable.versione} + 1`,
@@ -383,45 +419,38 @@ router.patch("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (r
     });
     return [row];
   });
+  } catch (error) {
+    if (error instanceof LogisticaPolicyError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
   if (!changed) { res.status(409).json({ error: "La risorsa è stata aggiornata da un altro operatore" }); return; }
   res.json(await loadMezzo(id));
 });
 
 router.delete("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (req, res) => {
   const id = parseInt(String(req.params.id));
-  const [existing] = await baseSelect().where(eq(mezziTable.id, id));
-  if (!existing) { res.status(204).send(); return; }
-  if (!canAccessCentro(effectiveCentroOf(existing), callerCentroId(req))) {
-    res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
-    return;
+  const caller = callerCentroId(req);
+  const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
+  try {
+    const result = await db.transaction(async (tx) => {
+      let locked;
+      try { locked = await loadAndLockEffectiveMezzoTx(tx, id); }
+      catch (error) { if (error instanceof LogisticaPolicyError && error.status === 404) return null; throw error; }
+      if (!canAccessCentro(locked.effectiveCentroId, caller) || !inVisibleCentroSet(locked.effectiveCentroId, visibleIds)) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+      const versione = parseRequiredVersion(req.body?.versione);
+      if (versione == null) throw new LogisticaPolicyError(400, "versione obbligatoria e valida");
+      const [row] = await tx.update(mezziTable).set({ stato: "ritirato", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() })
+        .where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione))).returning({ id: mezziTable.id, versione: mezziTable.versione });
+      if (!row) throw new LogisticaPolicyError(409, "La risorsa è stata aggiornata da un altro operatore");
+      await auditLogistica(tx, req, { entita: "mezzo", id, azione: "ritiro", precedente: { versione: locked.mezzo.versione, stato: locked.mezzo.stato }, nuovo: { versione: row.versione, stato: "ritirato" } });
+      return row;
+    });
+    if (!result) { res.status(204).send(); return; }
+    res.status(200).json({ ritirato: true, versione: result.versione });
+  } catch (error) {
+    if (error instanceof LogisticaPolicyError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
   }
-  if (!inVisibleCentroSet(effectiveCentroOf(existing), await visibleCentroIds(callerAreaOperativaId(req)))) {
-    res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
-    return;
-  }
-  const versione = parseRequiredVersion(req.body?.versione);
-  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
-  const historical = await db.execute(sql`
-    SELECT EXISTS (
-      SELECT 1 FROM ${turniTable} WHERE ${turniTable.mezzoId} = ${id}
-      UNION ALL SELECT 1 FROM ${consegneTable} WHERE ${consegneTable.mezzoId} = ${id}
-      UNION ALL SELECT 1 FROM ${bolleTable} WHERE ${bolleTable.mezzoId} = ${id}
-    ) AS used
-  `);
-  const used = Boolean((historical.rows[0] as { used?: boolean } | undefined)?.used);
-  const changed = await db.transaction(async (tx) => {
-    if (used) {
-      const [row] = await tx.update(mezziTable).set({ stato: "ritirato", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione))).returning({ id: mezziTable.id, versione: mezziTable.versione });
-      if (!row) return false;
-      await auditLogistica(tx, req, { entita: "mezzo", id, azione: "ritiro", precedente: { versione, stato: existing.m.stato }, nuovo: { versione: row.versione, stato: "ritirato" } });
-      return true;
-    }
-    const [row] = await tx.delete(mezziTable).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione))).returning({ id: mezziTable.id });
-    return Boolean(row);
-  });
-  if (!changed) { res.status(409).json({ error: "La risorsa è stata aggiornata da un altro operatore" }); return; }
-  if (used) { res.status(200).json({ ritirato: true }); return; }
-  res.status(204).send();
 });
 
 export default router;

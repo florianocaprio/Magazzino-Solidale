@@ -24,6 +24,7 @@ import {
   trasferimentoRigheTable,
   movimentiTable,
   turniTable,
+  turniConsegneTable,
   turniVolontariTable,
   areeOperativeTable,
   zoneUdsTable,
@@ -675,6 +676,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(interventiTable).where(inArray(interventiTable.id, scope.interventoIds));
   }
   if (scope.turnoIds.length > 0) {
+    await db.delete(turniConsegneTable).where(inArray(turniConsegneTable.turnoId, scope.turnoIds));
     await db.delete(turniVolontariTable).where(inArray(turniVolontariTable.turnoId, scope.turnoIds));
     await db.delete(turniTable).where(inArray(turniTable.id, scope.turnoIds));
   }
@@ -688,6 +690,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(bolleTable).where(inArray(bolleTable.id, scope.bollaIds));
   }
   if (scope.consegnaIds.length > 0) {
+    await db.delete(turniConsegneTable).where(inArray(turniConsegneTable.consegnaId, scope.consegnaIds));
     await db.delete(consegneTable).where(inArray(consegneTable.id, scope.consegnaIds));
   }
   if (scope.scaricoIds.length > 0) {

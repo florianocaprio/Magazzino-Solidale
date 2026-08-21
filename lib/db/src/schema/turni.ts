@@ -7,6 +7,7 @@ import {
   integer,
   date,
   text,
+  boolean,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -27,6 +28,7 @@ export const turniTable = pgTable(
     mezzoId: integer("mezzo_id").references(() => mezziTable.id, {
       onDelete: "set null",
     }),
+    mezzoManuale: boolean("mezzo_manuale").notNull().default(true),
     stato: varchar("stato", { length: 20 }).notNull().default("pianificato"),
     motivoAnnullamento: text("motivo_annullamento"),
     versione: integer("versione").notNull().default(1),
@@ -51,11 +53,12 @@ export const turniVolontariTable = pgTable(
     id: serial("id").primaryKey(),
     turnoId: integer("turno_id")
       .notNull()
-      .references(() => turniTable.id, { onDelete: "cascade" }),
+      .references(() => turniTable.id, { onDelete: "restrict" }),
     volontarioId: integer("volontario_id")
       .notNull()
       .references(() => volontariTable.id, { onDelete: "restrict" }),
     ruolo: varchar("ruolo", { length: 80 }),
+    manuale: boolean("manuale").notNull().default(true),
   },
   (table) => [
     uniqueIndex("turni_volontari_turno_volontario_unique").on(

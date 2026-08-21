@@ -375,7 +375,7 @@ export default function Volontari() {
                         {statoLabel(v)}
                       </Badge>
                       {canManage && v.statoApprovazione === "approvato" && (
-                        <Switch checked={v.attivo} onCheckedChange={() => toggleStatus(v)} />
+                        <Switch checked={v.attivo} onCheckedChange={() => toggleStatus(v)} aria-label={v.attivo ? t("volontari.deactivate", { defaultValue: "Disattiva" }) : t("volontari.activate", { defaultValue: "Attiva" })} />
                       )}
                     </div>
                   </TableCell>

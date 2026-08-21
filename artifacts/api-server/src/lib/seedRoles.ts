@@ -15,8 +15,8 @@ export const EMPORIO_ROLE_NAME = "Emporio";
 export const MENSA_ROLE_NAME = "Operatore Mensa";
 export const MAGAZZINO_ROLE_NAME = "Operatore Magazzino";
 export const LOGISTICA_ROLE_NAME = "Operatore Logistica";
-const OPERATOR_ROLE_NAME = "Operatore";
-const VOLUNTEER_ROLE_NAME = "Volontario";
+export const OPERATOR_ROLE_NAME = "Operatore";
+export const VOLUNTEER_ROLE_NAME = "Volontario";
 const UDS_ROLE_NAME = "Operatore UDS";
 
 const SOCIAL_OPERATOR_PERMISSIONS = [
@@ -39,6 +39,8 @@ const SOCIAL_OPERATOR_PERMISSIONS = [
   "bolle.manage",
   "bolle.deliver",
   "bolle.cancel",
+  "logistica.turni.view",
+  "logistica.turni.manage",
 ] as const;
 const UDS_OPERATOR_PERMISSIONS = [
   "beneficiari.view",
@@ -187,7 +189,7 @@ export async function seedRoles(): Promise<void> {
   }
 
   const [operatorRole] = await db
-    .select({ id: ruoliTable.id, permessi: ruoliTable.permessi })
+    .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, OPERATOR_ROLE_NAME));
   if (!operatorRole) {
@@ -203,6 +205,7 @@ export async function seedRoles(): Promise<void> {
     await db
       .update(ruoliTable)
       .set({
+        aree: mergePermissions(operatorRole.aree, ["generale", "sociale"]),
         permessi: mergePermissions(
           operatorRole.permessi,
           SOCIAL_OPERATOR_PERMISSIONS,

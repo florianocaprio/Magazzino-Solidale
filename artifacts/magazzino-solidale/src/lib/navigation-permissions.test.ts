@@ -99,4 +99,12 @@ describe("permission gate della navigazione operativa", () => {
       NAV_ITEMS.find((item) => item.key === "mensaConsumi")?.permission,
     ).toBe("mensa.consumption.manage");
   });
+
+  it("mostra Turni solo con Area Sociale e permesso dedicato", () => {
+    const item = NAV_ITEMS.find((candidate) => candidate.key === "turni")!;
+    expect(item.area).toBe("sociale");
+    expect(isNavItemEnabledByAccess(item, (area) => area === "sociale", () => true)).toBe(true);
+    expect(isNavItemEnabledByAccess(item, () => false, () => true)).toBe(false);
+    expect(isNavItemEnabledByAccess(item, () => true, () => false)).toBe(false);
+  });
 });
