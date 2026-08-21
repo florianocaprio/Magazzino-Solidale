@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { db } from "@workspace/db";
 import {
   consegneTable,
@@ -25,20 +25,38 @@ import {
   canUseBeneficiario,
   canAccessMagazzino,
 } from "../lib/centroScope";
-import { volontarioOverLimit } from "../lib/volontarioCarico";
 import { sendEmail } from "../lib/emailService";
 import { buildIcs } from "../lib/ics";
 import { completeBollaDelivery, handleBollaActionError } from "../lib/bollaDelivery";
 import { requireAllModuli } from "../lib/featureFlags";
-import { syncTurnoDaConsegna } from "../lib/consegneTurni";
+import {
+  ConsegnaPlanningError,
+  syncTurnoDaConsegnaTx,
+  validateConsegnaPlanningTx,
+} from "../lib/consegneTurni";
 import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 
-const LIMITE_TURNO_MSG = "Il volontario ha già raggiunto il numero massimo di consegne per questo turno";
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
 
 const router: IRouter = Router();
 
 router.use("/consegne", requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]));
+
+function handlePlanningError(error: unknown, res: Response): boolean {
+  if (error instanceof ConsegnaPlanningError) {
+    res.status(error.status).json({ error: error.message });
+    return true;
+  }
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 6; depth += 1) {
+    if (typeof current === "object" && (current as { code?: string }).code === "23505") {
+      res.status(409).json({ error: "La pianificazione è in conflitto con un'altra operazione" });
+      return true;
+    }
+    current = typeof current === "object" ? (current as { cause?: unknown }).cause : undefined;
+  }
+  return false;
+}
 
 // priorità con cui scegliere la bolla "rappresentativa" di una consegna quando
 // ce ne fosse più d'una collegata (le annullate sono ignorate del tutto)
@@ -188,15 +206,26 @@ router.post("/consegne", async (req, res) => {
     res.status(403).json({ error: "Magazzino non accessibile per il tuo centro" });
     return;
   }
-  if (body.volontarioId != null && body.dataPrevista
-      && await volontarioOverLimit(body.volontarioId, body.dataPrevista)) {
-    res.status(400).json({ error: LIMITE_TURNO_MSG });
-    return;
+  const codice = `CON-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  try {
+    const row = await db.transaction(async (tx) => {
+      const planning = await validateConsegnaPlanningTx(tx, {
+        beneficiarioId: Number(body.beneficiarioId),
+        dataPrevista: String(body.dataPrevista),
+        fasciaOraria: body.fasciaOraria ?? null,
+        volontarioId: body.volontarioId ?? null,
+        mezzoId: body.mezzoId ?? null,
+        mezzoAltro: Boolean(body.mezzoAltro),
+      });
+      const [created] = await tx.insert(consegneTable).values({ ...body, codice, tipoPianificazione: TIPO_CONSEGNA_PACCO } as typeof consegneTable.$inferInsert).returning();
+      await syncTurnoDaConsegnaTx(tx, created, planning.centroAscoltoId, req);
+      return created;
+    });
+    res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
+  } catch (error) {
+    if (handlePlanningError(error, res)) return;
+    throw error;
   }
-  const codice = `CON-${Date.now()}`;
-  const [row] = await db.insert(consegneTable).values({ ...body, codice, tipoPianificazione: TIPO_CONSEGNA_PACCO } as typeof consegneTable.$inferInsert).returning();
-  await syncTurnoDaConsegna(row);
-  res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
 router.get("/consegne/:id", async (req, res) => {
@@ -243,15 +272,21 @@ router.patch("/consegne/:id", async (req, res) => {
     res.status(400).json({ error: "Indicare un volontario censito oppure Altro, non entrambi" });
     return;
   }
-  const nextData = body.dataPrevista !== undefined ? body.dataPrevista : existing.dataPrevista;
-  if (nextVol != null && nextData
-      && await volontarioOverLimit(nextVol, nextData, { excludeConsegnaId: id })) {
-    res.status(400).json({ error: LIMITE_TURNO_MSG });
-    return;
+  try {
+    const row = await db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, id)).for("update");
+      if (!locked) throw new ConsegnaPlanningError(404, "Not found");
+      const next = { ...locked, ...body };
+      const planning = await validateConsegnaPlanningTx(tx, next, { excludeConsegnaId: id });
+      const [updated] = await tx.update(consegneTable).set(body).where(eq(consegneTable.id, id)).returning();
+      await syncTurnoDaConsegnaTx(tx, updated, planning.centroAscoltoId, req);
+      return updated;
+    });
+    res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
+  } catch (error) {
+    if (handlePlanningError(error, res)) return;
+    throw error;
   }
-  const [row] = await db.update(consegneTable).set(body).where(eq(consegneTable.id, id)).returning();
-  await syncTurnoDaConsegna(row);
-  res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
 // ─── ANNULLA (ELIMINA) PIANIFICAZIONE ────────────────────────────────────────

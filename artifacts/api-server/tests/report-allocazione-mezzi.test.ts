@@ -90,6 +90,19 @@ describe("Report allocazione mezzi — conteggi per mezzo", () => {
     expect(riga!.totale).toBe(4);
   });
 
+  it("esclude i turni annullati e preserva quelli completati", async () => {
+    const areaOperativa = await createAreaOperativa(scope);
+    const centro = await createCentroRec(scope, { areaOperativaId: areaOperativa });
+    const mezzo = await createMezzo(scope, { centroId: centro.id });
+    await insertTurno(scope, { centroAscoltoId: centro.id, mezzoId: mezzo, data: "2026-06-02", stato: "annullato" });
+    await insertTurno(scope, { centroAscoltoId: centro.id, mezzoId: mezzo, data: "2026-06-03", stato: "completato" });
+
+    const body = (await request(appAs(null, null)).get(Q)).body as Report;
+    const riga = body.mezzi.find((m) => m.mezzoId === mezzo);
+    expect(riga).toBeDefined();
+    expect(riga!.turni).toBe(1);
+  });
+
   it("un mezzo UNIVERSALE non fa trapelare conteggi cross-area operativa", async () => {
     const areaOperativaA = await createAreaOperativa(scope);
     const areaOperativaB = await createAreaOperativa(scope);

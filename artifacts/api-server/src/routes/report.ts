@@ -4,6 +4,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { callerCentroId, callerAreaOperativaId } from "../lib/centroScope";
 import { requireAllModuli } from "../lib/featureFlags";
 import { isUdsReportRequest, requirePermission } from "../middlewares/auth";
+import { effectiveMezzoCentroSql } from "../lib/logisticaPolicy";
 
 const router: IRouter = Router();
 
@@ -196,8 +197,13 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
   // axis, by their centro's area operativa (derived via centri_di_ascolto; NULL = a
   // universal mezzo or a centro without area operativa, kept visible like magazzini).
   const mezzoConds: SQL[] = [];
-  if (centroAscoltoId) mezzoConds.push(sql`m.centro_ascolto_id = ${centroAscoltoId}`);
-  const mCentroCond = ownOrNullSql(sql`m.centro_ascolto_id`, caller);
+  const effectiveMezzoCentro = effectiveMezzoCentroSql(
+    sql`m.volontario_id`,
+    sql`mv.centro_ascolto_id`,
+    sql`m.centro_ascolto_id`,
+  );
+  if (centroAscoltoId) mezzoConds.push(sql`${effectiveMezzoCentro} = ${centroAscoltoId}`);
+  const mCentroCond = ownOrNullSql(effectiveMezzoCentro, caller);
   if (mCentroCond) mezzoConds.push(mCentroCond);
   const mAreaOperativaCond = ownOrNullSql(sql`ca.area_operativa_id`, areaOperativa);
   if (mAreaOperativaCond) mezzoConds.push(mAreaOperativaCond);
@@ -231,7 +237,7 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
     SELECT m.id as mezzo_id,
            m.codice as mezzo_codice,
            m.tipo as mezzo_tipo,
-           m.centro_ascolto_id as centro_id,
+           ${effectiveMezzoCentro} as centro_id,
            ca.nome as centro_nome,
            (SELECT COUNT(*) FROM consegne c
               JOIN beneficiari be ON be.id = c.beneficiario_id
@@ -244,9 +250,11 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
            (SELECT COUNT(*) FROM turni tu
               LEFT JOIN centri_di_ascolto tca ON tca.id = tu.centro_ascolto_id
               WHERE tu.mezzo_id = m.id
+                AND tu.stato <> 'annullato'
                 AND tu.data BETWEEN ${da} AND ${a}${turniScope}) as turni
     FROM mezzi m
-    LEFT JOIN centri_di_ascolto ca ON ca.id = m.centro_ascolto_id
+    LEFT JOIN volontari mv ON mv.id = m.volontario_id
+    LEFT JOIN centri_di_ascolto ca ON ca.id = ${effectiveMezzoCentro}
     ${mezzoWhere}
     ORDER BY m.codice
   `);

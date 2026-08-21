@@ -3,6 +3,7 @@ import { db, ruoliTable } from "@workspace/db";
 import { ALL_AREA_KEYS, EMPORIO_AREA_KEY, MENSA_AREA_KEY } from "./areas";
 import {
   ALL_PERMISSION_KEYS,
+  LOGISTICA_PERMISSIONS,
   MENSA_PERMISSIONS,
   UDS_PERMISSIONS,
 } from "./permissions";
@@ -58,6 +59,7 @@ const LOGISTICA_OPERATOR_PERMISSIONS = [
   "approvvigionamenti.view",
   "approvvigionamenti.manage",
   "approvvigionamenti.receive",
+  ...LOGISTICA_PERMISSIONS.map((permission) => permission.key),
 ] as const;
 const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "magazzino.view",

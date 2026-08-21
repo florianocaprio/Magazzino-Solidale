@@ -1043,7 +1043,7 @@ router.post(
         const [linked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, current.consegnaId));
         if (!linked) throw new BollaActionError(409, "La bolla risulta già convertita ma la consegna collegata non è disponibile");
         const planning = await validateConsegnaPlanningTx(tx, linked, { excludeConsegnaId: linked.id });
-        await syncTurnoDaConsegnaTx(tx, linked, planning.centroAscoltoId);
+        await syncTurnoDaConsegnaTx(tx, linked, planning.centroAscoltoId, req);
         return { consegna: linked, existing: true };
       }
       const volontarioId = requestedVolontarioId === undefined ? current.volontarioConsegnaId : requestedVolontarioId;
@@ -1096,7 +1096,7 @@ router.post(
         indirizzoConsegna,
         operatoreId: req.user!.id,
       }).where(eq(bolleTable.id, bollaId));
-      await syncTurnoDaConsegnaTx(tx, created, planning.centroAscoltoId);
+      await syncTurnoDaConsegnaTx(tx, created, planning.centroAscoltoId, req);
       return { consegna: created, existing: false };
     });
   } catch (error) {

@@ -12,19 +12,22 @@ import {
   cleanup,
   type SeedScope,
   createCentro,
+  createRuoloVolontario,
 } from "./scope-helpers";
 import { pianificaNormalizzazioneMatricoleVolontari } from "../../../scripts/src/normalizzaMatricoleVolontari";
 
 const DUPLICATE_MSG = "La matricola indicata è già associata a un altro volontario.";
 
 let scope: SeedScope;
+let ruoloVolontarioId: number;
 
 const appVolontari = () => makeScopedApp(volontariRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
 const appTurni = () => makeScopedApp(turniRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
 const appApprovazioni = () => makeScopedApp(approvazioniLogisticaRouter, { id: 0, centroAscoltoId: null, areaOperativaId: null });
 
-beforeEach(() => {
+beforeEach(async () => {
   scope = newScope();
+  ruoloVolontarioId = await createRuoloVolontario(scope, { nome: `Ruolo matricola ${Date.now()}` });
 });
 
 afterEach(async () => {
@@ -39,13 +42,13 @@ describe("Volontari — matricola unica", () => {
   it("rifiuta la creazione con matricola già esistente", async () => {
     const first = await request(appVolontari())
       .post("/volontari")
-      .send({ nome: "Mario", cognome: "Rossi", matricola: "VOL-DUP-001", ruolo: "autista" });
+      .send({ nome: "Mario", cognome: "Rossi", matricola: "VOL-DUP-001", ruoloVolontarioId });
     expect(first.status).toBe(201);
     scope.volontarioIds.push(first.body.id);
 
     const duplicate = await request(appVolontari())
       .post("/volontari")
-      .send({ nome: "Luigi", cognome: "Bianchi", matricola: "VOL-DUP-001", ruolo: "autista" });
+      .send({ nome: "Luigi", cognome: "Bianchi", matricola: "VOL-DUP-001", ruoloVolontarioId });
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error).toContain(DUPLICATE_MSG);
     expect(duplicate.body.matricolaSuggerita).toBe("VOL-DUP-001-01");
@@ -54,17 +57,17 @@ describe("Volontari — matricola unica", () => {
   it("rifiuta la modifica con matricola già esistente su un altro volontario", async () => {
     const first = await request(appVolontari())
       .post("/volontari")
-      .send({ nome: "Anna", cognome: "Verdi", matricola: "VOL-DUP-002", ruolo: "volontario" });
+      .send({ nome: "Anna", cognome: "Verdi", matricola: "VOL-DUP-002", ruoloVolontarioId });
     const second = await request(appVolontari())
       .post("/volontari")
-      .send({ nome: "Sara", cognome: "Neri", matricola: "VOL-DUP-003", ruolo: "volontario" });
+      .send({ nome: "Sara", cognome: "Neri", matricola: "VOL-DUP-003", ruoloVolontarioId });
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
     scope.volontarioIds.push(first.body.id, second.body.id);
 
     const duplicate = await request(appVolontari())
       .patch(`/volontari/${second.body.id}`)
-      .send({ matricola: "VOL-DUP-002" });
+      .send({ matricola: "VOL-DUP-002", versione: second.body.versione });
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error).toContain(DUPLICATE_MSG);
     expect(duplicate.body.matricolaSuggerita).toBe("VOL-DUP-002-01");
@@ -74,7 +77,7 @@ describe("Volontari — matricola unica", () => {
     const centro = await createCentro(scope);
     const existing = await request(appVolontari())
       .post("/volontari")
-      .send({ nome: "Paolo", cognome: "Gialli", matricola: "VOL-DUP-004", ruolo: "autista", centroAscoltoId: centro });
+      .send({ nome: "Paolo", cognome: "Gialli", matricola: "VOL-DUP-004", ruoloVolontarioId, centroAscoltoId: centro });
     expect(existing.status).toBe(201);
     scope.volontarioIds.push(existing.body.id);
 
@@ -94,7 +97,7 @@ describe("Volontari — matricola unica", () => {
 
     const duplicate = await request(appApprovazioni())
       .post(`/approvazioni-logistica/volontari/${pending.id}/approva`)
-      .send();
+      .send({ versione: 1 });
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error).toContain(DUPLICATE_MSG);
     expect(duplicate.body.matricolaSuggerita).toBe("VOL-DUP-004-01");
@@ -104,13 +107,13 @@ describe("Volontari — matricola unica", () => {
     const centro = await createCentro(scope);
     const existing = await request(appVolontari())
       .post("/volontari")
-      .send({ nome: "Luca", cognome: "Blu", matricola: "VOL-DUP-005", ruolo: "autista", centroAscoltoId: centro });
+      .send({ nome: "Luca", cognome: "Blu", matricola: "VOL-DUP-005", ruoloVolontarioId, centroAscoltoId: centro });
     expect(existing.status).toBe(201);
     scope.volontarioIds.push(existing.body.id);
 
     const duplicate = await request(appTurni())
       .post("/turni/volontari-pending")
-      .send({ centroAscoltoId: centro, nome: "Nuovo", cognome: "Pending", matricola: "VOL-DUP-005" });
+      .send({ centroAscoltoId: centro, nome: "Nuovo", cognome: "Pending", matricola: "VOL-DUP-005", ruoloVolontarioId });
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error).toContain(DUPLICATE_MSG);
     expect(duplicate.body.matricolaSuggerita).toBe("VOL-DUP-005-01");

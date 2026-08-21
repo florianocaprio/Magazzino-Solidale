@@ -6,6 +6,7 @@ import {
   timestamp,
   integer,
   date,
+  text,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -26,7 +27,11 @@ export const turniTable = pgTable(
     mezzoId: integer("mezzo_id").references(() => mezziTable.id, {
       onDelete: "set null",
     }),
+    stato: varchar("stato", { length: 20 }).notNull().default("pianificato"),
+    motivoAnnullamento: text("motivo_annullamento"),
+    versione: integer("versione").notNull().default(1),
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
+    dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("turni_centro_data_fascia_unique").on(
@@ -62,7 +67,9 @@ export const turniVolontariTable = pgTable(
 
 export const insertTurnoSchema = createInsertSchema(turniTable).omit({
   id: true,
+  versione: true,
   dataCreazione: true,
+  dataAggiornamento: true,
 });
 export type InsertTurno = z.infer<typeof insertTurnoSchema>;
 export type Turno = typeof turniTable.$inferSelect;

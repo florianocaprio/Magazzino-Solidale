@@ -3,12 +3,17 @@ import {
   db,
   beneficiariTable,
   consegneTable,
-  mezziTable,
   turniTable,
   turniVolontariTable,
-  volontariTable,
 } from "@workspace/db";
+import type { Request } from "express";
 import { beneficiarioCentroId } from "./centroScope";
+import { auditLogistica } from "./logisticaAudit";
+import {
+  assertMezzoAssignableTx,
+  assertVolontarioAssignableTx,
+  type FasciaTurno,
+} from "./logisticaPolicy";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -33,6 +38,14 @@ export function fasciaTurnoFromConsegna(fascia: string | null | undefined): stri
 
 export function isFasciaConsegna(value: unknown): value is FasciaConsegna {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(FASCE_TURNO, value);
+}
+
+export function fasciaTurnoConsegnaSql() {
+  return sql<string>`CASE ${consegneTable.fasciaOraria}
+    WHEN 'Mattina' THEN '09-13'
+    WHEN 'Pomeriggio' THEN '14-18'
+    WHEN 'Sera' THEN '18-20'
+    ELSE NULL END`;
 }
 
 type PlanningInput = Pick<
@@ -68,31 +81,40 @@ export async function validateConsegnaPlanningTx(
     throw new ConsegnaPlanningError(400, "Indicare un mezzo censito oppure Altro, non entrambi");
   }
 
-  if (fasciaTurno != null && (input.volontarioId != null || input.mezzoId != null)) {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${centroAscoltoId ?? "null"}:${input.dataPrevista}:${fasciaTurno}`}))`);
+  if ((input.volontarioId != null || input.mezzoId != null) && centroAscoltoId == null) {
+    throw new ConsegnaPlanningError(403, "La consegna assegnata deve appartenere a un Centro");
   }
 
+  const [targetTurno] = centroAscoltoId != null && fasciaTurno != null
+    ? await tx.select({ id: turniTable.id }).from(turniTable).where(and(
+        eq(turniTable.centroAscoltoId, centroAscoltoId),
+        eq(turniTable.data, input.dataPrevista),
+        eq(turniTable.fascia, fasciaTurno),
+      )).limit(1)
+    : [];
+
   if (input.volontarioId != null) {
-    const [volontario] = await tx
-      .select({
-        id: volontariTable.id,
-        centroAscoltoId: volontariTable.centroAscoltoId,
-        attivo: volontariTable.attivo,
-        statoApprovazione: volontariTable.statoApprovazione,
-        maxConsegneTurno: volontariTable.maxConsegneTurno,
-      })
-      .from(volontariTable)
-      .where(eq(volontariTable.id, input.volontarioId))
-      .for("update");
-    const centroCompatibile = volontario?.centroAscoltoId == null
-      || (centroAscoltoId != null && volontario.centroAscoltoId === centroAscoltoId);
-    if (!volontario || !volontario.attivo || volontario.statoApprovazione !== "approvato" || !centroCompatibile) {
-      throw new ConsegnaPlanningError(403, "Volontario non attivo, non approvato o non assegnabile al centro della consegna");
+    let volontario;
+    try {
+      volontario = await assertVolontarioAssignableTx(tx, {
+        volontarioId: input.volontarioId,
+        centroAscoltoId: centroAscoltoId!,
+        data: input.dataPrevista,
+        fascia: fasciaTurno as FasciaTurno,
+        excludeTurnoId: targetTurno?.id,
+      });
+    } catch (error) {
+      if (error instanceof Error && "status" in error) {
+        throw new ConsegnaPlanningError((error as { status: number }).status, error.message);
+      }
+      throw error;
     }
     if (volontario.maxConsegneTurno > 0) {
       const conditions = [
         eq(consegneTable.volontarioId, input.volontarioId),
         eq(consegneTable.dataPrevista, input.dataPrevista),
+        ne(consegneTable.stato, "annullata"),
+        eq(fasciaTurnoConsegnaSql(), fasciaTurno),
       ];
       if (options.excludeConsegnaId != null) conditions.push(ne(consegneTable.id, options.excludeConsegnaId));
       const assegnate = await tx.select({ id: consegneTable.id }).from(consegneTable).where(and(...conditions));
@@ -103,45 +125,19 @@ export async function validateConsegnaPlanningTx(
   }
 
   if (input.mezzoId != null) {
-    const [mezzo] = await tx
-      .select({
-        id: mezziTable.id,
-        centroAscoltoId: mezziTable.centroAscoltoId,
-        volontarioId: mezziTable.volontarioId,
-        stato: mezziTable.stato,
-        statoApprovazione: mezziTable.statoApprovazione,
-      })
-      .from(mezziTable)
-      .where(eq(mezziTable.id, input.mezzoId))
-      .for("update");
-    let proprietarioCentroId: number | null = null;
-    if (mezzo?.volontarioId != null) {
-      const [proprietario] = await tx
-        .select({ centroAscoltoId: volontariTable.centroAscoltoId })
-        .from(volontariTable)
-        .where(eq(volontariTable.id, mezzo.volontarioId))
-        .for("update");
-      proprietarioCentroId = proprietario?.centroAscoltoId ?? null;
-    }
-    const effectiveCentroId = mezzo?.volontarioId != null
-      ? proprietarioCentroId
-      : (mezzo?.centroAscoltoId ?? null);
-    const centroCompatibile = effectiveCentroId == null
-      || (centroAscoltoId != null && effectiveCentroId === centroAscoltoId);
-    if (!mezzo || mezzo.stato !== "disponibile" || mezzo.statoApprovazione !== "approvato" || !centroCompatibile) {
-      throw new ConsegnaPlanningError(403, "Mezzo non disponibile, non approvato o non assegnabile al centro della consegna");
-    }
-
-    const conflitti = await tx
-      .select({ id: turniTable.id, centroAscoltoId: turniTable.centroAscoltoId })
-      .from(turniTable)
-      .where(and(
-        eq(turniTable.data, input.dataPrevista),
-        eq(turniTable.fascia, fasciaTurno!),
-        eq(turniTable.mezzoId, input.mezzoId),
-      ));
-    if (conflitti.some((turno) => turno.centroAscoltoId !== centroAscoltoId)) {
-      throw new ConsegnaPlanningError(409, "Mezzo già assegnato a un altro turno in questa data e fascia");
+    try {
+      await assertMezzoAssignableTx(tx, {
+        mezzoId: input.mezzoId,
+        centroAscoltoId: centroAscoltoId!,
+        data: input.dataPrevista,
+        fascia: fasciaTurno as FasciaTurno,
+        excludeTurnoId: targetTurno?.id,
+      });
+    } catch (error) {
+      if (error instanceof Error && "status" in error) {
+        throw new ConsegnaPlanningError((error as { status: number }).status, error.message);
+      }
+      throw error;
     }
   }
 
@@ -158,23 +154,41 @@ export async function syncTurnoDaConsegnaTx(
   tx: Tx,
   consegna: typeof consegneTable.$inferSelect,
   centroAscoltoId: number | null,
+  req?: Request,
 ): Promise<void> {
   if (consegna.volontarioId == null && consegna.mezzoId == null) return;
   const fascia = fasciaTurnoFromConsegna(consegna.fasciaOraria);
   if (centroAscoltoId == null || fascia == null) return;
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(
+    hashtext('turno-centro-slot'),
+    hashtext(${`${centroAscoltoId}:${consegna.dataPrevista}:${fascia}`})
+  )`);
   const [existing] = await tx.select().from(turniTable).where(and(
     eq(turniTable.centroAscoltoId, centroAscoltoId),
     eq(turniTable.data, consegna.dataPrevista),
     eq(turniTable.fascia, fascia),
-  ));
+  )).for("update");
   let turnoId: number;
+  let turnoVersione: number;
+  let turnoModificato = false;
+  let volontarioAggiunto = false;
   if (existing) {
     turnoId = existing.id;
+    turnoVersione = existing.versione;
+    if (existing.stato === "completato") {
+      throw new ConsegnaPlanningError(409, "Il turno selezionato è già completato");
+    }
     if (consegna.mezzoId != null && existing.mezzoId !== consegna.mezzoId) {
       if (existing.mezzoId != null) {
         throw new ConsegnaPlanningError(409, "Il turno selezionato ha già un mezzo diverso assegnato");
       }
-      await tx.update(turniTable).set({ mezzoId: consegna.mezzoId }).where(eq(turniTable.id, turnoId));
+      const [updated] = await tx.update(turniTable).set({ mezzoId: consegna.mezzoId, stato: "pianificato", motivoAnnullamento: null, versione: sql`${turniTable.versione} + 1`, dataAggiornamento: new Date() }).where(eq(turniTable.id, turnoId)).returning({ versione: turniTable.versione });
+      turnoVersione = updated.versione;
+      turnoModificato = true;
+    } else if (existing.stato === "annullato") {
+      const [updated] = await tx.update(turniTable).set({ stato: "pianificato", motivoAnnullamento: null, versione: sql`${turniTable.versione} + 1`, dataAggiornamento: new Date() }).where(eq(turniTable.id, turnoId)).returning({ versione: turniTable.versione });
+      turnoVersione = updated.versione;
+      turnoModificato = true;
     }
   } else {
     const [created] = await tx.insert(turniTable).values({
@@ -184,6 +198,8 @@ export async function syncTurnoDaConsegnaTx(
       mezzoId: consegna.mezzoId ?? null,
     }).returning();
     turnoId = created.id;
+    turnoVersione = created.versione;
+    turnoModificato = true;
   }
   if (consegna.volontarioId != null) {
     const [already] = await tx.select({ id: turniVolontariTable.id }).from(turniVolontariTable).where(and(
@@ -192,6 +208,23 @@ export async function syncTurnoDaConsegnaTx(
     ));
     if (!already) {
       await tx.insert(turniVolontariTable).values({ turnoId, volontarioId: consegna.volontarioId, ruolo: "Consegna" });
+      volontarioAggiunto = true;
     }
+  }
+  if (req && (turnoModificato || volontarioAggiunto)) {
+    await auditLogistica(tx, req, {
+      entita: "turno",
+      id: turnoId,
+      azione: existing ? "sincronizzazione_consegna" : "creazione_da_consegna",
+      precedente: existing
+        ? { stato: existing.stato, mezzoId: existing.mezzoId, versione: existing.versione }
+        : null,
+      nuovo: {
+        stato: existing?.stato === "annullato" ? "pianificato" : (existing?.stato ?? "pianificato"),
+        mezzoId: consegna.mezzoId ?? existing?.mezzoId ?? null,
+        volontarioId: consegna.volontarioId ?? null,
+        versione: turnoVersione,
+      },
+    });
   }
 }

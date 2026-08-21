@@ -101,6 +101,7 @@ describe("PUT /turni — anti-doppia-prenotazione mezzo", () => {
         data: DATA,
         fascia: FASCIA,
         mezzoId: mezzo,
+        versione: first.body.versione,
         volontari: [{ volontarioId: vol1 }, { volontarioId: vol2 }],
       });
     expect(second.status).toBe(200);
@@ -124,7 +125,7 @@ describe("PUT /turni — anti-doppia-prenotazione mezzo", () => {
       request(appGlobal()).put("/turni").send(payload(vol1)),
       request(appGlobal()).put("/turni").send(payload(vol2)),
     ]);
-    expect(responses.every((response) => response.status === 200)).toBe(true);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 400]);
     const turnoIds = [
       ...new Set(
         responses

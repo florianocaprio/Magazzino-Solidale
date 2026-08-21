@@ -1,8 +1,15 @@
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { mezziTable, volontariTable, centriAscoltoTable } from "@workspace/db";
+import {
+  mezziTable,
+  volontariTable,
+  centriAscoltoTable,
+  consegneTable,
+  bolleTable,
+  turniTable,
+} from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, sql, inArray, or, desc, type SQL } from "drizzle-orm";
+import { and, eq, sql, desc } from "drizzle-orm";
 import {
   callerCentroId,
   callerAreaOperativaId,
@@ -13,6 +20,16 @@ import {
 } from "../lib/centroScope";
 import { requireModulo } from "../lib/featureFlags";
 import { validateCapacita } from "../lib/bug5Validation";
+import { requirePermission } from "../middlewares/auth";
+import {
+  effectiveAreaOperativaFilter,
+  effectiveCentroFilter,
+  effectiveCentroFromMezzo,
+  normalizeTarga,
+  parseRequiredVersion,
+  STATI_MEZZO,
+} from "../lib/logisticaPolicy";
+import { auditLogistica } from "../lib/logisticaAudit";
 
 const router: IRouter = Router();
 router.use("/mezzi", requireModulo("MEZZI"));
@@ -52,29 +69,7 @@ type MezzoJoinRow = {
  * `centroAscoltoId`. NULL on either path = visible to all centri.
  */
 function effectiveCentroOf(r: MezzoJoinRow): number | null {
-  return r.m.volontarioId != null ? (r.volCentroId ?? null) : (r.m.centroAscoltoId ?? null);
-}
-
-/** SQL expression mirroring effectiveCentroOf for use in WHERE clauses. */
-const effectiveCentroExpr = sql<number | null>`CASE WHEN ${mezziTable.volontarioId} IS NOT NULL THEN ${volontariTable.centroAscoltoId} ELSE ${mezziTable.centroAscoltoId} END`;
-
-function effectiveCentroFilter(centroId: number | null): SQL | undefined {
-  if (centroId == null) return undefined;
-  return sql`(${effectiveCentroExpr} IS NULL OR ${effectiveCentroExpr} = ${centroId})`;
-}
-
-/**
- * Area Operativa boundary applied to the effective centro: the effective centro must be
- * NULL (shared) or belong to the set of centri visible to the caller's area operativa.
- * `null` ids → area operativa-global caller (no filtering); empty ids → only NULL.
- */
-function effectiveAreaOperativaFilter(areaOperativaCentroIds: number[] | null): SQL | undefined {
-  if (areaOperativaCentroIds == null) return undefined;
-  if (areaOperativaCentroIds.length === 0) return sql`${effectiveCentroExpr} IS NULL`;
-  return or(
-    sql`${effectiveCentroExpr} IS NULL`,
-    inArray(effectiveCentroExpr, areaOperativaCentroIds),
-  );
+  return effectiveCentroFromMezzo(r.m, r.volCentroId);
 }
 
 const baseSelect = () =>
@@ -110,7 +105,9 @@ const fmt = (r: MezzoJoinRow, centroNome: string | null) => {
     scadenzaAssicurazione: r.m.scadenzaAssicurazione ?? null,
     scadenzaRevisione: r.m.scadenzaRevisione ?? null,
     note: r.m.note ?? null,
+    versione: r.m.versione,
     dataCreazione: r.m.dataCreazione.toISOString(),
+    dataAggiornamento: r.m.dataAggiornamento.toISOString(),
   };
 };
 
@@ -130,15 +127,15 @@ async function loadMezzo(id: number): Promise<ReturnType<typeof fmt> | null> {
 }
 
 /** Centro of a volontario (for inheritance/validation), or null. */
-async function volontarioCentroId(volontarioId: number): Promise<number | null> {
+async function volontarioCentroId(volontarioId: number): Promise<{ exists: boolean; centroId: number | null }> {
   const [v] = await db
     .select({ c: volontariTable.centroAscoltoId })
     .from(volontariTable)
     .where(eq(volontariTable.id, volontarioId));
-  return v?.c ?? null;
+  return { exists: Boolean(v), centroId: v?.c ?? null };
 }
 
-router.get("/mezzi", async (req, res) => {
+router.get("/mezzi", requirePermission("logistica.mezzi.view"), async (req, res) => {
   const caller = callerCentroId(req);
   const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const rows = await baseSelect()
@@ -170,7 +167,7 @@ async function resolveCentro(
   body: { volontarioId?: number | null; centroAscoltoId?: number | null },
   caller: number | null,
   areaOperativaCentroIds: number[] | null,
-): Promise<{ ownCentro: number | null } | { error: string }> {
+): Promise<{ ownCentro: number | null } | { error: string; status: number }> {
   let ownCentro: number | null = body.centroAscoltoId ?? null;
   if (body.volontarioId != null) {
     // Volontario-owned: own centro is ignored/derived from the volontario.
@@ -179,13 +176,20 @@ async function resolveCentro(
     // Scoped, non-volontario-owned: lock to caller's centro.
     ownCentro = caller;
   }
-  const effective =
-    body.volontarioId != null ? await volontarioCentroId(body.volontarioId) : ownCentro;
+  const owner = body.volontarioId != null ? await volontarioCentroId(body.volontarioId) : null;
+  if (owner && !owner.exists) return { error: "Volontario proprietario non trovato", status: 400 };
+  const effective = effectiveCentroFromMezzo(
+    { volontarioId: body.volontarioId ?? null, centroAscoltoId: ownCentro },
+    owner?.centroId ?? null,
+  );
+  if (caller == null && areaOperativaCentroIds != null && effective == null) {
+    return { error: "Seleziona un Centro della tua Area Operativa", status: 400 };
+  }
   if (!canAccessCentro(effective, caller)) {
-    return { error: "Mezzo non accessibile per il tuo centro" };
+    return { error: "Mezzo non accessibile per il tuo centro", status: 403 };
   }
   if (!inVisibleCentroSet(effective, areaOperativaCentroIds)) {
-    return { error: "Mezzo non accessibile per la tua area operativa" };
+    return { error: "Mezzo non accessibile per la tua area operativa", status: 403 };
   }
   return { ownCentro };
 }
@@ -200,23 +204,45 @@ async function createMezzoOne(
   const caller = callerCentroId(req);
   const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const resolved = await resolveCentro(b, caller, areaOperativaCentroIds);
-  if ("error" in resolved) return { error: resolved.error, status: 403 };
+  if ("error" in resolved) return { error: resolved.error, status: resolved.status };
   const baseValues = {
     ...(b as typeof mezziTable.$inferInsert),
     centroAscoltoId: resolved.ownCentro,
     capacitaKg: b.capacitaKg?.toString(),
+    targa: normalizeTarga(b.targa),
+    stato: "non_disponibile",
+    statoApprovazione: "in_attesa",
   };
+  delete (baseValues as Record<string, unknown>).versione;
+  delete (baseValues as Record<string, unknown>).dataAggiornamento;
   const providedCodice = typeof b.codice === "string" ? b.codice.trim() : "";
 
   // Caller-provided codice: a duplicate is a clear client error, not a 500.
   if (providedCodice) {
+    const codice = providedCodice.toUpperCase();
     try {
-      const [created] = await db
-        .insert(mezziTable)
-        .values({ ...baseValues, codice: providedCodice })
-        .returning({ id: mezziTable.id });
+      const [created] = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(
+          hashtext('mezzo-codice'), hashtext(${codice})
+        )`);
+        const [duplicate] = await tx
+          .select({ id: mezziTable.id })
+          .from(mezziTable)
+          .where(sql`upper(trim(${mezziTable.codice})) = ${codice}`)
+          .limit(1);
+        if (duplicate) throw new Error("DUPLICATE_MEZZO_CODICE");
+        const [row] = await tx
+          .insert(mezziTable)
+          .values({ ...baseValues, codice })
+          .returning({ id: mezziTable.id, versione: mezziTable.versione });
+        await auditLogistica(tx, req, { entita: "mezzo", id: row.id, azione: "creazione", nuovo: { statoApprovazione: "in_attesa", stato: "non_disponibile", versione: row.versione } });
+        return [row];
+      });
       return { id: created.id };
     } catch (e) {
+      if (e instanceof Error && e.message === "DUPLICATE_MEZZO_CODICE") {
+        return { error: `Codice "${providedCodice}" già in uso`, status: 409 };
+      }
       if (isUniqueViolation(e)) return { error: `Codice "${providedCodice}" già in uso`, status: 409 };
       throw e;
     }
@@ -227,12 +253,29 @@ async function createMezzoOne(
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const codice = await nextMezCodice();
     try {
-      const [created] = await db
-        .insert(mezziTable)
-        .values({ ...baseValues, codice })
-        .returning({ id: mezziTable.id });
+      const [created] = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(
+          hashtext('mezzo-codice'), hashtext(${codice})
+        )`);
+        const [duplicate] = await tx
+          .select({ id: mezziTable.id })
+          .from(mezziTable)
+          .where(eq(mezziTable.codice, codice))
+          .limit(1);
+        if (duplicate) throw new Error("AUTO_MEZZO_CODICE_COLLISION");
+        const [row] = await tx
+          .insert(mezziTable)
+          .values({ ...baseValues, codice })
+          .returning({ id: mezziTable.id, versione: mezziTable.versione });
+        await auditLogistica(tx, req, { entita: "mezzo", id: row.id, azione: "creazione", nuovo: { statoApprovazione: "in_attesa", stato: "non_disponibile", versione: row.versione } });
+        return [row];
+      });
       return { id: created.id };
     } catch (e) {
+      if (e instanceof Error && e.message === "AUTO_MEZZO_CODICE_COLLISION") {
+        if (attempt < MAX_ATTEMPTS - 1) continue;
+        return { error: "Impossibile generare un codice univoco per il mezzo, riprova", status: 409 };
+      }
       if (isUniqueViolation(e) && attempt < MAX_ATTEMPTS - 1) continue;
       if (isUniqueViolation(e)) return { error: "Impossibile generare un codice univoco per il mezzo, riprova", status: 409 };
       throw e;
@@ -241,13 +284,13 @@ async function createMezzoOne(
   return { error: "Impossibile generare un codice univoco per il mezzo, riprova", status: 409 };
 }
 
-router.post("/mezzi", async (req, res) => {
+router.post("/mezzi", requirePermission("logistica.mezzi.manage"), async (req, res) => {
   const r = await createMezzoOne(req.body, req);
   if ("error" in r) { res.status(r.status ?? 403).json({ error: r.error }); return; }
   res.status(201).json(await loadMezzo(r.id));
 });
 
-router.post("/mezzi/bulk", async (req, res) => {
+router.post("/mezzi/bulk", requirePermission("logistica.mezzi.manage"), async (req, res) => {
   const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
   const result = await runBulk(righe, async (row) => {
     const r = await createMezzoOne(row, req);
@@ -256,8 +299,8 @@ router.post("/mezzi/bulk", async (req, res) => {
   res.json(result);
 });
 
-router.get("/mezzi/:id", async (req, res) => {
-  const [r] = await baseSelect().where(eq(mezziTable.id, parseInt(req.params.id)));
+router.get("/mezzi/:id", requirePermission("logistica.mezzi.view"), async (req, res) => {
+  const [r] = await baseSelect().where(eq(mezziTable.id, parseInt(String(req.params.id))));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(effectiveCentroOf(r), callerCentroId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
@@ -270,8 +313,8 @@ router.get("/mezzi/:id", async (req, res) => {
   res.json(fmt(r, await centroNomeOf(effectiveCentroOf(r))));
 });
 
-router.patch("/mezzi/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.patch("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (req, res) => {
+  const id = parseInt(String(req.params.id));
   const caller = callerCentroId(req);
   const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   const [existing] = await baseSelect().where(eq(mezziTable.id, id));
@@ -285,8 +328,14 @@ router.patch("/mezzi/:id", async (req, res) => {
     return;
   }
   const body = req.body;
+  const versione = parseRequiredVersion(body?.versione);
+  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
   const capacitaError = validateCapacita(body);
   if (capacitaError) { res.status(400).json({ error: capacitaError }); return; }
+  if (body.stato !== undefined && !STATI_MEZZO.includes(body.stato)) {
+    res.status(400).json({ error: "Stato mezzo non valido" });
+    return;
+  }
   // Determine the post-update owner link to recompute the effective centro.
   const volontarioId =
     body.volontarioId !== undefined ? body.volontarioId : existing.m.volontarioId;
@@ -300,20 +349,46 @@ router.patch("/mezzi/:id", async (req, res) => {
     areaOperativaCentroIds,
   );
   if ("error" in resolved) {
-    res.status(403).json({ error: resolved.error });
+    res.status(resolved.status).json({ error: resolved.error });
     return;
   }
   const update = {
     ...body,
     centroAscoltoId: resolved.ownCentro,
     capacitaKg: body.capacitaKg === null ? null : body.capacitaKg === undefined ? undefined : body.capacitaKg.toString(),
+    targa: body.targa === undefined ? undefined : normalizeTarga(body.targa),
   };
-  await db.update(mezziTable).set(update).where(eq(mezziTable.id, id));
+  delete update.versione;
+  delete update.codice;
+  delete update.statoApprovazione;
+  delete update.dataCreazione;
+  delete update.dataAggiornamento;
+  if (body.stato === "disponibile" && existing.m.statoApprovazione !== "approvato") {
+    res.status(409).json({ error: "Il mezzo deve essere approvato prima di diventare disponibile" });
+    return;
+  }
+  const [changed] = await db.transaction(async (tx) => {
+    const [row] = await tx.update(mezziTable).set({
+      ...update,
+      versione: sql`${mezziTable.versione} + 1`,
+      dataAggiornamento: new Date(),
+    }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione))).returning({ id: mezziTable.id, versione: mezziTable.versione });
+    if (!row) return [];
+    await auditLogistica(tx, req, {
+      entita: "mezzo",
+      id,
+      azione: body.stato !== undefined ? "disponibilita" : body.volontarioId !== undefined || body.centroAscoltoId !== undefined ? "cambio_proprietario_centro" : "modifica",
+      precedente: { versione: existing.m.versione, stato: existing.m.stato, volontarioId: existing.m.volontarioId, centroAscoltoId: existing.m.centroAscoltoId },
+      nuovo: { versione: row.versione, stato: body.stato ?? existing.m.stato, volontarioId, centroAscoltoId: resolved.ownCentro },
+    });
+    return [row];
+  });
+  if (!changed) { res.status(409).json({ error: "La risorsa è stata aggiornata da un altro operatore" }); return; }
   res.json(await loadMezzo(id));
 });
 
-router.delete("/mezzi/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.delete("/mezzi/:id", requirePermission("logistica.mezzi.manage"), async (req, res) => {
+  const id = parseInt(String(req.params.id));
   const [existing] = await baseSelect().where(eq(mezziTable.id, id));
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCentro(effectiveCentroOf(existing), callerCentroId(req))) {
@@ -324,7 +399,28 @@ router.delete("/mezzi/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
-  await db.delete(mezziTable).where(eq(mezziTable.id, id));
+  const versione = parseRequiredVersion(req.body?.versione);
+  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
+  const historical = await db.execute(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM ${turniTable} WHERE ${turniTable.mezzoId} = ${id}
+      UNION ALL SELECT 1 FROM ${consegneTable} WHERE ${consegneTable.mezzoId} = ${id}
+      UNION ALL SELECT 1 FROM ${bolleTable} WHERE ${bolleTable.mezzoId} = ${id}
+    ) AS used
+  `);
+  const used = Boolean((historical.rows[0] as { used?: boolean } | undefined)?.used);
+  const changed = await db.transaction(async (tx) => {
+    if (used) {
+      const [row] = await tx.update(mezziTable).set({ stato: "ritirato", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione))).returning({ id: mezziTable.id, versione: mezziTable.versione });
+      if (!row) return false;
+      await auditLogistica(tx, req, { entita: "mezzo", id, azione: "ritiro", precedente: { versione, stato: existing.m.stato }, nuovo: { versione: row.versione, stato: "ritirato" } });
+      return true;
+    }
+    const [row] = await tx.delete(mezziTable).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione))).returning({ id: mezziTable.id });
+    return Boolean(row);
+  });
+  if (!changed) { res.status(409).json({ error: "La risorsa è stata aggiornata da un altro operatore" }); return; }
+  if (used) { res.status(200).json({ ritirato: true }); return; }
   res.status(204).send();
 });
 

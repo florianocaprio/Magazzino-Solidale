@@ -123,6 +123,25 @@ export const MAPS_PERMISSIONS = [
   },
 ] as const;
 
+export const LOGISTICA_PERMISSIONS = [
+  { key: "logistica.volontari.view", label: "Logistica: consultazione volontari" },
+  { key: "logistica.volontari.manage", label: "Logistica: gestione volontari" },
+  { key: "logistica.volontari.export", label: "Logistica: esportazione volontari" },
+  { key: "logistica.mezzi.view", label: "Logistica: consultazione mezzi" },
+  { key: "logistica.mezzi.manage", label: "Logistica: gestione mezzi" },
+  { key: "logistica.mezzi.export", label: "Logistica: esportazione mezzi" },
+  { key: "logistica.turni.view", label: "Logistica: consultazione turni" },
+  { key: "logistica.turni.manage", label: "Logistica: gestione turni" },
+  {
+    key: "logistica.approvazioni.view",
+    label: "Logistica: consultazione approvazioni",
+  },
+  {
+    key: "logistica.approvazioni.manage",
+    label: "Logistica: gestione approvazioni",
+  },
+] as const;
+
 export const MAGAZZINO_PERMISSIONS = [
   { key: "magazzino.view", label: "Magazzino: consultazione" },
   { key: "magazzino.products.manage", label: "Magazzino: gestione prodotti" },
@@ -177,6 +196,7 @@ export const ALL_PERMISSIONS = [
   ...SOCIALE_INTERVENTI_PERMISSIONS,
   ...UDS_PERMISSIONS,
   ...MAPS_PERMISSIONS,
+  ...LOGISTICA_PERMISSIONS,
   ...MAGAZZINO_PERMISSIONS,
   ...BOLLE_PERMISSIONS,
   ...APPROVVIGIONAMENTI_PERMISSIONS,

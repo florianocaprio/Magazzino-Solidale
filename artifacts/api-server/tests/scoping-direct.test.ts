@@ -8,7 +8,7 @@ import utentiRouter from "../src/routes/utenti";
 import scarichiRouter from "../src/routes/scarichi";
 import approvvigionamentiRouter from "../src/routes/approvvigionamenti";
 import beneficiariRouter from "../src/routes/beneficiari";
-import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentroRec, createMagazzino, createProdotto, createBeneficiario, createAreaOperativa, createFornitore, createVolontario, createMezzo, createRuolo, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
+import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentroRec, createMagazzino, createProdotto, createBeneficiario, createAreaOperativa, createFornitore, createVolontario, createMezzo, createRuolo, createRuoloVolontario, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
 
 /**
  * Centro scoping for direct-column entities: each row carries its own
@@ -23,6 +23,7 @@ let centroA: number;
 let centroB: number;
 let areaOperativaA: number;
 let areaOperativaB: number;
+let ruoloVolontarioId: number;
 
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 
@@ -37,6 +38,7 @@ beforeEach(async () => {
   areaOperativaB = await createAreaOperativa(scope);
   centroA = (await createCentroRec(scope, { areaOperativaId: areaOperativaA })).id;
   centroB = (await createCentroRec(scope, { areaOperativaId: areaOperativaB })).id;
+  ruoloVolontarioId = await createRuoloVolontario(scope);
 });
 
 afterEach(async () => {
@@ -178,7 +180,7 @@ describe("Volontari — scoping per centro", () => {
         nome: "Mario",
         cognome: "Rossi",
         matricola: "MR-001",
-        ruolo: "autista",
+        ruoloVolontarioId,
         centroAscoltoId: centroB,
       });
     expect(res.status).toBe(201);
@@ -263,7 +265,7 @@ describe("Mezzi — scoping per centro", () => {
     const volB = await createVolontario(scope, centroB);
     const res = await request(makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA }))
       .patch(`/mezzi/${mA}`)
-      .send({ volontarioId: volB });
+      .send({ volontarioId: volB, versione: 1 });
     expect(res.status).toBe(403);
   });
 

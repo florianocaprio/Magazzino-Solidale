@@ -97,9 +97,12 @@ router.patch("/ruoli-volontari/:id", requireGlobalAdmin, async (req, res) => {
 
 router.delete("/ruoli-volontari/:id", requireGlobalAdmin, async (req, res) => {
   const id = parseInt(req.params.id as string);
-  // `volontari.ruolo` stores the role NAME as free text (no FK), so removing a
-  // role simply retires the option; existing volunteers keep their stored value.
-  await db.delete(ruoliVolontariTable).where(eq(ruoliVolontariTable.id, id));
+  // Il catalogo è referenziato dai nuovi volontari: il delete ordinario ritira
+  // l'opzione senza cancellare il ruolo storico o rompere la FK.
+  await db
+    .update(ruoliVolontariTable)
+    .set({ attivo: false })
+    .where(eq(ruoliVolontariTable.id, id));
   res.status(204).send();
 });
 

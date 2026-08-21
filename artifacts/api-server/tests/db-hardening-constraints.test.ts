@@ -56,7 +56,7 @@ describe("vincoli referenziali Interventi e Turni", () => {
       await expect(
         client.query(
           `INSERT INTO turni (centro_ascolto_id, data, fascia)
-           VALUES ($1, '2099-01-01', 'audit')`,
+           VALUES ($1, '2099-01-01', '09-13')`,
           [-2_000_000_003],
         ),
       ).rejects.toMatchObject({ code: "23503" });
@@ -76,7 +76,7 @@ describe("vincoli referenziali Interventi e Turni", () => {
       );
       const turno = await client.query<{ id: number }>(
         `INSERT INTO turni (centro_ascolto_id, data, fascia)
-         VALUES ($1, '2099-01-02', 'audit') RETURNING id`,
+         VALUES ($1, '2099-01-02', '14-18') RETURNING id`,
         [centro.rows[0].id],
       );
       await expect(

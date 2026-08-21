@@ -1,8 +1,16 @@
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { volontariTable, centriAscoltoTable, consegneTable, bolleTable } from "@workspace/db";
+import {
+  volontariTable,
+  centriAscoltoTable,
+  consegneTable,
+  bolleTable,
+  ruoliVolontariTable,
+  turniVolontariTable,
+  mezziTable,
+} from "@workspace/db";
 import { runBulk } from "../lib/bulk";
-import { eq, and, ne, isNull, getTableColumns, desc, ilike, or } from "drizzle-orm";
+import { eq, and, ne, getTableColumns, desc, ilike, or, sql } from "drizzle-orm";
 import {
   callerCentroId,
   callerAreaOperativaId,
@@ -22,12 +30,17 @@ import {
   type MatricolaDuplicataPayload,
 } from "../lib/volontariMatricola";
 import { requireModulo } from "../lib/featureFlags";
+import { requirePermission } from "../middlewares/auth";
+import { auditLogistica } from "../lib/logisticaAudit";
+import { isFasciaTurno, parseRequiredVersion } from "../lib/logisticaPolicy";
+import { fasciaTurnoConsegnaSql } from "../lib/consegneTurni";
 
 const router: IRouter = Router();
 router.use("/volontari", requireModulo("VOLONTARI"));
 
 type VolontarioRow = typeof volontariTable.$inferSelect & {
   centroAscoltoNome: string | null;
+  ruoloCatalogoNome: string | null;
 };
 
 const fmt = (r: VolontarioRow) => ({
@@ -40,13 +53,17 @@ const fmt = (r: VolontarioRow) => ({
   telefono: r.telefono ?? null,
   email: r.email ?? null,
   ruolo: r.ruolo,
+  ruoloVolontarioId: r.ruoloVolontarioId ?? null,
+  ruoloCatalogoNome: r.ruoloCatalogoNome ?? null,
   patente: r.patente,
   mezzoPersonale: r.mezzoPersonale,
   maxConsegneTurno: r.maxConsegneTurno,
   attivo: r.attivo,
   statoApprovazione: r.statoApprovazione,
   note: r.note ?? null,
+  versione: r.versione,
   dataCreazione: r.dataCreazione.toISOString(),
+  dataAggiornamento: r.dataAggiornamento.toISOString(),
 });
 
 const selectVolontario = () =>
@@ -54,11 +71,13 @@ const selectVolontario = () =>
     .select({
       ...getTableColumns(volontariTable),
       centroAscoltoNome: centriAscoltoTable.nome,
+      ruoloCatalogoNome: ruoliVolontariTable.nome,
     })
     .from(volontariTable)
-    .leftJoin(centriAscoltoTable, eq(volontariTable.centroAscoltoId, centriAscoltoTable.id));
+    .leftJoin(centriAscoltoTable, eq(volontariTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(ruoliVolontariTable, eq(volontariTable.ruoloVolontarioId, ruoliVolontariTable.id));
 
-router.get("/volontari", async (req, res) => {
+router.get("/volontari", requirePermission("logistica.volontari.view"), async (req, res) => {
   const caller = callerCentroId(req);
   const areaOperativaCentroIds = await visibleCentroIds(callerAreaOperativaId(req));
   let requestedCentroScope: ReturnType<typeof centroScopeFilter>;
@@ -106,22 +125,54 @@ async function createVolontarioOne(
   const matricola = normalizeVolontarioMatricola(values.matricola);
   if (!matricola) return { error: MATRICOLA_OBBLIGATORIA_MSG, status: 400 };
   values.matricola = matricola;
+  const areaId = callerAreaOperativaId(req);
+  const visibleIds = await visibleCentroIds(areaId);
   if (caller != null) values.centroAscoltoId = caller;
-  if (
-    caller == null &&
+  else if (areaId != null && values.centroAscoltoId == null) {
+    return { error: "Seleziona un Centro della tua Area Operativa", status: 400 };
+  } else if (
     values.centroAscoltoId != null &&
-    !inVisibleCentroSet(values.centroAscoltoId as number, await visibleCentroIds(callerAreaOperativaId(req)))
+    !inVisibleCentroSet(values.centroAscoltoId as number, visibleIds)
   ) {
     return { error: "Centro non accessibile per la tua area operativa", status: 403 };
   }
+  const ruoloVolontarioId = Number(values.ruoloVolontarioId);
+  if (!Number.isInteger(ruoloVolontarioId) || ruoloVolontarioId <= 0) {
+    return { error: "ruoloVolontarioId obbligatorio", status: 400 };
+  }
+  const [ruolo] = await db
+    .select({ id: ruoliVolontariTable.id, nome: ruoliVolontariTable.nome })
+    .from(ruoliVolontariTable)
+    .where(and(eq(ruoliVolontariTable.id, ruoloVolontarioId), eq(ruoliVolontariTable.attivo, true)));
+  if (!ruolo) return { error: "Ruolo volontario non attivo o non valido", status: 400 };
+  const maxConsegneTurno = Number(values.maxConsegneTurno ?? 5);
+  if (!Number.isInteger(maxConsegneTurno) || maxConsegneTurno < 0) {
+    return { error: "maxConsegneTurno deve essere maggiore o uguale a zero", status: 400 };
+  }
+  values.ruoloVolontarioId = ruolo.id;
+  values.ruolo = ruolo.nome;
+  values.maxConsegneTurno = maxConsegneTurno;
+  values.statoApprovazione = "in_attesa";
+  values.attivo = false;
+  delete values.versione;
+  delete values.dataAggiornamento;
   if (await matricolaVolontarioGiaUsata(matricola)) {
     return { ...(await matricolaVolontarioDuplicataPayload(matricola)), status: 409 };
   }
   try {
-    const [created] = await db
-      .insert(volontariTable)
-      .values(values as typeof volontariTable.$inferInsert)
-      .returning({ id: volontariTable.id });
+    const [created] = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(volontariTable)
+        .values(values as typeof volontariTable.$inferInsert)
+        .returning({ id: volontariTable.id, versione: volontariTable.versione });
+      await auditLogistica(tx, req, {
+        entita: "volontario",
+        id: row.id,
+        azione: "creazione",
+        nuovo: { statoApprovazione: "in_attesa", attivo: false, versione: row.versione },
+      });
+      return [row];
+    });
     return { id: created.id };
   } catch (e) {
     if (isVolontarioMatricolaUniqueViolation(e)) {
@@ -131,7 +182,7 @@ async function createVolontarioOne(
   }
 }
 
-router.post("/volontari", async (req, res) => {
+router.post("/volontari", requirePermission("logistica.volontari.manage"), async (req, res) => {
   const r = await createVolontarioOne(req.body, req);
   if ("error" in r) {
     res.status(r.status ?? 403).json({
@@ -144,7 +195,7 @@ router.post("/volontari", async (req, res) => {
   res.status(201).json(fmt(row));
 });
 
-router.post("/volontari/bulk", async (req, res) => {
+router.post("/volontari/bulk", requirePermission("logistica.volontari.manage"), async (req, res) => {
   const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
   const result = await runBulk(righe, async (row) => {
     const r = await createVolontarioOne(row, req);
@@ -153,39 +204,34 @@ router.post("/volontari/bulk", async (req, res) => {
   res.json(result);
 });
 
-// Carico per volontario in un turno (= un giorno): consegne assegnate per quella
-// data + bolle assegnate per quella data non collegate a una consegna (no doppioni),
-// escluse le bolle annullate. Usato dalla UI per disabilitare i volontari al limite.
-router.get("/volontari/carico", async (req, res) => {
-  const { data, excludeConsegnaId, excludeBollaId } = req.query as Record<string, string>;
+// Carico per volontario nello slot canonico data+fascia. Conta solo le consegne
+// ancora operative; le bolle non costituiscono una seconda unità di carico.
+router.get("/volontari/carico", requirePermission("logistica.volontari.view"), async (req, res) => {
+  const { data, fascia, excludeConsegnaId } = req.query as Record<string, string>;
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
     res.status(400).json({ error: "Parametro 'data' non valido (formato atteso: YYYY-MM-DD)" });
     return;
   }
+  if (!isFasciaTurno(fascia)) {
+    res.status(400).json({ error: "Parametro 'fascia' non valido" });
+    return;
+  }
   const exclConsegna = excludeConsegnaId != null ? parseInt(excludeConsegnaId) : NaN;
-  const exclBolla = excludeBollaId != null ? parseInt(excludeBollaId) : NaN;
   const counts = new Map<number, number>();
 
-  // I conteggi restano GLOBALI: il limite di un volontario è giornaliero su tutti
-  // i centri (un volontario universale consegna ovunque), quindi il carico va
-  // sommato senza scoping per ottenere un limite corretto.
-  const consegneConds = [eq(consegneTable.dataPrevista, data)];
+  // Il conteggio dello slot resta globale tra i centri: una risorsa condivisa
+  // non può superare il proprio limite data+fascia distribuendo le consegne.
+  const consegneConds = [
+    eq(consegneTable.dataPrevista, data),
+    ne(consegneTable.stato, "annullata"),
+    eq(fasciaTurnoConsegnaSql(), fascia),
+  ];
   if (Number.isInteger(exclConsegna)) consegneConds.push(ne(consegneTable.id, exclConsegna));
   const cons = await db
     .select({ volontarioId: consegneTable.volontarioId })
     .from(consegneTable)
     .where(and(...consegneConds));
   for (const r of cons) {
-    if (r.volontarioId != null) counts.set(r.volontarioId, (counts.get(r.volontarioId) ?? 0) + 1);
-  }
-
-  const bolleConds = [eq(bolleTable.dataBolla, data), isNull(bolleTable.consegnaId), ne(bolleTable.stato, "annullato")];
-  if (Number.isInteger(exclBolla)) bolleConds.push(ne(bolleTable.id, exclBolla));
-  const bol = await db
-    .select({ volontarioId: bolleTable.volontarioConsegnaId })
-    .from(bolleTable)
-    .where(and(...bolleConds));
-  for (const r of bol) {
     if (r.volontarioId != null) counts.set(r.volontarioId, (counts.get(r.volontarioId) ?? 0) + 1);
   }
 
@@ -211,8 +257,8 @@ router.get("/volontari/carico", async (req, res) => {
   );
 });
 
-router.get("/volontari/:id", async (req, res) => {
-  const [row] = await selectVolontario().where(eq(volontariTable.id, parseInt(req.params.id)));
+router.get("/volontari/:id", requirePermission("logistica.volontari.view"), async (req, res) => {
+  const [row] = await selectVolontario().where(eq(volontariTable.id, parseInt(String(req.params.id))));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
@@ -225,9 +271,9 @@ router.get("/volontari/:id", async (req, res) => {
   res.json(fmt(row));
 });
 
-router.patch("/volontari/:id", async (req, res) => {
+router.patch("/volontari/:id", requirePermission("logistica.volontari.manage"), async (req, res) => {
   const caller = callerCentroId(req);
-  const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, parseInt(req.params.id)));
+  const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, parseInt(String(req.params.id))));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
@@ -237,7 +283,13 @@ router.patch("/volontari/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
+  const versione = parseRequiredVersion(req.body?.versione);
+  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
   const updates = { ...req.body };
+  delete updates.versione;
+  delete updates.statoApprovazione;
+  delete updates.dataCreazione;
+  delete updates.dataAggiornamento;
   if ("matricola" in updates) {
     const matricola = normalizeVolontarioMatricola(updates.matricola);
     if (!matricola) { res.status(400).json({ error: MATRICOLA_OBBLIGATORIA_MSG }); return; }
@@ -247,12 +299,66 @@ router.patch("/volontari/:id", async (req, res) => {
     }
     updates.matricola = matricola;
   }
+  const areaId = callerAreaOperativaId(req);
   if (caller != null) delete updates.centroAscoltoId;
+  else if (updates.centroAscoltoId !== undefined) {
+    if (areaId != null && updates.centroAscoltoId == null) {
+      res.status(400).json({ error: "Seleziona un Centro della tua Area Operativa" });
+      return;
+    }
+    if (!inVisibleCentroSet(updates.centroAscoltoId, await visibleCentroIds(areaId))) {
+      res.status(403).json({ error: "Centro non accessibile per la tua area operativa" });
+      return;
+    }
+  }
+  if (updates.attivo === true && existing.statoApprovazione !== "approvato") {
+    res.status(409).json({ error: "La risorsa deve essere approvata prima dell'attivazione" });
+    return;
+  }
+  if (updates.ruoloVolontarioId !== undefined) {
+    const ruoloId = Number(updates.ruoloVolontarioId);
+    const [ruolo] = Number.isInteger(ruoloId) ? await db
+      .select({ id: ruoliVolontariTable.id, nome: ruoliVolontariTable.nome })
+      .from(ruoliVolontariTable)
+      .where(and(eq(ruoliVolontariTable.id, ruoloId), eq(ruoliVolontariTable.attivo, true))) : [];
+    if (!ruolo) { res.status(400).json({ error: "Ruolo volontario non attivo o non valido" }); return; }
+    updates.ruoloVolontarioId = ruolo.id;
+    updates.ruolo = ruolo.nome;
+  } else {
+    delete updates.ruolo;
+  }
+  if (updates.maxConsegneTurno !== undefined) {
+    const max = Number(updates.maxConsegneTurno);
+    if (!Number.isInteger(max) || max < 0) {
+      res.status(400).json({ error: "maxConsegneTurno deve essere maggiore o uguale a zero" });
+      return;
+    }
+    updates.maxConsegneTurno = max;
+  }
   try {
-    const [updated] = await db.update(volontariTable).set(updates).where(eq(volontariTable.id, parseInt(req.params.id))).returning({ id: volontariTable.id });
+    const [updated] = await db.transaction(async (tx) => {
+      const [row] = await tx.update(volontariTable).set({
+        ...updates,
+        versione: sql`${volontariTable.versione} + 1`,
+        dataAggiornamento: new Date(),
+      }).where(and(eq(volontariTable.id, existing.id), eq(volontariTable.versione, versione))).returning({ id: volontariTable.id, versione: volontariTable.versione });
+      if (!row) throw new Error("STALE_VERSION");
+      await auditLogistica(tx, req, {
+        entita: "volontario",
+        id: row.id,
+        azione: updates.attivo === true ? "attivazione" : updates.attivo === false ? "disattivazione" : "modifica",
+        precedente: { versione: existing.versione, attivo: existing.attivo },
+        nuovo: { versione: row.versione, attivo: updates.attivo ?? existing.attivo },
+      });
+      return [row];
+    });
     const [row] = await selectVolontario().where(eq(volontariTable.id, updated.id));
     res.json(fmt(row));
   } catch (e) {
+    if (e instanceof Error && e.message === "STALE_VERSION") {
+      res.status(409).json({ error: "La risorsa è stata aggiornata da un altro operatore" });
+      return;
+    }
     if (isVolontarioMatricolaUniqueViolation(e)) {
       const matricola = normalizeVolontarioMatricola(updates.matricola) ?? existing.matricola ?? "";
       res.status(409).json(await matricolaVolontarioDuplicataPayload(matricola, existing.id));
@@ -262,9 +368,9 @@ router.patch("/volontari/:id", async (req, res) => {
   }
 });
 
-router.delete("/volontari/:id", async (req, res) => {
+router.delete("/volontari/:id", requirePermission("logistica.volontari.manage"), async (req, res) => {
   const caller = callerCentroId(req);
-  const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, parseInt(req.params.id)));
+  const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, parseInt(String(req.params.id))));
   if (!existing) { res.status(204).send(); return; }
   if (!canAccessCentro(existing.centroAscoltoId, caller)) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
@@ -274,7 +380,33 @@ router.delete("/volontari/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
-  await db.delete(volontariTable).where(eq(volontariTable.id, parseInt(req.params.id)));
+  const versione = parseRequiredVersion(req.body?.versione);
+  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
+  const historical = await db.execute(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM ${turniVolontariTable} WHERE ${turniVolontariTable.volontarioId} = ${existing.id}
+      UNION ALL SELECT 1 FROM ${consegneTable} WHERE ${consegneTable.volontarioId} = ${existing.id}
+      UNION ALL SELECT 1 FROM ${bolleTable} WHERE ${bolleTable.volontarioConsegnaId} = ${existing.id}
+      UNION ALL SELECT 1 FROM ${mezziTable} WHERE ${mezziTable.volontarioId} = ${existing.id}
+    ) AS used
+  `);
+  const used = Boolean((historical.rows[0] as { used?: boolean } | undefined)?.used);
+  const changed = await db.transaction(async (tx) => {
+    if (used) {
+      const [row] = await tx.update(volontariTable).set({
+        attivo: false,
+        versione: sql`${volontariTable.versione} + 1`,
+        dataAggiornamento: new Date(),
+      }).where(and(eq(volontariTable.id, existing.id), eq(volontariTable.versione, versione))).returning({ id: volontariTable.id, versione: volontariTable.versione });
+      if (!row) return false;
+      await auditLogistica(tx, req, { entita: "volontario", id: row.id, azione: "disattivazione", precedente: { versione }, nuovo: { versione: row.versione, attivo: false } });
+      return true;
+    }
+    const [row] = await tx.delete(volontariTable).where(and(eq(volontariTable.id, existing.id), eq(volontariTable.versione, versione))).returning({ id: volontariTable.id });
+    return Boolean(row);
+  });
+  if (!changed) { res.status(409).json({ error: "La risorsa è stata aggiornata da un altro operatore" }); return; }
+  if (used) { res.status(200).json({ disattivato: true }); return; }
   res.status(204).send();
 });
 

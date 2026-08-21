@@ -6,8 +6,9 @@ import {
   volontariTable,
   centriAscoltoTable,
   mezziTable,
+  ruoliVolontariTable,
 } from "@workspace/db";
-import { eq, and, gte, lte, inArray, asc, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, asc, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerAreaOperativaId,
@@ -23,6 +24,16 @@ import {
   matricolaVolontarioGiaUsata,
 } from "../lib/volontariMatricola";
 import { requireModulo } from "../lib/featureFlags";
+import { requirePermission } from "../middlewares/auth";
+import {
+  assertMezzoAssignableTx,
+  assertVolontarioAssignableTx,
+  isFasciaTurno,
+  isLogisticaUniqueViolation,
+  LogisticaPolicyError,
+  parseRequiredVersion,
+} from "../lib/logisticaPolicy";
+import { auditLogistica } from "../lib/logisticaAudit";
 
 const router: IRouter = Router();
 
@@ -128,6 +139,10 @@ async function buildTurno(id: number) {
     mezzoCodice: t.mezzoCodice ?? null,
     mezzoTipo: t.mezzoTipo ?? null,
     mezzoStatoApprovazione: t.mezzoStatoApprovazione ?? null,
+    stato: t.t.stato,
+    motivoAnnullamento: t.t.motivoAnnullamento ?? null,
+    versione: t.t.versione,
+    dataAggiornamento: t.t.dataAggiornamento.toISOString(),
     volontari: vols.map((r) => ({
       volontarioId: r.v.volontarioId,
       volontarioNome: r.nome && r.cognome ? `${r.cognome} ${r.nome}` : null,
@@ -137,7 +152,7 @@ async function buildTurno(id: number) {
   };
 }
 
-router.get("/turni", async (req, res) => {
+router.get("/turni", requirePermission("logistica.turni.view"), async (req, res) => {
   const { da, a, centroAscoltoId } = req.query as Record<string, string>;
   const conditions: SQL[] = [];
   if (da) conditions.push(gte(turniTable.data, da));
@@ -202,6 +217,10 @@ router.get("/turni", async (req, res) => {
       mezzoCodice: r.mezzoCodice ?? null,
       mezzoTipo: r.mezzoTipo ?? null,
       mezzoStatoApprovazione: r.mezzoStatoApprovazione ?? null,
+      stato: r.t.stato,
+      motivoAnnullamento: r.t.motivoAnnullamento ?? null,
+      versione: r.t.versione,
+      dataAggiornamento: r.t.dataAggiornamento.toISOString(),
       volontari: vols
         .filter((x) => x.v.turnoId === r.t.id)
         .map((x) => ({
@@ -214,13 +233,14 @@ router.get("/turni", async (req, res) => {
   );
 });
 
-router.put("/turni", async (req, res) => {
+router.put("/turni", requirePermission("logistica.turni.manage"), async (req, res) => {
   const body = req.body as {
     centroAscoltoId?: number;
     data?: string;
     fascia?: string;
     mezzoId?: number | null;
     volontari?: VolInput[];
+    versione?: number;
   };
   const caller = callerCentroId(req);
   const centroAscoltoId = caller != null ? caller : body.centroAscoltoId;
@@ -228,6 +248,10 @@ router.put("/turni", async (req, res) => {
     res
       .status(400)
       .json({ error: "centroAscoltoId, data e fascia sono obbligatori" });
+    return;
+  }
+  if (!isFasciaTurno(body.fascia)) {
+    res.status(400).json({ error: "fascia non valida: usare 09-13, 14-18 o 18-20" });
     return;
   }
   if (
@@ -240,56 +264,7 @@ router.put("/turni", async (req, res) => {
     res.status(403).json({ error: "Centro non accessibile per la tua area operativa" });
     return;
   }
-  const mezzoId = Number.isInteger(body.mezzoId)
-    ? (body.mezzoId as number)
-    : null;
-  // IDOR guard: the assigned mezzo must be universal (centroAscoltoId NULL) OR
-  // belong to the turno's centro — mirror the volontari guard so a scoped caller
-  // can't attach an out-of-scope vehicle and read its codice/tipo back via GET.
-  if (mezzoId != null) {
-    const [m] = await db
-      .select({
-        id: mezziTable.id,
-        centroAscoltoId: mezziTable.centroAscoltoId,
-        statoApprovazione: mezziTable.statoApprovazione,
-      })
-      .from(mezziTable)
-      .where(eq(mezziTable.id, mezzoId));
-    if (
-      !m ||
-      m.statoApprovazione === "respinto" ||
-      (m.centroAscoltoId != null && m.centroAscoltoId !== centroAscoltoId)
-    ) {
-      res.status(403).json({ error: "Mezzo non assegnabile a questo centro" });
-      return;
-    }
-    // Anti-doppia-prenotazione: lo stesso mezzo non può essere usato in due turni
-    // nella stessa data + fascia (anche se di centri diversi). Il turno che si sta
-    // aggiornando è quello con stesso (centro, data, fascia), quindi un conflitto è
-    // un QUALSIASI altro turno con quel mezzo nello slot — lo individuo per centro
-    // diverso (lo slot è unico per centro+data+fascia).
-    const sameSlot = await db
-      .select({
-        id: turniTable.id,
-        centroAscoltoId: turniTable.centroAscoltoId,
-      })
-      .from(turniTable)
-      .where(
-        and(
-          eq(turniTable.data, body.data!),
-          eq(turniTable.fascia, body.fascia!),
-          eq(turniTable.mezzoId, mezzoId),
-        ),
-      );
-    if (sameSlot.some((s) => s.centroAscoltoId !== centroAscoltoId)) {
-      res
-        .status(409)
-        .json({
-          error: "Mezzo già assegnato a un altro turno in questa data e fascia",
-        });
-      return;
-    }
-  }
+  const mezzoId = Number.isInteger(body.mezzoId) ? (body.mezzoId as number) : null;
   const rawVolontari = Array.isArray(body.volontari) ? body.volontari : [];
   // Dedupe by volontarioId (last ruolo wins) so the same volunteer can't be
   // listed twice in one turno.
@@ -300,44 +275,13 @@ router.put("/turni", async (req, res) => {
   const volontari = [...dedupMap.values()];
   const volIds = [...dedupMap.keys()];
 
-  // IDOR guard: every assigned volontario must be assignable to this centro —
-  // i.e. universal (centroAscoltoId NULL) OR belonging to the turno's centro.
-  // Without this a scoped caller could attach out-of-scope volunteers and read
-  // their names back via GET /turni (which joins volontari).
-  if (volIds.length) {
-    const found = await db
-      .select({
-        id: volontariTable.id,
-        centroAscoltoId: volontariTable.centroAscoltoId,
-        statoApprovazione: volontariTable.statoApprovazione,
-      })
-      .from(volontariTable)
-      .where(inArray(volontariTable.id, volIds));
-    const okIds = new Set(
-      found
-        .filter(
-          (v) =>
-            v.statoApprovazione !== "respinto" &&
-            (v.centroAscoltoId == null ||
-              v.centroAscoltoId === centroAscoltoId),
-        )
-        .map((v) => v.id),
-    );
-    if (volIds.some((id) => !okIds.has(id))) {
-      res
-        .status(403)
-        .json({
-          error: "Uno o più volontari non sono assegnabili a questo centro",
-        });
-      return;
-    }
-  }
-
-  // Find-or-create the (centro, data, fascia) slot and replace its volunteer set
-  // atomically so a double-submit can't leave a partial state.
-  let turnoId: number;
+  let turnoId: number | null;
   try {
     turnoId = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(
+        hashtext('turno-centro-slot'),
+        hashtext(${`${centroAscoltoId}:${body.data}:${body.fascia}`})
+      )`);
       const [existing] = await tx
         .select()
         .from(turniTable)
@@ -349,14 +293,70 @@ router.put("/turni", async (req, res) => {
           ),
         )
         .for("update");
+      const existingVolontari = existing
+        ? await tx
+            .select({
+              volontarioId: turniVolontariTable.volontarioId,
+              ruolo: turniVolontariTable.ruolo,
+            })
+            .from(turniVolontariTable)
+            .where(eq(turniVolontariTable.turnoId, existing.id))
+        : [];
+
+      if (existing?.stato === "completato") {
+        throw new LogisticaPolicyError(409, "Un turno completato non può essere riscritto");
+      }
+      if (existing) {
+        const versione = parseRequiredVersion(body.versione);
+        if (versione == null) {
+          throw new LogisticaPolicyError(400, "versione obbligatoria per aggiornare il turno");
+        }
+        if (versione !== existing.versione) {
+          throw new LogisticaPolicyError(409, "La pianificazione è stata aggiornata da un altro operatore");
+        }
+      }
+
+      for (const volontarioId of volIds) {
+        await assertVolontarioAssignableTx(tx, {
+          volontarioId,
+          centroAscoltoId,
+          data: body.data!,
+          fascia: body.fascia as "09-13" | "14-18" | "18-20",
+          excludeTurnoId: existing?.id,
+        });
+      }
+      if (mezzoId != null) {
+        await assertMezzoAssignableTx(tx, {
+          mezzoId,
+          centroAscoltoId,
+          data: body.data!,
+          fascia: body.fascia as "09-13" | "14-18" | "18-20",
+          excludeTurnoId: existing?.id,
+        });
+      }
+
+      if (!existing && volontari.length === 0 && mezzoId == null) return null;
 
       let id: number;
       if (existing) {
         id = existing.id;
-        await tx
+        const [updated] = await tx
           .update(turniTable)
-          .set({ mezzoId })
-          .where(eq(turniTable.id, id));
+          .set({
+            mezzoId,
+            stato: volontari.length === 0 && mezzoId == null ? "annullato" : "pianificato",
+            motivoAnnullamento:
+              volontari.length === 0 && mezzoId == null
+                ? "Tutte le assegnazioni sono state rimosse"
+                : null,
+            versione: sql`${turniTable.versione} + 1`,
+            dataAggiornamento: new Date(),
+          })
+          .where(and(eq(turniTable.id, id), eq(turniTable.versione, existing.versione)))
+          .returning({ versione: turniTable.versione });
+        if (!updated) {
+          throw new LogisticaPolicyError(409, "La pianificazione è stata aggiornata da un altro operatore");
+        }
       } else {
         const [created] = await tx
           .insert(turniTable)
@@ -365,6 +365,7 @@ router.put("/turni", async (req, res) => {
             data: body.data!,
             fascia: body.fascia!,
             mezzoId,
+            stato: "pianificato",
           })
           .returning();
         id = created.id;
@@ -373,7 +374,7 @@ router.put("/turni", async (req, res) => {
       await tx
         .delete(turniVolontariTable)
         .where(eq(turniVolontariTable.turnoId, id));
-      if (volontari.length) {
+      if (volontari.length > 0) {
         await tx
           .insert(turniVolontariTable)
           .values(
@@ -383,14 +384,40 @@ router.put("/turni", async (req, res) => {
               ruolo: v.ruolo ?? null,
             })),
           );
-      } else if (mezzoId == null) {
-        // No volunteers and no mezzo left -> drop the empty slot.
-        await tx.delete(turniTable).where(eq(turniTable.id, id));
       }
+      await auditLogistica(tx, req, {
+        entita: "turno",
+        id,
+        azione: existing
+          ? volontari.length === 0 && mezzoId == null
+            ? "annullamento"
+            : existing.stato === "annullato"
+              ? "riattivazione"
+              : "modifica_assegnazioni"
+          : "creazione",
+        precedente: existing
+          ? {
+              stato: existing.stato,
+              mezzoId: existing.mezzoId,
+              volontari: existingVolontari,
+              versione: existing.versione,
+            }
+          : null,
+        nuovo: {
+          stato: volontari.length === 0 && mezzoId == null ? "annullato" : "pianificato",
+          mezzoId,
+          volontari: volontari.map((v) => ({ volontarioId: v.volontarioId, ruolo: v.ruolo ?? null })),
+          versione: existing ? existing.versione + 1 : 1,
+        },
+      });
       return id;
     });
   } catch (error) {
-    if (isTurnoUniqueViolation(error)) {
+    if (error instanceof LogisticaPolicyError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    if (isTurnoUniqueViolation(error) || isLogisticaUniqueViolation(error)) {
       res.status(409).json({
         error:
           "Slot, mezzo o volontario già assegnato da un'altra operazione concorrente",
@@ -400,30 +427,23 @@ router.put("/turni", async (req, res) => {
     throw error;
   }
 
+  if (turnoId == null) {
+    res.status(204).end();
+    return;
+  }
   if (volontari.length || mezzoId != null) {
     res.json(await buildTurno(turnoId));
     return;
   }
 
-  const [centro] = await db
-    .select({ nome: centriAscoltoTable.nome })
-    .from(centriAscoltoTable)
-    .where(eq(centriAscoltoTable.id, centroAscoltoId));
-  res.json({
-    id: turnoId,
-    centroAscoltoId,
-    centroAscoltoNome: centro?.nome ?? null,
-    data: body.data,
-    fascia: body.fascia,
-    mezzoId: null,
-    mezzoCodice: null,
-    mezzoTipo: null,
-    mezzoStatoApprovazione: null,
-    volontari: [],
-  });
+  res.json(await buildTurno(turnoId));
 });
 
-router.post("/turni/volontari-pending", async (req, res) => {
+router.post(
+  "/turni/volontari-pending",
+  requirePermission("logistica.turni.manage"),
+  requirePermission("logistica.volontari.manage"),
+  async (req, res) => {
   const resolved = await resolveCentroAscoltoId(req, req.body?.centroAscoltoId);
   if ("error" in resolved) {
     res.status(resolved.status).json({ error: resolved.error });
@@ -442,26 +462,41 @@ router.post("/turni/volontari-pending", async (req, res) => {
     res.status(409).json(await matricolaVolontarioDuplicataPayload(matricola));
     return;
   }
+  const ruoloVolontarioId = toIntOrNull(req.body?.ruoloVolontarioId);
+  if (ruoloVolontarioId == null) {
+    res.status(400).json({ error: "ruoloVolontarioId obbligatorio" });
+    return;
+  }
+  const [ruolo] = await db
+    .select({ id: ruoliVolontariTable.id, nome: ruoliVolontariTable.nome })
+    .from(ruoliVolontariTable)
+    .where(and(eq(ruoliVolontariTable.id, ruoloVolontarioId), eq(ruoliVolontariTable.attivo, true)));
+  if (!ruolo) {
+    res.status(400).json({ error: "Ruolo volontario non attivo o non valido" });
+    return;
+  }
   let created: typeof volontariTable.$inferSelect | null = null;
   try {
-    [created] = await db
-      .insert(volontariTable)
-      .values({
+    created = await db.transaction(async (tx) => {
+      const [row] = await tx.insert(volontariTable).values({
         nome,
         cognome,
         matricola,
         centroAscoltoId: resolved.centroAscoltoId,
         telefono: trimText(req.body?.telefono) || null,
         email: trimText(req.body?.email) || null,
-        ruolo: trimText(req.body?.ruolo) || "volontario",
+        ruolo: ruolo.nome,
+        ruoloVolontarioId: ruolo.id,
         patente: Boolean(req.body?.patente),
         mezzoPersonale: false,
         maxConsegneTurno: 5,
         attivo: false,
         statoApprovazione: "in_attesa",
         note: trimText(req.body?.note) || "Inserito da pianificazione turni",
-      })
-      .returning();
+      }).returning();
+      await auditLogistica(tx, req, { entita: "volontario", id: row.id, azione: "creazione", nuovo: { origine: "turni", statoApprovazione: "in_attesa", attivo: false, versione: row.versione } });
+      return row;
+    });
   } catch (e) {
     if (isVolontarioMatricolaUniqueViolation(e)) {
       res
@@ -485,17 +520,26 @@ router.post("/turni/volontari-pending", async (req, res) => {
     telefono: created.telefono ?? null,
     email: created.email ?? null,
     ruolo: created.ruolo,
+    ruoloVolontarioId: created.ruoloVolontarioId,
+    ruoloCatalogoNome: ruolo.nome,
     patente: created.patente,
     mezzoPersonale: created.mezzoPersonale,
     maxConsegneTurno: created.maxConsegneTurno,
     attivo: created.attivo,
     statoApprovazione: created.statoApprovazione,
     note: created.note ?? null,
+    versione: created.versione,
     dataCreazione: created.dataCreazione.toISOString(),
+    dataAggiornamento: created.dataAggiornamento.toISOString(),
   });
-});
+  },
+);
 
-router.post("/turni/mezzi-pending", async (req, res) => {
+router.post(
+  "/turni/mezzi-pending",
+  requirePermission("logistica.turni.manage"),
+  requirePermission("logistica.mezzi.manage"),
+  async (req, res) => {
   const resolved = await resolveCentroAscoltoId(req, req.body?.centroAscoltoId);
   if ("error" in resolved) {
     res.status(resolved.status).json({ error: resolved.error });
@@ -507,26 +551,53 @@ router.post("/turni/mezzi-pending", async (req, res) => {
     return;
   }
   const codice = trimText(req.body?.codice) || (await nextMezzoCodice());
-  const [created] = await db
-    .insert(mezziTable)
-    .values({
-      codice,
+  const capacitaColli = toIntOrNull(req.body?.capacitaColli);
+  const capacitaKg = req.body?.capacitaKg != null && req.body.capacitaKg !== "" ? Number(req.body.capacitaKg) : null;
+  if ((capacitaColli != null && capacitaColli < 0) || (capacitaKg != null && (!Number.isFinite(capacitaKg) || capacitaKg < 0))) {
+    res.status(400).json({ error: "Le capacità devono essere maggiori o uguali a zero" });
+    return;
+  }
+  let created: typeof mezziTable.$inferSelect;
+  try {
+    created = await db.transaction(async (tx) => {
+      const codiceNormalizzato = codice.toUpperCase();
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(
+        hashtext('mezzo-codice'), hashtext(${codiceNormalizzato})
+      )`);
+      const [duplicate] = await tx
+        .select({ id: mezziTable.id })
+        .from(mezziTable)
+        .where(sql`upper(trim(${mezziTable.codice})) = ${codiceNormalizzato}`)
+        .limit(1);
+      if (duplicate) throw new Error("DUPLICATE_MEZZO_CODICE");
+      const [row] = await tx.insert(mezziTable).values({
+      codice: codiceNormalizzato,
       tipo,
-      targa: trimText(req.body?.targa) || null,
+      targa: trimText(req.body?.targa).toUpperCase().replace(/\s+/g, " ") || null,
       proprieta: trimText(req.body?.proprieta) || "associazione",
       proprietarioNome: trimText(req.body?.proprietarioNome) || null,
       centroAscoltoId: resolved.centroAscoltoId,
-      capacitaColli: toIntOrNull(req.body?.capacitaColli),
-      capacitaKg:
-        req.body?.capacitaKg != null && req.body.capacitaKg !== ""
-          ? String(req.body.capacitaKg)
-          : null,
+      capacitaColli,
+      capacitaKg: capacitaKg == null ? null : String(capacitaKg),
       descrizione: trimText(req.body?.descrizione) || null,
       stato: "non_disponibile",
       statoApprovazione: "in_attesa",
       note: trimText(req.body?.note) || "Inserito da pianificazione turni",
-    })
-    .returning();
+      }).returning();
+      await auditLogistica(tx, req, { entita: "mezzo", id: row.id, azione: "creazione", nuovo: { origine: "turni", statoApprovazione: "in_attesa", stato: "non_disponibile", versione: row.versione } });
+      return row;
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "DUPLICATE_MEZZO_CODICE") {
+      res.status(409).json({ error: "Codice mezzo già in uso" });
+      return;
+    }
+    if (isLogisticaUniqueViolation(error)) {
+      res.status(409).json({ error: "Codice mezzo già in uso" });
+      return;
+    }
+    throw error;
+  }
   const nomeCentro = await centroNome(resolved.centroAscoltoId);
   res.status(201).json({
     id: created.id,
@@ -548,12 +619,78 @@ router.post("/turni/mezzi-pending", async (req, res) => {
     scadenzaAssicurazione: created.scadenzaAssicurazione ?? null,
     scadenzaRevisione: created.scadenzaRevisione ?? null,
     note: created.note ?? null,
+    versione: created.versione,
     dataCreazione: created.dataCreazione.toISOString(),
+    dataAggiornamento: created.dataAggiornamento.toISOString(),
   });
-});
+  },
+);
 
-router.delete("/turni/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.patch(
+  "/turni/:id/stato",
+  requirePermission("logistica.turni.manage"),
+  async (req, res) => {
+    const id = parseInt(String(req.params.id));
+    const target = trimText(req.body?.stato);
+    const versione = parseRequiredVersion(req.body?.versione);
+    if (versione == null) {
+      res.status(400).json({ error: "versione obbligatoria e valida" });
+      return;
+    }
+    const transitions: Record<string, string[]> = {
+      pianificato: ["confermato", "annullato"],
+      confermato: ["completato", "annullato"],
+      completato: [],
+      annullato: [],
+    };
+    try {
+      await db.transaction(async (tx) => {
+        const [current] = await tx.select().from(turniTable).where(eq(turniTable.id, id)).for("update");
+        if (!current) throw new LogisticaPolicyError(404, "Not found");
+        if (!canAccessCentro(current.centroAscoltoId, callerCentroId(req))) {
+          throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo centro");
+        }
+        if (!inVisibleCentroSet(current.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
+          throw new LogisticaPolicyError(403, "Risorsa non accessibile per la tua area operativa");
+        }
+        if (!transitions[current.stato]?.includes(target)) {
+          throw new LogisticaPolicyError(409, "Transizione di stato non consentita");
+        }
+        if (target === "annullato" && !trimText(req.body?.motivoAnnullamento)) {
+          throw new LogisticaPolicyError(400, "motivoAnnullamento obbligatorio");
+        }
+        if (target === "confermato") {
+          const volontari = await tx.select({ volontarioId: turniVolontariTable.volontarioId }).from(turniVolontariTable).where(eq(turniVolontariTable.turnoId, id));
+          for (const volontario of volontari) {
+            await assertVolontarioAssignableTx(tx, { volontarioId: volontario.volontarioId, centroAscoltoId: current.centroAscoltoId, data: current.data, fascia: current.fascia as "09-13" | "14-18" | "18-20", excludeTurnoId: id });
+          }
+          if (current.mezzoId != null) {
+            await assertMezzoAssignableTx(tx, { mezzoId: current.mezzoId, centroAscoltoId: current.centroAscoltoId, data: current.data, fascia: current.fascia as "09-13" | "14-18" | "18-20", excludeTurnoId: id });
+          }
+        }
+        const [updated] = await tx.update(turniTable).set({
+          stato: target,
+          mezzoId: target === "annullato" ? null : current.mezzoId,
+          motivoAnnullamento: target === "annullato" ? trimText(req.body?.motivoAnnullamento) : null,
+          versione: sql`${turniTable.versione} + 1`,
+          dataAggiornamento: new Date(),
+        }).where(and(eq(turniTable.id, id), eq(turniTable.versione, versione))).returning({ versione: turniTable.versione });
+        if (!updated) throw new LogisticaPolicyError(409, "La pianificazione è stata aggiornata da un altro operatore");
+        await auditLogistica(tx, req, { entita: "turno", id, azione: target, precedente: { stato: current.stato, versione: current.versione }, nuovo: { stato: target, versione: updated.versione }, note: target === "annullato" ? trimText(req.body?.motivoAnnullamento) : null });
+      });
+    } catch (error) {
+      if (error instanceof LogisticaPolicyError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
+    res.json(await buildTurno(id));
+  },
+);
+
+router.delete("/turni/:id", requirePermission("logistica.turni.manage"), async (req, res) => {
+  const id = parseInt(String(req.params.id));
   const [current] = await db
     .select()
     .from(turniTable)
@@ -569,7 +706,6 @@ router.delete("/turni/:id", async (req, res) => {
     return;
   }
   if (
-    callerCentroId(req) == null &&
     !inVisibleCentroSet(
       current.centroAscoltoId,
       await visibleCentroIds(callerAreaOperativaId(req)),
@@ -578,11 +714,23 @@ router.delete("/turni/:id", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per la tua area operativa" });
     return;
   }
-  await db
-    .delete(turniVolontariTable)
-    .where(eq(turniVolontariTable.turnoId, id));
-  await db.delete(turniTable).where(eq(turniTable.id, id));
-  res.status(204).end();
+  const versione = parseRequiredVersion(req.body?.versione);
+  if (versione == null) {
+    res.status(400).json({ error: "versione obbligatoria e valida" });
+    return;
+  }
+  if (current.stato === "completato" || current.stato === "annullato") {
+    res.status(409).json({ error: "Transizione di stato non consentita" });
+    return;
+  }
+  const [updated] = await db.transaction(async (tx) => {
+    const [row] = await tx.update(turniTable).set({ stato: "annullato", mezzoId: null, motivoAnnullamento: trimText(req.body?.motivoAnnullamento) || "Annullamento operativo", versione: sql`${turniTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(turniTable.id, id), eq(turniTable.versione, versione))).returning({ versione: turniTable.versione });
+    if (!row) return [];
+    await auditLogistica(tx, req, { entita: "turno", id, azione: "annullamento", precedente: { stato: current.stato, versione: current.versione }, nuovo: { stato: "annullato", versione: row.versione } });
+    return [row];
+  });
+  if (!updated) { res.status(409).json({ error: "La pianificazione è stata aggiornata da un altro operatore" }); return; }
+  res.status(200).json(await buildTurno(id));
 });
 
 export default router;
