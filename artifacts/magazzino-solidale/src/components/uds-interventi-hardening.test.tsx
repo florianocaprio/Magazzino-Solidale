@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   permissions: new Set<string>(),
   createdInterventions: [] as unknown[],
+  directoryParams: vi.fn(),
+  personaSheetProps: null as null | {
+    open: boolean;
+    initialZonaUdsId: number | null;
+  },
 }));
 
 const intervention = {
@@ -40,23 +45,31 @@ vi.mock("@workspace/api-client-react", () => ({
   getListAreeOperativeQueryKey: () => ["aree"],
   getListInterventiQueryKey: (params: unknown) => ["interventi", params],
   useListAreeOperative: () => ({ data: [] }),
-  useListZoneUds: () => ({ data: [] }),
-  useListUdsDirectory: () => ({
+  useListZoneUds: () => ({
     data: [
-      {
-        id: 7,
-        codice: "UDS-7",
-        nome: "Mario",
-        cognome: "Rossi",
-        soprannome: null,
-        fasciaEtaCorrente: "30_49",
-        zonaUdsId: 11,
-        zonaUdsNome: "Zona B",
-        canale: "uds",
-        accessoCompleto: false,
-      },
+      { id: 20, nome: "Zona 20" },
+      { id: 30, nome: "Zona 30" },
     ],
   }),
+  useListUdsDirectory: (params: unknown) => {
+    mocks.directoryParams(params);
+    return {
+      data: [
+        {
+          id: 7,
+          codice: "UDS-7",
+          nome: "Mario",
+          cognome: "Rossi",
+          soprannome: null,
+          fasciaEtaCorrente: "30_49",
+          zonaUdsId: 30,
+          zonaUdsNome: "Zona 30",
+          canale: "uds",
+          accessoCompleto: false,
+        },
+      ],
+    };
+  },
   useListInterventi: () => ({
     data: [
       intervention,
@@ -92,7 +105,7 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: 2, areaOperativaId: 1, zonaUdsId: 11 },
+    user: { id: 2, areaOperativaId: 10, zonaUdsId: 20 },
     hasArea: () => true,
     hasPermission: (permission: string) => mocks.permissions.has(permission),
   }),
@@ -109,8 +122,10 @@ vi.mock("@/components/uds-persona-sheet", () => ({
   UdsPersonaSheet: ({
     open,
     onPersonReady,
+    initialZonaUdsId,
   }: {
     open: boolean;
+    initialZonaUdsId: number | null;
     onPersonReady: (
       person: {
         id: number;
@@ -121,8 +136,9 @@ vi.mock("@/components/uds-persona-sheet", () => ({
       },
       outcome: string,
     ) => void;
-  }) =>
-    open ? (
+  }) => {
+    mocks.personaSheetProps = { open, initialZonaUdsId };
+    return open ? (
       <button
         type="button"
         onClick={() =>
@@ -131,8 +147,8 @@ vi.mock("@/components/uds-persona-sheet", () => ({
               id: 7,
               nome: "Mario",
               cognome: "Rossi",
-              areaOperativaId: 1,
-              zonaUdsId: 11,
+              areaOperativaId: 10,
+              zonaUdsId: 20,
             },
             "created",
           )
@@ -140,7 +156,8 @@ vi.mock("@/components/uds-persona-sheet", () => ({
       >
         salva-persona-rapida
       </button>
-    ) : null,
+    ) : null;
+  },
 }));
 vi.mock("@/components/bisogni-pianificati-editor", () => ({
   BisogniPianificatiEditor: ({
@@ -189,6 +206,8 @@ describe("hardening UI Interventi UDS", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     mocks.create.mockReset();
+    mocks.directoryParams.mockReset();
+    mocks.personaSheetProps = null;
     mocks.permissions = new Set([
       "uds.interventi.create",
       "uds.interventi.update",
@@ -224,6 +243,57 @@ describe("hardening UI Interventi UDS", () => {
     expect(udsInterventi.it.bisogniPianificatiTitle).toBe(
       "Bisogni e azioni",
     );
+  });
+
+  it("cerca per default in tutta l'Area e propone la zona operatore alla nuova persona", async () => {
+    await act(async () => root.render(<UdsInterventi />));
+
+    expect(mocks.directoryParams).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ zonaUdsId: expect.anything() }),
+    );
+    const newPerson = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("udsAnagrafica.newPerson"),
+    );
+    await act(async () => newPerson?.click());
+    expect(mocks.personaSheetProps).toEqual({
+      open: true,
+      initialZonaUdsId: 20,
+    });
+  });
+
+  it("applica la zona scelta esplicitamente anche alla nuova persona", async () => {
+    await act(async () => root.render(<UdsInterventi />));
+    const zoneFilter =
+      document.querySelector<HTMLButtonElement>('[role="combobox"]');
+    expect(zoneFilter).not.toBeNull();
+    await act(async () => zoneFilter?.click());
+    const zone20 = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="option"]'),
+    ).find((option) => option.textContent?.trim() === "Zona 20");
+    expect(zone20).toBeDefined();
+    await act(async () => zone20?.click());
+    expect(mocks.directoryParams).toHaveBeenLastCalledWith(
+      expect.objectContaining({ zonaUdsId: 20 }),
+    );
+
+    await act(async () => zoneFilter?.click());
+    const zone30 = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="option"]'),
+    ).find((option) => option.textContent?.trim() === "Zona 30");
+    expect(zone30).toBeDefined();
+    await act(async () => zone30?.click());
+
+    expect(mocks.directoryParams).toHaveBeenLastCalledWith(
+      expect.objectContaining({ zonaUdsId: 30 }),
+    );
+    const newPerson = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("udsAnagrafica.newPerson"),
+    );
+    await act(async () => newPerson?.click());
+    expect(mocks.personaSheetProps).toEqual({
+      open: true,
+      initialZonaUdsId: 30,
+    });
   });
 
   it("crea tramite operazione UDS esplicita senza inviare una data autorevole", async () => {

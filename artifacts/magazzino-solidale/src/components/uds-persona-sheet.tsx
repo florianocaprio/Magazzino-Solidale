@@ -293,7 +293,6 @@ export function UdsPersonaSheet({
     wDataNascita,
     isFasciaEtaPresunta(wFasciaEtaPresunta) ? wFasciaEtaPresunta : null,
   );
-  const fasciaEtaPresuntaDirty = form.formState.dirtyFields.fasciaEtaPresunta;
   useEffect(() => {
     if (!open) return;
     const rawIdentityLength = [wNome, wCognome, wSoprannome, wTelefono]
@@ -433,6 +432,8 @@ export function UdsPersonaSheet({
       zonaValue && zonaValue !== NO_ZONE
         ? parseInt(zonaValue)
         : (user?.zonaUdsId ?? null);
+    const areaProvenienza = form.getValues("areaProvenienza")?.trim();
+    const dataNascita = form.getValues("dataNascita")?.trim();
     updateBenef.mutate(
       {
         id: suggestion.id,
@@ -440,13 +441,12 @@ export function UdsPersonaSheet({
           uds: true,
           versione: suggestion.versione,
           ...(targetZona != null ? { zonaUdsId: targetZona } : {}),
-          ...(fasciaEtaPresuntaDirty
-            ? {
-                fasciaEtaPresunta: isFasciaEtaPresunta(wFasciaEtaPresunta)
-                  ? wFasciaEtaPresunta
-                  : null,
-              }
-            : {}),
+          ...(areaProvenienza ? { areaProvenienza } : {}),
+          ...(dataNascita
+            ? { dataNascita, fasciaEtaPresunta: null }
+            : isFasciaEtaPresunta(wFasciaEtaPresunta)
+              ? { fasciaEtaPresunta: wFasciaEtaPresunta }
+              : {}),
         } as never,
       },
       {

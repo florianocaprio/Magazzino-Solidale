@@ -69,6 +69,8 @@ const UDS_CLASSIFICAZIONE_ETA_RICHIESTA_MSG =
   "Se non conosci la data di nascita, seleziona la fascia d'età.";
 const UDS_AREA_PROVENIENZA_RICHIESTA_MSG =
   "Seleziona l'Area di provenienza della persona UDS.";
+const UDS_LINK_AREA_PROVENIENZA_RICHIESTA_MSG =
+  "Per aggiungere la persona all'Unità di Strada indica l'Area di provenienza.";
 const CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG =
   "ATTENZIONE: il beneficiario non ha un Centro di Ascolto assegnato. Non è possibile assegnare Credito Solidale.";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -984,13 +986,21 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const patchKeys = Object.keys(input);
-  const isInitialUdsLink = !existing.uds
-    && toBool(input.uds) === true
-    && patchKeys.length > 0
-    && patchKeys.every((key) => key === "uds" || key === "zonaUdsId" || key === "fasciaEtaPresunta" || key === "versione");
-  const canLinkWithinCallerAreaOperativa = isInitialUdsLink
-    && cid != null
-    && existing.areaOperativaId === cid;
+  const isInitialUdsLink =
+    !existing.uds &&
+    toBool(input.uds) === true &&
+    patchKeys.length > 0 &&
+    patchKeys.every(
+      (key) =>
+        key === "uds" ||
+        key === "zonaUdsId" ||
+        key === "areaProvenienza" ||
+        key === "dataNascita" ||
+        key === "fasciaEtaPresunta" ||
+        key === "versione",
+    );
+  const canLinkWithinCallerAreaOperativa =
+    isInitialUdsLink && cid != null && existing.areaOperativaId === cid;
 
   // The shared-directory UDS action is the only mutation allowed across centro
   // and Zona boundaries, and only for a non-UDS person in the caller's exact
@@ -1150,6 +1160,16 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     return;
   }
   if (enablesUds) {
+    const resultingAreaProvenienza =
+      "areaProvenienza" in updates
+        ? updates.areaProvenienza
+        : existing.areaProvenienza;
+    if (!trimOrUndefined(resultingAreaProvenienza)) {
+      res.status(400).json({
+        error: UDS_LINK_AREA_PROVENIENZA_RICHIESTA_MSG,
+      });
+      return;
+    }
     const resultingDataNascita =
       "dataNascita" in updates ? updates.dataNascita : existing.dataNascita;
     const resultingFasciaEtaPresunta =

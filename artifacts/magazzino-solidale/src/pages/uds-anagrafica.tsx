@@ -45,9 +45,7 @@ export default function UdsAnagrafica() {
   const { user, hasPermission } = useAuth();
   const isGlobal = user?.areaOperativaId == null;
   const [filterAreaOperativa, setFilterAreaOperativa] = useState("");
-  const [filterZona, setFilterZona] = useState(
-    user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
-  );
+  const [filterZona, setFilterZona] = useState(ALL_ZONE);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);

@@ -85,6 +85,7 @@ const newUdsRequiredFields = {
   fasciaEtaPresunta: "30_64",
 } as const;
 const udsEnableRequiredFields = {
+  areaProvenienza: "UE",
   fasciaEtaPresunta: "30_64",
 } as const;
 const creditoSolidaleCentroAscoltoRichiestoMsg =
@@ -568,6 +569,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
     expect(res.body.uds).toBe(true);
     expect(res.body.centroAscoltoId).toBe(centroPersona);
     expect(res.body.zonaUdsId).toBe(zonaOperatore);
+    expect(res.body.areaProvenienza).toBe("UE");
     expect(res.body.fasciaEtaCorrente).toBe("30_64");
     expect(res.body.fasciaEtaOrigine).toBe("presunta");
 
@@ -575,11 +577,151 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       .select({
         id: beneficiariTable.id,
         uds: beneficiariTable.uds,
+        areaProvenienza: beneficiariTable.areaProvenienza,
         fasciaEtaPresunta: beneficiariTable.fasciaEtaPresunta,
       })
       .from(beneficiariTable)
       .where(eq(beneficiariTable.codice, codice));
-    expect(rows).toEqual([{ id: sociale.id, uds: true, fasciaEtaPresunta: "30_64" }]);
+    expect(rows).toEqual([{
+      id: sociale.id,
+      uds: true,
+      areaProvenienza: "UE",
+      fasciaEtaPresunta: "30_64",
+    }]);
+  });
+
+  it("rifiuta il collegamento UDS senza una area di provenienza risultante", async () => {
+    const [sociale] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-${rnd()}`,
+        nome: "Senza",
+        cognome: "Provenienza",
+        sesso: "F",
+        areaOperativaId: areaOperativaA,
+        fasciaEtaPresunta: "30_64",
+        uds: false,
+      })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(sociale.id);
+
+    const res = await request(appAs(areaOperativaA))
+      .patch(`/beneficiari/${sociale.id}`)
+      .send({ uds: true });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(
+      "Per aggiungere la persona all'Unità di Strada indica l'Area di provenienza.",
+    );
+  });
+
+  it("rifiuta il collegamento UDS senza data di nascita o fascia di età risultante", async () => {
+    const [sociale] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-${rnd()}`,
+        nome: "Senza",
+        cognome: "Eta",
+        sesso: "M",
+        areaOperativaId: areaOperativaA,
+        areaProvenienza: "UE",
+        uds: false,
+      })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(sociale.id);
+
+    const res = await request(appAs(areaOperativaA))
+      .patch(`/beneficiari/${sociale.id}`)
+      .send({ uds: true });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(
+      "Se non conosci la data di nascita, seleziona la fascia d'età.",
+    );
+  });
+
+  it("collega a UDS trasferendo area di provenienza e data di nascita", async () => {
+    const [sociale] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-${rnd()}`,
+        nome: "Con",
+        cognome: "DataNascita",
+        sesso: "F",
+        areaOperativaId: areaOperativaA,
+        uds: false,
+      })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(sociale.id);
+
+    const res = await request(appAs(areaOperativaA))
+      .patch(`/beneficiari/${sociale.id}`)
+      .send({
+        uds: true,
+        areaProvenienza: "Extra-UE",
+        dataNascita: "2000-01-01",
+        fasciaEtaPresunta: null,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.areaProvenienza).toBe("Extra-UE");
+    expect(res.body.dataNascita).toBe("2000-01-01");
+    expect(res.body.fasciaEtaPresunta).toBeNull();
+    expect(res.body.fasciaEtaOrigine).toBe("calcolata");
+  });
+
+  it("collega a UDS conservando area di provenienza e fascia già presenti", async () => {
+    const [sociale] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-${rnd()}`,
+        nome: "Dati",
+        cognome: "Presenti",
+        sesso: "M",
+        areaOperativaId: areaOperativaA,
+        areaProvenienza: "UE",
+        fasciaEtaPresunta: "18_29",
+        uds: false,
+      })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(sociale.id);
+
+    const res = await request(appAs(areaOperativaA))
+      .patch(`/beneficiari/${sociale.id}`)
+      .send({ uds: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.areaProvenienza).toBe("UE");
+    expect(res.body.fasciaEtaPresunta).toBe("18_29");
+  });
+
+  it("nega il collegamento UDS di una persona appartenente a un'altra area", async () => {
+    const areaOperativaB = await createAreaOperativa();
+    const [sociale] = await db
+      .insert(beneficiariTable)
+      .values({
+        codice: `BEN-${rnd()}`,
+        nome: "Altra",
+        cognome: "Area",
+        sesso: "F",
+        areaOperativaId: areaOperativaB,
+        areaProvenienza: "UE",
+        fasciaEtaPresunta: "30_64",
+        uds: false,
+      })
+      .returning({ id: beneficiariTable.id });
+    beneficiarioIds.push(sociale.id);
+
+    const res = await request(appAs(areaOperativaA))
+      .patch(`/beneficiari/${sociale.id}`)
+      .send({ uds: true });
+
+    expect(res.status).toBe(403);
+    const [unchanged] = await db
+      .select({ uds: beneficiariTable.uds })
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, sociale.id));
+    expect(unchanged.uds).toBe(false);
   });
 
   it("non trasforma il collegamento UDS in un bypass generico per una persona già UDS di un'altra zona", async () => {
@@ -680,7 +822,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
   it("permette una PATCH parziale del flag UDS su un legacy senza sesso", async () => {
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "LegacySoloUds", cognome: rnd(), areaOperativaId: null, fasciaEtaPresunta: "30_64" })
+      .values({ codice: `BEN-${rnd()}`, nome: "LegacySoloUds", cognome: rnd(), areaOperativaId: null, areaProvenienza: "UE", fasciaEtaPresunta: "30_64" })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
     const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true, areaOperativaId: areaOperativaA });

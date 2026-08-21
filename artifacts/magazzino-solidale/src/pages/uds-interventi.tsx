@@ -172,9 +172,7 @@ export default function UdsInterventi() {
   const [selectedPerson, setSelectedPerson] = useState<string>("");
   const [personSearch, setPersonSearch] = useState("");
   const [filterAreaOperativa, setFilterAreaOperativa] = useState<string>("");
-  const [filterZona, setFilterZona] = useState<string>(
-    user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
-  );
+  const [filterZona, setFilterZona] = useState<string>(ALL_ZONE);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isNewPersonOpen, setIsNewPersonOpen] = useState(false);
   const [selectedPersonFallback, setSelectedPersonFallback] =

@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   exportDirectory: vi.fn(),
   exportProps: null as null | { loadRows: () => Promise<unknown> },
   permissions: new Set<string>(),
+  personaSheetProps: null as null | {
+    open: boolean;
+    initialZonaUdsId: number | null;
+  },
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
@@ -14,7 +18,12 @@ vi.mock("@workspace/api-client-react", () => ({
   exportUdsDirectory: (...args: unknown[]) => mocks.exportDirectory(...args),
   useListUdsDirectory: (params: unknown) => mocks.list(params),
   useListAreeOperative: () => ({ data: [] }),
-  useListZoneUds: () => ({ data: [] }),
+  useListZoneUds: () => ({
+    data: [
+      { id: 20, nome: "Zona 20" },
+      { id: 30, nome: "Zona 30" },
+    ],
+  }),
   useUpdateBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
   useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn() }),
 }));
@@ -28,7 +37,7 @@ vi.mock("react-i18next", () => ({
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: 1, areaOperativaId: 1, zonaUdsId: null },
+    user: { id: 1, areaOperativaId: 10, zonaUdsId: 20 },
     hasPermission: (permission: string) => mocks.permissions.has(permission),
   }),
 }));
@@ -39,7 +48,16 @@ vi.mock("@/components/export-buttons", () => ({
   },
 }));
 vi.mock("@/components/uds-persona-sheet", () => ({
-  UdsPersonaSheet: () => null,
+  UdsPersonaSheet: ({
+    open,
+    initialZonaUdsId,
+  }: {
+    open: boolean;
+    initialZonaUdsId: number | null;
+  }) => {
+    mocks.personaSheetProps = { open, initialZonaUdsId };
+    return null;
+  },
 }));
 vi.mock("wouter", () => ({
   Link: ({
@@ -84,6 +102,7 @@ describe("paginazione UDS Anagrafica", () => {
     mocks.permissions = new Set(["beneficiari.export", "beneficiari.manage"]);
     mocks.exportDirectory.mockResolvedValue([]);
     mocks.exportProps = null;
+    mocks.personaSheetProps = null;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -137,6 +156,57 @@ describe("paginazione UDS Anagrafica", () => {
     expect(mocks.list).toHaveBeenLastCalledWith(
       expect.objectContaining({ page: 1, search: "Mario" }),
     );
+  });
+
+  it("cerca per default in tutta l'Area e propone la zona operatore alla nuova persona", async () => {
+    await act(async () => root.render(<UdsAnagrafica />));
+
+    expect(mocks.list).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ zonaUdsId: expect.anything() }),
+    );
+    const newPerson = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("udsAnagrafica.newPerson"),
+    );
+    await act(async () => newPerson?.click());
+    expect(mocks.personaSheetProps).toEqual({
+      open: true,
+      initialZonaUdsId: 20,
+    });
+  });
+
+  it("applica la zona scelta esplicitamente anche alla nuova persona", async () => {
+    await act(async () => root.render(<UdsAnagrafica />));
+    const zoneFilter =
+      document.querySelector<HTMLButtonElement>('[role="combobox"]');
+    expect(zoneFilter).not.toBeNull();
+    await act(async () => zoneFilter?.click());
+    const zone20 = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="option"]'),
+    ).find((option) => option.textContent?.trim() === "Zona 20");
+    expect(zone20).toBeDefined();
+    await act(async () => zone20?.click());
+    expect(mocks.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ zonaUdsId: 20 }),
+    );
+
+    await act(async () => zoneFilter?.click());
+    const zone30 = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="option"]'),
+    ).find((option) => option.textContent?.trim() === "Zona 30");
+    expect(zone30).toBeDefined();
+    await act(async () => zone30?.click());
+
+    expect(mocks.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ zonaUdsId: 30 }),
+    );
+    const newPerson = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("udsAnagrafica.newPerson"),
+    );
+    await act(async () => newPerson?.click());
+    expect(mocks.personaSheetProps).toEqual({
+      open: true,
+      initialZonaUdsId: 30,
+    });
   });
 
   it("usa l'endpoint export dedicato e nasconde il comando senza permesso", async () => {
