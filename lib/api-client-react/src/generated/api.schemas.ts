@@ -374,11 +374,12 @@ export interface VolontarioInput {
   centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
-  ruolo: string;
+  /** @minimum 1 */
+  ruoloVolontarioId: number;
   patente?: boolean;
   mezzoPersonale?: boolean;
+  /** @minimum 0 */
   maxConsegneTurno?: number;
-  statoApprovazione?: string;
   note?: string;
 }
 
@@ -396,10 +397,11 @@ export interface MezzoInput {
   volontarioId?: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /** @minimum 0 */
   capacitaColli?: number;
+  /** @minimum 0 */
   capacitaKg?: number;
   descrizione?: string;
-  statoApprovazione?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;
@@ -1173,6 +1175,25 @@ export interface ApprovvigionamentoUpdate {
   righe?: ApprovvigionamentoRigaInput[];
 }
 
+export type TurnoFascia = typeof TurnoFascia[keyof typeof TurnoFascia];
+
+
+export const TurnoFascia = {
+  '09-13': '09-13',
+  '14-18': '14-18',
+  '18-20': '18-20',
+} as const;
+
+export type TurnoStato = typeof TurnoStato[keyof typeof TurnoStato];
+
+
+export const TurnoStato = {
+  pianificato: 'pianificato',
+  confermato: 'confermato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
 export interface TurnoVolontario {
   volontarioId: number;
   /** @nullable */
@@ -1189,7 +1210,7 @@ export interface Turno {
   /** @nullable */
   centroAscoltoNome?: string | null;
   data: string;
-  fascia: string;
+  fascia: TurnoFascia;
   /** @nullable */
   mezzoId?: number | null;
   /** @nullable */
@@ -1198,8 +1219,23 @@ export interface Turno {
   mezzoTipo?: string | null;
   /** @nullable */
   mezzoStatoApprovazione?: string | null;
+  stato: TurnoStato;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @minimum 1 */
+  versione: number;
+  dataAggiornamento: string;
   volontari: TurnoVolontario[];
 }
+
+export type TurnoInputFascia = typeof TurnoInputFascia[keyof typeof TurnoInputFascia];
+
+
+export const TurnoInputFascia = {
+  '09-13': '09-13',
+  '14-18': '14-18',
+  '18-20': '18-20',
+} as const;
 
 export interface TurnoVolontarioInput {
   volontarioId: number;
@@ -1209,10 +1245,12 @@ export interface TurnoVolontarioInput {
 export interface TurnoInput {
   centroAscoltoId: number;
   data: string;
-  fascia: string;
+  fascia: TurnoInputFascia;
   /** @nullable */
   mezzoId?: number | null;
   volontari: TurnoVolontarioInput[];
+  /** @minimum 1 */
+  versione?: number;
 }
 
 export interface TurnoVolontarioPendingInput {
@@ -1223,6 +1261,8 @@ export interface TurnoVolontarioPendingInput {
   telefono?: string;
   email?: string;
   ruolo?: string;
+  /** @minimum 1 */
+  ruoloVolontarioId: number;
   patente?: boolean;
   note?: string;
 }
@@ -1238,6 +1278,28 @@ export interface TurnoMezzoPendingInput {
   capacitaKg?: number;
   descrizione?: string;
   note?: string;
+}
+
+export type TurnoStatoInputStato = typeof TurnoStatoInputStato[keyof typeof TurnoStatoInputStato];
+
+
+export const TurnoStatoInputStato = {
+  confermato: 'confermato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+export interface TurnoStatoInput {
+  stato: TurnoStatoInputStato;
+  /** @minimum 1 */
+  versione: number;
+  motivoAnnullamento?: string;
+}
+
+export interface AnnullaTurnoInput {
+  /** @minimum 1 */
+  versione: number;
+  motivoAnnullamento?: string;
 }
 
 export interface BeneficiarioSimile {
@@ -4668,6 +4730,15 @@ export interface BollaUpdate {
   noteConsegna?: string | null;
 }
 
+export type VolontarioStatoApprovazione = typeof VolontarioStatoApprovazione[keyof typeof VolontarioStatoApprovazione];
+
+
+export const VolontarioStatoApprovazione = {
+  in_attesa: 'in_attesa',
+  approvato: 'approvato',
+  respinto: 'respinto',
+} as const;
+
 export interface Volontario {
   id: number;
   nome: string;
@@ -4683,14 +4754,22 @@ export interface Volontario {
   /** @nullable */
   email?: string | null;
   ruolo: string;
+  /** @nullable */
+  ruoloVolontarioId?: number | null;
+  /** @nullable */
+  ruoloCatalogoNome?: string | null;
   patente: boolean;
   mezzoPersonale: boolean;
+  /** @minimum 0 */
   maxConsegneTurno: number;
   attivo: boolean;
-  statoApprovazione?: string;
+  statoApprovazione: VolontarioStatoApprovazione;
   /** @nullable */
   note?: string | null;
+  /** @minimum 1 */
+  versione: number;
   dataCreazione: string;
+  dataAggiornamento: string;
 }
 
 export interface VolontarioUpdate {
@@ -4701,14 +4780,37 @@ export interface VolontarioUpdate {
   centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
-  ruolo?: string;
+  /** @minimum 1 */
+  ruoloVolontarioId?: number;
   patente?: boolean;
   mezzoPersonale?: boolean;
+  /** @minimum 0 */
   maxConsegneTurno?: number;
   attivo?: boolean;
-  statoApprovazione?: string;
   note?: string;
+  /** @minimum 1 */
+  versione: number;
 }
+
+export type MezzoStato = typeof MezzoStato[keyof typeof MezzoStato];
+
+
+export const MezzoStato = {
+  disponibile: 'disponibile',
+  non_disponibile: 'non_disponibile',
+  manutenzione: 'manutenzione',
+  respinto: 'respinto',
+  ritirato: 'ritirato',
+} as const;
+
+export type MezzoStatoApprovazione = typeof MezzoStatoApprovazione[keyof typeof MezzoStatoApprovazione];
+
+
+export const MezzoStatoApprovazione = {
+  in_attesa: 'in_attesa',
+  approvato: 'approvato',
+  respinto: 'respinto',
+} as const;
 
 export interface Mezzo {
   id: number;
@@ -4735,16 +4837,30 @@ export interface Mezzo {
   capacitaKg?: number | null;
   /** @nullable */
   descrizione?: string | null;
-  stato: string;
-  statoApprovazione?: string;
+  stato: MezzoStato;
+  statoApprovazione: MezzoStatoApprovazione;
   /** @nullable */
   scadenzaAssicurazione?: string | null;
   /** @nullable */
   scadenzaRevisione?: string | null;
   /** @nullable */
   note?: string | null;
+  /** @minimum 1 */
+  versione: number;
   dataCreazione: string;
+  dataAggiornamento: string;
 }
+
+export type MezzoUpdateStato = typeof MezzoUpdateStato[keyof typeof MezzoUpdateStato];
+
+
+export const MezzoUpdateStato = {
+  disponibile: 'disponibile',
+  non_disponibile: 'non_disponibile',
+  manutenzione: 'manutenzione',
+  respinto: 'respinto',
+  ritirato: 'ritirato',
+} as const;
 
 export interface MezzoUpdate {
   tipo?: string;
@@ -4755,18 +4871,23 @@ export interface MezzoUpdate {
   volontarioId?: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /** @minimum 0 */
   capacitaColli?: number;
+  /** @minimum 0 */
   capacitaKg?: number;
   descrizione?: string;
-  stato?: string;
-  statoApprovazione?: string;
+  stato?: MezzoUpdateStato;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface ActionResult {
   ok: boolean;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface ApprovazioneVolontario {
@@ -4789,6 +4910,8 @@ export interface ApprovazioneVolontario {
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface ApprovazioneMezzo {
@@ -4811,6 +4934,8 @@ export interface ApprovazioneMezzo {
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface ApprovazioniLogistica {
@@ -6652,8 +6777,17 @@ export type GetVolontariCaricoParams = {
  */
 data: string;
 excludeConsegnaId?: number;
-excludeBollaId?: number;
+fascia: GetVolontariCaricoFascia;
 };
+
+export type GetVolontariCaricoFascia = typeof GetVolontariCaricoFascia[keyof typeof GetVolontariCaricoFascia];
+
+
+export const GetVolontariCaricoFascia = {
+  '09-13': '09-13',
+  '14-18': '14-18',
+  '18-20': '18-20',
+} as const;
 
 export type GetVolontariCarico200Item = {
   volontarioId: number;

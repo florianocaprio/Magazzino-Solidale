@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ActionResult {
-  ok: boolean;
+export interface AnnullaTurnoInput {
   /** @minimum 1 */
   versione: number;
+  motivoAnnullamento?: string;
 }

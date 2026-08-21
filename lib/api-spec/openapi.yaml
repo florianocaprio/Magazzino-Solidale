@@ -1025,6 +1025,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Turno"
+        "204":
+          description: Empty non-existing slot; no record created
+        "400":
+          description: Invalid payload or missing version on update
+        "403":
+          description: Resource outside the caller scope or not assignable
+        "409":
+          description: Stale version or concurrent slot conflict
 
   /turni/volontari-pending:
     post:
@@ -1074,9 +1082,52 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnullaTurnoInput"
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Shift logically cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Turno"
+        "409":
+          description: Stale version or incompatible lifecycle transition
+
+  /turni/{id}/stato:
+    patch:
+      operationId: updateTurnoStato
+      tags: [turni]
+      summary: Apply an audited shift lifecycle transition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TurnoStatoInput"
+      responses:
+        "200":
+          description: Updated shift
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Turno"
+        "400":
+          description: Invalid payload or missing cancellation reason
+        "403":
+          description: Shift outside the caller scope
+        "409":
+          description: Stale version or incompatible transition
 
   # ─── BENEFICIARI ─────────────────────────────────────────────────────────────
   /beneficiari:
@@ -4797,7 +4848,7 @@ paths:
     get:
       operationId: getVolontariCarico
       tags: [volontari]
-      summary: Carico (numero consegne assegnate) per volontario in un turno/giorno
+      summary: Carico per volontario nella stessa data e fascia canonica
       parameters:
         - name: data
           in: query
@@ -4810,11 +4861,12 @@ paths:
           required: false
           schema:
             type: integer
-        - name: excludeBollaId
+        - name: fascia
           in: query
-          required: false
+          required: true
           schema:
-            type: integer
+            type: string
+            enum: [09-13, 14-18, 18-20]
       responses:
         "200":
           description: Carico per volontario
@@ -4879,9 +4931,19 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
+        "200":
+          description: Historical volunteer deactivated instead of deleted
         "204":
-          description: Deleted
+          description: Never-used volunteer deleted
+        "409":
+          description: Stale version
 
   # ─── MEZZI ───────────────────────────────────────────────────────────────────
   /mezzi:
@@ -4980,9 +5042,19 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
+        "200":
+          description: Historical vehicle retired instead of deleted
         "204":
-          description: Deleted
+          description: Never-used vehicle deleted
+        "409":
+          description: Stale version
 
   # ─── APPROVAZIONI LOGISTICA ─────────────────────────────────────────────────
   /approvazioni-logistica:
@@ -5008,6 +5080,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
           description: Approved
@@ -5026,6 +5104,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
           description: Rejected
@@ -5044,6 +5128,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
           description: Approved
@@ -5062,6 +5152,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersioneInput"
       responses:
         "200":
           description: Rejected
@@ -7966,6 +8062,7 @@ components:
 
     VersioneInput:
       type: object
+      additionalProperties: false
       properties:
         versione:
           type: integer
@@ -8216,6 +8313,7 @@ components:
           type: string
         fascia:
           type: string
+          enum: [09-13, 14-18, 18-20]
         mezzoId:
           type: ["integer", "null"]
         mezzoCodice:
@@ -8224,11 +8322,21 @@ components:
           type: ["string", "null"]
         mezzoStatoApprovazione:
           type: ["string", "null"]
+        stato:
+          type: string
+          enum: [pianificato, confermato, completato, annullato]
+        motivoAnnullamento:
+          type: ["string", "null"]
+        versione:
+          type: integer
+          minimum: 1
+        dataAggiornamento:
+          type: string
         volontari:
           type: array
           items:
             $ref: "#/components/schemas/TurnoVolontario"
-      required: [id, centroAscoltoId, data, fascia, volontari]
+      required: [id, centroAscoltoId, data, fascia, stato, versione, dataAggiornamento, volontari]
 
     TurnoVolontario:
       type: object
@@ -8252,12 +8360,16 @@ components:
           type: string
         fascia:
           type: string
+          enum: [09-13, 14-18, 18-20]
         mezzoId:
           type: ["integer", "null"]
         volontari:
           type: array
           items:
             $ref: "#/components/schemas/TurnoVolontarioInput"
+        versione:
+          type: integer
+          minimum: 1
       required: [centroAscoltoId, data, fascia, volontari]
 
     TurnoVolontarioInput:
@@ -8286,11 +8398,14 @@ components:
           type: string
         ruolo:
           type: string
+        ruoloVolontarioId:
+          type: integer
+          minimum: 1
         patente:
           type: boolean
         note:
           type: string
-      required: [centroAscoltoId, nome, cognome, matricola]
+      required: [centroAscoltoId, nome, cognome, matricola, ruoloVolontarioId]
 
     TurnoMezzoPendingInput:
       type: object
@@ -8316,6 +8431,31 @@ components:
         note:
           type: string
       required: [centroAscoltoId, tipo]
+
+    TurnoStatoInput:
+      type: object
+      additionalProperties: false
+      properties:
+        stato:
+          type: string
+          enum: [confermato, completato, annullato]
+        versione:
+          type: integer
+          minimum: 1
+        motivoAnnullamento:
+          type: string
+      required: [stato, versione]
+
+    AnnullaTurnoInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+        motivoAnnullamento:
+          type: string
+      required: [versione]
 
     # ── Beneficiari ───────────────────────────────────────────────────────
     BeneficiarioSimile:
@@ -12618,19 +12758,30 @@ components:
           type: ["string", "null"]
         ruolo:
           type: string
+        ruoloVolontarioId:
+          type: ["integer", "null"]
+        ruoloCatalogoNome:
+          type: ["string", "null"]
         patente:
           type: boolean
         mezzoPersonale:
           type: boolean
         maxConsegneTurno:
           type: integer
+          minimum: 0
         attivo:
           type: boolean
         statoApprovazione:
           type: string
+          enum: [in_attesa, approvato, respinto]
         note:
           type: ["string", "null"]
+        versione:
+          type: integer
+          minimum: 1
         dataCreazione:
+          type: string
+        dataAggiornamento:
           type: string
       required:
         [
@@ -12642,7 +12793,10 @@ components:
           mezzoPersonale,
           maxConsegneTurno,
           attivo,
+          statoApprovazione,
+          versione,
           dataCreazione,
+          dataAggiornamento,
         ]
 
     VolontarioInput:
@@ -12660,19 +12814,19 @@ components:
           type: string
         email:
           type: string
-        ruolo:
-          type: string
+        ruoloVolontarioId:
+          type: integer
+          minimum: 1
         patente:
           type: boolean
         mezzoPersonale:
           type: boolean
         maxConsegneTurno:
           type: integer
-        statoApprovazione:
-          type: string
+          minimum: 0
         note:
           type: string
-      required: [nome, cognome, matricola, ruolo]
+      required: [nome, cognome, matricola, ruoloVolontarioId]
 
     VolontarioUpdate:
       type: object
@@ -12689,20 +12843,24 @@ components:
           type: string
         email:
           type: string
-        ruolo:
-          type: string
+        ruoloVolontarioId:
+          type: integer
+          minimum: 1
         patente:
           type: boolean
         mezzoPersonale:
           type: boolean
         maxConsegneTurno:
           type: integer
+          minimum: 0
         attivo:
           type: boolean
-        statoApprovazione:
-          type: string
         note:
           type: string
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
 
     # ── Mezzi ─────────────────────────────────────────────────────────────
     Mezzo:
@@ -12738,17 +12896,24 @@ components:
           type: ["string", "null"]
         stato:
           type: string
+          enum: [disponibile, non_disponibile, manutenzione, respinto, ritirato]
         statoApprovazione:
           type: string
+          enum: [in_attesa, approvato, respinto]
         scadenzaAssicurazione:
           type: ["string", "null"]
         scadenzaRevisione:
           type: ["string", "null"]
         note:
           type: ["string", "null"]
+        versione:
+          type: integer
+          minimum: 1
         dataCreazione:
           type: string
-      required: [id, codice, tipo, proprieta, stato, dataCreazione]
+        dataAggiornamento:
+          type: string
+      required: [id, codice, tipo, proprieta, stato, statoApprovazione, versione, dataCreazione, dataAggiornamento]
 
     MezzoInput:
       type: object
@@ -12769,11 +12934,11 @@ components:
           type: ["integer", "null"]
         capacitaColli:
           type: integer
+          minimum: 0
         capacitaKg:
           type: number
+          minimum: 0
         descrizione:
-          type: string
-        statoApprovazione:
           type: string
         scadenzaAssicurazione:
           type: string
@@ -12800,20 +12965,25 @@ components:
           type: ["integer", "null"]
         capacitaColli:
           type: integer
+          minimum: 0
         capacitaKg:
           type: number
+          minimum: 0
         descrizione:
           type: string
         stato:
           type: string
-        statoApprovazione:
-          type: string
+          enum: [disponibile, non_disponibile, manutenzione, respinto, ritirato]
         scadenzaAssicurazione:
           type: string
         scadenzaRevisione:
           type: string
         note:
           type: string
+        versione:
+          type: integer
+          minimum: 1
+      required: [versione]
 
     # ── Approvazioni Logistica ────────────────────────────────────────────
     ActionResult:
@@ -12821,7 +12991,10 @@ components:
       properties:
         ok:
           type: boolean
-      required: [ok]
+        versione:
+          type: integer
+          minimum: 1
+      required: [ok, versione]
 
     ApprovazioneVolontario:
       type: object
@@ -12852,8 +13025,11 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
+        versione:
+          type: integer
+          minimum: 1
       required:
-        [id, nome, cognome, ruolo, attivo, statoApprovazione, dataCreazione]
+        [id, nome, cognome, ruolo, attivo, statoApprovazione, versione, dataCreazione]
 
     ApprovazioneMezzo:
       type: object
@@ -12884,8 +13060,11 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
+        versione:
+          type: integer
+          minimum: 1
       required:
-        [id, codice, tipo, proprieta, stato, statoApprovazione, dataCreazione]
+        [id, codice, tipo, proprieta, stato, statoApprovazione, versione, dataCreazione]
 
     ApprovazioniLogistica:
       type: object

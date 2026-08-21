@@ -14,6 +14,8 @@ export interface TurnoVolontarioPendingInput {
   telefono?: string;
   email?: string;
   ruolo?: string;
+  /** @minimum 1 */
+  ruoloVolontarioId: number;
   patente?: boolean;
   note?: string;
 }

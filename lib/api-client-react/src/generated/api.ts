@@ -29,6 +29,7 @@ import type {
   ActionResult,
   Alert,
   AllocazioneMezziReport,
+  AnnullaTurnoInput,
   ApprovazioniLogistica,
   Approvvigionamento,
   ApprovvigionamentoInput,
@@ -310,6 +311,7 @@ import type {
   Turno,
   TurnoInput,
   TurnoMezzoPendingInput,
+  TurnoStatoInput,
   TurnoVolontarioPendingInput,
   UdsDirectoryExportInput,
   UdsDirectoryItem,
@@ -3652,9 +3654,9 @@ export const getUpsertTurnoUrl = () => {
 /**
  * @summary Create or replace a shift (centro+data+fascia) and its volunteers
  */
-export const upsertTurno = async (turnoInput: TurnoInput, options?: RequestInit): Promise<Turno> => {
+export const upsertTurno = async (turnoInput: TurnoInput, options?: RequestInit): Promise<Turno | void> => {
 
-  return customFetch<Turno>(getUpsertTurnoUrl(),
+  return customFetch<Turno | void>(getUpsertTurnoUrl(),
   {
     ...options,
     method: 'PUT',
@@ -3667,7 +3669,7 @@ export const upsertTurno = async (turnoInput: TurnoInput, options?: RequestInit)
 
 
 
-export const getUpsertTurnoMutationOptions = <TError = ErrorType<unknown>,
+export const getUpsertTurnoMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertTurno>>, TError,{data: BodyType<TurnoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof upsertTurno>>, TError,{data: BodyType<TurnoInput>}, TContext> => {
 
@@ -3696,12 +3698,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpsertTurnoMutationResult = NonNullable<Awaited<ReturnType<typeof upsertTurno>>>
     export type UpsertTurnoMutationBody = BodyType<TurnoInput>
-    export type UpsertTurnoMutationError = ErrorType<unknown>
+    export type UpsertTurnoMutationError = ErrorType<void>
 
     /**
  * @summary Create or replace a shift (centro+data+fascia) and its volunteers
  */
-export const useUpsertTurno = <TError = ErrorType<unknown>,
+export const useUpsertTurno = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertTurno>>, TError,{data: BodyType<TurnoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof upsertTurno>>,
@@ -3862,23 +3864,25 @@ export const getDeleteTurnoUrl = (id: number,) => {
   return `/api/turni/${id}`
 }
 
-export const deleteTurno = async (id: number, options?: RequestInit): Promise<void> => {
+export const deleteTurno = async (id: number,
+    annullaTurnoInput: AnnullaTurnoInput, options?: RequestInit): Promise<Turno> => {
 
-  return customFetch<void>(getDeleteTurnoUrl(id),
+  return customFetch<Turno>(getDeleteTurnoUrl(id),
   {
     ...options,
-    method: 'DELETE'
-
-
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      annullaTurnoInput,)
   }
 );}
 
 
 
 
-export const getDeleteTurnoMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number}, TContext> => {
+export const getDeleteTurnoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number;data: BodyType<AnnullaTurnoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number;data: BodyType<AnnullaTurnoInput>}, TContext> => {
 
 const mutationKey = ['deleteTurno'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -3890,10 +3894,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTurno>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTurno>>, {id: number;data: BodyType<AnnullaTurnoInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  deleteTurno(id,requestOptions)
+          return  deleteTurno(id,data,requestOptions)
         }
 
 
@@ -3904,18 +3908,90 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteTurnoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTurno>>>
+    export type DeleteTurnoMutationBody = BodyType<AnnullaTurnoInput>
+    export type DeleteTurnoMutationError = ErrorType<void>
 
-    export type DeleteTurnoMutationError = ErrorType<unknown>
-
-    export const useDeleteTurno = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    export const useDeleteTurno = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTurno>>, TError,{id: number;data: BodyType<AnnullaTurnoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteTurno>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<AnnullaTurnoInput>},
         TContext
       > => {
       return useMutation(getDeleteTurnoMutationOptions(options));
+    }
+
+export const getUpdateTurnoStatoUrl = (id: number,) => {
+
+
+
+
+  return `/api/turni/${id}/stato`
+}
+
+/**
+ * @summary Apply an audited shift lifecycle transition
+ */
+export const updateTurnoStato = async (id: number,
+    turnoStatoInput: TurnoStatoInput, options?: RequestInit): Promise<Turno> => {
+
+  return customFetch<Turno>(getUpdateTurnoStatoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      turnoStatoInput,)
+  }
+);}
+
+
+
+
+export const getUpdateTurnoStatoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTurnoStato>>, TError,{id: number;data: BodyType<TurnoStatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTurnoStato>>, TError,{id: number;data: BodyType<TurnoStatoInput>}, TContext> => {
+
+const mutationKey = ['updateTurnoStato'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTurnoStato>>, {id: number;data: BodyType<TurnoStatoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTurnoStato(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTurnoStatoMutationResult = NonNullable<Awaited<ReturnType<typeof updateTurnoStato>>>
+    export type UpdateTurnoStatoMutationBody = BodyType<TurnoStatoInput>
+    export type UpdateTurnoStatoMutationError = ErrorType<void>
+
+    /**
+ * @summary Apply an audited shift lifecycle transition
+ */
+export const useUpdateTurnoStato = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTurnoStato>>, TError,{id: number;data: BodyType<TurnoStatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTurnoStato>>,
+        TError,
+        {id: number;data: BodyType<TurnoStatoInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateTurnoStatoMutationOptions(options));
     }
 
 export const getListBeneficiariUrl = (params?: ListBeneficiariParams,) => {
@@ -15066,7 +15142,7 @@ export const getGetVolontariCaricoUrl = (params: GetVolontariCaricoParams,) => {
 }
 
 /**
- * @summary Carico (numero consegne assegnate) per volontario in un turno/giorno
+ * @summary Carico per volontario nella stessa data e fascia canonica
  */
 export const getVolontariCarico = async (params: GetVolontariCaricoParams, options?: RequestInit): Promise<GetVolontariCarico200Item[]> => {
 
@@ -15113,7 +15189,7 @@ export type GetVolontariCaricoQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Carico (numero consegne assegnate) per volontario in un turno/giorno
+ * @summary Carico per volontario nella stessa data e fascia canonica
  */
 
 export function useGetVolontariCarico<TData = Awaited<ReturnType<typeof getVolontariCarico>>, TError = ErrorType<unknown>>(
@@ -15279,23 +15355,25 @@ export const getDeleteVolontarioUrl = (id: number,) => {
   return `/api/volontari/${id}`
 }
 
-export const deleteVolontario = async (id: number, options?: RequestInit): Promise<void> => {
+export const deleteVolontario = async (id: number,
+    versioneInput: VersioneInput, options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getDeleteVolontarioUrl(id),
   {
     ...options,
-    method: 'DELETE'
-
-
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      versioneInput,)
   }
 );}
 
 
 
 
-export const getDeleteVolontarioMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVolontario>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteVolontario>>, TError,{id: number}, TContext> => {
+export const getDeleteVolontarioMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVolontario>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteVolontario>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext> => {
 
 const mutationKey = ['deleteVolontario'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15307,10 +15385,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteVolontario>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteVolontario>>, {id: number;data: BodyType<VersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  deleteVolontario(id,requestOptions)
+          return  deleteVolontario(id,data,requestOptions)
         }
 
 
@@ -15321,15 +15399,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteVolontarioMutationResult = NonNullable<Awaited<ReturnType<typeof deleteVolontario>>>
+    export type DeleteVolontarioMutationBody = BodyType<VersioneInput>
+    export type DeleteVolontarioMutationError = ErrorType<void>
 
-    export type DeleteVolontarioMutationError = ErrorType<unknown>
-
-    export const useDeleteVolontario = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVolontario>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    export const useDeleteVolontario = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVolontario>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteVolontario>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<VersioneInput>},
         TContext
       > => {
       return useMutation(getDeleteVolontarioMutationOptions(options));
@@ -15681,23 +15759,25 @@ export const getDeleteMezzoUrl = (id: number,) => {
   return `/api/mezzi/${id}`
 }
 
-export const deleteMezzo = async (id: number, options?: RequestInit): Promise<void> => {
+export const deleteMezzo = async (id: number,
+    versioneInput: VersioneInput, options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getDeleteMezzoUrl(id),
   {
     ...options,
-    method: 'DELETE'
-
-
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      versioneInput,)
   }
 );}
 
 
 
 
-export const getDeleteMezzoMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMezzo>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteMezzo>>, TError,{id: number}, TContext> => {
+export const getDeleteMezzoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMezzo>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMezzo>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext> => {
 
 const mutationKey = ['deleteMezzo'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15709,10 +15789,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMezzo>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMezzo>>, {id: number;data: BodyType<VersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  deleteMezzo(id,requestOptions)
+          return  deleteMezzo(id,data,requestOptions)
         }
 
 
@@ -15723,15 +15803,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteMezzoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMezzo>>>
+    export type DeleteMezzoMutationBody = BodyType<VersioneInput>
+    export type DeleteMezzoMutationError = ErrorType<void>
 
-    export type DeleteMezzoMutationError = ErrorType<unknown>
-
-    export const useDeleteMezzo = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMezzo>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    export const useDeleteMezzo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMezzo>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteMezzo>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<VersioneInput>},
         TContext
       > => {
       return useMutation(getDeleteMezzoMutationOptions(options));
@@ -15822,14 +15902,16 @@ export const getApprovaVolontarioLogisticaUrl = (id: number,) => {
   return `/api/approvazioni-logistica/volontari/${id}/approva`
 }
 
-export const approvaVolontarioLogistica = async (id: number, options?: RequestInit): Promise<ActionResult> => {
+export const approvaVolontarioLogistica = async (id: number,
+    versioneInput: VersioneInput, options?: RequestInit): Promise<ActionResult> => {
 
   return customFetch<ActionResult>(getApprovaVolontarioLogisticaUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      versioneInput,)
   }
 );}
 
@@ -15837,8 +15919,8 @@ export const approvaVolontarioLogistica = async (id: number, options?: RequestIn
 
 
 export const getApprovaVolontarioLogisticaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvaVolontarioLogistica>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof approvaVolontarioLogistica>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvaVolontarioLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approvaVolontarioLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext> => {
 
 const mutationKey = ['approvaVolontarioLogistica'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15850,10 +15932,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approvaVolontarioLogistica>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approvaVolontarioLogistica>>, {id: number;data: BodyType<VersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  approvaVolontarioLogistica(id,requestOptions)
+          return  approvaVolontarioLogistica(id,data,requestOptions)
         }
 
 
@@ -15864,15 +15946,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ApprovaVolontarioLogisticaMutationResult = NonNullable<Awaited<ReturnType<typeof approvaVolontarioLogistica>>>
-
+    export type ApprovaVolontarioLogisticaMutationBody = BodyType<VersioneInput>
     export type ApprovaVolontarioLogisticaMutationError = ErrorType<unknown>
 
     export const useApprovaVolontarioLogistica = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvaVolontarioLogistica>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvaVolontarioLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof approvaVolontarioLogistica>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<VersioneInput>},
         TContext
       > => {
       return useMutation(getApprovaVolontarioLogisticaMutationOptions(options));
@@ -15886,14 +15968,16 @@ export const getRespingiVolontarioLogisticaUrl = (id: number,) => {
   return `/api/approvazioni-logistica/volontari/${id}/respingi`
 }
 
-export const respingiVolontarioLogistica = async (id: number, options?: RequestInit): Promise<ActionResult> => {
+export const respingiVolontarioLogistica = async (id: number,
+    versioneInput: VersioneInput, options?: RequestInit): Promise<ActionResult> => {
 
   return customFetch<ActionResult>(getRespingiVolontarioLogisticaUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      versioneInput,)
   }
 );}
 
@@ -15901,8 +15985,8 @@ export const respingiVolontarioLogistica = async (id: number, options?: RequestI
 
 
 export const getRespingiVolontarioLogisticaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respingiVolontarioLogistica>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof respingiVolontarioLogistica>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respingiVolontarioLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof respingiVolontarioLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext> => {
 
 const mutationKey = ['respingiVolontarioLogistica'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15914,10 +15998,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respingiVolontarioLogistica>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respingiVolontarioLogistica>>, {id: number;data: BodyType<VersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  respingiVolontarioLogistica(id,requestOptions)
+          return  respingiVolontarioLogistica(id,data,requestOptions)
         }
 
 
@@ -15928,15 +16012,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type RespingiVolontarioLogisticaMutationResult = NonNullable<Awaited<ReturnType<typeof respingiVolontarioLogistica>>>
-
+    export type RespingiVolontarioLogisticaMutationBody = BodyType<VersioneInput>
     export type RespingiVolontarioLogisticaMutationError = ErrorType<unknown>
 
     export const useRespingiVolontarioLogistica = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respingiVolontarioLogistica>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respingiVolontarioLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof respingiVolontarioLogistica>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<VersioneInput>},
         TContext
       > => {
       return useMutation(getRespingiVolontarioLogisticaMutationOptions(options));
@@ -15950,14 +16034,16 @@ export const getApprovaMezzoLogisticaUrl = (id: number,) => {
   return `/api/approvazioni-logistica/mezzi/${id}/approva`
 }
 
-export const approvaMezzoLogistica = async (id: number, options?: RequestInit): Promise<ActionResult> => {
+export const approvaMezzoLogistica = async (id: number,
+    versioneInput: VersioneInput, options?: RequestInit): Promise<ActionResult> => {
 
   return customFetch<ActionResult>(getApprovaMezzoLogisticaUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      versioneInput,)
   }
 );}
 
@@ -15965,8 +16051,8 @@ export const approvaMezzoLogistica = async (id: number, options?: RequestInit): 
 
 
 export const getApprovaMezzoLogisticaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvaMezzoLogistica>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof approvaMezzoLogistica>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvaMezzoLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approvaMezzoLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext> => {
 
 const mutationKey = ['approvaMezzoLogistica'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15978,10 +16064,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approvaMezzoLogistica>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approvaMezzoLogistica>>, {id: number;data: BodyType<VersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  approvaMezzoLogistica(id,requestOptions)
+          return  approvaMezzoLogistica(id,data,requestOptions)
         }
 
 
@@ -15992,15 +16078,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ApprovaMezzoLogisticaMutationResult = NonNullable<Awaited<ReturnType<typeof approvaMezzoLogistica>>>
-
+    export type ApprovaMezzoLogisticaMutationBody = BodyType<VersioneInput>
     export type ApprovaMezzoLogisticaMutationError = ErrorType<unknown>
 
     export const useApprovaMezzoLogistica = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvaMezzoLogistica>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvaMezzoLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof approvaMezzoLogistica>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<VersioneInput>},
         TContext
       > => {
       return useMutation(getApprovaMezzoLogisticaMutationOptions(options));
@@ -16014,14 +16100,16 @@ export const getRespingiMezzoLogisticaUrl = (id: number,) => {
   return `/api/approvazioni-logistica/mezzi/${id}/respingi`
 }
 
-export const respingiMezzoLogistica = async (id: number, options?: RequestInit): Promise<ActionResult> => {
+export const respingiMezzoLogistica = async (id: number,
+    versioneInput: VersioneInput, options?: RequestInit): Promise<ActionResult> => {
 
   return customFetch<ActionResult>(getRespingiMezzoLogisticaUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      versioneInput,)
   }
 );}
 
@@ -16029,8 +16117,8 @@ export const respingiMezzoLogistica = async (id: number, options?: RequestInit):
 
 
 export const getRespingiMezzoLogisticaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respingiMezzoLogistica>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof respingiMezzoLogistica>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respingiMezzoLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof respingiMezzoLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext> => {
 
 const mutationKey = ['respingiMezzoLogistica'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -16042,10 +16130,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respingiMezzoLogistica>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respingiMezzoLogistica>>, {id: number;data: BodyType<VersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  respingiMezzoLogistica(id,requestOptions)
+          return  respingiMezzoLogistica(id,data,requestOptions)
         }
 
 
@@ -16056,15 +16144,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type RespingiMezzoLogisticaMutationResult = NonNullable<Awaited<ReturnType<typeof respingiMezzoLogistica>>>
-
+    export type RespingiMezzoLogisticaMutationBody = BodyType<VersioneInput>
     export type RespingiMezzoLogisticaMutationError = ErrorType<unknown>
 
     export const useRespingiMezzoLogistica = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respingiMezzoLogistica>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respingiMezzoLogistica>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof respingiMezzoLogistica>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<VersioneInput>},
         TContext
       > => {
       return useMutation(getRespingiMezzoLogisticaMutationOptions(options));

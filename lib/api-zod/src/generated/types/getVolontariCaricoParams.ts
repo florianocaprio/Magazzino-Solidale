@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { GetVolontariCaricoFascia } from './getVolontariCaricoFascia';
 
 export type GetVolontariCaricoParams = {
 /**
@@ -12,5 +13,5 @@ export type GetVolontariCaricoParams = {
  */
 data: string;
 excludeConsegnaId?: number;
-excludeBollaId?: number;
+fascia: GetVolontariCaricoFascia;
 };

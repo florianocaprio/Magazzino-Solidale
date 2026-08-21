@@ -26,4 +26,6 @@ export interface ApprovazioneVolontario {
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
+  /** @minimum 1 */
+  versione: number;
 }

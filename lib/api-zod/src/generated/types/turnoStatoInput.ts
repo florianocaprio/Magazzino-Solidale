@@ -5,9 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { TurnoStatoInputStato } from './turnoStatoInputStato';
 
-export interface ActionResult {
-  ok: boolean;
+export interface TurnoStatoInput {
+  stato: TurnoStatoInputStato;
   /** @minimum 1 */
   versione: number;
+  motivoAnnullamento?: string;
 }
