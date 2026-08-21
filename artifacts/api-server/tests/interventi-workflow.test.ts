@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import request from "supertest";
 import {
   beneficiariTable,
+  bisogniPianificatiStoricoTable,
   bisogniPianificatiTable,
   centriAscoltoTable,
   areeOperativeTable,
@@ -200,16 +201,19 @@ beforeAll(async () => {
     areaOperativaId: areaOperativaRoma,
     centroAscoltoId: centroRoma,
     zonaUdsId: zonaRoma,
+    uds: true,
   });
   socialeAltroCentroRoma = await createBeneficiario({
     areaOperativaId: areaOperativaRoma,
     centroAscoltoId: altroCentroRoma,
     zonaUdsId: zonaRoma,
+    uds: true,
   });
   socialeMilano = await createBeneficiario({
     areaOperativaId: areaOperativaMilano,
     centroAscoltoId: centroMilano,
     zonaUdsId: zonaMilano,
+    uds: true,
   });
   udsRomaAltraZona = await createBeneficiario({
     areaOperativaId: areaOperativaRoma,
@@ -231,6 +235,18 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (interventoIds.length > 0) {
+    const needs = await db
+      .select({ id: bisogniPianificatiTable.id })
+      .from(bisogniPianificatiTable)
+      .where(inArray(bisogniPianificatiTable.interventoId, interventoIds));
+    if (needs.length > 0) {
+      await db.delete(bisogniPianificatiStoricoTable).where(
+        inArray(
+          bisogniPianificatiStoricoTable.bisognoId,
+          needs.map((need) => need.id),
+        ),
+      );
+    }
     await db
       .delete(bisogniPianificatiTable)
       .where(inArray(bisogniPianificatiTable.interventoId, interventoIds));

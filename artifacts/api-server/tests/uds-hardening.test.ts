@@ -29,6 +29,7 @@ import reportRouter from "../src/routes/report";
 import udsRouter from "../src/routes/uds";
 import zoneUdsRouter from "../src/routes/zone-uds";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
+import { areaGuard } from "../src/middlewares/auth";
 import {
   cleanup,
   createAreaOperativa,
@@ -51,6 +52,7 @@ const UDS_PERMISSIONS = [
   "uds.reports.view",
   "beneficiari.view",
   "beneficiari.manage",
+  "beneficiari.export",
 ] as const;
 
 let scope: SeedScope;
@@ -81,6 +83,21 @@ function appAs(
     aree: ["uds"],
     permessi: [...permessi],
   });
+}
+
+function appWithRealAreaGuard(aree: string[], permessi: readonly string[]) {
+  return makeScopedApp(
+    combinedRouter(),
+    {
+      id: userId,
+      centroAscoltoId: null,
+      areaOperativaId: null,
+      zonaUdsId: null,
+      aree,
+      permessi: [...permessi],
+    },
+    [areaGuard],
+  );
 }
 
 beforeAll(async () => {
@@ -126,6 +143,38 @@ afterAll(async () => {
 });
 
 describe("UDS hardening territoriale e storico", () => {
+  it("classifica i report UDS attraverso areaGuard reale senza ampliare gli altri report", async () => {
+    const udsReports = appWithRealAreaGuard(["uds"], ["uds.reports.view"]);
+    for (const path of [
+      "/report/uds",
+      "/report/uds/interventi-per-mese",
+      "/report/filter-options?section=uds",
+      "/report/drilldown?section=uds&metric=interventi",
+    ]) {
+      expect((await request(udsReports).get(path)).status, path).toBe(200);
+    }
+    for (const path of [
+      "/report/mensa",
+      "/report/emporio",
+      "/report/centro-ascolto",
+      "/report/magazzino-logistica",
+      "/report/fse-plus/integrato",
+    ]) {
+      expect((await request(udsReports).get(path)).status, path).toBe(403);
+    }
+    expect(
+      (await request(appWithRealAreaGuard(["uds"], [])).get("/report/uds"))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await request(
+          appWithRealAreaGuard(["analisi"], ["uds.reports.view"]),
+        ).get("/report/uds")
+      ).status,
+    ).toBe(403);
+  });
+
   it("consente cross-Zona minimizzato nella stessa Area e nega sempre l'altra Area", async () => {
     const areaA = await createAreaOperativa(scope);
     const areaB = await createAreaOperativa(scope);
@@ -293,6 +342,161 @@ describe("UDS hardening territoriale e storico", () => {
     expect(richDuplicateSearch.status).toBe(403);
   });
 
+  it("autorizza e audita l'export server-side della sola directory minimizzata", async () => {
+    const areaA = await createAreaOperativa(scope);
+    const areaB = await createAreaOperativa(scope);
+    const zonaA = await createZona(scope, areaA);
+    const zonaB = await createZona(scope, areaB);
+    const personaA = await createBeneficiario(scope, null, {
+      uds: true,
+      areaOperativaId: areaA,
+      zonaUdsId: zonaA.id,
+    });
+    await createBeneficiario(scope, null, {
+      uds: true,
+      areaOperativaId: areaB,
+      zonaUdsId: zonaB.id,
+    });
+
+    const allowed = await request(
+      appAs(areaA, null, ["uds.directory.view", "beneficiari.export"]),
+    )
+      .post("/uds/directory/export")
+      .send({ zonaUdsId: zonaA.id, search: "Test" });
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.map((item: { id: number }) => item.id)).toContain(
+      personaA,
+    );
+    expect(allowed.body).toHaveLength(1);
+    expect(Object.keys(allowed.body[0]).sort()).toEqual(
+      [
+        "accessoCompleto",
+        "canale",
+        "codice",
+        "cognome",
+        "fasciaEtaCorrente",
+        "id",
+        "nome",
+        "soprannome",
+        "zonaUdsId",
+        "zonaUdsNome",
+      ].sort(),
+    );
+    expect(allowed.body[0]).not.toHaveProperty("telefono");
+    expect(allowed.body[0]).not.toHaveProperty("codiceFiscale");
+
+    expect(
+      (
+        await request(appAs(areaA, null, ["uds.directory.view"]))
+          .post("/uds/directory/export")
+          .send({})
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(appAs(areaA, null, ["beneficiari.export"]))
+          .post("/uds/directory/export")
+          .send({})
+      ).status,
+    ).toBe(403);
+
+    const [audit] = await db
+      .select()
+      .from(auditConfigurazioniTable)
+      .where(
+        and(
+          eq(auditConfigurazioniTable.utenteId, userId),
+          eq(auditConfigurazioniTable.chiave, "directory:export"),
+        ),
+      );
+    expect(audit.valoreNuovo).toMatchObject({
+      tipo: "directory UDS",
+      areaOperativaId: areaA,
+      zonaUdsId: zonaA.id,
+      searchApplied: true,
+      recordCount: 1,
+    });
+    expect(JSON.stringify(audit.valoreNuovo)).not.toMatch(
+      /nome|cognome|codiceFiscale|telefono/i,
+    );
+  });
+
+  it("mantiene accessibile il legacy UDS esplicito senza inventare snapshot", async () => {
+    const areaA = await createAreaOperativa(scope);
+    const areaB = await createAreaOperativa(scope);
+    const persona = await createBeneficiario(scope, null, {
+      uds: false,
+      areaOperativaId: areaA,
+      zonaUdsId: null,
+    });
+    const fixtureClient = await pool.connect();
+    let legacy: number;
+    try {
+      await fixtureClient.query("BEGIN");
+      await fixtureClient.query("SET LOCAL session_replication_role = replica");
+      const inserted = await fixtureClient.query<{ id: number }>(
+        `
+          INSERT INTO interventi (
+            beneficiario_id, ambito, area_operativa_id_snapshot,
+            zona_uds_id_snapshot, data_intervento, tipo_intervento
+          ) VALUES ($1, 'uds', NULL, NULL, '2026-08-19', 'legacy_uds_esplicito')
+          RETURNING id
+        `,
+        [persona],
+      );
+      legacy = inserted.rows[0].id;
+      await fixtureClient.query("COMMIT");
+    } catch (error) {
+      await fixtureClient.query("ROLLBACK");
+      throw error;
+    } finally {
+      fixtureClient.release();
+    }
+    scope.interventoIds.push(legacy);
+    const [legacyRow] = await db
+      .select()
+      .from(interventiTable)
+      .where(eq(interventiTable.id, legacy));
+
+    const sameArea = appAs(areaA, null, [
+      "uds.interventi.view",
+      "uds.interventi.note",
+      "uds.bisogni.manage",
+    ]);
+    const history = await request(sameArea).get(
+      `/uds/beneficiari/${persona}/interventi`,
+    );
+    expect(history.status).toBe(200);
+    expect(history.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: legacy,
+          areaOperativaIdSnapshot: null,
+          zonaUdsIdSnapshot: null,
+          territorioStoricoClassificato: false,
+        }),
+      ]),
+    );
+    const note = await request(sameArea)
+      .patch(`/uds/interventi/${legacy}/nota`)
+      .send({
+        versione: legacyRow.dataAggiornamento?.toISOString(),
+        noteUds: "Nota legacy consentita",
+      });
+    expect(note.status).toBe(200);
+    expect(note.body.areaOperativaIdSnapshot).toBeNull();
+    expect(
+      (await request(appAs(areaB, null)).get(`/uds/interventi/${legacy}`))
+        .status,
+    ).toBe(403);
+    const [persisted] = await db
+      .select()
+      .from(interventiTable)
+      .where(eq(interventiTable.id, legacy));
+    expect(persisted.areaOperativaIdSnapshot).toBeNull();
+    expect(persisted.zonaUdsIdSnapshot).toBeNull();
+  });
+
   it("mantiene snapshot, terminalità, nota/rettifica auditata e Bisogni versionati", async () => {
     const area = await createAreaOperativa(scope);
     const zonaStorica = await createZona(scope, area);
@@ -404,21 +608,62 @@ describe("UDS hardening territoriale e storico", () => {
       versione: needUpdated.body.versione,
     });
 
+    const completedNeed = await request(app)
+      .patch(`/interventi/${created.body.id}/bisogni-pianificati/${need.id}`)
+      .send({
+        versione: needUpdated.body.versione,
+        stato: "completato",
+        motivo: "Completamento",
+      });
+    expect(completedNeed.status).toBe(200);
+    expect(completedNeed.body).toMatchObject({ stato: "completato" });
+    expect(completedNeed.body.dataCompletamento).not.toBeNull();
+
+    const reopenedNeed = await request(app)
+      .patch(`/interventi/${created.body.id}/bisogni-pianificati/${need.id}`)
+      .send({
+        versione: completedNeed.body.versione,
+        stato: "da_pianificare",
+        motivo: "Riapertura",
+      });
+    expect(reopenedNeed.status).toBe(200);
+    expect(reopenedNeed.body).toMatchObject({ stato: "da_pianificare" });
+    expect(reopenedNeed.body.dataCompletamento).toBeNull();
+
+    const createdAfterConclusion = await request(app)
+      .post(`/interventi/${created.body.id}/bisogni-pianificati`)
+      .send({
+        tipo: "azione",
+        descrizione: "Nuovo bisogno successivo",
+        stato: "da_pianificare",
+        priorita: "alta",
+      });
+    expect(createdAfterConclusion.status).toBe(201);
+
     const history = await request(app).get(
       `/interventi/${created.body.id}/bisogni-pianificati/${need.id}/storico`,
     );
     expect(history.status).toBe(200);
-    expect(history.body).toHaveLength(2);
+    expect(history.body).toHaveLength(4);
+    expect(history.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          statoPrecedente: "da_pianificare",
+          statoNuovo: "pianificato",
+          operatoreId: userId,
+          motivo: "Pianificazione",
+        }),
+      ]),
+    );
     expect(history.body.at(-1)).toMatchObject({
-      statoPrecedente: "da_pianificare",
-      statoNuovo: "pianificato",
-      operatoreId: userId,
-      motivo: "Pianificazione",
+      statoPrecedente: "completato",
+      statoNuovo: "da_pianificare",
+      motivo: "Riapertura",
     });
 
     await db
       .update(beneficiariTable)
-      .set({ zonaUdsId: zonaNuova.id, uds: false })
+      .set({ zonaUdsId: null, uds: false })
       .where(eq(beneficiariTable.id, persona));
     const report = await request(app)
       .get("/report/uds/interventi-per-zona")
@@ -476,6 +721,34 @@ describe("UDS hardening territoriale e storico", () => {
 });
 
 describe("Zone UDS lifecycle", () => {
+  it("rifiuta uds=false finché la Zona non viene rimossa esplicitamente", async () => {
+    const area = await createAreaOperativa(scope);
+    const zona = await createZona(scope, area);
+    const personaId = await createBeneficiario(scope, null, {
+      uds: true,
+      areaOperativaId: area,
+      zonaUdsId: zona.id,
+    });
+    const [persona] = await db
+      .select()
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, personaId));
+    const app = appAs(area, null, ["beneficiari.manage"]);
+
+    const rejected = await request(app)
+      .patch(`/beneficiari/${personaId}`)
+      .send({ uds: false, versione: persona.versione });
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.error).toMatch(/rimuovere esplicitamente.*Zona/i);
+
+    const cleared = await request(app)
+      .patch(`/beneficiari/${personaId}`)
+      .send({ uds: false, zonaUdsId: null, versione: persona.versione });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body).toMatchObject({ uds: false, zonaUdsId: null });
+    expect(cleared.body.versione).toBe(persona.versione + 1);
+  });
+
   it("normalizza unicità, rende l'Area immutabile e usa locking/soft deactivate", async () => {
     const areaA = await createAreaOperativa(scope);
     const areaB = await createAreaOperativa(scope);

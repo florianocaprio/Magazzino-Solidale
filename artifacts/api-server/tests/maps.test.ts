@@ -104,6 +104,7 @@ describe("MAPS — capability, scope e routing", () => {
     for (const combination of combinations) {
       const warehouse = await createMagazzino(scope, combination.centreId, { areaOperativaId: combination.areaOperativaId });
       const beneficiary = await createBeneficiario(scope, combination.centreId, {
+        uds: true,
         areaOperativaId: combination.areaOperativaId,
         zonaUdsId: combination.zoneId,
       });

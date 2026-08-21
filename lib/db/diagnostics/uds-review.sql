@@ -75,6 +75,9 @@ WITH interventi_diagnostica AS (
 SELECT 'interventi_uds_senza_area_snapshot' AS controllo, count(*)::bigint AS valore
 FROM interventi_diagnostica WHERE ambito = 'uds' AND area_snapshot IS NULL
 UNION ALL
+SELECT 'interventi_uds_senza_zona_snapshot', count(*)::bigint
+FROM interventi_diagnostica WHERE ambito = 'uds' AND zona_snapshot IS NULL
+UNION ALL
 SELECT 'interventi_uds_zona_area_snapshot_incoerente', count(*)::bigint
 FROM interventi_diagnostica i
 JOIN public.zone_uds z ON z.id = i.zona_snapshot
@@ -135,6 +138,21 @@ LEFT JOIN public.interventi i ON i.id = b.intervento_id
 WHERE i.id IS NULL;
 
 SELECT
+  c.conname AS nome_constraint,
+  c.convalidated AS validato,
+  c.confdeltype AS delete_action_code,
+  CASE c.confdeltype
+    WHEN 'r' THEN 'RESTRICT'
+    WHEN 'a' THEN 'NO ACTION'
+    WHEN 'c' THEN 'CASCADE'
+    WHEN 'n' THEN 'SET NULL'
+    WHEN 'd' THEN 'SET DEFAULT'
+  END AS delete_action
+FROM pg_constraint c
+WHERE c.conrelid = 'public.bisogni_pianificati_storico'::regclass
+  AND c.conname = 'bisogni_pianificati_storico_bisogno_id_fkey';
+
+SELECT
   r.is_admin,
   count(*)::bigint AS ruoli_uds,
   count(*) FILTER (
@@ -162,10 +180,12 @@ SELECT
 FROM pg_constraint c
 WHERE c.conname = ANY(ARRAY[
   'beneficiari_zona_richiede_area_check',
+  'beneficiari_zona_richiede_uds_check',
   'beneficiari_zona_area_fk',
   'utenti_zona_richiede_area_check',
   'utenti_zona_area_fk',
-  'interventi_uds_area_snapshot_check',
+  'interventi_area_operativa_id_snapshot_aree_operative_id_fk',
+  'interventi_zona_uds_id_snapshot_zone_uds_id_fk',
   'interventi_uds_zona_area_snapshot_fk'
 ])
 ORDER BY tabella, nome_constraint;

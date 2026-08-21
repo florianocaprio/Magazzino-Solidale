@@ -2183,6 +2183,28 @@ paths:
                 items: { $ref: "#/components/schemas/UdsDirectoryItem" }
         "403": { description: Area o permesso UDS non disponibile }
 
+  /uds/directory/export:
+    post:
+      operationId: exportUdsDirectory
+      tags: [uds]
+      description: Esporta server-side la stessa proiezione minimizzata della directory, applicando permessi e scope Area UDS.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UdsDirectoryExportInput" }
+      responses:
+        "200":
+          description: Dataset completo minimizzato autorizzato per i filtri richiesti
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UdsDirectoryItem" }
+        "400": { description: Filtri non validi }
+        "403":
+          { description: Richiesti uds.directory.view e beneficiari.export }
+
   /uds/interventi:
     post:
       operationId: createUdsIntervento
@@ -9689,6 +9711,14 @@ components:
           minimum: 1
       required: [versione]
 
+    UdsDirectoryExportInput:
+      type: object
+      additionalProperties: false
+      properties:
+        search: { type: string, minLength: 2, maxLength: 120 }
+        areaOperativaId: { type: integer, minimum: 1 }
+        zonaUdsId: { type: integer, minimum: 1 }
+
     UdsDirectoryItem:
       type: object
       description: Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.
@@ -9734,6 +9764,7 @@ components:
         ambito: { type: string, enum: [uds] }
         areaOperativaIdSnapshot: { type: [integer, "null"] }
         zonaUdsIdSnapshot: { type: [integer, "null"] }
+        territorioStoricoClassificato: { type: boolean }
         dataOraConclusione: { type: [string, "null"], format: date-time }
         dataCreazione: { type: string, format: date-time }
         dataAggiornamento: { type: [string, "null"], format: date-time }
@@ -9752,6 +9783,7 @@ components:
           ambito,
           areaOperativaIdSnapshot,
           zonaUdsIdSnapshot,
+          territorioStoricoClassificato,
           dataOraConclusione,
           dataCreazione,
           dataAggiornamento,

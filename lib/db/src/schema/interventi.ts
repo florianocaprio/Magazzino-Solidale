@@ -116,10 +116,6 @@ export const interventiTable = pgTable(
       "interventi_precedente_diverso_check",
       sql`${table.interventoPrecedenteId} is null or ${table.interventoPrecedenteId} <> ${table.id}`,
     ),
-    check(
-      "interventi_uds_area_snapshot_check",
-      sql`${table.ambito} <> 'uds' or ${table.areaOperativaIdSnapshot} is not null`,
-    ),
     foreignKey({
       name: "interventi_uds_zona_area_snapshot_fk",
       columns: [table.zonaUdsIdSnapshot, table.areaOperativaIdSnapshot],

@@ -104,6 +104,10 @@ vi.mock("@/components/uds-persona-sheet", () => ({
 vi.mock("@/components/bisogni-pianificati-editor", () => ({
   BisogniPianificatiEditor: () => null,
 }));
+vi.mock("@/components/uds-bisogni-dialog", () => ({
+  UdsBisogniDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="gestione-bisogni-dialog" /> : null,
+}));
 vi.mock("@/components/intervento-workflow", () => ({
   InterventoStatoBadge: ({ stato }: { stato: string }) => <span>{stato}</span>,
   interventoDataLabel: () => "21/08/2026",
@@ -212,8 +216,27 @@ describe("hardening UI Interventi UDS", () => {
       "udsInterventi.newIntervento",
     );
     expect(document.body.textContent).not.toContain("udsInterventi.addNote");
+    expect(document.body.textContent).not.toContain(
+      "udsInterventi.manageBisogniAction",
+    );
     expect(
       document.querySelector('button[title="udsInterventi.editAction"]'),
     ).toBeNull();
+  });
+
+  it("espone Gestisci Bisogni sull'Intervento concluso come azione separata", async () => {
+    await renderAndSelectPerson();
+    const manage = Array.from(document.querySelectorAll("button")).find(
+      (button) =>
+        button.textContent?.includes("udsInterventi.manageBisogniAction"),
+    );
+    expect(manage).toBeDefined();
+    await act(async () => manage?.click());
+    expect(
+      document.querySelector('[data-testid="gestione-bisogni-dialog"]'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('button[title="udsInterventi.editAction"]'),
+    ).not.toBeNull();
   });
 });

@@ -591,6 +591,12 @@ export async function createBeneficiarioOne(
   if (options.areaOperativaId != null) values.areaOperativaId = options.areaOperativaId;
   if ("centroAscoltoId" in options) values.centroAscoltoId = options.centroAscoltoId;
   if ("zonaUdsId" in options) values.zonaUdsId = options.zonaUdsId;
+  if (values.zonaUdsId != null && values.uds !== true) {
+    return {
+      error: "Una Zona UDS può essere assegnata soltanto a una persona con UDS attivo",
+      status: 400,
+    };
+  }
   const scopeError = await validateBeneficiarioTerritorialAssignment({
     areaOperativaId: values.areaOperativaId ?? null,
     centroAscoltoId: values.centroAscoltoId ?? null,
@@ -1106,6 +1112,16 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
   // assegna la propria Area anche ai record legacy; un caller globale deve
   // supply one explicitly.
   const resultingUds = "uds" in updates ? updates.uds === true : existing.uds === true;
+  const resultingZonaUds = "zonaUdsId" in updates
+    ? updates.zonaUdsId
+    : existing.zonaUdsId;
+  if (!resultingUds && resultingZonaUds != null) {
+    res.status(400).json({
+      error:
+        "Per disattivare UDS devi rimuovere esplicitamente anche la Zona UDS",
+    });
+    return;
+  }
   const resultingAreaOperativa = "areaOperativaId" in updates ? updates.areaOperativaId : existing.areaOperativaId;
   if (resultingUds && resultingAreaOperativa == null) {
     if (cid != null) {

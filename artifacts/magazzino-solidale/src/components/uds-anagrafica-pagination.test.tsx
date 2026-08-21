@@ -4,11 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
+  exportDirectory: vi.fn(),
+  exportProps: null as null | { loadRows: () => Promise<unknown> },
+  permissions: new Set<string>(),
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
   getListAreeOperativeQueryKey: () => ["aree"],
-  listUdsDirectory: vi.fn().mockResolvedValue([]),
+  exportUdsDirectory: (...args: unknown[]) => mocks.exportDirectory(...args),
   useListUdsDirectory: (params: unknown) => mocks.list(params),
   useListAreeOperative: () => ({ data: [] }),
   useListZoneUds: () => ({ data: [] }),
@@ -26,10 +29,15 @@ vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
     user: { id: 1, areaOperativaId: 1, zonaUdsId: null },
-    hasPermission: () => true,
+    hasPermission: (permission: string) => mocks.permissions.has(permission),
   }),
 }));
-vi.mock("@/components/export-buttons", () => ({ ExportButtons: () => null }));
+vi.mock("@/components/export-buttons", () => ({
+  ExportButtons: (props: { loadRows: () => Promise<unknown> }) => {
+    mocks.exportProps = props;
+    return <button data-testid="uds-export">Export</button>;
+  },
+}));
 vi.mock("@/components/uds-persona-sheet", () => ({
   UdsPersonaSheet: () => null,
 }));
@@ -73,6 +81,9 @@ describe("paginazione UDS Anagrafica", () => {
       data: pageRows(params.page ?? 1),
       isLoading: false,
     }));
+    mocks.permissions = new Set(["beneficiari.export", "beneficiari.manage"]);
+    mocks.exportDirectory.mockResolvedValue([]);
+    mocks.exportProps = null;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -126,5 +137,18 @@ describe("paginazione UDS Anagrafica", () => {
     expect(mocks.list).toHaveBeenLastCalledWith(
       expect.objectContaining({ page: 1, search: "Mario" }),
     );
+  });
+
+  it("usa l'endpoint export dedicato e nasconde il comando senza permesso", async () => {
+    await act(async () => root.render(<UdsAnagrafica />));
+    expect(document.querySelector('[data-testid="uds-export"]')).not.toBeNull();
+    await act(async () => {
+      await mocks.exportProps?.loadRows();
+    });
+    expect(mocks.exportDirectory).toHaveBeenCalledWith({});
+
+    mocks.permissions.delete("beneficiari.export");
+    await act(async () => root.render(<UdsAnagrafica />));
+    expect(document.querySelector('[data-testid="uds-export"]')).toBeNull();
   });
 });

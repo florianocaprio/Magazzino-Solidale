@@ -2587,6 +2587,18 @@ export interface ZonaUdsVersioneInput {
   versione: number;
 }
 
+export interface UdsDirectoryExportInput {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  search?: string;
+  /** @minimum 1 */
+  areaOperativaId?: number;
+  /** @minimum 1 */
+  zonaUdsId?: number;
+}
+
 export type UdsDirectoryItemFasciaEtaCorrente = typeof UdsDirectoryItemFasciaEtaCorrente[keyof typeof UdsDirectoryItemFasciaEtaCorrente];
 
 
@@ -2659,6 +2671,7 @@ export interface UdsIntervento {
   areaOperativaIdSnapshot: number | null;
   /** @nullable */
   zonaUdsIdSnapshot: number | null;
+  territorioStoricoClassificato: boolean;
   /** @nullable */
   dataOraConclusione: string | null;
   dataCreazione: string;

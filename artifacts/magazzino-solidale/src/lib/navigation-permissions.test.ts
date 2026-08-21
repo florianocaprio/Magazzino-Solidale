@@ -1,7 +1,38 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { isNavItemEnabledByAccess, NAV_ITEMS } from "@/components/layout";
 
+const appSource = readFileSync(
+  path.resolve(process.cwd(), "src/App.tsx"),
+  "utf8",
+);
+
+function routeSource(path: string, nextPath: string): string {
+  const start = appSource.indexOf(`<Route path="${path}">`);
+  const end = appSource.indexOf(`<Route path="${nextPath}">`, start + 1);
+  return appSource.slice(start, end);
+}
+
 describe("permission gate della navigazione operativa", () => {
+  it("separa lista Sociale, directory UDS e dossier completo", () => {
+    expect(routeSource("/beneficiari", "/beneficiari/:id")).toContain(
+      'permission="beneficiari.view"',
+    );
+    expect(routeSource("/beneficiari", "/beneficiari/:id")).not.toContain(
+      'permission="uds.directory.view"',
+    );
+    expect(routeSource("/beneficiari/:id", "/interventi")).toContain(
+      'permission="beneficiari.view"',
+    );
+    expect(routeSource("/uds/anagrafica", "/mensa/postazione")).toContain(
+      'permission="uds.directory.view"',
+    );
+    expect(routeSource("/uds/anagrafica", "/mensa/postazione")).not.toContain(
+      'permission="beneficiari.view"',
+    );
+  });
+
   it.each([
     ["beneficiari", "beneficiari.view"],
     ["udsAnagrafica", "uds.directory.view"],

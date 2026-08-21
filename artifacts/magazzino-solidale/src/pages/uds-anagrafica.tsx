@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getListAreeOperativeQueryKey,
-  listUdsDirectory,
-  type ListUdsDirectoryParams,
+  exportUdsDirectory,
+  type UdsDirectoryExportInput,
   type UdsDirectoryItem,
   useListUdsDirectory,
   useListAreeOperative,
@@ -38,21 +38,6 @@ import { fasciaEtaLabel } from "@/lib/fascia-eta";
 
 const DIRECTORY_PAGE_SIZE = 50;
 
-async function fetchAllUdsDirectoryPages(
-  params: Omit<ListUdsDirectoryParams, "page" | "limit">,
-): Promise<UdsDirectoryItem[]> {
-  const all: UdsDirectoryItem[] = [];
-  for (let page = 1; ; page += 1) {
-    const rows = await listUdsDirectory({
-      ...params,
-      page,
-      limit: DIRECTORY_PAGE_SIZE,
-    });
-    all.push(...rows);
-    if (rows.length < DIRECTORY_PAGE_SIZE) return all;
-  }
-}
-
 const ALL_ZONE = "__all__";
 
 export default function UdsAnagrafica() {
@@ -87,7 +72,7 @@ export default function UdsAnagrafica() {
     },
   );
 
-  const listFilters = useMemo<ListUdsDirectoryParams>(
+  const listFilters = useMemo<UdsDirectoryExportInput>(
     () => ({
       ...(search.trim() ? { search: search.trim() } : {}),
       ...(isGlobal && effectiveAreaOperativa
@@ -169,7 +154,7 @@ export default function UdsAnagrafica() {
               columns={exportColumns}
               filename="uds-anagrafica"
               title={t("udsAnagrafica.exportTitle")}
-              loadRows={() => fetchAllUdsDirectoryPages(listFilters)}
+              loadRows={() => exportUdsDirectory(listFilters)}
             />
           )}
           {hasPermission("beneficiari.manage") && (

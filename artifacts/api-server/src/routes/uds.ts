@@ -17,6 +17,7 @@ import { requireModulo } from "../lib/featureFlags";
 import { callerAreaOperativaId } from "../lib/centroScope";
 import { canAccessBeneficiarioRecord } from "../lib/beneficiarioPolicy";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
+import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
 
 const router: IRouter = Router();
 
@@ -74,23 +75,95 @@ function requireOperationalArea(req: Request): number | null {
   return areaId;
 }
 
-function requestedAdminArea(req: Request): number | null {
-  if (req.query.areaOperativaId == null || req.query.areaOperativaId === "") {
-    return null;
+function buildUdsDirectoryScope(req: Request, source: Record<string, unknown>) {
+  const conditions: SQL[] = [
+    eq(beneficiariTable.uds, true),
+    eq(beneficiariTable.attivo, true),
+  ];
+  const callerArea = requireOperationalArea(req);
+  let requestedArea: number | null = null;
+  if (source.areaOperativaId != null && source.areaOperativaId !== "") {
+    requestedArea = positiveInteger(source.areaOperativaId);
+    if (requestedArea == null) {
+      throw new UdsError(400, "areaOperativaId non valido");
+    }
   }
-  const parsed = positiveInteger(req.query.areaOperativaId);
-  if (parsed == null) throw new UdsError(400, "areaOperativaId non valido");
-  return parsed;
+  const effectiveArea = callerArea ?? requestedArea;
+  if (effectiveArea != null) {
+    conditions.push(eq(beneficiariTable.areaOperativaId, effectiveArea));
+  }
+  let zonaUdsId: number | null = null;
+  if (source.zonaUdsId != null && source.zonaUdsId !== "") {
+    zonaUdsId = positiveInteger(source.zonaUdsId);
+    if (zonaUdsId == null) throw new UdsError(400, "zonaUdsId non valido");
+    conditions.push(eq(beneficiariTable.zonaUdsId, zonaUdsId));
+  }
+  const search = String(source.search ?? "").trim();
+  if (search) {
+    if (search.length < 2 || search.length > 120) {
+      throw new UdsError(400, "La ricerca deve contenere da 2 a 120 caratteri");
+    }
+    const like = `%${search}%`;
+    conditions.push(
+      or(
+        ilike(beneficiariTable.codice, like),
+        ilike(beneficiariTable.nome, like),
+        ilike(beneficiariTable.cognome, like),
+        ilike(beneficiariTable.soprannome, like),
+        ilike(beneficiariTable.codiceFiscale, like),
+        ilike(beneficiariTable.telefono, like),
+      )!,
+    );
+  }
+  return {
+    where: and(...conditions),
+    auditFilters: {
+      areaOperativaId: effectiveArea,
+      zonaUdsId,
+      searchApplied: search.length > 0,
+    },
+  };
 }
 
-function areaCondition(
+async function selectUdsDirectoryRows(
+  where: SQL | undefined,
+  pagination?: { limit: number; offset: number },
+) {
+  const query = db
+    .select({ beneficiario: beneficiariTable, zonaNome: zoneUdsTable.nome })
+    .from(beneficiariTable)
+    .leftJoin(zoneUdsTable, eq(beneficiariTable.zonaUdsId, zoneUdsTable.id))
+    .where(where)
+    .orderBy(
+      beneficiariTable.cognome,
+      beneficiariTable.nome,
+      beneficiariTable.id,
+    );
+  return pagination
+    ? query.limit(pagination.limit).offset(pagination.offset)
+    : query;
+}
+
+function formatUdsDirectoryItem(
+  row: Awaited<ReturnType<typeof selectUdsDirectoryRows>>[number],
   req: Request,
-  column: typeof beneficiariTable.areaOperativaId,
-): SQL | undefined {
-  const callerArea = requireOperationalArea(req);
-  if (callerArea != null) return eq(column, callerArea);
-  const requested = requestedAdminArea(req);
-  return requested == null ? undefined : eq(column, requested);
+) {
+  const { beneficiario, zonaNome } = row;
+  return {
+    id: beneficiario.id,
+    codice: beneficiario.codice,
+    nome: beneficiario.nome,
+    cognome: beneficiario.cognome,
+    soprannome: beneficiario.soprannome ?? null,
+    fasciaEtaCorrente: risolviFasciaEta(
+      beneficiario.dataNascita,
+      beneficiario.fasciaEtaPresunta,
+    ).fascia,
+    zonaUdsId: beneficiario.zonaUdsId ?? null,
+    zonaUdsNome: zonaNome ?? null,
+    canale: beneficiario.centroAscoltoId == null ? "uds" : "uds_centro",
+    accessoCompleto: canAccessBeneficiarioRecord(beneficiario, req),
+  };
 }
 
 function formatInterventoUds(row: typeof interventiTable.$inferSelect) {
@@ -107,6 +180,7 @@ function formatInterventoUds(row: typeof interventiTable.$inferSelect) {
     ambito: row.ambito,
     areaOperativaIdSnapshot: row.areaOperativaIdSnapshot ?? null,
     zonaUdsIdSnapshot: row.zonaUdsIdSnapshot ?? null,
+    territorioStoricoClassificato: row.areaOperativaIdSnapshot != null,
     dataOraConclusione: row.dataOraConclusione?.toISOString() ?? null,
     dataCreazione: row.dataCreazione.toISOString(),
     dataAggiornamento: row.dataAggiornamento?.toISOString() ?? null,
@@ -198,17 +272,30 @@ function bisognoAuditValue(row: BisognoPianificato): Record<string, unknown> {
 }
 
 async function loadAccessibleUdsIntervento(id: number, req: Request) {
-  const [row] = await db
-    .select()
+  const [result] = await db
+    .select({
+      intervento: interventiTable,
+      beneficiarioAreaOperativaId: beneficiariTable.areaOperativaId,
+    })
     .from(interventiTable)
+    .innerJoin(
+      beneficiariTable,
+      eq(interventiTable.beneficiarioId, beneficiariTable.id),
+    )
     .where(and(eq(interventiTable.id, id), eq(interventiTable.ambito, "uds")))
     .limit(1);
-  if (!row) throw new UdsError(404, "Intervento UDS non trovato");
-  const callerArea = requireOperationalArea(req);
-  if (callerArea != null && row.areaOperativaIdSnapshot !== callerArea) {
+  if (!result) throw new UdsError(404, "Intervento UDS non trovato");
+  requireOperationalArea(req);
+  if (
+    !canAccessUdsInterventoTerritory(
+      req,
+      result.intervento,
+      result.beneficiarioAreaOperativaId,
+    )
+  ) {
     throw new UdsError(403, "Intervento UDS non accessibile");
   }
-  return row;
+  return result.intervento;
 }
 
 function expectedVersion(value: unknown): Date {
@@ -241,74 +328,54 @@ router.get(
           "Paginazione non valida: page >= 1 e limit compreso tra 1 e 100",
         );
       }
-      const conditions: SQL[] = [
-        eq(beneficiariTable.uds, true),
-        eq(beneficiariTable.attivo, true),
-      ];
-      const scope = areaCondition(req, beneficiariTable.areaOperativaId);
-      if (scope) conditions.push(scope);
-      if (req.query.zonaUdsId != null && req.query.zonaUdsId !== "") {
-        const zonaUdsId = positiveInteger(req.query.zonaUdsId);
-        if (zonaUdsId == null) throw new UdsError(400, "zonaUdsId non valido");
-        conditions.push(eq(beneficiariTable.zonaUdsId, zonaUdsId));
-      }
-      const search = String(req.query.search ?? "").trim();
-      if (search) {
-        if (search.length < 2 || search.length > 120) {
-          throw new UdsError(
-            400,
-            "La ricerca deve contenere da 2 a 120 caratteri",
-          );
-        }
-        const like = `%${search}%`;
-        conditions.push(
-          or(
-            ilike(beneficiariTable.codice, like),
-            ilike(beneficiariTable.nome, like),
-            ilike(beneficiariTable.cognome, like),
-            ilike(beneficiariTable.soprannome, like),
-            ilike(beneficiariTable.codiceFiscale, like),
-            ilike(beneficiariTable.telefono, like),
-          )!,
-        );
-      }
-      const where = and(...conditions);
+      const { where } = buildUdsDirectoryScope(
+        req,
+        req.query as Record<string, unknown>,
+      );
       const [{ total }] = await db
         .select({ total: sql<number>`count(*)::int` })
         .from(beneficiariTable)
         .where(where);
-      const rows = await db
-        .select({ beneficiario: beneficiariTable, zonaNome: zoneUdsTable.nome })
-        .from(beneficiariTable)
-        .leftJoin(zoneUdsTable, eq(beneficiariTable.zonaUdsId, zoneUdsTable.id))
-        .where(where)
-        .orderBy(
-          beneficiariTable.cognome,
-          beneficiariTable.nome,
-          beneficiariTable.id,
-        )
-        .limit(limit)
-        .offset((page - 1) * limit);
+      const rows = await selectUdsDirectoryRows(where, {
+        limit,
+        offset: (page - 1) * limit,
+      });
       res.setHeader("X-Total-Count", String(total));
       res.setHeader("X-Page", String(page));
       res.setHeader("X-Page-Size", String(limit));
-      res.json(
-        rows.map(({ beneficiario, zonaNome }) => ({
-          id: beneficiario.id,
-          codice: beneficiario.codice,
-          nome: beneficiario.nome,
-          cognome: beneficiario.cognome,
-          soprannome: beneficiario.soprannome ?? null,
-          fasciaEtaCorrente: risolviFasciaEta(
-            beneficiario.dataNascita,
-            beneficiario.fasciaEtaPresunta,
-          ).fascia,
-          zonaUdsId: beneficiario.zonaUdsId ?? null,
-          zonaUdsNome: zonaNome ?? null,
-          canale: beneficiario.centroAscoltoId == null ? "uds" : "uds_centro",
-          accessoCompleto: canAccessBeneficiarioRecord(beneficiario, req),
-        })),
-      );
+      res.json(rows.map((row) => formatUdsDirectoryItem(row, req)));
+    } catch (error) {
+      if (sendUdsError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.post(
+  "/uds/directory/export",
+  requirePermission("uds.directory.view"),
+  requirePermission("beneficiari.export"),
+  async (req, res) => {
+    try {
+      const source =
+        req.body && typeof req.body === "object" && !Array.isArray(req.body)
+          ? (req.body as Record<string, unknown>)
+          : {};
+      const { where, auditFilters } = buildUdsDirectoryScope(req, source);
+      const rows = await selectUdsDirectoryRows(where);
+      await db.insert(auditConfigurazioniTable).values({
+        area: "uds",
+        chiave: "directory:export",
+        azione: "export",
+        valoreNuovo: {
+          tipo: "directory UDS",
+          ...auditFilters,
+          recordCount: rows.length,
+        },
+        utenteId: req.user!.id,
+        ip: req.ip ?? req.socket.remoteAddress ?? null,
+      });
+      res.json(rows.map((row) => formatUdsDirectoryItem(row, req)));
     } catch (error) {
       if (sendUdsError(error, res)) return;
       throw error;
@@ -344,35 +411,35 @@ router.get(
       const [beneficiario] = await db
         .select({
           id: beneficiariTable.id,
-          uds: beneficiariTable.uds,
           areaOperativaId: beneficiariTable.areaOperativaId,
         })
         .from(beneficiariTable)
         .where(eq(beneficiariTable.id, beneficiarioId))
         .limit(1);
-      if (
-        !beneficiario ||
-        !beneficiario.uds ||
-        beneficiario.areaOperativaId == null ||
-        (callerArea != null && beneficiario.areaOperativaId !== callerArea)
-      ) {
+      if (!beneficiario) {
         throw new UdsError(403, "Storico UDS non accessibile");
-      }
-      const conditions: SQL[] = [
-        eq(interventiTable.beneficiarioId, beneficiarioId),
-        eq(interventiTable.ambito, "uds"),
-      ];
-      if (callerArea != null) {
-        conditions.push(
-          eq(interventiTable.areaOperativaIdSnapshot, callerArea),
-        );
       }
       const rows = await db
         .select()
         .from(interventiTable)
-        .where(and(...conditions))
+        .where(
+          and(
+            eq(interventiTable.beneficiarioId, beneficiarioId),
+            eq(interventiTable.ambito, "uds"),
+          ),
+        )
         .orderBy(desc(interventiTable.id));
-      res.json(rows.map(formatInterventoUds));
+      const visibleRows = rows.filter((row) =>
+        canAccessUdsInterventoTerritory(req, row, beneficiario.areaOperativaId),
+      );
+      if (
+        callerArea != null &&
+        visibleRows.length === 0 &&
+        beneficiario.areaOperativaId !== callerArea
+      ) {
+        throw new UdsError(403, "Storico UDS non accessibile");
+      }
+      res.json(visibleRows.map(formatInterventoUds));
     } catch (error) {
       if (sendUdsError(error, res)) return;
       throw error;
@@ -536,12 +603,10 @@ router.patch(
         const [row] = await tx
           .update(interventiTable)
           .set({ noteUds, dataAggiornamento: now })
-          .where(
-            and(
-              eq(interventiTable.id, id),
-              eq(interventiTable.dataAggiornamento, version),
-            ),
-          )
+          // La riga è già bloccata FOR UPDATE e la versione è stata verificata
+          // sopra. Evita un secondo confronto SQL che perderebbe i microsecondi
+          // dei timestamp legacy durante la conversione JavaScript Date.
+          .where(eq(interventiTable.id, id))
           .returning();
         if (!row) {
           throw new UdsError(
@@ -629,12 +694,7 @@ router.patch(
         const [row] = await tx
           .update(interventiTable)
           .set({ ...updates, dataAggiornamento: now })
-          .where(
-            and(
-              eq(interventiTable.id, id),
-              eq(interventiTable.dataAggiornamento, version),
-            ),
-          )
+          .where(eq(interventiTable.id, id))
           .returning();
         if (!row) {
           throw new UdsError(

@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
 import { callerCentroId, callerAreaOperativaId } from "../lib/centroScope";
 import { requireAllModuli } from "../lib/featureFlags";
-import { requirePermission } from "../middlewares/auth";
+import { isUdsReportRequest, requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -11,7 +11,7 @@ const requireReportCentro = requireAllModuli(["CENTRO_ASCOLTO", "REPORT"]);
 const requireReportUds = requireAllModuli(["UDS", "REPORT"]);
 
 router.use("/report", (req, res, next) => {
-  const guard = req.path.startsWith("/uds/")
+  const guard = isUdsReportRequest(req)
     ? requireReportUds
     : requireReportCentro;
   guard(req, res, next);

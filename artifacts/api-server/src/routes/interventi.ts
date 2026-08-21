@@ -80,6 +80,7 @@ import {
   creaScaricoInventariale,
   InventoryError,
 } from "../lib/scaricoInventory";
+import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
 
 const router: IRouter = Router();
 
@@ -1515,13 +1516,14 @@ async function requireAccessibleIntervento(
     return result.intervento;
   }
   if (expectedAmbito === "uds") {
-    const callerAreaOperativa = callerAreaOperativaId(req);
     const udsAccessible =
       result.intervento.ambito === "uds" &&
       canUseInterventoArea(req, "uds") &&
-      result.intervento.areaOperativaIdSnapshot != null &&
-      (callerAreaOperativa == null ||
-        result.intervento.areaOperativaIdSnapshot === callerAreaOperativa);
+      canAccessUdsInterventoTerritory(
+        req,
+        result.intervento,
+        result.beneficiario.areaOperativaId,
+      );
     if (!udsAccessible) throw new RouteError(403, "Intervento non accessibile");
     requireUdsInterventoPermission(
       req,
@@ -1530,12 +1532,13 @@ async function requireAccessibleIntervento(
     return result.intervento;
   }
   if (result.intervento.ambito === "uds") {
-    const callerArea = callerAreaOperativaId(req);
     if (
       !canUseInterventoArea(req, "uds") ||
-      result.intervento.areaOperativaIdSnapshot == null ||
-      (callerArea != null &&
-        result.intervento.areaOperativaIdSnapshot !== callerArea)
+      !canAccessUdsInterventoTerritory(
+        req,
+        result.intervento,
+        result.beneficiario.areaOperativaId,
+      )
     ) {
       throw new RouteError(403, "Intervento non accessibile");
     }
@@ -1704,24 +1707,30 @@ async function requireManageableUdsIntervento(
     throw new RouteError(403, "Intervento UDS non accessibile");
   }
   const [result] = await db
-    .select({ intervento: interventiTable })
+    .select({
+      intervento: interventiTable,
+      beneficiarioAreaOperativaId: beneficiariTable.areaOperativaId,
+    })
     .from(interventiTable)
+    .innerJoin(
+      beneficiariTable,
+      eq(interventiTable.beneficiarioId, beneficiariTable.id),
+    )
     .where(eq(interventiTable.id, interventoId))
     .limit(1);
   if (!result) throw new RouteError(404, "Intervento non trovato");
-  if (
-    result.intervento.ambito !== "uds" ||
-    result.intervento.areaOperativaIdSnapshot == null
-  ) {
+  if (result.intervento.ambito !== "uds") {
     throw new RouteError(
       403,
       "Intervento UDS non accessibile per la tua area operativa",
     );
   }
-  const callerAreaOperativa = callerAreaOperativaId(req);
   if (
-    callerAreaOperativa != null &&
-    result.intervento.areaOperativaIdSnapshot !== callerAreaOperativa
+    !canAccessUdsInterventoTerritory(
+      req,
+      result.intervento,
+      result.beneficiarioAreaOperativaId,
+    )
   ) {
     throw new RouteError(
       403,

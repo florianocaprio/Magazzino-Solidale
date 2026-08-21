@@ -250,7 +250,7 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
   it("accetta Area/Centro/Zona/Emporio coerenti e normalizza il codice fiscale", async () => {
     const response = await request(socialAreaA()).post("/beneficiari").send({
       nome: "Coerente", cognome: "Area", sesso: "ALTRO", centroAscoltoId: centerA,
-      zonaUdsId: zoneA, magazzinoEmporioPreferitoId: emporioA, codiceFiscale: "  abc123  ", priorita: "urgente",
+      uds: true, zonaUdsId: zoneA, magazzinoEmporioPreferitoId: emporioA, codiceFiscale: "  abc123  ", priorita: "urgente",
     });
     expect(response.status).toBe(201);
     expect(response.body.codiceFiscale).toBe("ABC123");

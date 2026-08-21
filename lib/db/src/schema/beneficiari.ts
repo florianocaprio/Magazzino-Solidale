@@ -62,6 +62,7 @@ export const beneficiariTable = pgTable("beneficiari", {
 }, (table) => [
   check("beneficiari_stato_anagrafica_check", sql`${table.statoAnagrafica} in ('provvisoria', 'completa')`),
   check("beneficiari_zona_richiede_area_check", sql`${table.zonaUdsId} is null or ${table.areaOperativaId} is not null`),
+  check("beneficiari_zona_richiede_uds_check", sql`${table.zonaUdsId} is null or ${table.uds} = true`),
   foreignKey({
     name: "beneficiari_zona_area_fk",
     columns: [table.zonaUdsId, table.areaOperativaId],

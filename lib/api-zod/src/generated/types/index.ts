@@ -507,6 +507,7 @@ export * from './turnoMezzoPendingInput';
 export * from './turnoVolontario';
 export * from './turnoVolontarioInput';
 export * from './turnoVolontarioPendingInput';
+export * from './udsDirectoryExportInput';
 export * from './udsDirectoryItem';
 export * from './udsDirectoryItemCanale';
 export * from './udsDirectoryItemFasciaEtaCorrente';

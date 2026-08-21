@@ -145,18 +145,36 @@ BEGIN
       REFERENCES public.zone_uds(id, area_operativa_id)
       NOT VALID;
   END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.interventi'::regclass
-      AND conname = 'interventi_uds_area_snapshot_check'
-  ) THEN
-    ALTER TABLE public.interventi
-      ADD CONSTRAINT interventi_uds_area_snapshot_check
-      CHECK (ambito <> 'uds' OR area_operativa_id_snapshot IS NOT NULL)
-      NOT VALID;
-  END IF;
 END
 $uds$;
+
+-- Un CHECK NOT VALID viene comunque applicato agli UPDATE e renderebbe
+-- immodificabili i record UDS legacy privi di snapshot. L'enforcement mirato
+-- seguente protegge solo INSERT e nuove transizioni verso UDS.
+ALTER TABLE public.interventi
+  DROP CONSTRAINT IF EXISTS interventi_uds_area_snapshot_check;
+
+CREATE OR REPLACE FUNCTION public.enforce_new_uds_area_snapshot()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF NEW.ambito = 'uds'
+    AND NEW.area_operativa_id_snapshot IS NULL
+    AND (TG_OP = 'INSERT' OR OLD.ambito IS DISTINCT FROM 'uds')
+  THEN
+    RAISE EXCEPTION 'Un nuovo Intervento UDS richiede lo snapshot Area Operativa'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END
+$function$;
+
+DROP TRIGGER IF EXISTS enforce_new_uds_area_snapshot_trg ON public.interventi;
+CREATE TRIGGER enforce_new_uds_area_snapshot_trg
+BEFORE INSERT OR UPDATE OF ambito, area_operativa_id_snapshot
+ON public.interventi
+FOR EACH ROW EXECUTE FUNCTION public.enforce_new_uds_area_snapshot();
 
 CREATE OR REPLACE FUNCTION public.prevent_uds_snapshot_rewrite()
 RETURNS trigger
@@ -193,6 +211,16 @@ BEGIN
     ALTER TABLE public.beneficiari
       ADD CONSTRAINT beneficiari_zona_richiede_area_check
       CHECK (zona_uds_id IS NULL OR area_operativa_id IS NOT NULL)
+      NOT VALID;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.beneficiari'::regclass
+      AND conname = 'beneficiari_zona_richiede_uds_check'
+  ) THEN
+    ALTER TABLE public.beneficiari
+      ADD CONSTRAINT beneficiari_zona_richiede_uds_check
+      CHECK (zona_uds_id IS NULL OR uds = true)
       NOT VALID;
   END IF;
   IF NOT EXISTS (
@@ -235,8 +263,7 @@ ALTER TABLE public.bisogni_pianificati
 
 CREATE TABLE IF NOT EXISTS public.bisogni_pianificati_storico (
   id serial PRIMARY KEY,
-  bisogno_id integer NOT NULL
-    REFERENCES public.bisogni_pianificati(id) ON DELETE CASCADE,
+  bisogno_id integer NOT NULL,
   stato_precedente varchar(30),
   stato_nuovo varchar(30) NOT NULL,
   operatore_id integer REFERENCES public.utenti(id),
@@ -245,6 +272,31 @@ CREATE TABLE IF NOT EXISTS public.bisogni_pianificati_storico (
   valore_precedente jsonb,
   valore_nuovo jsonb
 );
+
+DO $uds$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.bisogni_pianificati_storico'::regclass
+      AND conname = 'bisogni_pianificati_storico_bisogno_id_fkey'
+      AND confdeltype <> 'r'
+  ) THEN
+    ALTER TABLE public.bisogni_pianificati_storico
+      DROP CONSTRAINT bisogni_pianificati_storico_bisogno_id_fkey;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.bisogni_pianificati_storico'::regclass
+      AND conname = 'bisogni_pianificati_storico_bisogno_id_fkey'
+  ) THEN
+    ALTER TABLE public.bisogni_pianificati_storico
+      ADD CONSTRAINT bisogni_pianificati_storico_bisogno_id_fkey
+      FOREIGN KEY (bisogno_id)
+      REFERENCES public.bisogni_pianificati(id)
+      ON DELETE RESTRICT;
+  END IF;
+END
+$uds$;
 
 CREATE INDEX IF NOT EXISTS bisogni_pianificati_storico_bisogno_idx
   ON public.bisogni_pianificati_storico (bisogno_id, id);

@@ -310,6 +310,7 @@ import type {
   TurnoInput,
   TurnoMezzoPendingInput,
   TurnoVolontarioPendingInput,
+  UdsDirectoryExportInput,
   UdsDirectoryItem,
   UdsInterventiMeseReport,
   UdsInterventiTipoReport,
@@ -6551,6 +6552,74 @@ export function useListUdsDirectory<TData = Awaited<ReturnType<typeof listUdsDir
 
 
 
+
+export const getExportUdsDirectoryUrl = () => {
+
+
+
+
+  return `/api/uds/directory/export`
+}
+
+/**
+ * Esporta server-side la stessa proiezione minimizzata della directory, applicando permessi e scope Area UDS.
+ */
+export const exportUdsDirectory = async (udsDirectoryExportInput?: UdsDirectoryExportInput, options?: RequestInit): Promise<UdsDirectoryItem[]> => {
+
+  return customFetch<UdsDirectoryItem[]>(getExportUdsDirectoryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      udsDirectoryExportInput,)
+  }
+);}
+
+
+
+
+export const getExportUdsDirectoryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportUdsDirectory>>, TError,{data?: BodyType<UdsDirectoryExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof exportUdsDirectory>>, TError,{data?: BodyType<UdsDirectoryExportInput>}, TContext> => {
+
+const mutationKey = ['exportUdsDirectory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof exportUdsDirectory>>, {data?: BodyType<UdsDirectoryExportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  exportUdsDirectory(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExportUdsDirectoryMutationResult = NonNullable<Awaited<ReturnType<typeof exportUdsDirectory>>>
+    export type ExportUdsDirectoryMutationBody = BodyType<UdsDirectoryExportInput> | undefined
+    export type ExportUdsDirectoryMutationError = ErrorType<void>
+
+    export const useExportUdsDirectory = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportUdsDirectory>>, TError,{data?: BodyType<UdsDirectoryExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof exportUdsDirectory>>,
+        TError,
+        {data?: BodyType<UdsDirectoryExportInput>},
+        TContext
+      > => {
+      return useMutation(getExportUdsDirectoryMutationOptions(options));
+    }
 
 export const getCreateUdsInterventoUrl = () => {
 

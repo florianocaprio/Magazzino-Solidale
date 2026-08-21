@@ -28,6 +28,7 @@ export interface UdsIntervento {
   areaOperativaIdSnapshot: number | null;
   /** @nullable */
   zonaUdsIdSnapshot: number | null;
+  territorioStoricoClassificato: boolean;
   /** @nullable */
   dataOraConclusione: Date | null;
   dataCreazione: Date;

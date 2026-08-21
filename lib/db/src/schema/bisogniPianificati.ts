@@ -65,7 +65,7 @@ export const bisogniPianificatiStoricoTable = pgTable(
     id: serial("id").primaryKey(),
     bisognoId: integer("bisogno_id")
       .notNull()
-      .references(() => bisogniPianificatiTable.id, { onDelete: "cascade" }),
+      .references(() => bisogniPianificatiTable.id, { onDelete: "restrict" }),
     statoPrecedente: varchar("stato_precedente", { length: 30 }),
     statoNuovo: varchar("stato_nuovo", { length: 30 }).notNull(),
     operatoreId: integer("operatore_id").references(() => utentiTable.id),

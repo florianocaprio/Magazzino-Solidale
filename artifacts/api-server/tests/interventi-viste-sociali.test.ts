@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import request from "supertest";
 import {
   beneficiariTable,
+  bisogniPianificatiStoricoTable,
   bisogniPianificatiTable,
   centriAscoltoTable,
   areeOperativeTable,
@@ -330,6 +331,20 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ids.interventi.length) {
+    const needs = await db
+      .select({ id: bisogniPianificatiTable.id })
+      .from(bisogniPianificatiTable)
+      .where(inArray(bisogniPianificatiTable.interventoId, ids.interventi));
+    if (needs.length > 0) {
+      await db
+        .delete(bisogniPianificatiStoricoTable)
+        .where(
+          inArray(
+            bisogniPianificatiStoricoTable.bisognoId,
+            needs.map((need) => need.id),
+          ),
+        );
+    }
     await db
       .delete(bisogniPianificatiTable)
       .where(inArray(bisogniPianificatiTable.interventoId, ids.interventi));

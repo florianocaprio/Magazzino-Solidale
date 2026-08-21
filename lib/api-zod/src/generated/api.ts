@@ -3565,6 +3565,37 @@ export const ListUdsDirectoryResponseItem = zod.object({
 export const ListUdsDirectoryResponse = zod.array(ListUdsDirectoryResponseItem)
 
 
+/**
+ * Esporta server-side la stessa proiezione minimizzata della directory, applicando permessi e scope Area UDS.
+ */
+export const exportUdsDirectoryBodySearchMin = 2;
+export const exportUdsDirectoryBodySearchMax = 120;
+
+
+
+
+
+export const ExportUdsDirectoryBody = zod.object({
+  "search": zod.string().min(exportUdsDirectoryBodySearchMin).max(exportUdsDirectoryBodySearchMax).optional(),
+  "areaOperativaId": zod.number().min(1).optional(),
+  "zonaUdsId": zod.number().min(1).optional()
+})
+
+export const ExportUdsDirectoryResponseItem = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "soprannome": zod.string().nullable(),
+  "fasciaEtaCorrente": zod.enum(['0_17', '18_29', '30_64', '65_plus', 'non_determinata']),
+  "zonaUdsId": zod.number().nullable(),
+  "zonaUdsNome": zod.string().nullable(),
+  "canale": zod.enum(['uds', 'uds_centro']),
+  "accessoCompleto": zod.boolean()
+}).describe('Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.')
+export const ExportUdsDirectoryResponse = zod.array(ExportUdsDirectoryResponseItem)
+
+
 export const createUdsInterventoBodyTipoInterventoMax = 120;
 
 export const createUdsInterventoBodyDescrizioneMax = 4000;
@@ -3615,6 +3646,7 @@ export const GetUdsInterventoResponse = zod.object({
   "ambito": zod.enum(['uds']),
   "areaOperativaIdSnapshot": zod.number().nullable(),
   "zonaUdsIdSnapshot": zod.number().nullable(),
+  "territorioStoricoClassificato": zod.boolean(),
   "dataOraConclusione": zod.coerce.date().nullable(),
   "dataCreazione": zod.coerce.date(),
   "dataAggiornamento": zod.coerce.date().nullable(),
@@ -3639,6 +3671,7 @@ export const ListUdsInterventiBeneficiarioResponseItem = zod.object({
   "ambito": zod.enum(['uds']),
   "areaOperativaIdSnapshot": zod.number().nullable(),
   "zonaUdsIdSnapshot": zod.number().nullable(),
+  "territorioStoricoClassificato": zod.boolean(),
   "dataOraConclusione": zod.coerce.date().nullable(),
   "dataCreazione": zod.coerce.date(),
   "dataAggiornamento": zod.coerce.date().nullable(),
@@ -3673,6 +3706,7 @@ export const UpdateUdsInterventoNotaResponse = zod.object({
   "ambito": zod.enum(['uds']),
   "areaOperativaIdSnapshot": zod.number().nullable(),
   "zonaUdsIdSnapshot": zod.number().nullable(),
+  "territorioStoricoClassificato": zod.boolean(),
   "dataOraConclusione": zod.coerce.date().nullable(),
   "dataCreazione": zod.coerce.date(),
   "dataAggiornamento": zod.coerce.date().nullable(),
@@ -3716,6 +3750,7 @@ export const RectifyUdsInterventoResponse = zod.object({
   "ambito": zod.enum(['uds']),
   "areaOperativaIdSnapshot": zod.number().nullable(),
   "zonaUdsIdSnapshot": zod.number().nullable(),
+  "territorioStoricoClassificato": zod.boolean(),
   "dataOraConclusione": zod.coerce.date().nullable(),
   "dataCreazione": zod.coerce.date(),
   "dataAggiornamento": zod.coerce.date().nullable(),

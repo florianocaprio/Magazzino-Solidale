@@ -67,6 +67,7 @@ import {
   BisogniPianificatiEditor,
   type BisognoPianificatoDraft,
 } from "@/components/bisogni-pianificati-editor";
+import { UdsBisogniDialog } from "@/components/uds-bisogni-dialog";
 import {
   InterventoStatoBadge,
   interventoDataLabel,
@@ -180,6 +181,7 @@ export default function UdsInterventi() {
     useState<UdsPersonaSelection | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [noteEditing, setNoteEditing] = useState<Intervento | null>(null);
+  const [bisogniEditingId, setBisogniEditingId] = useState<number | null>(null);
   const [noteText, setNoteText] = useState("");
   const [bisogniFilter, setBisogniFilter] = useState<
     "tutti" | "aperti" | "scaduti" | "nessuno"
@@ -781,6 +783,17 @@ export default function UdsInterventi() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {hasPermission("uds.bisogni.manage") && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => setBisogniEditingId(i.id)}
+                            >
+                              <CalendarClock className="h-3.5 w-3.5" />
+                              {t("udsInterventi.manageBisogniAction")}
+                            </Button>
+                          )}
                           {hasPermission("uds.interventi.note") && (
                             <Button
                               variant={i.noteUds ? "secondary" : "ghost"}
@@ -817,6 +830,15 @@ export default function UdsInterventi() {
           </CardContent>
         </Card>
       )}
+
+      <UdsBisogniDialog
+        interventoId={bisogniEditingId}
+        open={bisogniEditingId != null}
+        onOpenChange={(open) => {
+          if (!open) setBisogniEditingId(null);
+        }}
+        onChanged={invalidateList}
+      />
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">

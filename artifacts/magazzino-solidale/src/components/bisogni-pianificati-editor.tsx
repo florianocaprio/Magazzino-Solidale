@@ -30,6 +30,7 @@ export type BisognoPriorita = "bassa" | "normale" | "alta" | "urgente";
 export interface BisognoPianificatoDraft {
   clientKey: string;
   id?: number;
+  versione?: number;
   tipo: BisognoTipo;
   descrizione: string;
   stato: BisognoStato;
@@ -149,6 +150,9 @@ export function BisogniPianificatiEditor({
                     <Badge variant="outline">
                       {t(`udsInterventi.bisognoPriorita.${bisogno.priorita}`)}
                     </Badge>
+                    {bisogno.versione != null && (
+                      <Badge variant="outline">v{bisogno.versione}</Badge>
+                    )}
                     {scaduto && (
                       <Badge
                         variant="destructive"

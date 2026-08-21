@@ -402,7 +402,7 @@ function AppRoutes() {
           {() => (
             <Guard area="sociale">
               <RequireModulo codice="CENTRO_ASCOLTO">
-                <RequirePermission permission="uds.directory.view">
+                <RequirePermission permission="beneficiari.view">
                   <Beneficiari />
                 </RequirePermission>
               </RequireModulo>
@@ -474,7 +474,7 @@ function AppRoutes() {
           {() => (
             <Guard area="uds">
               <RequireModulo codice="UDS">
-                <RequirePermission permission="beneficiari.view">
+                <RequirePermission permission="uds.directory.view">
                   <UdsAnagrafica />
                 </RequirePermission>
               </RequireModulo>
