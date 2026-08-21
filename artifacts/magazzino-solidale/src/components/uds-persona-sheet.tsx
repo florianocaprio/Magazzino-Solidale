@@ -108,6 +108,17 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
       uds: z.boolean().optional(),
     })
     .superRefine((data, ctx) => {
+      if (
+        (data.uds ?? true) &&
+        !data.dataNascita &&
+        !isFasciaEtaPresunta(data.fasciaEtaPresunta)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["fasciaEtaPresunta"],
+          message: t("udsAnagrafica.ageClassificationRequired"),
+        });
+      }
       if (isGlobal && (data.uds ?? true) && !data.areaOperativaId) {
         ctx.addIssue({
           code: "custom",
@@ -476,7 +487,7 @@ export function UdsPersonaSheet({
     const payload: Record<string, unknown> = {
       nome: data.nome,
       cognome: data.cognome,
-      uds: data.uds ?? true,
+      uds: isGlobal ? (data.uds ?? true) : true,
       centroAscoltoId:
         data.centroAscoltoId && data.centroAscoltoId !== NO_CENTRO
           ? parseInt(data.centroAscoltoId)
@@ -485,7 +496,9 @@ export function UdsPersonaSheet({
     if (data.soprannome) payload.soprannome = data.soprannome;
     if (data.codiceFiscale) payload.codiceFiscale = data.codiceFiscale;
     if (data.dataNascita) payload.dataNascita = data.dataNascita;
-    payload.fasciaEtaPresunta = isFasciaEtaPresunta(data.fasciaEtaPresunta)
+    payload.fasciaEtaPresunta = data.dataNascita
+      ? null
+      : isFasciaEtaPresunta(data.fasciaEtaPresunta)
       ? data.fasciaEtaPresunta
       : null;
     payload.sesso = data.sesso;
@@ -505,7 +518,11 @@ export function UdsPersonaSheet({
       payload.motivoConsegnaDomicilio = data.motivoConsegnaDomicilio;
     if (data.restrizioniAlimentari)
       payload.restrizioniAlimentari = data.restrizioniAlimentari;
-    if (data.uds && data.zonaUdsId && data.zonaUdsId !== NO_ZONE) {
+    if (
+      (isGlobal ? data.uds : true) &&
+      data.zonaUdsId &&
+      data.zonaUdsId !== NO_ZONE
+    ) {
       payload.zonaUdsId = parseInt(data.zonaUdsId);
     }
     if (isGlobal && data.areaOperativaId)
@@ -533,6 +550,8 @@ export function UdsPersonaSheet({
   };
 
   const watchUds = form.watch("uds");
+  const duplicateCheckPending =
+    !dupDismissed && (dupDebouncing || isDupFetching || isDirectoryFetching);
 
   return (
     <>
@@ -624,6 +643,14 @@ export function UdsPersonaSheet({
                       ? t("udsAnagrafica.selectAreaOperativaForSearch")
                       : t("udsAnagrafica.existingSearchHint")}
                   </p>
+                  {duplicateCheckPending && (
+                    <p
+                      role="status"
+                      className="text-sm font-medium text-amber-700"
+                    >
+                      {t("udsAnagrafica.duplicateCheckInProgress")}
+                    </p>
+                  )}
                 </div>
 
                 {!dupDismissed && (directoryMatches?.length ?? 0) > 0 && (
@@ -734,16 +761,20 @@ export function UdsPersonaSheet({
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {!dupDismissed &&
+                  ((directoryMatches?.length ?? 0) > 0 ||
+                    suggestions.length > 0) && (
                     <Button
                       type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="text-amber-800"
+                      variant="outline"
+                      className="w-full min-h-11 border-amber-300 text-amber-900"
                       onClick={() => setDupDismissed(true)}
                     >
                       {t("udsAnagrafica.dupContinueNew")}
                     </Button>
-                  </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
@@ -752,7 +783,7 @@ export function UdsPersonaSheet({
                     name="nome"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("udsAnagrafica.fNome")}</FormLabel>
+                        <FormLabel>{t("udsAnagrafica.fNome")} *</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -765,7 +796,7 @@ export function UdsPersonaSheet({
                     name="cognome"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("udsAnagrafica.fCognome")}</FormLabel>
+                        <FormLabel>{t("udsAnagrafica.fCognome")} *</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -777,13 +808,27 @@ export function UdsPersonaSheet({
 
                 <FormField
                   control={form.control}
-                  name="soprannome"
+                  name="areaProvenienza"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("udsAnagrafica.fSoprannome")}</FormLabel>
+                      <FormLabel>
+                        {t("beneficiarioDettaglio.areaProvenienza")} *
+                      </FormLabel>
+                      <Select
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                      >
                       <FormControl>
-                        <Input {...field} />
+                          <SelectTrigger>
+                            <SelectValue placeholder="-" />
+                          </SelectTrigger>
                       </FormControl>
+                        <SelectContent>
+                          <SelectItem value="UE">UE</SelectItem>
+                          <SelectItem value="Extra-UE">Extra-UE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -806,7 +851,7 @@ export function UdsPersonaSheet({
                     name="sesso"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("udsAnagrafica.fSesso")}</FormLabel>
+                        <FormLabel>{t("udsAnagrafica.fSesso")} *</FormLabel>
                         <Select
                           value={field.value || ""}
                           onValueChange={field.onChange}
@@ -834,13 +879,14 @@ export function UdsPersonaSheet({
                     )}
                   />
                 </div>
+                {!wDataNascita && (
                 <FormField
                   control={form.control}
                   name="fasciaEtaPresunta"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        {t("udsAnagrafica.fasciaEtaPresuntaLabel")}
+                          {t("udsAnagrafica.fasciaEtaLabel")} *
                       </FormLabel>
                       <Select
                         value={field.value || NO_FASCIA_ETA}
@@ -848,7 +894,11 @@ export function UdsPersonaSheet({
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue />
+                              <SelectValue
+                                placeholder={t(
+                                  "udsAnagrafica.fasciaEtaPlaceholder",
+                                )}
+                              />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -857,17 +907,16 @@ export function UdsPersonaSheet({
                               {fasciaEtaLabel(t, fascia)}
                             </SelectItem>
                           ))}
-                          <SelectItem value={NO_FASCIA_ETA}>
-                            {fasciaEtaLabel(t, "non_determinata")}
-                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        {t("udsAnagrafica.fasciaEtaPresuntaHint")}
+                          {t("udsAnagrafica.fasciaEtaRequiredHint")}
                       </p>
+                        <FormMessage />
                     </FormItem>
                   )}
                 />
+                )}
                 <div
                   className="rounded-md border bg-muted/30 p-3 text-sm"
                   data-testid="fascia-eta-corrente"
@@ -889,6 +938,28 @@ export function UdsPersonaSheet({
                     </p>
                   )}
                 </div>
+                <details className="rounded-lg border bg-muted/20 p-3">
+                  <summary className="cursor-pointer font-medium min-h-11 flex items-center">
+                    {t("udsAnagrafica.optionalDataTitle")}
+                  </summary>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    {t("udsAnagrafica.optionalDataHint")}
+                  </p>
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="soprannome"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t("udsAnagrafica.fSoprannome")}
+                          </FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                 <FormField
                   control={form.control}
                   name="telefono"
@@ -931,7 +1002,6 @@ export function UdsPersonaSheet({
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="cittadinanza"
@@ -946,33 +1016,6 @@ export function UdsPersonaSheet({
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="areaProvenienza"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {t("beneficiarioDettaglio.areaProvenienza")} *
-                        </FormLabel>
-                        <Select
-                          value={field.value || ""}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="-" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="UE">UE</SelectItem>
-                            <SelectItem value="Extra-UE">Extra-UE</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
                 <FormField
                   control={form.control}
                   name="residenza"
@@ -1019,7 +1062,9 @@ export function UdsPersonaSheet({
                     name="zonaMunicipio"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("beneficiari.zonaMunicipio")}</FormLabel>
+                            <FormLabel>
+                              {t("beneficiari.zonaMunicipio")}
+                            </FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -1033,7 +1078,9 @@ export function UdsPersonaSheet({
                     name="numComponenti"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("beneficiari.numComponenti")}</FormLabel>
+                            <FormLabel>
+                              {t("beneficiari.numComponenti")}
+                            </FormLabel>
                         <FormControl>
                           <Input type="number" min="1" {...field} />
                         </FormControl>
@@ -1127,8 +1174,11 @@ export function UdsPersonaSheet({
                     </FormItem>
                   )}
                 />
+                  </div>
+                </details>
 
                 <div className="rounded-md border p-3 space-y-3">
+                  {isGlobal && (
                   <FormField
                     control={form.control}
                     name="uds"
@@ -1151,7 +1201,8 @@ export function UdsPersonaSheet({
                       </FormItem>
                     )}
                   />
-                  {watchUds && (
+                  )}
+                  {(!isGlobal || watchUds) && (
                     <FormField
                       control={form.control}
                       name="zonaUdsId"
@@ -1199,6 +1250,7 @@ export function UdsPersonaSheet({
                   </Button>
                   <Button
                     type="submit"
+                    className="min-h-11 min-w-28"
                     disabled={
                       createBenef.isPending ||
                       (!dupDismissed &&
@@ -1209,7 +1261,11 @@ export function UdsPersonaSheet({
                           (directoryMatches?.length ?? 0) > 0))
                     }
                   >
-                    {t("common.save")}
+                    {duplicateCheckPending
+                      ? t("udsAnagrafica.duplicateCheckInProgress")
+                      : createBenef.isPending
+                        ? t("udsAnagrafica.savingPerson")
+                        : t("common.save")}
                   </Button>
                 </div>
               </form>

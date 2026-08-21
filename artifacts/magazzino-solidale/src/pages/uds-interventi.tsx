@@ -433,6 +433,8 @@ export default function UdsInterventi() {
   };
 
   const rows = interventi ?? [];
+  const bisogniEditingIntervento =
+    rows.find((item) => item.id === bisogniEditingId) ?? null;
 
   const exportColumns = useMemo(
     () => [
@@ -478,7 +480,7 @@ export default function UdsInterventi() {
           </h1>
           <p className="text-muted-foreground">{t("udsInterventi.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <ExportButtons
             rows={rows}
             columns={exportColumns}
@@ -489,7 +491,7 @@ export default function UdsInterventi() {
           {hasPermission("uds.interventi.create") && (
             <Button
               onClick={handleCreate}
-              className="gap-2"
+              className="min-h-11 w-full gap-2 sm:w-auto"
               disabled={personId == null}
             >
               <Plus className="h-4 w-4" /> {t("udsInterventi.newIntervento")}
@@ -645,194 +647,329 @@ export default function UdsInterventi() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <Table className="min-w-[1100px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">
-                    {t("udsInterventi.colData")}
-                  </TableHead>
-                  <TableHead>{t("udsInterventi.colTipo")}</TableHead>
-                  <TableHead>{t("interventi.workflowState")}</TableHead>
-                  <TableHead>{t("udsInterventi.colBisogni")}</TableHead>
-                  <TableHead>
-                    {t("udsInterventi.colBisogniPianificati")}
-                  </TableHead>
-                  <TableHead>{t("udsInterventi.colMateriale")}</TableHead>
-                  <TableHead>{t("udsInterventi.colNote")}</TableHead>
-                  <TableHead>{t("udsInterventi.colOperatore")}</TableHead>
-                  <TableHead className="text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array(3)
-                    .fill(0)
-                    .map((_, i) => (
-                      <TableRow key={i}>
-                        {Array(9)
-                          .fill(0)
-                          .map((_, j) => (
-                            <TableCell key={j}>
-                              <Skeleton className="h-5 w-24" />
-                            </TableCell>
-                          ))}
-                      </TableRow>
-                    ))
-                ) : rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={9}
-                      className="h-32 text-center text-muted-foreground"
-                    >
-                      {t("udsInterventi.noIntervento")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((i) => (
-                    <TableRow
-                      key={i.id}
-                      className={
-                        i.bisogniPianificatiScaduti > 0
-                          ? "bg-red-50/70"
-                          : i.noteUds
-                            ? "bg-amber-50/60"
-                            : ""
-                      }
-                    >
-                      <TableCell className="text-sm">
-                        {interventoDataLabel(i)}
-                      </TableCell>
-                      <TableCell>
+        <>
+          <div
+            data-testid="uds-interventi-mobile"
+            className="space-y-3 md:hidden"
+          >
+            {isLoading ? (
+              Array(3)
+                .fill(0)
+                .map((_, index) => (
+                  <Card key={index}>
+                    <CardContent className="space-y-3 p-4">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-12 w-full" />
+                    </CardContent>
+                  </Card>
+                ))
+            ) : rows.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  {t("udsInterventi.noIntervento")}
+                </CardContent>
+              </Card>
+            ) : (
+              rows.map((intervento) => (
+                <Card
+                  key={intervento.id}
+                  data-testid="uds-intervento-mobile-card"
+                  className={
+                    intervento.bisogniPianificatiScaduti > 0
+                      ? "border-red-300 bg-red-50/60"
+                      : intervento.noteUds
+                        ? "border-amber-300 bg-amber-50/60"
+                        : ""
+                  }
+                >
+                  <CardContent className="space-y-4 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold">
+                          {interventoDataLabel(intervento)}
+                        </div>
                         <Badge
                           variant="outline"
-                          className="gap-1 border-none bg-amber-500/10 text-amber-700"
+                          className="mt-1 gap-1 border-none bg-amber-500/10 text-amber-700"
                         >
-                          <HeartHandshake className="h-3 w-3" />{" "}
-                          {tipoLabel(i.tipoIntervento)}
+                          <HeartHandshake className="h-3.5 w-3.5" />
+                          {tipoLabel(intervento.tipoIntervento)}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <InterventoStatoBadge stato={i.stato} />
-                      </TableCell>
-                      <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
-                        {i.descrizione || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm min-w-[190px]">
-                        {i.bisogniPianificatiTotale === 0 ? (
-                          <span className="text-muted-foreground">
-                            {t("udsInterventi.noBisogniPianificati")}
-                          </span>
-                        ) : (
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap gap-1">
-                              <Badge variant="outline">
-                                {t("udsInterventi.bisogniTotale", {
-                                  count: i.bisogniPianificatiTotale,
-                                })}
-                              </Badge>
-                              <Badge
-                                variant={
-                                  i.bisogniPianificatiAperti > 0
-                                    ? "secondary"
-                                    : "outline"
-                                }
-                              >
-                                {t("udsInterventi.bisogniAperti", {
-                                  count: i.bisogniPianificatiAperti,
-                                })}
-                              </Badge>
-                              {i.bisogniPianificatiScaduti > 0 && (
-                                <Badge variant="destructive" className="gap-1">
-                                  <AlertTriangle className="h-3 w-3" />
-                                  {t("udsInterventi.bisogniScaduti", {
-                                    count: i.bisogniPianificatiScaduti,
-                                  })}
-                                </Badge>
-                              )}
-                            </div>
-                            {i.bisogniPianificatiProssimaScadenza && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <CalendarClock className="h-3.5 w-3.5" />
-                                {t("udsInterventi.bisogniProssimaScadenza", {
-                                  date: new Date(
-                                    `${i.bisogniPianificatiProssimaScadenza}T12:00:00`,
-                                  ).toLocaleDateString("it-IT"),
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
-                        {i.note || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm max-w-xs">
-                        {i.noteUds ? (
-                          <div className="flex items-start gap-1 rounded-md bg-amber-100 px-2 py-1 text-amber-900 whitespace-pre-wrap">
-                            <StickyNote className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                            <span>{i.noteUds}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {i.operatoreCodice || "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {hasPermission("uds.bisogni.manage") && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1"
-                              onClick={() => setBisogniEditingId(i.id)}
-                            >
-                              <CalendarClock className="h-3.5 w-3.5" />
-                              {t("udsInterventi.manageBisogniAction")}
-                            </Button>
-                          )}
-                          {hasPermission("uds.interventi.note") && (
-                            <Button
-                              variant={i.noteUds ? "secondary" : "ghost"}
-                              size="sm"
-                              className={`gap-1 ${i.noteUds ? "bg-amber-100 text-amber-900 hover:bg-amber-200" : ""}`}
-                              onClick={() => {
-                                setNoteEditing(i);
-                                setNoteText(i.noteUds ?? "");
-                              }}
-                            >
-                              <StickyNote className="h-3.5 w-3.5" />
-                              {i.noteUds
-                                ? t("udsInterventi.editNote")
-                                : t("udsInterventi.addNote")}
-                            </Button>
-                          )}
-                          {hasPermission("uds.interventi.update") && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(i)}
-                              title={t("udsInterventi.editAction")}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
+                      </div>
+                      <InterventoStatoBadge stato={intervento.stato} />
+                    </div>
+
+                    <p className="line-clamp-3 whitespace-pre-wrap text-sm">
+                      {intervento.descrizione ||
+                        t("udsInterventi.noMeetingSummary")}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {intervento.bisogniPianificatiAperti > 0 && (
+                        <Badge variant="secondary">
+                          {t("udsInterventi.mobileOpenNeeds", {
+                            count: intervento.bisogniPianificatiAperti,
+                          })}
+                        </Badge>
+                      )}
+                      {intervento.bisogniPianificatiScaduti > 0 && (
+                        <Badge variant="destructive" className="gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          {t("udsInterventi.mobileOverdueNeeds", {
+                            count: intervento.bisogniPianificatiScaduti,
+                          })}
+                        </Badge>
+                      )}
+                      {intervento.noteUds && (
+                        <Badge variant="outline" className="gap-1">
+                          <StickyNote className="h-3.5 w-3.5" />
+                          {t("udsInterventi.notePresent")}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {hasPermission("uds.bisogni.manage") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="min-h-11 gap-2"
+                          onClick={() => setBisogniEditingId(intervento.id)}
+                        >
+                          <CalendarClock className="h-4 w-4" />
+                          {t("udsInterventi.manageBisogniAction")}
+                        </Button>
+                      )}
+                      {hasPermission("uds.interventi.note") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="min-h-11 gap-2"
+                          onClick={() => {
+                            setNoteEditing(intervento);
+                            setNoteText(intervento.noteUds ?? "");
+                          }}
+                        >
+                          <StickyNote className="h-4 w-4" />
+                          {t("udsInterventi.mobileNoteAction")}
+                        </Button>
+                      )}
+                      {hasPermission("uds.interventi.update") && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="col-span-2 min-h-11 gap-2"
+                          onClick={() => handleEdit(intervento)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                          {t("udsInterventi.editAction")}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          <Card
+            data-testid="uds-interventi-desktop"
+            className="hidden md:block"
+          >
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[1100px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[120px]">
+                      {t("udsInterventi.colData")}
+                    </TableHead>
+                    <TableHead>{t("udsInterventi.colTipo")}</TableHead>
+                    <TableHead>{t("interventi.workflowState")}</TableHead>
+                    <TableHead>{t("udsInterventi.colBisogni")}</TableHead>
+                    <TableHead>
+                      {t("udsInterventi.colBisogniPianificati")}
+                    </TableHead>
+                    <TableHead>{t("udsInterventi.colMateriale")}</TableHead>
+                    <TableHead>{t("udsInterventi.colNote")}</TableHead>
+                    <TableHead>{t("udsInterventi.colOperatore")}</TableHead>
+                    <TableHead className="text-right" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array(3)
+                      .fill(0)
+                      .map((_, i) => (
+                        <TableRow key={i}>
+                          {Array(9)
+                            .fill(0)
+                            .map((_, j) => (
+                              <TableCell key={j}>
+                                <Skeleton className="h-5 w-24" />
+                              </TableCell>
+                            ))}
+                        </TableRow>
+                      ))
+                  ) : rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={9}
+                        className="h-32 text-center text-muted-foreground"
+                      >
+                        {t("udsInterventi.noIntervento")}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  ) : (
+                    rows.map((i) => (
+                      <TableRow
+                        key={i.id}
+                        className={
+                          i.bisogniPianificatiScaduti > 0
+                            ? "bg-red-50/70"
+                            : i.noteUds
+                              ? "bg-amber-50/60"
+                              : ""
+                        }
+                      >
+                        <TableCell className="text-sm">
+                          {interventoDataLabel(i)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className="gap-1 border-none bg-amber-500/10 text-amber-700"
+                          >
+                            <HeartHandshake className="h-3 w-3" />{" "}
+                            {tipoLabel(i.tipoIntervento)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <InterventoStatoBadge stato={i.stato} />
+                        </TableCell>
+                        <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
+                          {i.descrizione || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm min-w-[190px]">
+                          {i.bisogniPianificatiTotale === 0 ? (
+                            <span className="text-muted-foreground">
+                              {t("udsInterventi.noBisogniPianificati")}
+                            </span>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap gap-1">
+                                <Badge variant="outline">
+                                  {t("udsInterventi.bisogniTotale", {
+                                    count: i.bisogniPianificatiTotale,
+                                  })}
+                                </Badge>
+                                <Badge
+                                  variant={
+                                    i.bisogniPianificatiAperti > 0
+                                      ? "secondary"
+                                      : "outline"
+                                  }
+                                >
+                                  {t("udsInterventi.bisogniAperti", {
+                                    count: i.bisogniPianificatiAperti,
+                                  })}
+                                </Badge>
+                                {i.bisogniPianificatiScaduti > 0 && (
+                                  <Badge
+                                    variant="destructive"
+                                    className="gap-1"
+                                  >
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {t("udsInterventi.bisogniScaduti", {
+                                      count: i.bisogniPianificatiScaduti,
+                                    })}
+                                  </Badge>
+                                )}
+                              </div>
+                              {i.bisogniPianificatiProssimaScadenza && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <CalendarClock className="h-3.5 w-3.5" />
+                                  {t("udsInterventi.bisogniProssimaScadenza", {
+                                    date: new Date(
+                                      `${i.bisogniPianificatiProssimaScadenza}T12:00:00`,
+                                    ).toLocaleDateString("it-IT"),
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
+                          {i.note || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm max-w-xs">
+                          {i.noteUds ? (
+                            <div className="flex items-start gap-1 rounded-md bg-amber-100 px-2 py-1 text-amber-900 whitespace-pre-wrap">
+                              <StickyNote className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                              <span>{i.noteUds}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {i.operatoreCodice || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {hasPermission("uds.bisogni.manage") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => setBisogniEditingId(i.id)}
+                              >
+                                <CalendarClock className="h-3.5 w-3.5" />
+                                {t("udsInterventi.manageBisogniAction")}
+                              </Button>
+                            )}
+                            {hasPermission("uds.interventi.note") && (
+                              <Button
+                                variant={i.noteUds ? "secondary" : "ghost"}
+                                size="sm"
+                                className={`gap-1 ${i.noteUds ? "bg-amber-100 text-amber-900 hover:bg-amber-200" : ""}`}
+                                onClick={() => {
+                                  setNoteEditing(i);
+                                  setNoteText(i.noteUds ?? "");
+                                }}
+                              >
+                                <StickyNote className="h-3.5 w-3.5" />
+                                {i.noteUds
+                                  ? t("udsInterventi.editNote")
+                                  : t("udsInterventi.addNote")}
+                              </Button>
+                            )}
+                            {hasPermission("uds.interventi.update") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleEdit(i)}
+                                title={t("udsInterventi.editAction")}
+                              >
+                                <Pencil className="h-4 w-4" />
+                                {t("udsInterventi.editAction")}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       <UdsBisogniDialog
         interventoId={bisogniEditingId}
+        interventoVersione={bisogniEditingIntervento?.dataAggiornamento ?? null}
         open={bisogniEditingId != null}
         onOpenChange={(open) => {
           if (!open) setBisogniEditingId(null);
@@ -857,23 +994,37 @@ export default function UdsInterventi() {
                 className="space-y-4"
               >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="dataIntervento"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("udsInterventi.fData")}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            disabled={editingId == null}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {editingId == null ? (
+                    <div
+                      data-testid="uds-new-intervento-today"
+                      className="rounded-md border bg-muted/30 p-3"
+                    >
+                      <div className="text-sm font-medium">
+                        {t("udsInterventi.fData")}
+                      </div>
+                      <div className="mt-1">
+                        {t("udsInterventi.todayLabel", {
+                          date: new Date(
+                            `${todayEuropeRome()}T12:00:00`,
+                          ).toLocaleDateString("it-IT"),
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="dataIntervento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("udsInterventi.fData")}</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={form.control}
                     name="tipoIntervento"
@@ -987,11 +1138,14 @@ export default function UdsInterventi() {
                   </Button>
                   <Button
                     type="submit"
+                    className="min-h-11 min-w-28"
                     disabled={
                       createIntervento.isPending || rectifyIntervento.isPending
                     }
                   >
-                    {t("common.save")}
+                    {createIntervento.isPending || rectifyIntervento.isPending
+                      ? t("udsInterventi.savingIntervention")
+                      : t("common.save")}
                   </Button>{" "}
                 </div>
               </form>

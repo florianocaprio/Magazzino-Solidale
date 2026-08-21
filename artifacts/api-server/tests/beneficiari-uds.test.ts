@@ -80,6 +80,13 @@ const appAsCentro = (centroAscoltoId: number, areaOperativaId: number | null, zo
   makeApp({ id: testUserId, centroAscoltoId, areaOperativaId, zonaUdsId });
 const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
 const sessoObbligatorioMsg = "Il campo Sesso è obbligatorio.";
+const newUdsRequiredFields = {
+  areaProvenienza: "UE",
+  fasciaEtaPresunta: "30_64",
+} as const;
+const udsEnableRequiredFields = {
+  fasciaEtaPresunta: "30_64",
+} as const;
 const creditoSolidaleCentroAscoltoRichiestoMsg =
   "ATTENZIONE: il beneficiario non ha un Centro di Ascolto assegnato. Non è possibile assegnare Credito Solidale.";
 
@@ -140,7 +147,7 @@ describe("POST /beneficiari (uds)", () => {
   it("crea una persona UDS con la area operativa e ritorna uds=true", async () => {
     const res = await request(appAs(null))
       .post("/beneficiari")
-      .send({ nome: "Mario", cognome: "Rossi", sesso: "M", uds: true, areaOperativaId: areaOperativaA });
+      .send({ ...newUdsRequiredFields, nome: "Mario", cognome: "Rossi", sesso: "M", uds: true, areaOperativaId: areaOperativaA });
     expect(res.status).toBe(201);
     expect(res.body.uds).toBe(true);
     expect(res.body.areaOperativaId).toBe(areaOperativaA);
@@ -155,6 +162,7 @@ describe("POST /beneficiari (uds)", () => {
         nome: "Persona",
         cognome: "Solo UDS",
         sesso: "F",
+        ...newUdsRequiredFields,
         uds: true,
         areaOperativaId: areaOperativaA,
       });
@@ -195,7 +203,7 @@ describe("POST /beneficiari (uds)", () => {
   it("rifiuta una persona UDS senza area operativa per un caller globale (400)", async () => {
     const res = await request(appAs(null))
       .post("/beneficiari")
-      .send({ nome: "Senza", cognome: "AreaOperativa", sesso: "M", uds: true });
+      .send({ ...newUdsRequiredFields, nome: "Senza", cognome: "AreaOperativa", sesso: "M", uds: true });
     expect(res.status).toBe(400);
     if (res.body?.id) beneficiarioIds.push(res.body.id);
   });
@@ -211,7 +219,7 @@ describe("POST /beneficiari (uds)", () => {
   it("un caller con area operativa pinnata può creare una persona UDS senza inviare areaOperativaId", async () => {
     const res = await request(appAs(areaOperativaA))
       .post("/beneficiari")
-      .send({ nome: "Auto", cognome: "AreaOperativa", sesso: "M", uds: true });
+      .send({ ...newUdsRequiredFields, nome: "Auto", cognome: "AreaOperativa", sesso: "M", uds: true });
     expect(res.status).toBe(201);
     expect(res.body.uds).toBe(true);
     expect(res.body.areaOperativaId).toBe(areaOperativaA);
@@ -291,6 +299,7 @@ describe("fascia d'età UDS", () => {
         nome: "Fascia",
         cognome: rnd(),
         sesso: "F",
+        areaProvenienza: "UE",
         uds: true,
         dataNascita: birthDateAge26,
         fasciaEtaPresunta: "65_plus",
@@ -552,7 +561,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
 
     const res = await request(appAsCentro(centroOperatore, areaOperativaA, zonaOperatore))
       .patch(`/beneficiari/${sociale.id}`)
-      .send({ uds: true, zonaUdsId: zonaOperatore, fasciaEtaPresunta: "30_64" });
+      .send({ uds: true, zonaUdsId: zonaOperatore, ...udsEnableRequiredFields });
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(sociale.id);
@@ -608,7 +617,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       .values({ codice: `BEN-${rnd()}`, nome: "NoAreaOperativa", cognome: rnd(), sesso: "M", areaOperativaId: null })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true });
+    const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true, ...udsEnableRequiredFields });
     expect(res.status).toBe(400);
   });
 
@@ -618,7 +627,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       .values({ codice: `BEN-${rnd()}`, nome: "ConAreaOperativa", cognome: rnd(), sesso: "M", areaOperativaId: areaOperativaA })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true });
+    const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true, ...udsEnableRequiredFields });
     expect(res.status).toBe(200);
     expect(res.body.uds).toBe(true);
   });
@@ -639,7 +648,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       .values({ codice: `BEN-${rnd()}`, nome: "Legacy", cognome: rnd(), sesso: "M", areaOperativaId: null })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(areaOperativaA)).patch(`/beneficiari/${b.id}`).send({ uds: true });
+    const res = await request(appAs(areaOperativaA)).patch(`/beneficiari/${b.id}`).send({ uds: true, ...udsEnableRequiredFields });
     expect(res.status).toBe(200);
     expect(res.body.uds).toBe(true);
     expect(res.body.areaOperativaId).toBe(areaOperativaA);
@@ -651,7 +660,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       .values({ codice: `BEN-${rnd()}`, nome: "AssegnaAreaOperativa", cognome: rnd(), sesso: "M", areaOperativaId: null })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true, areaOperativaId: areaOperativaA });
+    const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true, areaOperativaId: areaOperativaA, ...udsEnableRequiredFields });
     expect(res.status).toBe(200);
     expect(res.body.uds).toBe(true);
     expect(res.body.areaOperativaId).toBe(areaOperativaA);
@@ -671,7 +680,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
   it("permette una PATCH parziale del flag UDS su un legacy senza sesso", async () => {
     const [b] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "LegacySoloUds", cognome: rnd(), areaOperativaId: null })
+      .values({ codice: `BEN-${rnd()}`, nome: "LegacySoloUds", cognome: rnd(), areaOperativaId: null, fasciaEtaPresunta: "30_64" })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
     const res = await request(appAs(null)).patch(`/beneficiari/${b.id}`).send({ uds: true, areaOperativaId: areaOperativaA });
@@ -694,7 +703,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
 
 describe("GET /beneficiari?uds", () => {
   it("ritorna solo le persone con uds=true", async () => {
-    const u = await request(appAs(areaOperativaA)).post("/beneficiari").send({ nome: "UdsOnly", cognome: rnd(), sesso: "M", uds: true });
+    const u = await request(appAs(areaOperativaA)).post("/beneficiari").send({ ...newUdsRequiredFields, nome: "UdsOnly", cognome: rnd(), sesso: "M", uds: true });
     const n = await request(appAs(areaOperativaA)).post("/beneficiari").send({ nome: "NoUds", cognome: rnd(), sesso: "F", uds: false });
     beneficiarioIds.push(u.body.id, n.body.id);
 
@@ -707,9 +716,9 @@ describe("GET /beneficiari?uds", () => {
 
   it("filtra per parte del nome rispettando lo scope area operativa", async () => {
     const areaOperativaB = await createAreaOperativa();
-    const marioA = await request(appAs(areaOperativaA)).post("/beneficiari").send({ nome: "Mario", cognome: rnd(), sesso: "M", uds: true });
-    const luigiA = await request(appAs(areaOperativaA)).post("/beneficiari").send({ nome: "Luigi", cognome: rnd(), sesso: "M", uds: true });
-    const mariaB = await request(appAs(null)).post("/beneficiari").send({ nome: "Maria", cognome: rnd(), sesso: "F", uds: true, areaOperativaId: areaOperativaB });
+    const marioA = await request(appAs(areaOperativaA)).post("/beneficiari").send({ ...newUdsRequiredFields, nome: "Mario", cognome: rnd(), sesso: "M", uds: true });
+    const luigiA = await request(appAs(areaOperativaA)).post("/beneficiari").send({ ...newUdsRequiredFields, nome: "Luigi", cognome: rnd(), sesso: "M", uds: true });
+    const mariaB = await request(appAs(null)).post("/beneficiari").send({ ...newUdsRequiredFields, nome: "Maria", cognome: rnd(), sesso: "F", uds: true, areaOperativaId: areaOperativaB });
     beneficiarioIds.push(marioA.body.id, luigiA.body.id, mariaB.body.id);
 
     const res = await request(appAs(areaOperativaA)).get("/beneficiari").query({ uds: "true", search: "mar" });
@@ -725,10 +734,10 @@ describe("GET /beneficiari?uds", () => {
     const cf = `RSSMRA80A01H501${rnd().slice(0, 1).toUpperCase()}`;
     const target = await request(appAs(areaOperativaA))
       .post("/beneficiari")
-      .send({ codice, codiceFiscale: cf, nome: "Codice", cognome: rnd(), sesso: "M", uds: true });
+      .send({ ...newUdsRequiredFields, codice, codiceFiscale: cf, nome: "Codice", cognome: rnd(), sesso: "M", uds: true });
     const other = await request(appAs(areaOperativaA))
       .post("/beneficiari")
-      .send({ nome: "Altro", cognome: rnd(), sesso: "F", uds: true });
+      .send({ ...newUdsRequiredFields, nome: "Altro", cognome: rnd(), sesso: "F", uds: true });
     beneficiarioIds.push(target.body.id, other.body.id);
 
     const byCodice = await request(appAs(areaOperativaA)).get("/beneficiari").query({ search: codice.toLowerCase() });
@@ -747,10 +756,10 @@ describe("GET /beneficiari?uds", () => {
     const zonaB = await createZona(areaOperativaA);
     const a = await request(appAs(areaOperativaA))
       .post("/beneficiari")
-      .send({ nome: "ZonaA", cognome: rnd(), sesso: "M", uds: true, areaOperativaId: areaOperativaA, zonaUdsId: zonaA });
+      .send({ ...newUdsRequiredFields, nome: "ZonaA", cognome: rnd(), sesso: "M", uds: true, areaOperativaId: areaOperativaA, zonaUdsId: zonaA });
     const b = await request(appAs(areaOperativaA))
       .post("/beneficiari")
-      .send({ nome: "ZonaB", cognome: rnd(), sesso: "F", uds: true, areaOperativaId: areaOperativaA, zonaUdsId: zonaB });
+      .send({ ...newUdsRequiredFields, nome: "ZonaB", cognome: rnd(), sesso: "F", uds: true, areaOperativaId: areaOperativaA, zonaUdsId: zonaB });
     beneficiarioIds.push(a.body.id, b.body.id);
 
     const res = await request(appAs(areaOperativaA, zonaA)).get("/beneficiari").query({ uds: "true" });
@@ -765,7 +774,7 @@ describe("GET /beneficiari?uds", () => {
     // uds + centro → deve comparire
     const both = await request(appAs(areaOperativaA))
       .post("/beneficiari")
-      .send({ nome: "UdsCentro", cognome: rnd(), sesso: "M", uds: true, centroAscoltoId: centro });
+      .send({ ...newUdsRequiredFields, nome: "UdsCentro", cognome: rnd(), sesso: "M", uds: true, centroAscoltoId: centro });
     // solo centro (uds=false) → non deve MAI comparire nell'anagrafica UDS
     const centroOnly = await request(appAs(areaOperativaA))
       .post("/beneficiari")

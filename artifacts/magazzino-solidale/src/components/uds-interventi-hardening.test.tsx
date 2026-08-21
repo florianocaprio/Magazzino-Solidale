@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   invalidate: vi.fn(),
   toast: vi.fn(),
   permissions: new Set<string>(),
+  createdInterventions: [] as unknown[],
 }));
 
 const intervention = {
@@ -56,7 +57,13 @@ vi.mock("@workspace/api-client-react", () => ({
       },
     ],
   }),
-  useListInterventi: () => ({ data: [intervention], isLoading: false }),
+  useListInterventi: () => ({
+    data: [
+      intervention,
+      ...(mocks.createdInterventions as Array<typeof intervention>),
+    ],
+    isLoading: false,
+  }),
   useListTipiIntervento: () => ({
     data: [{ id: 1, nome: "ascolto", attivo: true }],
   }),
@@ -99,10 +106,67 @@ vi.mock("@/components/beneficiario-combobox", () => ({
 }));
 vi.mock("@/components/export-buttons", () => ({ ExportButtons: () => null }));
 vi.mock("@/components/uds-persona-sheet", () => ({
-  UdsPersonaSheet: () => null,
+  UdsPersonaSheet: ({
+    open,
+    onPersonReady,
+  }: {
+    open: boolean;
+    onPersonReady: (
+      person: {
+        id: number;
+        nome: string;
+        cognome: string;
+        areaOperativaId: number;
+        zonaUdsId: number;
+      },
+      outcome: string,
+    ) => void;
+  }) =>
+    open ? (
+      <button
+        type="button"
+        onClick={() =>
+          onPersonReady(
+            {
+              id: 7,
+              nome: "Mario",
+              cognome: "Rossi",
+              areaOperativaId: 1,
+              zonaUdsId: 11,
+            },
+            "created",
+          )
+        }
+      >
+        salva-persona-rapida
+      </button>
+    ) : null,
 }));
 vi.mock("@/components/bisogni-pianificati-editor", () => ({
-  BisogniPianificatiEditor: () => null,
+  BisogniPianificatiEditor: ({
+    onChange,
+  }: {
+    onChange: (value: Array<Record<string, unknown>>) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onChange([
+          {
+            clientKey: "quick-need",
+            tipo: "richiesta",
+            descrizione: "Vestiti taglia L",
+            stato: "da_pianificare",
+            dataPrevista: "",
+            priorita: "normale",
+            note: "",
+          },
+        ])
+      }
+    >
+      aggiungi-bisogno-rapido
+    </button>
+  ),
 }));
 vi.mock("@/components/uds-bisogni-dialog", () => ({
   UdsBisogniDialog: ({ open }: { open: boolean }) =>
@@ -114,6 +178,7 @@ vi.mock("@/components/intervento-workflow", () => ({
 }));
 
 import UdsInterventi from "@/pages/uds-interventi";
+import { udsInterventi } from "@/lib/i18n/namespaces/udsInterventi";
 
 describe("hardening UI Interventi UDS", () => {
   let container: HTMLDivElement;
@@ -123,12 +188,15 @@ describe("hardening UI Interventi UDS", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.create.mockReset();
     mocks.permissions = new Set([
       "uds.interventi.create",
       "uds.interventi.update",
       "uds.interventi.note",
       "uds.bisogni.manage",
+      "beneficiari.manage",
     ]);
+    mocks.createdInterventions.length = 0;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -148,6 +216,15 @@ describe("hardening UI Interventi UDS", () => {
     );
     await act(async () => select?.click());
   }
+
+  it("presenta la descrizione come Sintesi e mantiene separato il materiale", () => {
+    expect(udsInterventi.it.fBisogni).toBe("Sintesi dell'incontro");
+    expect(udsInterventi.it.fBisogni).not.toMatch(/bisogni rilevati/i);
+    expect(udsInterventi.it.fMateriale).toBe("Materiale consegnato");
+    expect(udsInterventi.it.bisogniPianificatiTitle).toBe(
+      "Bisogni e azioni",
+    );
+  });
 
   it("crea tramite operazione UDS esplicita senza inviare una data autorevole", async () => {
     await renderAndSelectPerson();
@@ -174,6 +251,108 @@ describe("hardening UI Interventi UDS", () => {
     expect(mocks.create.mock.calls[0]?.[0].data).not.toHaveProperty(
       "dataIntervento",
     );
+    expect(
+      document.querySelector('[data-testid="uds-new-intervento-today"]'),
+    ).not.toBeNull();
+    expect(document.querySelector('input[name="dataIntervento"]')).toBeNull();
+  });
+
+  it("copre il percorso da strada con Sintesi e bisogno rapido", async () => {
+    mocks.create.mockImplementation(
+      (
+        input: { data: { descrizione?: string | null } },
+        callbacks: { onSuccess: () => void },
+      ) => {
+        mocks.createdInterventions.push({
+          ...intervention,
+          id: 32,
+          descrizione: input.data.descrizione ?? null,
+        });
+        callbacks.onSuccess();
+      },
+    );
+    await renderAndSelectPerson();
+    const createButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("udsInterventi.newIntervento"),
+    );
+    await act(async () => createButton?.click());
+    const summary = document.querySelector<HTMLTextAreaElement>(
+      'textarea[name="descrizione"]',
+    );
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(summary, "Incontrato a Termini");
+      summary?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const addNeed = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "aggiungi-bisogno-rapido",
+    );
+    await act(async () => addNeed?.click());
+    await act(async () =>
+      document
+        .querySelector("form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        ),
+    );
+    expect(mocks.create.mock.calls.at(-1)?.[0].data).toMatchObject({
+      descrizione: "Incontrato a Termini",
+      bisogniPianificati: [
+        {
+          tipo: "richiesta",
+          descrizione: "Vestiti taglia L",
+          stato: "da_pianificare",
+          dataPrevista: null,
+          priorita: "normale",
+          note: null,
+        },
+      ],
+    });
+    await act(async () => root.render(<UdsInterventi />));
+    expect(
+      Array.from(
+        document.querySelectorAll('[data-testid="uds-intervento-mobile-card"]'),
+      ).some((card) => card.textContent?.includes("Incontrato a Termini")),
+    ).toBe(true);
+  });
+
+  it("seleziona automaticamente la persona appena creata e consente subito l'incontro", async () => {
+    await act(async () => root.render(<UdsInterventi />));
+    const newPerson = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("udsAnagrafica.newPerson"),
+    );
+    await act(async () => newPerson?.click());
+    const savePerson = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "salva-persona-rapida",
+    );
+    await act(async () => savePerson?.click());
+    const newIntervention = Array.from(
+      document.querySelectorAll("button"),
+    ).find((button) =>
+      button.textContent?.includes("udsInterventi.newIntervento"),
+    );
+    expect(newIntervention?.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("mantiene tabella desktop e card mobile con azioni touch", async () => {
+    await renderAndSelectPerson();
+    const mobile = document.querySelector(
+      '[data-testid="uds-interventi-mobile"]',
+    );
+    const desktop = document.querySelector(
+      '[data-testid="uds-interventi-desktop"]',
+    );
+    expect(mobile?.className).toContain("md:hidden");
+    expect(desktop?.className).toContain("hidden md:block");
+    expect(
+      mobile?.querySelector('[data-testid="uds-intervento-mobile-card"]'),
+    ).not.toBeNull();
+    expect(mobile?.textContent).toContain("udsInterventi.manageBisogniAction");
+    expect(mobile?.textContent).toContain("udsInterventi.mobileNoteAction");
+    expect(mobile?.textContent).toContain("udsInterventi.editAction");
   });
 
   it("invia la versione alla Nota dedicata e su 409 ricarica lo storico", async () => {

@@ -143,6 +143,110 @@ afterAll(async () => {
 });
 
 describe("UDS hardening territoriale e storico", () => {
+  it("applica i soli dati minimi e la classificazione età alle nuove persone UDS", async () => {
+    const area = await createAreaOperativa(scope);
+    const zona = await createZona(scope, area);
+    const udsApp = appAs(area, zona.id, ["beneficiari.manage"]);
+    const base = {
+      nome: "Persona",
+      cognome: "Campo",
+      sesso: "F",
+      areaProvenienza: "Extra-UE",
+      uds: true,
+    };
+
+    const missingAge = await request(udsApp).post("/beneficiari").send(base);
+    expect(missingAge.status).toBe(400);
+    expect(missingAge.body.error).toMatch(/seleziona la fascia d'età/i);
+
+    const missingOrigin = await request(udsApp)
+      .post("/beneficiari")
+      .send({ ...base, areaProvenienza: undefined, fasciaEtaPresunta: "18_29" });
+    expect(missingOrigin.status).toBe(400);
+    expect(missingOrigin.body.error).toMatch(/Area di provenienza/i);
+
+    const estimated = await request(udsApp)
+      .post("/beneficiari")
+      .send({ ...base, fasciaEtaPresunta: "18_29" });
+    expect(estimated.status).toBe(201);
+    scope.beneficiarioIds.push(estimated.body.id);
+    expect(estimated.body).toMatchObject({
+      uds: true,
+      areaOperativaId: area,
+      zonaUdsId: zona.id,
+      fasciaEtaCorrente: "18_29",
+      fasciaEtaOrigine: "presunta",
+    });
+
+    const birthDate = await request(udsApp)
+      .post("/beneficiari")
+      .send({
+        ...base,
+        nome: "Data",
+        dataNascita: "2000-01-01",
+      });
+    expect(birthDate.status).toBe(201);
+    scope.beneficiarioIds.push(birthDate.body.id);
+    expect(birthDate.body.fasciaEtaOrigine).toBe("calcolata");
+
+    const birthDateWins = await request(udsApp)
+      .post("/beneficiari")
+      .send({
+        ...base,
+        nome: "Precedenza",
+        dataNascita: "2000-01-01",
+        fasciaEtaPresunta: "65_plus",
+      });
+    expect(birthDateWins.status).toBe(201);
+    scope.beneficiarioIds.push(birthDateWins.body.id);
+    expect(birthDateWins.body).toMatchObject({
+      fasciaEtaCorrente: birthDate.body.fasciaEtaCorrente,
+      fasciaEtaOrigine: "calcolata",
+    });
+
+    const notDetermined = await request(udsApp)
+      .post("/beneficiari")
+      .send({ ...base, fasciaEtaPresunta: "non_determinata" });
+    expect(notDetermined.status).toBe(400);
+
+    const socialApp = makeScopedApp(combinedRouter(), {
+      id: userId,
+      centroAscoltoId: null,
+      areaOperativaId: area,
+      zonaUdsId: null,
+      aree: ["sociale"],
+      permessi: ["beneficiari.manage"],
+    });
+    const social = await request(socialApp).post("/beneficiari").send({
+      nome: "Sociale",
+      cognome: "Invariato",
+      sesso: "M",
+      areaProvenienza: "UE",
+      uds: false,
+    });
+    expect(social.status).toBe(201);
+    scope.beneficiarioIds.push(social.body.id);
+    const enableWithoutAge = await request(udsApp)
+      .patch(`/beneficiari/${social.body.id}`)
+      .send({ uds: true, versione: social.body.versione });
+    expect(enableWithoutAge.status).toBe(400);
+    expect(enableWithoutAge.body.error).toMatch(/seleziona la fascia d'età/i);
+    const enabledWithAge = await request(udsApp)
+      .patch(`/beneficiari/${social.body.id}`)
+      .send({
+        uds: true,
+        zonaUdsId: zona.id,
+        fasciaEtaPresunta: "30_64",
+        versione: social.body.versione,
+      });
+    expect(enabledWithAge.status).toBe(200);
+    expect(enabledWithAge.body).toMatchObject({
+      uds: true,
+      fasciaEtaCorrente: "30_64",
+    });
+
+  });
+
   it("classifica i report UDS attraverso areaGuard reale senza ampliare gli altri report", async () => {
     const udsReports = appWithRealAreaGuard(["uds"], ["uds.reports.view"]);
     for (const path of [
@@ -525,6 +629,12 @@ describe("UDS hardening territoriale e storico", () => {
             stato: "da_pianificare",
             priorita: "normale",
           },
+          {
+            tipo: "azione",
+            descrizione: "Accompagnamento",
+            stato: "da_pianificare",
+            priorita: "normale",
+          },
         ],
       });
     expect(created.status).toBe(201);
@@ -565,7 +675,11 @@ describe("UDS hardening territoriale e storico", () => {
       .select()
       .from(bisogniPianificatiTable)
       .where(eq(bisogniPianificatiTable.interventoId, created.body.id));
-    const [need, secondNeed] = needs;
+    const need = needs.find((item) => item.descrizione === "Documento")!;
+    const secondNeed = needs.find((item) => item.descrizione === "Contatto")!;
+    const thirdNeed = needs.find(
+      (item) => item.descrizione === "Accompagnamento",
+    )!;
     const needUpdated = await request(app)
       .patch(`/interventi/${created.body.id}/bisogni-pianificati/${need.id}`)
       .send({
@@ -581,6 +695,16 @@ describe("UDS hardening territoriale e storico", () => {
       .send({ versione: need.versione, stato: "annullato" });
     expect(staleNeed.status).toBe(409);
 
+    const historyBeforeConflict = await db
+      .select()
+      .from(bisogniPianificatiStoricoTable)
+      .where(
+        inArray(bisogniPianificatiStoricoTable.bisognoId, [
+          need.id,
+          secondNeed.id,
+          thirdNeed.id,
+        ]),
+      );
     const nestedConflict = await request(app)
       .patch(`/interventi/${created.body.id}`)
       .send({
@@ -593,20 +717,119 @@ describe("UDS hardening territoriale e storico", () => {
           },
           {
             id: secondNeed.id,
-            versione: secondNeed.versione + 1,
+            versione: secondNeed.versione,
             stato: "annullato",
+          },
+          {
+            id: thirdNeed.id,
+            versione: thirdNeed.versione + 1,
+            stato: "completato",
           },
         ],
       });
     expect(nestedConflict.status).toBe(409);
-    const [needAfterRollback] = await db
+    const needsAfterRollback = await db
       .select()
       .from(bisogniPianificatiTable)
-      .where(eq(bisogniPianificatiTable.id, need.id));
+      .where(
+        inArray(bisogniPianificatiTable.id, [
+          need.id,
+          secondNeed.id,
+          thirdNeed.id,
+        ]),
+      );
+    const needAfterRollback = needsAfterRollback.find(
+      (item) => item.id === need.id,
+    );
     expect(needAfterRollback).toMatchObject({
       stato: "pianificato",
       versione: needUpdated.body.versione,
     });
+    expect(
+      needsAfterRollback.find((item) => item.id === secondNeed.id),
+    ).toMatchObject({
+      stato: "da_pianificare",
+      versione: secondNeed.versione,
+    });
+    expect(
+      needsAfterRollback.find((item) => item.id === thirdNeed.id),
+    ).toMatchObject({
+      stato: "da_pianificare",
+      versione: thirdNeed.versione,
+    });
+    const historyAfterConflict = await db
+      .select()
+      .from(bisogniPianificatiStoricoTable)
+      .where(
+        inArray(bisogniPianificatiStoricoTable.bisognoId, [
+          need.id,
+          secondNeed.id,
+          thirdNeed.id,
+        ]),
+      );
+    expect(historyAfterConflict).toHaveLength(historyBeforeConflict.length);
+
+    const validBatch = await request(app)
+      .patch(`/interventi/${created.body.id}`)
+      .send({
+        versione: rectified.body.versione,
+        bisogniPianificati: [
+          {
+            id: secondNeed.id,
+            versione: secondNeed.versione,
+            stato: "pianificato",
+            dataPrevista: "2026-09-01",
+            motivo: "Pianificazione batch",
+          },
+          {
+            id: thirdNeed.id,
+            versione: thirdNeed.versione,
+            stato: "completato",
+            motivo: "Completamento batch",
+          },
+          {
+            tipo: "richiesta",
+            descrizione: "Nuova richiesta batch",
+            stato: "da_pianificare",
+            priorita: "normale",
+            motivo: "Creazione batch",
+          },
+        ],
+      });
+    expect(validBatch.status).toBe(200);
+    const needsAfterValidBatch = await db
+      .select()
+      .from(bisogniPianificatiTable)
+      .where(eq(bisogniPianificatiTable.interventoId, created.body.id));
+    expect(
+      needsAfterValidBatch.find((item) => item.id === secondNeed.id),
+    ).toMatchObject({
+      stato: "pianificato",
+      dataPrevista: "2026-09-01",
+      versione: secondNeed.versione + 1,
+    });
+    expect(
+      needsAfterValidBatch.find((item) => item.id === thirdNeed.id),
+    ).toMatchObject({
+      stato: "completato",
+      versione: thirdNeed.versione + 1,
+    });
+    const createdInBatch = needsAfterValidBatch.find(
+      (item) => item.descrizione === "Nuova richiesta batch",
+    );
+    expect(createdInBatch).toBeDefined();
+    const historyAfterValidBatch = await db
+      .select()
+      .from(bisogniPianificatiStoricoTable)
+      .where(
+        inArray(
+          bisogniPianificatiStoricoTable.bisognoId,
+          needsAfterValidBatch.map((item) => item.id),
+        ),
+      );
+    expect(historyAfterValidBatch).toHaveLength(
+      historyBeforeConflict.length + 3,
+    );
 
     const completedNeed = await request(app)
       .patch(`/interventi/${created.body.id}/bisogni-pianificati/${need.id}`)

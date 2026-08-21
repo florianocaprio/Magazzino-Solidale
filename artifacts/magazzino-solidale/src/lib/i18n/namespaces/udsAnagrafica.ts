@@ -1,7 +1,8 @@
 export const udsAnagrafica = {
   it: {
     title: "Anagrafica UDS",
-    subtitle: "Persone seguite dall'Unità di Strada nella tua zona e Area Operativa.",
+    subtitle:
+      "Persone seguite dall'Unità di Strada nella tua zona e Area Operativa.",
     newPerson: "Nuova persona",
     newTitle: "Nuova persona UDS",
     filterZona: "Zona",
@@ -20,7 +21,8 @@ export const udsAnagrafica = {
     canaleEntrambi: "UDS + Centro",
     canaleNd: "Non classificato",
     noPersone: "Nessuna persona trovata.",
-    noAreaOperativaWarning: "Nessuna Area Operativa disponibile. Chiedi a un amministratore di crearne una.",
+    noAreaOperativaWarning:
+      "Nessuna Area Operativa disponibile. Chiedi a un amministratore di crearne una.",
     toastCreated: "Persona UDS creata",
     dupTitle: "Possibili persone già esistenti",
     dupHint: "Controlla se è una di queste prima di crearne una nuova.",
@@ -31,23 +33,40 @@ export const udsAnagrafica = {
     dupNeedZona: "Seleziona una zona per aggiungerla all'UDS",
     dupLinked: "Persona collegata all'UDS",
     existingSearchLabel: "Cerca una persona già presente",
-    existingSearchPlaceholder: "Nome, cognome, soprannome, telefono, codice o codice fiscale",
-    existingSearchHint: "Inserisci almeno 2 caratteri. La ricerca copre tutta la area operativa, senza limiti di zona o Centro di Ascolto.",
-    selectAreaOperativaForSearch: "Seleziona prima la area operativa in cui cercare",
+    existingSearchPlaceholder:
+      "Nome, cognome, soprannome, telefono, codice o codice fiscale",
+    existingSearchHint:
+      "Inserisci almeno 2 caratteri. La ricerca copre tutta la area operativa, senza limiti di zona o Centro di Ascolto.",
+    selectAreaOperativaForSearch:
+      "Seleziona prima la area operativa in cui cercare",
     dupStatusUds: "Già presente in UDS",
     dupStatusShared: "Anagrafica condivisa",
     dupConfirmTitle: "Collegare la persona all'UDS?",
-    dupConfirmDescription: "Confermi di collegare {{nome}} all'Unità di Strada senza creare una nuova anagrafica?",
+    dupConfirmDescription:
+      "Confermi di collegare {{nome}} all'Unità di Strada senza creare una nuova anagrafica?",
     dupConfirmAction: "Conferma collegamento",
     dupCheckRequired: "Verifica la persona esistente",
-    dupCheckRequiredHint: "Controlla i risultati oppure scegli esplicitamente di continuare come nuova persona.",
+    dupCheckRequiredHint:
+      "Controlla i risultati oppure scegli esplicitamente di continuare come nuova persona.",
+    duplicateCheckInProgress: "Verifica persone già presenti...",
+    savingPerson: "Salvataggio...",
+    optionalDataTitle: "Altri dati — facoltativi",
+    optionalDataHint:
+      "Compilali solo se sono disponibili: non bloccano la registrazione.",
     exportTitle: "Anagrafica UDS",
     fNome: "Nome",
     fCognome: "Cognome",
     fSoprannome: "Soprannome",
     fDataNascita: "Data di nascita",
+    fasciaEtaLabel: "Fascia d'età",
+    fasciaEtaPlaceholder: "Seleziona fascia",
+    fasciaEtaRequiredHint:
+      "Se non conosci la data di nascita, seleziona una fascia.",
+    ageClassificationRequired:
+      "Se non conosci la data di nascita, seleziona la fascia d'età.",
     fasciaEtaPresuntaLabel: "Fascia d'età presunta",
-    fasciaEtaPresuntaHint: "Usata quando la data di nascita non è disponibile; viene conservata anche se inserisci una data.",
+    fasciaEtaPresuntaHint:
+      "Usata quando la data di nascita non è disponibile; viene conservata anche se inserisci una data.",
     fasciaEtaCorrenteLabel: "Fascia d'età corrente",
     fasciaEtaCalcolataHint: "Calcolata dalla data di nascita.",
     fasciaEta: {
@@ -93,7 +112,8 @@ export const udsAnagrafica = {
     canaleEntrambi: "UDS + Centro",
     canaleNd: "Sin clasificar",
     noPersone: "No se encontraron personas.",
-    noAreaOperativaWarning: "No hay áreas disponibles. Pide a un administrador que cree las áreas.",
+    noAreaOperativaWarning:
+      "No hay áreas disponibles. Pide a un administrador que cree las áreas.",
     toastCreated: "Persona UDS creada",
     dupTitle: "Posibles personas ya existentes",
     dupHint: "Comprueba si es una de estas antes de crear una nueva.",
@@ -104,23 +124,39 @@ export const udsAnagrafica = {
     dupNeedZona: "Selecciona una zona para añadirla a la UDS",
     dupLinked: "Persona vinculada a la UDS",
     existingSearchLabel: "Buscar una persona existente",
-    existingSearchPlaceholder: "Nombre, apellido, apodo, teléfono, código o identificación fiscal",
-    existingSearchHint: "Introduce al menos 2 caracteres. La búsqueda abarca toda la ciudad, sin límites de zona o centro.",
+    existingSearchPlaceholder:
+      "Nombre, apellido, apodo, teléfono, código o identificación fiscal",
+    existingSearchHint:
+      "Introduce al menos 2 caracteres. La búsqueda abarca toda la ciudad, sin límites de zona o centro.",
     selectAreaOperativaForSearch: "Primero selecciona la ciudad donde buscar",
     dupStatusUds: "Ya está en UDS",
     dupStatusShared: "Registro compartido",
     dupConfirmTitle: "¿Vincular la persona a la UDS?",
-    dupConfirmDescription: "¿Confirmas vincular a {{nome}} a la Unidad de Calle sin crear un nuevo registro?",
+    dupConfirmDescription:
+      "¿Confirmas vincular a {{nome}} a la Unidad de Calle sin crear un nuevo registro?",
     dupConfirmAction: "Confirmar vinculación",
     dupCheckRequired: "Comprueba la persona existente",
-    dupCheckRequiredHint: "Revisa los resultados o elige explícitamente continuar como nueva persona.",
+    dupCheckRequiredHint:
+      "Revisa los resultados o elige explícitamente continuar como nueva persona.",
+    duplicateCheckInProgress: "Comprobando personas existentes...",
+    savingPerson: "Guardando...",
+    optionalDataTitle: "Otros datos — opcionales",
+    optionalDataHint:
+      "Complétalos solo si están disponibles; no bloquean el registro.",
     exportTitle: "Registro UDS",
     fNome: "Nombre",
     fCognome: "Apellido",
     fSoprannome: "Apodo",
     fDataNascita: "Fecha de nacimiento",
+    fasciaEtaLabel: "Franja de edad",
+    fasciaEtaPlaceholder: "Selecciona una franja",
+    fasciaEtaRequiredHint:
+      "Si no conoces la fecha de nacimiento, selecciona una franja.",
+    ageClassificationRequired:
+      "Si no conoces la fecha de nacimiento, selecciona la franja de edad.",
     fasciaEtaPresuntaLabel: "Franja de edad estimada",
-    fasciaEtaPresuntaHint: "Se usa cuando no hay fecha de nacimiento y se conserva aunque se introduzca una fecha.",
+    fasciaEtaPresuntaHint:
+      "Se usa cuando no hay fecha de nacimiento y se conserva aunque se introduzca una fecha.",
     fasciaEtaCorrenteLabel: "Franja de edad actual",
     fasciaEtaCalcolataHint: "Calculada a partir de la fecha de nacimiento.",
     fasciaEta: {
@@ -166,7 +202,8 @@ export const udsAnagrafica = {
     canaleEntrambi: "Street Unit + Centre",
     canaleNd: "Unclassified",
     noPersone: "No person found.",
-    noAreaOperativaWarning: "No areas available. Ask an administrator to create areas.",
+    noAreaOperativaWarning:
+      "No areas available. Ask an administrator to create areas.",
     toastCreated: "Street-unit person created",
     dupTitle: "Possible existing people",
     dupHint: "Check whether it is one of these before creating a new one.",
@@ -177,23 +214,39 @@ export const udsAnagrafica = {
     dupNeedZona: "Select a zone to add them to the street unit",
     dupLinked: "Person linked to the street unit",
     existingSearchLabel: "Search for an existing person",
-    existingSearchPlaceholder: "Name, surname, nickname, phone, code or tax code",
-    existingSearchHint: "Enter at least 2 characters. The search covers the whole Operational Area, without zone or centre limits.",
+    existingSearchPlaceholder:
+      "Name, surname, nickname, phone, code or tax code",
+    existingSearchHint:
+      "Enter at least 2 characters. The search covers the whole Operational Area, without zone or centre limits.",
     selectAreaOperativaForSearch: "First select the Operational Area to search",
     dupStatusUds: "Already in street unit",
     dupStatusShared: "Shared registry",
     dupConfirmTitle: "Link this person to the street unit?",
-    dupConfirmDescription: "Confirm linking {{nome}} to the street unit without creating a new record?",
+    dupConfirmDescription:
+      "Confirm linking {{nome}} to the street unit without creating a new record?",
     dupConfirmAction: "Confirm link",
     dupCheckRequired: "Check the existing person",
-    dupCheckRequiredHint: "Review the results or explicitly choose to continue as a new person.",
+    dupCheckRequiredHint:
+      "Review the results or explicitly choose to continue as a new person.",
+    duplicateCheckInProgress: "Checking for existing people...",
+    savingPerson: "Saving...",
+    optionalDataTitle: "Other details — optional",
+    optionalDataHint:
+      "Complete these only when available; they do not block registration.",
     exportTitle: "Street Unit Registry",
     fNome: "First name",
     fCognome: "Last name",
     fSoprannome: "Nickname",
     fDataNascita: "Date of birth",
+    fasciaEtaLabel: "Age range",
+    fasciaEtaPlaceholder: "Select an age range",
+    fasciaEtaRequiredHint:
+      "If the date of birth is unknown, select an age range.",
+    ageClassificationRequired:
+      "If the date of birth is unknown, select the age range.",
     fasciaEtaPresuntaLabel: "Estimated age range",
-    fasciaEtaPresuntaHint: "Used when the date of birth is unavailable and retained if a date is later entered.",
+    fasciaEtaPresuntaHint:
+      "Used when the date of birth is unavailable and retained if a date is later entered.",
     fasciaEtaCorrenteLabel: "Current age range",
     fasciaEtaCalcolataHint: "Calculated from the date of birth.",
     fasciaEta: {
@@ -220,7 +273,8 @@ export const udsAnagrafica = {
   },
   fr: {
     title: "Répertoire UDS",
-    subtitle: "Personnes suivies par l'Unité de Rue dans votre zone et votre zone opérationnelle.",
+    subtitle:
+      "Personnes suivies par l'Unité de Rue dans votre zone et votre zone opérationnelle.",
     newPerson: "Nouvelle personne",
     newTitle: "Nouvelle personne UDS",
     filterZona: "Zone",
@@ -239,7 +293,8 @@ export const udsAnagrafica = {
     canaleEntrambi: "UDS + Centre",
     canaleNd: "Non classé",
     noPersone: "Aucune personne trouvée.",
-    noAreaOperativaWarning: "Aucun zone opérationnelle disponible. Demandez à un administrateur de créer les zone opérationnelles.",
+    noAreaOperativaWarning:
+      "Aucun zone opérationnelle disponible. Demandez à un administrateur de créer les zone opérationnelles.",
     toastCreated: "Personne UDS créée",
     dupTitle: "Personnes déjà existantes possibles",
     dupHint: "Vérifiez si c'est l'une d'elles avant d'en créer une nouvelle.",
@@ -250,23 +305,39 @@ export const udsAnagrafica = {
     dupNeedZona: "Sélectionnez une zone pour l'ajouter à l'UDS",
     dupLinked: "Personne reliée à l'UDS",
     existingSearchLabel: "Rechercher une personne existante",
-    existingSearchPlaceholder: "Nom, prénom, surnom, téléphone, code ou identifiant fiscal",
-    existingSearchHint: "Saisissez au moins 2 caractères. La recherche couvre toute la ville, sans limite de zone ou de centre.",
+    existingSearchPlaceholder:
+      "Nom, prénom, surnom, téléphone, code ou identifiant fiscal",
+    existingSearchHint:
+      "Saisissez au moins 2 caractères. La recherche couvre toute la ville, sans limite de zone ou de centre.",
     selectAreaOperativaForSearch: "Sélectionnez d'abord la ville où rechercher",
     dupStatusUds: "Déjà présente dans l'UDS",
     dupStatusShared: "Registre partagé",
     dupConfirmTitle: "Relier cette personne à l'UDS ?",
-    dupConfirmDescription: "Confirmez-vous le rattachement de {{nome}} à l'UDS sans créer une nouvelle fiche ?",
+    dupConfirmDescription:
+      "Confirmez-vous le rattachement de {{nome}} à l'UDS sans créer une nouvelle fiche ?",
     dupConfirmAction: "Confirmer le rattachement",
     dupCheckRequired: "Vérifiez la personne existante",
-    dupCheckRequiredHint: "Examinez les résultats ou choisissez explicitement de continuer avec une nouvelle personne.",
+    dupCheckRequiredHint:
+      "Examinez les résultats ou choisissez explicitement de continuer avec une nouvelle personne.",
+    duplicateCheckInProgress: "Vérification des personnes existantes...",
+    savingPerson: "Enregistrement...",
+    optionalDataTitle: "Autres données — facultatives",
+    optionalDataHint:
+      "Renseignez-les seulement si elles sont disponibles; elles ne bloquent pas l'enregistrement.",
     exportTitle: "Répertoire UDS",
     fNome: "Prénom",
     fCognome: "Nom",
     fSoprannome: "Surnom",
     fDataNascita: "Date de naissance",
+    fasciaEtaLabel: "Tranche d'âge",
+    fasciaEtaPlaceholder: "Sélectionnez une tranche",
+    fasciaEtaRequiredHint:
+      "Si la date de naissance est inconnue, sélectionnez une tranche.",
+    ageClassificationRequired:
+      "Si la date de naissance est inconnue, sélectionnez la tranche d'âge.",
     fasciaEtaPresuntaLabel: "Tranche d'âge estimée",
-    fasciaEtaPresuntaHint: "Utilisée quand la date de naissance est indisponible et conservée si une date est ensuite saisie.",
+    fasciaEtaPresuntaHint:
+      "Utilisée quand la date de naissance est indisponible et conservée si une date est ensuite saisie.",
     fasciaEtaCorrenteLabel: "Tranche d'âge actuelle",
     fasciaEtaCalcolataHint: "Calculée à partir de la date de naissance.",
     fasciaEta: {
@@ -293,7 +364,8 @@ export const udsAnagrafica = {
   },
   de: {
     title: "UDS-Verzeichnis",
-    subtitle: "Vom Straßendienst betreute Personen in Ihrer Zone und Ihrem Betriebsbereich.",
+    subtitle:
+      "Vom Straßendienst betreute Personen in Ihrer Zone und Ihrem Betriebsbereich.",
     newPerson: "Neue Person",
     newTitle: "Neue Straßendienst-Person",
     filterZona: "Zone",
@@ -312,7 +384,8 @@ export const udsAnagrafica = {
     canaleEntrambi: "Straßendienst + Zentrum",
     canaleNd: "Nicht klassifiziert",
     noPersone: "Keine Person gefunden.",
-    noAreaOperativaWarning: "Keine Betriebsbereiche verfügbar. Bitten Sie einen Administrator, Betriebsbereiche anzulegen.",
+    noAreaOperativaWarning:
+      "Keine Betriebsbereiche verfügbar. Bitten Sie einen Administrator, Betriebsbereiche anzulegen.",
     toastCreated: "Straßendienst-Person erstellt",
     dupTitle: "Mögliche bereits vorhandene Personen",
     dupHint: "Prüfe, ob es eine davon ist, bevor du eine neue anlegst.",
@@ -323,23 +396,40 @@ export const udsAnagrafica = {
     dupNeedZona: "Wähle eine Zone, um sie zum Straßendienst hinzuzufügen",
     dupLinked: "Person mit dem Straßendienst verknüpft",
     existingSearchLabel: "Vorhandene Person suchen",
-    existingSearchPlaceholder: "Vorname, Nachname, Spitzname, Telefon, Code oder Steuernummer",
-    existingSearchHint: "Mindestens 2 Zeichen eingeben. Die Suche umfasst den gesamten Betriebsbereich, ohne Zonen- oder Einrichtungsgrenzen.",
-    selectAreaOperativaForSearch: "Zuerst den Betriebsbereich für die Suche auswählen",
+    existingSearchPlaceholder:
+      "Vorname, Nachname, Spitzname, Telefon, Code oder Steuernummer",
+    existingSearchHint:
+      "Mindestens 2 Zeichen eingeben. Die Suche umfasst den gesamten Betriebsbereich, ohne Zonen- oder Einrichtungsgrenzen.",
+    selectAreaOperativaForSearch:
+      "Zuerst den Betriebsbereich für die Suche auswählen",
     dupStatusUds: "Bereits im Straßendienst",
     dupStatusShared: "Gemeinsames Register",
     dupConfirmTitle: "Person mit dem Straßendienst verknüpfen?",
-    dupConfirmDescription: "Bestätigst du die Verknüpfung von {{nome}} mit dem Straßendienst, ohne einen neuen Datensatz anzulegen?",
+    dupConfirmDescription:
+      "Bestätigst du die Verknüpfung von {{nome}} mit dem Straßendienst, ohne einen neuen Datensatz anzulegen?",
     dupConfirmAction: "Verknüpfung bestätigen",
     dupCheckRequired: "Vorhandene Person prüfen",
-    dupCheckRequiredHint: "Prüfe die Ergebnisse oder entscheide ausdrücklich, als neue Person fortzufahren.",
+    dupCheckRequiredHint:
+      "Prüfe die Ergebnisse oder entscheide ausdrücklich, als neue Person fortzufahren.",
+    duplicateCheckInProgress: "Vorhandene Personen werden geprüft...",
+    savingPerson: "Speichern...",
+    optionalDataTitle: "Weitere Angaben — optional",
+    optionalDataHint:
+      "Nur ausfüllen, wenn sie verfügbar sind; die Registrierung wird dadurch nicht blockiert.",
     exportTitle: "UDS-Verzeichnis",
     fNome: "Vorname",
     fCognome: "Nachname",
     fSoprannome: "Spitzname",
     fDataNascita: "Geburtsdatum",
+    fasciaEtaLabel: "Altersgruppe",
+    fasciaEtaPlaceholder: "Altersgruppe auswählen",
+    fasciaEtaRequiredHint:
+      "Wenn das Geburtsdatum unbekannt ist, wähle eine Altersgruppe.",
+    ageClassificationRequired:
+      "Wenn das Geburtsdatum unbekannt ist, wähle die Altersgruppe.",
     fasciaEtaPresuntaLabel: "Geschätzte Altersgruppe",
-    fasciaEtaPresuntaHint: "Wird ohne Geburtsdatum verwendet und bleibt erhalten, wenn später ein Datum eingetragen wird.",
+    fasciaEtaPresuntaHint:
+      "Wird ohne Geburtsdatum verwendet und bleibt erhalten, wenn später ein Datum eingetragen wird.",
     fasciaEtaCorrenteLabel: "Aktuelle Altersgruppe",
     fasciaEtaCalcolataHint: "Aus dem Geburtsdatum berechnet.",
     fasciaEta: {
@@ -385,7 +475,8 @@ export const udsAnagrafica = {
     canaleEntrambi: "وحدة الشارع + المركز",
     canaleNd: "غير مصنّف",
     noPersone: "لم يتم العثور على أي شخص.",
-    noAreaOperativaWarning: "لا توجد أقاليم متاحة. اطلب من المسؤول إنشاء الأقاليم.",
+    noAreaOperativaWarning:
+      "لا توجد أقاليم متاحة. اطلب من المسؤول إنشاء الأقاليم.",
     toastCreated: "تم إنشاء شخص وحدة الشارع",
     dupTitle: "أشخاص موجودون محتملون",
     dupHint: "تحقّق مما إذا كان أحد هؤلاء قبل إنشاء شخص جديد.",
@@ -396,23 +487,36 @@ export const udsAnagrafica = {
     dupNeedZona: "اختر منطقة لإضافته إلى وحدة الشارع",
     dupLinked: "تم ربط الشخص بوحدة الشارع",
     existingSearchLabel: "البحث عن شخص موجود",
-    existingSearchPlaceholder: "الاسم أو الكنية أو الهاتف أو الرمز أو الرمز الضريبي",
-    existingSearchHint: "أدخل حرفين على الأقل. يشمل البحث المنطقة التشغيلية بأكملها دون قيود المنطقة أو المركز.",
+    existingSearchPlaceholder:
+      "الاسم أو الكنية أو الهاتف أو الرمز أو الرمز الضريبي",
+    existingSearchHint:
+      "أدخل حرفين على الأقل. يشمل البحث المنطقة التشغيلية بأكملها دون قيود المنطقة أو المركز.",
     selectAreaOperativaForSearch: "اختر أولاً المنطقة التشغيلية للبحث",
     dupStatusUds: "مسجل بالفعل في وحدة الشارع",
     dupStatusShared: "سجل مشترك",
     dupConfirmTitle: "ربط الشخص بوحدة الشارع؟",
-    dupConfirmDescription: "هل تؤكد ربط {{nome}} بوحدة الشارع دون إنشاء سجل جديد؟",
+    dupConfirmDescription:
+      "هل تؤكد ربط {{nome}} بوحدة الشارع دون إنشاء سجل جديد؟",
     dupConfirmAction: "تأكيد الربط",
     dupCheckRequired: "تحقق من الشخص الموجود",
     dupCheckRequiredHint: "راجع النتائج أو اختر بوضوح المتابعة كشخص جديد.",
+    duplicateCheckInProgress: "جارٍ التحقق من الأشخاص الموجودين...",
+    savingPerson: "جارٍ الحفظ...",
+    optionalDataTitle: "بيانات أخرى — اختيارية",
+    optionalDataHint: "أكملها فقط إذا كانت متاحة؛ فهي لا تمنع التسجيل.",
     exportTitle: "سجل وحدة الشارع",
     fNome: "الاسم",
     fCognome: "اللقب العائلي",
     fSoprannome: "الكنية",
     fDataNascita: "تاريخ الميلاد",
+    fasciaEtaLabel: "الفئة العمرية",
+    fasciaEtaPlaceholder: "اختر الفئة العمرية",
+    fasciaEtaRequiredHint: "إذا لم تعرف تاريخ الميلاد، فاختر فئة عمرية.",
+    ageClassificationRequired:
+      "إذا لم تعرف تاريخ الميلاد، فاختر الفئة العمرية.",
     fasciaEtaPresuntaLabel: "الفئة العمرية المقدرة",
-    fasciaEtaPresuntaHint: "تُستخدم عند عدم توفر تاريخ الميلاد وتبقى محفوظة عند إدخال التاريخ لاحقًا.",
+    fasciaEtaPresuntaHint:
+      "تُستخدم عند عدم توفر تاريخ الميلاد وتبقى محفوظة عند إدخال التاريخ لاحقًا.",
     fasciaEtaCorrenteLabel: "الفئة العمرية الحالية",
     fasciaEtaCalcolataHint: "محسوبة من تاريخ الميلاد.",
     fasciaEta: {

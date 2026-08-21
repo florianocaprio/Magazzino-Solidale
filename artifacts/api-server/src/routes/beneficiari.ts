@@ -65,6 +65,10 @@ const CODICE_BENEFICIARIO_DUPLICATO_MSG = "Il codice beneficiario indicato è gi
 const SESSO_OBBLIGATORIO_MSG = "Il campo Sesso è obbligatorio.";
 const DATA_NASCITA_NON_VALIDA_MSG = "La data di nascita non è valida. Usa il formato AAAA-MM-GG.";
 const FASCIA_ETA_PRESUNTA_NON_VALIDA_MSG = "La fascia d'età presunta selezionata non è valida.";
+const UDS_CLASSIFICAZIONE_ETA_RICHIESTA_MSG =
+  "Se non conosci la data di nascita, seleziona la fascia d'età.";
+const UDS_AREA_PROVENIENZA_RICHIESTA_MSG =
+  "Seleziona l'Area di provenienza della persona UDS.";
 const CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG =
   "ATTENZIONE: il beneficiario non ha un Centro di Ascolto assegnato. Non è possibile assegnare Credito Solidale.";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -194,6 +198,16 @@ function normalizeEtaFields(
     }
   }
   return {};
+}
+
+function hasUdsAgeClassification(
+  dataNascita: unknown,
+  fasciaEtaPresunta: unknown,
+): boolean {
+  return (
+    (typeof dataNascita === "string" && calcolaEta(dataNascita) != null) ||
+    isFasciaEtaPresunta(fasciaEtaPresunta)
+  );
 }
 
 async function codiceBeneficiarioEsiste(codice: string, excludeId?: number): Promise<boolean> {
@@ -619,6 +633,19 @@ export async function createBeneficiarioOne(
     (zid != null && values.zonaUdsId != null);
   if (createsUdsData && !(await isUnitaStradaEnabled())) {
     return { error: UNITA_STRADA_DISABLED_MSG, status: 403 };
+  }
+  if (values.uds === true) {
+    if (!trimOrUndefined(values.areaProvenienza)) {
+      return { error: UDS_AREA_PROVENIENZA_RICHIESTA_MSG, status: 400 };
+    }
+    if (
+      !hasUdsAgeClassification(
+        values.dataNascita,
+        values.fasciaEtaPresunta,
+      )
+    ) {
+      return { error: UDS_CLASSIFICAZIONE_ETA_RICHIESTA_MSG, status: 400 };
+    }
   }
   const completeError = validateBeneficiarioCompleto({
     statoAnagrafica: values.statoAnagrafica,
@@ -1121,6 +1148,23 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
         "Per disattivare UDS devi rimuovere esplicitamente anche la Zona UDS",
     });
     return;
+  }
+  if (enablesUds) {
+    const resultingDataNascita =
+      "dataNascita" in updates ? updates.dataNascita : existing.dataNascita;
+    const resultingFasciaEtaPresunta =
+      "fasciaEtaPresunta" in updates
+        ? updates.fasciaEtaPresunta
+        : existing.fasciaEtaPresunta;
+    if (
+      !hasUdsAgeClassification(
+        resultingDataNascita,
+        resultingFasciaEtaPresunta,
+      )
+    ) {
+      res.status(400).json({ error: UDS_CLASSIFICAZIONE_ETA_RICHIESTA_MSG });
+      return;
+    }
   }
   const resultingAreaOperativa = "areaOperativaId" in updates ? updates.areaOperativaId : existing.areaOperativaId;
   if (resultingUds && resultingAreaOperativa == null) {

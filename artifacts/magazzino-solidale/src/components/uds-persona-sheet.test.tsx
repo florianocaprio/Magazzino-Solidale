@@ -2,6 +2,17 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const mocks = vi.hoisted(() => ({
+  directoryMatches: [] as Array<{
+    id: number;
+    nome: string;
+    cognome: string;
+    soprannome: null;
+    zonaUdsId: number;
+  }>,
+  directoryFetching: false,
+}));
+
 vi.mock("@workspace/api-client-react", () => ({
   getCercaBeneficiariSimiliQueryKey: () => ["beneficiari", "cerca-simili"],
   getListBeneficiariQueryKey: () => ["beneficiari"],
@@ -12,7 +23,10 @@ vi.mock("@workspace/api-client-react", () => ({
   useListCentriAscolto: () => ({ data: [] }),
   useListAreeOperative: () => ({ data: [{ id: 1, nome: "Roma" }] }),
   useListZoneUds: () => ({ data: [{ id: 10, nome: "Zona test" }] }),
-  useListUdsDirectory: () => ({ data: [], isFetching: false }),
+  useListUdsDirectory: () => ({
+    data: mocks.directoryMatches,
+    isFetching: mocks.directoryFetching,
+  }),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -42,6 +56,8 @@ describe("UdsPersonaSheet", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.directoryMatches = [];
+    mocks.directoryFetching = false;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -81,6 +97,13 @@ describe("UdsPersonaSheet", () => {
     expect(
       document.querySelectorAll('[role="combobox"]').length,
     ).toBeGreaterThan(0);
+    const optionalData = Array.from(document.querySelectorAll("details")).find(
+      (details) =>
+        details.textContent?.includes("udsAnagrafica.optionalDataTitle"),
+    );
+    expect(optionalData).not.toBeUndefined();
+    expect(optionalData?.open).toBe(false);
+    expect(document.body.textContent).not.toContain("beneficiari.udsToggle");
     expect(onOpenChange).not.toHaveBeenCalled();
 
     const fasciaPreview = document.querySelector(
@@ -153,5 +176,80 @@ describe("UdsPersonaSheet", () => {
     await act(async () => cancelButtons[0]?.click());
     expect(onOpenChange).toHaveBeenCalledTimes(1);
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("spiega che senza data di nascita serve la fascia d'età", async () => {
+    await act(async () => {
+      root.render(
+        <UdsPersonaSheet
+          open
+          onOpenChange={vi.fn()}
+          initialAreaOperativaId={1}
+          initialZonaUdsId={10}
+        />,
+      );
+    });
+    const form = document.querySelector("form");
+    await act(async () => {
+      form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    });
+    expect(document.body.textContent).toContain(
+      "udsAnagrafica.ageClassificationRequired",
+    );
+  });
+
+  it("spiega la verifica duplicati e permette di continuare consapevolmente", async () => {
+    mocks.directoryMatches = [
+      {
+        id: 77,
+        nome: "Mario",
+        cognome: "Rossi",
+        soprannome: null,
+        zonaUdsId: 10,
+      },
+    ];
+    await act(async () => {
+      root.render(
+        <UdsPersonaSheet
+          open
+          onOpenChange={vi.fn()}
+          initialAreaOperativaId={1}
+          initialZonaUdsId={10}
+        />,
+      );
+    });
+    expect(document.body.textContent).toContain(
+      "udsAnagrafica.dupTitle",
+    );
+    const continueNew = Array.from(document.querySelectorAll("button")).find(
+      (button) =>
+        button.textContent?.includes("udsAnagrafica.dupContinueNew"),
+    );
+    expect(continueNew).toBeDefined();
+    const save = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "common.save",
+    );
+    expect(save?.hasAttribute("disabled")).toBe(true);
+    await act(async () => continueNew?.click());
+    expect(save?.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("mostra lo stato mentre verifica le persone già presenti", async () => {
+    mocks.directoryFetching = true;
+    await act(async () => {
+      root.render(
+        <UdsPersonaSheet
+          open
+          onOpenChange={vi.fn()}
+          initialAreaOperativaId={1}
+          initialZonaUdsId={10}
+        />,
+      );
+    });
+    expect(document.body.textContent).toContain(
+      "udsAnagrafica.duplicateCheckInProgress",
+    );
   });
 });

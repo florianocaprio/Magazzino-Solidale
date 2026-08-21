@@ -3,8 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  create: vi.fn(),
-  update: vi.fn(),
+  batch: vi.fn(),
   invalidate: vi.fn(),
   refetch: vi.fn(),
   toast: vi.fn(),
@@ -18,12 +17,8 @@ vi.mock("@workspace/api-client-react", () => ({
     isLoading: false,
     refetch: mocks.refetch,
   }),
-  useCreateBisognoPianificato: () => ({
-    mutateAsync: mocks.create,
-    isPending: false,
-  }),
-  useUpdateBisognoPianificato: () => ({
-    mutateAsync: mocks.update,
+  useUpdateIntervento: () => ({
+    mutateAsync: mocks.batch,
     isPending: false,
   }),
 }));
@@ -46,9 +41,6 @@ vi.mock("./bisogni-pianificati-editor", () => ({
   }) => (
     <div>
       <span data-testid="loaded-needs">{value.length}</span>
-      <span data-testid="loaded-version">
-        {String(value[0]?.versione ?? "")}
-      </span>
       <button
         type="button"
         onClick={() =>
@@ -122,8 +114,7 @@ describe("dialog Gestisci Bisogni UDS", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     mocks.needs = [need()];
-    mocks.create.mockResolvedValue({});
-    mocks.update.mockResolvedValue({});
+    mocks.batch.mockResolvedValue({});
     mocks.refetch.mockResolvedValue({ data: mocks.needs });
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -142,6 +133,7 @@ describe("dialog Gestisci Bisogni UDS", () => {
       root.render(
         <UdsBisogniDialog
           interventoId={31}
+          interventoVersione="2026-08-21T10:00:00.000Z"
           open
           onOpenChange={vi.fn()}
           onChanged={vi.fn()}
@@ -157,20 +149,26 @@ describe("dialog Gestisci Bisogni UDS", () => {
     await act(async () => button?.click());
   }
 
-  it("carica la lista e completa inviando la versione", async () => {
+  it("carica la lista e completa con una sola mutation batch versionata", async () => {
     await renderDialog();
     expect(
       document.querySelector('[data-testid="loaded-needs"]')?.textContent,
     ).toBe("1");
-    expect(
-      document.querySelector('[data-testid="loaded-version"]')?.textContent,
-    ).toBe("3");
     await click("completa");
     await click("common.save");
-    expect(mocks.update).toHaveBeenCalledWith({
-      interventoId: 31,
-      bisognoId: 9,
-      data: expect.objectContaining({ versione: 3, stato: "completato" }),
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
+    expect(mocks.batch).toHaveBeenCalledWith({
+      id: 31,
+      data: {
+        versione: "2026-08-21T10:00:00.000Z",
+        bisogniPianificati: [
+          expect.objectContaining({
+            id: 9,
+            versione: 3,
+            stato: "completato",
+          }),
+        ],
+      },
     });
   });
 
@@ -180,19 +178,19 @@ describe("dialog Gestisci Bisogni UDS", () => {
     await click("riapri");
     await click("nuovo");
     await click("common.save");
-    expect(mocks.update).toHaveBeenCalledWith({
-      interventoId: 31,
-      bisognoId: 9,
-      data: expect.objectContaining({ versione: 3, stato: "da_pianificare" }),
-    });
-    expect(mocks.create).toHaveBeenCalledWith({
-      interventoId: 31,
-      data: expect.objectContaining({ descrizione: "Nuovo bisogno" }),
-    });
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
+    expect(mocks.batch.mock.calls[0]?.[0].data.bisogniPianificati).toEqual([
+      expect.objectContaining({
+        id: 9,
+        versione: 3,
+        stato: "da_pianificare",
+      }),
+      expect.objectContaining({ descrizione: "Nuovo bisogno" }),
+    ]);
   });
 
   it("su 409 invalida, ricarica e non sovrascrive", async () => {
-    mocks.update.mockRejectedValue({ status: 409 });
+    mocks.batch.mockRejectedValue({ status: 409 });
     await renderDialog();
     await click("completa");
     await click("common.save");

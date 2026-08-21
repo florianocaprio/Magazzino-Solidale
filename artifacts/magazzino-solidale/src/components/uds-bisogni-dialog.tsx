@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import {
   getListBisogniPianificatiQueryKey,
   type BisognoPianificato,
-  useCreateBisognoPianificato,
   useListBisogniPianificati,
-  useUpdateBisognoPianificato,
+  useUpdateIntervento,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -65,6 +64,7 @@ function changed(
 
 interface Props {
   interventoId: number | null;
+  interventoVersione: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChanged: () => void;
@@ -72,6 +72,7 @@ interface Props {
 
 export function UdsBisogniDialog({
   interventoId,
+  interventoVersione,
   open,
   onOpenChange,
   onChanged,
@@ -88,8 +89,7 @@ export function UdsBisogniDialog({
       enabled: open && interventoId != null,
     },
   });
-  const createNeed = useCreateBisognoPianificato();
-  const updateNeed = useUpdateBisognoPianificato();
+  const updateNeeds = useUpdateIntervento();
 
   useEffect(() => {
     if (!open || !query.data) return;
@@ -97,44 +97,51 @@ export function UdsBisogniDialog({
     setMotivo("");
   }, [open, query.data]);
 
-  const pending = createNeed.isPending || updateNeed.isPending;
+  const pending = updateNeeds.isPending;
   const save = async () => {
-    if (interventoId == null) return;
+    if (interventoId == null || interventoVersione == null) return;
+    if (drafts.some((item) => !item.descrizione.trim())) {
+      toast({
+        title: t("udsInterventi.manageBisogniTitle"),
+        description: t("udsInterventi.bisognoDescrizioneRequired"),
+        variant: "destructive",
+      });
+      return;
+    }
     if (
-      drafts.some(
-        (item) =>
-          !item.descrizione.trim() ||
-          (item.stato === "pianificato" && !item.dataPrevista),
-      )
+      drafts.some((item) => item.stato === "pianificato" && !item.dataPrevista)
     ) {
       toast({
         title: t("udsInterventi.manageBisogniTitle"),
-        description: t("common.requiredField"),
+        description: t("udsInterventi.bisognoDataRequired"),
         variant: "destructive",
       });
       return;
     }
     try {
-      for (const draft of drafts) {
-        const payload = {
-          tipo: draft.tipo,
-          descrizione: draft.descrizione.trim(),
-          stato: draft.stato,
-          dataPrevista: draft.dataPrevista || null,
-          priorita: draft.priorita,
-          note: draft.note.trim() || null,
-          motivo: motivo.trim() || null,
-        };
-        if (draft.id == null) {
-          await createNeed.mutateAsync({ interventoId, data: payload });
-          continue;
-        }
+      const changedNeeds = drafts.filter((draft) => {
+        if (draft.id == null) return true;
         const original = query.data?.find((item) => item.id === draft.id);
-        if (!original || !changed(draft, original)) continue;
-        await updateNeed.mutateAsync({
-          interventoId,
-          bisognoId: draft.id,
-          data: { ...payload, versione: draft.versione ?? original.versione },
+        return original != null && changed(draft, original);
+      });
+      if (changedNeeds.length > 0) {
+        await updateNeeds.mutateAsync({
+          id: interventoId,
+          data: {
+            versione: interventoVersione,
+            bisogniPianificati: changedNeeds.map((draft) => ({
+              ...(draft.id != null
+                ? { id: draft.id, versione: draft.versione }
+                : {}),
+              tipo: draft.tipo,
+              descrizione: draft.descrizione.trim(),
+              stato: draft.stato,
+              dataPrevista: draft.dataPrevista || null,
+              priorita: draft.priorita,
+              note: draft.note.trim() || null,
+              motivo: motivo.trim() || null,
+            })),
+          },
         });
       }
       await queryClient.invalidateQueries({
@@ -149,6 +156,7 @@ export function UdsBisogniDialog({
           queryKey: getListBisogniPianificatiQueryKey(interventoId),
         });
         await query.refetch();
+        onChanged();
       }
       toast({
         title: t("udsInterventi.manageBisogniTitle"),
@@ -202,7 +210,7 @@ export function UdsBisogniDialog({
             onClick={save}
             disabled={pending || query.isLoading}
           >
-            {t("common.save")}
+            {pending ? t("udsInterventi.savingNeeds") : t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

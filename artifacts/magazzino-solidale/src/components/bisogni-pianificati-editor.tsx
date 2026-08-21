@@ -115,8 +115,7 @@ export function BisogniPianificatiEditor({
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="gap-2"
+          className="min-h-11 gap-2"
           disabled={disabled}
           onClick={() => onChange([...value, nuovoBisognoPianificato()])}
         >
@@ -142,17 +141,11 @@ export function BisogniPianificatiEditor({
                 data-testid="bisogno-pianificato-card"
                 className={`rounded-lg border p-4 space-y-4 ${scaduto ? "border-red-300 bg-red-50/60" : "bg-muted/20"}`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">
                       {t("udsInterventi.bisognoNumber", { number: index + 1 })}
                     </span>
-                    <Badge variant="outline">
-                      {t(`udsInterventi.bisognoPriorita.${bisogno.priorita}`)}
-                    </Badge>
-                    {bisogno.versione != null && (
-                      <Badge variant="outline">v{bisogno.versione}</Badge>
-                    )}
                     {scaduto && (
                       <Badge
                         variant="destructive"
@@ -174,7 +167,8 @@ export function BisogniPianificatiEditor({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
+                      size="sm"
+                      className="min-h-10 gap-2"
                       disabled={disabled}
                       aria-label={t("udsInterventi.removeBisognoPianificato")}
                       onClick={() =>
@@ -184,119 +178,14 @@ export function BisogniPianificatiEditor({
                       }
                     >
                       <Trash2 className="h-4 w-4" />
+                      {t("udsInterventi.removeBisognoPianificato")}
                     </Button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>{t("udsInterventi.bisognoTipoLabel")}</Label>
-                    <Select
-                      value={bisogno.tipo}
-                      disabled={disabled}
-                      onValueChange={(tipo: BisognoTipo) =>
-                        update(index, { tipo })
-                      }
-                    >
-                      <SelectTrigger
-                        aria-label={t("udsInterventi.bisognoTipoLabel")}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="richiesta">
-                          {t("udsInterventi.bisognoTipo.richiesta")}
-                        </SelectItem>
-                        <SelectItem value="azione">
-                          {t("udsInterventi.bisognoTipo.azione")}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>{t("udsInterventi.bisognoPrioritaLabel")}</Label>
-                    <Select
-                      value={bisogno.priorita}
-                      disabled={disabled}
-                      onValueChange={(priorita: BisognoPriorita) =>
-                        update(index, { priorita })
-                      }
-                    >
-                      <SelectTrigger
-                        aria-label={t("udsInterventi.bisognoPrioritaLabel")}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(["bassa", "normale", "alta", "urgente"] as const).map(
-                          (priorita) => (
-                            <SelectItem key={priorita} value={priorita}>
-                              {t(`udsInterventi.bisognoPriorita.${priorita}`)}
-                            </SelectItem>
-                          ),
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>{t("udsInterventi.bisognoStatoLabel")}</Label>
-                    <Select
-                      value={bisogno.stato}
-                      disabled={disabled}
-                      onValueChange={(stato: BisognoStato) =>
-                        update(index, { stato })
-                      }
-                    >
-                      <SelectTrigger
-                        aria-label={t("udsInterventi.bisognoStatoLabel")}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(
-                          [
-                            "da_pianificare",
-                            "pianificato",
-                            "completato",
-                            "annullato",
-                          ] as const
-                        ).map((stato) => (
-                          <SelectItem key={stato} value={stato}>
-                            {t(`udsInterventi.bisognoStato.${stato}`)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`bisogno-data-${bisogno.clientKey}`}>
-                      {t("udsInterventi.bisognoDataPrevistaLabel")}
-                    </Label>
-                    <div className="relative">
-                      <CalendarClock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id={`bisogno-data-${bisogno.clientKey}`}
-                        type="date"
-                        className="pl-9"
-                        value={bisogno.dataPrevista}
-                        disabled={disabled}
-                        onChange={(event) =>
-                          update(index, { dataPrevista: event.target.value })
-                        }
-                      />
-                    </div>
-                    {bisogno.stato === "pianificato" &&
-                      !bisogno.dataPrevista && (
-                        <p className="text-sm font-medium text-destructive">
-                          {t("udsInterventi.bisognoDataRequired")}
-                        </p>
-                      )}
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor={`bisogno-descrizione-${bisogno.clientKey}`}>
-                    {t("udsInterventi.bisognoDescrizioneLabel")}
+                    {t("udsInterventi.bisognoQuickPrompt")} *
                   </Label>
                   <Textarea
                     id={`bisogno-descrizione-${bisogno.clientKey}`}
@@ -312,31 +201,159 @@ export function BisogniPianificatiEditor({
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor={`bisogno-note-${bisogno.clientKey}`}>
-                    {t("udsInterventi.bisognoNoteLabel")}
-                  </Label>
-                  <Textarea
-                    id={`bisogno-note-${bisogno.clientKey}`}
-                    rows={2}
-                    maxLength={2000}
-                    value={bisogno.note}
-                    disabled={disabled}
-                    placeholder={t("udsInterventi.bisognoNotePlaceholder")}
-                    onChange={(event) =>
-                      update(index, { note: event.target.value })
-                    }
-                  />
-                  {bisogno.dataCompletamento && (
-                    <p className="text-xs text-muted-foreground">
-                      {t("udsInterventi.bisognoCompletatoIl", {
-                        date: new Date(
-                          bisogno.dataCompletamento,
-                        ).toLocaleString("it-IT"),
-                      })}
-                    </p>
+
+                <div className="flex flex-wrap gap-2">
+                  {bisogno.stato !== "pianificato" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-11 gap-2"
+                      disabled={disabled}
+                      onClick={() => update(index, { stato: "pianificato" })}
+                    >
+                      <CalendarClock className="h-4 w-4" />
+                      {t("udsInterventi.planNeedAction")}
+                    </Button>
                   )}
                 </div>
+
+                {bisogno.stato === "pianificato" && (
+                  <div className="space-y-2">
+                    <Label htmlFor={`bisogno-data-${bisogno.clientKey}`}>
+                      {t("udsInterventi.bisognoDataPrevistaLabel")} *
+                    </Label>
+                    <div className="relative">
+                      <CalendarClock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id={`bisogno-data-${bisogno.clientKey}`}
+                        type="date"
+                        className="min-h-11 pl-9"
+                        value={bisogno.dataPrevista}
+                        disabled={disabled}
+                        onChange={(event) =>
+                          update(index, { dataPrevista: event.target.value })
+                        }
+                      />
+                    </div>
+                    {!bisogno.dataPrevista && (
+                      <p className="text-sm font-medium text-destructive">
+                        {t("udsInterventi.bisognoDataRequired")}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <details className="rounded-md border bg-background p-3">
+                  <summary className="cursor-pointer min-h-10 flex items-center font-medium text-sm">
+                    {t("udsInterventi.advancedNeedDetails")}
+                  </summary>
+                  <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>{t("udsInterventi.bisognoTipoLabel")}</Label>
+                      <Select
+                        value={bisogno.tipo}
+                        disabled={disabled}
+                        onValueChange={(tipo: BisognoTipo) =>
+                          update(index, { tipo })
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label={t("udsInterventi.bisognoTipoLabel")}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="richiesta">
+                            {t("udsInterventi.bisognoTipo.richiesta")}
+                          </SelectItem>
+                          <SelectItem value="azione">
+                            {t("udsInterventi.bisognoTipo.azione")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("udsInterventi.bisognoPrioritaLabel")}</Label>
+                      <Select
+                        value={bisogno.priorita}
+                        disabled={disabled}
+                        onValueChange={(priorita: BisognoPriorita) =>
+                          update(index, { priorita })
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label={t("udsInterventi.bisognoPrioritaLabel")}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(
+                            ["bassa", "normale", "alta", "urgente"] as const
+                          ).map((priorita) => (
+                            <SelectItem key={priorita} value={priorita}>
+                              {t(`udsInterventi.bisognoPriorita.${priorita}`)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>{t("udsInterventi.bisognoStatoLabel")}</Label>
+                      <Select
+                        value={bisogno.stato}
+                        disabled={disabled}
+                        onValueChange={(stato: BisognoStato) =>
+                          update(index, { stato })
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label={t("udsInterventi.bisognoStatoLabel")}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(
+                            [
+                              "da_pianificare",
+                              "pianificato",
+                              "completato",
+                              "annullato",
+                            ] as const
+                          ).map((stato) => (
+                            <SelectItem key={stato} value={stato}>
+                              {t(`udsInterventi.bisognoStato.${stato}`)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor={`bisogno-note-${bisogno.clientKey}`}>
+                        {t("udsInterventi.bisognoNoteLabel")}
+                      </Label>
+                      <Textarea
+                        id={`bisogno-note-${bisogno.clientKey}`}
+                        rows={2}
+                        maxLength={2000}
+                        value={bisogno.note}
+                        disabled={disabled}
+                        placeholder={t("udsInterventi.bisognoNotePlaceholder")}
+                        onChange={(event) =>
+                          update(index, { note: event.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                </details>
+                {bisogno.dataCompletamento && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("udsInterventi.bisognoCompletatoIl", {
+                      date: new Date(bisogno.dataCompletamento).toLocaleString(
+                        "it-IT",
+                      ),
+                    })}
+                  </p>
+                )}
               </div>
             );
           })}
