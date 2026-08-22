@@ -3,6 +3,7 @@ import {
   civilDateEuropeRome,
   dateTimeEuropeRomeToIso,
   formatDateEuropeRome,
+  formatDateOrDateTimeEuropeRome,
   monthRange,
   shiftMonth,
 } from "./europe-rome";
@@ -19,11 +20,16 @@ describe("date civili Europe/Rome", () => {
   });
 
   it("formatta date civili senza interpretarle come timestamp UTC", () => {
-    expect(formatDateEuropeRome("2026-08-22")).toBe("22/08/2026");
+    expect(formatDateOrDateTimeEuropeRome("2026-08-22")).toBe("22/08/2026");
   });
 
-  it("formatta i timestamp usando esplicitamente Europe/Rome", () => {
-    expect(formatDateEuropeRome("2026-08-22T22:30:00Z")).toBe("23/08/2026");
+  it("preserva l'ora dei timestamp usando esplicitamente Europe/Rome", () => {
+    expect(formatDateOrDateTimeEuropeRome("2026-08-22T22:30:00Z")).toBe(
+      "23/08/2026 00:30",
+    );
+    expect(formatDateOrDateTimeEuropeRome("2026-08-22T12:30:00Z")).toBe(
+      "22/08/2026 14:30",
+    );
   });
 
   it("rifiuta l'ora inesistente al passaggio all'ora legale", () => {

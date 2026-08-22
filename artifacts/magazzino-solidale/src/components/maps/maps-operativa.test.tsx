@@ -2,7 +2,12 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const apiState = vi.hoisted(() => ({ markerActions: ["open", "route"], deliveryError: null as unknown }));
+const apiState = vi.hoisted(() => ({
+  markerActions: ["open", "route"],
+  deliveryError: null as unknown,
+  deliveryDate: "2026-08-22",
+  socialDate: null as string | null,
+}));
 
 vi.mock("@workspace/api-client-react", () => ({
   getMapsRouteConsegna: vi.fn(),
@@ -10,9 +15,9 @@ vi.mock("@workspace/api-client-react", () => ({
   getGetMapsInterventiSocialiQueryKey: () => ["maps", "social"],
   getGetMapsPuntiOperativiQueryKey: () => ["maps", "points"],
   getGetMapsRitiriNonEffettuatiQueryKey: () => ["maps", "missed"],
-  useGetMapsCapabilities: () => ({ data: { operational: true, layers: [{ code: "pacchi.consegne", domain: "pacchi", label: "Consegne", routeSupported: true }] }, isLoading: false }),
-  useGetMapsConsegne: () => ({ data: apiState.deliveryError ? undefined : [{ id: "pacchi.consegna:1", layer: "pacchi.consegne", entityType: "consegna", entityId: 1, title: "Consegna CON-1", subtitle: null, status: "pianificata", address: "Via Test 1", date: "2026-08-17", actions: apiState.markerActions }], isLoading: false, isError: apiState.deliveryError != null, error: apiState.deliveryError }),
-  useGetMapsInterventiSociali: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+  useGetMapsCapabilities: () => ({ data: { operational: true, layers: [{ code: "pacchi.consegne", domain: "pacchi", label: "Consegne", routeSupported: true }, ...(apiState.socialDate ? [{ code: "sociale.interventi_pianificati", domain: "sociale", label: "Interventi", routeSupported: false }] : [])] }, isLoading: false }),
+  useGetMapsConsegne: () => ({ data: apiState.deliveryError ? undefined : [{ id: "pacchi.consegna:1", layer: "pacchi.consegne", entityType: "consegna", entityId: 1, title: "Consegna CON-1", subtitle: null, status: "pianificata", address: "Via Test 1", date: apiState.deliveryDate, actions: apiState.markerActions }], isLoading: false, isError: apiState.deliveryError != null, error: apiState.deliveryError }),
+  useGetMapsInterventiSociali: () => ({ data: apiState.socialDate ? [{ id: "sociale.intervento:2", layer: "sociale.interventi_pianificati", entityType: "intervento", entityId: 2, title: "Intervento 2", subtitle: null, status: "pianificato", address: "Via Sociale 2", date: apiState.socialDate, actions: ["open"] }] : undefined, isLoading: false, isError: false, error: null }),
   useGetMapsRitiriNonEffettuati: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
   useGetMapsPuntiOperativi: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
 }));
@@ -30,6 +35,8 @@ describe("MAPS operativa", () => {
   beforeEach(() => {
     apiState.markerActions = ["open", "route"];
     apiState.deliveryError = null;
+    apiState.deliveryDate = "2026-08-22";
+    apiState.socialDate = null;
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -45,7 +52,8 @@ describe("MAPS operativa", () => {
     await act(async () => root.render(<MapsOperativa />));
     expect(document.body.textContent).toContain("maps.noApiKey");
     expect(document.body.textContent).toContain("Consegna CON-1");
-    expect(document.body.textContent).toContain("17/08/2026");
+    expect(document.body.textContent).toContain("22/08/2026");
+    expect(document.body.textContent).not.toContain("22/08/2026 00:00");
     expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeTruthy();
     expect(document.querySelectorAll('[role="switch"]')).toHaveLength(1);
     expect(document.querySelector('[aria-label="Mappa operativa Google Maps"]')).toBeNull();
@@ -61,6 +69,17 @@ describe("MAPS operativa", () => {
     apiState.markerActions = ["open"];
     await act(async () => root.render(<MapsOperativa />));
     expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeNull();
+  });
+
+  it("mostra data e ora Europe/Rome per i marker timestamp", async () => {
+    apiState.socialDate = "2026-08-22T22:30:00Z";
+    await act(async () => root.render(<MapsOperativa />));
+    expect(document.body.textContent).toContain("23/08/2026 00:30");
+
+    const details = Array.from(document.querySelectorAll("button"))
+      .filter((button) => button.textContent === "maps.markerDetails");
+    await act(async () => details[0]?.click());
+    expect(document.body.textContent?.match(/23\/08\/2026 00:30/g)).toHaveLength(2);
   });
 
   it("mostra Apri soltanto quando actions contiene open", async () => {

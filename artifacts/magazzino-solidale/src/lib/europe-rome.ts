@@ -51,6 +51,14 @@ export function formatDateEuropeRome(value: string | Date): string {
   return `${day}/${month}/${year}`;
 }
 
+export function formatDateOrDateTimeEuropeRome(value: string | Date): string {
+  if (typeof value === "string" && isCivilDate(value)) {
+    return formatDateEuropeRome(value);
+  }
+  const formatted = parts(typeof value === "string" ? new Date(value) : value);
+  return `${formatted.day}/${formatted.month}/${formatted.year} ${formatted.hour}:${formatted.minute}`;
+}
+
 export function dateTimeEuropeRomeToIso(
   dateOnly: string,
   time: string,
