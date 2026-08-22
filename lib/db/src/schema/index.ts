@@ -4,6 +4,7 @@ export * from "./fornitori";
 export * from "./lotti";
 export * from "./movimenti";
 export * from "./inventoryAccounting";
+export * from "./ageaImports";
 export * from "./carichiMagazzino";
 export * from "./operazioniDistribuzioneMagazzino";
 export * from "./volontari";

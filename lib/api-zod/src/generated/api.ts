@@ -657,6 +657,472 @@ export const ListCaricoRigheResponseItem = zod.object({
 export const ListCaricoRigheResponse = zod.array(ListCaricoRigheResponseItem)
 
 
+/**
+ * @summary Elenca le importazioni AGEA visibili nello scope Magazzino/Area/Centro
+ */
+export const listAgeaImportazioniResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ListAgeaImportazioniResponseItem = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(listAgeaImportazioniResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+export const ListAgeaImportazioniResponse = zod.array(ListAgeaImportazioniResponseItem)
+
+
+/**
+ * @summary Analizza localmente un registro XLSX senza modificare lo stock
+ */
+
+export const analyzeAgeaImportazioneQueryNomeFileMax = 255;
+
+
+export const analyzeAgeaImportazioneQueryNomeFileRegExp = new RegExp('.\*\\.xlsx$');
+
+
+export const AnalyzeAgeaImportazioneQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().min(1),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "nomeFile": zod.coerce.string().max(analyzeAgeaImportazioneQueryNomeFileMax).regex(analyzeAgeaImportazioneQueryNomeFileRegExp)
+})
+
+
+export const GetAgeaImportazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getAgeaImportazioneResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const GetAgeaImportazioneResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(getAgeaImportazioneResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const ListAgeaImportazioneRigheParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listAgeaImportazioneRigheResponseItemsItemMovimentoKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazioneRigheResponseItemsItemMovimentoPezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazioneRigheResponseItemsItemSaldoFinaleKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazioneRigheResponseItemsItemSaldoFinalePezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazioneRigheResponseItemsItemContentHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ListAgeaImportazioneRigheResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "importazioneId": zod.number(),
+  "numeroRiga": zod.number(),
+  "fondoRaw": zod.string().nullish(),
+  "fondoNormalizzato": zod.string().nullish(),
+  "prodottoRaw": zod.string(),
+  "prodottoNormalizzato": zod.string(),
+  "lottoRaw": zod.string().nullish(),
+  "numeroDocumentoRaw": zod.string().nullish(),
+  "dataDocumento": zod.coerce.date().nullish(),
+  "dataCaricoRisolta": zod.coerce.date().nullish(),
+  "dataCaricoFonte": zod.string().nullish(),
+  "movimentoKgLt": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemMovimentoKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "movimentoPezzi": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemMovimentoPezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "saldoFinaleKgLt": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemSaldoFinaleKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "saldoFinalePezzi": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemSaldoFinalePezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "attivitaRaw": zod.string().nullish(),
+  "tipoMovimentoEsterno": zod.enum(['CARICO', 'DISTRIBUZIONE', 'RESO', 'MOVIMENTO_NEGATIVO_NON_CLASSIFICATO', 'SEGNO_INCOERENTE', 'RIGA_SENZA_MOVIMENTO']),
+  "identityKey": zod.string(),
+  "contentHash": zod.string().regex(listAgeaImportazioneRigheResponseItemsItemContentHashRegExp),
+  "prodottoIdSnapshot": zod.number().nullish(),
+  "descrizioneProdottoSnapshot": zod.string().nullish(),
+  "unitaMisuraSnapshot": zod.string().nullish(),
+  "statoRiga": zod.string(),
+  "blocking": zod.boolean(),
+  "errorCodesJson": zod.array(zod.string()),
+  "warningCodesJson": zod.array(zod.string())
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+export const ListAgeaImportazionePartiteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listAgeaImportazionePartiteResponseSaldoFinalePezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazionePartiteResponseSaldoFinaleKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazionePartiteResponseQuantitaOperativaOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazionePartiteResponseFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+
+
+export const ListAgeaImportazionePartiteResponseItem = zod.object({
+  "id": zod.number(),
+  "importazioneId": zod.number(),
+  "partyKey": zod.string(),
+  "fondoOrigine": zod.string(),
+  "prodottoId": zod.number().nullish(),
+  "prodottoNormalizzato": zod.string(),
+  "lottoRaw": zod.string().nullish(),
+  "existingLottoId": zod.number().nullish(),
+  "saldoFinalePezzi": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseSaldoFinalePezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "saldoFinaleKgLt": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseSaldoFinaleKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "quantitaOperativa": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseQuantitaOperativaOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "unitaMisuraOperativa": zod.string().nullish(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "dataScadenzaRisolta": zod.coerce.date().nullish(),
+  "dataScadenzaFonte": zod.string().nullish(),
+  "stato": zod.string(),
+  "blocking": zod.boolean(),
+  "errorCodesJson": zod.array(zod.string()),
+  "warningCodesJson": zod.array(zod.string())
+})
+export const ListAgeaImportazionePartiteResponse = zod.array(ListAgeaImportazionePartiteResponseItem)
+
+
+export const UpdateAgeaImportazionePartitaParams = zod.object({
+  "id": zod.coerce.number(),
+  "partitaId": zod.coerce.number()
+})
+
+export const UpdateAgeaImportazionePartitaBody = zod.object({
+  "dataScadenza": zod.coerce.date().nullish()
+})
+
+export const updateAgeaImportazionePartitaResponseSaldoFinalePezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const updateAgeaImportazionePartitaResponseSaldoFinaleKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const updateAgeaImportazionePartitaResponseQuantitaOperativaOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const updateAgeaImportazionePartitaResponseFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+
+
+export const UpdateAgeaImportazionePartitaResponse = zod.object({
+  "id": zod.number(),
+  "importazioneId": zod.number(),
+  "partyKey": zod.string(),
+  "fondoOrigine": zod.string(),
+  "prodottoId": zod.number().nullish(),
+  "prodottoNormalizzato": zod.string(),
+  "lottoRaw": zod.string().nullish(),
+  "existingLottoId": zod.number().nullish(),
+  "saldoFinalePezzi": zod.union([zod.string().regex(updateAgeaImportazionePartitaResponseSaldoFinalePezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "saldoFinaleKgLt": zod.union([zod.string().regex(updateAgeaImportazionePartitaResponseSaldoFinaleKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "quantitaOperativa": zod.union([zod.string().regex(updateAgeaImportazionePartitaResponseQuantitaOperativaOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "unitaMisuraOperativa": zod.string().nullish(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(updateAgeaImportazionePartitaResponseFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "dataScadenzaRisolta": zod.coerce.date().nullish(),
+  "dataScadenzaFonte": zod.string().nullish(),
+  "stato": zod.string(),
+  "blocking": zod.boolean(),
+  "errorCodesJson": zod.array(zod.string()),
+  "warningCodesJson": zod.array(zod.string())
+})
+
+
+export const RecalculateAgeaImportazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const recalculateAgeaImportazioneResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const RecalculateAgeaImportazioneResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(recalculateAgeaImportazioneResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const ConfirmAgeaImportazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const ConfirmAgeaImportazioneBody = zod.object({
+  "versione": zod.number().min(1).optional()
+})
+
+export const confirmAgeaImportazioneResponseImportazioneSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ConfirmAgeaImportazioneResponse = zod.object({
+  "importazione": zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(confirmAgeaImportazioneResponseImportazioneSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+}),
+  "replay": zod.boolean(),
+  "carichi": zod.array(zod.number())
+})
+
+
+export const CancelAgeaImportazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const cancelAgeaImportazioneResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const CancelAgeaImportazioneResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(cancelAgeaImportazioneResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const ListAgeaMappatureProdottiResponseItem = zod.object({
+  "id": zod.number(),
+  "fonte": zod.enum(['AGEA_SIFEAD']),
+  "descrizioneEsterna": zod.string(),
+  "chiaveDescrizioneNormalizzata": zod.string(),
+  "prodottoId": zod.number(),
+  "attiva": zod.boolean(),
+  "versione": zod.number(),
+  "prodotto": zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "tipoProdotto": zod.string(),
+  "unitaMisura": zod.string(),
+  "codiceBarre": zod.string().nullish(),
+  "gestioneLotto": zod.boolean(),
+  "gestioneScadenza": zod.boolean(),
+  "fsePlus": zod.boolean(),
+  "scortaMinima": zod.number(),
+  "scortaConsigliata": zod.number(),
+  "abilitatoEmporio": zod.boolean(),
+  "creditoSolidaleValore": zod.number(),
+  "quantitaMassimaPerSpesa": zod.number().nullable(),
+  "quantitaMassimaMensile": zod.number().nullable(),
+  "conservazione": zod.string().nullish(),
+  "taglia": zod.string().nullish(),
+  "genere": zod.string().nullish(),
+  "stagione": zod.string().nullish(),
+  "condizione": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "fornitoreId": zod.number().nullish()
+}).optional()
+})
+export const ListAgeaMappatureProdottiResponse = zod.array(ListAgeaMappatureProdottiResponseItem)
+
+
+
+
+
+
+export const CreateAgeaMappaturaProdottoBody = zod.object({
+  "descrizioneEsterna": zod.string().min(1),
+  "prodottoId": zod.number().min(1)
+})
+
+
+export const UpdateAgeaMappaturaProdottoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateAgeaMappaturaProdottoBody = zod.object({
+  "prodottoId": zod.number().min(1),
+  "attiva": zod.boolean().optional()
+})
+
+export const UpdateAgeaMappaturaProdottoResponse = zod.object({
+  "id": zod.number(),
+  "fonte": zod.enum(['AGEA_SIFEAD']),
+  "descrizioneEsterna": zod.string(),
+  "chiaveDescrizioneNormalizzata": zod.string(),
+  "prodottoId": zod.number(),
+  "attiva": zod.boolean(),
+  "versione": zod.number(),
+  "prodotto": zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "tipoProdotto": zod.string(),
+  "unitaMisura": zod.string(),
+  "codiceBarre": zod.string().nullish(),
+  "gestioneLotto": zod.boolean(),
+  "gestioneScadenza": zod.boolean(),
+  "fsePlus": zod.boolean(),
+  "scortaMinima": zod.number(),
+  "scortaConsigliata": zod.number(),
+  "abilitatoEmporio": zod.boolean(),
+  "creditoSolidaleValore": zod.number(),
+  "quantitaMassimaPerSpesa": zod.number().nullable(),
+  "quantitaMassimaMensile": zod.number().nullable(),
+  "conservazione": zod.string().nullish(),
+  "taglia": zod.string().nullish(),
+  "genere": zod.string().nullish(),
+  "stagione": zod.string().nullish(),
+  "condizione": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "fornitoreId": zod.number().nullish()
+}).optional()
+})
+
+
 export const ListLottiQueryParams = zod.object({
   "prodottoId": zod.coerce.number().optional(),
   "magazzinoId": zod.coerce.number().optional(),

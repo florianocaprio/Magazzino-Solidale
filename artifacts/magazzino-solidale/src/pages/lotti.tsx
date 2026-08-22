@@ -69,6 +69,7 @@ import { format, differenceInDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
+import { AgeaImportWizard } from "@/components/agea-import-wizard";
 
 type DraftRiga = {
   key: number;
@@ -172,7 +173,9 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
       if (riga.quantitaKgLt && !quantitaValida(riga.quantitaKgLt))
         next.push(`Riga ${index + 1}: Kg/Lt non validi.`);
       if (riga.fattoreKgLtPezzo && !fattoreValido(riga.fattoreKgLtPezzo))
-        next.push(`Riga ${index + 1}: fattore non valido (massimo 9 decimali).`);
+        next.push(
+          `Riga ${index + 1}: fattore non valido (massimo 9 decimali).`,
+        );
       if (prodotto?.gestioneLotto && !riga.codiceLotto.trim())
         next.push(`Riga ${index + 1}: codice lotto obbligatorio.`);
       if (prodotto?.gestioneScadenza && !riga.dataScadenza)
@@ -761,7 +764,7 @@ export default function Lotti() {
   const [magazzinoId, setMagazzinoId] = useState<string>("all");
   const [prodottoId, setProdottoId] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<
-    "carichi" | "partite" | "scadenza"
+    "carichi" | "partite" | "scadenza" | "agea"
   >("carichi");
   const [nuovoOpen, setNuovoOpen] = useState(false);
   const [rettificaLotto, setRettificaLotto] = useState<Lotto | null>(null);
@@ -898,10 +901,15 @@ export default function Lotti() {
           <TabsTrigger value="carichi">Carichi</TabsTrigger>
           <TabsTrigger value="partite">Partite/Lotti</TabsTrigger>
           <TabsTrigger value="scadenza">In scadenza</TabsTrigger>
+          {hasPermission("magazzino.agea.view") && (
+            <TabsTrigger value="agea">Import AGEA/SIFEAD</TabsTrigger>
+          )}
         </TabsList>
       </Tabs>
 
-      {activeTab === "carichi" ? (
+      {activeTab === "agea" ? (
+        <AgeaImportWizard />
+      ) : activeTab === "carichi" ? (
         <Card>
           <CardHeader className="py-4 border-b bg-muted/20">
             <div className="flex items-center gap-2">

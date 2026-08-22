@@ -12,6 +12,7 @@ tags:
   - name: magazzini
   - name: prodotti
   - name: carichi
+  - name: agea
   - name: lotti
   - name: movimenti
   - name: giacenze
@@ -409,6 +410,215 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/CaricoMagazzinoRiga"
+
+  # ─── IMPORT AGEA/SIFEAD 2.0B ────────────────────────────────────────────────
+  /agea/importazioni:
+    get:
+      operationId: listAgeaImportazioni
+      tags: [agea]
+      summary: Elenca le importazioni AGEA visibili nello scope Magazzino/Area/Centro
+      responses:
+        "200":
+          description: Importazioni visibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeaImportazione" }
+
+  /agea/importazioni/analizza:
+    post:
+      operationId: analyzeAgeaImportazione
+      tags: [agea]
+      summary: Analizza localmente un registro XLSX senza modificare lo stock
+      parameters:
+        - {
+            name: magazzinoId,
+            in: query,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: modalita,
+            in: query,
+            required: true,
+            schema: { $ref: "#/components/schemas/AgeaImportModalita" },
+          }
+        - {
+            name: nomeFile,
+            in: query,
+            required: true,
+            schema: { type: string, maxLength: 255, pattern: ".*\\.xlsx$" },
+          }
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          description: Staging creato e preflight eseguito
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { description: File o tracciato non valido }
+        "403": { description: Permesso o scope non consentito }
+        "413": { description: Limite di 10 MB superato }
+        "415": { description: MIME XLSX richiesto }
+
+  /agea/importazioni/{id}:
+    get:
+      operationId: getAgeaImportazione
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Importazione
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+
+  /agea/importazioni/{id}/righe:
+    get:
+      operationId: listAgeaImportazioneRighe
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Preview paginata delle righe
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportRighePage" }
+
+  /agea/importazioni/{id}/partite:
+    get:
+      operationId: listAgeaImportazionePartite
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Partite di preview
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeaImportPartita" }
+
+  /agea/importazioni/{id}/partite/{partitaId}:
+    patch:
+      operationId: updateAgeaImportazionePartita
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: partitaId,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaImportPartitaUpdate" }
+      responses:
+        "200":
+          description: Scadenza di staging aggiornata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportPartita" }
+
+  /agea/importazioni/{id}/ricalcola:
+    post:
+      operationId: recalculateAgeaImportazione
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Preflight ricalcolato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+
+  /agea/importazioni/{id}/conferma:
+    post:
+      operationId: confirmAgeaImportazione
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaImportConfermaInput" }
+      responses:
+        "200":
+          description: Conferma atomica o replay idempotente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportConfermaResult" }
+        "409": { description: "Preflight, versione o concorrenza non validi" }
+
+  /agea/importazioni/{id}/annulla:
+    post:
+      operationId: cancelAgeaImportazione
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Importazione non confermata annullata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+
+  /agea/mappature-prodotti:
+    get:
+      operationId: listAgeaMappatureProdotti
+      tags: [agea]
+      responses:
+        "200":
+          description: Mapping globali AGEA
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeaMappaturaProdotto" }
+    post:
+      operationId: createAgeaMappaturaProdotto
+      tags: [agea]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaMappaturaProdottoInput" }
+      responses:
+        "201":
+          description: Mapping associato esplicitamente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaMappaturaProdotto" }
+
+  /agea/mappature-prodotti/{id}:
+    patch:
+      operationId: updateAgeaMappaturaProdotto
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaMappaturaProdottoUpdate" }
+      responses:
+        "200":
+          description: Mapping aggiornato senza alterare gli snapshot storici
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaMappaturaProdotto" }
 
   # ─── LOTTI ───────────────────────────────────────────────────────────────────
   /lotti:
@@ -2603,7 +2813,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consegna"
-        "400": { description: Stato risultante non valido o indirizzo domiciliare mancante }
+        "400":
+          {
+            description: Stato risultante non valido o indirizzo domiciliare mancante,
+          }
     delete:
       operationId: deleteConsegna
       tags: [consegne]
@@ -3700,7 +3913,10 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
-        "403": { description: "Permission MAPS o Interventi Sociali, area o modulo non consentiti" }
+        "403":
+          {
+            description: "Permission MAPS o Interventi Sociali, area o modulo non consentiti",
+          }
         "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/pacchi/consegne:
@@ -3720,7 +3936,10 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
-        "403": { description: "Permission MAPS, area, moduli o scope non consentiti" }
+        "403":
+          {
+            description: "Permission MAPS, area, moduli o scope non consentiti",
+          }
         "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/pacchi/ritiri-non-effettuati:
@@ -3740,7 +3959,10 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
-        "403": { description: "Permission MAPS o Bolle, area, moduli o scope non consentiti" }
+        "403":
+          {
+            description: "Permission MAPS o Bolle, area, moduli o scope non consentiti",
+          }
         "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/centro/punti-operativi:
@@ -3757,7 +3979,10 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
-        "403": { description: "Permission MAPS, area, modulo o scope non consentiti" }
+        "403":
+          {
+            description: "Permission MAPS, area, modulo o scope non consentiti",
+          }
         "422": { description: Troppi punti operativi; restringere i filtri }
 
   /maps/routes/consegne/{id}:
@@ -7666,6 +7891,307 @@ components:
       example: "53.593120"
       description: Decimale esatto; non convertire in number JavaScript per i calcoli.
 
+    AgeaImportModalita:
+      type: string
+      enum: [PRIMA_ACQUISIZIONE, AGGIORNAMENTO, SOLO_ANALISI]
+
+    AgeaImportStato:
+      type: string
+      enum:
+        [
+          ANALIZZATA,
+          DA_MAPPARE,
+          BLOCCATA,
+          PRONTA,
+          CONFERMATA,
+          ANNULLATA,
+          ERRORE,
+        ]
+
+    AgeaTipoMovimento:
+      type: string
+      enum:
+        [
+          CARICO,
+          DISTRIBUZIONE,
+          RESO,
+          MOVIMENTO_NEGATIVO_NON_CLASSIFICATO,
+          SEGNO_INCOERENTE,
+          RIGA_SENZA_MOVIMENTO,
+        ]
+
+    AgeaImportazione:
+      type: object
+      required:
+        [
+          id,
+          magazzinoId,
+          nomeFile,
+          mimeType,
+          dimensioneBytes,
+          sha256File,
+          tracciatoCodice,
+          parserVersion,
+          sheetName,
+          dataRiferimento,
+          modalita,
+          stato,
+          versione,
+          righeTotali,
+          righeCarico,
+          righeDistribuzione,
+          righeReso,
+          righeNonClassificate,
+          righeNuove,
+          righeDuplicate,
+          righeModificate,
+          righeAmbigue,
+          righeBloccanti,
+          partiteTotali,
+          partiteSaldoPositivo,
+          creatoDa,
+          dataCreazione,
+        ]
+      properties:
+        id: { type: integer }
+        magazzinoId: { type: integer }
+        nomeFile: { type: string }
+        mimeType: { type: string }
+        dimensioneBytes: { type: integer }
+        sha256File: { type: string, pattern: "^[0-9a-f]{64}$" }
+        tracciatoCodice:
+          { type: string, enum: [SIFEAD_REGISTRO_XLSX_OSSERVATO_V1] }
+        parserVersion: { type: string }
+        sheetName: { type: string }
+        dataRiferimento: { type: string, format: date }
+        modalita: { $ref: "#/components/schemas/AgeaImportModalita" }
+        stato: { $ref: "#/components/schemas/AgeaImportStato" }
+        versione: { type: integer }
+        righeTotali: { type: integer }
+        righeCarico: { type: integer }
+        righeDistribuzione: { type: integer }
+        righeReso: { type: integer }
+        righeNonClassificate: { type: integer }
+        righeNuove: { type: integer }
+        righeDuplicate: { type: integer }
+        righeModificate: { type: integer }
+        righeAmbigue: { type: integer }
+        righeBloccanti: { type: integer }
+        partiteTotali: { type: integer }
+        partiteSaldoPositivo: { type: integer }
+        bootstrapCaricoId: { type: [integer, "null"] }
+        creatoDa: { type: integer }
+        dataCreazione: { type: string, format: date-time }
+        confermatoDa: { type: [integer, "null"] }
+        dataConferma: { type: [string, "null"], format: date-time }
+        annullatoDa: { type: [integer, "null"] }
+        dataAnnullamento: { type: [string, "null"], format: date-time }
+        noteAudit: { type: [object, "null"], additionalProperties: true }
+
+    AgeaImportRiga:
+      type: object
+      required:
+        [
+          id,
+          importazioneId,
+          numeroRiga,
+          prodottoRaw,
+          prodottoNormalizzato,
+          tipoMovimentoEsterno,
+          identityKey,
+          contentHash,
+          statoRiga,
+          blocking,
+          errorCodesJson,
+          warningCodesJson,
+        ]
+      properties:
+        id: { type: integer }
+        importazioneId: { type: integer }
+        numeroRiga: { type: integer }
+        fondoRaw: { type: [string, "null"] }
+        fondoNormalizzato: { type: [string, "null"] }
+        prodottoRaw: { type: string }
+        prodottoNormalizzato: { type: string }
+        lottoRaw: { type: [string, "null"] }
+        numeroDocumentoRaw: { type: [string, "null"] }
+        dataDocumento: { type: [string, "null"], format: date }
+        dataCaricoRisolta: { type: [string, "null"], format: date }
+        dataCaricoFonte: { type: [string, "null"] }
+        movimentoKgLt:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        movimentoPezzi:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        saldoFinaleKgLt:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        saldoFinalePezzi:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        attivitaRaw: { type: [string, "null"] }
+        tipoMovimentoEsterno: { $ref: "#/components/schemas/AgeaTipoMovimento" }
+        identityKey: { type: string }
+        contentHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+        prodottoIdSnapshot: { type: [integer, "null"] }
+        descrizioneProdottoSnapshot: { type: [string, "null"] }
+        unitaMisuraSnapshot: { type: [string, "null"] }
+        statoRiga: { type: string }
+        blocking: { type: boolean }
+        errorCodesJson: { type: array, items: { type: string } }
+        warningCodesJson: { type: array, items: { type: string } }
+
+    AgeaImportRighePage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/AgeaImportRiga" },
+          }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+
+    AgeaImportPartita:
+      type: object
+      required:
+        [
+          id,
+          importazioneId,
+          partyKey,
+          fondoOrigine,
+          prodottoNormalizzato,
+          stato,
+          blocking,
+          errorCodesJson,
+          warningCodesJson,
+        ]
+      properties:
+        id: { type: integer }
+        importazioneId: { type: integer }
+        partyKey: { type: string }
+        fondoOrigine: { type: string }
+        prodottoId: { type: [integer, "null"] }
+        prodottoNormalizzato: { type: string }
+        lottoRaw: { type: [string, "null"] }
+        existingLottoId: { type: [integer, "null"] }
+        saldoFinalePezzi:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        saldoFinaleKgLt:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        quantitaOperativa:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabile" },
+                { type: "null" },
+              ],
+          }
+        unitaMisuraOperativa: { type: [string, "null"] }
+        fattoreKgLtPezzo:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/FattoreContabile" },
+                { type: "null" },
+              ],
+          }
+        dataScadenzaRisolta: { type: [string, "null"], format: date }
+        dataScadenzaFonte: { type: [string, "null"] }
+        stato: { type: string }
+        blocking: { type: boolean }
+        errorCodesJson: { type: array, items: { type: string } }
+        warningCodesJson: { type: array, items: { type: string } }
+
+    AgeaMappaturaProdottoInput:
+      type: object
+      required: [descrizioneEsterna, prodottoId]
+      properties:
+        descrizioneEsterna: { type: string, minLength: 1 }
+        prodottoId: { type: integer, minimum: 1 }
+
+    AgeaMappaturaProdottoUpdate:
+      type: object
+      required: [prodottoId]
+      properties:
+        prodottoId: { type: integer, minimum: 1 }
+        attiva: { type: boolean }
+
+    AgeaImportPartitaUpdate:
+      type: object
+      properties:
+        dataScadenza: { type: [string, "null"], format: date }
+
+    AgeaImportConfermaInput:
+      type: object
+      properties:
+        versione: { type: integer, minimum: 1 }
+
+    AgeaMappaturaProdotto:
+      type: object
+      required:
+        [
+          id,
+          fonte,
+          descrizioneEsterna,
+          chiaveDescrizioneNormalizzata,
+          prodottoId,
+          attiva,
+          versione,
+        ]
+      properties:
+        id: { type: integer }
+        fonte: { type: string, enum: [AGEA_SIFEAD] }
+        descrizioneEsterna: { type: string }
+        chiaveDescrizioneNormalizzata: { type: string }
+        prodottoId: { type: integer }
+        attiva: { type: boolean }
+        versione: { type: integer }
+        prodotto: { $ref: "#/components/schemas/Prodotto" }
+
+    AgeaImportConfermaResult:
+      type: object
+      required: [importazione, replay, carichi]
+      properties:
+        importazione: { $ref: "#/components/schemas/AgeaImportazione" }
+        replay: { type: boolean }
+        carichi: { type: array, items: { type: integer } }
+
     QuantitaContabileConSegno:
       type: string
       pattern: "^-?[0-9]+(?:\\.[0-9]{1,6})?$"
@@ -7697,7 +8223,15 @@ components:
         numeroRighe: { type: integer }
         dataCreazione: { type: string, format: date-time }
       required:
-        [id, magazzinoId, origineCarico, dataCarico, stato, creatoDa, dataCreazione]
+        [
+          id,
+          magazzinoId,
+          origineCarico,
+          dataCarico,
+          stato,
+          creatoDa,
+          dataCreazione,
+        ]
 
     CaricoMagazzinoRiga:
       type: object
@@ -8744,7 +9278,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TurnoVolontario"
-      required: [id, centroAscoltoId, data, fascia, stato, versione, dataAggiornamento, volontari]
+      required:
+        [
+          id,
+          centroAscoltoId,
+          data,
+          fascia,
+          stato,
+          versione,
+          dataAggiornamento,
+          volontari,
+        ]
 
     TurnoVolontario:
       type: object
@@ -13319,7 +13863,18 @@ components:
           type: string
         dataAggiornamento:
           type: string
-      required: [id, codice, tipo, proprieta, stato, statoApprovazione, versione, dataCreazione, dataAggiornamento]
+      required:
+        [
+          id,
+          codice,
+          tipo,
+          proprieta,
+          stato,
+          statoApprovazione,
+          versione,
+          dataCreazione,
+          dataAggiornamento,
+        ]
 
     MezzoInput:
       type: object
@@ -13435,7 +13990,16 @@ components:
           type: integer
           minimum: 1
       required:
-        [id, nome, cognome, ruolo, attivo, statoApprovazione, versione, dataCreazione]
+        [
+          id,
+          nome,
+          cognome,
+          ruolo,
+          attivo,
+          statoApprovazione,
+          versione,
+          dataCreazione,
+        ]
 
     ApprovazioneMezzo:
       type: object
@@ -13470,7 +14034,16 @@ components:
           type: integer
           minimum: 1
       required:
-        [id, codice, tipo, proprieta, stato, statoApprovazione, versione, dataCreazione]
+        [
+          id,
+          codice,
+          tipo,
+          proprieta,
+          stato,
+          statoApprovazione,
+          versione,
+          dataCreazione,
+        ]
 
     ApprovazioniLogistica:
       type: object

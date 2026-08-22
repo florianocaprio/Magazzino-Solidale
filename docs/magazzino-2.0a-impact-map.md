@@ -1,6 +1,6 @@
 # Magazzino 2.0A — Impact Map
 
-Baseline R1 verificata: `feature/magazzino-2-0` / `3cdb26eeab5cc97a47686d7f88474c355d6b79f9`.
+Baseline 2.0B verificata: `feature/magazzino-2-0` / `80cc878f99a5888fe86bc9f85bdbee4591bd04a6`.
 Branch di lavoro: `feature/magazzino-2-0`.
 
 ## Architettura e fonte contabile
@@ -124,5 +124,25 @@ visualizzazione e non sono fonti per decisioni inventariali.
 - `CONCURRENCY_RISK`: idempotenza Carico e operazione distribuzione sono
   serializzate con advisory lock; il lifecycle è riconciliato dalle quantità
   originali e compensate, impedendo over-storno.
-- `EXTERNAL_FORMAT_UNVERIFIED`: nessun parser/export/mapping AGEA viene
-  implementato nel ciclo 2.0A.
+- `EXTERNAL_FORMAT_VERIFIED_V1`: la 2.0B supporta esclusivamente il tracciato
+  osservato `SIFEAD_REGISTRO_XLSX_OSSERVATO_V1`; varianti future devono
+  introdurre un nuovo adapter, senza euristiche permissive.
+
+## Estensione 2.0B — confini coinvolti
+
+- Database: nuove tabelle `importazioni_agea`, `importazioni_agea_righe`,
+  `importazioni_agea_partite`, `movimenti_esterni_agea` e
+  `mappature_prodotti_esterni`; nessuna nuova tabella saldi.
+- Stock: soltanto `createWarehouseLoad()` scrive Carichi, Partite e Movimenti.
+  Il bootstrap usa `SALDO_INIZIALE`; l'incrementale usa `AGEA_SIFEAD`.
+- API: router `/agea`, upload XLSX binario, preview righe paginata, mapping,
+  ricalcolo, conferma atomica e annullamento logico.
+- Contratto: `openapi.yaml` resta la fonte; client React e validator Zod sono
+  rigenerati. Un post-process deterministico del codegen risolve il limite di
+  Orval 8 sull'invio raw di body binari; l'adapter UI riusa il metodo generato.
+- UI: una sola tab in “Carichi e Lotti”; export, riconciliazione e dashboard
+  AGEA restano fuori perimetro.
+- Scope: `canAccessMagazzino`, `visibleMagazzinoIds`, Area Operativa e Centro;
+  quattro permessi AGEA separano consultazione, import, mapping e bootstrap.
+- Test: parser sintetico, acceptance opzionale sul file reale esterno, upload
+  binario, migration idempotente e flussi DB bootstrap/incrementale/scope.

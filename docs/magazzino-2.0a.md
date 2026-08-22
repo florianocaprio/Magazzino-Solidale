@@ -38,4 +38,6 @@ Gli endpoint storici di Lotto restano disponibili e delegano al nuovo motore per
 
 ## Qualità dati nota
 
-Il modello corrente non contiene una classificazione strutturata saltuario/continuativo per il destinatario UDS. I relativi conteggi dell'evento restano quindi `NULL` (`NON_DETERMINATO` concettuale): non vengono inferiti da nomi, note, frequenza degli accessi o stato anagrafico. La mappatura AGEA resta esplicitamente `EXTERNAL_FORMAT_UNVERIFIED` e fuori dal ciclo 2.0A. Import, mapping ed export AGEA appartengono esclusivamente alla futura fase 2.0B.
+Il modello corrente non contiene una classificazione strutturata saltuario/continuativo per il destinatario UDS. I relativi conteggi dell'evento restano quindi `NULL` (`NON_DETERMINATO` concettuale): non vengono inferiti da nomi, note, frequenza degli accessi o stato anagrafico.
+
+La fase 2.0B aggiunge il solo import del tracciato AGEA/SIFEAD osservato. Staging, mapping e indice canonico esterno sono separati dalla giacenza; il bootstrap e i nuovi carichi positivi delegano sempre al motore `createWarehouseLoad()` della 2.0A. I movimenti negativi del registro non generano scarichi locali. Dettagli e limiti sono in [Magazzino 2.0B — Import AGEA/SIFEAD](./magazzino-2.0b-agea-import.md).

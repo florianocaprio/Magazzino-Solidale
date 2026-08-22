@@ -744,17 +744,230 @@ export const OrigineCaricoManuale = {
  */
 export type QuantitaContabile = string;
 
+export type AgeaImportModalita = typeof AgeaImportModalita[keyof typeof AgeaImportModalita];
+
+
+export const AgeaImportModalita = {
+  PRIMA_ACQUISIZIONE: 'PRIMA_ACQUISIZIONE',
+  AGGIORNAMENTO: 'AGGIORNAMENTO',
+  SOLO_ANALISI: 'SOLO_ANALISI',
+} as const;
+
+export type AgeaImportStato = typeof AgeaImportStato[keyof typeof AgeaImportStato];
+
+
+export const AgeaImportStato = {
+  ANALIZZATA: 'ANALIZZATA',
+  DA_MAPPARE: 'DA_MAPPARE',
+  BLOCCATA: 'BLOCCATA',
+  PRONTA: 'PRONTA',
+  CONFERMATA: 'CONFERMATA',
+  ANNULLATA: 'ANNULLATA',
+  ERRORE: 'ERRORE',
+} as const;
+
+export type AgeaTipoMovimento = typeof AgeaTipoMovimento[keyof typeof AgeaTipoMovimento];
+
+
+export const AgeaTipoMovimento = {
+  CARICO: 'CARICO',
+  DISTRIBUZIONE: 'DISTRIBUZIONE',
+  RESO: 'RESO',
+  MOVIMENTO_NEGATIVO_NON_CLASSIFICATO: 'MOVIMENTO_NEGATIVO_NON_CLASSIFICATO',
+  SEGNO_INCOERENTE: 'SEGNO_INCOERENTE',
+  RIGA_SENZA_MOVIMENTO: 'RIGA_SENZA_MOVIMENTO',
+} as const;
+
+export type AgeaImportazioneTracciatoCodice = typeof AgeaImportazioneTracciatoCodice[keyof typeof AgeaImportazioneTracciatoCodice];
+
+
+export const AgeaImportazioneTracciatoCodice = {
+  SIFEAD_REGISTRO_XLSX_OSSERVATO_V1: 'SIFEAD_REGISTRO_XLSX_OSSERVATO_V1',
+} as const;
+
+/**
+ * @nullable
+ */
+export type AgeaImportazioneNoteAudit = { [key: string]: unknown } | null;
+
+export interface AgeaImportazione {
+  id: number;
+  magazzinoId: number;
+  nomeFile: string;
+  mimeType: string;
+  dimensioneBytes: number;
+  /** @pattern ^[0-9a-f]{64}$ */
+  sha256File: string;
+  tracciatoCodice: AgeaImportazioneTracciatoCodice;
+  parserVersion: string;
+  sheetName: string;
+  dataRiferimento: string;
+  modalita: AgeaImportModalita;
+  stato: AgeaImportStato;
+  versione: number;
+  righeTotali: number;
+  righeCarico: number;
+  righeDistribuzione: number;
+  righeReso: number;
+  righeNonClassificate: number;
+  righeNuove: number;
+  righeDuplicate: number;
+  righeModificate: number;
+  righeAmbigue: number;
+  righeBloccanti: number;
+  partiteTotali: number;
+  partiteSaldoPositivo: number;
+  /** @nullable */
+  bootstrapCaricoId?: number | null;
+  creatoDa: number;
+  dataCreazione: string;
+  /** @nullable */
+  confermatoDa?: number | null;
+  /** @nullable */
+  dataConferma?: string | null;
+  /** @nullable */
+  annullatoDa?: number | null;
+  /** @nullable */
+  dataAnnullamento?: string | null;
+  /** @nullable */
+  noteAudit?: AgeaImportazioneNoteAudit;
+}
+
 /**
  * Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.
  * @pattern ^-?[0-9]+(?:\.[0-9]{1,6})?$
  */
 export type QuantitaContabileConSegno = string;
 
+export interface AgeaImportRiga {
+  id: number;
+  importazioneId: number;
+  numeroRiga: number;
+  /** @nullable */
+  fondoRaw?: string | null;
+  /** @nullable */
+  fondoNormalizzato?: string | null;
+  prodottoRaw: string;
+  prodottoNormalizzato: string;
+  /** @nullable */
+  lottoRaw?: string | null;
+  /** @nullable */
+  numeroDocumentoRaw?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  /** @nullable */
+  dataCaricoRisolta?: string | null;
+  /** @nullable */
+  dataCaricoFonte?: string | null;
+  movimentoKgLt?: QuantitaContabileConSegno | null;
+  movimentoPezzi?: QuantitaContabileConSegno | null;
+  saldoFinaleKgLt?: QuantitaContabileConSegno | null;
+  saldoFinalePezzi?: QuantitaContabileConSegno | null;
+  /** @nullable */
+  attivitaRaw?: string | null;
+  tipoMovimentoEsterno: AgeaTipoMovimento;
+  identityKey: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  contentHash: string;
+  /** @nullable */
+  prodottoIdSnapshot?: number | null;
+  /** @nullable */
+  descrizioneProdottoSnapshot?: string | null;
+  /** @nullable */
+  unitaMisuraSnapshot?: string | null;
+  statoRiga: string;
+  blocking: boolean;
+  errorCodesJson: string[];
+  warningCodesJson: string[];
+}
+
+export interface AgeaImportRighePage {
+  items: AgeaImportRiga[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 /**
  * Fattore Kg/Lt per pezzo esatto, positivo, scala massima 9.
  * @pattern ^[0-9]+(?:\.[0-9]{1,9})?$
  */
 export type FattoreContabile = string;
+
+export interface AgeaImportPartita {
+  id: number;
+  importazioneId: number;
+  partyKey: string;
+  fondoOrigine: string;
+  /** @nullable */
+  prodottoId?: number | null;
+  prodottoNormalizzato: string;
+  /** @nullable */
+  lottoRaw?: string | null;
+  /** @nullable */
+  existingLottoId?: number | null;
+  saldoFinalePezzi?: QuantitaContabileConSegno | null;
+  saldoFinaleKgLt?: QuantitaContabileConSegno | null;
+  quantitaOperativa?: QuantitaContabile | null;
+  /** @nullable */
+  unitaMisuraOperativa?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
+  /** @nullable */
+  dataScadenzaRisolta?: string | null;
+  /** @nullable */
+  dataScadenzaFonte?: string | null;
+  stato: string;
+  blocking: boolean;
+  errorCodesJson: string[];
+  warningCodesJson: string[];
+}
+
+export interface AgeaMappaturaProdottoInput {
+  /** @minLength 1 */
+  descrizioneEsterna: string;
+  /** @minimum 1 */
+  prodottoId: number;
+}
+
+export interface AgeaMappaturaProdottoUpdate {
+  /** @minimum 1 */
+  prodottoId: number;
+  attiva?: boolean;
+}
+
+export interface AgeaImportPartitaUpdate {
+  /** @nullable */
+  dataScadenza?: string | null;
+}
+
+export interface AgeaImportConfermaInput {
+  /** @minimum 1 */
+  versione?: number;
+}
+
+export type AgeaMappaturaProdottoFonte = typeof AgeaMappaturaProdottoFonte[keyof typeof AgeaMappaturaProdottoFonte];
+
+
+export const AgeaMappaturaProdottoFonte = {
+  AGEA_SIFEAD: 'AGEA_SIFEAD',
+} as const;
+
+export interface AgeaMappaturaProdotto {
+  id: number;
+  fonte: AgeaMappaturaProdottoFonte;
+  descrizioneEsterna: string;
+  chiaveDescrizioneNormalizzata: string;
+  prodottoId: number;
+  attiva: boolean;
+  versione: number;
+  prodotto?: Prodotto;
+}
+
+export interface AgeaImportConfermaResult {
+  importazione: AgeaImportazione;
+  replay: boolean;
+  carichi: number[];
+}
 
 export type CaricoMagazzinoStato = typeof CaricoMagazzinoStato[keyof typeof CaricoMagazzinoStato];
 
@@ -6441,6 +6654,19 @@ magazzinoId?: number;
 origineCarico?: OrigineCarico;
 da?: string;
 a?: string;
+};
+
+export type AnalyzeAgeaImportazioneParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: number;
+modalita: AgeaImportModalita;
+/**
+ * @maxLength 255
+ * @pattern .*\.xlsx$
+ */
+nomeFile: string;
 };
 
 export type ListLottiParams = {
