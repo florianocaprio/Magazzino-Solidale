@@ -22,6 +22,10 @@ export const movimentiTable = pgTable("movimenti", {
   quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
   quantitaPezzi: decimal("quantita_pezzi", { precision: 14, scale: 6 }),
   quantitaKgLt: decimal("quantita_kg_lt", { precision: 14, scale: 6 }),
+  fattoreKgLtPezzo: decimal("fattore_kg_lt_pezzo", {
+    precision: 18,
+    scale: 9,
+  }),
   unitaMisura: varchar("unita_misura", { length: 20 }).notNull(),
   fornitoreId: integer("fornitore_id"),
   beneficiarioId: integer("beneficiario_id"),

@@ -3,20 +3,30 @@ const FACTOR = 10n ** BigInt(SCALE);
 
 export class InventoryDecimalError extends Error {}
 
-function expandScientific(value: number): string {
+function exactNumberText(value: number): string {
   if (!Number.isFinite(value))
     throw new InventoryDecimalError("Valore decimale non finito");
-  return value.toFixed(SCALE);
+  const text = String(value);
+  if (/[eE]/.test(text)) {
+    throw new InventoryDecimalError(
+      "Le quantità numeriche in notazione scientifica non sono ammesse; usare una stringa decimale",
+    );
+  }
+  return text;
 }
 
 export class InventoryDecimal {
   private constructor(private readonly units: bigint) {}
 
+  static fromUnits(units: bigint): InventoryDecimal {
+    return new InventoryDecimal(units);
+  }
+
   static parse(
     raw: string | number,
     options: { allowNegative?: boolean; maxScale?: number } = {},
   ): InventoryDecimal {
-    const text = (typeof raw === "number" ? expandScientific(raw) : raw)
+    const text = (typeof raw === "number" ? exactNumberText(raw) : raw)
       .trim()
       .replace(",", ".");
     const match = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(text);
@@ -72,6 +82,10 @@ export class InventoryDecimal {
 
   isNegative(): boolean {
     return this.units < 0n;
+  }
+
+  toUnits(): bigint {
+    return this.units;
   }
 
   toDb(): string {

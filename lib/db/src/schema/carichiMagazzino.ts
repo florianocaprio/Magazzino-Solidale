@@ -33,6 +33,7 @@ export const carichiMagazzinoTable = pgTable(
     fornitoreId: integer("fornitore_id").references(() => fornitoriTable.id),
     note: text("note"),
     idempotencyKey: varchar("idempotency_key", { length: 120 }),
+    requestHash: varchar("request_hash", { length: 64 }),
     stato: varchar("stato", { length: 20 }).notNull().default("confermato"),
     creatoDa: integer("creato_da")
       .notNull()
@@ -56,6 +57,10 @@ export const carichiMagazzinoTable = pgTable(
     check(
       "carichi_magazzino_stato_check",
       sql`${table.stato} in ('confermato', 'stornato')`,
+    ),
+    check(
+      "carichi_magazzino_request_hash_check",
+      sql`${table.requestHash} is null or ${table.requestHash} ~ '^[0-9a-f]{64}$'`,
     ),
   ],
 );

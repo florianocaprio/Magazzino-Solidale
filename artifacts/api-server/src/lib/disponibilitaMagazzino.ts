@@ -4,6 +4,7 @@ import {
   dataOperativaEuropeRome,
   lottoDistribuibileCondition,
 } from "./lottoPolicy";
+import { InventoryDecimal } from "./inventoryDecimal";
 
 export const PRENOTAZIONE_MAGAZZINO_ATTIVA = "attiva";
 
@@ -15,6 +16,11 @@ export type DisponibilitaMagazzino = {
   giacenzaDistribuibile: number;
   impegnato: number;
   disponibileReale: number;
+  giacenzaFisicaPrecisa: string;
+  giacenzaScadutaPrecisa: string;
+  giacenzaDistribuibilePrecisa: string;
+  impegnatoPreciso: string;
+  disponibileRealePrecisa: string;
 };
 
 export function disponibilitaMagazzinoKey(prodottoId: number, magazzinoId: number): string {
@@ -57,10 +63,25 @@ export async function calcolaDisponibilitaMagazzino(
       ),
     );
 
-  const giacenzaFisica = parseDbNumber(giacenze?.fisica);
-  const giacenzaScaduta = parseDbNumber(giacenze?.scaduta);
-  const giacenzaDistribuibile = parseDbNumber(giacenze?.distribuibile);
-  const impegnato = parseDbNumber(prenotato?.totale);
+  const giacenzaFisicaPrecisa = InventoryDecimal.parse(
+    giacenze?.fisica ?? "0",
+  );
+  const giacenzaScadutaPrecisa = InventoryDecimal.parse(
+    giacenze?.scaduta ?? "0",
+  );
+  const giacenzaDistribuibilePrecisa = InventoryDecimal.parse(
+    giacenze?.distribuibile ?? "0",
+  );
+  const impegnatoPreciso = InventoryDecimal.parse(prenotato?.totale ?? "0");
+  const disponibileRealePreciso = giacenzaDistribuibilePrecisa.subtract(
+    impegnatoPreciso,
+  );
+  const giacenzaFisica = parseDbNumber(giacenzaFisicaPrecisa.toDb());
+  const giacenzaScaduta = parseDbNumber(giacenzaScadutaPrecisa.toDb());
+  const giacenzaDistribuibile = parseDbNumber(
+    giacenzaDistribuibilePrecisa.toDb(),
+  );
+  const impegnato = parseDbNumber(impegnatoPreciso.toDb());
   return {
     prodottoId,
     magazzinoId,
@@ -68,20 +89,27 @@ export async function calcolaDisponibilitaMagazzino(
     giacenzaScaduta,
     giacenzaDistribuibile,
     impegnato,
-    disponibileReale: giacenzaDistribuibile - impegnato,
+    disponibileReale: parseDbNumber(disponibileRealePreciso.toDb()),
+    giacenzaFisicaPrecisa: giacenzaFisicaPrecisa.toDb(),
+    giacenzaScadutaPrecisa: giacenzaScadutaPrecisa.toDb(),
+    giacenzaDistribuibilePrecisa: giacenzaDistribuibilePrecisa.toDb(),
+    impegnatoPreciso: impegnatoPreciso.toDb(),
+    disponibileRealePrecisa: disponibileRealePreciso.toDb(),
   };
 }
 
-export async function calcolaImpegnatoAttivoPerGiacenze(
+export async function calcolaImpegnatoAttivoPrecisoPerGiacenze(
   pairs: Array<{ prodottoId: number; magazzinoId: number }>,
-): Promise<Map<string, number>> {
+): Promise<Map<string, string>> {
   if (pairs.length === 0) return new Map();
-
   const prodottoIds = [...new Set(pairs.map((pair) => pair.prodottoId))];
   const magazzinoIds = [...new Set(pairs.map((pair) => pair.magazzinoId))];
-  const requestedKeys = new Set(pairs.map((pair) => disponibilitaMagazzinoKey(pair.prodottoId, pair.magazzinoId)));
+  const requestedKeys = new Set(
+    pairs.map((pair) =>
+      disponibilitaMagazzinoKey(pair.prodottoId, pair.magazzinoId),
+    ),
+  );
   const dataOperativa = dataOperativaEuropeRome();
-
   const rows = await db
     .select({
       prodottoId: prenotazioniMagazzinoTable.prodottoId,
@@ -101,14 +129,25 @@ export async function calcolaImpegnatoAttivoPerGiacenze(
         lottoDistribuibileCondition(dataOperativa),
       ),
     )
-    .groupBy(prenotazioniMagazzinoTable.prodottoId, prenotazioniMagazzinoTable.magazzinoId);
-
-  const result = new Map<string, number>();
+    .groupBy(
+      prenotazioniMagazzinoTable.prodottoId,
+      prenotazioniMagazzinoTable.magazzinoId,
+    );
+  const result = new Map<string, string>();
   for (const row of rows) {
     const key = disponibilitaMagazzinoKey(row.prodottoId, row.magazzinoId);
     if (requestedKeys.has(key)) {
-      result.set(key, parseDbNumber(row.totale));
+      result.set(key, InventoryDecimal.parse(row.totale ?? "0").toDb());
     }
   }
+  return result;
+}
+
+export async function calcolaImpegnatoAttivoPerGiacenze(
+  pairs: Array<{ prodottoId: number; magazzinoId: number }>,
+): Promise<Map<string, number>> {
+  const precise = await calcolaImpegnatoAttivoPrecisoPerGiacenze(pairs);
+  const result = new Map<string, number>();
+  for (const [key, value] of precise) result.set(key, parseDbNumber(value));
   return result;
 }

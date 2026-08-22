@@ -11,6 +11,7 @@ import {
   type Lotto,
   type FondoOrigine,
   type OrigineCarico,
+  type OrigineCaricoManuale,
   getListGiacenzeQueryKey,
   getListLottiQueryKey,
   getListMovimentiQueryKey,
@@ -78,6 +79,7 @@ type DraftRiga = {
   dataScadenza: string;
   quantitaPezzi: string;
   quantitaKgLt: string;
+  fattoreKgLtPezzo: string;
 };
 
 let draftRigaKey = 0;
@@ -90,14 +92,14 @@ const nuovaRiga = (): DraftRiga => ({
   dataScadenza: "",
   quantitaPezzi: "",
   quantitaKgLt: "",
+  fattoreKgLtPezzo: "",
 });
 
-const originiCarico: Array<{ value: OrigineCarico; label: string }> = [
+const originiCarico: Array<{ value: OrigineCaricoManuale; label: string }> = [
   { value: "RACCOLTA_ALIMENTARE", label: "Raccolta alimentare" },
   { value: "DONAZIONE", label: "Donazione" },
   { value: "ACQUISTO", label: "Acquisto" },
   { value: "FORNITORE", label: "Fornitore" },
-  { value: "AGEA_SIFEAD", label: "AGEA / SIFEAD" },
   { value: "ALTRO", label: "Altro" },
 ];
 
@@ -113,7 +115,11 @@ const fondiOrigine: Array<{ value: FondoOrigine; label: string }> = [
 
 const quantitaValida = (value: string) =>
   /^\d+(?:[.,]\d{1,6})?$/.test(value.trim()) &&
-  Number(value.replace(",", ".")) > 0;
+  !/^0+(?:[.,]0+)?$/.test(value.trim());
+
+const fattoreValido = (value: string) =>
+  /^\d+(?:[.,]\d{1,9})?$/.test(value.trim()) &&
+  !/^0+(?:[.,]0+)?$/.test(value.trim());
 
 function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
   const { data: magazzini } = useListMagazzini();
@@ -123,7 +129,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [magazzinoId, setMagazzinoId] = useState("");
-  const [origineCarico, setOrigineCarico] = useState<OrigineCarico>(
+  const [origineCarico, setOrigineCarico] = useState<OrigineCaricoManuale>(
     "RACCOLTA_ALIMENTARE",
   );
   const [dataCarico, setDataCarico] = useState(
@@ -165,6 +171,8 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
         next.push(`Riga ${index + 1}: pezzi non validi.`);
       if (riga.quantitaKgLt && !quantitaValida(riga.quantitaKgLt))
         next.push(`Riga ${index + 1}: Kg/Lt non validi.`);
+      if (riga.fattoreKgLtPezzo && !fattoreValido(riga.fattoreKgLtPezzo))
+        next.push(`Riga ${index + 1}: fattore non valido (massimo 9 decimali).`);
       if (prodotto?.gestioneLotto && !riga.codiceLotto.trim())
         next.push(`Riga ${index + 1}: codice lotto obbligatorio.`);
       if (prodotto?.gestioneScadenza && !riga.dataScadenza)
@@ -208,6 +216,9 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                 : null,
               quantitaKgLt: riga.quantitaKgLt
                 ? riga.quantitaKgLt.replace(",", ".")
+                : null,
+              fattoreKgLtPezzo: riga.fattoreKgLtPezzo
+                ? riga.fattoreKgLtPezzo.replace(",", ".")
                 : null,
             };
           }),
@@ -293,7 +304,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
               <Select
                 value={origineCarico}
                 onValueChange={(value) => {
-                  setOrigineCarico(value as OrigineCarico);
+                  setOrigineCarico(value as OrigineCaricoManuale);
                   if (value === "RACCOLTA_ALIMENTARE") setFornitoreId("");
                 }}
               >
@@ -539,6 +550,19 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                         }
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Fattore Kg/Lt per pezzo</Label>
+                      <Input
+                        inputMode="decimal"
+                        placeholder="0,000000000"
+                        value={riga.fattoreKgLtPezzo}
+                        onChange={(event) =>
+                          aggiornaRiga(riga.key, {
+                            fattoreKgLtPezzo: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               );
@@ -606,10 +630,9 @@ function RettificaDialog({
   const mutation = useRettificaLotto();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const parsedDelta = Number(delta);
   const valid =
-    Number.isFinite(parsedDelta) &&
-    parsedDelta !== 0 &&
+    /^-?\d+(?:[.,]\d{1,6})?$/.test(delta.trim()) &&
+    !/^-?0+(?:[.,]0+)?$/.test(delta.trim()) &&
     (causale !== "altro" || motivazione.trim().length > 0);
 
   const submit = () => {
@@ -618,7 +641,7 @@ function RettificaDialog({
       {
         id: lotto.id,
         data: {
-          delta: parsedDelta,
+          delta: delta.replace(",", "."),
           causale,
           motivazione: motivazione || undefined,
           note: note || undefined,
@@ -669,8 +692,8 @@ function RettificaDialog({
             <Label htmlFor="rettifica-delta">Variazione quantità</Label>
             <Input
               id="rettifica-delta"
-              type="number"
-              step="0.01"
+              inputMode="decimal"
+              placeholder="0,000001"
               value={delta}
               onChange={(event) => setDelta(event.target.value)}
             />

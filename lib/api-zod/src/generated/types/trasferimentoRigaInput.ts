@@ -5,11 +5,12 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { QuantitaContabile } from './quantitaContabile';
 
 export interface TrasferimentoRigaInput {
   prodottoId: number;
   lottoId?: number;
-  quantita: number;
+  quantita: QuantitaContabile;
   /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
   unitaMisura?: string;
   note?: string;

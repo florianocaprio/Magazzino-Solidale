@@ -50,6 +50,7 @@ import {
   TransferRequestError,
 } from "../lib/transferWorkflow";
 import { InventoryDecimal } from "../lib/inventoryDecimal";
+import { resolveInventoryQuantityDimensions } from "../lib/inventoryQuantityDimensions";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -284,6 +285,12 @@ async function trasferimentoUscitaFEFO(
       .set({ quantitaResidua: disp.subtract(scala).toDb() })
       .where(eq(lottiTable.id, lotto.id));
 
+    const dimensions = resolveInventoryQuantityDimensions({
+      quantitaOperativa: scala.toDb(),
+      unitaMisura: opts.unitaMisura,
+      fattorePartita: lotto.fattoreKgLtPezzo,
+    });
+
     await tx.insert(movimentiTable).values({
       tipoMovimento: "trasferimento",
       tipoDettaglio: "uscita",
@@ -292,11 +299,9 @@ async function trasferimentoUscitaFEFO(
       prodottoId: opts.prodottoId,
       lottoId: lotto.id,
       quantita: scala.toDb(),
-      quantitaPezzi:
-        opts.unitaMisura.toLowerCase() === "pz" ? scala.toDb() : null,
-      quantitaKgLt: ["kg", "lt", "l"].includes(opts.unitaMisura.toLowerCase())
-        ? scala.toDb()
-        : null,
+      quantitaPezzi: dimensions.quantitaPezzi,
+      quantitaKgLt: dimensions.quantitaKgLt,
+      fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
       unitaMisura: opts.unitaMisura,
       fornitoreId: lotto.fornitoreId,
       operatoreId: opts.operatoreId,
@@ -714,7 +719,7 @@ router.post("/trasferimenti", async (req, res) => {
   }
   const righeInput: Array<{
     prodottoId: number;
-    quantita: number;
+    quantita: string | number;
     unitaMisura?: string;
   }> = body.righe ?? [];
   if (
@@ -722,9 +727,7 @@ router.post("/trasferimenti", async (req, res) => {
     righeInput.some(
       (r) =>
         !Number.isSafeInteger(r.prodottoId) ||
-        r.prodottoId <= 0 ||
-        !Number.isFinite(r.quantita) ||
-        r.quantita <= 0,
+        r.prodottoId <= 0,
     )
   ) {
     res.status(400).json({
@@ -1082,11 +1085,13 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const prodottoMap = new Map(prodotti.map((p) => [p.id, p.nome]));
 
   // Valida la disponibilità all'origine sommando per prodotto.
-  const richiestaPerProdotto = new Map<number, number>();
+  const richiestaPerProdotto = new Map<number, InventoryDecimal>();
   for (const r of righe) {
     richiestaPerProdotto.set(
       r.prodottoId,
-      (richiestaPerProdotto.get(r.prodottoId) ?? 0) + parseFloat(r.quantita),
+      (richiestaPerProdotto.get(r.prodottoId) ?? InventoryDecimal.zero()).add(
+        InventoryDecimal.parse(r.quantita),
+      ),
     );
   }
   for (const [prodottoId, richiesta] of richiestaPerProdotto) {
@@ -1094,11 +1099,19 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
       prodottoId,
       current.magazzinoOrigineId,
     );
-    const disp = Math.max(0, disponibilita.disponibileReale);
-    if (richiesta > disp) {
+    const available = InventoryDecimal.parse(
+      disponibilita.disponibileRealePrecisa,
+      { allowNegative: true },
+    );
+    const disp = available.isNegative() ? InventoryDecimal.zero() : available;
+    if (richiesta.compare(disp) > 0) {
       if (
-        richiesta <= disponibilita.giacenzaFisica &&
-        disponibilita.giacenzaScaduta > 0
+        richiesta.compare(
+          InventoryDecimal.parse(disponibilita.giacenzaFisicaPrecisa),
+        ) <= 0 &&
+        InventoryDecimal.parse(
+          disponibilita.giacenzaScadutaPrecisa,
+        ).isPositive()
       ) {
         res.status(409).json({
           error:
@@ -1107,7 +1120,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
         return;
       }
       res.status(400).json({
-        error: `Disponibilità insufficiente all'origine per ${prodottoMap.get(prodottoId) ?? `prodotto #${prodottoId}`}: ${disp} disponibili, richiesti ${richiesta}`,
+        error: `Disponibilità insufficiente all'origine per ${prodottoMap.get(prodottoId) ?? `prodotto #${prodottoId}`}: ${disp.toCanonical()} disponibili, richiesti ${richiesta.toCanonical()}`,
       });
       return;
     }
@@ -1301,6 +1314,13 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           ) {
             throw new Error("PARTITA_DESTINAZIONE_INCOERENTE");
           }
+          if (
+            destLotto.fattoreKgLtPezzo != null &&
+            u.m.fattoreKgLtPezzo != null &&
+            destLotto.fattoreKgLtPezzo !== u.m.fattoreKgLtPezzo
+          ) {
+            throw new Error("PARTITA_DESTINAZIONE_FATTORE_INCOERENTE");
+          }
           const increment = InventoryDecimal.parse(qty);
           [destLotto] = await tx
             .update(lottiTable)
@@ -1314,6 +1334,8 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
                 .add(increment)
                 .toDb(),
               dataUltimoCarico: dataConferma,
+              fattoreKgLtPezzo:
+                destLotto.fattoreKgLtPezzo ?? u.m.fattoreKgLtPezzo,
             })
             .where(eq(lottiTable.id, destLotto.id))
             .returning();
@@ -1333,7 +1355,8 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
               fornitoreId: u.lotto?.fornitoreId ?? null,
               fsePlus: u.m.fondoOrigine === "FSE_PLUS",
               fondoOrigine: u.m.fondoOrigine,
-              fattoreKgLtPezzo: u.lotto?.fattoreKgLtPezzo ?? null,
+              fattoreKgLtPezzo:
+                u.m.fattoreKgLtPezzo ?? u.lotto?.fattoreKgLtPezzo ?? null,
               note: `Da trasferimento ${current.codice}`,
             })
             .returning();
@@ -1349,6 +1372,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           quantita: qty,
           quantitaPezzi: u.m.quantitaPezzi,
           quantitaKgLt: u.m.quantitaKgLt,
+          fattoreKgLtPezzo: u.m.fattoreKgLtPezzo,
           unitaMisura: u.m.unitaMisura,
           fornitoreId: u.lotto?.fornitoreId ?? null,
           operatoreId: req.user!.id,

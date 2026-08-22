@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FondoOrigine } from './fondoOrigine';
-import type { OrigineCarico } from './origineCarico';
 
 export type ListGiacenzeParams = {
 magazzinoId?: number;
@@ -14,7 +13,6 @@ sottoscortaOnly?: boolean;
 fsePlusOnly?: boolean;
 prodottoId?: number;
 fondoOrigine?: FondoOrigine;
-provenienza?: OrigineCarico;
 scadenzaDa?: Date;
 scadenzaA?: Date;
 };

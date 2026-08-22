@@ -13,5 +13,8 @@ prodottoId?: number;
 magazzinoId?: number;
 inScadenza?: boolean;
 fondoOrigine?: FondoOrigine;
-provenienza?: OrigineCarico;
+/**
+ * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
+ */
+origineCaricoPresente?: OrigineCarico;
 };

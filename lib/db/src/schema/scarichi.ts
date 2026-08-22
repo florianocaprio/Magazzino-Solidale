@@ -21,7 +21,7 @@ export const scaricoRigheTable = pgTable("scarico_righe", {
   id: serial("id").primaryKey(),
   scaricoId: integer("scarico_id").notNull(),
   prodottoId: integer("prodotto_id").notNull(),
-  quantita: decimal("quantita", { precision: 10, scale: 2 }).notNull(),
+  quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
   unitaMisura: varchar("unita_misura", { length: 20 }).notNull(),
   note: text("note"),
 });

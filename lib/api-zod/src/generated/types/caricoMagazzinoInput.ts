@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CaricoMagazzinoRigaInput } from './caricoMagazzinoRigaInput';
-import type { OrigineCarico } from './origineCarico';
+import type { OrigineCaricoManuale } from './origineCaricoManuale';
 
 export interface CaricoMagazzinoInput {
   /** @minimum 1 */
   magazzinoId: number;
-  origineCarico: OrigineCarico;
+  origineCarico: OrigineCaricoManuale;
   /** @nullable */
   numeroDocumento?: string | null;
   /** @nullable */

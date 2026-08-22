@@ -725,10 +725,36 @@ export const OrigineCarico = {
 } as const;
 
 /**
+ * Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.
+ */
+export type OrigineCaricoManuale = typeof OrigineCaricoManuale[keyof typeof OrigineCaricoManuale];
+
+
+export const OrigineCaricoManuale = {
+  RACCOLTA_ALIMENTARE: 'RACCOLTA_ALIMENTARE',
+  DONAZIONE: 'DONAZIONE',
+  ACQUISTO: 'ACQUISTO',
+  FORNITORE: 'FORNITORE',
+  ALTRO: 'ALTRO',
+} as const;
+
+/**
  * Decimale esatto; non convertire in number JavaScript per i calcoli.
  * @pattern ^[0-9]+(?:\.[0-9]{1,6})?$
  */
 export type QuantitaContabile = string;
+
+/**
+ * Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.
+ * @pattern ^-?[0-9]+(?:\.[0-9]{1,6})?$
+ */
+export type QuantitaContabileConSegno = string;
+
+/**
+ * Fattore Kg/Lt per pezzo esatto, positivo, scala massima 9.
+ * @pattern ^[0-9]+(?:\.[0-9]{1,9})?$
+ */
+export type FattoreContabile = string;
 
 export type CaricoMagazzinoStato = typeof CaricoMagazzinoStato[keyof typeof CaricoMagazzinoStato];
 
@@ -778,8 +804,7 @@ export interface CaricoMagazzinoRiga {
   unitaMisuraOperativa: string;
   quantitaPezzi?: QuantitaContabile | null;
   quantitaKgLt?: QuantitaContabile | null;
-  /** @nullable */
-  fattoreKgLtPezzo?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
   /** @nullable */
   codiceLottoOriginale?: string | null;
   /** @nullable */
@@ -812,8 +837,7 @@ export interface CaricoMagazzinoRigaInput {
   unitaMisuraOperativa?: string;
   quantitaPezzi?: QuantitaContabile | null;
   quantitaKgLt?: QuantitaContabile | null;
-  /** @nullable */
-  fattoreKgLtPezzo?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
   /** @nullable */
   codiceLotto?: string | null;
   /** @nullable */
@@ -829,7 +853,7 @@ export interface CaricoMagazzinoRigaInput {
 export interface CaricoMagazzinoInput {
   /** @minimum 1 */
   magazzinoId: number;
-  origineCarico: OrigineCarico;
+  origineCarico: OrigineCaricoManuale;
   /** @nullable */
   numeroDocumento?: string | null;
   /** @nullable */
@@ -911,10 +935,8 @@ export interface LottoInput {
 }
 
 export interface LottoUpdate {
-  codiceLotto?: string;
-  dataScadenza?: string;
-  documentoCarico?: string;
-  note?: string;
+  /** @nullable */
+  note?: string | null;
 }
 
 export type RettificaLottoInputCausale = typeof RettificaLottoInputCausale[keyof typeof RettificaLottoInputCausale];
@@ -928,7 +950,7 @@ export const RettificaLottoInputCausale = {
 } as const;
 
 export interface RettificaLottoInput {
-  delta: number;
+  delta: QuantitaContabileConSegno;
   causale: RettificaLottoInputCausale;
   motivazione?: string;
   note?: string;
@@ -953,6 +975,7 @@ export interface Movimento {
   quantitaPezzi?: string | null;
   /** @nullable */
   quantitaKgLt?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
   unitaMisura: string;
   /** @nullable */
   fornitoreId?: number | null;
@@ -1016,12 +1039,15 @@ export interface Giacenza {
   giacenzaScaduta: number;
   /** Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome. */
   giacenzaDistribuibile: number;
-  giacenzaFisicaPrecisa?: QuantitaContabile;
+  giacenzaFisicaPrecisa: QuantitaContabile;
   giacenzaScadutaPrecisa?: QuantitaContabile;
-  giacenzaDistribuibilePrecisa?: QuantitaContabile;
+  giacenzaDistribuibilePrecisa: QuantitaContabile;
   impegnato: number;
+  impegnatoPreciso: QuantitaContabile;
   disponibileReale: number;
+  disponibileRealePrecisa: QuantitaContabileConSegno;
   scortaMinima: number;
+  scortaMinimaPrecisa?: QuantitaContabile;
   scortaConsigliata: number;
   sottoscorta: boolean;
   lottiAttivi: number;
@@ -1126,7 +1152,7 @@ export interface Trasferimento {
 export interface TrasferimentoRigaInput {
   prodottoId: number;
   lottoId?: number;
-  quantita: number;
+  quantita: QuantitaContabile;
   /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
   unitaMisura?: string;
   note?: string;
@@ -1218,7 +1244,7 @@ export const ScaricoInputCanaleOperativo = {
 
 export interface ScaricoRigaInput {
   prodottoId: number;
-  quantita: number;
+  quantita: QuantitaContabile;
   unitaMisura: string;
   note?: string;
 }
@@ -4388,8 +4414,7 @@ export interface SessioneCassaEmporioAperturaInput {
 
 export interface SessioneCassaEmporioAggiungiProdottoInput {
   prodottoId: number;
-  /** @minimum 0.01 */
-  quantita: number;
+  quantita: QuantitaContabile;
   /** @minimum 1 */
   versione: number;
   /** @nullable */
@@ -4397,8 +4422,7 @@ export interface SessioneCassaEmporioAggiungiProdottoInput {
 }
 
 export interface SessioneCassaEmporioAggiornaRigaInput {
-  /** @minimum 0.01 */
-  quantita: number;
+  quantita: QuantitaContabile;
   /** @minimum 1 */
   versione: number;
   /** @nullable */
@@ -4848,7 +4872,7 @@ export interface BollaDettaglio {
 export interface BollaRigaInput {
   prodottoId: number;
   lottoId?: number;
-  quantita: number;
+  quantita: QuantitaContabile;
   unitaMisura: string;
   note?: string;
 }
@@ -5803,10 +5827,15 @@ export interface MensaGiacenza {
   nome: string;
   unitaMisura: string;
   quantita: number;
+  quantitaPrecisa?: QuantitaContabile;
   giacenzaFisica: number;
+  giacenzaFisicaPrecisa?: QuantitaContabile;
   giacenzaDistribuibile: number;
+  giacenzaDistribuibilePrecisa?: QuantitaContabile;
   impegnato: number;
+  impegnatoPreciso?: QuantitaContabile;
   disponibileReale: number;
+  disponibileRealePrecisa?: QuantitaContabile;
 }
 
 export type MensaConsumoInputTipoServizio = typeof MensaConsumoInputTipoServizio[keyof typeof MensaConsumoInputTipoServizio];
@@ -5830,8 +5859,7 @@ export interface MensaConsumoInput {
   dataServizio: string;
   tipoServizio: MensaConsumoInputTipoServizio;
   prodottoId: number;
-  /** @exclusiveMinimum 0 */
-  quantita: number;
+  quantita: QuantitaContabile;
   causale: MensaConsumoInputCausale;
   /**
      * @maxLength 2000
@@ -5999,8 +6027,7 @@ export interface MensaTrasferimentiPage {
 
 export type MensaTrasferimentoInputRigheItem = {
   prodottoId: number;
-  /** @exclusiveMinimum 0 */
-  quantita: number;
+  quantita: QuantitaContabile;
   /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
   unitaMisura?: string;
   /** @nullable */
@@ -6421,7 +6448,10 @@ prodottoId?: number;
 magazzinoId?: number;
 inScadenza?: boolean;
 fondoOrigine?: FondoOrigine;
-provenienza?: OrigineCarico;
+/**
+ * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
+ */
+origineCaricoPresente?: OrigineCarico;
 };
 
 export type ListMovimentiParams = {
@@ -6451,7 +6481,6 @@ sottoscortaOnly?: boolean;
 fsePlusOnly?: boolean;
 prodottoId?: number;
 fondoOrigine?: FondoOrigine;
-provenienza?: OrigineCarico;
 scadenzaDa?: string;
 scadenzaA?: string;
 };

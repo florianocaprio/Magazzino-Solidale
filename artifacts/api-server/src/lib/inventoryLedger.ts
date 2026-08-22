@@ -7,18 +7,25 @@ import {
   magazziniTable,
   movimentiTable,
   ORIGINI_CARICO,
+  ORIGINI_CARICO_MANUALI,
   prodottiTable,
   systemLogsTable,
   type FondoOrigine,
   type OrigineCarico,
 } from "@workspace/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { InventoryTransaction } from "./scaricoInventory";
 import {
   InventoryDecimal,
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "./inventoryDecimal";
+import {
+  canonicalInventoryFactor,
+  InventoryQuantityDimensionsError,
+  resolveInventoryQuantityDimensions,
+} from "./inventoryQuantityDimensions";
 
 export class InventoryLedgerError extends Error {
   constructor(
@@ -76,39 +83,20 @@ export function normalizeInventoryLotCode(value: string | null | undefined): {
   };
 }
 
-function decimalText(
-  value: string | number | null | undefined,
-  options: { required?: boolean; maxScale?: number } = {},
-): string | null {
-  if (value == null || value === "") {
-    if (options.required)
-      throw new InventoryLedgerError(400, "Valore decimale obbligatorio");
-    return null;
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value != null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(",")}}`;
   }
-  try {
-    const parsed = InventoryDecimal.parse(value, {
-      maxScale: options.maxScale ?? 6,
-    });
-    return parsed.toDb();
-  } catch (error) {
-    if (error instanceof InventoryDecimalError) {
-      throw new InventoryLedgerError(400, error.message);
-    }
-    throw error;
-  }
+  return JSON.stringify(value);
 }
 
-function factorText(value: string | number | null | undefined): string | null {
-  if (value == null || value === "") return null;
-  const text = String(value).trim().replace(",", ".");
-  const match = /^(\d+)(?:\.(\d{1,9}))?$/.exec(text);
-  if (!match || /^0(?:\.0+)?$/.test(text)) {
-    throw new InventoryLedgerError(
-      400,
-      "Il fattore Kg/Lt per pezzo deve essere positivo e avere al massimo 9 decimali",
-    );
-  }
-  return `${match[1]}.${(match[2] ?? "").padEnd(9, "0")}`;
+function requestHash(value: unknown): string {
+  return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
 export interface WarehouseLoadLineInput {
@@ -136,6 +124,7 @@ export interface WarehouseLoadInput {
   fornitoreId?: number | null;
   note?: string | null;
   idempotencyKey?: string | null;
+  executionContext?: "manual" | "system";
   creatoDa: number;
   righe: WarehouseLoadLineInput[];
 }
@@ -205,6 +194,17 @@ export async function createWarehouseLoad(
   if (!ORIGINI_CARICO.includes(input.origineCarico)) {
     throw new InventoryLedgerError(400, "Provenienza del carico non valida");
   }
+  if (
+    (input.executionContext ?? "manual") === "manual" &&
+    !ORIGINI_CARICO_MANUALI.includes(
+      input.origineCarico as (typeof ORIGINI_CARICO_MANUALI)[number],
+    )
+  ) {
+    throw new InventoryLedgerError(
+      403,
+      "Provenienza riservata a un processo interno di sistema",
+    );
+  }
   if (!Array.isArray(input.righe) || input.righe.length === 0) {
     throw new InventoryLedgerError(400, "Il carico richiede almeno una riga");
   }
@@ -216,11 +216,6 @@ export async function createWarehouseLoad(
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`carico-idempotency:${idempotencyKey}`}, 0))`,
     );
-    const [existing] = await tx
-      .select()
-      .from(carichiMagazzinoTable)
-      .where(eq(carichiMagazzinoTable.idempotencyKey, idempotencyKey));
-    if (existing) return existingWarehouseLoad(tx, existing, true);
   }
 
   const magazzino = await requireOperationalMagazzino(tx, input.magazzinoId);
@@ -277,18 +272,6 @@ export async function createWarehouseLoad(
         `Fondo non valido alla riga ${index + 1}`,
       );
     }
-    let quantita: InventoryDecimal;
-    try {
-      quantita = positiveInventoryDecimal(riga.quantitaOperativa);
-    } catch (error) {
-      if (error instanceof InventoryDecimalError) {
-        throw new InventoryLedgerError(
-          400,
-          `Riga ${index + 1}: ${error.message}`,
-        );
-      }
-      throw error;
-    }
     const unita =
       optionalText(riga.unitaMisuraOperativa, 20) ?? prodotto.unitaMisura;
     if (unita !== prodotto.unitaMisura) {
@@ -312,27 +295,23 @@ export async function createWarehouseLoad(
         `Data di scadenza obbligatoria alla riga ${index + 1}`,
       );
     }
-    const quantitaPezzi = decimalText(
-      riga.quantitaPezzi ??
-        (prodotto.unitaMisura.toLowerCase() === "pz" ? quantita.toDb() : null),
-    );
-    const quantitaKgLt = decimalText(
-      riga.quantitaKgLt ??
-        (["kg", "lt", "l"].includes(prodotto.unitaMisura.toLowerCase())
-          ? quantita.toDb()
-          : null),
-    );
     return {
       numeroRiga: index + 1,
       input: riga,
       prodotto,
-      quantita,
       unita,
       lotto,
       dataScadenza,
-      quantitaPezzi,
-      quantitaKgLt,
-      fattore: factorText(riga.fattoreKgLtPezzo),
+      partyKey:
+        lotto.normalized == null
+          ? null
+          : `${input.magazzinoId}:${prodotto.id}:${riga.fondoOrigine}:${lotto.normalized}`,
+      dimensions: null as ReturnType<
+        typeof resolveInventoryQuantityDimensions
+      > | null,
+      quantita: null as InventoryDecimal | null,
+      existingLotto: undefined as typeof lottiTable.$inferSelect | undefined,
+      adoptedLegacy: false,
     };
   });
 
@@ -349,6 +328,170 @@ export async function createWarehouseLoad(
     );
   }
 
+  const candidateByParty = new Map<
+    string,
+    typeof lottiTable.$inferSelect | undefined
+  >();
+  const factorByParty = new Map<string, string>();
+  for (const line of normalizedLines) {
+    if (line.lotto.normalized != null) {
+      let candidates: Array<typeof lottiTable.$inferSelect>;
+      if (candidateByParty.has(line.partyKey!)) {
+        const cached = candidateByParty.get(line.partyKey!);
+        candidates = cached ? [cached] : [];
+      } else {
+        candidates = await tx
+          .select()
+          .from(lottiTable)
+          .where(
+            and(
+              eq(lottiTable.magazzinoId, input.magazzinoId),
+              eq(lottiTable.prodottoId, line.prodotto.id),
+              eq(lottiTable.fondoOrigine, line.input.fondoOrigine),
+              or(
+                eq(lottiTable.codiceLottoNormalizzato, line.lotto.normalized),
+                and(
+                  sql`${lottiTable.codiceLottoNormalizzato} is null`,
+                  sql`upper(regexp_replace(btrim(${lottiTable.codiceLotto}), '\\s+', ' ', 'g')) = ${line.lotto.normalized}`,
+                ),
+              ),
+            ),
+          )
+          .for("update");
+      }
+      if (candidates.length > 1) {
+        throw new InventoryLedgerError(
+          409,
+          `PARTITA_LEGACY_AMBIGUA: più Partite corrispondono al lotto ${line.lotto.original}`,
+        );
+      }
+      line.existingLotto = candidates[0];
+      candidateByParty.set(line.partyKey!, candidates[0]);
+      line.adoptedLegacy =
+        candidates[0]?.codiceLottoNormalizzato == null && candidates.length === 1;
+      if (
+        line.existingLotto &&
+        (line.existingLotto.dataScadenza ?? null) !== line.dataScadenza
+      ) {
+        throw new InventoryLedgerError(
+          409,
+          `Scadenza incompatibile per la partita ${line.lotto.original}`,
+        );
+      }
+    }
+    try {
+      line.dimensions = resolveInventoryQuantityDimensions({
+        quantitaOperativa: line.input.quantitaOperativa,
+        unitaMisura: line.unita,
+        quantitaPezzi: line.input.quantitaPezzi,
+        quantitaKgLt: line.input.quantitaKgLt,
+        fattoreKgLtPezzo: line.input.fattoreKgLtPezzo,
+        fattorePartita:
+          line.existingLotto?.fattoreKgLtPezzo ??
+          (line.partyKey ? factorByParty.get(line.partyKey) : null),
+      });
+      line.quantita = InventoryDecimal.parse(line.dimensions.quantitaOperativa);
+      if (line.partyKey && line.dimensions.fattoreKgLtPezzo) {
+        factorByParty.set(line.partyKey, line.dimensions.fattoreKgLtPezzo);
+      }
+    } catch (error) {
+      if (error instanceof InventoryQuantityDimensionsError) {
+        throw new InventoryLedgerError(
+          error.status,
+          `Riga ${line.numeroRiga}: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+  for (const line of normalizedLines) {
+    const effectiveFactor = line.partyKey
+      ? factorByParty.get(line.partyKey)
+      : undefined;
+    if (!effectiveFactor) continue;
+    try {
+      line.dimensions = resolveInventoryQuantityDimensions({
+        quantitaOperativa: line.input.quantitaOperativa,
+        unitaMisura: line.unita,
+        quantitaPezzi: line.input.quantitaPezzi,
+        quantitaKgLt: line.input.quantitaKgLt,
+        fattoreKgLtPezzo: line.input.fattoreKgLtPezzo,
+        fattorePartita: effectiveFactor,
+      });
+    } catch (error) {
+      if (error instanceof InventoryQuantityDimensionsError) {
+        throw new InventoryLedgerError(
+          error.status,
+          `Riga ${line.numeroRiga}: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  const normalizedRequestHash = requestHash({
+    magazzinoId: input.magazzinoId,
+    origineCarico: input.origineCarico,
+    numeroDocumento: optionalText(input.numeroDocumento, 100),
+    dataDocumento: input.dataDocumento ?? null,
+    dataCarico: input.dataCarico,
+    descrizione: optionalText(input.descrizione, 4000),
+    fornitoreId,
+    note: optionalText(input.note, 4000),
+    righe: normalizedLines.map((line) => ({
+      numeroRiga: line.numeroRiga,
+      prodottoId: line.prodotto.id,
+      fondoOrigine: line.input.fondoOrigine,
+      quantitaOperativa: line.dimensions!.quantitaOperativa,
+      unitaMisuraOperativa: line.unita,
+      quantitaPezzi:
+        line.input.quantitaPezzi == null
+          ? null
+          : InventoryDecimal.parse(line.input.quantitaPezzi).toDb(),
+      quantitaKgLt:
+        line.input.quantitaKgLt == null
+          ? null
+          : InventoryDecimal.parse(line.input.quantitaKgLt).toDb(),
+      fattoreKgLtPezzo: canonicalInventoryFactor(
+        line.input.fattoreKgLtPezzo,
+      ),
+      codiceLotto: line.lotto.original,
+      codiceLottoNormalizzato: line.lotto.normalized,
+      dataScadenza: line.dataScadenza,
+      descrizioneEsterna: optionalText(line.input.descrizioneEsterna, 4000),
+      riferimentoEsterno: optionalText(line.input.riferimentoEsterno, 160),
+      note: optionalText(line.input.note, 4000),
+    })),
+  });
+
+  if (idempotencyKey) {
+    const [existing] = await tx
+      .select()
+      .from(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.idempotencyKey, idempotencyKey));
+    if (existing) {
+      if (existing.magazzinoId !== input.magazzinoId) {
+        throw new InventoryLedgerError(
+          409,
+          "Idempotency key già usata in un diverso Magazzino",
+        );
+      }
+      if (existing.requestHash == null) {
+        throw new InventoryLedgerError(
+          409,
+          "Idempotency key legacy priva di hash verificabile",
+        );
+      }
+      if (existing.requestHash !== normalizedRequestHash) {
+        throw new InventoryLedgerError(
+          409,
+          "Idempotency key già usata con un contenuto differente",
+        );
+      }
+      return existingWarehouseLoad(tx, existing, true);
+    }
+  }
+
   const [carico] = await tx
     .insert(carichiMagazzinoTable)
     .values({
@@ -361,49 +504,23 @@ export async function createWarehouseLoad(
       fornitoreId,
       note: optionalText(input.note, 4000),
       idempotencyKey,
+      requestHash: normalizedRequestHash,
       creatoDa: input.creatoDa,
     })
     .returning();
 
   const createdLines: WarehouseLoadResult["righe"] = [];
+  const resolvedParties = new Map<string, typeof lottiTable.$inferSelect>();
   for (const line of normalizedLines) {
-    let lotto: typeof lottiTable.$inferSelect | undefined;
-    if (line.lotto.normalized != null) {
-      [lotto] = await tx
-        .select()
-        .from(lottiTable)
-        .where(
-          and(
-            eq(lottiTable.magazzinoId, input.magazzinoId),
-            eq(lottiTable.prodottoId, line.prodotto.id),
-            eq(lottiTable.fondoOrigine, line.input.fondoOrigine),
-            eq(lottiTable.codiceLottoNormalizzato, line.lotto.normalized),
-          ),
-        )
-        .for("update");
-    }
+    let lotto =
+      (line.partyKey ? resolvedParties.get(line.partyKey) : undefined) ??
+      line.existingLotto;
     if (lotto) {
-      if ((lotto.dataScadenza ?? null) !== line.dataScadenza) {
-        throw new InventoryLedgerError(
-          409,
-          `Scadenza incompatibile per la partita ${line.lotto.original}`,
-        );
-      }
-      if (
-        lotto.fattoreKgLtPezzo != null &&
-        line.fattore != null &&
-        lotto.fattoreKgLtPezzo !== line.fattore
-      ) {
-        throw new InventoryLedgerError(
-          409,
-          `Fattore Pezzi/KgLt incompatibile per la partita ${line.lotto.original}`,
-        );
-      }
       const caricata = InventoryDecimal.parse(lotto.quantitaCaricata).add(
-        line.quantita,
+        line.quantita!,
       );
       const residua = InventoryDecimal.parse(lotto.quantitaResidua).add(
-        line.quantita,
+        line.quantita!,
       );
       [lotto] = await tx
         .update(lottiTable)
@@ -418,7 +535,10 @@ export async function createWarehouseLoad(
             input.dataCarico > (lotto.dataUltimoCarico ?? lotto.dataCarico)
               ? input.dataCarico
               : (lotto.dataUltimoCarico ?? lotto.dataCarico),
-          fattoreKgLtPezzo: lotto.fattoreKgLtPezzo ?? line.fattore,
+          codiceLottoNormalizzato:
+            lotto.codiceLottoNormalizzato ?? line.lotto.normalized,
+          fattoreKgLtPezzo:
+            lotto.fattoreKgLtPezzo ?? line.dimensions!.fattoreKgLtPezzo,
         })
         .where(eq(lottiTable.id, lotto.id))
         .returning();
@@ -432,13 +552,13 @@ export async function createWarehouseLoad(
           dataScadenza: line.dataScadenza,
           dataCarico: input.dataCarico,
           dataUltimoCarico: input.dataCarico,
-          quantitaCaricata: line.quantita.toDb(),
-          quantitaResidua: line.quantita.toDb(),
+          quantitaCaricata: line.quantita!.toDb(),
+          quantitaResidua: line.quantita!.toDb(),
           magazzinoId: input.magazzinoId,
           fornitoreId,
           fsePlus: line.input.fondoOrigine === "FSE_PLUS",
           fondoOrigine: line.input.fondoOrigine,
-          fattoreKgLtPezzo: line.fattore,
+          fattoreKgLtPezzo: line.dimensions!.fattoreKgLtPezzo,
           documentoCarico: optionalText(input.numeroDocumento, 100),
           note: optionalText(line.input.note ?? input.note, 4000),
         })
@@ -453,11 +573,11 @@ export async function createWarehouseLoad(
         prodottoId: line.prodotto.id,
         lottoId: lotto.id,
         fondoOrigine: line.input.fondoOrigine,
-        quantitaOperativa: line.quantita.toDb(),
+        quantitaOperativa: line.dimensions!.quantitaOperativa,
         unitaMisuraOperativa: line.unita,
-        quantitaPezzi: line.quantitaPezzi,
-        quantitaKgLt: line.quantitaKgLt,
-        fattoreKgLtPezzo: line.fattore,
+        quantitaPezzi: line.dimensions!.quantitaPezzi,
+        quantitaKgLt: line.dimensions!.quantitaKgLt,
+        fattoreKgLtPezzo: line.dimensions!.fattoreKgLtPezzo,
         codiceLottoOriginale: line.lotto.original,
         dataScadenza: line.dataScadenza,
         descrizioneEsterna: optionalText(line.input.descrizioneEsterna, 4000),
@@ -473,9 +593,10 @@ export async function createWarehouseLoad(
       magazzinoId: input.magazzinoId,
       prodottoId: line.prodotto.id,
       lottoId: lotto.id,
-      quantita: line.quantita.toDb(),
-      quantitaPezzi: line.quantitaPezzi,
-      quantitaKgLt: line.quantitaKgLt,
+      quantita: line.dimensions!.quantitaOperativa,
+      quantitaPezzi: line.dimensions!.quantitaPezzi,
+      quantitaKgLt: line.dimensions!.quantitaKgLt,
+      fattoreKgLtPezzo: line.dimensions!.fattoreKgLtPezzo,
       unitaMisura: line.unita,
       fornitoreId,
       fondoOrigine: line.input.fondoOrigine,
@@ -490,6 +611,20 @@ export async function createWarehouseLoad(
       documentoRiferimento: optionalText(input.numeroDocumento, 100),
       note: optionalText(line.input.note ?? input.note, 4000),
     });
+    if (line.adoptedLegacy) {
+      await tx.insert(systemLogsTable).values({
+        evento: "MAGAZZINO_PARTITA_LEGACY_ADOTTATA",
+        esito: "SUCCESS",
+        actorUserId: input.creatoDa,
+        details: {
+          lottoId: lotto.id,
+          magazzinoId: input.magazzinoId,
+          prodottoId: line.prodotto.id,
+          fondoOrigine: line.input.fondoOrigine,
+        },
+      });
+    }
+    if (line.partyKey) resolvedParties.set(line.partyKey, lotto);
     createdLines.push({ riga, lotto });
   }
 
@@ -514,7 +649,7 @@ export interface CaricoInventarialeInput {
   codiceLotto?: string | null;
   dataScadenza?: string | null;
   dataCarico: string;
-  quantita: number;
+  quantita: string | number;
   magazzinoId: number;
   fornitoreId?: number | null;
   fsePlus: boolean;
@@ -536,11 +671,12 @@ export async function creaCaricoInventariale(
         ? "ACQUISTO"
         : input.causale === "donazione"
           ? "DONAZIONE"
-          : "AGEA_SIFEAD",
+          : "ALTRO",
     numeroDocumento: input.documentoCarico,
     dataCarico: input.dataCarico,
     fornitoreId: input.fornitoreId,
     note: input.note,
+    executionContext: "manual",
     creatoDa: input.operatoreId,
     righe: [
       {
@@ -621,6 +757,11 @@ export async function rettificaInventariale(
     .set({ quantitaResidua: nuovaQuantita.toDb() })
     .where(eq(lottiTable.id, lotto.lotto.id))
     .returning();
+  const dimensions = resolveInventoryQuantityDimensions({
+    quantitaOperativa: delta.abs().toDb(),
+    unitaMisura: lotto.unitaMisura,
+    fattorePartita: lotto.lotto.fattoreKgLtPezzo,
+  });
   await tx.insert(movimentiTable).values({
     tipoMovimento: delta.isPositive()
       ? "rettifica_positiva"
@@ -631,6 +772,9 @@ export async function rettificaInventariale(
     prodottoId: lotto.lotto.prodottoId,
     lottoId: lotto.lotto.id,
     quantita: delta.abs().toDb(),
+    quantitaPezzi: dimensions.quantitaPezzi,
+    quantitaKgLt: dimensions.quantitaKgLt,
+    fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
     unitaMisura: lotto.unitaMisura,
     fornitoreId: lotto.lotto.fornitoreId,
     fondoOrigine: lotto.lotto.fondoOrigine,

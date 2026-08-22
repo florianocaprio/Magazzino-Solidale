@@ -24,7 +24,6 @@ import { requirePermission } from "../middlewares/auth";
 import {
   creaCaricoInventariale,
   InventoryLedgerError,
-  normalizeInventoryLotCode,
   rettificaInventariale,
   RETTIFICA_CAUSALI,
 } from "../lib/inventoryLedger";
@@ -48,8 +47,13 @@ function positiveInteger(value: unknown): value is number {
 }
 
 router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
-  const { prodottoId, magazzinoId, inScadenza, fondoOrigine, provenienza } =
-    req.query as Record<string, string>;
+  const {
+    prodottoId,
+    magazzinoId,
+    inScadenza,
+    fondoOrigine,
+    origineCaricoPresente,
+  } = req.query as Record<string, string>;
   const conditions: SQL[] = [gt(lottiTable.quantitaResidua, "0")];
   if (prodottoId)
     conditions.push(eq(lottiTable.prodottoId, parseInt(prodottoId)));
@@ -62,13 +66,13 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
     }
     conditions.push(eq(lottiTable.fondoOrigine, fondoOrigine));
   }
-  if (provenienza) {
+  if (origineCaricoPresente) {
     conditions.push(sql`exists (
       select 1
       from ${carichiMagazzinoRigheTable} cr
       join ${carichiMagazzinoTable} c on c.id = cr.carico_magazzino_id
       where cr.lotto_id = ${lottiTable.id}
-        and c.origine_carico = ${provenienza}
+        and c.origine_carico = ${origineCaricoPresente}
     )`);
   }
   const scope = magazzinoScopeFilter(
@@ -140,10 +144,9 @@ router.post(
         .json({ error: "Prodotto e Magazzino devono essere validi" });
       return;
     }
-    const quantita = Number(body.quantitaCaricata);
+    const quantita = body.quantitaCaricata;
     if (
-      !Number.isFinite(quantita) ||
-      quantita <= 0 ||
+      (typeof quantita !== "string" && typeof quantita !== "number") ||
       !isDateOnly(body.dataCarico)
     ) {
       res.status(400).json({ error: "Quantità e data di carico non valide" });
@@ -257,12 +260,7 @@ router.patch(
         .json({ error: "Risorsa non accessibile per il tuo profilo" });
       return;
     }
-    const allowed = new Set([
-      "codiceLotto",
-      "dataScadenza",
-      "documentoCarico",
-      "note",
-    ]);
+    const allowed = new Set(["note"]);
     const unsupported = Object.keys(body).filter((key) => !allowed.has(key));
     if (unsupported.length > 0) {
       res.status(400).json({
@@ -271,32 +269,14 @@ router.patch(
       return;
     }
     const update: Partial<typeof lottiTable.$inferInsert> = {};
-    if ("codiceLotto" in body) {
-      const codice = normalizeInventoryLotCode(
-        typeof body.codiceLotto === "string" ? body.codiceLotto : null,
-      );
-      update.codiceLotto = codice.original;
-      update.codiceLottoNormalizzato = codice.normalized;
-    }
-    if ("dataScadenza" in body) {
-      if (
-        body.dataScadenza != null &&
-        body.dataScadenza !== "" &&
-        !isDateOnly(body.dataScadenza)
-      ) {
-        res.status(400).json({ error: "dataScadenza non valida" });
+    if ("note" in body) {
+      if (body.note != null && typeof body.note !== "string") {
+        res.status(400).json({ error: "note non valide" });
         return;
       }
-      update.dataScadenza = body.dataScadenza || null;
-    }
-    if ("documentoCarico" in body)
-      update.documentoCarico =
-        typeof body.documentoCarico === "string"
-          ? body.documentoCarico.trim() || null
-          : null;
-    if ("note" in body)
       update.note =
         typeof body.note === "string" ? body.note.trim() || null : null;
+    }
     const [row] = await db
       .update(lottiTable)
       .set(update)

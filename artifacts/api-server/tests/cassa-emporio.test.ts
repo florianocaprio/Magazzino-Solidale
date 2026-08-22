@@ -1978,7 +1978,7 @@ describe("Cassa Emporio", () => {
       .post(`/spese-emporio/${close.body.spesa.id}/storna`)
       .send({
         motivo: "Precisione non valida",
-        righe: [{ spesaRigaId, quantita: 0.001 }],
+        righe: [{ spesaRigaId, quantita: "0.0000001" }],
       });
     expect(invalidPrecision.status).toBe(400);
 

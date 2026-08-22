@@ -14,13 +14,13 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
 import { requireOperationalMagazzino } from "./inventoryLedger";
-import { parseDbNumber } from "./disponibilitaMagazzino";
 import { isLottoDistribuibile } from "./lottoPolicy";
 import { InventoryDecimal } from "./inventoryDecimal";
 import {
   ensureDistributionOperation,
   markDistributionOperationReversed,
 } from "./distributionLedger";
+import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -236,6 +236,7 @@ export async function stornoRigaTx(
       movimentoOrigineId: mov.id,
       quantitaPezzi: mov.quantitaPezzi,
       quantitaKgLt: mov.quantitaKgLt,
+      fattoreKgLtPezzo: mov.fattoreKgLtPezzo,
       fondoOrigine: mov.fondoOrigine,
       naturaContabile: "STORNO",
       dominioOrigine: mov.dominioOrigine,
@@ -324,6 +325,13 @@ async function convertiPrenotazioniAttiveInScarico(
       .set({ quantitaResidua: residua.subtract(qta).toDb() })
       .where(eq(lottiTable.id, lotto.id));
 
+    const unitaMisura = row.r?.unitaMisura ?? "pz";
+    const dimensions = resolveInventoryQuantityDimensions({
+      quantitaOperativa: prenotazione.quantita,
+      unitaMisura,
+      fattorePartita: lotto.fattoreKgLtPezzo,
+    });
+
     await tx.insert(movimentiTable).values({
       tipoMovimento: "scarico",
       tipoDettaglio: "consegna_beneficiario",
@@ -332,16 +340,10 @@ async function convertiPrenotazioniAttiveInScarico(
       prodottoId: prenotazione.prodottoId,
       lottoId: prenotazione.lottoId,
       quantita: prenotazione.quantita,
-      quantitaPezzi:
-        (row.r?.unitaMisura ?? "pz").toLowerCase() === "pz"
-          ? prenotazione.quantita
-          : null,
-      quantitaKgLt: ["kg", "lt", "l"].includes(
-        (row.r?.unitaMisura ?? "pz").toLowerCase(),
-      )
-        ? prenotazione.quantita
-        : null,
-      unitaMisura: row.r?.unitaMisura ?? "pz",
+      quantitaPezzi: dimensions.quantitaPezzi,
+      quantitaKgLt: dimensions.quantitaKgLt,
+      fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
+      unitaMisura,
       beneficiarioId: bolla.beneficiarioId,
       operatoreId: opts.operatoreId,
       bollaId: bolla.id,

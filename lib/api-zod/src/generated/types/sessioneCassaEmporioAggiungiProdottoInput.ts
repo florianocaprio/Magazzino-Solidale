@@ -5,11 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { QuantitaContabile } from './quantitaContabile';
 
 export interface SessioneCassaEmporioAggiungiProdottoInput {
   prodottoId: number;
-  /** @minimum 0.01 */
-  quantita: number;
+  quantita: QuantitaContabile;
   /** @minimum 1 */
   versione: number;
   /** @nullable */

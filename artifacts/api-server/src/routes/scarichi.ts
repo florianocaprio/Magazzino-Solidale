@@ -39,6 +39,11 @@ import { withDocumentCodeRetry } from "../lib/documentCode";
 import { isDateOnly } from "../lib/interventiWorkflow";
 import type { LottoSelectionPolicy } from "../lib/lottoPolicy";
 import { canAccessBeneficiarioRecord } from "../lib/beneficiarioPolicy";
+import {
+  InventoryDecimal,
+  InventoryDecimalError,
+  positiveInventoryDecimal,
+} from "../lib/inventoryDecimal";
 
 const router: IRouter = Router();
 
@@ -155,17 +160,25 @@ async function disponibilitaPerScarico(
   magazzinoId: number,
   dataScarico: string,
   policy: LottoSelectionPolicy,
-): Promise<number> {
+): Promise<InventoryDecimal> {
   const disponibilita = await calcolaDisponibilitaMagazzino(
     prodottoId,
     magazzinoId,
     dataScarico,
   );
-  if (policy === "scaduto") return Math.max(0, disponibilita.giacenzaScaduta);
-  if (policy === "qualsiasi") {
-    return Math.max(0, disponibilita.giacenzaFisica - disponibilita.impegnato);
+  let value: InventoryDecimal;
+  if (policy === "scaduto") {
+    value = InventoryDecimal.parse(disponibilita.giacenzaScadutaPrecisa);
+  } else if (policy === "qualsiasi") {
+    value = InventoryDecimal.parse(disponibilita.giacenzaFisicaPrecisa).subtract(
+      InventoryDecimal.parse(disponibilita.impegnatoPreciso),
+    );
+  } else {
+    value = InventoryDecimal.parse(disponibilita.disponibileRealePrecisa, {
+      allowNegative: true,
+    });
   }
-  return Math.max(0, disponibilita.disponibileReale);
+  return value.isNegative() ? InventoryDecimal.zero() : value;
 }
 
 router.get(
@@ -418,7 +431,7 @@ router.post(
 
     const righeInput: Array<{
       prodottoId: number;
-      quantita: number;
+      quantita: string | number;
       unitaMisura: string;
       note?: string;
     }> = body.righe ?? [];
@@ -428,11 +441,14 @@ router.post(
         .json({ error: "Aggiungi almeno un prodotto da scaricare" });
       return;
     }
-    if (righeInput.some((r) => !(r.quantita > 0))) {
-      res
-        .status(400)
-        .json({ error: "Le quantità devono essere maggiori di zero" });
-      return;
+    try {
+      for (const riga of righeInput) positiveInventoryDecimal(riga.quantita);
+    } catch (error) {
+      if (error instanceof InventoryDecimalError) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      throw error;
     }
 
     // Carica unità canonica + nome per i prodotti coinvolti (audit consistente)
@@ -456,11 +472,13 @@ router.post(
     }
 
     // Valida disponibilità per ogni prodotto (somma quantità per prodotto)
-    const richiestaPerProdotto = new Map<number, number>();
+    const richiestaPerProdotto = new Map<number, InventoryDecimal>();
     for (const r of righeInput) {
       richiestaPerProdotto.set(
         r.prodottoId,
-        (richiestaPerProdotto.get(r.prodottoId) ?? 0) + r.quantita,
+        (richiestaPerProdotto.get(r.prodottoId) ?? InventoryDecimal.zero()).add(
+          positiveInventoryDecimal(r.quantita),
+        ),
       );
     }
     const lottoPolicy: LottoSelectionPolicy =
@@ -472,9 +490,9 @@ router.post(
         body.dataScarico,
         lottoPolicy,
       );
-      if (richiesta > disp) {
+      if (richiesta.compare(disp) > 0) {
         res.status(400).json({
-          error: `Disponibilità insufficiente per ${prodottoMap.get(prodottoId)?.nome ?? `prodotto #${prodottoId}`}: ${disp} disponibili, richiesti ${richiesta}`,
+          error: `Disponibilità insufficiente per ${prodottoMap.get(prodottoId)?.nome ?? `prodotto #${prodottoId}`}: ${disp.toCanonical()} disponibili, richiesti ${richiesta.toCanonical()}`,
         });
         return;
       }

@@ -52,11 +52,16 @@ import {
   isLottoDistribuibile,
   lottoDistribuibileCondition,
 } from "./lottoPolicy";
-import { InventoryDecimal } from "./inventoryDecimal";
+import {
+  InventoryDecimal,
+  InventoryDecimalError,
+  positiveInventoryDecimal,
+} from "./inventoryDecimal";
 import {
   ensureDistributionOperation,
   markDistributionOperationReversed,
 } from "./distributionLedger";
+import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 
@@ -233,6 +238,24 @@ export async function quantitaNettaMensileProdotto(
   prodottoId: number,
   referenceDate = new Date(),
 ): Promise<number> {
+  return Number(
+    (
+      await quantitaNettaMensileProdottoPrecisa(
+        tx,
+        beneficiarioId,
+        prodottoId,
+        referenceDate,
+      )
+    ).toCanonical(),
+  );
+}
+
+export async function quantitaNettaMensileProdottoPrecisa(
+  tx: Tx | typeof db,
+  beneficiarioId: number,
+  prodottoId: number,
+  referenceDate = new Date(),
+): Promise<InventoryDecimal> {
   const { start, end } = monthBoundsEuropeRome(referenceDate);
   const [gross] = await tx
     .select({ quantita: sum(speseEmporioRigheTable.quantita) })
@@ -268,12 +291,10 @@ export async function quantitaNettaMensileProdotto(
         lt(speseEmporioTable.dataChiusura, end),
       ),
     );
-  return round2(
-    Math.max(
-      0,
-      parseDbNumber(gross?.quantita) - parseDbNumber(reversed?.quantita),
-    ),
+  const net = InventoryDecimal.parse(gross?.quantita ?? "0").subtract(
+    InventoryDecimal.parse(reversed?.quantita ?? "0"),
   );
+  return net.isNegative() ? InventoryDecimal.zero() : net;
 }
 
 async function validateRigheFinali(
@@ -290,7 +311,7 @@ async function validateRigheFinali(
     .where(inArray(prodottiTable.id, prodottoIds));
   const productMap = new Map(prodotti.map((p) => [p.id, p]));
 
-  const quantityByProduct = new Map<number, number>();
+  const quantityByProduct = new Map<number, InventoryDecimal>();
   for (const riga of righe) {
     const prodotto = productMap.get(riga.prodottoId);
     if (!prodotto || !prodotto.attivo)
@@ -306,10 +327,10 @@ async function validateRigheFinali(
         "L'unità di misura del Prodotto è cambiata: aggiornare il carrello prima della chiusura.",
       );
     }
-    const quantitaRiga = parseDbNumber(riga.quantita);
+    const quantitaRiga = InventoryDecimal.parse(riga.quantita);
     if (
       !quantitaCompatibileConUnitaMisuraEmporio(
-        quantitaRiga,
+        quantitaRiga.toDb(),
         riga.unitaMisura ?? prodotto.unitaMisura,
       )
     ) {
@@ -320,7 +341,9 @@ async function validateRigheFinali(
     }
     quantityByProduct.set(
       riga.prodottoId,
-      (quantityByProduct.get(riga.prodottoId) ?? 0) + quantitaRiga,
+      (quantityByProduct.get(riga.prodottoId) ?? InventoryDecimal.zero()).add(
+        quantitaRiga,
+      ),
     );
   }
 
@@ -329,22 +352,22 @@ async function validateRigheFinali(
     const limitePerSpesa =
       prodotto.quantitaMassimaPerSpesa == null
         ? null
-        : parseDbNumber(prodotto.quantitaMassimaPerSpesa);
+        : InventoryDecimal.parse(prodotto.quantitaMassimaPerSpesa);
     const limiteMensile =
       prodotto.quantitaMassimaMensile == null
         ? null
-        : parseDbNumber(prodotto.quantitaMassimaMensile);
+        : InventoryDecimal.parse(prodotto.quantitaMassimaMensile);
     if (
       limitePerSpesa != null &&
-      limitePerSpesa > 0 &&
-      quantita > limitePerSpesa
+      limitePerSpesa.isPositive() &&
+      quantita.compare(limitePerSpesa) > 0
     ) {
       throw new SpesaEmporioError(
         400,
         "La quantità supera il limite previsto per singola spesa.",
       );
     }
-    const giaDistribuita = await quantitaNettaMensileProdotto(
+    const giaDistribuita = await quantitaNettaMensileProdottoPrecisa(
       tx,
       beneficiarioId,
       prodottoId,
@@ -352,8 +375,8 @@ async function validateRigheFinali(
     );
     if (
       limiteMensile != null &&
-      limiteMensile > 0 &&
-      round2(giaDistribuita + quantita) > limiteMensile
+      limiteMensile.isPositive() &&
+      giaDistribuita.add(quantita).compare(limiteMensile) > 0
     ) {
       throw new SpesaEmporioError(
         400,
@@ -448,6 +471,12 @@ async function scaricaRigaEmporio(
       note: `Bolla Emporio ${opts.numeroBolla}`,
     });
 
+    const dimensions = resolveInventoryQuantityDimensions({
+      quantitaOperativa: take.toDb(),
+      unitaMisura,
+      fattorePartita: locked.fattoreKgLtPezzo,
+    });
+
     await tx.insert(movimentiTable).values({
       tipoMovimento: "scarico",
       tipoDettaglio: "spesa_emporio",
@@ -456,10 +485,9 @@ async function scaricaRigaEmporio(
       prodottoId: opts.riga.prodottoId,
       lottoId: locked.id,
       quantita: take.toDb(),
-      quantitaPezzi: unitaMisura.toLowerCase() === "pz" ? take.toDb() : null,
-      quantitaKgLt: ["kg", "lt", "l"].includes(unitaMisura.toLowerCase())
-        ? take.toDb()
-        : null,
+      quantitaPezzi: dimensions.quantitaPezzi,
+      quantitaKgLt: dimensions.quantitaKgLt,
+      fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
       unitaMisura,
       beneficiarioId: opts.beneficiarioId,
       bollaId: opts.bollaId,
@@ -1095,7 +1123,7 @@ export async function getBollaStampaSpesaEmporio(id: number) {
 export type StornoSpesaEmporioInput = {
   spesaId: number;
   motivo: string;
-  righe?: Array<{ spesaRigaId: number; quantita: number }>;
+  righe?: Array<{ spesaRigaId: number; quantita: string | number }>;
   operatoreId: number | null;
   idempotencyKey?: string | null;
   ip?: string | null;
@@ -1157,16 +1185,19 @@ export async function stornaSpesaEmporio(
       .where(eq(speseEmporioRigheTable.spesaEmporioId, spesa.id))
       .groupBy(speseEmporioStorniRigheTable.spesaRigaId);
     const reversedByRiga = new Map(
-      reversed.map((row) => [row.spesaRigaId, parseDbNumber(row.quantita)]),
+      reversed.map((row) => [
+        row.spesaRigaId,
+        InventoryDecimal.parse(row.quantita ?? "0"),
+      ]),
     );
     const rowById = new Map(righe.map((row) => [row.id, row]));
-    const requested = new Map<number, number>();
+    const requested = new Map<number, InventoryDecimal>();
     if (opts.righe == null) {
       for (const row of righe) {
-        const residual = round2(
-          parseDbNumber(row.quantita) - (reversedByRiga.get(row.id) ?? 0),
+        const residual = InventoryDecimal.parse(row.quantita).subtract(
+          reversedByRiga.get(row.id) ?? InventoryDecimal.zero(),
         );
-        if (residual > 0) requested.set(row.id, residual);
+        if (residual.isPositive()) requested.set(row.id, residual);
       }
     } else {
       for (const input of opts.righe) {
@@ -1176,13 +1207,17 @@ export async function stornaSpesaEmporio(
             "Una riga di Spesa è stata indicata più volte.",
           );
         }
-        if (!Number.isFinite(input.quantita) || input.quantita <= 0) {
+        let quantity: InventoryDecimal;
+        try {
+          quantity = positiveInventoryDecimal(input.quantita);
+        } catch (error) {
+          if (!(error instanceof InventoryDecimalError)) throw error;
           throw new SpesaEmporioError(
             400,
             "Le quantità da stornare devono essere positive.",
           );
         }
-        requested.set(input.spesaRigaId, round2(input.quantita));
+        requested.set(input.spesaRigaId, quantity);
       }
     }
     if (requested.size === 0) {
@@ -1196,17 +1231,18 @@ export async function stornaSpesaEmporio(
     for (const [rowId, quantity] of requested) {
       const row = rowById.get(rowId);
       if (!row) throw new SpesaEmporioError(400, "Riga Spesa non valida.");
-      const residual = round2(
-        parseDbNumber(row.quantita) - (reversedByRiga.get(rowId) ?? 0),
+      const residual = InventoryDecimal.parse(row.quantita).subtract(
+        reversedByRiga.get(rowId) ?? InventoryDecimal.zero(),
       );
-      if (quantity > residual) {
+      if (quantity.compare(residual) > 0) {
         throw new SpesaEmporioError(
           409,
           "La quantità richiesta supera quella ancora stornabile.",
         );
       }
       creditoRestituito = round2(
-        creditoRestituito + parseDbNumber(row.creditoUnitario) * quantity,
+        creditoRestituito +
+          parseDbNumber(row.creditoUnitario) * Number(quantity.toCanonical()),
       );
     }
     if (creditoRestituito <= 0) {
@@ -1271,11 +1307,16 @@ export async function stornaSpesaEmporio(
         );
       }
       const unitaMisura = row.unitaMisura ?? originalMovement.unitaMisura;
+      const dimensions = resolveInventoryQuantityDimensions({
+        quantitaOperativa: quantity.toDb(),
+        unitaMisura,
+        fattorePartita: originalMovement.fattoreKgLtPezzo,
+      });
       await tx
         .update(lottiTable)
         .set({
           quantitaResidua: InventoryDecimal.parse(lotto.quantitaResidua)
-            .add(InventoryDecimal.parse(quantity))
+            .add(quantity)
             .toDb(),
         })
         .where(eq(lottiTable.id, lotto.id));
@@ -1288,13 +1329,15 @@ export async function stornaSpesaEmporio(
           magazzinoId: spesa.magazzinoEmporioId,
           prodottoId: row.prodottoId,
           lottoId: lotto.id,
-          quantita: InventoryDecimal.parse(quantity).toDb(),
+          quantita: quantity.toDb(),
           unitaMisura,
           beneficiarioId: spesa.beneficiarioId,
           bollaId: spesa.bollaId,
           bollaRigaId: row.bollaRigaId,
-          quantitaPezzi: originalMovement.quantitaPezzi,
-          quantitaKgLt: originalMovement.quantitaKgLt,
+          movimentoOrigineId: originalMovement.id,
+          quantitaPezzi: dimensions.quantitaPezzi,
+          quantitaKgLt: dimensions.quantitaKgLt,
+          fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
           fondoOrigine: originalMovement.fondoOrigine,
           naturaContabile: "STORNO",
           dominioOrigine: originalMovement.dominioOrigine,
@@ -1316,9 +1359,9 @@ export async function stornaSpesaEmporio(
       await tx.insert(speseEmporioStorniRigheTable).values({
         stornoId: storno.id,
         spesaRigaId: row.id,
-        quantita: asDecimal(quantity),
+        quantita: quantity.toDb(),
         creditoRestituito: asDecimal(
-          parseDbNumber(row.creditoUnitario) * quantity,
+          parseDbNumber(row.creditoUnitario) * Number(quantity.toCanonical()),
         ),
         movimentoInventarioId: movement.id,
         movimentoInventarioOriginaleId: originalMovement.id,
@@ -1359,16 +1402,16 @@ export async function stornaSpesaEmporio(
       .where(eq(speseEmporioStorniTable.id, storno.id));
 
     const fullyReversed = righe.every((row) => {
-      const residual = round2(
-        parseDbNumber(row.quantita) - (reversedByRiga.get(row.id) ?? 0),
+      const residual = InventoryDecimal.parse(row.quantita).subtract(
+        reversedByRiga.get(row.id) ?? InventoryDecimal.zero(),
       );
-      return round2(residual - (requested.get(row.id) ?? 0)) === 0;
+      return residual
+        .subtract(requested.get(row.id) ?? InventoryDecimal.zero())
+        .isZero();
     });
     const statoSpesa = fullyReversed ? "stornata" : "stornata_parzialmente";
-    if (fullyReversed) {
-      for (const operationId of distributionOperationIds) {
-        await markDistributionOperationReversed(tx, operationId);
-      }
+    for (const operationId of distributionOperationIds) {
+      await markDistributionOperationReversed(tx, operationId);
     }
     await tx
       .update(speseEmporioTable)
@@ -1385,7 +1428,7 @@ export async function stornaSpesaEmporio(
         spesaId: spesa.id,
         righe: [...requested].map(([spesaRigaId, quantita]) => ({
           spesaRigaId,
-          quantita,
+          quantita: quantita.toDb(),
         })),
         creditoRestituito,
       },

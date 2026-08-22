@@ -84,10 +84,11 @@ import {
   stornaScaricoInventariale,
 } from "../lib/scaricoInventory";
 import {
-  calcolaImpegnatoAttivoPerGiacenze,
+  calcolaImpegnatoAttivoPrecisoPerGiacenze,
   disponibilitaMagazzinoKey,
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
+import { ensureDistributionOperation } from "../lib/distributionLedger";
 import {
   createTransferRequest,
   TransferRequestError,
@@ -2333,26 +2334,40 @@ router.get(
         )
         .groupBy(prodottiTable.id)
         .orderBy(asc(prodottiTable.nome));
-      const committed = await calcolaImpegnatoAttivoPerGiacenze(
+      const committed = await calcolaImpegnatoAttivoPrecisoPerGiacenze(
         rows.map((row) => ({ prodottoId: row.prodottoId, magazzinoId })),
       );
       res.json(
         rows.map((row) => {
-          const giacenzaFisica = parseDbNumber(row.giacenzaFisica);
-          const giacenzaDistribuibile = parseDbNumber(
-            row.giacenzaDistribuibile,
+          const giacenzaFisicaPrecisa = InventoryDecimal.parse(
+            row.giacenzaFisica ?? "0",
           );
-          const impegnato =
+          const giacenzaDistribuibilePrecisa = InventoryDecimal.parse(
+            row.giacenzaDistribuibile ?? "0",
+          );
+          const impegnatoPreciso = InventoryDecimal.parse(
             committed.get(
               disponibilitaMagazzinoKey(row.prodottoId, magazzinoId),
-            ) ?? 0;
+            ) ?? "0",
+          );
+          const netto = giacenzaDistribuibilePrecisa.subtract(impegnatoPreciso);
+          const disponibileRealePreciso = netto.isNegative()
+            ? InventoryDecimal.zero()
+            : netto;
           return {
             ...row,
-            quantita: Math.max(0, giacenzaDistribuibile - impegnato),
-            giacenzaFisica,
-            giacenzaDistribuibile,
-            impegnato,
-            disponibileReale: Math.max(0, giacenzaDistribuibile - impegnato),
+            quantita: Number(disponibileRealePreciso.toCanonical()),
+            quantitaPrecisa: disponibileRealePreciso.toDb(),
+            giacenzaFisica: Number(giacenzaFisicaPrecisa.toCanonical()),
+            giacenzaFisicaPrecisa: giacenzaFisicaPrecisa.toDb(),
+            giacenzaDistribuibile: Number(
+              giacenzaDistribuibilePrecisa.toCanonical(),
+            ),
+            giacenzaDistribuibilePrecisa: giacenzaDistribuibilePrecisa.toDb(),
+            impegnato: Number(impegnatoPreciso.toCanonical()),
+            impegnatoPreciso: impegnatoPreciso.toDb(),
+            disponibileReale: Number(disponibileRealePreciso.toCanonical()),
+            disponibileRealePrecisa: disponibileRealePreciso.toDb(),
           };
         }),
       );
@@ -2397,21 +2412,30 @@ router.post(
         : [];
       if (!righe.length)
         throw new MensaError(400, "Indicare almeno un prodotto");
-      const normalized = righe.map((row: Record<string, unknown>) => ({
-        prodottoId: positiveInt(row.prodottoId, "prodottoId"),
-        quantita: Number(row.quantita),
-        unitaMisura:
-          row.unitaMisura == null
-            ? null
-            : text(row.unitaMisura, "L'unità di misura", 20),
-        note: optionalText(row.note, "Le note", 1000),
-      }));
-      if (
-        normalized.some(
-          (row) => !Number.isFinite(row.quantita) || row.quantita <= 0,
-        )
-      )
-        throw new MensaError(400, "Le quantità devono essere maggiori di zero");
+      const normalized = righe.map((row: Record<string, unknown>) => {
+        let quantity: InventoryDecimal;
+        try {
+          if (
+            typeof row.quantita !== "string" &&
+            typeof row.quantita !== "number"
+          ) {
+            throw new InventoryDecimalError("Formato quantità non valido");
+          }
+          quantity = positiveInventoryDecimal(row.quantita);
+        } catch (error) {
+          if (!(error instanceof InventoryDecimalError)) throw error;
+          throw new MensaError(400, error.message);
+        }
+        return {
+          prodottoId: positiveInt(row.prodottoId, "prodottoId"),
+          quantita: quantity.toDb(),
+          unitaMisura:
+            row.unitaMisura == null
+              ? null
+              : text(row.unitaMisura, "L'unità di misura", 20),
+          note: optionalText(row.note, "Le note", 1000),
+        };
+      });
       const [replay] = await db
         .select({
           id: trasferimentiTable.id,
@@ -2937,6 +2961,7 @@ router.post(
           .select({
             giornata: mensaGiornateServizioTable,
             areaOperativaId: menseTable.areaOperativaId,
+            magazzinoId: menseTable.magazzinoId,
           })
           .from(mensaGiornateServizioTable)
           .innerJoin(
@@ -3037,6 +3062,16 @@ router.post(
           perFasciaEta: countBy(meals.map((meal) => meal.fasciaEta)),
           ...consumptionBreakdown,
         };
+        await ensureDistributionOperation(tx, {
+          magazzinoId: current.magazzinoId,
+          dataDistribuzione: current.giornata.dataServizio,
+          canaleOperativo: "MENSA",
+          dominioOrigine: "MENSA",
+          entitaOrigineTipo: "mensa_giornata_servizio",
+          entitaOrigineId: id,
+          numeroPasti: snapshot.pasti,
+          creatoDa: req.user!.id,
+        });
         const [updated] = await tx
           .update(mensaGiornateServizioTable)
           .set({

@@ -1,6 +1,6 @@
 # Magazzino 2.0A — Impact Map
 
-Baseline verificata: `main` / `7466afa04d5fedafe7ee35fbf35ab64e34a471b0`.
+Baseline R1 verificata: `feature/magazzino-2-0` / `3cdb26eeab5cc97a47686d7f88474c355d6b79f9`.
 Branch di lavoro: `feature/magazzino-2-0`.
 
 ## Architettura e fonte contabile
@@ -56,12 +56,11 @@ Consumatori e collegamenti:
 
 ## Precisione
 
-I percorsi contabili usano oggi `numeric(10,2)`, `Number`, `parseFloat` e
-`toFixed(2)`. La migration deve ampliare almeno `lotti`, `movimenti`, righe di
-carico, prenotazioni, bolle/trasferimenti/scarichi e righe operative collegate a
-`numeric(14,6)`. I fattori usano `numeric(18,9)`. I nuovi contratti espongono i
-decimali come stringhe; i DTO legacy numerici restano compatibili dove non è
-possibile cambiarli senza rotture.
+I percorsi contabili usano quantità `numeric(14,6)` e fattori `numeric(18,9)`.
+La R1 allinea anche schema Drizzle, prenotazioni, scorte/limiti, Cassa Emporio e
+storni parziali. Somme e confronti decisivi usano fixed-point; i contratti di
+scrittura espongono stringhe decimali. I DTO numerici legacy restano alias di
+visualizzazione e non sono fonti per decisioni inventariali.
 
 ## Fondo e provenienza
 
@@ -79,8 +78,9 @@ possibile cambiarli senza rotture.
   `GET /carichi/{id}/righe`.
 - `POST /lotti` resta compatibility layer e usa il service multi-riga.
 - `PATCH /lotti/{id}` resta metadata-only; quantità e Fondo non sono ammessi.
-- `GET /lotti`, `GET /movimenti` e `GET /giacenze` ricevono filtri Fondo e
-  provenienza; `fsePlusOnly=true` equivale a `FSE_PLUS`.
+- `GET /lotti` usa `origineCaricoPresente` con semantica esistenziale;
+  `GET /giacenze` non filtra per provenienza perché aggrega Partite che possono
+  ricevere più Carichi. Fondo e `fsePlusOnly=true` restano filtri contabili.
 - `openapi.yaml` è la fonte dei client Orval; i file generati non saranno
   modificati manualmente.
 - `lotti.tsx` evolve in “Carichi e Lotti” con viste Carichi, Partite/Lotti e In
@@ -119,5 +119,10 @@ possibile cambiarli senza rotture.
   separati e il POST legacy viene adattato.
 - `LEGACY_COMPATIBILITY`: righe storiche ambigue possono avere lineage nullo e
   natura `LEGACY`; nessun dato storico viene inventato.
+- `LEGACY_COMPATIBILITY`: una sola Partita legacy compatibile viene adottata;
+  più candidate bloccano la scrittura senza fusione automatica.
+- `CONCURRENCY_RISK`: idempotenza Carico e operazione distribuzione sono
+  serializzate con advisory lock; il lifecycle è riconciliato dalle quantità
+  originali e compensate, impedendo over-storno.
 - `EXTERNAL_FORMAT_UNVERIFIED`: nessun parser/export/mapping AGEA viene
   implementato nel ciclo 2.0A.

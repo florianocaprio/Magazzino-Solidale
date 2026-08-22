@@ -574,7 +574,7 @@ function AggiungiProdottoDialog({
         data: {
           prodottoId: parseInt(prodottoId),
           lottoId: lottoId ? parseInt(lottoId) : undefined,
-          quantita: quantitaNum,
+          quantita,
           unitaMisura,
         },
       },
@@ -661,7 +661,7 @@ function AggiungiProdottoDialog({
               <Input
                 type="number"
                 min="0.01"
-                step="0.01"
+                step="0.000001"
                 max={maxDisponibile || undefined}
                 value={quantita}
                 onChange={e => setQuantita(e.target.value)}

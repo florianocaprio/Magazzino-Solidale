@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { QuantitaContabile } from './quantitaContabile';
 
 export interface MensaGiacenza {
   prodottoId: number;
@@ -12,8 +13,13 @@ export interface MensaGiacenza {
   nome: string;
   unitaMisura: string;
   quantita: number;
+  quantitaPrecisa?: QuantitaContabile;
   giacenzaFisica: number;
+  giacenzaFisicaPrecisa?: QuantitaContabile;
   giacenzaDistribuibile: number;
+  giacenzaDistribuibilePrecisa?: QuantitaContabile;
   impegnato: number;
+  impegnatoPreciso?: QuantitaContabile;
   disponibileReale: number;
+  disponibileRealePrecisa?: QuantitaContabile;
 }

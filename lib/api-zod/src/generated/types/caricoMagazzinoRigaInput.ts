@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { FattoreContabile } from './fattoreContabile';
 import type { FondoOrigine } from './fondoOrigine';
 import type { QuantitaContabile } from './quantitaContabile';
 
@@ -16,8 +17,7 @@ export interface CaricoMagazzinoRigaInput {
   unitaMisuraOperativa?: string;
   quantitaPezzi?: QuantitaContabile | null;
   quantitaKgLt?: QuantitaContabile | null;
-  /** @nullable */
-  fattoreKgLtPezzo?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
   /** @nullable */
   codiceLotto?: string | null;
   /** @nullable */

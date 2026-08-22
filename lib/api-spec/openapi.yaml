@@ -131,12 +131,6 @@ paths:
             schema:
               $ref: "#/components/schemas/MagazzinoInput"
       responses:
-        "200":
-          description: Replay idempotente di un carico già contabilizzato
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CaricoMagazzinoDettaglio"
         "201":
           description: Created
           content:
@@ -367,6 +361,12 @@ paths:
             schema:
               $ref: "#/components/schemas/CaricoMagazzinoInput"
       responses:
+        "200":
+          description: Replay idempotente verificato per contenuto e Magazzino
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoMagazzinoDettaglio"
         "201":
           description: Carico multi-riga contabilizzato atomicamente
           content:
@@ -432,8 +432,11 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/FondoOrigine"
-        - name: provenienza
+        - name: origineCaricoPresente
           in: query
+          description: >-
+            Restituisce Partite alimentate almeno una volta da questa origine.
+            Non attribuisce la quantità residua alla provenienza selezionata.
           schema:
             $ref: "#/components/schemas/OrigineCarico"
       responses:
@@ -479,6 +482,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Lotto"
+    patch:
+      operationId: updateLotto
+      tags: [lotti]
+      summary: Aggiorna esclusivamente le note non identificative della Partita
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LottoUpdate"
+      responses:
+        "200":
+          description: Note aggiornate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lotto"
 
   /lotti/{id}/rettifica:
     post:
@@ -500,28 +526,6 @@ paths:
       responses:
         "200":
           description: Lot adjusted and movement appended
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Lotto"
-    patch:
-      operationId: updateLotto
-      tags: [lotti]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LottoUpdate"
-      responses:
-        "200":
-          description: Updated
           content:
             application/json:
               schema:
@@ -608,10 +612,6 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/FondoOrigine"
-        - name: provenienza
-          in: query
-          schema:
-            $ref: "#/components/schemas/OrigineCarico"
         - name: scadenzaDa
           in: query
           schema: { type: string, format: date }
@@ -7655,11 +7655,26 @@ components:
           LEGACY,
         ]
 
+    OrigineCaricoManuale:
+      type: string
+      description: Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.
+      enum: [RACCOLTA_ALIMENTARE, DONAZIONE, ACQUISTO, FORNITORE, ALTRO]
+
     QuantitaContabile:
       type: string
       pattern: "^[0-9]+(?:\\.[0-9]{1,6})?$"
       example: "53.593120"
       description: Decimale esatto; non convertire in number JavaScript per i calcoli.
+
+    QuantitaContabileConSegno:
+      type: string
+      pattern: "^-?[0-9]+(?:\\.[0-9]{1,6})?$"
+      description: Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.
+
+    FattoreContabile:
+      type: string
+      pattern: "^[0-9]+(?:\\.[0-9]{1,9})?$"
+      description: Fattore Kg/Lt per pezzo esatto, positivo, scala massima 9.
 
     CaricoMagazzino:
       type: object
@@ -7706,7 +7721,10 @@ components:
           oneOf:
             - $ref: "#/components/schemas/QuantitaContabile"
             - type: "null"
-        fattoreKgLtPezzo: { type: [string, "null"] }
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
         codiceLottoOriginale: { type: [string, "null"] }
         codiceLotto: { type: [string, "null"] }
         codiceLottoNormalizzato: { type: [string, "null"] }
@@ -7761,7 +7779,10 @@ components:
           oneOf:
             - $ref: "#/components/schemas/QuantitaContabile"
             - type: "null"
-        fattoreKgLtPezzo: { type: [string, "null"] }
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
         codiceLotto: { type: [string, "null"] }
         dataScadenza: { type: [string, "null"], format: date }
         descrizioneEsterna: { type: [string, "null"] }
@@ -7774,7 +7795,7 @@ components:
       properties:
         magazzinoId: { type: integer, minimum: 1 }
         origineCarico:
-          $ref: "#/components/schemas/OrigineCarico"
+          $ref: "#/components/schemas/OrigineCaricoManuale"
         numeroDocumento: { type: [string, "null"] }
         dataDocumento: { type: [string, "null"], format: date }
         dataCarico: { type: string, format: date }
@@ -7884,22 +7905,16 @@ components:
 
     LottoUpdate:
       type: object
+      additionalProperties: false
       properties:
-        codiceLotto:
-          type: string
-        dataScadenza:
-          type: string
-        documentoCarico:
-          type: string
         note:
-          type: string
+          type: [string, "null"]
 
     RettificaLottoInput:
       type: object
       properties:
         delta:
-          type: number
-          not: { const: 0 }
+          $ref: "#/components/schemas/QuantitaContabileConSegno"
         causale:
           type: string
           enum: [inventario_fisico, errore_registrazione, deterioramento, altro]
@@ -7939,6 +7954,10 @@ components:
           type: [string, "null"]
         quantitaKgLt:
           type: [string, "null"]
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
         unitaMisura:
           type: string
         fornitoreId:
@@ -8066,10 +8085,16 @@ components:
           $ref: "#/components/schemas/QuantitaContabile"
         impegnato:
           type: number
+        impegnatoPreciso:
+          $ref: "#/components/schemas/QuantitaContabile"
         disponibileReale:
           type: number
+        disponibileRealePrecisa:
+          $ref: "#/components/schemas/QuantitaContabileConSegno"
         scortaMinima:
           type: number
+        scortaMinimaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         scortaConsigliata:
           type: number
         sottoscorta:
@@ -8093,6 +8118,11 @@ components:
           giacenzaDistribuibile,
           impegnato,
           disponibileReale,
+          quantitaPrecisa,
+          giacenzaFisicaPrecisa,
+          giacenzaDistribuibilePrecisa,
+          impegnatoPreciso,
+          disponibileRealePrecisa,
           scortaMinima,
           scortaConsigliata,
           sottoscorta,
@@ -8314,7 +8344,7 @@ components:
         lottoId:
           type: integer
         quantita:
-          type: number
+          $ref: "#/components/schemas/QuantitaContabile"
         unitaMisura:
           type: string
           description: >-
@@ -8419,7 +8449,7 @@ components:
         prodottoId:
           type: integer
         quantita:
-          type: number
+          $ref: "#/components/schemas/QuantitaContabile"
         unitaMisura:
           type: string
         note:
@@ -12318,9 +12348,7 @@ components:
         prodottoId:
           type: integer
         quantita:
-          type: number
-          minimum: 0.01
-          multipleOf: 0.01
+          $ref: "#/components/schemas/QuantitaContabile"
         versione:
           type: integer
           minimum: 1
@@ -12332,9 +12360,7 @@ components:
       type: object
       properties:
         quantita:
-          type: number
-          minimum: 0.01
-          multipleOf: 0.01
+          $ref: "#/components/schemas/QuantitaContabile"
         versione:
           type: integer
           minimum: 1
@@ -13031,7 +13057,7 @@ components:
         lottoId:
           type: integer
         quantita:
-          type: number
+          $ref: "#/components/schemas/QuantitaContabile"
         unitaMisura:
           type: string
         note:
@@ -14014,10 +14040,20 @@ components:
         nome: { type: string }
         unitaMisura: { type: string }
         quantita: { type: number }
+        quantitaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         giacenzaFisica: { type: number }
+        giacenzaFisicaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         giacenzaDistribuibile: { type: number }
+        giacenzaDistribuibilePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         impegnato: { type: number }
+        impegnatoPreciso:
+          $ref: "#/components/schemas/QuantitaContabile"
         disponibileReale: { type: number }
+        disponibileRealePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
 
     MensaConsumoInput:
       type: object
@@ -14036,7 +14072,8 @@ components:
         dataServizio: { type: string, format: date }
         tipoServizio: { type: string, enum: [pranzo, cena] }
         prodottoId: { type: integer }
-        quantita: { type: number, exclusiveMinimum: 0 }
+        quantita:
+          $ref: "#/components/schemas/QuantitaContabile"
         causale: { type: string, enum: [consumo, scarto] }
         note: { type: [string, "null"], maxLength: 2000 }
         idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
@@ -14191,7 +14228,8 @@ components:
             required: [prodottoId, quantita]
             properties:
               prodottoId: { type: integer }
-              quantita: { type: number, exclusiveMinimum: 0 }
+              quantita:
+                $ref: "#/components/schemas/QuantitaContabile"
               unitaMisura:
                 type: string
                 description: >-

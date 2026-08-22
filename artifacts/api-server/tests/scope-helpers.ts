@@ -457,8 +457,8 @@ export async function createLotto(
       magazzinoId: opts.magazzinoId,
       dataCarico: "2026-01-01",
       dataScadenza: opts.dataScadenza ?? null,
-      quantitaCaricata: opts.quantita.toFixed(2),
-      quantitaResidua: opts.quantita.toFixed(2),
+      quantitaCaricata: opts.quantita.toFixed(6),
+      quantitaResidua: opts.quantita.toFixed(6),
       fornitoreId: opts.fsePlus ? null : (opts.fornitoreId ?? null),
       fsePlus: opts.fsePlus ?? false,
       fondoOrigine: opts.fsePlus ? "FSE_PLUS" : "NESSUN_FONDO",
@@ -602,7 +602,7 @@ export async function insertBollaRiga(
       bollaId: opts.bollaId,
       prodottoId: opts.prodottoId,
       lottoId: opts.lottoId ?? null,
-      quantita: opts.quantita.toFixed(2),
+      quantita: opts.quantita.toFixed(6),
       unitaMisura: opts.unitaMisura ?? "kg",
     })
     .returning({ id: bollaRigheTable.id });
@@ -629,7 +629,7 @@ export async function insertPrenotazioneMagazzino(
       prodottoId: opts.prodottoId,
       lottoId: opts.lottoId,
       magazzinoId: opts.magazzinoId,
-      quantita: opts.quantita.toFixed(2),
+      quantita: opts.quantita.toFixed(6),
       stato: opts.stato ?? "attiva",
     })
     .returning({ id: prenotazioniMagazzinoTable.id });

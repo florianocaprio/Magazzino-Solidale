@@ -8,6 +8,10 @@ const migrationUrl = new URL(
   "../../../lib/db/updates/20260822_magazzino_2_0a.sql",
   import.meta.url,
 );
+const r1MigrationUrl = new URL(
+  "../../../lib/db/updates/20260822_magazzino_2_0a_r1.sql",
+  import.meta.url,
+);
 
 afterAll(async () => {
   await pool.end();
@@ -16,7 +20,9 @@ afterAll(async () => {
 describe("migration progressiva Magazzino 2.0A", () => {
   it("è additiva, ripetibile e conserva le cardinalità business", async () => {
     const migrationSql = await readFile(migrationUrl, "utf8");
+    const r1MigrationSql = await readFile(r1MigrationUrl, "utf8");
     expect(migrationSql).not.toMatch(/\b(?:DELETE|TRUNCATE)\b/i);
+    expect(r1MigrationSql).not.toMatch(/\b(?:DELETE|TRUNCATE)\b/i);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -28,6 +34,8 @@ describe("migration progressiva Magazzino 2.0A", () => {
       `);
       await client.query(migrationSql);
       await client.query(migrationSql);
+      await client.query(r1MigrationSql);
+      await client.query(r1MigrationSql);
       const after = await client.query(`
         SELECT
           (SELECT count(*)::int FROM lotti) AS lotti,
@@ -75,10 +83,19 @@ describe("migration progressiva Magazzino 2.0A", () => {
           ('lotti', 'codice_lotto_normalizzato'),
           ('movimenti', 'natura_contabile'),
           ('movimenti', 'operazione_distribuzione_id'),
-          ('movimenti', 'carico_magazzino_riga_id')
+          ('movimenti', 'carico_magazzino_riga_id'),
+          ('movimenti', 'fattore_kg_lt_pezzo'),
+          ('carichi_magazzino', 'request_hash')
         )
       `);
-      expect(requiredColumns.rows[0].count).toBe(5);
+      expect(requiredColumns.rows[0].count).toBe(7);
+      const states = await client.query<{ definition: string }>(`
+        SELECT pg_get_constraintdef(oid) AS definition
+        FROM pg_constraint
+        WHERE conrelid = 'public.operazioni_distribuzione_magazzino'::regclass
+          AND conname = 'operazioni_distribuzione_stato_check'
+      `);
+      expect(states.rows[0].definition).toContain("parzialmente_stornata");
       await client.query("ROLLBACK");
     } catch (error) {
       await client.query("ROLLBACK");

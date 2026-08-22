@@ -7,8 +7,6 @@
  */
 
 export interface LottoUpdate {
-  codiceLotto?: string;
-  dataScadenza?: string;
-  documentoCarico?: string;
-  note?: string;
+  /** @nullable */
+  note?: string | null;
 }

@@ -24,6 +24,7 @@ import {
   markDistributionOperationReversed,
   type DistributionOperationInput,
 } from "./distributionLedger";
+import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
 
 export type InventoryTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
@@ -149,6 +150,11 @@ async function scaricaRigaFefo(
       .update(lottiTable)
       .set({ quantitaResidua: residua.subtract(prelievo).toDb() })
       .where(eq(lottiTable.id, lotto.id));
+    const dimensions = resolveInventoryQuantityDimensions({
+      quantitaOperativa: prelievo.toDb(),
+      unitaMisura: riga.unitaMisura,
+      fattorePartita: lotto.fattoreKgLtPezzo,
+    });
     await tx.insert(movimentiTable).values({
       tipoMovimento: "scarico",
       tipoDettaglio: input.causale,
@@ -157,11 +163,9 @@ async function scaricaRigaFefo(
       prodottoId: riga.prodottoId,
       lottoId: lotto.id,
       quantita: prelievo.toDb(),
-      quantitaPezzi:
-        riga.unitaMisura.toLowerCase() === "pz" ? prelievo.toDb() : null,
-      quantitaKgLt: ["kg", "lt", "l"].includes(riga.unitaMisura.toLowerCase())
-        ? prelievo.toDb()
-        : null,
+      quantitaPezzi: dimensions.quantitaPezzi,
+      quantitaKgLt: dimensions.quantitaKgLt,
+      fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
       unitaMisura: riga.unitaMisura,
       beneficiarioId: input.beneficiarioId ?? null,
       operatoreId: input.operatoreId,
@@ -328,6 +332,7 @@ export async function stornaScaricoInventariale(
       quantita: quantity.toDb(),
       quantitaPezzi: movement.quantitaPezzi,
       quantitaKgLt: movement.quantitaKgLt,
+      fattoreKgLtPezzo: movement.fattoreKgLtPezzo,
       unitaMisura: movement.unitaMisura,
       movimentoOrigineId: movement.id,
       fondoOrigine: movement.fondoOrigine,

@@ -30,7 +30,7 @@ export const operazioniDistribuzioneMagazzinoTable = pgTable(
     numeroPasti: integer("numero_pasti"),
     indigentiSaltuari: integer("indigenti_saltuari"),
     indigentiContinuativi: integer("indigenti_continuativi"),
-    stato: varchar("stato", { length: 20 }).notNull().default("confermata"),
+    stato: varchar("stato", { length: 30 }).notNull().default("confermata"),
     creatoDa: integer("creato_da")
       .notNull()
       .references(() => utentiTable.id),
@@ -51,7 +51,7 @@ export const operazioniDistribuzioneMagazzinoTable = pgTable(
     index("operazioni_distribuzione_canale_idx").on(table.canaleOperativo),
     check(
       "operazioni_distribuzione_stato_check",
-      sql`${table.stato} in ('confermata', 'stornata')`,
+      sql`${table.stato} in ('confermata', 'parzialmente_stornata', 'stornata')`,
     ),
     check(
       "operazioni_distribuzione_conteggi_check",

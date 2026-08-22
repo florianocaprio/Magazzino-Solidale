@@ -1,8 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
-  carichiMagazzinoRigheTable,
-  carichiMagazzinoTable,
   FONDI_ORIGINE,
   lottiTable,
   prodottiTable,
@@ -17,12 +15,13 @@ import {
   magazzinoScopeFilter,
 } from "../lib/centroScope";
 import {
-  calcolaImpegnatoAttivoPerGiacenze,
+  calcolaImpegnatoAttivoPrecisoPerGiacenze,
   disponibilitaMagazzinoKey,
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
 import { requirePermission } from "../middlewares/auth";
 import { dataOperativaEuropeRome } from "../lib/lottoPolicy";
+import { InventoryDecimal } from "../lib/inventoryDecimal";
 
 const router: IRouter = Router();
 
@@ -36,7 +35,6 @@ router.get(
       sottoscortaOnly,
       fsePlusOnly,
       fondoOrigine,
-      provenienza,
       scadenzaDa,
       scadenzaA,
     } = req.query as Record<string, string>;
@@ -54,15 +52,6 @@ router.get(
         return;
       }
       conditions.push(eq(lottiTable.fondoOrigine, fondoOrigine));
-    }
-    if (provenienza) {
-      conditions.push(sql`exists (
-      select 1
-      from ${carichiMagazzinoRigheTable} cr
-      join ${carichiMagazzinoTable} c on c.id = cr.carico_magazzino_id
-      where cr.lotto_id = ${lottiTable.id}
-        and c.origine_carico = ${provenienza}
-    )`);
     }
     if (scadenzaDa)
       conditions.push(sql`${lottiTable.dataScadenza} >= ${scadenzaDa}`);
@@ -104,7 +93,7 @@ router.get(
       .groupBy(prodottiTable.id, magazziniTable.id)
       .orderBy(prodottiTable.nome);
 
-    const impegnatoByKey = await calcolaImpegnatoAttivoPerGiacenze(
+    const impegnatoByKey = await calcolaImpegnatoAttivoPrecisoPerGiacenze(
       rows.map((r) => ({
         prodottoId: r.prodottoId,
         magazzinoId: r.magazzinoId,
@@ -112,15 +101,27 @@ router.get(
     );
 
     const result = rows.map((r) => {
-      const giacenzaFisica = parseDbNumber(r.quantitaTotale);
+      const giacenzaFisicaPrecisa = InventoryDecimal.parse(
+        r.quantitaTotale ?? "0",
+      );
+      const giacenzaFisica = parseDbNumber(giacenzaFisicaPrecisa.toDb());
       const giacenzaScaduta = parseDbNumber(r.giacenzaScaduta);
       const giacenzaDistribuibile = parseDbNumber(r.giacenzaDistribuibile);
-      const impegnato =
+      const impegnatoPreciso = InventoryDecimal.parse(
         impegnatoByKey.get(
           disponibilitaMagazzinoKey(r.prodottoId, r.magazzinoId),
-        ) ?? 0;
-      const sm = parseDbNumber(r.scortaMinima);
-      const disponibileReale = giacenzaDistribuibile - impegnato;
+        ) ?? "0",
+      );
+      const giacenzaDistribuibilePrecisa = InventoryDecimal.parse(
+        r.giacenzaDistribuibile ?? "0",
+      );
+      const disponibileRealePreciso = giacenzaDistribuibilePrecisa.subtract(
+        impegnatoPreciso,
+      );
+      const scortaMinimaPrecisa = InventoryDecimal.parse(r.scortaMinima ?? "0");
+      const impegnato = parseDbNumber(impegnatoPreciso.toDb());
+      const sm = parseDbNumber(scortaMinimaPrecisa.toDb());
+      const disponibileReale = parseDbNumber(disponibileRealePreciso.toDb());
       return {
         prodottoId: r.prodottoId,
         prodottoNome: r.prodottoNome,
@@ -130,18 +131,23 @@ router.get(
         magazzinoId: r.magazzinoId,
         magazzinoNome: r.magazzinoNome,
         quantitaTotale: giacenzaFisica,
-        quantitaTotalePrecisa: r.quantitaTotale ?? "0.000000",
+        quantitaTotalePrecisa: giacenzaFisicaPrecisa.toDb(),
         giacenzaFisica,
-        giacenzaFisicaPrecisa: r.quantitaTotale ?? "0.000000",
+        giacenzaFisicaPrecisa: giacenzaFisicaPrecisa.toDb(),
         giacenzaScaduta,
-        giacenzaScadutaPrecisa: r.giacenzaScaduta,
+        giacenzaScadutaPrecisa: InventoryDecimal.parse(
+          r.giacenzaScaduta ?? "0",
+        ).toDb(),
         giacenzaDistribuibile,
-        giacenzaDistribuibilePrecisa: r.giacenzaDistribuibile,
+        giacenzaDistribuibilePrecisa: giacenzaDistribuibilePrecisa.toDb(),
         impegnato,
+        impegnatoPreciso: impegnatoPreciso.toDb(),
         disponibileReale,
+        disponibileRealePrecisa: disponibileRealePreciso.toDb(),
         scortaMinima: sm,
+        scortaMinimaPrecisa: scortaMinimaPrecisa.toDb(),
         scortaConsigliata: parseDbNumber(r.scortaConsigliata),
-        sottoscorta: disponibileReale <= sm,
+        sottoscorta: disponibileRealePreciso.compare(scortaMinimaPrecisa) <= 0,
         lottiAttivi: Number(r.lottiAttivi),
         prossimaScadenza: r.prossimaScadenza ?? null,
       };

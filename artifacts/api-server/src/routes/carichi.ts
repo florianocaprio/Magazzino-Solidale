@@ -8,6 +8,7 @@ import {
   magazziniTable,
   prodottiTable,
   ORIGINI_CARICO,
+  ORIGINI_CARICO_MANUALI,
   type OrigineCarico,
 } from "@workspace/db";
 import { and, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
@@ -23,6 +24,8 @@ import {
   InventoryLedgerError,
   type WarehouseLoadResult,
 } from "../lib/inventoryLedger";
+import { InventoryDecimal } from "../lib/inventoryDecimal";
+import { canonicalInventoryFactor } from "../lib/inventoryQuantityDimensions";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 
@@ -30,8 +33,9 @@ const router: IRouter = Router();
 router.use("/carichi", requireModulo("LOTTI"));
 
 function caricoJson(result: WarehouseLoadResult) {
+  const { requestHash: _requestHash, ...publicCarico } = result.carico;
   return {
-    ...result.carico,
+    ...publicCarico,
     dataCreazione: result.carico.dataCreazione.toISOString(),
     replay: result.replay,
     righe: result.righe.map(({ riga, lotto, prodottoNome }) => ({
@@ -40,10 +44,29 @@ function caricoJson(result: WarehouseLoadResult) {
       prodottoNome: prodottoNome ?? null,
       codiceLotto: lotto.codiceLotto,
       codiceLottoNormalizzato: lotto.codiceLottoNormalizzato,
-      partitaQuantitaCaricata: lotto.quantitaCaricata,
-      partitaQuantitaResidua: lotto.quantitaResidua,
+      quantitaOperativa: InventoryDecimal.parse(riga.quantitaOperativa).toDb(),
+      quantitaPezzi:
+        riga.quantitaPezzi == null
+          ? null
+          : InventoryDecimal.parse(riga.quantitaPezzi).toDb(),
+      quantitaKgLt:
+        riga.quantitaKgLt == null
+          ? null
+          : InventoryDecimal.parse(riga.quantitaKgLt).toDb(),
+      fattoreKgLtPezzo: canonicalInventoryFactor(riga.fattoreKgLtPezzo),
+      partitaQuantitaCaricata: InventoryDecimal.parse(
+        lotto.quantitaCaricata,
+      ).toDb(),
+      partitaQuantitaResidua: InventoryDecimal.parse(
+        lotto.quantitaResidua,
+      ).toDb(),
     })),
   };
+}
+
+function publicCaricoRow(carico: typeof carichiMagazzinoTable.$inferSelect) {
+  const { requestHash: _requestHash, ...publicCarico } = carico;
+  return publicCarico;
 }
 
 async function getCarico(id: number): Promise<WarehouseLoadResult | null> {
@@ -143,7 +166,7 @@ router.get(
 
     res.json(
       rows.map((row) => ({
-        ...row.carico,
+        ...publicCaricoRow(row.carico),
         magazzinoNome: row.magazzinoNome,
         fornitoreNome: row.fornitoreNome,
         numeroRighe: row.numeroRighe,
@@ -170,6 +193,16 @@ router.post(
       return;
     }
     if (
+      !ORIGINI_CARICO_MANUALI.includes(
+        body.origineCarico as (typeof ORIGINI_CARICO_MANUALI)[number],
+      )
+    ) {
+      res.status(403).json({
+        error: "Provenienza riservata a un processo interno di sistema",
+      });
+      return;
+    }
+    if (
       !(await canAccessMagazzino(
         body.magazzinoId,
         callerCentroId(req),
@@ -193,6 +226,7 @@ router.post(
           fornitoreId: body.fornitoreId,
           note: body.note,
           idempotencyKey: body.idempotencyKey,
+          executionContext: "manual",
           creatoDa: req.user!.id,
           righe: body.righe,
         }),

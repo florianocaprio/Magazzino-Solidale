@@ -138,6 +138,7 @@ router.get(
         quantitaPrecisa: r.mov.quantita,
         quantitaPezzi: r.mov.quantitaPezzi,
         quantitaKgLt: r.mov.quantitaKgLt,
+        fattoreKgLtPezzo: r.mov.fattoreKgLtPezzo,
         unitaMisura: r.mov.unitaMisura,
         fornitoreId: r.mov.fornitoreId ?? null,
         beneficiarioId: r.mov.beneficiarioId ?? null,

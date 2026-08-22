@@ -21,6 +21,21 @@ export const ORIGINI_CARICO = [
 
 export type OrigineCarico = (typeof ORIGINI_CARICO)[number];
 
+export const ORIGINI_CARICO_MANUALI = [
+  "RACCOLTA_ALIMENTARE",
+  "DONAZIONE",
+  "ACQUISTO",
+  "FORNITORE",
+  "ALTRO",
+] as const satisfies readonly OrigineCarico[];
+
+export const ORIGINI_CARICO_RISERVATE = [
+  "AGEA_SIFEAD",
+  "RETTIFICA_INVENTARIO",
+  "SALDO_INIZIALE",
+  "LEGACY",
+] as const satisfies readonly OrigineCarico[];
+
 export const NATURE_CONTABILI = [
   "CARICO",
   "DISTRIBUZIONE_FINALE",

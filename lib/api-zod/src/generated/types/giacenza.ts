@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { QuantitaContabile } from './quantitaContabile';
+import type { QuantitaContabileConSegno } from './quantitaContabileConSegno';
 
 export interface Giacenza {
   prodottoId: number;
@@ -23,12 +24,15 @@ export interface Giacenza {
   giacenzaScaduta: number;
   /** Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome. */
   giacenzaDistribuibile: number;
-  giacenzaFisicaPrecisa?: QuantitaContabile;
+  giacenzaFisicaPrecisa: QuantitaContabile;
   giacenzaScadutaPrecisa?: QuantitaContabile;
-  giacenzaDistribuibilePrecisa?: QuantitaContabile;
+  giacenzaDistribuibilePrecisa: QuantitaContabile;
   impegnato: number;
+  impegnatoPreciso: QuantitaContabile;
   disponibileReale: number;
+  disponibileRealePrecisa: QuantitaContabileConSegno;
   scortaMinima: number;
+  scortaMinimaPrecisa?: QuantitaContabile;
   scortaConsigliata: number;
   sottoscorta: boolean;
   lottiAttivi: number;

@@ -13,25 +13,29 @@
 - L'**Operazione distribuzione** raccoglie sorgente, magazzino, data, canale e statistiche dell'evento. Le statistiche appartengono all'evento e non sono duplicate su ogni movimento.
 - Il **canale operativo** distingue `PACCHI`, `RITIRO_SEDE`, `DOMICILIARE`, `EMPORIO`, `MENSA`, `UDS_STRADA` e `ALTRO`.
 - Il **source lineage** usa dominio, tipo entità, id entità e id riga; ogni distribuzione finale ha una sorgente strutturata.
-- Lo **storno** non modifica il ledger storico: crea movimenti compensativi collegati alla sorgente e marca l'operazione come stornata.
+- Lo **storno** non modifica il ledger storico: crea movimenti compensativi collegati alla sorgente e riconcilia l'operazione come `confermata`, `parzialmente_stornata` o `stornata` in base alle quantità nette.
 - La **giacenza deriva dalle Partite** come somma delle quantità residue, non dalla somma dei movimenti.
 
 ## Precisione Pezzi/KgLt
 
-Le quantità stock usano `numeric(14,6)` e sono serializzate dalle nuove API come stringhe decimali esatte. Pezzi e Kg/Lt possono coesistere; l'eventuale fattore usa `numeric(18,9)`. I calcoli server-side passano da un tipo fixed-point basato su interi, senza `number` JavaScript nel nucleo contabile.
+Le quantità stock, le prenotazioni, le scorte minime e i limiti quantitativi usano `numeric(14,6)` e sono serializzati dalle API contabili come stringhe decimali esatte. Pezzi e Kg/Lt possono coesistere; l'eventuale fattore usa `numeric(18,9)` ed è salvato anche come snapshot sul Movimento. Il helper centrale usa interi `BigInt`, quantità a scala 6, fattori a scala 9 e arrotondamento `HALF_UP` a scala 6. Un numero con più di sei decimali o in notazione scientifica non rappresentabile viene rifiutato, mai arrotondato implicitamente.
 
 ## Carico e concorrenza
 
-Il service multi-riga valida prima i riferimenti, acquisisce advisory lock in ordine deterministico per le chiavi di Partita, crea o incrementa le Partite compatibili, scrive righe e movimenti e infine l'audit. Qualsiasi errore provoca il rollback completo. Una idempotency key ripetuta restituisce il Carico esistente senza duplicazioni.
+Il service multi-riga valida prima i riferimenti, acquisisce advisory lock per idempotency key e in ordine deterministico per le chiavi di Partita, crea o incrementa le Partite compatibili, scrive righe e movimenti e infine l'audit. Qualsiasi errore provoca il rollback completo. La key è associata a magazzino e SHA-256 del payload normalizzato (testata e righe ordinate): stesso scope e stesso hash producono replay, contenuto o magazzino diverso producono conflitto. L'hash non è esposto dalle API; i carichi precedenti a R1 con hash nullo non vengono reinterpretati automaticamente.
+
+## Origini e provenienza
+
+Le origini manuali ammesse sono `RACCOLTA_ALIMENTARE`, `DONAZIONE`, `ACQUISTO`, `FORNITORE` e `ALTRO`. `AGEA_SIFEAD`, `RETTIFICA_INVENTARIO`, `SALDO_INIZIALE` e `LEGACY` sono riservate ai flussi di sistema e vengono rifiutate dal Carico manuale. Il filtro `origineCaricoPresente` sui Lotti significa “esiste almeno un Carico collegato con questa origine” e usa `EXISTS`, quindi non duplica la Partita. La Giacenza non espone un filtro di provenienza: una Partita può derivare da più Carichi, mentre il Fondo resta una proprietà univoca della Partita.
 
 ## Migrazione legacy
 
-La migration è additiva e ripetibile. Esegue il backfill del Fondo dal flag storico FSE+, amplia la precisione e normalizza soltanto gruppi lotto univoci. Partite legacy duplicate non vengono fuse: il codice normalizzato resta `NULL` e il caso è classificato `DATA_MIGRATION_RISK`. I movimenti preesistenti ricevono natura `LEGACY`; i riferimenti storici mancanti restano una compatibilità esplicita, non vengono inventati.
+La migration è additiva e ripetibile. Esegue il backfill del Fondo dal flag storico FSE+, amplia la precisione e normalizza soltanto gruppi lotto univoci. Durante un nuovo Carico una sola Partita legacy compatibile può essere adottata aggiornandone la chiave normalizzata; due o più candidate producono `PARTITA_LEGACY_AMBIGUA` e nessuna fusione o nuova Partita. I movimenti preesistenti ricevono natura `LEGACY`; i riferimenti storici mancanti restano una compatibilità esplicita, non vengono inventati.
 
 ## Compatibilità
 
-Gli endpoint storici di Lotto restano disponibili e delegano al nuovo motore per i carichi singoli. Il `PATCH` del Lotto è solo anagrafico: quantità e Fondo non sono modificabili. I report FSE+ possono continuare a leggere il flag compatibile, che ora è vincolato al Fondo della Partita.
+Gli endpoint storici di Lotto restano disponibili e delegano al nuovo motore per i carichi singoli. Il `PATCH /lotti/{id}` consente soltanto le note: identità, quantità, Fondo, fattore, magazzino, prodotto e date non sono modificabili. Le variazioni di stock passano dalla rettifica append-only. I report FSE+ possono continuare a leggere il flag compatibile, che ora è vincolato al Fondo della Partita. Gli alias numerici restano solo per compatibilità di visualizzazione; le decisioni contabili usano i campi precisi.
 
 ## Qualità dati nota
 
-Il modello corrente non contiene una classificazione strutturata saltuario/continuativo per il destinatario UDS. I relativi conteggi dell'evento restano quindi `NULL` (`NON_DETERMINATO` concettuale): non vengono inferiti da nomi, note, frequenza degli accessi o stato anagrafico. La mappatura AGEA resta esplicitamente `EXTERNAL_FORMAT_UNVERIFIED` e fuori dal ciclo 2.0A.
+Il modello corrente non contiene una classificazione strutturata saltuario/continuativo per il destinatario UDS. I relativi conteggi dell'evento restano quindi `NULL` (`NON_DETERMINATO` concettuale): non vengono inferiti da nomi, note, frequenza degli accessi o stato anagrafico. La mappatura AGEA resta esplicitamente `EXTERNAL_FORMAT_UNVERIFIED` e fuori dal ciclo 2.0A. Import, mapping ed export AGEA appartengono esclusivamente alla futura fase 2.0B.

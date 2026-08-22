@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { FattoreContabile } from './fattoreContabile';
 import type { FondoOrigine } from './fondoOrigine';
 import type { QuantitaContabile } from './quantitaContabile';
 
@@ -27,6 +28,7 @@ export interface Movimento {
   quantitaPezzi?: string | null;
   /** @nullable */
   quantitaKgLt?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
   unitaMisura: string;
   /** @nullable */
   fornitoreId?: number | null;

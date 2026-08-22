@@ -390,7 +390,7 @@ export const mensaConsumiTable = pgTable(
     prodottoId: integer("prodotto_id")
       .notNull()
       .references(() => prodottiTable.id),
-    quantita: decimal("quantita", { precision: 10, scale: 2 }).notNull(),
+    quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
     unitaMisura: varchar("unita_misura", { length: 20 }).notNull(),
     causale: varchar("causale", { length: 20 }).notNull(),
     note: text("note"),

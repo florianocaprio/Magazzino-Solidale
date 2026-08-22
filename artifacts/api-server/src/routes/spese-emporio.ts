@@ -23,6 +23,11 @@ import {
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 import { resolveSessionRuntimeConfig } from "../lib/sessionConfig";
+import {
+  InventoryDecimal,
+  InventoryDecimalError,
+  positiveInventoryDecimal,
+} from "../lib/inventoryDecimal";
 
 const router: IRouter = Router();
 router.use(
@@ -44,16 +49,17 @@ function asText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function asPositiveQuantity(value: unknown): number | null {
-  const n =
-    typeof value === "number"
-      ? value
-      : typeof value === "string" && value.trim()
-        ? Number(value)
-        : NaN;
-  if (!Number.isFinite(n) || n <= 0 || n > 99_999_999.99) return null;
-  const rounded = Math.round((n + Number.EPSILON) * 100) / 100;
-  return Math.abs(rounded - n) < 1e-9 ? rounded : null;
+function asPositiveQuantity(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  try {
+    const quantity = positiveInventoryDecimal(value);
+    return quantity.compare(InventoryDecimal.parse("99999999.99")) <= 0
+      ? quantity.toDb()
+      : null;
+  } catch (error) {
+    if (error instanceof InventoryDecimalError) return null;
+    throw error;
+  }
 }
 
 function operatorId(req: import("express").Request): number | null {
@@ -248,7 +254,7 @@ router.post(
       res.status(400).json({ error: "Il motivo dello storno è obbligatorio." });
       return;
     }
-    let righe: Array<{ spesaRigaId: number; quantita: number }> | undefined;
+    let righe: Array<{ spesaRigaId: number; quantita: string }> | undefined;
     if (req.body?.righe !== undefined) {
       if (!Array.isArray(req.body.righe) || req.body.righe.length === 0) {
         res.status(400).json({
@@ -265,7 +271,7 @@ router.post(
       );
       if (
         righeRichieste.some(
-          (row: { spesaRigaId: number; quantita: number | null }) =>
+          (row: { spesaRigaId: number; quantita: string | null }) =>
             !Number.isSafeInteger(row.spesaRigaId) ||
             row.spesaRigaId <= 0 ||
             row.quantita == null,
@@ -276,7 +282,7 @@ router.post(
       }
       righe = righeRichieste as Array<{
         spesaRigaId: number;
-        quantita: number;
+        quantita: string;
       }>;
     }
     try {

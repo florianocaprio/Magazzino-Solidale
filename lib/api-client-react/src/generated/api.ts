@@ -755,9 +755,9 @@ export const getCreateMagazzinoUrl = () => {
  * Creates a warehouse. When tipoMagazzino is mensa, areaOperativaId (the Area) is required and the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
-export const createMagazzino = async (magazzinoInput: MagazzinoInput, options?: RequestInit): Promise<CaricoMagazzinoDettaglio | Magazzino> => {
+export const createMagazzino = async (magazzinoInput: MagazzinoInput, options?: RequestInit): Promise<Magazzino> => {
 
-  return customFetch<CaricoMagazzinoDettaglio | Magazzino>(getCreateMagazzinoUrl(),
+  return customFetch<Magazzino>(getCreateMagazzinoUrl(),
   {
     ...options,
     method: 'POST',
@@ -1933,6 +1933,78 @@ export function useGetLotto<TData = Awaited<ReturnType<typeof getLotto>>, TError
 
 
 
+export const getUpdateLottoUrl = (id: number,) => {
+
+
+
+
+  return `/api/lotti/${id}`
+}
+
+/**
+ * @summary Aggiorna esclusivamente le note non identificative della Partita
+ */
+export const updateLotto = async (id: number,
+    lottoUpdate: LottoUpdate, options?: RequestInit): Promise<Lotto> => {
+
+  return customFetch<Lotto>(getUpdateLottoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lottoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateLottoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext> => {
+
+const mutationKey = ['updateLotto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLotto>>, {id: number;data: BodyType<LottoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateLotto(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateLotto>>>
+    export type UpdateLottoMutationBody = BodyType<LottoUpdate>
+    export type UpdateLottoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Aggiorna esclusivamente le note non identificative della Partita
+ */
+export const useUpdateLotto = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateLotto>>,
+        TError,
+        {id: number;data: BodyType<LottoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateLottoMutationOptions(options));
+    }
+
 export const getRettificaLottoUrl = (id: number,) => {
 
 
@@ -2003,72 +2075,6 @@ export const useRettificaLotto = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRettificaLottoMutationOptions(options));
-    }
-
-export const getUpdateLottoUrl = (id: number,) => {
-
-
-
-
-  return `/api/lotti/${id}/rettifica`
-}
-
-export const updateLotto = async (id: number,
-    lottoUpdate: LottoUpdate, options?: RequestInit): Promise<Lotto> => {
-
-  return customFetch<Lotto>(getUpdateLottoUrl(id),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      lottoUpdate,)
-  }
-);}
-
-
-
-
-export const getUpdateLottoMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext> => {
-
-const mutationKey = ['updateLotto'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLotto>>, {id: number;data: BodyType<LottoUpdate>}> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  updateLotto(id,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateLotto>>>
-    export type UpdateLottoMutationBody = BodyType<LottoUpdate>
-    export type UpdateLottoMutationError = ErrorType<unknown>
-
-    export const useUpdateLotto = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof updateLotto>>,
-        TError,
-        {id: number;data: BodyType<LottoUpdate>},
-        TContext
-      > => {
-      return useMutation(getUpdateLottoMutationOptions(options));
     }
 
 export const getListMovimentiUrl = (params?: ListMovimentiParams,) => {
