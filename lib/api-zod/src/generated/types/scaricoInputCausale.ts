@@ -13,5 +13,6 @@ export const ScaricoInputCausale = {
   deteriorata: 'deteriorata',
   rubata: 'rubata',
   scaduta: 'scaduta',
+  consegna_beneficiario: 'consegna_beneficiario',
   altro: 'altro',
 } as const;

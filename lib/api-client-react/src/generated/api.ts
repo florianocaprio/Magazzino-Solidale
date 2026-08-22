@@ -68,6 +68,10 @@ import type {
   BollaUpdate,
   BootstrapStatus,
   BulkImportResult,
+  CaricoMagazzino,
+  CaricoMagazzinoDettaglio,
+  CaricoMagazzinoInput,
+  CaricoMagazzinoRiga,
   CentroAscolto,
   CentroAscoltoInput,
   CentroAscoltoUpdate,
@@ -162,6 +166,7 @@ import type {
   ListApprovvigionamentiParams,
   ListBeneficiariParams,
   ListBolleParams,
+  ListCarichiParams,
   ListConsegneParams,
   ListConsumiMensaParams,
   ListCreditoSolidaleBeneficiariParams,
@@ -1429,6 +1434,291 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getDeleteProdottoMutationOptions(options));
     }
 
+export const getListCarichiUrl = (params?: ListCarichiParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/carichi?${stringifiedParams}` : `/api/carichi`
+}
+
+export const listCarichi = async (params?: ListCarichiParams, options?: RequestInit): Promise<CaricoMagazzino[]> => {
+
+  return customFetch<CaricoMagazzino[]>(getListCarichiUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCarichiQueryKey = (params?: ListCarichiParams,) => {
+    return [
+    `/api/carichi`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCarichiQueryOptions = <TData = Awaited<ReturnType<typeof listCarichi>>, TError = ErrorType<unknown>>(params?: ListCarichiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCarichi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCarichiQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCarichi>>> = ({ signal }) => listCarichi(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCarichi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCarichiQueryResult = NonNullable<Awaited<ReturnType<typeof listCarichi>>>
+export type ListCarichiQueryError = ErrorType<unknown>
+
+
+
+export function useListCarichi<TData = Awaited<ReturnType<typeof listCarichi>>, TError = ErrorType<unknown>>(
+ params?: ListCarichiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCarichi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCarichiQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCaricoUrl = () => {
+
+
+
+
+  return `/api/carichi`
+}
+
+export const createCarico = async (caricoMagazzinoInput: CaricoMagazzinoInput, options?: RequestInit): Promise<CaricoMagazzinoDettaglio> => {
+
+  return customFetch<CaricoMagazzinoDettaglio>(getCreateCaricoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoMagazzinoInput,)
+  }
+);}
+
+
+
+
+export const getCreateCaricoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCarico>>, TError,{data: BodyType<CaricoMagazzinoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCarico>>, TError,{data: BodyType<CaricoMagazzinoInput>}, TContext> => {
+
+const mutationKey = ['createCarico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCarico>>, {data: BodyType<CaricoMagazzinoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCarico(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaricoMutationResult = NonNullable<Awaited<ReturnType<typeof createCarico>>>
+    export type CreateCaricoMutationBody = BodyType<CaricoMagazzinoInput>
+    export type CreateCaricoMutationError = ErrorType<unknown>
+
+    export const useCreateCarico = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCarico>>, TError,{data: BodyType<CaricoMagazzinoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCarico>>,
+        TError,
+        {data: BodyType<CaricoMagazzinoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCaricoMutationOptions(options));
+    }
+
+export const getGetCaricoUrl = (id: number,) => {
+
+
+
+
+  return `/api/carichi/${id}`
+}
+
+export const getCarico = async (id: number, options?: RequestInit): Promise<CaricoMagazzinoDettaglio> => {
+
+  return customFetch<CaricoMagazzinoDettaglio>(getGetCaricoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaricoQueryKey = (id: number,) => {
+    return [
+    `/api/carichi/${id}`
+    ] as const;
+    }
+
+
+export const getGetCaricoQueryOptions = <TData = Awaited<ReturnType<typeof getCarico>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCarico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaricoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCarico>>> = ({ signal }) => getCarico(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCarico>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaricoQueryResult = NonNullable<Awaited<ReturnType<typeof getCarico>>>
+export type GetCaricoQueryError = ErrorType<unknown>
+
+
+
+export function useGetCarico<TData = Awaited<ReturnType<typeof getCarico>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCarico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaricoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListCaricoRigheUrl = (id: number,) => {
+
+
+
+
+  return `/api/carichi/${id}/righe`
+}
+
+export const listCaricoRighe = async (id: number, options?: RequestInit): Promise<CaricoMagazzinoRiga[]> => {
+
+  return customFetch<CaricoMagazzinoRiga[]>(getListCaricoRigheUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCaricoRigheQueryKey = (id: number,) => {
+    return [
+    `/api/carichi/${id}/righe`
+    ] as const;
+    }
+
+
+export const getListCaricoRigheQueryOptions = <TData = Awaited<ReturnType<typeof listCaricoRighe>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCaricoRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCaricoRigheQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCaricoRighe>>> = ({ signal }) => listCaricoRighe(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCaricoRighe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCaricoRigheQueryResult = NonNullable<Awaited<ReturnType<typeof listCaricoRighe>>>
+export type ListCaricoRigheQueryError = ErrorType<unknown>
+
+
+
+export function useListCaricoRighe<TData = Awaited<ReturnType<typeof listCaricoRighe>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCaricoRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCaricoRigheQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListLottiUrl = (params?: ListLottiParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1643,6 +1933,78 @@ export function useGetLotto<TData = Awaited<ReturnType<typeof getLotto>>, TError
 
 
 
+export const getUpdateLottoUrl = (id: number,) => {
+
+
+
+
+  return `/api/lotti/${id}`
+}
+
+/**
+ * @summary Aggiorna esclusivamente le note non identificative della Partita
+ */
+export const updateLotto = async (id: number,
+    lottoUpdate: LottoUpdate, options?: RequestInit): Promise<Lotto> => {
+
+  return customFetch<Lotto>(getUpdateLottoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lottoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateLottoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext> => {
+
+const mutationKey = ['updateLotto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLotto>>, {id: number;data: BodyType<LottoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateLotto(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateLotto>>>
+    export type UpdateLottoMutationBody = BodyType<LottoUpdate>
+    export type UpdateLottoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Aggiorna esclusivamente le note non identificative della Partita
+ */
+export const useUpdateLotto = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateLotto>>,
+        TError,
+        {id: number;data: BodyType<LottoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateLottoMutationOptions(options));
+    }
+
 export const getRettificaLottoUrl = (id: number,) => {
 
 
@@ -1713,72 +2075,6 @@ export const useRettificaLotto = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRettificaLottoMutationOptions(options));
-    }
-
-export const getUpdateLottoUrl = (id: number,) => {
-
-
-
-
-  return `/api/lotti/${id}/rettifica`
-}
-
-export const updateLotto = async (id: number,
-    lottoUpdate: LottoUpdate, options?: RequestInit): Promise<Lotto> => {
-
-  return customFetch<Lotto>(getUpdateLottoUrl(id),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      lottoUpdate,)
-  }
-);}
-
-
-
-
-export const getUpdateLottoMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext> => {
-
-const mutationKey = ['updateLotto'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLotto>>, {id: number;data: BodyType<LottoUpdate>}> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  updateLotto(id,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateLotto>>>
-    export type UpdateLottoMutationBody = BodyType<LottoUpdate>
-    export type UpdateLottoMutationError = ErrorType<unknown>
-
-    export const useUpdateLotto = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof updateLotto>>,
-        TError,
-        {id: number;data: BodyType<LottoUpdate>},
-        TContext
-      > => {
-      return useMutation(getUpdateLottoMutationOptions(options));
     }
 
 export const getListMovimentiUrl = (params?: ListMovimentiParams,) => {

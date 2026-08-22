@@ -137,6 +137,23 @@ describe("audit hardening del giornale inventariale", () => {
 
     const patch = await request(appFor(lottiRouter)).patch(`/lotti/${loaded.body.id}`).send({ quantitaResidua: 99 });
     expect(patch.status).toBe(400);
+    for (const body of [
+      { fondoOrigine: "FSE_PLUS" },
+      { codiceLotto: "ALTERATO" },
+      { dataScadenza: "2028-01-01" },
+      { documentoCarico: "ALTERATO" },
+      { fattoreKgLtPezzo: "0.500000000" },
+    ]) {
+      const immutable = await request(appFor(lottiRouter))
+        .patch(`/lotti/${loaded.body.id}`)
+        .send(body);
+      expect(immutable.status).toBe(400);
+    }
+    const notes = await request(appFor(lottiRouter))
+      .patch(`/lotti/${loaded.body.id}`)
+      .send({ note: "Nota non identificativa R1" });
+    expect(notes.status).toBe(200);
+    expect(notes.body.note).toBe("Nota non identificativa R1");
 
     const positive = await request(appFor(lottiRouter))
       .post(`/lotti/${loaded.body.id}/rettifica`)

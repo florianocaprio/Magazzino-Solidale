@@ -34,6 +34,7 @@ import {
   speseEmporioStorniTable,
   speseEmporioTable,
   utentiTable,
+  operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import cassaEmporioRouter from "../src/routes/cassa-emporio";
 import bolleRouter from "../src/routes/bolle";
@@ -298,6 +299,7 @@ async function createProdotto(opts: {
         quantitaResidua: opts.quantitaResidua ?? "10",
         magazzinoId: opts.magazzinoId,
         fsePlus: opts.fsePlus ?? false,
+        fondoOrigine: opts.fsePlus ? "FSE_PLUS" : "NESSUN_FONDO",
       })
       .returning({ id: lottiTable.id });
     lottoIds.push(lotto.id);
@@ -448,6 +450,15 @@ afterEach(async () => {
     await db
       .delete(consegneTable)
       .where(inArray(consegneTable.id, currentConsegnaIds));
+  if (currentMagazzinoIds.length > 0)
+    await db
+      .delete(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        inArray(
+          operazioniDistribuzioneMagazzinoTable.magazzinoId,
+          currentMagazzinoIds,
+        ),
+      );
   if (lottoIds.length > 0)
     await db
       .delete(lottiTable)
@@ -764,7 +775,11 @@ describe("Cassa Emporio", () => {
   it("forza un Accesso Emporio dalla Cassa e apre una sessione tracciata", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroId = await createCentro(areaOperativaId);
-    const magazzinoId = await createMagazzino("emporio", areaOperativaId, centroId);
+    const magazzinoId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroId,
+    );
     const beneficiarioId = await createBeneficiario({
       areaOperativaId,
       centroAscoltoId: centroId,
@@ -1963,7 +1978,7 @@ describe("Cassa Emporio", () => {
       .post(`/spese-emporio/${close.body.spesa.id}/storna`)
       .send({
         motivo: "Precisione non valida",
-        righe: [{ spesaRigaId, quantita: 0.001 }],
+        righe: [{ spesaRigaId, quantita: "0.0000001" }],
       });
     expect(invalidPrecision.status).toBe(400);
 
@@ -2195,8 +2210,16 @@ describe("Cassa Emporio", () => {
     const areaOperativaId = await createAreaOperativa();
     const centroAId = await createCentro(areaOperativaId);
     const centroBId = await createCentro(areaOperativaId);
-    const magazzinoAId = await createMagazzino("emporio", areaOperativaId, centroAId);
-    const magazzinoBId = await createMagazzino("emporio", areaOperativaId, centroBId);
+    const magazzinoAId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroAId,
+    );
+    const magazzinoBId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroBId,
+    );
     const beneficiarioId = await createBeneficiario({
       areaOperativaId,
       centroAscoltoId: centroAId,

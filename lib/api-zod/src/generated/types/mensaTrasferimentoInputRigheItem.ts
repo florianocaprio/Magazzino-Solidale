@@ -5,11 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { QuantitaContabile } from './quantitaContabile';
 
 export type MensaTrasferimentoInputRigheItem = {
   prodottoId: number;
-  /** @exclusiveMinimum 0 */
-  quantita: number;
+  quantita: QuantitaContabile;
   /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
   unitaMisura?: string;
   /** @nullable */

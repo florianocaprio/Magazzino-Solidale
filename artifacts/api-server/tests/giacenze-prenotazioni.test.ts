@@ -28,6 +28,10 @@ type GiacenzaBody = {
   giacenzaDistribuibile: number;
   impegnato: number;
   disponibileReale: number;
+  giacenzaFisicaPrecisa: string;
+  impegnatoPreciso: string;
+  disponibileRealePrecisa: string;
+  scortaMinimaPrecisa: string;
   sottoscorta: boolean;
 };
 
@@ -188,6 +192,35 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
       giacenzaFisica: 100,
       impegnato: 90,
       disponibileReale: 10,
+      sottoscorta: true,
+    });
+  });
+
+  it("confronta disponibilità e scorta al limite con precisione scala 6", async () => {
+    await db
+      .update(prodottiTable)
+      .set({ scortaMinima: "0.000001" })
+      .where(eq(prodottiTable.id, prod));
+    const lottoId = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 0.000002,
+    });
+    await prenota({
+      beneficiarioId: beneficiarioA,
+      magazzinoId: magA,
+      lottoId,
+      quantita: 0.000001,
+    });
+
+    const res = await request(appAs(centroA)).get("/giacenze");
+    const row = rowFor(res.body, magA);
+    expect(res.status).toBe(200);
+    expect(row).toMatchObject({
+      giacenzaFisicaPrecisa: "0.000002",
+      impegnatoPreciso: "0.000001",
+      disponibileRealePrecisa: "0.000001",
+      scortaMinimaPrecisa: "0.000001",
       sottoscorta: true,
     });
   });

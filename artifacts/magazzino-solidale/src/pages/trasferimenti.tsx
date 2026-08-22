@@ -120,7 +120,7 @@ function RigheEditor({
                 <Input
                   type="number"
                   min="0.01"
-                  step="0.01"
+                  step="0.000001"
                   max={max || undefined}
                   value={r.quantita}
                   onChange={(e) => update(r.key, { quantita: e.target.value })}
@@ -235,7 +235,7 @@ function NuovoTrasferimentoForm({
           note: note || undefined,
           righe: righeValide.map((r) => ({
             prodottoId: parseInt(r.prodottoId),
-            quantita: parseFloat(r.quantita),
+            quantita: r.quantita,
             unitaMisura: r.unitaMisura,
           })),
         },
@@ -388,7 +388,7 @@ function ModificaTrasferimentoForm({
           note,
           righe: righeValide.map((r) => ({
             prodottoId: parseInt(r.prodottoId),
-            quantita: parseFloat(r.quantita),
+            quantita: r.quantita,
             unitaMisura: r.unitaMisura,
           })),
         },

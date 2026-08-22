@@ -38,6 +38,11 @@ import {
   scarichiFisiciBolla,
   stornoRigaTx,
 } from "../lib/bollaDelivery";
+import {
+  InventoryDecimal,
+  InventoryDecimalError,
+  positiveInventoryDecimal,
+} from "../lib/inventoryDecimal";
 import { requireAllModuli } from "../lib/featureFlags";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
@@ -232,28 +237,38 @@ async function buildDettaglio(id: number) {
 }
 
 /** Calcola giacenza disponibile per un prodotto in un magazzino */
-async function giacenzaDisponibile(prodottoId: number, magazzinoId: number): Promise<number> {
-  return (await calcolaDisponibilitaMagazzino(prodottoId, magazzinoId)).disponibileReale;
+async function giacenzaDisponibile(prodottoId: number, magazzinoId: number): Promise<InventoryDecimal> {
+  const result = await calcolaDisponibilitaMagazzino(prodottoId, magazzinoId);
+  const value = InventoryDecimal.parse(result.disponibileRealePrecisa, {
+    allowNegative: true,
+  });
+  return value.isNegative() ? InventoryDecimal.zero() : value;
 }
 
 /** Calcola quanto è già in bolla (bozza) per un prodotto */
-async function quantitaGiaInBolla(bollaId: number, prodottoId: number, excludeRigaId?: number): Promise<number> {
+async function quantitaGiaInBolla(bollaId: number, prodottoId: number, excludeRigaId?: number): Promise<InventoryDecimal> {
   const righe = await db
     .select({ q: bollaRigheTable.quantita, id: bollaRigheTable.id })
     .from(bollaRigheTable)
     .where(and(eq(bollaRigheTable.bollaId, bollaId), eq(bollaRigheTable.prodottoId, prodottoId)));
   return righe
     .filter(r => r.id !== excludeRigaId)
-    .reduce((acc, r) => acc + parseFloat(r.q), 0);
+    .reduce(
+      (total, r) => total.add(InventoryDecimal.parse(r.q)),
+      InventoryDecimal.zero(),
+    );
 }
 
 /** Calcola quanto è già in bolla (bozza) per uno specifico lotto */
-async function quantitaGiaInBollaLotto(bollaId: number, lottoId: number): Promise<number> {
+async function quantitaGiaInBollaLotto(bollaId: number, lottoId: number): Promise<InventoryDecimal> {
   const righe = await db
     .select({ q: bollaRigheTable.quantita })
     .from(bollaRigheTable)
     .where(and(eq(bollaRigheTable.bollaId, bollaId), eq(bollaRigheTable.lottoId, lottoId)));
-  return righe.reduce((acc, r) => acc + parseFloat(r.q), 0);
+  return righe.reduce(
+    (total, r) => total.add(InventoryDecimal.parse(r.q)),
+    InventoryDecimal.zero(),
+  );
 }
 
 async function canAccessBollaOperativa(
@@ -306,7 +321,10 @@ async function lockLottiFEFO(
     .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.dataCarico), asc(lottiTable.id));
 }
 
-async function impegnatoAttivoLotto(tx: Tx, lottoId: number): Promise<number> {
+async function impegnatoAttivoLotto(
+  tx: Tx,
+  lottoId: number,
+): Promise<InventoryDecimal> {
   const [res] = await tx
     .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
     .from(prenotazioniMagazzinoTable)
@@ -314,7 +332,7 @@ async function impegnatoAttivoLotto(tx: Tx, lottoId: number): Promise<number> {
       eq(prenotazioniMagazzinoTable.lottoId, lottoId),
       eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
     ));
-  return parseDbNumber(res?.totale);
+  return InventoryDecimal.parse(res?.totale ?? "0");
 }
 
 async function creaPrenotazione(
@@ -325,7 +343,7 @@ async function creaPrenotazione(
     prodottoId: number;
     lottoId: number;
     magazzinoId: number;
-    quantita: number;
+    quantita: string;
   },
 ): Promise<void> {
   await tx.insert(prenotazioniMagazzinoTable).values({
@@ -334,7 +352,7 @@ async function creaPrenotazione(
     prodottoId: opts.prodottoId,
     lottoId: opts.lottoId,
     magazzinoId: opts.magazzinoId,
-    quantita: opts.quantita.toFixed(2),
+    quantita: opts.quantita,
     stato: PRENOTAZIONE_ATTIVA,
   });
 }
@@ -344,7 +362,7 @@ async function prenotaRigaFEFO(
   bolla: typeof bolleTable.$inferSelect,
   riga: typeof bollaRigheTable.$inferSelect,
 ): Promise<void> {
-  const richiesta = parseDbNumber(riga.quantita);
+  const richiesta = InventoryDecimal.parse(riga.quantita);
   let rimanente = richiesta;
   let primoLottoId: number | null = null;
 
@@ -356,11 +374,13 @@ async function prenotaRigaFEFO(
     if (!isLottoDistribuibile(lotto.dataScadenza)) {
       throw new BollaActionError(409, "Il lotto selezionato è scaduto e non può essere distribuito");
     }
-    const disponibileReale = parseDbNumber(lotto.quantitaResidua) - await impegnatoAttivoLotto(tx, lotto.id);
-    if (disponibileReale < richiesta) {
+    const disponibileReale = InventoryDecimal.parse(
+      lotto.quantitaResidua,
+    ).subtract(await impegnatoAttivoLotto(tx, lotto.id));
+    if (disponibileReale.compare(richiesta) < 0) {
       throw new BollaActionError(
         409,
-        `Disponibilità reale insufficiente nel lotto ${lotto.codiceLotto ?? `#${lotto.id}`} per ${await productName(riga.prodottoId)}: disponibili ${Math.max(0, disponibileReale).toFixed(2)}, richiesti ${richiesta.toFixed(2)}`,
+        `Disponibilità reale insufficiente nel lotto ${lotto.codiceLotto ?? `#${lotto.id}`} per ${await productName(riga.prodottoId)}: disponibili ${disponibileReale.isNegative() ? "0" : disponibileReale.toCanonical()}, richiesti ${richiesta.toCanonical()}`,
       );
     }
     await creaPrenotazione(tx, {
@@ -369,33 +389,35 @@ async function prenotaRigaFEFO(
       prodottoId: riga.prodottoId,
       lottoId: lotto.id,
       magazzinoId: bolla.magazzinoId,
-      quantita: richiesta,
+      quantita: richiesta.toDb(),
     });
     return;
   }
 
   const lotti = await lockLottiFEFO(tx, riga.prodottoId, bolla.magazzinoId);
   for (const lotto of lotti) {
-    if (rimanente <= 0) break;
-    const disponibileReale = parseDbNumber(lotto.quantitaResidua) - await impegnatoAttivoLotto(tx, lotto.id);
-    if (disponibileReale <= 0) continue;
-    const prenota = Math.min(disponibileReale, rimanente);
+    if (!rimanente.isPositive()) break;
+    const disponibileReale = InventoryDecimal.parse(
+      lotto.quantitaResidua,
+    ).subtract(await impegnatoAttivoLotto(tx, lotto.id));
+    if (!disponibileReale.isPositive()) continue;
+    const prenota = disponibileReale.min(rimanente);
     await creaPrenotazione(tx, {
       bollaId: bolla.id,
       rigaBollaId: riga.id,
       prodottoId: riga.prodottoId,
       lottoId: lotto.id,
       magazzinoId: bolla.magazzinoId,
-      quantita: prenota,
+      quantita: prenota.toDb(),
     });
     if (primoLottoId == null) primoLottoId = lotto.id;
-    rimanente = Math.round((rimanente - prenota) * 100) / 100;
+    rimanente = rimanente.subtract(prenota);
   }
 
-  if (rimanente > 0) {
+  if (rimanente.isPositive()) {
     throw new BollaActionError(
       409,
-      `Disponibilità reale insufficiente per ${await productName(riga.prodottoId)}: disponibili ${(richiesta - rimanente).toFixed(2)}, richiesti ${richiesta.toFixed(2)}`,
+      `Disponibilità reale insufficiente per ${await productName(riga.prodottoId)}: disponibili ${richiesta.subtract(rimanente).toCanonical()}, richiesti ${richiesta.toCanonical()}`,
     );
   }
 
@@ -750,9 +772,15 @@ router.post("/bolle/:id/righe", requirePermission("bolle.manage"), async (req, r
     res.status(400).json({ error: "Lotto non valido" });
     return;
   }
-  if (typeof quantita !== "number" || !Number.isFinite(quantita) || quantita <= 0) {
-    res.status(400).json({ error: "Quantità non valida" });
-    return;
+  let quantitaContabile: InventoryDecimal;
+  try {
+    quantitaContabile = positiveInventoryDecimal(quantita);
+  } catch (error) {
+    if (error instanceof InventoryDecimalError) {
+      res.status(400).json({ error: "Quantità non valida" });
+      return;
+    }
+    throw error;
   }
   if (!STATI_MODIFICABILI.includes(bolla.stato)) {
     res.status(400).json({ error: "Le righe della bolla sono modificabili solo in stato bozza" });
@@ -779,7 +807,7 @@ router.post("/bolle/:id/righe", requirePermission("bolle.manage"), async (req, r
       res.status(409).json({ error: "Il lotto selezionato è scaduto e non può essere distribuito" });
       return;
     }
-    const giaInBollaLotto = bolla.stato === "bozza" ? await quantitaGiaInBollaLotto(bollaId, lottoId) : 0;
+    const giaInBollaLotto = bolla.stato === "bozza" ? await quantitaGiaInBollaLotto(bollaId, lottoId) : InventoryDecimal.zero();
     const [impegno] = await db
       .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
       .from(prenotazioniMagazzinoTable)
@@ -787,20 +815,22 @@ router.post("/bolle/:id/righe", requirePermission("bolle.manage"), async (req, r
         eq(prenotazioniMagazzinoTable.lottoId, lottoId),
         eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
       ));
-    const nettaLotto = parseFloat(lotto.quantitaResidua) - parseDbNumber(impegno?.totale) - giaInBollaLotto;
-    if (nettaLotto < quantita) {
+    const nettaLotto = InventoryDecimal.parse(lotto.quantitaResidua)
+      .subtract(InventoryDecimal.parse(impegno?.totale ?? "0"))
+      .subtract(giaInBollaLotto);
+    if (nettaLotto.compare(quantitaContabile) < 0) {
       res.status(400).json({
-        error: `Disponibilità insufficiente nel lotto: ${Math.max(0, nettaLotto).toFixed(2)} disponibili, richiesti ${quantita}`,
+        error: `Disponibilità insufficiente nel lotto: ${(nettaLotto.isNegative() ? InventoryDecimal.zero() : nettaLotto).toCanonical()} disponibili, richiesti ${quantitaContabile.toCanonical()}`,
       });
       return;
     }
   } else {
     const disponibile = await giacenzaDisponibile(prodottoId, bolla.magazzinoId);
-    const giainBolla = bolla.stato === "bozza" ? await quantitaGiaInBolla(bollaId, prodottoId) : 0;
-    const netta = disponibile - giainBolla;
-    if (netta < quantita) {
+    const giainBolla = bolla.stato === "bozza" ? await quantitaGiaInBolla(bollaId, prodottoId) : InventoryDecimal.zero();
+    const netta = disponibile.subtract(giainBolla);
+    if (netta.compare(quantitaContabile) < 0) {
       res.status(400).json({
-        error: `Disponibilità insufficiente per ${prod?.nome ?? "prodotto"}: ${Math.max(0, netta).toFixed(2)} disponibili (giacenza ${disponibile.toFixed(2)} − già in bolla ${giainBolla.toFixed(2)}), richiesti ${quantita}`,
+        error: `Disponibilità insufficiente per ${prod?.nome ?? "prodotto"}: ${(netta.isNegative() ? InventoryDecimal.zero() : netta).toCanonical()} disponibili (giacenza ${disponibile.toCanonical()} − già in bolla ${giainBolla.toCanonical()}), richiesti ${quantitaContabile.toCanonical()}`,
       });
       return;
     }
@@ -810,7 +840,7 @@ router.post("/bolle/:id/righe", requirePermission("bolle.manage"), async (req, r
     bollaId,
     prodottoId,
     lottoId: lottoId ?? null,
-    quantita: quantita.toString(),
+    quantita: quantitaContabile.toDb(),
     unitaMisura: unitaMisura ?? prod?.unitaMisura ?? "pz",
     note: note ?? null,
   }).returning();

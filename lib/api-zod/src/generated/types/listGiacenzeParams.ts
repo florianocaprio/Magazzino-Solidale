@@ -5,9 +5,14 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { FondoOrigine } from './fondoOrigine';
 
 export type ListGiacenzeParams = {
 magazzinoId?: number;
 sottoscortaOnly?: boolean;
 fsePlusOnly?: boolean;
+prodottoId?: number;
+fondoOrigine?: FondoOrigine;
+scadenzaDa?: Date;
+scadenzaA?: Date;
 };

@@ -5,6 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { FondoOrigine } from './fondoOrigine';
+import type { QuantitaContabile } from './quantitaContabile';
 
 export interface Lotto {
   id: number;
@@ -18,6 +20,8 @@ export interface Lotto {
   dataCarico: string;
   quantitaCaricata: number;
   quantitaResidua: number;
+  quantitaCaricataPrecisa: QuantitaContabile;
+  quantitaResiduaPrecisa: QuantitaContabile;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
@@ -26,6 +30,13 @@ export interface Lotto {
   /** @nullable */
   fornitoreNome?: string | null;
   fsePlus: boolean;
+  fondoOrigine: FondoOrigine;
+  /** @nullable */
+  codiceLottoNormalizzato?: string | null;
+  /** @nullable */
+  dataUltimoCarico?: Date | null;
+  /** @nullable */
+  fattoreKgLtPezzo?: string | null;
   /** @nullable */
   documentoCarico?: string | null;
   /** @nullable */

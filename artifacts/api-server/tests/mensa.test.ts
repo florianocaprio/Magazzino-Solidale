@@ -29,6 +29,7 @@ import {
   trasferimentiTable,
   utentiTable,
   zoneUdsTable,
+  operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import mensaRouter, {
   activeEligibility,
@@ -48,6 +49,7 @@ import {
 import { aggregatiConsumiMensa } from "../src/lib/mensaService";
 import { areaGuard } from "../src/middlewares/auth";
 import { initDbExtensions } from "../src/lib/dbInit";
+import { InventoryDecimal } from "../src/lib/inventoryDecimal";
 
 const ids = {
   users: [] as number[],
@@ -88,7 +90,10 @@ function makeApp(
   app.use((req, _res, next) => {
     req.user = {
       id: fixture.userId,
-      areaOperativaId: "areaOperativaId" in scope ? (scope.areaOperativaId ?? null) : fixture.romeId,
+      areaOperativaId:
+        "areaOperativaId" in scope
+          ? (scope.areaOperativaId ?? null)
+          : fixture.romeId,
       centroAscoltoId:
         "centroAscoltoId" in scope ? (scope.centroAscoltoId ?? null) : null,
       zonaUdsId: "zonaUdsId" in scope ? (scope.zonaUdsId ?? null) : null,
@@ -358,6 +363,15 @@ afterEach(async () => {
     await db
       .delete(beneficiariTable)
       .where(inArray(beneficiariTable.id, ids.beneficiaries.splice(0)));
+  if (ids.warehouses.length)
+    await db
+      .delete(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        inArray(
+          operazioniDistribuzioneMagazzinoTable.magazzinoId,
+          ids.warehouses,
+        ),
+      );
   if (ids.lots.length)
     await db
       .delete(lottiTable)
@@ -646,9 +660,9 @@ describe("Modulo Mensa", () => {
       },
     ];
 
-    const areaOperativaScoped = await request(makeApp(fixture, ["mensa.view"])).get(
-      path,
-    );
+    const areaOperativaScoped = await request(
+      makeApp(fixture, ["mensa.view"]),
+    ).get(path);
     expect(areaOperativaScoped.status).toBe(200);
     expect(
       areaOperativaScoped.body.map(
@@ -871,7 +885,9 @@ describe("Modulo Mensa", () => {
   it("non usa le chiavi idempotenti come capability di lettura cross-Area", async () => {
     const fixture = await createFixture();
     const appRome = makeApp(fixture);
-    const appMilan = makeApp(fixture, undefined, { areaOperativaId: fixture.milanId });
+    const appMilan = makeApp(fixture, undefined, {
+      areaOperativaId: fixture.milanId,
+    });
 
     const accessKey = `scope-access-${rnd()}`;
     const access = await verify(appRome, fixture, {
@@ -1247,7 +1263,10 @@ describe("Modulo Mensa", () => {
     const fixture = await createFixture();
     const [centroMilano] = await db
       .insert(centriAscoltoTable)
-      .values({ nome: `Centro Milano ${rnd()}`, areaOperativaId: fixture.milanId })
+      .values({
+        nome: `Centro Milano ${rnd()}`,
+        areaOperativaId: fixture.milanId,
+      })
       .returning({ id: centriAscoltoTable.id });
     ids.centers.push(centroMilano.id);
     const before = await db
@@ -1631,7 +1650,10 @@ describe("Modulo Mensa", () => {
     const fixture = await createFixture();
     const [center] = await db
       .insert(centriAscoltoTable)
-      .values({ nome: `Centro tessere ${rnd()}`, areaOperativaId: fixture.romeId })
+      .values({
+        nome: `Centro tessere ${rnd()}`,
+        areaOperativaId: fixture.romeId,
+      })
       .returning({ id: centriAscoltoTable.id });
     ids.centers.push(center.id);
     const [beneficiary] = await db
@@ -2867,7 +2889,7 @@ describe("Modulo Mensa", () => {
       .update(beneficiariTable)
       .set({
         sesso: "F",
-        dataNascita: "2008-08-21",
+        dataNascita: "2009-08-21",
         fasciaEtaPresunta: null,
         statoAnagrafica: "provvisoria",
       })
@@ -3221,5 +3243,180 @@ describe("Modulo Mensa", () => {
       .from(lottiTable)
       .where(eq(lottiTable.id, lots[1].id));
     expect(Number(restored.quantity)).toBe(1);
+  });
+
+  it("Magazzino 2.0A-R2 — riconcilia il riuso della stessa giornata dopo uno storno completo", async () => {
+    const fixture = await createFixture();
+    const products = await db
+      .insert(prodottiTable)
+      .values([
+        {
+          codice: `R2A-${rnd()}`,
+          nome: "Prodotto Mensa R2 A",
+          tipoProdotto: "alimentare",
+          unitaMisura: "kg",
+          attivo: true,
+        },
+        {
+          codice: `R2B-${rnd()}`,
+          nome: "Prodotto Mensa R2 B",
+          tipoProdotto: "alimentare",
+          unitaMisura: "kg",
+          attivo: true,
+        },
+      ])
+      .returning({ id: prodottiTable.id });
+    ids.products.push(...products.map((product) => product.id));
+    const lots = await db
+      .insert(lottiTable)
+      .values(
+        products.map((product, index) => ({
+          prodottoId: product.id,
+          codiceLotto: `R2L${index}-${rnd()}`,
+          dataScadenza: `2027-0${index + 1}-15`,
+          dataCarico: "2026-08-01",
+          quantitaCaricata: "5.000000",
+          quantitaResidua: "5.000000",
+          magazzinoId: fixture.warehouseIds[0],
+        })),
+      )
+      .returning({ id: lottiTable.id });
+    ids.lots.push(...lots.map((lot) => lot.id));
+    const app = makeApp(fixture);
+    const today = dataServizioMensa();
+
+    const first = await request(app)
+      .post("/mensa/consumi")
+      .send({
+        mensaId: fixture.mensaA,
+        dataServizio: today,
+        tipoServizio: "pranzo",
+        prodottoId: products[0].id,
+        quantita: "2.000000",
+        causale: "consumo",
+        idempotencyKey: `r2-a-${rnd()}`,
+      });
+    expect(first.status).toBe(201);
+    ids.consumptions.push(first.body.id);
+    ids.issues.push(first.body.scaricoId);
+    const [consumptionA] = await db
+      .select()
+      .from(mensaConsumiTable)
+      .where(eq(mensaConsumiTable.id, first.body.id));
+    const [operation] = await db
+      .select()
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        and(
+          eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "MENSA"),
+          eq(
+            operazioniDistribuzioneMagazzinoTable.entitaOrigineTipo,
+            "mensa_giornata_servizio",
+          ),
+          eq(
+            operazioniDistribuzioneMagazzinoTable.entitaOrigineId,
+            consumptionA.giornataServizioId,
+          ),
+        ),
+      );
+    const [movementA] = await db
+      .select()
+      .from(movimentiTable)
+      .where(
+        and(
+          eq(movimentiTable.operazioneDistribuzioneId, operation.id),
+          eq(movimentiTable.prodottoId, products[0].id),
+          eq(movimentiTable.naturaContabile, "DISTRIBUZIONE_FINALE"),
+        ),
+      );
+    expect(InventoryDecimal.parse(movementA.quantita).toDb()).toBe("2.000000");
+
+    const reversalA = await request(app)
+      .post(`/mensa/consumi/${first.body.id}/storno`)
+      .send({ motivo: "Correzione completa R2 A" });
+    expect(reversalA.status).toBe(200);
+    let [state] = await db
+      .select({ stato: operazioniDistribuzioneMagazzinoTable.stato })
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(eq(operazioniDistribuzioneMagazzinoTable.id, operation.id));
+    expect(state.stato).toBe("stornata");
+
+    const second = await request(app)
+      .post("/mensa/consumi")
+      .send({
+        mensaId: fixture.mensaA,
+        dataServizio: today,
+        tipoServizio: "pranzo",
+        prodottoId: products[1].id,
+        quantita: "3.000000",
+        causale: "consumo",
+        idempotencyKey: `r2-b-${rnd()}`,
+      });
+    expect(second.status).toBe(201);
+    ids.consumptions.push(second.body.id);
+    ids.issues.push(second.body.scaricoId);
+    const [consumptionB] = await db
+      .select()
+      .from(mensaConsumiTable)
+      .where(eq(mensaConsumiTable.id, second.body.id));
+    expect(consumptionB.giornataServizioId).toBe(
+      consumptionA.giornataServizioId,
+    );
+
+    const [operationAfterB] = await db
+      .select()
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(eq(operazioniDistribuzioneMagazzinoTable.id, operation.id));
+    expect(operationAfterB).toMatchObject({
+      id: operation.id,
+      stato: "parzialmente_stornata",
+      numeroPasti: 0,
+      indigentiSaltuari: null,
+      indigentiContinuativi: null,
+    });
+    const afterB = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.operazioneDistribuzioneId, operation.id))
+      .orderBy(movimentiTable.id);
+    expect(afterB).toHaveLength(3);
+    const movementB = afterB.find(
+      (movement) =>
+        movement.prodottoId === products[1].id &&
+        movement.naturaContabile === "DISTRIBUZIONE_FINALE",
+    );
+    expect(movementB).toBeDefined();
+    expect(InventoryDecimal.parse(movementB!.quantita).toDb()).toBe("3.000000");
+    expect(
+      afterB.some((movement) => movement.movimentoOrigineId === movementA.id),
+    ).toBe(true);
+    const netAfterB = afterB.reduce((net, movement) => {
+      const quantity = InventoryDecimal.parse(movement.quantita);
+      return movement.naturaContabile === "STORNO"
+        ? net.subtract(quantity)
+        : net.add(quantity);
+    }, InventoryDecimal.zero());
+    expect(netAfterB.toDb()).toBe("3.000000");
+
+    const reversalB = await request(app)
+      .post(`/mensa/consumi/${second.body.id}/storno`)
+      .send({ motivo: "Correzione completa R2 B" });
+    expect(reversalB.status).toBe(200);
+    [state] = await db
+      .select({ stato: operazioniDistribuzioneMagazzinoTable.stato })
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(eq(operazioniDistribuzioneMagazzinoTable.id, operation.id));
+    expect(state.stato).toBe("stornata");
+    const finalLedger = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.operazioneDistribuzioneId, operation.id));
+    expect(finalLedger).toHaveLength(4);
+    expect(
+      finalLedger
+        .filter((movement) => movement.naturaContabile === "STORNO")
+        .map((movement) => movement.movimentoOrigineId)
+        .sort((a, b) => (a ?? 0) - (b ?? 0)),
+    ).toEqual([movementA.id, movementB!.id].sort((a, b) => a - b));
   });
 });

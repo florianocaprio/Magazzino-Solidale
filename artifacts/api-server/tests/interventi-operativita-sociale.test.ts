@@ -18,6 +18,7 @@ import {
   scaricoRigheTable,
   tipiInterventoTable,
   utentiTable,
+  operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
@@ -273,6 +274,15 @@ afterAll(async () => {
       );
     }
   }
+  if (ids.magazzini.length > 0)
+    await db
+      .delete(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        inArray(
+          operazioniDistribuzioneMagazzinoTable.magazzinoId,
+          ids.magazzini,
+        ),
+      );
   if (ids.lotti.length > 0)
     await db.delete(lottiTable).where(inArray(lottiTable.id, ids.lotti));
   if (ids.prodotti.length > 0)
@@ -294,7 +304,9 @@ afterAll(async () => {
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));
-  await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, ids.areaOperativa));
+  await db
+    .delete(areeOperativeTable)
+    .where(inArray(areeOperativeTable.id, ids.areaOperativa));
   await pool.end();
 });
 

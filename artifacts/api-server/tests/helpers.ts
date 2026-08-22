@@ -11,6 +11,9 @@ import {
   movimentiTable,
   utentiTable,
   fornitoriTable,
+  carichiMagazzinoRigheTable,
+  carichiMagazzinoTable,
+  operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import trasferimentiRouter from "../src/routes/trasferimenti";
@@ -23,7 +26,10 @@ import scarichiRouter from "../src/routes/scarichi";
  */
 type TestSessionUser = NonNullable<Express.Request["user"]>;
 
-function testSessionUser(userId: number, overrides: Partial<TestSessionUser> = {}): TestSessionUser {
+function testSessionUser(
+  userId: number,
+  overrides: Partial<TestSessionUser> = {},
+): TestSessionUser {
   return {
     id: userId,
     isAdmin: true,
@@ -36,7 +42,10 @@ function testSessionUser(userId: number, overrides: Partial<TestSessionUser> = {
   } as TestSessionUser;
 }
 
-export function makeApp(userId: number, user: Partial<TestSessionUser> = {}): Express {
+export function makeApp(
+  userId: number,
+  user: Partial<TestSessionUser> = {},
+): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -51,7 +60,10 @@ export function makeApp(userId: number, user: Partial<TestSessionUser> = {}): Ex
  * Same as {@link makeApp} but mounts the scarichi router instead, so the
  * discharge tests can exercise the FEFO/transaction handler in isolation.
  */
-export function makeScarichiApp(userId: number, user: Partial<TestSessionUser> = {}): Express {
+export function makeScarichiApp(
+  userId: number,
+  user: Partial<TestSessionUser> = {},
+): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -99,7 +111,10 @@ export async function createUtente(scope: SeedScope): Promise<number> {
   return u.id;
 }
 
-export async function createMagazzino(scope: SeedScope, nome: string): Promise<number> {
+export async function createMagazzino(
+  scope: SeedScope,
+  nome: string,
+): Promise<number> {
   const [m] = await db
     .insert(magazziniTable)
     .values({ codice: `TST-${rnd()}`, nome })
@@ -108,7 +123,10 @@ export async function createMagazzino(scope: SeedScope, nome: string): Promise<n
   return m.id;
 }
 
-export async function createFornitore(scope: SeedScope, nome: string): Promise<number> {
+export async function createFornitore(
+  scope: SeedScope,
+  nome: string,
+): Promise<number> {
   const [f] = await db
     .insert(fornitoriTable)
     .values({ nome, tipo: "azienda" })
@@ -157,6 +175,7 @@ export async function createLotto(opts: {
       quantitaResidua: opts.quantita.toFixed(2),
       fornitoreId: opts.fornitoreId ?? null,
       fsePlus: opts.fsePlus ?? false,
+      fondoOrigine: opts.fsePlus ? "FSE_PLUS" : "NESSUN_FONDO",
     })
     .returning();
   return l.id;
@@ -183,42 +202,91 @@ export async function getScaricoMovimentiForMagazzino(magazzinoId: number) {
     .select()
     .from(movimentiTable)
     .where(
-      and(eq(movimentiTable.magazzinoId, magazzinoId), eq(movimentiTable.tipoMovimento, "scarico")),
+      and(
+        eq(movimentiTable.magazzinoId, magazzinoId),
+        eq(movimentiTable.tipoMovimento, "scarico"),
+      ),
     );
 }
 
 export async function getLottiInMagazzino(magazzinoId: number) {
-  return db.select().from(lottiTable).where(eq(lottiTable.magazzinoId, magazzinoId));
+  return db
+    .select()
+    .from(lottiTable)
+    .where(eq(lottiTable.magazzinoId, magazzinoId));
 }
 
 /** Deletes every row created under this scope, in FK-safe order. */
 export async function cleanup(scope: SeedScope): Promise<void> {
   if (scope.magazzinoIds.length > 0) {
-    await db.delete(movimentiTable).where(inArray(movimentiTable.magazzinoId, scope.magazzinoIds));
-    await db.delete(lottiTable).where(inArray(lottiTable.magazzinoId, scope.magazzinoIds));
+    await db
+      .delete(movimentiTable)
+      .where(inArray(movimentiTable.magazzinoId, scope.magazzinoIds));
+    await db
+      .delete(carichiMagazzinoRigheTable)
+      .where(
+        inArray(
+          carichiMagazzinoRigheTable.lottoId,
+          db
+            .select({ id: lottiTable.id })
+            .from(lottiTable)
+            .where(inArray(lottiTable.magazzinoId, scope.magazzinoIds)),
+        ),
+      );
+    await db
+      .delete(carichiMagazzinoTable)
+      .where(inArray(carichiMagazzinoTable.magazzinoId, scope.magazzinoIds));
+    await db
+      .delete(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        inArray(
+          operazioniDistribuzioneMagazzinoTable.magazzinoId,
+          scope.magazzinoIds,
+        ),
+      );
+    await db
+      .delete(lottiTable)
+      .where(inArray(lottiTable.magazzinoId, scope.magazzinoIds));
   }
   if (scope.trasferimentoIds.length > 0) {
     await db
       .delete(trasferimentoRigheTable)
-      .where(inArray(trasferimentoRigheTable.trasferimentoId, scope.trasferimentoIds));
-    await db.delete(trasferimentiTable).where(inArray(trasferimentiTable.id, scope.trasferimentoIds));
+      .where(
+        inArray(
+          trasferimentoRigheTable.trasferimentoId,
+          scope.trasferimentoIds,
+        ),
+      );
+    await db
+      .delete(trasferimentiTable)
+      .where(inArray(trasferimentiTable.id, scope.trasferimentoIds));
   }
   if (scope.scaricoIds.length > 0) {
     await db
       .delete(scaricoRigheTable)
       .where(inArray(scaricoRigheTable.scaricoId, scope.scaricoIds));
-    await db.delete(scarichiTable).where(inArray(scarichiTable.id, scope.scaricoIds));
+    await db
+      .delete(scarichiTable)
+      .where(inArray(scarichiTable.id, scope.scaricoIds));
   }
   if (scope.prodottoIds.length > 0) {
-    await db.delete(prodottiTable).where(inArray(prodottiTable.id, scope.prodottoIds));
+    await db
+      .delete(prodottiTable)
+      .where(inArray(prodottiTable.id, scope.prodottoIds));
   }
   if (scope.fornitoreIds.length > 0) {
-    await db.delete(fornitoriTable).where(inArray(fornitoriTable.id, scope.fornitoreIds));
+    await db
+      .delete(fornitoriTable)
+      .where(inArray(fornitoriTable.id, scope.fornitoreIds));
   }
   if (scope.magazzinoIds.length > 0) {
-    await db.delete(magazziniTable).where(inArray(magazziniTable.id, scope.magazzinoIds));
+    await db
+      .delete(magazziniTable)
+      .where(inArray(magazziniTable.id, scope.magazzinoIds));
   }
   if (scope.utenteIds.length > 0) {
-    await db.delete(utentiTable).where(inArray(utentiTable.id, scope.utenteIds));
+    await db
+      .delete(utentiTable)
+      .where(inArray(utentiTable.id, scope.utenteIds));
   }
 }

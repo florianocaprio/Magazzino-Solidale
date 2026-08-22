@@ -84,14 +84,20 @@ import {
   stornaScaricoInventariale,
 } from "../lib/scaricoInventory";
 import {
-  calcolaImpegnatoAttivoPerGiacenze,
+  calcolaImpegnatoAttivoPrecisoPerGiacenze,
   disponibilitaMagazzinoKey,
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
+import { ensureDistributionOperation } from "../lib/distributionLedger";
 import {
   createTransferRequest,
   TransferRequestError,
 } from "../lib/transferWorkflow";
+import {
+  InventoryDecimal,
+  InventoryDecimalError,
+  positiveInventoryDecimal,
+} from "../lib/inventoryDecimal";
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
@@ -396,7 +402,10 @@ async function loadMensa(id: number) {
       magazzinoTipo: magazziniTable.tipoMagazzino,
     })
     .from(menseTable)
-    .leftJoin(areeOperativeTable, eq(menseTable.areaOperativaId, areeOperativeTable.id))
+    .leftJoin(
+      areeOperativeTable,
+      eq(menseTable.areaOperativaId, areeOperativeTable.id),
+    )
     .leftJoin(magazziniTable, eq(menseTable.magazzinoId, magazziniTable.id))
     .leftJoin(
       centriAscoltoTable,
@@ -409,7 +418,12 @@ async function loadMensa(id: number) {
 async function requireMensa(id: number, req: Request, active = false) {
   const row = await loadMensa(id);
   if (!row) throw new MensaError(404, "Mensa non trovata");
-  if (!canAccessAreaOperativa(row.mensa.areaOperativaId, callerAreaOperativaId(req))) {
+  if (
+    !canAccessAreaOperativa(
+      row.mensa.areaOperativaId,
+      callerAreaOperativaId(req),
+    )
+  ) {
     throw new MensaError(403, "Mensa non accessibile per la tua area");
   }
   if (
@@ -436,7 +450,8 @@ async function requireMensaLogisticsWarehouse(id: number, req: Request) {
   if (!warehouse) throw new MensaError(404, "Magazzino non trovato");
   const ownAreaOperativa = callerAreaOperativaId(req);
   if (
-    (ownAreaOperativa != null && warehouse.areaOperativaId !== ownAreaOperativa) ||
+    (ownAreaOperativa != null &&
+      warehouse.areaOperativaId !== ownAreaOperativa) ||
     !(await canAccessMagazzino(id, callerCentroId(req), ownAreaOperativa))
   ) {
     throw new MensaError(403, "Magazzino non accessibile per la tua area");
@@ -522,7 +537,10 @@ async function loadRiepilogoAbilitazioniBeneficiari(
   const conditions: SQL[] = [inArray(beneficiariTable.id, beneficiarioIds)];
   const scopes = [
     centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req)),
-    areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req)),
+    areaOperativaScopeFilter(
+      beneficiariTable.areaOperativaId,
+      callerAreaOperativaId(req),
+    ),
     zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req)),
   ];
   for (const scope of scopes) if (scope) conditions.push(scope);
@@ -723,7 +741,8 @@ async function loadAccessoDto(id: number) {
       )
     : null;
   const outsideMensaArea =
-    row.beneficiario != null && row.beneficiario.areaOperativaId !== row.mensa.areaOperativaId;
+    row.beneficiario != null &&
+    row.beneficiario.areaOperativaId !== row.mensa.areaOperativaId;
   const hidePersonal =
     outsideMensaArea ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.AREA_NON_COMPATIBILE ||
@@ -803,7 +822,10 @@ router.get(
     try {
       const conditions: SQL[] = [];
       const ownAreaOperativa = callerAreaOperativaId(req);
-      const requestedAreaOperativa = optionalPositiveInt(req.query.areaOperativaId, "areaOperativaId");
+      const requestedAreaOperativa = optionalPositiveInt(
+        req.query.areaOperativaId,
+        "areaOperativaId",
+      );
       if (ownAreaOperativa != null) {
         conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       } else if (requestedAreaOperativa != null) {
@@ -821,7 +843,10 @@ router.get(
           centroAscoltoNome: centriAscoltoTable.nome,
         })
         .from(menseTable)
-        .leftJoin(areeOperativeTable, eq(menseTable.areaOperativaId, areeOperativeTable.id))
+        .leftJoin(
+          areeOperativeTable,
+          eq(menseTable.areaOperativaId, areeOperativeTable.id),
+        )
         .leftJoin(magazziniTable, eq(menseTable.magazzinoId, magazziniTable.id))
         .leftJoin(
           centriAscoltoTable,
@@ -875,7 +900,9 @@ router.post(
       const providedCodice = optionalText(req.body?.codice, "Il codice", 30);
       const nome = text(req.body?.nome, "Il nome", 160);
       const ownAreaOperativa = callerAreaOperativaId(req);
-      const areaOperativaId = ownAreaOperativa ?? positiveInt(req.body?.areaOperativaId, "areaOperativaId");
+      const areaOperativaId =
+        ownAreaOperativa ??
+        positiveInt(req.body?.areaOperativaId, "areaOperativaId");
       if (
         ownAreaOperativa != null &&
         req.body?.areaOperativaId != null &&
@@ -1038,7 +1065,10 @@ router.get(
         .where(eq(beneficiariTable.id, beneficiarioId));
       if (!beneficiario) throw new MensaError(404, "Beneficiario non trovato");
       const ownAreaOperativa = callerAreaOperativaId(req);
-      if (ownAreaOperativa != null && beneficiario.areaOperativaId !== ownAreaOperativa)
+      if (
+        ownAreaOperativa != null &&
+        beneficiario.areaOperativaId !== ownAreaOperativa
+      )
         throw new MensaError(403, "Beneficiario non accessibile");
       const rows = await db
         .select()
@@ -1078,7 +1108,10 @@ router.post(
           "Completa l'anagrafica e associa un Centro di Ascolto prima di emettere la tessera",
         );
       const ownAreaOperativa = callerAreaOperativaId(req);
-      if (ownAreaOperativa != null && beneficiario.areaOperativaId !== ownAreaOperativa)
+      if (
+        ownAreaOperativa != null &&
+        beneficiario.areaOperativaId !== ownAreaOperativa
+      )
         throw new MensaError(403, "Beneficiario non accessibile");
       const dataScadenza = dateOnly(req.body?.dataScadenza, "La scadenza");
       const motivoSostituzione = optionalText(
@@ -1139,7 +1172,10 @@ router.post(
         .where(eq(tessereBeneficiariTable.id, id));
       if (!current) throw new MensaError(404, "Tessera non trovata");
       const ownAreaOperativa = callerAreaOperativaId(req);
-      if (ownAreaOperativa != null && current.areaOperativaId !== ownAreaOperativa)
+      if (
+        ownAreaOperativa != null &&
+        current.areaOperativaId !== ownAreaOperativa
+      )
         throw new MensaError(403, "Tessera non accessibile");
       const updated = await db.transaction(async (tx) => {
         const allowed: Record<TesseraStato, readonly TesseraStato[]> = {
@@ -1592,7 +1628,10 @@ router.post(
             .from(beneficiariTable)
             .where(eq(beneficiariTable.id, beneficiarioId))
             .for("update");
-          if (!existing || existing.areaOperativaId !== mensa.mensa.areaOperativaId) {
+          if (
+            !existing ||
+            existing.areaOperativaId !== mensa.mensa.areaOperativaId
+          ) {
             throw new MensaError(404, "Beneficiario non disponibile");
           }
           if (!existing.attivo) {
@@ -1734,7 +1773,12 @@ router.post(
           .where(eq(mensaAccessiTable.id, accessoId))
           .for("update");
         if (!row) throw new MensaError(404, "Accesso non trovato");
-        if (!canAccessAreaOperativa(row.destinazione.areaOperativaId, callerAreaOperativaId(req)))
+        if (
+          !canAccessAreaOperativa(
+            row.destinazione.areaOperativaId,
+            callerAreaOperativaId(req),
+          )
+        )
           throw new MensaError(403, "Accesso non disponibile");
         if (
           !row.destinazione.attiva ||
@@ -1855,7 +1899,8 @@ router.get(
       if (mensaId != null)
         conditions.push(eq(mensaAccessiTable.mensaId, mensaId));
       const ownAreaOperativa = callerAreaOperativaId(req);
-      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+      if (ownAreaOperativa != null)
+        conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const paging = pagination(req.query);
       const where = conditions.length ? and(...conditions) : undefined;
       const [totalRow] = paging.requested
@@ -1958,7 +2003,12 @@ router.post(
           "Il tipo servizio del pasto non corrisponde alla verifica accesso",
         );
       }
-      if (!canAccessAreaOperativa(access.mensa.areaOperativaId, callerAreaOperativaId(req)))
+      if (
+        !canAccessAreaOperativa(
+          access.mensa.areaOperativaId,
+          callerAreaOperativaId(req),
+        )
+      )
         throw new MensaError(403, "Accesso non disponibile");
       await requireMensa(access.mensa.id, req, true);
       if (
@@ -2106,7 +2156,8 @@ router.get(
       if (data) conditions.push(eq(mensaPastiTable.dataServizio, data));
       if (tipo) conditions.push(eq(mensaPastiTable.tipoServizio, tipo));
       const ownAreaOperativa = callerAreaOperativaId(req);
-      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+      if (ownAreaOperativa != null)
+        conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const paging = pagination(req.query);
       const where = conditions.length ? and(...conditions) : undefined;
       const [totalRow] = paging.requested
@@ -2176,7 +2227,9 @@ router.get(
       const conditions: SQL[] = [];
       const ownAreaOperativa = callerAreaOperativaId(req);
       if (ownAreaOperativa != null)
-        conditions.push(eq(mensaEccezioniTable.areaOperativaId, ownAreaOperativa));
+        conditions.push(
+          eq(mensaEccezioniTable.areaOperativaId, ownAreaOperativa),
+        );
       const paging = pagination(req.query);
       const where = conditions.length ? and(...conditions) : undefined;
       const [totalRow] = paging.requested
@@ -2233,7 +2286,8 @@ router.get(
     );
     const conditions: SQL[] = [eq(magazziniTable.stato, "attivo")];
     const ownAreaOperativa = callerAreaOperativaId(req);
-    if (ownAreaOperativa != null) conditions.push(eq(magazziniTable.areaOperativaId, ownAreaOperativa));
+    if (ownAreaOperativa != null)
+      conditions.push(eq(magazziniTable.areaOperativaId, ownAreaOperativa));
     if (ids != null)
       conditions.push(
         ids.length ? inArray(magazziniTable.id, ids) : sql`false`,
@@ -2280,26 +2334,40 @@ router.get(
         )
         .groupBy(prodottiTable.id)
         .orderBy(asc(prodottiTable.nome));
-      const committed = await calcolaImpegnatoAttivoPerGiacenze(
+      const committed = await calcolaImpegnatoAttivoPrecisoPerGiacenze(
         rows.map((row) => ({ prodottoId: row.prodottoId, magazzinoId })),
       );
       res.json(
         rows.map((row) => {
-          const giacenzaFisica = parseDbNumber(row.giacenzaFisica);
-          const giacenzaDistribuibile = parseDbNumber(
-            row.giacenzaDistribuibile,
+          const giacenzaFisicaPrecisa = InventoryDecimal.parse(
+            row.giacenzaFisica ?? "0",
           );
-          const impegnato =
+          const giacenzaDistribuibilePrecisa = InventoryDecimal.parse(
+            row.giacenzaDistribuibile ?? "0",
+          );
+          const impegnatoPreciso = InventoryDecimal.parse(
             committed.get(
               disponibilitaMagazzinoKey(row.prodottoId, magazzinoId),
-            ) ?? 0;
+            ) ?? "0",
+          );
+          const netto = giacenzaDistribuibilePrecisa.subtract(impegnatoPreciso);
+          const disponibileRealePreciso = netto.isNegative()
+            ? InventoryDecimal.zero()
+            : netto;
           return {
             ...row,
-            quantita: Math.max(0, giacenzaDistribuibile - impegnato),
-            giacenzaFisica,
-            giacenzaDistribuibile,
-            impegnato,
-            disponibileReale: Math.max(0, giacenzaDistribuibile - impegnato),
+            quantita: Number(disponibileRealePreciso.toCanonical()),
+            quantitaPrecisa: disponibileRealePreciso.toDb(),
+            giacenzaFisica: Number(giacenzaFisicaPrecisa.toCanonical()),
+            giacenzaFisicaPrecisa: giacenzaFisicaPrecisa.toDb(),
+            giacenzaDistribuibile: Number(
+              giacenzaDistribuibilePrecisa.toCanonical(),
+            ),
+            giacenzaDistribuibilePrecisa: giacenzaDistribuibilePrecisa.toDb(),
+            impegnato: Number(impegnatoPreciso.toCanonical()),
+            impegnatoPreciso: impegnatoPreciso.toDb(),
+            disponibileReale: Number(disponibileRealePreciso.toCanonical()),
+            disponibileRealePrecisa: disponibileRealePreciso.toDb(),
           };
         }),
       );
@@ -2344,21 +2412,30 @@ router.post(
         : [];
       if (!righe.length)
         throw new MensaError(400, "Indicare almeno un prodotto");
-      const normalized = righe.map((row: Record<string, unknown>) => ({
-        prodottoId: positiveInt(row.prodottoId, "prodottoId"),
-        quantita: Number(row.quantita),
-        unitaMisura:
-          row.unitaMisura == null
-            ? null
-            : text(row.unitaMisura, "L'unità di misura", 20),
-        note: optionalText(row.note, "Le note", 1000),
-      }));
-      if (
-        normalized.some(
-          (row) => !Number.isFinite(row.quantita) || row.quantita <= 0,
-        )
-      )
-        throw new MensaError(400, "Le quantità devono essere maggiori di zero");
+      const normalized = righe.map((row: Record<string, unknown>) => {
+        let quantity: InventoryDecimal;
+        try {
+          if (
+            typeof row.quantita !== "string" &&
+            typeof row.quantita !== "number"
+          ) {
+            throw new InventoryDecimalError("Formato quantità non valido");
+          }
+          quantity = positiveInventoryDecimal(row.quantita);
+        } catch (error) {
+          if (!(error instanceof InventoryDecimalError)) throw error;
+          throw new MensaError(400, error.message);
+        }
+        return {
+          prodottoId: positiveInt(row.prodottoId, "prodottoId"),
+          quantita: quantity.toDb(),
+          unitaMisura:
+            row.unitaMisura == null
+              ? null
+              : text(row.unitaMisura, "L'unità di misura", 20),
+          note: optionalText(row.note, "Le note", 1000),
+        };
+      });
       const [replay] = await db
         .select({
           id: trasferimentiTable.id,
@@ -2459,7 +2536,8 @@ router.get(
   async (req, res) => {
     const conditions: SQL[] = [];
     const ownAreaOperativa = callerAreaOperativaId(req);
-    if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+    if (ownAreaOperativa != null)
+      conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
     const paging = pagination(req.query);
     const where = conditions.length ? and(...conditions) : undefined;
     const [totalRow] = paging.requested
@@ -2517,7 +2595,8 @@ router.get(
       if (data != null)
         conditions.push(eq(mensaConsumiTable.dataServizio, data));
       const ownAreaOperativa = callerAreaOperativaId(req);
-      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+      if (ownAreaOperativa != null)
+        conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const paging = pagination(req.query);
       const where = conditions.length ? and(...conditions) : undefined;
       const [totalRow] = await db
@@ -2611,9 +2690,14 @@ router.post(
         );
       }
       const tipoServizio = canonicalTipoServizio(req.body?.tipoServizio);
-      const quantita = Number(req.body?.quantita);
-      if (!Number.isFinite(quantita) || quantita <= 0) {
-        throw new MensaError(400, "La quantità deve essere maggiore di zero");
+      let quantita: InventoryDecimal;
+      try {
+        quantita = positiveInventoryDecimal(req.body?.quantita);
+      } catch (error) {
+        if (error instanceof InventoryDecimalError) {
+          throw new MensaError(400, error.message);
+        }
+        throw error;
       }
       const causale = req.body?.causale;
       if (causale !== "consumo" && causale !== "scarto") {
@@ -2640,6 +2724,10 @@ router.post(
           tipoServizio,
           operatoreId: req.user!.id,
         });
+        const [{ numeroPasti }] = await tx
+          .select({ numeroPasti: count(mensaPastiTable.id) })
+          .from(mensaPastiTable)
+          .where(eq(mensaPastiTable.giornataServizioId, giornata.id));
         const scaricoId = await creaScaricoInventariale(tx, {
           codice,
           magazzinoId: mensa.mensa.magazzinoId,
@@ -2651,8 +2739,32 @@ router.post(
           note,
           operatoreId: req.user!.id,
           documentoRiferimento: codice,
+          source: {
+            naturaContabile:
+              causale === "consumo" ? "DISTRIBUZIONE_FINALE" : "SCARTO",
+            dominioOrigine: "MENSA",
+            entitaOrigineTipo: "mensa_giornata_servizio",
+            entitaOrigineId: giornata.id,
+            canaleOperativo: causale === "consumo" ? "MENSA" : null,
+          },
+          operazioneDistribuzione:
+            causale === "consumo"
+              ? {
+                  canaleOperativo: "MENSA",
+                  dominioOrigine: "MENSA",
+                  entitaOrigineTipo: "mensa_giornata_servizio",
+                  entitaOrigineId: giornata.id,
+                  numeroDocumento: codice,
+                  numeroPasti: Number(numeroPasti),
+                }
+              : undefined,
           righe: [
-            { prodottoId, quantita, unitaMisura: prodotto.unitaMisura, note },
+            {
+              prodottoId,
+              quantita: quantita.toDb(),
+              unitaMisura: prodotto.unitaMisura,
+              note,
+            },
           ],
         });
         const [row] = await tx
@@ -2664,7 +2776,7 @@ router.post(
             dataServizio,
             tipoServizio,
             prodottoId,
-            quantita: quantita.toFixed(2),
+            quantita: quantita.toDb(),
             unitaMisura: prodotto.unitaMisura,
             causale,
             note,
@@ -2676,7 +2788,7 @@ router.post(
           auditValues(req, `mensa-consumo:${row.id}`, "registrazione", null, {
             mensaId,
             prodottoId,
-            quantita,
+            quantita: quantita.toCanonical(),
             causale,
             scaricoId,
             giornataServizioId: giornata.id,
@@ -2731,12 +2843,20 @@ router.post(
       const id = positiveInt(req.params.id, "id");
       const motivo = text(req.body?.motivo, "Il motivo dello storno", 2000);
       const [current] = await db
-        .select({ consumo: mensaConsumiTable, areaOperativaId: menseTable.areaOperativaId })
+        .select({
+          consumo: mensaConsumiTable,
+          areaOperativaId: menseTable.areaOperativaId,
+        })
         .from(mensaConsumiTable)
         .innerJoin(menseTable, eq(mensaConsumiTable.mensaId, menseTable.id))
         .where(eq(mensaConsumiTable.id, id));
       if (!current) throw new MensaError(404, "Consumo non trovato");
-      if (!canAccessAreaOperativa(current.areaOperativaId, callerAreaOperativaId(req))) {
+      if (
+        !canAccessAreaOperativa(
+          current.areaOperativaId,
+          callerAreaOperativaId(req),
+        )
+      ) {
         throw new MensaError(403, "Consumo non accessibile per la tua Area");
       }
       const code = consumoCodice(current.consumo.idempotencyKey);
@@ -2802,7 +2922,8 @@ router.get(
       if (data != null)
         conditions.push(eq(mensaGiornateServizioTable.dataServizio, data));
       const ownAreaOperativa = callerAreaOperativaId(req);
-      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+      if (ownAreaOperativa != null)
+        conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const rows = await db
         .select({
           giornata: mensaGiornateServizioTable,
@@ -2840,6 +2961,7 @@ router.post(
           .select({
             giornata: mensaGiornateServizioTable,
             areaOperativaId: menseTable.areaOperativaId,
+            magazzinoId: menseTable.magazzinoId,
           })
           .from(mensaGiornateServizioTable)
           .innerJoin(
@@ -2849,7 +2971,12 @@ router.post(
           .where(eq(mensaGiornateServizioTable.id, id))
           .for("update");
         if (!current) throw new MensaError(404, "Giornata Mensa non trovata");
-        if (!canAccessAreaOperativa(current.areaOperativaId, callerAreaOperativaId(req)))
+        if (
+          !canAccessAreaOperativa(
+            current.areaOperativaId,
+            callerAreaOperativaId(req),
+          )
+        )
           throw new MensaError(403, "Giornata non accessibile");
         if (current.giornata.stato !== "aperta")
           throw new MensaError(409, "La giornata è già chiusa");
@@ -2935,6 +3062,16 @@ router.post(
           perFasciaEta: countBy(meals.map((meal) => meal.fasciaEta)),
           ...consumptionBreakdown,
         };
+        await ensureDistributionOperation(tx, {
+          magazzinoId: current.magazzinoId,
+          dataDistribuzione: current.giornata.dataServizio,
+          canaleOperativo: "MENSA",
+          dominioOrigine: "MENSA",
+          entitaOrigineTipo: "mensa_giornata_servizio",
+          entitaOrigineId: id,
+          numeroPasti: snapshot.pasti,
+          creatoDa: req.user!.id,
+        });
         const [updated] = await tx
           .update(mensaGiornateServizioTable)
           .set({
@@ -3000,7 +3137,12 @@ router.post(
           .where(eq(mensaGiornateServizioTable.id, id))
           .for("update");
         if (!current) throw new MensaError(404, "Giornata Mensa non trovata");
-        if (!canAccessAreaOperativa(current.areaOperativaId, callerAreaOperativaId(req)))
+        if (
+          !canAccessAreaOperativa(
+            current.areaOperativaId,
+            callerAreaOperativaId(req),
+          )
+        )
           throw new MensaError(403, "Giornata non accessibile");
         if (current.giornata.stato !== "chiusa")
           throw new MensaError(
@@ -3071,7 +3213,8 @@ router.get(
         conditions.push(eq(mensaPastiTable.mensaId, mensaId));
       if (tipo) conditions.push(eq(mensaPastiTable.tipoServizio, tipo));
       const ownAreaOperativa = callerAreaOperativaId(req);
-      if (ownAreaOperativa != null) conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+      if (ownAreaOperativa != null)
+        conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const distribution = await db
         .select({
           mensaId: menseTable.id,
@@ -3162,7 +3305,9 @@ router.get(
       if (tipo != null)
         consumptionConditions.push(eq(mensaConsumiTable.tipoServizio, tipo));
       if (ownAreaOperativa != null)
-        consumptionConditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+        consumptionConditions.push(
+          eq(menseTable.areaOperativaId, ownAreaOperativa),
+        );
       const consumption = await db
         .select({
           causale: mensaConsumiTable.causale,
@@ -3559,7 +3704,12 @@ router.post(
       const expected = expectedVersion(req.body?.versione);
       const current = await loadAbilitazione(id);
       if (!current) throw new MensaError(404, "Abilitazione non trovata");
-      if (!canAccessAreaOperativa(current.areaOperativaId, callerAreaOperativaId(req)))
+      if (
+        !canAccessAreaOperativa(
+          current.areaOperativaId,
+          callerAreaOperativaId(req),
+        )
+      )
         throw new MensaError(403, "Abilitazione non accessibile");
       const updated = await db.transaction(async (tx) => {
         const allowed: Record<AbilitazioneStato, readonly AbilitazioneStato[]> =

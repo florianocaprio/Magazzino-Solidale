@@ -1271,7 +1271,7 @@ function TrasferimentiView() {
           righe: [
             {
               prodottoId: product.prodottoId,
-              quantita: requestedQuantity,
+              quantita: String(requestedQuantity),
               unitaMisura: product.unitaMisura,
             },
           ],
@@ -1361,7 +1361,7 @@ function TrasferimentiView() {
           <Input
             type="number"
             min="0.01"
-            step="0.01"
+            step="0.000001"
             max={selectedProduct?.disponibileReale}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
@@ -1529,7 +1529,7 @@ function ConsumiView() {
           dataServizio: date,
           tipoServizio,
           prodottoId: selectedProduct.prodottoId,
-          quantita: Number(quantity),
+          quantita: quantity,
           causale,
           note: notes.trim() || null,
           idempotencyKey: requestKey("mensa-consumo"),
@@ -1622,7 +1622,7 @@ function ConsumiView() {
           <Input
             type="number"
             min="0.01"
-            step="0.01"
+            step="0.000001"
             max={selectedProduct?.disponibileReale}
             value={quantity}
             onChange={(event) => setQuantity(event.target.value)}

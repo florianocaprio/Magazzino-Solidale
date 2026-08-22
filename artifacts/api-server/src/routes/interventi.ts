@@ -81,6 +81,11 @@ import {
   InventoryError,
 } from "../lib/scaricoInventory";
 import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
+import {
+  InventoryDecimal,
+  InventoryDecimalError,
+  nonNegativeInventoryDecimal,
+} from "../lib/inventoryDecimal";
 
 const router: IRouter = Router();
 
@@ -807,11 +812,21 @@ function optionalPositiveInteger(value: unknown, field: string): number | null {
 
 function nonNegativeQuantity(value: unknown, field: string): string {
   if (value == null || value === "") return "0";
-  const parsed = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 999_999_999) {
+  if (typeof value !== "string" && typeof value !== "number") {
     throw new RouteError(400, `${field} deve essere una quantità non negativa`);
   }
-  return parsed.toFixed(3);
+  try {
+    const parsed = nonNegativeInventoryDecimal(value);
+    if (parsed.compare(InventoryDecimal.parse("99999999.999999")) > 0) {
+      throw new RouteError(400, `${field} supera il massimo contabile`);
+    }
+    return parsed.toDb();
+  } catch (error) {
+    if (error instanceof InventoryDecimalError) {
+      throw new RouteError(400, `${field}: ${error.message}`);
+    }
+    throw error;
+  }
 }
 
 function inputArray<T>(
@@ -1129,16 +1144,6 @@ async function replaceOperativita(
           "Un materiale catalogato consegnato richiede il magazzino di scarico",
         );
       }
-      if (
-        prodottoId != null &&
-        Math.round(Number(quantitaConsegnata) * 100) / 100 !==
-          Number(quantitaConsegnata)
-      ) {
-        throw new RouteError(
-          400,
-          "La quantità consegnata inventariale accetta al massimo due decimali",
-        );
-      }
       return {
         interventoId,
         prodottoId,
@@ -1176,7 +1181,7 @@ async function replaceOperativita(
         {
           prodottoId: number;
           magazzinoId: number;
-          quantita: number;
+          quantita: InventoryDecimal;
           unitaMisura: string;
         }
       >();
@@ -1187,7 +1192,9 @@ async function replaceOperativita(
         result.set(key, {
           prodottoId: row.prodottoId,
           magazzinoId: row.magazzinoId,
-          quantita: (current?.quantita ?? 0) + Number(row.quantitaConsegnata),
+          quantita: (current?.quantita ?? InventoryDecimal.zero()).add(
+            InventoryDecimal.parse(row.quantitaConsegnata),
+          ),
           unitaMisura: row.unitaMisuraSnapshot,
         });
       }
@@ -1197,11 +1204,11 @@ async function replaceOperativita(
     const nextDelivered = deliveredByKey(values);
     const deltasByWarehouse = new Map<
       number,
-      Array<{ prodottoId: number; quantita: number; unitaMisura: string }>
+      Array<{ prodottoId: number; quantita: string; unitaMisura: string }>
     >();
     for (const [key, previous] of previousDelivered) {
-      const next = nextDelivered.get(key)?.quantita ?? 0;
-      if (next + 0.000_001 < previous.quantita) {
+      const next = nextDelivered.get(key)?.quantita ?? InventoryDecimal.zero();
+      if (next.compare(previous.quantita) < 0) {
         throw new RouteError(
           409,
           "Una quantità già consegnata e scaricata non può essere ridotta senza uno storno esplicito",
@@ -1209,13 +1216,14 @@ async function replaceOperativita(
       }
     }
     for (const [key, next] of nextDelivered) {
-      const previous = previousDelivered.get(key)?.quantita ?? 0;
-      const delta = Math.round((next.quantita - previous) * 100) / 100;
-      if (delta <= 0) continue;
+      const previous =
+        previousDelivered.get(key)?.quantita ?? InventoryDecimal.zero();
+      const delta = next.quantita.subtract(previous);
+      if (!delta.isPositive()) continue;
       const rows = deltasByWarehouse.get(next.magazzinoId) ?? [];
       rows.push({
         prodottoId: next.prodottoId,
-        quantita: delta,
+        quantita: delta.toDb(),
         unitaMisura: next.unitaMisura,
       });
       deltasByWarehouse.set(next.magazzinoId, rows);
@@ -1240,6 +1248,22 @@ async function replaceOperativita(
           operatoreId,
           beneficiarioId: intervento.beneficiarioId,
           documentoRiferimento: `INTERVENTO-${interventoId}`,
+          source: {
+            naturaContabile: "DISTRIBUZIONE_FINALE",
+            dominioOrigine: intervento.ambito === "uds" ? "UDS" : "SOCIALE",
+            entitaOrigineTipo: `intervento_materiali_${magazzinoId}`,
+            entitaOrigineId: interventoId,
+            canaleOperativo:
+              intervento.ambito === "uds" ? "UDS_STRADA" : "ALTRO",
+          },
+          operazioneDistribuzione: {
+            canaleOperativo:
+              intervento.ambito === "uds" ? "UDS_STRADA" : "ALTRO",
+            dominioOrigine: intervento.ambito === "uds" ? "UDS" : "SOCIALE",
+            entitaOrigineTipo: `intervento_materiali_${magazzinoId}`,
+            entitaOrigineId: interventoId,
+            numeroDocumento: `INTERVENTO-${interventoId}`,
+          },
           righe,
         });
       } catch (error) {
