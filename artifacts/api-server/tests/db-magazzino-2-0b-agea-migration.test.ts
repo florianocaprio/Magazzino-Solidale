@@ -8,6 +8,10 @@ const migrationUrl = new URL(
   "../../../lib/db/updates/20260822_magazzino_2_0b_agea_import.sql",
   import.meta.url,
 );
+const r1MigrationUrl = new URL(
+  "../../../lib/db/updates/20260823_magazzino_2_0b_r1_agea_hardening.sql",
+  import.meta.url,
+);
 
 afterAll(async () => {
   await pool.end();
@@ -69,6 +73,65 @@ describe("migration Magazzino 2.0B AGEA", () => {
         ORDER BY conname
       `);
       expect(constraints.rows).toHaveLength(4);
+      await client.query("ROLLBACK");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  it("applica due volte l'hardening R1 preservando i dati business e aggiungendo campi/indici", async () => {
+    const migration = await readFile(r1MigrationUrl, "utf8");
+    expect(migration).not.toMatch(/^\s*(?:DELETE|TRUNCATE|DROP\s+TABLE)\b/im);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const before = await client.query(`
+        SELECT
+          (SELECT count(*)::int FROM prodotti) AS prodotti,
+          (SELECT count(*)::int FROM lotti) AS lotti,
+          (SELECT count(*)::int FROM movimenti) AS movimenti,
+          (SELECT count(*)::int FROM carichi_magazzino) AS carichi
+      `);
+      await client.query(migration);
+      await client.query(migration);
+      const after = await client.query(`
+        SELECT
+          (SELECT count(*)::int FROM prodotti) AS prodotti,
+          (SELECT count(*)::int FROM lotti) AS lotti,
+          (SELECT count(*)::int FROM movimenti) AS movimenti,
+          (SELECT count(*)::int FROM carichi_magazzino) AS carichi
+      `);
+      expect(after.rows[0]).toEqual(before.rows[0]);
+      const columns = await client.query<{ column_name: string }>(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'importazioni_agea_righe'
+          AND column_name = ANY(ARRAY[
+            'lotto_effettivo_raw',
+            'lotto_effettivo_normalizzato',
+            'data_carico_effettiva',
+            'mapping_versione_snapshot',
+            'correzione_motivazione',
+            'corretto_da',
+            'data_correzione'
+          ])
+      `);
+      expect(columns.rows).toHaveLength(7);
+      const indexes = await client.query<{ indexname: string }>(`
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND indexname = ANY(ARRAY[
+            'importazioni_agea_righe_identity_base_idx',
+            'importazioni_agea_righe_mapping_idx',
+            'importazioni_agea_partite_identity_idx'
+          ])
+      `);
+      expect(indexes.rows).toHaveLength(3);
       await client.query("ROLLBACK");
     } catch (error) {
       await client.query("ROLLBACK");

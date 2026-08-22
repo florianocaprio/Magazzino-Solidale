@@ -11,6 +11,7 @@ import {
   carichiMagazzinoTable,
   db,
   importazioniAgeaRigheTable,
+  importazioniAgeaPartiteTable,
   importazioniAgeaTable,
   lottiTable,
   mappatureProdottiEsterniTable,
@@ -44,7 +45,10 @@ let foreignAreaId: number;
 let productId: number;
 let originalLotti = true;
 let acceptanceWarehouseId: number | null = null;
+let manyToOneWarehouseId: number | null = null;
+const concurrencyWarehouseIds: number[] = [];
 let acceptanceProductIds: number[] = [];
+let extraProductIds: number[] = [];
 const acceptancePath = process.env.AGEA_ACCEPTANCE_XLSX;
 
 const headers = [
@@ -153,6 +157,46 @@ function registry(
   );
 }
 
+function ageaRow(overrides: Record<number, string | number> = {}) {
+  const values: Array<string | number> = [
+    "FSE+",
+    "Pasta test AGEA",
+    8,
+    4.4,
+    "DOC-R1",
+    "20/08/2026",
+    "20/08/2026",
+    "LOT-R1",
+    "AGEA",
+    4.4,
+    8,
+    8,
+    4.4,
+    "",
+    "Pacchi",
+    0,
+    0,
+    0,
+    0,
+  ];
+  Object.entries(overrides).forEach(([index, value]) => {
+    values[Number(index)] = value;
+  });
+  return values;
+}
+
+function workbookFromRows(rows: Array<Array<string | number>>) {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([headers, ...rows]),
+    "Table1",
+  );
+  return Buffer.from(
+    XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }),
+  );
+}
+
 function makeApp(
   permissions: string[],
   areaOperativaId: number | null = null,
@@ -189,13 +233,21 @@ function makeApp(
 }
 
 async function analyze(
-  mode: "PRIMA_ACQUISIZIONE" | "AGGIORNAMENTO",
+  mode: "PRIMA_ACQUISIZIONE" | "AGGIORNAMENTO" | "SOLO_ANALISI",
   buffer: Buffer,
+) {
+  return analyzeForWarehouse(mode, buffer, warehouseId);
+}
+
+async function analyzeForWarehouse(
+  mode: "PRIMA_ACQUISIZIONE" | "AGGIORNAMENTO" | "SOLO_ANALISI",
+  buffer: Buffer,
+  targetWarehouseId: number,
 ) {
   return request(app)
     .post("/agea/importazioni/analizza")
     .query({
-      magazzinoId: warehouseId,
+      magazzinoId: targetWarehouseId,
       modalita: mode,
       nomeFile: "registro.xlsx",
     })
@@ -278,6 +330,96 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  for (const concurrencyWarehouseId of concurrencyWarehouseIds) {
+    const imports = await db
+      .select({ id: importazioniAgeaTable.id })
+      .from(importazioniAgeaTable)
+      .where(eq(importazioniAgeaTable.magazzinoId, concurrencyWarehouseId));
+    const importIds = imports.map((item) => item.id);
+    if (importIds.length)
+      await db
+        .update(importazioniAgeaRigheTable)
+        .set({ movimentoEsternoId: null })
+        .where(inArray(importazioniAgeaRigheTable.importazioneId, importIds));
+    await db
+      .delete(movimentiEsterniAgeaTable)
+      .where(eq(movimentiEsterniAgeaTable.magazzinoId, concurrencyWarehouseId));
+    await db
+      .update(importazioniAgeaTable)
+      .set({ bootstrapCaricoId: null })
+      .where(eq(importazioniAgeaTable.magazzinoId, concurrencyWarehouseId));
+    await db
+      .delete(importazioniAgeaTable)
+      .where(eq(importazioniAgeaTable.magazzinoId, concurrencyWarehouseId));
+    await db
+      .delete(movimentiTable)
+      .where(eq(movimentiTable.magazzinoId, concurrencyWarehouseId));
+    const loads = await db
+      .select({ id: carichiMagazzinoTable.id })
+      .from(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.magazzinoId, concurrencyWarehouseId));
+    if (loads.length)
+      await db.delete(carichiMagazzinoRigheTable).where(
+        inArray(
+          carichiMagazzinoRigheTable.caricoMagazzinoId,
+          loads.map((load) => load.id),
+        ),
+      );
+    await db
+      .delete(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.magazzinoId, concurrencyWarehouseId));
+    await db
+      .delete(lottiTable)
+      .where(eq(lottiTable.magazzinoId, concurrencyWarehouseId));
+    await db
+      .delete(magazziniTable)
+      .where(eq(magazziniTable.id, concurrencyWarehouseId));
+  }
+  if (manyToOneWarehouseId != null) {
+    const imports = await db
+      .select({ id: importazioniAgeaTable.id })
+      .from(importazioniAgeaTable)
+      .where(eq(importazioniAgeaTable.magazzinoId, manyToOneWarehouseId));
+    const importIds = imports.map((item) => item.id);
+    if (importIds.length)
+      await db
+        .update(importazioniAgeaRigheTable)
+        .set({ movimentoEsternoId: null })
+        .where(inArray(importazioniAgeaRigheTable.importazioneId, importIds));
+    await db
+      .delete(movimentiEsterniAgeaTable)
+      .where(eq(movimentiEsterniAgeaTable.magazzinoId, manyToOneWarehouseId));
+    await db
+      .update(importazioniAgeaTable)
+      .set({ bootstrapCaricoId: null })
+      .where(eq(importazioniAgeaTable.magazzinoId, manyToOneWarehouseId));
+    await db
+      .delete(importazioniAgeaTable)
+      .where(eq(importazioniAgeaTable.magazzinoId, manyToOneWarehouseId));
+    await db
+      .delete(movimentiTable)
+      .where(eq(movimentiTable.magazzinoId, manyToOneWarehouseId));
+    const loads = await db
+      .select({ id: carichiMagazzinoTable.id })
+      .from(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.magazzinoId, manyToOneWarehouseId));
+    if (loads.length)
+      await db.delete(carichiMagazzinoRigheTable).where(
+        inArray(
+          carichiMagazzinoRigheTable.caricoMagazzinoId,
+          loads.map((load) => load.id),
+        ),
+      );
+    await db
+      .delete(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.magazzinoId, manyToOneWarehouseId));
+    await db
+      .delete(lottiTable)
+      .where(eq(lottiTable.magazzinoId, manyToOneWarehouseId));
+    await db
+      .delete(magazziniTable)
+      .where(eq(magazziniTable.id, manyToOneWarehouseId));
+  }
   if (acceptanceWarehouseId != null) {
     const acceptanceImports = await db
       .select({ id: importazioniAgeaTable.id })
@@ -359,6 +501,16 @@ afterAll(async () => {
   await db
     .delete(mappatureProdottiEsterniTable)
     .where(eq(mappatureProdottiEsterniTable.prodottoId, productId));
+  if (extraProductIds.length) {
+    await db
+      .delete(mappatureProdottiEsterniTable)
+      .where(
+        inArray(mappatureProdottiEsterniTable.prodottoId, extraProductIds),
+      );
+    await db
+      .delete(prodottiTable)
+      .where(inArray(prodottiTable.id, extraProductIds));
+  }
   await db.delete(prodottiTable).where(eq(prodottiTable.id, productId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, warehouseId));
   await db
@@ -412,9 +564,14 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
     expect(InventoryDecimal.parse(stockMovements[0].quantita).toDb()).toBe(
       "4.400000",
     );
-    const replay = await request(app)
+    const staleReplay = await request(app)
       .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
       .send({ versione: analyzed.body.versione });
+    expect(staleReplay.status).toBe(409);
+    expect(staleReplay.body.code).toBe("VERSIONE_NON_CORRENTE");
+    const replay = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
+      .send({ versione: confirmed.body.importazione.versione });
     expect(replay.body.replay).toBe(true);
     expect(
       await db
@@ -497,6 +654,727 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       righeModificate: 0,
     });
   });
+
+  it("non collide su documenti lunghi e mantiene l'idempotenza invertendo l'ordine", async () => {
+    const prefix = "DOC-" + "X".repeat(130);
+    const firstBuffer = workbookFromRows([
+      ageaRow({ 4: `${prefix}-A`, 9: 1.1, 10: 2 }),
+      ageaRow({ 4: `${prefix}-B`, 9: 2.2, 10: 4 }),
+    ]);
+    const analyzed = await analyze("AGGIORNAMENTO", firstBuffer);
+    expect(analyzed.body).toMatchObject({ stato: "PRONTA", righeNuove: 2 });
+    const confirmed = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
+      .send({ versione: analyzed.body.versione });
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body.carichi).toHaveLength(2);
+
+    const reversed = await analyze(
+      "AGGIORNAMENTO",
+      workbookFromRows([
+        ageaRow({ 4: `${prefix}-B`, 9: 2.2, 10: 4 }),
+        ageaRow({ 4: `${prefix}-A`, 9: 1.1, 10: 2 }),
+      ]),
+    );
+    expect(reversed.body).toMatchObject({
+      stato: "PRONTA",
+      righeDuplicate: 2,
+      righeNuove: 0,
+    });
+    const replayed = await request(app)
+      .post(`/agea/importazioni/${reversed.body.id}/conferma`)
+      .send({ versione: reversed.body.versione });
+    expect(replayed.status).toBe(200);
+    expect(replayed.body.carichi).toHaveLength(0);
+  });
+
+  it("ricostruisce tutti gli snapshot dopo mapping A→B, disable/enable e blocca la conferma su drift", async () => {
+    const [mappingA] = await db
+      .select()
+      .from(mappatureProdottiEsterniTable)
+      .where(
+        eq(
+          mappatureProdottiEsterniTable.chiaveDescrizioneNormalizzata,
+          "PASTA TEST AGEA",
+        ),
+      );
+    const [{ id: productB }] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `AGEAB-${suffix}`.slice(0, 30),
+        nome: "Pasta AGEA interna B",
+        tipoProdotto: "alimentare",
+        unitaMisura: "kg",
+        gestioneLotto: true,
+        gestioneScadenza: false,
+      })
+      .returning({ id: prodottiTable.id });
+    extraProductIds.push(productB);
+    const analyzed = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow()]),
+    );
+    expect(analyzed.body.stato).toBe("PRONTA");
+
+    const unsafeUpsert = await request(app)
+      .post("/agea/mappature-prodotti")
+      .send({ descrizioneEsterna: "Pasta test AGEA", prodottoId: productB });
+    expect(unsafeUpsert.status).toBe(409);
+    expect(unsafeUpsert.body.code).toBe("MAPPATURA_GIA_ESISTENTE");
+
+    const changed = await request(app)
+      .patch(`/agea/mappature-prodotti/${mappingA.id}`)
+      .send({
+        prodottoId: productB,
+        versione: mappingA.versione,
+        attiva: true,
+      });
+    expect(changed.status).toBe(200);
+    const drift = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
+      .send({ versione: analyzed.body.versione });
+    expect(drift.status).toBe(409);
+    expect(drift.body.code).toBe("MAPPING_MODIFICATO");
+
+    const recalculatedB = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/ricalcola`)
+      .send({ versione: analyzed.body.versione });
+    expect(recalculatedB.status).toBe(200);
+    expect(recalculatedB.body.versione).toBe(analyzed.body.versione + 1);
+    const [rowB] = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .where(eq(importazioniAgeaRigheTable.importazioneId, analyzed.body.id));
+    expect(rowB).toMatchObject({
+      prodottoIdSnapshot: productB,
+      mappingVersioneSnapshot: changed.body.versione,
+    });
+
+    const disabled = await request(app)
+      .patch(`/agea/mappature-prodotti/${mappingA.id}`)
+      .send({
+        prodottoId: productB,
+        versione: changed.body.versione,
+        attiva: false,
+      });
+    const recalculatedDisabled = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/ricalcola`)
+      .send({ versione: recalculatedB.body.versione });
+    expect(recalculatedDisabled.body.stato).toBe("DA_MAPPARE");
+    const [unmapped] = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .where(eq(importazioniAgeaRigheTable.importazioneId, analyzed.body.id));
+    expect(unmapped.prodottoIdSnapshot).toBeNull();
+
+    const enabled = await request(app)
+      .patch(`/agea/mappature-prodotti/${mappingA.id}`)
+      .send({
+        prodottoId: productB,
+        versione: disabled.body.versione,
+        attiva: true,
+      });
+    const recalculatedEnabled = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/ricalcola`)
+      .send({ versione: recalculatedDisabled.body.versione });
+    expect(recalculatedEnabled.body.stato).toBe("PRONTA");
+
+    const restored = await request(app)
+      .patch(`/agea/mappature-prodotti/${mappingA.id}`)
+      .send({
+        prodottoId: productId,
+        versione: enabled.body.versione,
+        attiva: true,
+      });
+    expect(restored.status).toBe(200);
+    const confirmedRows = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .innerJoin(
+        importazioniAgeaTable,
+        eq(importazioniAgeaTable.id, importazioniAgeaRigheTable.importazioneId),
+      )
+      .where(eq(importazioniAgeaTable.stato, "CONFERMATA"));
+    expect(
+      confirmedRows.every(
+        ({ importazioni_agea_righe: row }) =>
+          row.prodottoIdSnapshot === productId,
+      ),
+    ).toBe(true);
+  });
+
+  it("aggrega in una sola partita due descrizioni mappate allo stesso prodotto/fondo/lotto", async () => {
+    await db.insert(mappatureProdottiEsterniTable).values({
+      fonte: "AGEA_SIFEAD",
+      descrizioneEsterna: "Alias pasta AGEA",
+      chiaveDescrizioneNormalizzata: "ALIAS PASTA AGEA",
+      prodottoId: productId,
+      creatoDa: userId,
+      aggiornatoDa: userId,
+    });
+    [{ id: manyToOneWarehouseId }] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `AGEAM-${suffix}`.slice(0, 20),
+        nome: `AGEA many-to-one ${suffix}`,
+      })
+      .returning({ id: magazziniTable.id });
+    const analyzed = await request(app)
+      .post("/agea/importazioni/analizza")
+      .query({
+        magazzinoId: manyToOneWarehouseId,
+        modalita: "PRIMA_ACQUISIZIONE",
+        nomeFile: "many-to-one.xlsx",
+      })
+      .set("Content-Type", AGEA_XLSX_MIME)
+      .send(
+        workbookFromRows([
+          ageaRow(),
+          ageaRow({
+            1: "Alias pasta AGEA",
+            4: "SC-R1",
+            8: "Distribuzione indigenti",
+            9: -1.1,
+            10: -2,
+          }),
+        ]),
+      );
+    expect(analyzed.body).toMatchObject({
+      stato: "PRONTA",
+      partiteTotali: 1,
+      partiteSaldoPositivo: 1,
+    });
+    const parties = await request(app).get(
+      `/agea/importazioni/${analyzed.body.id}/partite`,
+    );
+    expect(parties.body).toHaveLength(1);
+    expect(parties.body[0].descrizioniEsterneJson).toEqual([
+      "ALIAS PASTA AGEA",
+      "PASTA TEST AGEA",
+    ]);
+    expect(
+      InventoryDecimal.parse(parties.body[0].quantitaOperativa).toDb(),
+    ).toBe("4.400000");
+    const confirmed = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
+      .send({ versione: analyzed.body.versione });
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body.carichi).toHaveLength(1);
+    const loadLines = await db
+      .select()
+      .from(carichiMagazzinoRigheTable)
+      .where(
+        eq(
+          carichiMagazzinoRigheTable.caricoMagazzinoId,
+          confirmed.body.carichi[0],
+        ),
+      );
+    expect(loadLines).toHaveLength(1);
+    expect(InventoryDecimal.parse(loadLines[0].quantitaOperativa).toDb()).toBe(
+      "4.400000",
+    );
+  });
+
+  it("blocca il merge molti-a-uno quando le scadenze manuali precedenti sono discordanti", async () => {
+    const [{ id: conflictWarehouseId }] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `AGEACM-${suffix}`.slice(0, 20),
+        nome: `AGEA merge conflict ${suffix}`,
+      })
+      .returning({ id: magazziniTable.id });
+    concurrencyWarehouseIds.push(conflictWarehouseId);
+    const [{ id: conflictProductId }] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `AGEACF-${suffix}`.slice(0, 30),
+        nome: "Pasta AGEA conflitto",
+        tipoProdotto: "alimentare",
+        unitaMisura: "kg",
+        gestioneLotto: true,
+        gestioneScadenza: true,
+      })
+      .returning({ id: prodottiTable.id });
+    extraProductIds.push(conflictProductId);
+    await db
+      .update(prodottiTable)
+      .set({ gestioneScadenza: true })
+      .where(eq(prodottiTable.id, productId));
+    const [conflictMapping] = await db
+      .insert(mappatureProdottiEsterniTable)
+      .values({
+        fonte: "AGEA_SIFEAD",
+        descrizioneEsterna: "Alias conflitto AGEA",
+        chiaveDescrizioneNormalizzata: "ALIAS CONFLITTO AGEA",
+        prodottoId: conflictProductId,
+        creatoDa: userId,
+        aggiornatoDa: userId,
+      })
+      .returning();
+    const analyzed = await analyzeForWarehouse(
+      "SOLO_ANALISI",
+      workbookFromRows([
+        ageaRow({ 4: "MERGE-CONFLICT-A" }),
+        ageaRow({ 1: "Alias conflitto AGEA", 4: "MERGE-CONFLICT-B" }),
+      ]),
+      conflictWarehouseId,
+    );
+    const initialParties = await request(app).get(
+      `/agea/importazioni/${analyzed.body.id}/partite`,
+    );
+    expect(initialParties.body).toHaveLength(2);
+    const firstCorrection = await request(app)
+      .patch(
+        `/agea/importazioni/${analyzed.body.id}/partite/${initialParties.body.find((party: { prodottoId: number }) => party.prodottoId === productId).id}`,
+      )
+      .send({
+        dataScadenza: "2028-01-31",
+        motivazione: "Scadenza prodotto A",
+        versione: analyzed.body.versione,
+      });
+    expect(firstCorrection.status, JSON.stringify(firstCorrection.body)).toBe(
+      200,
+    );
+    const refreshedParties = await request(app).get(
+      `/agea/importazioni/${analyzed.body.id}/partite`,
+    );
+    const secondCorrection = await request(app)
+      .patch(
+        `/agea/importazioni/${analyzed.body.id}/partite/${refreshedParties.body.find((party: { prodottoId: number }) => party.prodottoId === conflictProductId).id}`,
+      )
+      .send({
+        dataScadenza: "2029-01-31",
+        motivazione: "Scadenza prodotto B",
+        versione: firstCorrection.body.versione,
+      });
+    expect(secondCorrection.status, JSON.stringify(secondCorrection.body)).toBe(
+      200,
+    );
+    expect(secondCorrection.body.stato).toBe("PRONTA");
+    const mergedMapping = await request(app)
+      .patch(`/agea/mappature-prodotti/${conflictMapping.id}`)
+      .send({
+        prodottoId: productId,
+        versione: conflictMapping.versione,
+        attiva: true,
+      });
+    expect(mergedMapping.status).toBe(200);
+    const recalculated = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/ricalcola`)
+      .send({ versione: secondCorrection.body.versione });
+    expect(recalculated.body).toMatchObject({
+      stato: "BLOCCATA",
+      partiteTotali: 1,
+    });
+    const mergedParties = await request(app).get(
+      `/agea/importazioni/${analyzed.body.id}/partite`,
+    );
+    expect(mergedParties.body).toHaveLength(1);
+    expect(mergedParties.body[0].errorCodesJson).toContain(
+      "CORREZIONI_PARTITA_CONFLITTO",
+    );
+    await db
+      .update(prodottiTable)
+      .set({ gestioneScadenza: false })
+      .where(eq(prodottiTable.id, productId));
+  });
+
+  it("blocca saldi finali negativi o a segno misto senza applicare valori assoluti", async () => {
+    const negative = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([
+        ageaRow({
+          2: -8,
+          3: -4.4,
+          8: "Distribuzione indigenti",
+          9: -1,
+          10: -2,
+        }),
+      ]),
+    );
+    expect(negative.body.stato).toBe("BLOCCATA");
+    const negativeParties = await request(app).get(
+      `/agea/importazioni/${negative.body.id}/partite`,
+    );
+    expect(negativeParties.body[0].errorCodesJson).toContain(
+      "SALDO_FINALE_NEGATIVO",
+    );
+    expect(
+      InventoryDecimal.parse(negativeParties.body[0].quantitaOperativa, {
+        allowNegative: true,
+      }).toDb(),
+    ).toBe("-4.400000");
+
+    const mixed = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow({ 2: 8, 3: -4.4 })]),
+    );
+    const mixedParties = await request(app).get(
+      `/agea/importazioni/${mixed.body.id}/partite`,
+    );
+    expect(mixedParties.body[0].errorCodesJson).toEqual(
+      expect.arrayContaining([
+        "SALDO_FINALE_NEGATIVO",
+        "SALDO_FINALE_SEGNO_INCOERENTE",
+      ]),
+    );
+
+    const zero = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow({ 2: 0, 3: 0, 9: 0, 10: 0 })]),
+    );
+    const zeroParties = await request(app).get(
+      `/agea/importazioni/${zero.body.id}/partite`,
+    );
+    expect(zero.body).toMatchObject({
+      stato: "PRONTA",
+      partiteSaldoPositivo: 0,
+    });
+    expect(zeroParties.body[0].stato).toBe("SALDO_ZERO");
+    expect(
+      InventoryDecimal.parse(zeroParties.body[0].quantitaOperativa).toDb(),
+    ).toBe("0.000000");
+  });
+
+  it("applica correzioni effective versionate lasciando immutati i raw e gestisce la concorrenza", async () => {
+    const analyzed = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow({ 5: 23, 6: 23, 7: "" })]),
+    );
+    const rows = await request(app).get(
+      `/agea/importazioni/${analyzed.body.id}/righe`,
+    );
+    const rowId = rows.body.items[0].id;
+    for (const body of [
+      {},
+      { versione: null },
+      { versione: "1" },
+      { versione: 1.5 },
+      { versione: 0 },
+    ]) {
+      const invalidVersion = await request(app)
+        .post(`/agea/importazioni/${analyzed.body.id}/ricalcola`)
+        .send(body);
+      expect(invalidVersion.status).toBe(400);
+      expect(invalidVersion.body.code).toBe("VERSIONE_RICHIESTA");
+    }
+    const invalid = await request(app)
+      .patch(
+        `/agea/importazioni/${analyzed.body.id}/righe/${rowId}/data-carico`,
+      )
+      .send({
+        valore: "2026-02-30",
+        motivazione: "Correzione test",
+        versione: analyzed.body.versione,
+      });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.code).toBe("DATA_CIVILE_NON_VALIDA");
+    const correctedDate = await request(app)
+      .patch(
+        `/agea/importazioni/${analyzed.body.id}/righe/${rowId}/data-carico`,
+      )
+      .send({
+        valore: "2026-08-20",
+        motivazione: "Correzione test",
+        versione: analyzed.body.versione,
+      });
+    expect(correctedDate.status).toBe(200);
+    expect(correctedDate.body.versione).toBe(analyzed.body.versione + 1);
+    const correctedLot = await request(app)
+      .patch(`/agea/importazioni/${analyzed.body.id}/righe/${rowId}/lotto`)
+      .send({
+        valore: "  Lotto N\u0303  ",
+        motivazione: "Correzione lotto test",
+        versione: correctedDate.body.versione,
+      });
+    expect(correctedLot.status).toBe(200);
+    expect(correctedLot.body.stato).toBe("PRONTA");
+    const [stored] = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .where(eq(importazioniAgeaRigheTable.id, rowId));
+    expect(stored).toMatchObject({
+      dataCaricoMagazzinoRaw: "23",
+      dataCaricoEffettiva: "2026-08-20",
+      lottoRaw: null,
+      lottoEffettivoRaw: "  Lotto Ñ  ",
+      lottoEffettivoNormalizzato: "LOTTO Ñ",
+    });
+
+    const removedLot = await request(app)
+      .patch(`/agea/importazioni/${analyzed.body.id}/righe/${rowId}/lotto`)
+      .send({
+        valore: null,
+        motivazione: "Rimozione correzione lotto test",
+        versione: correctedLot.body.versione,
+      });
+    expect(removedLot.status).toBe(200);
+    expect(removedLot.body.stato).toBe("BLOCCATA");
+    const [withoutLotCorrection] = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .where(eq(importazioniAgeaRigheTable.id, rowId));
+    expect(withoutLotCorrection.lottoRaw).toBeNull();
+    expect(withoutLotCorrection.lottoEffettivoRaw).toBeNull();
+    expect(withoutLotCorrection.errorCodesJson).toContain(
+      "LOTTO_DA_COMPLETARE",
+    );
+
+    const missingVersion = await request(app).post(
+      `/agea/importazioni/${analyzed.body.id}/ricalcola`,
+    );
+    expect(missingVersion.status).toBe(400);
+    expect(missingVersion.body.code).toBe("VERSIONE_RICHIESTA");
+    const concurrent = await Promise.all([
+      request(app)
+        .post(`/agea/importazioni/${analyzed.body.id}/ricalcola`)
+        .send({ versione: removedLot.body.versione }),
+      request(app)
+        .post(`/agea/importazioni/${analyzed.body.id}/ricalcola`)
+        .send({ versione: removedLot.body.versione }),
+    ]);
+    expect(concurrent.map((response) => response.status).sort()).toEqual([
+      200, 409,
+    ]);
+    expect(
+      concurrent.find((response) => response.status === 409)?.body.code,
+    ).toBe("VERSIONE_NON_CORRENTE");
+    const conflicts = await db
+      .select()
+      .from(systemLogsTable)
+      .where(eq(systemLogsTable.evento, "MAGAZZINO_AGEA_CONFLITTO"));
+    expect(
+      conflicts.some(
+        (entry) =>
+          (entry.details as { importazioneId?: number }).importazioneId ===
+            analyzed.body.id &&
+          (entry.details as { codiceErrore?: string }).codiceErrore ===
+            "VERSIONE_NON_CORRENTE",
+      ),
+    ).toBe(true);
+  });
+
+  it("serializza correzioni, annullamento, conferme e due bootstrap concorrenti", async () => {
+    const expectOneWinner = (
+      responses: Array<{ status: number; body: { code?: string } }>,
+    ) => {
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        200, 409,
+      ]);
+      expect(
+        responses.find((response) => response.status === 409)?.body.code,
+      ).toMatch(
+        /VERSIONE_NON_CORRENTE|IMPORTAZIONE_IMMUTABILE|BOOTSTRAP_GIA_CONFERMATO|CARICO_AGEA_ESISTENTE/,
+      );
+    };
+
+    const recalculateImport = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow({ 4: "RACE-RECALCULATE" })]),
+    );
+    expectOneWinner(
+      await Promise.all([
+        request(app)
+          .post(`/agea/importazioni/${recalculateImport.body.id}/ricalcola`)
+          .send({ versione: recalculateImport.body.versione }),
+        request(app)
+          .post(`/agea/importazioni/${recalculateImport.body.id}/conferma`)
+          .send({ versione: recalculateImport.body.versione }),
+      ]),
+    );
+
+    const expiryImport = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([
+        ageaRow({ 4: "RACE-EXPIRY", 7: "RACE-EXPIRY-LOT" }),
+      ]),
+    );
+    const expiryParties = await request(app).get(
+      `/agea/importazioni/${expiryImport.body.id}/partite`,
+    );
+    expectOneWinner(
+      await Promise.all([
+        request(app)
+          .patch(
+            `/agea/importazioni/${expiryImport.body.id}/partite/${expiryParties.body[0].id}`,
+          )
+          .send({
+            dataScadenza: "2028-01-31",
+            motivazione: "Race scadenza",
+            versione: expiryImport.body.versione,
+          }),
+        request(app)
+          .post(`/agea/importazioni/${expiryImport.body.id}/conferma`)
+          .send({ versione: expiryImport.body.versione }),
+      ]),
+    );
+
+    const lotImport = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow({ 4: "RACE-LOT" })]),
+    );
+    const lotRows = await request(app).get(
+      `/agea/importazioni/${lotImport.body.id}/righe`,
+    );
+    expectOneWinner(
+      await Promise.all([
+        request(app)
+          .patch(
+            `/agea/importazioni/${lotImport.body.id}/righe/${lotRows.body.items[0].id}/lotto`,
+          )
+          .send({
+            valore: "LOT-RACE",
+            motivazione: "Race lotto",
+            versione: lotImport.body.versione,
+          }),
+        request(app)
+          .post(`/agea/importazioni/${lotImport.body.id}/conferma`)
+          .send({ versione: lotImport.body.versione }),
+      ]),
+    );
+
+    const cancelledImport = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow({ 4: "RACE-CANCEL" })]),
+    );
+    expectOneWinner(
+      await Promise.all([
+        request(app)
+          .post(`/agea/importazioni/${cancelledImport.body.id}/annulla`)
+          .send({ versione: cancelledImport.body.versione }),
+        request(app)
+          .post(`/agea/importazioni/${cancelledImport.body.id}/conferma`)
+          .send({ versione: cancelledImport.body.versione }),
+      ]),
+    );
+
+    const doubleConfirmImport = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow({ 4: "RACE-CONFIRM" })]),
+    );
+    expectOneWinner(
+      await Promise.all([
+        request(app)
+          .post(`/agea/importazioni/${doubleConfirmImport.body.id}/conferma`)
+          .send({ versione: doubleConfirmImport.body.versione }),
+        request(app)
+          .post(`/agea/importazioni/${doubleConfirmImport.body.id}/conferma`)
+          .send({ versione: doubleConfirmImport.body.versione }),
+      ]),
+    );
+
+    const [{ id: bootstrapWarehouseId }] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `AGEAC-${suffix}`.slice(0, 20),
+        nome: `AGEA concurrency ${suffix}`,
+      })
+      .returning({ id: magazziniTable.id });
+    concurrencyWarehouseIds.push(bootstrapWarehouseId);
+    const [bootstrapA, bootstrapB] = await Promise.all([
+      analyzeForWarehouse(
+        "PRIMA_ACQUISIZIONE",
+        workbookFromRows([ageaRow({ 4: "BOOT-A" })]),
+        bootstrapWarehouseId,
+      ),
+      analyzeForWarehouse(
+        "PRIMA_ACQUISIZIONE",
+        workbookFromRows([ageaRow({ 4: "BOOT-B" })]),
+        bootstrapWarehouseId,
+      ),
+    ]);
+    const bootstrapResponses = await Promise.all([
+      request(app)
+        .post(`/agea/importazioni/${bootstrapA.body.id}/conferma`)
+        .send({ versione: bootstrapA.body.versione }),
+      request(app)
+        .post(`/agea/importazioni/${bootstrapB.body.id}/conferma`)
+        .send({ versione: bootstrapB.body.versione }),
+    ]);
+    expectOneWinner(bootstrapResponses);
+    const bootstrapLoads = await db
+      .select({ id: carichiMagazzinoTable.id })
+      .from(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.magazzinoId, bootstrapWarehouseId));
+    expect(bootstrapLoads).toHaveLength(1);
+  });
+
+  it("propaga scadenza, lotto e fattore dalla partita preview a un carico incrementale", async () => {
+    await db
+      .update(prodottiTable)
+      .set({ gestioneScadenza: true })
+      .where(eq(prodottiTable.id, productId));
+    const analyzed = await analyze(
+      "AGGIORNAMENTO",
+      workbookFromRows([
+        ageaRow({
+          4: "DOC-EXP-R1",
+          7: "LOT-EXP-R1",
+          9: 1.1,
+          10: 2,
+        }),
+      ]),
+    );
+    expect(analyzed.body.stato).toBe("BLOCCATA");
+    const parties = await request(app).get(
+      `/agea/importazioni/${analyzed.body.id}/partite`,
+    );
+    expect(parties.body[0].errorCodesJson).toContain("SCADENZA_DA_COMPLETARE");
+    const expiry = await request(app)
+      .patch(
+        `/agea/importazioni/${analyzed.body.id}/partite/${parties.body[0].id}`,
+      )
+      .send({
+        dataScadenza: "2027-12-31",
+        motivazione: "Scadenza da documento AGEA",
+        versione: analyzed.body.versione,
+      });
+    expect(expiry.status).toBe(200);
+    expect(expiry.body.stato).toBe("PRONTA");
+    const confirmed = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
+      .send({ versione: expiry.body.versione });
+    expect(confirmed.status).toBe(200);
+    const [lot] = await db
+      .select()
+      .from(lottiTable)
+      .where(
+        and(
+          eq(lottiTable.magazzinoId, warehouseId),
+          eq(lottiTable.prodottoId, productId),
+          eq(lottiTable.codiceLottoNormalizzato, "LOT-EXP-R1"),
+        ),
+      );
+    await db
+      .update(prodottiTable)
+      .set({ gestioneScadenza: false })
+      .where(eq(prodottiTable.id, productId));
+    expect(lot.dataScadenza).toBe("2027-12-31");
+    expect(Number(lot.fattoreKgLtPezzo)).toBe(0.55);
+  });
+
+  it("registra in chunk un dataset PostgreSQL ampio senza superare i parametri di insert", async () => {
+    const rows = Array.from({ length: 2_200 }, (_, index) =>
+      ageaRow({ 4: `DOC-LARGE-${String(index).padStart(5, "0")}` }),
+    );
+    const analyzed = await analyze("SOLO_ANALISI", workbookFromRows(rows));
+    expect(analyzed.status).toBe(201);
+    expect(analyzed.body).toMatchObject({
+      stato: "PRONTA",
+      righeTotali: 2_200,
+      partiteTotali: 1,
+    });
+    const page = await request(app)
+      .get(`/agea/importazioni/${analyzed.body.id}/righe`)
+      .query({ page: 11, pageSize: 200 });
+    expect(page.status).toBe(200);
+    expect(page.body).toMatchObject({
+      page: 11,
+      pageSize: 200,
+      total: 2_200,
+    });
+    expect(page.body.items).toHaveLength(200);
+  }, 20_000);
 
   it.runIf(Boolean(acceptancePath && existsSync(acceptancePath)))(
     "esegue il bootstrap del registro reale come un Carico con sette righe e nessun movimento negativo",
@@ -604,6 +1482,34 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       expect(
         stockMovements.every((movement) => movement.tipoMovimento === "carico"),
       ).toBe(true);
+
+      const repeated = await request(app)
+        .post("/agea/importazioni/analizza")
+        .query({
+          magazzinoId: acceptanceWarehouseId,
+          modalita: "AGGIORNAMENTO",
+          nomeFile: "registro-reale-ripetuto.xlsx",
+        })
+        .set("Content-Type", AGEA_XLSX_MIME)
+        .send(buffer);
+      expect(repeated.status).toBe(201);
+      expect(repeated.body).toMatchObject({
+        stato: "PRONTA",
+        righeTotali: 239,
+        righeDuplicate: 239,
+        righeNuove: 0,
+      });
+      const repeatedConfirmation = await request(app)
+        .post(`/agea/importazioni/${repeated.body.id}/conferma`)
+        .send({ versione: repeated.body.versione });
+      expect(repeatedConfirmation.status).toBe(200);
+      expect(repeatedConfirmation.body.carichi).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.magazzinoId, acceptanceWarehouseId)),
+      ).toHaveLength(7);
     },
   );
 

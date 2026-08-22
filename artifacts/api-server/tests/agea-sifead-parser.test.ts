@@ -62,11 +62,12 @@ function row(overrides: Record<number, string | number> = {}) {
 function workbookBuffer(
   rows: Array<Array<string | number>>,
   sheetName = "Table1",
+  workbookHeaders: Array<string> = headers,
 ) {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(
     workbook,
-    XLSX.utils.aoa_to_sheet([headers, ...rows]),
+    XLSX.utils.aoa_to_sheet([workbookHeaders, ...rows]),
     sheetName,
   );
   return Buffer.from(
@@ -74,7 +75,36 @@ function workbookBuffer(
   );
 }
 
+function renameZipEntry(buffer: Buffer, from: string, prefix: string): Buffer {
+  const replacement = prefix.padEnd(from.length, "x");
+  if (replacement.length !== from.length)
+    throw new Error("Nome ZIP troppo lungo");
+  const copy = Buffer.from(buffer);
+  let offset = 0;
+  let replaced = 0;
+  while ((offset = copy.indexOf(from, offset, "utf8")) >= 0) {
+    copy.write(replacement, offset, from.length, "utf8");
+    offset += from.length;
+    replaced += 1;
+  }
+  if (replaced < 2) throw new Error("Entry ZIP di test non trovata");
+  return copy;
+}
+
+function makeZipBombMetadata(buffer: Buffer): Buffer {
+  const copy = Buffer.from(buffer);
+  const signature = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
+  const offset = copy.indexOf(signature);
+  if (offset < 0) throw new Error("Directory ZIP non trovata");
+  copy.writeUInt32LE(1, offset + 20);
+  copy.writeUInt32LE(2 * 1024 * 1024, offset + 24);
+  return copy;
+}
+
 describe("parser AGEA/SIFEAD osservato", () => {
+  it("usa SheetJS 0.20.3 nel percorso server", () => {
+    expect(XLSX.version).toBe("0.20.3");
+  });
   it("valida header dinamici, fondi, decimali e placeholder 23 senza usare floating point per le decisioni", () => {
     const parsed = parseAgeaWorkbook(workbookBuffer([row()]));
     expect(parsed).toMatchObject({
@@ -177,6 +207,112 @@ describe("parser AGEA/SIFEAD osservato", () => {
       ),
     );
     expect(formulaParsed.rows[0].movimentoKgLt).toBe("5.500000");
+  });
+
+  it("normalizza NFC, maiuscole e spazi per header e domini senza alterare i raw", () => {
+    const decomposed = "Attivita\u0300";
+    const variantHeaders = headers.map((header) =>
+      header === "Attività"
+        ? `  ${decomposed.toUpperCase()}  `
+        : `  ${header.toUpperCase()}  `,
+    );
+    const parsed = parseAgeaWorkbook(
+      workbookBuffer(
+        [
+          row({
+            0: "  fondo   nazionale  ",
+            1: "  Pasta   di semola 500 g  ",
+            4: " Doc  001 ",
+            7: " Lotto  01 ",
+            14: "  pacchi  ",
+          }),
+        ],
+        "Table1",
+        variantHeaders,
+      ),
+    );
+    expect(parsed.rows[0]).toMatchObject({
+      fondoRaw: "  fondo   nazionale  ",
+      fondoNormalizzato: "FONDO_NAZIONALE",
+      prodottoRaw: "  Pasta   di semola 500 g  ",
+      prodottoNormalizzato: "PASTA DI SEMOLA 500 G",
+      lottoRaw: " Lotto  01 ",
+      lottoNormalizzato: "LOTTO 01",
+      numeroDocumentoNormalizzato: "DOC 001",
+      attivitaNormalizzata: "PACCHI",
+    });
+  });
+
+  it("non confonde valori semanticamente diversi e non inquina Object.prototype", () => {
+    const before = Object.prototype.hasOwnProperty.call(
+      Object.prototype,
+      "polluted",
+    );
+    const parsed = parseAgeaWorkbook(
+      workbookBuffer([
+        row({ 1: "__proto__", 4: "DOC-A" }),
+        row({ 4: "DOC-B" }),
+      ]),
+    );
+    expect(parsed.rows[0].prodottoNormalizzato).toBe("__PROTO__");
+    expect(parsed.rows[0].identityBaseHash).not.toBe(
+      parsed.rows[1].identityBaseHash,
+    );
+    expect(
+      Object.prototype.hasOwnProperty.call(Object.prototype, "polluted"),
+    ).toBe(before);
+    expect(() =>
+      parseAgeaWorkbook(
+        workbookBuffer(
+          [row()],
+          "Table1",
+          headers.map((header) => (header === "Fondo" ? "Fonte" : header)),
+        ),
+      ),
+    ).toThrowError(expect.objectContaining({ code: "FOGLIO_AMBIGUO" }));
+    const unknownActivity = parseAgeaWorkbook(
+      workbookBuffer([
+        row({
+          4: "DOC-UNKNOWN-ACTIVITY",
+          8: "Distribuzione indigenti",
+          9: -1,
+          10: -2,
+          14: "Attività sconosciuta",
+        }),
+      ]),
+    );
+    expect(unknownActivity.rows[0]).toMatchObject({
+      attivitaNormalizzata: null,
+      warningCodes: expect.arrayContaining(["ATTIVITA_NON_RICONOSCIUTA"]),
+    });
+  });
+
+  it("rifiuta traversal, oggetti incorporati e metadati da ZIP bomb", () => {
+    const safe = workbookBuffer([row()]);
+    const entry = "xl/worksheets/sheet1.xml";
+    expect(() =>
+      parseAgeaWorkbook(renameZipEntry(safe, entry, "../sheet1.xml")),
+    ).toThrowError(expect.objectContaining({ code: "ZIP_PATH_NON_SICURO" }));
+    expect(() =>
+      parseAgeaWorkbook(renameZipEntry(safe, entry, "xl/embeddings/a")),
+    ).toThrowError(expect.objectContaining({ code: "MACRO_NON_AMMESSE" }));
+    expect(() => parseAgeaWorkbook(makeZipBombMetadata(safe))).toThrowError(
+      expect.objectContaining({ code: "ZIP_BOMB_RILEVATA" }),
+    );
+  });
+
+  it("rifiuta una formula priva di valore cached", () => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([headers, row()]);
+    sheet.J2 = { t: "n", f: "1+1" };
+    XLSX.utils.book_append_sheet(workbook, sheet, "Table1");
+    expect(() =>
+      parseAgeaWorkbook(
+        Buffer.from(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })),
+      ),
+    ).toThrowError(
+      expect.objectContaining({ code: "VALORE_FORMULA_NON_DISPONIBILE" }),
+    );
   });
 });
 
