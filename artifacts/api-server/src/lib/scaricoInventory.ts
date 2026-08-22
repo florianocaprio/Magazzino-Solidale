@@ -22,6 +22,7 @@ import {
 import {
   ensureDistributionOperation,
   markDistributionOperationReversed,
+  reconcileDistributionOperationState,
   type DistributionOperationInput,
 } from "./distributionLedger";
 import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
@@ -270,6 +271,9 @@ export async function creaScaricoInventariale(
   );
   for (const riga of input.righe) {
     await scaricaRigaFefo(tx, movementInput, riga, operationId);
+  }
+  if (movementInput.source?.naturaContabile === "DISTRIBUZIONE_FINALE") {
+    await reconcileDistributionOperationState(tx, operationId);
   }
   return scarico.id;
 }

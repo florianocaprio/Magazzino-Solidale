@@ -13,7 +13,7 @@
 - L'**Operazione distribuzione** raccoglie sorgente, magazzino, data, canale e statistiche dell'evento. Le statistiche appartengono all'evento e non sono duplicate su ogni movimento.
 - Il **canale operativo** distingue `PACCHI`, `RITIRO_SEDE`, `DOMICILIARE`, `EMPORIO`, `MENSA`, `UDS_STRADA` e `ALTRO`.
 - Il **source lineage** usa dominio, tipo entità, id entità e id riga; ogni distribuzione finale ha una sorgente strutturata.
-- Lo **storno** non modifica il ledger storico: crea movimenti compensativi collegati alla sorgente e riconcilia l'operazione come `confermata`, `parzialmente_stornata` o `stornata` in base alle quantità nette.
+- Lo **storno** non modifica il ledger storico: crea movimenti compensativi collegati alla sorgente e riconcilia l'operazione come `confermata`, `parzialmente_stornata` o `stornata` in base alle quantità nette. La stessa riconciliazione avviene dopo l'inserimento completo di nuovi movimenti `DISTRIBUZIONE_FINALE`, così lo stato rappresenta sempre l'intero ledger dell'operazione.
 - La **giacenza deriva dalle Partite** come somma delle quantità residue, non dalla somma dei movimenti.
 
 ## Precisione Pezzi/KgLt

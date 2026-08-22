@@ -80,34 +80,24 @@ $logistica_residui$;
 -- il nome assegnato storicamente al vincolo.
 DO $logistica_residui$
 DECLARE
-  fk record;
+  fk_name text;
+  fk_action "char";
 BEGIN
-  FOR fk IN
-    SELECT DISTINCT c.conname, c.confdeltype
-    FROM pg_constraint c
-    JOIN pg_attribute a
-      ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
-    WHERE c.conrelid = 'public.turni_volontari'::regclass
-      AND c.contype = 'f'
-      AND c.confrelid = 'public.turni'::regclass
-      AND a.attname = 'turno_id'
-  LOOP
-    IF fk.confdeltype <> 'r' THEN
-      EXECUTE format('ALTER TABLE public.turni_volontari DROP CONSTRAINT %I', fk.conname);
-    END IF;
-  END LOOP;
+  SELECT c.conname, c.confdeltype INTO fk_name, fk_action
+  FROM pg_constraint c
+  JOIN pg_attribute a
+    ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+  WHERE c.conrelid = 'public.turni_volontari'::regclass
+    AND c.contype = 'f'
+    AND c.confrelid = 'public.turni'::regclass
+    AND a.attname = 'turno_id'
+  LIMIT 1;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint c
-    JOIN pg_attribute a
-      ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
-    WHERE c.conrelid = 'public.turni_volontari'::regclass
-      AND c.contype = 'f'
-      AND c.confrelid = 'public.turni'::regclass
-      AND c.confdeltype = 'r'
-      AND a.attname = 'turno_id'
-  ) THEN
+  IF fk_name IS NOT NULL AND fk_action <> 'r' THEN
+    EXECUTE format('ALTER TABLE public.turni_volontari DROP CONSTRAINT %I', fk_name);
+    fk_name := NULL;
+  END IF;
+  IF fk_name IS NULL THEN
     ALTER TABLE public.turni_volontari
       ADD CONSTRAINT turni_volontari_turno_restrict_fk
       FOREIGN KEY (turno_id) REFERENCES public.turni(id)
