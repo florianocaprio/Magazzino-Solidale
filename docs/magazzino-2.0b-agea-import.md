@@ -1,5 +1,50 @@
 # Magazzino 2.0B — Import AGEA/SIFEAD
 
+## Hardening R1 (23 agosto 2026)
+
+La revisione R1 usa SheetJS 0.20.3 dal CDN ufficiale, conserva i valori raw e
+applica una normalizzazione conservativa NFC/case/whitespace soltanto alle
+chiavi di confronto. Restano attivi i limiti di 10 MB, 10.000 righe e 100
+colonne e le difese contro ZIP64, cifratura, path traversal, macro, oggetti
+incorporati, ZIP bomb e formule prive di valore cached.
+
+Ogni mutazione di una preview richiede `versione` intera positiva. Una versione
+mancante/non valida produce `400 VERSIONE_RICHIESTA`; una versione superata
+produce `409 VERSIONE_NON_CORRENTE`; una preview confermata o annullata produce
+`409 IMPORTAZIONE_IMMUTABILE`. Il client deve ricaricare l'importazione e
+ripetere consapevolmente l'azione. La conferma non ricalcola la preview: se una
+mappatura è cambiata restituisce `409 MAPPING_MODIFICATO` e richiede un
+ricalcolo esplicito. Anche il replay di una conferma richiede la versione
+corrente dell'importazione confermata.
+
+Le correzioni manuali sono dati di staging effective e non sovrascrivono mai i
+raw acquisiti. Sono disponibili:
+
+- `PATCH /agea/importazioni/{id}/righe/{rigaId}/data-carico`;
+- `PATCH /agea/importazioni/{id}/righe/{rigaId}/lotto`;
+- `PATCH /agea/importazioni/{id}/partite/{partitaId}` per la scadenza.
+
+Ogni payload contiene valore (anche `null` per rimuovere), motivazione e
+versione. La scrittura, l'audit, il rebuild e l'incremento singolo di versione
+avvengono nella stessa transazione. Le date sono validate come date civili.
+
+`GET /agea/importazioni/{id}/descrizioni-da-mappare` restituisce tutte le
+descrizioni distinte dell'importazione, non solo la pagina visibile, con
+frequenza, fondi e mapping corrente. La preview righe supporta formalmente
+`page`, `pageSize`, `stato`, `fondo`, `tipo` e `q`.
+
+Le partite mappate usano l'identità prodotto interno + fondo + lotto effective;
+descrizioni esterne diverse dirette allo stesso prodotto confluiscono quindi in
+una sola partita senza duplicare il saldo. Le descrizioni originali rimangono
+nel dettaglio di audit. Scadenze manuali discordanti durante un merge molti-a-uno
+producono `CORREZIONI_PARTITA_CONFLITTO`, senza scegliere silenziosamente un
+valore. Saldi finali negativi o con segni misti sono bloccanti.
+
+Nel flusso incrementale lotto, scadenza e fattore canonico provengono dalla
+partita di preview. La chiave idempotente è un SHA-256 stabile, indipendente da
+ID importazione e ordine righe, e non tronca il documento sorgente prima del
+calcolo.
+
 ## Perimetro
 
 La 2.0B importa localmente il registro informatico AGEA/SIFEAD nel tracciato osservato `SIFEAD_REGISTRO_XLSX_OSSERVATO_V1`. Non trasmette dati a SIFEAD, non esporta registri, non riconcilia gli scarichi locali e non aggiunge dashboard AGEA. Il file binario non viene conservato: restano nome sanitizzato, MIME, dimensione, SHA-256, foglio, data di riferimento, versione parser e valori raw di ogni riga.
@@ -77,7 +122,13 @@ Applicare in ordine:
 pnpm --filter @workspace/db run update
 ```
 
-La migration dedicata è `lib/db/updates/20260822_magazzino_2_0b_agea_import.sql`, è additiva e ripetibile e non altera i saldi esistenti.
+Le migration dedicate, applicate in ordine, sono:
+
+- `lib/db/updates/20260822_magazzino_2_0b_agea_import.sql`;
+- `lib/db/updates/20260823_magazzino_2_0b_r1_agea_hardening.sql`.
+
+La seconda è additiva e idempotente, inizializza soltanto campi di staging,
+aggiunge indici di identity/mapping/Partita e non altera i saldi business.
 
 ## Acceptance osservata
 
@@ -88,4 +139,10 @@ AGEA_ACCEPTANCE_XLSX=/percorso/al/registro.xlsx \
 pnpm --filter @workspace/api-server exec vitest run tests/agea-sifead-parser.test.ts
 ```
 
-Aggregati attesi: 239 righe, 80 carichi, 158 distribuzioni, 1 reso, 53 descrizioni prodotto, 79 Partite storiche, 7 Partite a saldo positivo e 3 Fondi.
+Aggregati attesi: data 20/08/2026, 239 righe, 80 carichi, 159 movimenti
+negativi (158 distribuzioni e 1 reso), 53 descrizioni prodotto, 79 Partite
+storiche, 3 Fondi, 19 gruppi documento/data positivi e 7 Partite a saldo
+positivo. Il bootstrap atteso crea 1 `SALDO_INIZIALE`, 7 righe e 7 movimenti
+positivi, senza movimenti negativi o scarichi locali. La seconda importazione
+identica produce 239 identity duplicate, zero nuovi Carichi e zero variazioni di
+stock.
