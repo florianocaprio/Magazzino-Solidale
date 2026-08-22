@@ -26,6 +26,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useToast } from "@/hooks/use-toast";
 import { GoogleOperationalMap } from "@/components/maps/google-operational-map";
 import { RouteActions } from "@/components/maps/route-actions";
+import { formatDateEuropeRome } from "@/lib/europe-rome";
 
 const LAYER_LABELS: Record<MapsLayerCode, string> = {
   "sociale.interventi_pianificati": "maps.layerSocialInterventions",
@@ -53,6 +54,16 @@ function entityUrl(marker: MapsMarker): string | null {
   return null;
 }
 
+function mapsLayerError(error: unknown, fallback: string): string {
+  if (typeof error !== "object" || error == null) return fallback;
+  const candidate = error as {
+    data?: { error?: string };
+    response?: { data?: { error?: string } };
+    message?: string;
+  };
+  return candidate.data?.error ?? candidate.response?.data?.error ?? candidate.message ?? fallback;
+}
+
 export default function MapsOperativa() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -73,6 +84,12 @@ export default function MapsOperativa() {
     () => [social.data, deliveries.data, missed.data, points.data].flatMap((rows) => rows ?? []),
     [social.data, deliveries.data, missed.data, points.data],
   );
+  const layerErrors = [
+    { code: "sociale.interventi_pianificati" as const, query: social },
+    { code: "pacchi.consegne" as const, query: deliveries },
+    { code: "pacchi.ritiri_non_effettuati" as const, query: missed },
+    { code: "centro.punti_operativi" as const, query: points },
+  ].filter(({ code, query }) => enabled(code) && query.isError);
   const isLoading = social.isLoading || deliveries.isLoading || missed.isLoading || points.isLoading;
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() ?? "";
 
@@ -108,6 +125,12 @@ export default function MapsOperativa() {
           </div>
         </CardContent>
       </Card>
+      {layerErrors.map(({ code, query }) => (
+        <div key={code} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+          <span className="font-medium">{t(LAYER_LABELS[code])}: </span>
+          {mapsLayerError(query.error, t("maps.layerLoadError"))}
+        </div>
+      ))}
       {apiKey ? (
         <GoogleOperationalMap markers={markers} apiKey={apiKey} onMarkerSelect={setSelectedMarker} onUnavailable={onMapUnavailable} />
       ) : (
@@ -118,7 +141,7 @@ export default function MapsOperativa() {
         <CardContent className="space-y-3">
           {isLoading ? <Skeleton className="h-24 w-full" /> : markers.length === 0 ? <p className="py-8 text-center text-muted-foreground">{t("maps.empty")}</p> : markers.map((marker) => (
             <div key={marker.id} className="flex flex-col justify-between gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{marker.title}</p><Badge variant="outline">{marker.status}</Badge></div><p className="truncate text-sm text-muted-foreground">{marker.address}</p>{marker.date && <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" />{new Date(marker.date).toLocaleString()}</p>}</div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{marker.title}</p><Badge variant="outline">{marker.status}</Badge></div><p className="truncate text-sm text-muted-foreground">{marker.address}</p>{marker.date && <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" />{formatDateEuropeRome(marker.date)}</p>}</div>
               <div className="flex shrink-0 flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedMarker(marker)}>{t("maps.markerDetails")}</Button><RouteActions consegnaId={marker.entityId} available={marker.entityType === "consegna" && marker.actions.includes("route")} compact /></div>
             </div>
           ))}
@@ -133,10 +156,10 @@ export default function MapsOperativa() {
             </SheetHeader>
             <div className="mt-6 space-y-4">
               <div><p className="text-xs uppercase text-muted-foreground">{t("maps.status")}</p><Badge variant="outline">{selectedMarker.status}</Badge></div>
-              {selectedMarker.date && <div><p className="text-xs uppercase text-muted-foreground">{t("maps.date")}</p><p className="text-sm">{new Date(selectedMarker.date).toLocaleString()}</p></div>}
+              {selectedMarker.date && <div><p className="text-xs uppercase text-muted-foreground">{t("maps.date")}</p><p className="text-sm">{formatDateEuropeRome(selectedMarker.date)}</p></div>}
               <div><p className="text-xs uppercase text-muted-foreground">{t("maps.address")}</p><p className="text-sm">{selectedMarker.address}</p></div>
               <div className="flex flex-col gap-2 pt-2">
-                {entityUrl(selectedMarker) && <Button asChild variant="outline"><Link href={selectedMarker.entityType === "bolla" ? `/bolle?bollaId=${selectedMarker.entityId}` : entityUrl(selectedMarker)!}>{t("maps.openOwner")}</Link></Button>}
+                {selectedMarker.actions.includes("open") && entityUrl(selectedMarker) && <Button asChild variant="outline"><Link href={selectedMarker.entityType === "bolla" ? `/bolle?bollaId=${selectedMarker.entityId}` : entityUrl(selectedMarker)!}>{t("maps.openOwner")}</Link></Button>}
                 <RouteActions consegnaId={selectedMarker.entityId} available={selectedMarker.entityType === "consegna" && selectedMarker.actions.includes("route")} />
                 {selectedMarker.actions.includes("convert_delivery") && <Button asChild><Link href={`/bolle?bollaId=${selectedMarker.entityId}`}>{t("maps.convertDelivery")}</Link></Button>}
               </div>

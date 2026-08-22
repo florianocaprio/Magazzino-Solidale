@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListAreeOperative, getListAreeOperativeQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, useListRuoliVolontari, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useGetBeneficiario, getGetBeneficiarioQueryKey, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListAreeOperative, getListAreeOperativeQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, useListRuoliVolontari, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -44,6 +44,16 @@ const formSchema = z.object({
   mezzoId: z.coerce.number().optional(),
   mezzoAltro: z.boolean().optional(),
   noteOperative: z.string().optional()
+}).superRefine((value, context) => {
+  if (value.tipoConsegna !== "domicilio") return;
+  const address = value.indirizzoConsegna?.trim() ?? "";
+  if (!address || address.length > 200) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["indirizzoConsegna"],
+      message: "Indirizzo obbligatorio (massimo 200 caratteri)",
+    });
+  }
 });
 
 export default function Consegne() {
@@ -211,10 +221,35 @@ export default function Consegne() {
   );
   const caricoMap = new Map((caricoTurno ?? []).map((c) => [c.volontarioId, c.count]));
   const selectedBeneficiarioId = form.watch("beneficiarioId");
+  const previousBeneficiarioId = useRef(selectedBeneficiarioId);
+  const { data: beneficiarioDettaglio } = useGetBeneficiario(selectedBeneficiarioId, {
+    query: {
+      queryKey: getGetBeneficiarioQueryKey(selectedBeneficiarioId),
+      enabled: selectedBeneficiarioId > 0,
+    },
+  });
   const beneficiarioSelezionato = useMemo(
     () => [...(beneficiari ?? []), ...(allBeneficiari ?? [])].find((b) => b.id === selectedBeneficiarioId),
     [allBeneficiari, beneficiari, selectedBeneficiarioId],
   );
+  useEffect(() => {
+    if (previousBeneficiarioId.current === selectedBeneficiarioId) return;
+    previousBeneficiarioId.current = selectedBeneficiarioId;
+    if (form.getValues("tipoConsegna") === "domicilio") {
+      form.setValue("indirizzoConsegna", "", { shouldValidate: true });
+    }
+  }, [form, selectedBeneficiarioId]);
+  useEffect(() => {
+    if (
+      form.getValues("tipoConsegna") === "domicilio"
+      && beneficiarioDettaglio?.id === selectedBeneficiarioId
+      && !(form.getValues("indirizzoConsegna") ?? "").trim()
+    ) {
+      form.setValue("indirizzoConsegna", beneficiarioDettaglio.domicilio?.trim() ?? "", {
+        shouldValidate: true,
+      });
+    }
+  }, [beneficiarioDettaglio, form, selectedBeneficiarioId]);
   const effectiveConsegnaCentroId = beneficiarioSelezionato?.centroAscoltoId
     ?? (createCentroId !== "all" ? parseInt(createCentroId) : lockedCentroId);
   const volontariConsegna = useMemo(
@@ -636,7 +671,7 @@ export default function Consegne() {
                   <TableCell className="text-right">
                     <RouteActions
                       consegnaId={c.id}
-                      available={c.tipoConsegna === "domicilio" && Boolean(c.indirizzoConsegna)}
+                      available={c.stato === "pianificata" && c.tipoConsegna === "domicilio" && Boolean(c.indirizzoConsegna)}
                       className="mb-2 justify-end sm:mb-0 sm:me-2"
                       compact
                     />
@@ -780,7 +815,12 @@ export default function Consegne() {
                     <BeneficiarioCombobox
                       items={(beneficiari ?? []).map(b => ({ id: b.id, nome: b.nome, cognome: b.cognome, codice: b.codice }))}
                       value={field.value ? String(field.value) : ""}
-                      onChange={(id) => field.onChange(Number(id))}
+                      onChange={(id) => {
+                        field.onChange(Number(id));
+                        if (form.getValues("tipoConsegna") === "domicilio") {
+                          form.setValue("indirizzoConsegna", "", { shouldValidate: true });
+                        }
+                      }}
                       placeholder={t("consegne.selectPlaceholder")}
                       emptyText={t("consegne.noBeneficiarioForCentro")}
                       selectedLabelFallback={(() => {
@@ -817,6 +857,15 @@ export default function Consegne() {
                     <Select
                       onValueChange={(v) => {
                         field.onChange(v);
+                        if (v === "domicilio") {
+                          form.setValue(
+                            "indirizzoConsegna",
+                            beneficiarioDettaglio?.id === selectedBeneficiarioId
+                              ? beneficiarioDettaglio.domicilio?.trim() ?? ""
+                              : "",
+                            { shouldValidate: true },
+                          );
+                        }
                         if (v !== "domicilio") {
                           form.setValue("volontarioId", 0);
                           form.setValue("volontarioAltro", undefined);
@@ -838,7 +887,7 @@ export default function Consegne() {
                 {form.watch("tipoConsegna") === "domicilio" && (
                   <div className="space-y-4 pt-2 border-t">
                     <FormField control={form.control} name="indirizzoConsegna" render={({ field }) => (
-                      <FormItem><FormLabel>{t("consegne.formIndirizzo")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                      <FormItem><FormLabel>{t("consegne.formIndirizzo")}</FormLabel><FormControl><Input maxLength={200} {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name="zona" render={({ field }) => (
                       <FormItem><FormLabel>{t("consegne.formZona")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
