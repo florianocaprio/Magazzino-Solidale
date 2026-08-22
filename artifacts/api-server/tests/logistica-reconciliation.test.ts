@@ -34,7 +34,7 @@ async function fixture() {
 describe("riconciliazione residui Logistica", () => {
   it("sposta atomicamente data/fascia/risorse e libera il vecchio turno", async () => {
     const f = await fixture();
-    const created = await request(app(consegneRouter)).post("/consegne").send({ beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", dataPrevista: "2026-10-01", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioA, mezzoId: f.mezzoA });
+    const created = await request(app(consegneRouter)).post("/consegne").send({ beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", indirizzoConsegna: "Via Test 1", dataPrevista: "2026-10-01", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioA, mezzoId: f.mezzoA });
     expect(created.status).toBe(201); scope.consegnaIds.push(created.body.id);
     const [oldSource] = await db.select().from(turniConsegneTable).where(eq(turniConsegneTable.consegnaId, created.body.id));
     scope.turnoIds.push(oldSource.turnoId);
@@ -51,7 +51,7 @@ describe("riconciliazione residui Logistica", () => {
 
   it("riconcilia singolarmente volontario, mezzo, fascia e data senza occupazioni fantasma", async () => {
     const f = await fixture();
-    const created = await request(app(consegneRouter)).post("/consegne").send({ beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", dataPrevista: "2026-11-01", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioA, mezzoId: f.mezzoA });
+    const created = await request(app(consegneRouter)).post("/consegne").send({ beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", indirizzoConsegna: "Via Test 1", dataPrevista: "2026-11-01", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioA, mezzoId: f.mezzoA });
     expect(created.status).toBe(201); scope.consegnaIds.push(created.body.id);
 
     expect((await request(app(consegneRouter)).patch(`/consegne/${created.body.id}`).send({ volontarioId: f.volontarioB })).status).toBe(200);
@@ -88,7 +88,7 @@ describe("riconciliazione residui Logistica", () => {
     const f = await fixture();
     const manual = await request(app(turniRouter)).put("/turni").send({ centroAscoltoId: f.centro.id, data: "2026-10-03", fascia: "09-13", volontari: [{ volontarioId: f.volontarioA }], mezzoId: f.mezzoA });
     expect(manual.status).toBe(200); scope.turnoIds.push(manual.body.id);
-    const payload = { beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", dataPrevista: "2026-10-03", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioA, mezzoId: f.mezzoA };
+    const payload = { beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", indirizzoConsegna: "Via Test 1", dataPrevista: "2026-10-03", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioA, mezzoId: f.mezzoA };
     const one = await request(app(consegneRouter)).post("/consegne").send(payload);
     const two = await request(app(consegneRouter)).post("/consegne").send(payload);
     expect([one.status, two.status]).toEqual([201, 201]); scope.consegnaIds.push(one.body.id, two.body.id);
@@ -106,13 +106,13 @@ describe("riconciliazione residui Logistica", () => {
     const [legacy] = await db.insert(turniTable).values({ centroAscoltoId: f.centro.id, data: "2026-11-03", fascia: "09-13", mezzoId: f.mezzoA }).returning();
     scope.turnoIds.push(legacy.id);
     await db.insert(turniVolontariTable).values({ turnoId: legacy.id, volontarioId: f.volontarioA, ruolo: "Legacy" });
-    const created = await request(app(consegneRouter)).post("/consegne").send({ beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", dataPrevista: "2026-11-03", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioA, mezzoId: f.mezzoA });
+    const created = await request(app(consegneRouter)).post("/consegne").send({ beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", indirizzoConsegna: "Via Test 1", dataPrevista: "2026-11-03", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioA, mezzoId: f.mezzoA });
     expect(created.status).toBe(201); scope.consegnaIds.push(created.body.id);
     expect((await request(app(consegneRouter)).delete(`/consegne/${created.body.id}`)).status).toBe(204);
     expect((await db.select().from(turniVolontariTable).where(eq(turniVolontariTable.turnoId, legacy.id)))[0]).toMatchObject({ volontarioId: f.volontarioA, manuale: true });
     expect((await db.select().from(turniTable).where(eq(turniTable.id, legacy.id)))[0]).toMatchObject({ stato: "pianificato", mezzoId: f.mezzoA, mezzoManuale: true });
 
-    const rollback = await request(app(consegneRouter)).post("/consegne").send({ beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", dataPrevista: "2026-11-04", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioB, mezzoId: f.mezzoB });
+    const rollback = await request(app(consegneRouter)).post("/consegne").send({ beneficiarioId: f.beneficiario, tipoConsegna: "domicilio", indirizzoConsegna: "Via Test 1", dataPrevista: "2026-11-04", fasciaOraria: "Mattina", magazzinoId: f.magazzino, volontarioId: f.volontarioB, mezzoId: f.mezzoB });
     expect(rollback.status).toBe(201); scope.consegnaIds.push(rollback.body.id);
     const [oldSource] = await db.select().from(turniConsegneTable).where(eq(turniConsegneTable.consegnaId, rollback.body.id));
     scope.turnoIds.push(oldSource.turnoId);
@@ -168,7 +168,7 @@ describe("riconciliazione residui Logistica", () => {
     try {
       await clientDelivery.query("BEGIN");
       await clientDelivery.query("UPDATE volontari SET centro_ascolto_id = $1 WHERE id = $2", [centroB.id, ownerDelivery]);
-      const delivery = start(request(areaApp(consegneRouter, areaA)).post("/consegne").send({ beneficiarioId: beneficiary, tipoConsegna: "domicilio", dataPrevista: "2026-11-06", fasciaOraria: "Pomeriggio", magazzinoId: magazzino, mezzoId: deliveryMezzo }));
+      const delivery = start(request(areaApp(consegneRouter, areaA)).post("/consegne").send({ beneficiarioId: beneficiary, tipoConsegna: "domicilio", indirizzoConsegna: "Via Test 1", dataPrevista: "2026-11-06", fasciaOraria: "Pomeriggio", magazzinoId: magazzino, mezzoId: deliveryMezzo }));
       await letRequestReachLock();
       await clientDelivery.query("COMMIT");
       expect((await delivery).status).toBe(403);

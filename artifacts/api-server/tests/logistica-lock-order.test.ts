@@ -96,6 +96,7 @@ describe("ordine globale lock pianificazione Logistica", () => {
       request(app(consegneRouter)).post("/consegne").send({
         beneficiarioId: f.beneficiario,
         tipoConsegna: "domicilio",
+        indirizzoConsegna: "Via Test 1",
         dataPrevista: data,
         fasciaOraria: "Mattina",
         magazzinoId: f.magazzino,
@@ -126,6 +127,7 @@ describe("ordine globale lock pianificazione Logistica", () => {
       request(app(consegneRouter)).post("/consegne").send({
         beneficiarioId: f.beneficiario,
         tipoConsegna: "domicilio",
+        indirizzoConsegna: "Via Test 1",
         dataPrevista: data,
         fasciaOraria: "Pomeriggio",
         magazzinoId: f.magazzino,
@@ -148,6 +150,7 @@ describe("ordine globale lock pianificazione Logistica", () => {
     const created = await request(app(consegneRouter)).post("/consegne").send({
       beneficiarioId: f.beneficiario,
       tipoConsegna: "domicilio",
+      indirizzoConsegna: "Via Test 1",
       dataPrevista: "2026-12-03",
       fasciaOraria: "Mattina",
       magazzinoId: f.magazzino,
@@ -198,6 +201,7 @@ describe("ordine globale lock pianificazione Logistica", () => {
     const payload = (dataPrevista: string) => ({
       beneficiarioId: f.beneficiario,
       tipoConsegna: "domicilio",
+      indirizzoConsegna: "Via Test 1",
       dataPrevista,
       fasciaOraria: "Mattina",
       magazzinoId: f.magazzino,

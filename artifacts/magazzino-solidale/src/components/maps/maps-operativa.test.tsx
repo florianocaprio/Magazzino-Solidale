@@ -2,7 +2,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const apiState = vi.hoisted(() => ({ markerActions: ["open", "route"] }));
+const apiState = vi.hoisted(() => ({ markerActions: ["open", "route"], deliveryError: null as unknown }));
 
 vi.mock("@workspace/api-client-react", () => ({
   getMapsRouteConsegna: vi.fn(),
@@ -11,10 +11,10 @@ vi.mock("@workspace/api-client-react", () => ({
   getGetMapsPuntiOperativiQueryKey: () => ["maps", "points"],
   getGetMapsRitiriNonEffettuatiQueryKey: () => ["maps", "missed"],
   useGetMapsCapabilities: () => ({ data: { operational: true, layers: [{ code: "pacchi.consegne", domain: "pacchi", label: "Consegne", routeSupported: true }] }, isLoading: false }),
-  useGetMapsConsegne: () => ({ data: [{ id: "pacchi.consegna:1", layer: "pacchi.consegne", entityType: "consegna", entityId: 1, title: "Consegna CON-1", subtitle: null, status: "pianificata", address: "Via Test 1", date: "2026-08-17", actions: apiState.markerActions }], isLoading: false }),
-  useGetMapsInterventiSociali: () => ({ data: undefined, isLoading: false }),
-  useGetMapsRitiriNonEffettuati: () => ({ data: undefined, isLoading: false }),
-  useGetMapsPuntiOperativi: () => ({ data: undefined, isLoading: false }),
+  useGetMapsConsegne: () => ({ data: apiState.deliveryError ? undefined : [{ id: "pacchi.consegna:1", layer: "pacchi.consegne", entityType: "consegna", entityId: 1, title: "Consegna CON-1", subtitle: null, status: "pianificata", address: "Via Test 1", date: "2026-08-17", actions: apiState.markerActions }], isLoading: false, isError: apiState.deliveryError != null, error: apiState.deliveryError }),
+  useGetMapsInterventiSociali: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+  useGetMapsRitiriNonEffettuati: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+  useGetMapsPuntiOperativi: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
 }));
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -29,6 +29,7 @@ describe("MAPS operativa", () => {
   let container: HTMLDivElement;
   beforeEach(() => {
     apiState.markerActions = ["open", "route"];
+    apiState.deliveryError = null;
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -44,6 +45,7 @@ describe("MAPS operativa", () => {
     await act(async () => root.render(<MapsOperativa />));
     expect(document.body.textContent).toContain("maps.noApiKey");
     expect(document.body.textContent).toContain("Consegna CON-1");
+    expect(document.body.textContent).toContain("17/08/2026");
     expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeTruthy();
     expect(document.querySelectorAll('[role="switch"]')).toHaveLength(1);
     expect(document.querySelector('[aria-label="Mappa operativa Google Maps"]')).toBeNull();
@@ -59,5 +61,21 @@ describe("MAPS operativa", () => {
     apiState.markerActions = ["open"];
     await act(async () => root.render(<MapsOperativa />));
     expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeNull();
+  });
+
+  it("mostra Apri soltanto quando actions contiene open", async () => {
+    apiState.markerActions = ["route"];
+    await act(async () => root.render(<MapsOperativa />));
+    const details = Array.from(document.querySelectorAll("button")).find((button) => button.textContent === "maps.markerDetails");
+    await act(async () => details?.click());
+    expect(document.body.textContent).not.toContain("maps.openOwner");
+    expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeTruthy();
+  });
+
+  it("mantiene gli altri layer utilizzabili e mostra l'errore specifico del layer", async () => {
+    apiState.deliveryError = { data: { error: "Restringi l'intervallo o i filtri" } };
+    await act(async () => root.render(<MapsOperativa />));
+    expect(document.body.textContent).toContain("Restringi l'intervallo o i filtri");
+    expect(document.body.textContent).toContain("maps.empty");
   });
 });

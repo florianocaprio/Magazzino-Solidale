@@ -100,6 +100,7 @@ describe("Consegne — scoping via beneficiario", () => {
       .send({
         beneficiarioId: benB,
         tipoConsegna: "domicilio",
+        indirizzoConsegna: "Via Test 1",
         dataPrevista: "2026-06-01",
         magazzinoId: magNull,
       });
@@ -112,6 +113,7 @@ describe("Consegne — scoping via beneficiario", () => {
       .send({
         beneficiarioId: benA,
         tipoConsegna: "domicilio",
+        indirizzoConsegna: "Via Test 1",
         dataPrevista: "2026-06-01",
         magazzinoId: magB,
       });
@@ -124,6 +126,7 @@ describe("Consegne — scoping via beneficiario", () => {
       .send({
         beneficiarioId: benA,
         tipoConsegna: "domicilio",
+        indirizzoConsegna: "Via Test 1",
         dataPrevista: "2026-06-01",
         magazzinoId: magNull,
       });

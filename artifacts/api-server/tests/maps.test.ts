@@ -2,9 +2,10 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { db, pool, beneficiariTable, bolleTable, consegneTable, magazziniTable } from "@workspace/db";
+import { db, pool, beneficiariTable, bolleTable, centriAscoltoTable, consegneTable, interventiTable, magazziniTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import mapsRouter from "../src/routes/maps";
+import consegneRouter from "../src/routes/consegne";
 import { areaGuard } from "../src/middlewares/auth";
 import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
@@ -17,6 +18,7 @@ import {
   createZona,
   insertConsegna,
   insertBolla,
+  insertIntervento,
   makeScopedApp,
   newScope,
   type SeedScope,
@@ -54,7 +56,84 @@ function app(opts: {
   }, [areaGuard]);
 }
 
+function consegneApp(opts: Parameters<typeof app>[0]) {
+  return makeScopedApp(consegneRouter, {
+    id: 1,
+    centroAscoltoId: opts.centroId ?? null,
+    areaOperativaId: opts.areaOperativaId ?? null,
+    zonaUdsId: opts.zonaId ?? null,
+    aree: opts.aree ?? ["sociale"],
+    permessi: opts.permessi ?? [],
+    isAdmin: opts.isAdmin ?? false,
+    isSuperAdmin: opts.isSuperAdmin ?? false,
+  });
+}
+
 describe("MAPS — capability, scope e routing", () => {
+  it("eredita la permission Interventi sia nelle capability sia nell'endpoint", async () => {
+    const centre = await createCentro(scope);
+    const beneficiary = await createBeneficiario(scope, centre);
+    const intervention = await insertIntervento(scope, { beneficiarioId: beneficiary, ambito: "sociale" });
+    const now = new Date();
+    await db.update(interventiTable).set({
+      stato: "pianificato",
+      sede: "Via Sociale Riservata 1",
+      dataOraPianificata: now,
+    }).where(eq(interventiTable.id, intervention));
+    const today = dataCivileEuropeRome(now);
+
+    const deniedApp = app({ centroId: centre, permessi: ["maps.operational"] });
+    const capabilities = await request(deniedApp).get("/maps/capabilities");
+    expect(capabilities.body.layers).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "sociale.interventi_pianificati" }),
+    ]));
+    const denied = await request(deniedApp)
+      .get(`/maps/layers/sociale/interventi?da=${today}&a=${today}`);
+    expect(denied.status).toBe(403);
+    expect(JSON.stringify(denied.body)).not.toContain("Via Sociale Riservata");
+
+    const allowed = await request(app({
+      centroId: centre,
+      permessi: ["maps.operational", "sociale.interventi.view"],
+    })).get(`/maps/layers/sociale/interventi?da=${today}&a=${today}`);
+    expect(allowed.status).toBe(200);
+    expect(allowed.body[0]).toMatchObject({ entityId: intervention, actions: ["open"] });
+  });
+
+  it("eredita bolle.view e rende convert_delivery dipendente da bolle.deliver", async () => {
+    const centre = await createCentro(scope);
+    const warehouse = await createMagazzino(scope, centre);
+    const beneficiary = await createBeneficiario(scope, centre);
+    await db.update(beneficiariTable).set({ domicilio: "Via Domicilio Protetto 7" })
+      .where(eq(beneficiariTable.id, beneficiary));
+    const bolla = await insertBolla(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse, stato: "confermato" });
+    await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, bolla));
+    const today = dataCivileEuropeRome();
+
+    const deniedApp = app({ centroId: centre, permessi: ["maps.operational"] });
+    const capabilities = await request(deniedApp).get("/maps/capabilities");
+    expect(capabilities.body.layers).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "pacchi.ritiri_non_effettuati" }),
+    ]));
+    const denied = await request(deniedApp)
+      .get(`/maps/layers/pacchi/ritiri-non-effettuati?da=${today}&a=${today}`);
+    expect(denied.status).toBe(403);
+    expect(JSON.stringify(denied.body)).not.toContain("Via Domicilio Protetto");
+
+    const visible = await request(app({
+      centroId: centre,
+      permessi: ["maps.operational", "bolle.view"],
+    })).get(`/maps/layers/pacchi/ritiri-non-effettuati?da=${today}&a=${today}`);
+    expect(visible.status).toBe(200);
+    expect(visible.body[0]).toMatchObject({ entityId: bolla, actions: ["open"] });
+
+    const actionable = await request(app({
+      centroId: centre,
+      permessi: ["maps.operational", "bolle.view", "bolle.deliver"],
+    })).get(`/maps/layers/pacchi/ritiri-non-effettuati?da=${today}&a=${today}`);
+    expect(actionable.body[0].actions).toEqual(["open", "convert_delivery"]);
+  });
+
   it.each([
     { ruolo: "Admin", isAdmin: true, isSuperAdmin: false },
     { ruolo: "SuperAdmin", isAdmin: false, isSuperAdmin: true },
@@ -83,6 +162,36 @@ describe("MAPS — capability, scope e routing", () => {
     expect(uds.body.layers).toEqual([]);
     expect((await request(app({ aree: ["uds"], permessi: ["maps.operational"] })).get("/maps/layers/uds/interventi")).status).toBe(404);
     expect((await request(app({ aree: ["sociale"] })).get("/maps/layers/pacchi/consegne")).status).toBe(403);
+  });
+
+  it("dichiara routeSupported solo con layer Consegne visibile e maps.route", async () => {
+    const withoutRoute = await request(app({ permessi: ["maps.operational"] }))
+      .get("/maps/capabilities");
+    expect(withoutRoute.body.layers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "pacchi.consegne", routeSupported: false }),
+    ]));
+    const withRoute = await request(app({ permessi: ["maps.operational", "maps.route"] }))
+      .get("/maps/capabilities");
+    expect(withRoute.body.layers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "pacchi.consegne", routeSupported: true }),
+    ]));
+  });
+
+  it("non propone open per pagine amministrative a un caller standard", async () => {
+    const centre = await createCentro(scope);
+    const warehouse = await createMagazzino(scope, centre);
+    await db.update(centriAscoltoTable).set({ indirizzo: "Via Centro 1" }).where(eq(centriAscoltoTable.id, centre));
+    await db.update(magazziniTable).set({ indirizzo: "Via Magazzino 1" }).where(eq(magazziniTable.id, warehouse));
+
+    const standard = await request(app({ centroId: centre, permessi: ["maps.operational"] }))
+      .get("/maps/layers/centro/punti-operativi");
+    expect(standard.status).toBe(200);
+    expect(standard.body.every((marker: { actions: string[] }) => marker.actions.length === 0)).toBe(true);
+
+    const admin = await request(app({ centroId: centre, aree: [], isAdmin: true }))
+      .get("/maps/layers/centro/punti-operativi");
+    expect(admin.status).toBe(200);
+    expect(admin.body.every((marker: { actions: string[] }) => marker.actions.includes("open"))).toBe(true);
   });
 
   it("separa il bypass applicativo Admin dagli scope area operativa, centro e zona", async () => {
@@ -205,6 +314,119 @@ describe("MAPS — capability, scope e routing", () => {
     expect(JSON.stringify(response.body)).not.toContain("Via Segreta");
   });
 
+  it("interseca sempre lo scope Beneficiario con lo scope Magazzino", async () => {
+    const centreA = await createCentro(scope);
+    const centreB = await createCentro(scope);
+    const warehouseA = await createMagazzino(scope, centreA);
+    const warehouseB = await createMagazzino(scope, centreB);
+    const beneficiary = await createBeneficiario(scope, centreA);
+    await db.update(beneficiariTable).set({ domicilio: "Via Scope Magazzino 1" })
+      .where(eq(beneficiariTable.id, beneficiary));
+    const today = dataCivileEuropeRome();
+    const deliveryA = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouseA, dataPrevista: today });
+    const deliveryB = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouseB, dataPrevista: today });
+    await db.update(consegneTable).set({ indirizzoConsegna: "Via Consentita" }).where(eq(consegneTable.id, deliveryA));
+    await db.update(consegneTable).set({ indirizzoConsegna: "Via Fuori Scope" }).where(eq(consegneTable.id, deliveryB));
+    const bollaA = await insertBolla(scope, { beneficiarioId: beneficiary, magazzinoId: warehouseA, stato: "confermato" });
+    const bollaB = await insertBolla(scope, { beneficiarioId: beneficiary, magazzinoId: warehouseB, stato: "confermato" });
+    await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, bollaA));
+    await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, bollaB));
+
+    const scoped = app({ centroId: centreA, permessi: ["maps.operational", "bolle.view"] });
+    const deliveries = await request(scoped).get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
+    expect(deliveries.body.map((item: { entityId: number }) => item.entityId)).toEqual([deliveryA]);
+    expect(JSON.stringify(deliveries.body)).not.toContain("Via Fuori Scope");
+    const withdrawals = await request(scoped).get(`/maps/layers/pacchi/ritiri-non-effettuati?da=${today}&a=${today}`);
+    expect(withdrawals.body.map((item: { entityId: number }) => item.entityId)).toEqual([bollaA]);
+  });
+
+  it("mostra solo consegne pianificate e rifiuta la route di una consegna effettuata", async () => {
+    const centre = await createCentro(scope);
+    const warehouse = await createMagazzino(scope, centre);
+    await db.update(magazziniTable).set({ indirizzo: "Via Origine 1" }).where(eq(magazziniTable.id, warehouse));
+    const beneficiary = await createBeneficiario(scope, centre);
+    const today = dataCivileEuropeRome();
+    const planned = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse, dataPrevista: today });
+    const completed = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse, dataPrevista: today, stato: "effettuata" });
+    await db.update(consegneTable).set({ indirizzoConsegna: "Via Pianificata 1" }).where(eq(consegneTable.id, planned));
+    await db.update(consegneTable).set({ indirizzoConsegna: "Via Effettuata 2" }).where(eq(consegneTable.id, completed));
+
+    const layer = await request(app({ centroId: centre, permessi: ["maps.operational", "maps.route"] }))
+      .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
+    expect(layer.status).toBe(200);
+    expect(layer.body.map((marker: { entityId: number }) => marker.entityId)).toEqual([planned]);
+    const route = await request(app({ centroId: centre, permessi: ["maps.route"] }))
+      .get(`/maps/routes/consegne/${completed}`);
+    expect(route.status).toBe(409);
+    expect(route.body.error).toContain("non è più una pianificazione attiva");
+  });
+
+  it("rifiuta esplicitamente N+1 attività invece di troncare il layer", async () => {
+    const centre = await createCentro(scope);
+    const warehouse = await createMagazzino(scope, centre);
+    const beneficiary = await createBeneficiario(scope, centre);
+    const today = dataCivileEuropeRome();
+    const inserted = await db.insert(consegneTable).values(Array.from({ length: 501 }, (_, index) => ({
+      codice: `MAP-CAP-${index}`,
+      beneficiarioId: beneficiary,
+      tipoPianificazione: "consegna_pacco",
+      tipoConsegna: "domicilio",
+      dataPrevista: today,
+      indirizzoConsegna: `Via Cap ${index}`,
+      magazzinoId: warehouse,
+      stato: "pianificata",
+    }))).returning({ id: consegneTable.id });
+    scope.consegnaIds.push(...inserted.map((row) => row.id));
+
+    const response = await request(app({ centroId: centre, permessi: ["maps.operational"] }))
+      .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
+    expect(response.status).toBe(422);
+    expect(response.body.error).toContain("limite operativo");
+    expect(response.body).not.toHaveProperty("markers");
+  });
+
+  it("impone e conserva lo snapshot dell'indirizzo nelle POST/PATCH Consegna", async () => {
+    const centre = await createCentro(scope);
+    const warehouse = await createMagazzino(scope, centre);
+    await db.update(magazziniTable).set({ indirizzo: "Via Magazzino 1" }).where(eq(magazziniTable.id, warehouse));
+    const beneficiary = await createBeneficiario(scope, centre);
+    await db.update(beneficiariTable).set({ domicilio: "Via A" }).where(eq(beneficiariTable.id, beneficiary));
+    const deliveryApi = consegneApp({ centroId: centre });
+    const base = {
+      beneficiarioId: beneficiary,
+      tipoConsegna: "domicilio",
+      dataPrevista: dataCivileEuropeRome(),
+      fasciaOraria: "Mattina",
+      magazzinoId: warehouse,
+    };
+    expect((await request(deliveryApi).post("/consegne").send(base)).status).toBe(400);
+    expect((await request(deliveryApi).post("/consegne").send({ ...base, indirizzoConsegna: "   " })).status).toBe(400);
+    expect((await request(deliveryApi).post("/consegne").send({ ...base, indirizzoConsegna: "X".repeat(201) })).status).toBe(400);
+
+    const created = await request(deliveryApi).post("/consegne")
+      .send({ ...base, indirizzoConsegna: "  Via A  " });
+    expect(created.status).toBe(201);
+    scope.consegnaIds.push(created.body.id);
+    expect(created.body.indirizzoConsegna).toBe("Via A");
+    expect((await request(deliveryApi).patch(`/consegne/${created.body.id}`)
+      .send({ indirizzoConsegna: " " })).status).toBe(400);
+    const [unchanged] = await db.select().from(consegneTable).where(eq(consegneTable.id, created.body.id));
+    expect(unchanged.indirizzoConsegna).toBe("Via A");
+
+    const legacy = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse });
+    expect((await request(deliveryApi).patch(`/consegne/${legacy}`)
+      .send({ noteOperative: "correzione" })).status).toBe(400);
+    await db.update(consegneTable).set({ tipoConsegna: "in_sede", indirizzoConsegna: null }).where(eq(consegneTable.id, legacy));
+    expect((await request(deliveryApi).patch(`/consegne/${legacy}`)
+      .send({ tipoConsegna: "domicilio" })).status).toBe(400);
+
+    await db.update(beneficiariTable).set({ domicilio: "Via B" }).where(eq(beneficiariTable.id, beneficiary));
+    const route = await request(app({ centroId: centre, permessi: ["maps.route"] }))
+      .get(`/maps/routes/consegne/${created.body.id}`);
+    expect(route.status).toBe(200);
+    expect(route.body.destination).toBe("Via A");
+  });
+
   it("costruisce un URL minimizzato con i soli indirizzi e nega una consegna fuori scope", async () => {
     const areaOperativaA = await createAreaOperativa(scope);
     const areaOperativaB = await createAreaOperativa(scope);
@@ -270,16 +492,23 @@ describe("MAPS — capability, scope e routing", () => {
     await db.update(beneficiariTable).set({ domicilio: "Via Domicilio 7" }).where(eq(beneficiariTable.id, withAddress));
     const visibleBolla = await insertBolla(scope, { beneficiarioId: withAddress, magazzinoId: warehouse, stato: "confermato" });
     const hiddenBolla = await insertBolla(scope, { beneficiarioId: withoutAddress, magazzinoId: warehouse, stato: "confermato" });
+    const annulledBolla = await insertBolla(scope, { beneficiarioId: withAddress, magazzinoId: warehouse, stato: "annullato" });
+    const delivery = await insertConsegna(scope, { beneficiarioId: withAddress, magazzinoId: warehouse });
+    const convertedBolla = await insertBolla(scope, { beneficiarioId: withAddress, magazzinoId: warehouse, stato: "confermato", consegnaId: delivery });
     await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, visibleBolla));
     await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, hiddenBolla));
+    await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, annulledBolla));
+    await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, convertedBolla));
 
     const today = dataCivileEuropeRome();
-    const response = await request(app({ centroId: centre, permessi: ["maps.operational"] }))
+    const response = await request(app({ centroId: centre, permessi: ["maps.operational", "bolle.view"] }))
       .get(`/maps/layers/pacchi/ritiri-non-effettuati?da=${today}&a=${today}`);
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
     expect(response.body[0]).toMatchObject({ entityId: visibleBolla, address: "Via Domicilio 7" });
     expect(JSON.stringify(response.body)).not.toContain("Via Magazzino 99");
+    expect(response.body.map((marker: { entityId: number }) => marker.entityId))
+      .not.toEqual(expect.arrayContaining([annulledBolla, convertedBolla]));
   });
 });

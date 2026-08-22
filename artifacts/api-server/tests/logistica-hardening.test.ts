@@ -438,7 +438,7 @@ describe("hardening Logistica", () => {
     const magazzinoA = await createMagazzino(scope, centroA.id, { areaOperativaId: areaA });
     const volontarioB = await createVolontario(scope, centroB.id);
     const mezzoB = await createMezzo(scope, { centroId: centroB.id });
-    const payload = { beneficiarioId: beneficiarioA, tipoConsegna: "domicilio", dataPrevista: "2026-09-17", fasciaOraria: "Mattina", magazzinoId: magazzinoA };
+    const payload = { beneficiarioId: beneficiarioA, tipoConsegna: "domicilio", indirizzoConsegna: "Via Test 1", dataPrevista: "2026-09-17", fasciaOraria: "Mattina", magazzinoId: magazzinoA };
     const scopedA = { id: 0, centroAscoltoId: null, areaOperativaId: areaA };
     expect((await request(app(consegneRouter, scopedA)).post("/consegne").send({ ...payload, volontarioId: volontarioB })).status).toBe(403);
     expect((await request(app(consegneRouter, scopedA)).post("/consegne").send({ ...payload, mezzoId: mezzoB })).status).toBe(403);
@@ -485,6 +485,7 @@ describe("hardening Logistica", () => {
     const payload = (fasciaOraria: "Mattina" | "Pomeriggio") => ({
       beneficiarioId: beneficiario,
       tipoConsegna: "domicilio",
+      indirizzoConsegna: "Via Test 1",
       dataPrevista: "2026-09-06",
       fasciaOraria,
       magazzinoId: magazzino,
@@ -518,6 +519,7 @@ describe("hardening Logistica", () => {
     const response = await request(app(consegneRouter)).post("/consegne").send({
       beneficiarioId: beneficiario,
       tipoConsegna: "domicilio",
+      indirizzoConsegna: "Via Test 1",
       dataPrevista: "2026-09-07",
       fasciaOraria: "Mattina",
       magazzinoId: magazzino,
