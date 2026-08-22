@@ -383,7 +383,11 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
     const quantity = first.unitaMisuraSnapshot
       ? operationalQuantity(first.unitaMisuraSnapshot, pieces, kgLt)
       : null;
-    if (hasPositiveBalance && first.unitaMisuraSnapshot && !quantity)
+    if (
+      hasPositiveBalance &&
+      first.unitaMisuraSnapshot &&
+      (!quantity || !positive(quantity))
+    )
       errors.push("UNITA_PRODOTTO_INCOMPATIBILE");
     if (hasPositiveBalance && !ratioHalfUp(kgLt, pieces))
       warnings.push("FATTORE_MANCANTE");

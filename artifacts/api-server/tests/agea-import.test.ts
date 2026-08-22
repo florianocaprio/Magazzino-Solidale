@@ -1,5 +1,6 @@
 /* @vitest-environment node */
 
+import { existsSync, readFileSync } from "node:fs";
 import express, { type Express } from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,14 +22,14 @@ import {
   systemLogsTable,
   utentiTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import ageaRouter from "../src/routes/agea";
 import {
   ensureAmbienteModuli,
   listModuliFunzionali,
   updateModuloAmbiente,
 } from "../src/lib/configurazioneAmbiente";
-import { AGEA_XLSX_MIME } from "../src/lib/ageaSifeadParser";
+import { AGEA_XLSX_MIME, parseAgeaWorkbook } from "../src/lib/ageaSifeadParser";
 import { InventoryDecimal } from "../src/lib/inventoryDecimal";
 
 const suffix = `${process.pid}${Date.now().toString(36)}`;
@@ -42,6 +43,9 @@ let scopeAreaId: number;
 let foreignAreaId: number;
 let productId: number;
 let originalLotti = true;
+let acceptanceWarehouseId: number | null = null;
+let acceptanceProductIds: number[] = [];
+const acceptancePath = process.env.AGEA_ACCEPTANCE_XLSX;
 
 const headers = [
   "Fondo",
@@ -274,6 +278,64 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (acceptanceWarehouseId != null) {
+    const acceptanceImports = await db
+      .select({ id: importazioniAgeaTable.id })
+      .from(importazioniAgeaTable)
+      .where(eq(importazioniAgeaTable.magazzinoId, acceptanceWarehouseId));
+    const acceptanceImportIds = acceptanceImports.map((item) => item.id);
+    if (acceptanceImportIds.length)
+      await db
+        .update(importazioniAgeaRigheTable)
+        .set({ movimentoEsternoId: null })
+        .where(
+          inArray(
+            importazioniAgeaRigheTable.importazioneId,
+            acceptanceImportIds,
+          ),
+        );
+    await db
+      .delete(movimentiEsterniAgeaTable)
+      .where(eq(movimentiEsterniAgeaTable.magazzinoId, acceptanceWarehouseId));
+    await db
+      .update(importazioniAgeaTable)
+      .set({ bootstrapCaricoId: null })
+      .where(eq(importazioniAgeaTable.magazzinoId, acceptanceWarehouseId));
+    await db
+      .delete(importazioniAgeaTable)
+      .where(eq(importazioniAgeaTable.magazzinoId, acceptanceWarehouseId));
+    await db
+      .delete(movimentiTable)
+      .where(eq(movimentiTable.magazzinoId, acceptanceWarehouseId));
+    if (acceptanceProductIds.length)
+      await db
+        .delete(carichiMagazzinoRigheTable)
+        .where(
+          inArray(carichiMagazzinoRigheTable.prodottoId, acceptanceProductIds),
+        );
+    await db
+      .delete(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.magazzinoId, acceptanceWarehouseId));
+    await db
+      .delete(lottiTable)
+      .where(eq(lottiTable.magazzinoId, acceptanceWarehouseId));
+    if (acceptanceProductIds.length) {
+      await db
+        .delete(mappatureProdottiEsterniTable)
+        .where(
+          inArray(
+            mappatureProdottiEsterniTable.prodottoId,
+            acceptanceProductIds,
+          ),
+        );
+      await db
+        .delete(prodottiTable)
+        .where(inArray(prodottiTable.id, acceptanceProductIds));
+    }
+    await db
+      .delete(magazziniTable)
+      .where(eq(magazziniTable.id, acceptanceWarehouseId));
+  }
   await db
     .update(importazioniAgeaRigheTable)
     .set({ movimentoEsternoId: null })
@@ -435,6 +497,115 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       righeModificate: 0,
     });
   });
+
+  it.runIf(Boolean(acceptancePath && existsSync(acceptancePath)))(
+    "esegue il bootstrap del registro reale come un Carico con sette righe e nessun movimento negativo",
+    async () => {
+      const buffer = readFileSync(acceptancePath!);
+      const parsed = parseAgeaWorkbook(buffer);
+      [{ id: acceptanceWarehouseId }] = await db
+        .insert(magazziniTable)
+        .values({
+          codice: `AGEAR-${suffix}`.slice(0, 20),
+          nome: `AGEA reale ${suffix}`,
+        })
+        .returning({ id: magazziniTable.id });
+      const descriptions = [
+        ...new Map(
+          parsed.rows.map((row) => [row.prodottoNormalizzato, row.prodottoRaw]),
+        ).entries(),
+      ];
+      const productsToCreate = descriptions.map(([key], index) => {
+        const positiveRows = parsed.rows.filter(
+          (row) =>
+            row.prodottoNormalizzato === key &&
+            [row.saldoFinalePezzi, row.saldoFinaleKgLt].some(
+              (value) =>
+                value != null &&
+                InventoryDecimal.parse(value, {
+                  allowNegative: true,
+                }).isPositive(),
+            ),
+        );
+        const useKg = positiveRows.every(
+          (row) =>
+            row.saldoFinaleKgLt != null &&
+            InventoryDecimal.parse(row.saldoFinaleKgLt, {
+              allowNegative: true,
+            }).isPositive(),
+        );
+        return {
+          codice: `AGEAR-${String(index + 1).padStart(2, "0")}-${suffix.slice(-8)}`,
+          nome: `Prodotto acceptance AGEA ${index + 1}`,
+          tipoProdotto: "alimentare",
+          unitaMisura: useKg ? "kg" : "pz",
+          gestioneLotto: true,
+          gestioneScadenza: false,
+        };
+      });
+      const createdProducts = await db
+        .insert(prodottiTable)
+        .values(productsToCreate)
+        .returning({ id: prodottiTable.id, codice: prodottiTable.codice });
+      acceptanceProductIds = createdProducts.map((product) => product.id);
+      const productByCode = new Map(
+        createdProducts.map((product) => [product.codice, product.id]),
+      );
+      await db.insert(mappatureProdottiEsterniTable).values(
+        descriptions.map(([key, raw], index) => ({
+          fonte: "AGEA_SIFEAD" as const,
+          descrizioneEsterna: raw,
+          chiaveDescrizioneNormalizzata: key,
+          prodottoId: productByCode.get(productsToCreate[index].codice)!,
+          creatoDa: userId,
+          aggiornatoDa: userId,
+        })),
+      );
+
+      const analyzed = await request(app)
+        .post("/agea/importazioni/analizza")
+        .query({
+          magazzinoId: acceptanceWarehouseId,
+          modalita: "PRIMA_ACQUISIZIONE",
+          nomeFile: "registro-reale.xlsx",
+        })
+        .set("Content-Type", AGEA_XLSX_MIME)
+        .send(buffer);
+      expect(analyzed.status).toBe(201);
+      expect(analyzed.body).toMatchObject({
+        stato: "PRONTA",
+        righeTotali: 239,
+        righeCarico: 80,
+        righeDistribuzione: 158,
+        righeReso: 1,
+        partiteTotali: 79,
+        partiteSaldoPositivo: 7,
+      });
+      const confirmed = await request(app)
+        .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
+        .send({ versione: analyzed.body.versione });
+      expect(confirmed.status).toBe(200);
+      expect(confirmed.body.carichi).toHaveLength(1);
+      const loadLines = await db
+        .select()
+        .from(carichiMagazzinoRigheTable)
+        .where(
+          eq(
+            carichiMagazzinoRigheTable.caricoMagazzinoId,
+            confirmed.body.carichi[0],
+          ),
+        );
+      expect(loadLines).toHaveLength(7);
+      const stockMovements = await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, acceptanceWarehouseId));
+      expect(stockMovements).toHaveLength(7);
+      expect(
+        stockMovements.every((movement) => movement.tipoMovimento === "carico"),
+      ).toBe(true);
+    },
+  );
 
   it("nega l'analisi senza magazzino.agea.import", async () => {
     const response = await request(deniedApp)
