@@ -11,6 +11,11 @@ export type LogisticaTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export const FASCE_TURNO = ["09-13", "14-18", "18-20"] as const;
 export type FasciaTurno = (typeof FASCE_TURNO)[number];
+export type PlanningSlot = {
+  centroAscoltoId: number;
+  data: string;
+  fascia: FasciaTurno;
+};
 export const FASCE_CONSEGNA_TURNO = {
   Mattina: FASCE_TURNO[0],
   Pomeriggio: FASCE_TURNO[1],
@@ -60,6 +65,68 @@ export function fasciaTurnoConsegnaSql(fasciaOraria: SQL): SQL<string> {
 export function parseRequiredVersion(value: unknown): number | null {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function planningSlotKey(slot: PlanningSlot): string {
+  return `${slot.centroAscoltoId}:${slot.data}:${slot.fascia}`;
+}
+
+function normalizePlanningSlots(slots: Array<PlanningSlot | null | undefined>): PlanningSlot[] {
+  const unique = new Map<string, PlanningSlot>();
+  for (const slot of slots) {
+    if (slot != null) unique.set(planningSlotKey(slot), slot);
+  }
+  return [...unique.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, slot]) => slot);
+}
+
+/** Acquisisce tutti gli slot operativi prima di qualunque lock di risorsa. */
+export async function lockPlanningSlotsTx(
+  tx: LogisticaTx,
+  slots: Array<PlanningSlot | null | undefined>,
+): Promise<PlanningSlot[]> {
+  const normalized = normalizePlanningSlots(slots);
+  for (const slot of normalized) {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(
+      hashtext('turno-centro-slot'),
+      hashtext(${planningSlotKey(slot)})
+    )`);
+  }
+  return normalized;
+}
+
+/** Dopo gli slot, blocca i Turni esistenti in ordine crescente di id. */
+export async function lockPlanningTurnsTx(
+  tx: LogisticaTx,
+  slots: Array<PlanningSlot | null | undefined>,
+): Promise<Array<typeof turniTable.$inferSelect>> {
+  const normalized = normalizePlanningSlots(slots);
+  if (normalized.length === 0) return [];
+  const conditions = normalized.map((slot) => and(
+    eq(turniTable.centroAscoltoId, slot.centroAscoltoId),
+    eq(turniTable.data, slot.data),
+    eq(turniTable.fascia, slot.fascia),
+  ));
+  return tx
+    .select()
+    .from(turniTable)
+    .where(or(...conditions))
+    .orderBy(turniTable.id)
+    .for("update");
+}
+
+export const PLANNING_CONCURRENCY_MESSAGE =
+  "La pianificazione è stata modificata contemporaneamente. Riprova l'operazione.";
+
+export function isPlanningConcurrencyError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 6; depth += 1) {
+    const code = typeof current === "object" ? (current as { code?: string }).code : undefined;
+    if (code === "40P01" || code === "40001") return true;
+    current = typeof current === "object" ? (current as { cause?: unknown }).cause : undefined;
+  }
+  return false;
 }
 
 export function normalizeTarga(value: unknown): string | null {

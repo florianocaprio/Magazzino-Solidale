@@ -45,7 +45,14 @@ import {
   isFasciaConsegna,
   validateConsegnaPlanningTx,
 } from "../lib/consegneTurni";
-import { reconcileConsegnaPlanningTx } from "../lib/consegneReconciliation";
+import {
+  lockConsegnaPlanningContextTx,
+  reconcileConsegnaPlanningTx,
+} from "../lib/consegneReconciliation";
+import {
+  isPlanningConcurrencyError,
+  PLANNING_CONCURRENCY_MESSAGE,
+} from "../lib/logisticaPolicy";
 import { logger } from "../lib/logger";
 import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 import { requirePermission } from "../middlewares/auth";
@@ -1033,19 +1040,48 @@ router.post(
   if (!(await canAccessBollaOperativa(bolla, callerCentroId(req), callerAreaOperativaId(req), callerZonaUdsId(req)))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" }); return;
   }
+  const preliminaryVolontarioId = requestedVolontarioId === undefined ? bolla.volontarioConsegnaId : requestedVolontarioId;
+  const preliminaryMezzoId = requestedMezzoId === undefined ? bolla.mezzoId : requestedMezzoId;
+  const preliminaryMezzoAltro = body.mezzoAltro !== undefined
+    ? body.mezzoAltro
+    : requestedMezzoId === undefined
+      ? bolla.mezzoAltro
+      : false;
+  const preliminaryPlanningInput = {
+    beneficiarioId: bolla.beneficiarioId,
+    dataPrevista: body.dataPrevista,
+    fasciaOraria,
+    volontarioId: preliminaryVolontarioId,
+    mezzoId: preliminaryMezzoId,
+    mezzoAltro: preliminaryMezzoAltro,
+  };
   let result: { consegna: typeof consegneTable.$inferSelect; existing: boolean };
   try {
     result = await db.transaction(async (tx) => {
+      let linkedBefore: typeof consegneTable.$inferSelect | undefined;
+      let planning: Awaited<ReturnType<typeof lockConsegnaPlanningContextTx>>;
+      if (bolla.consegnaId != null) {
+        [linkedBefore] = await tx.select().from(consegneTable)
+          .where(eq(consegneTable.id, bolla.consegnaId)).for("update");
+        if (!linkedBefore) throw new BollaActionError(409, "La bolla risulta già convertita ma la consegna collegata non è disponibile");
+        planning = await lockConsegnaPlanningContextTx(tx, linkedBefore, linkedBefore);
+      } else {
+        planning = await lockConsegnaPlanningContextTx(tx, null, preliminaryPlanningInput);
+      }
       const current = await lockBolla(tx, bollaId);
       if (current.ritiroNonEffettuatoAt == null) throw new BollaActionError(409, "La bolla non è marcata come ritiro non effettuato");
       if (current.stato !== "confermato") throw new BollaActionError(409, "La bolla non è più convertibile");
       if (current.consegnaId != null) {
-        const [linked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, current.consegnaId));
+        const [linked] = linkedBefore?.id === current.consegnaId
+          ? [linkedBefore]
+          : await tx.select().from(consegneTable).where(eq(consegneTable.id, current.consegnaId));
         if (!linked) throw new BollaActionError(409, "La bolla risulta già convertita ma la consegna collegata non è disponibile");
-        await validateConsegnaPlanningTx(tx, linked, { excludeConsegnaId: linked.id });
-        await reconcileConsegnaPlanningTx(tx, linked, linked, req);
+        if (linkedBefore?.id !== linked.id) return { consegna: linked, existing: true };
+        await validateConsegnaPlanningTx(tx, linked, { excludeConsegnaId: linked.id, context: planning.nuovo ?? undefined });
+        await reconcileConsegnaPlanningTx(tx, linked, linked, req, planning.nuovo);
         return { consegna: linked, existing: true };
       }
+      if (linkedBefore != null) throw new BollaActionError(409, PLANNING_CONCURRENCY_MESSAGE);
       const volontarioId = requestedVolontarioId === undefined ? current.volontarioConsegnaId : requestedVolontarioId;
       const volontarioAltro = body.volontarioAltro === undefined
         ? current.trasportatoreNome
@@ -1072,7 +1108,7 @@ router.post(
         mezzoId,
         mezzoAltro,
       };
-      await validateConsegnaPlanningTx(tx, planningInput);
+      await validateConsegnaPlanningTx(tx, planningInput, { context: planning.nuovo ?? undefined });
       const codice = `CON-${Date.now()}-${bollaId}`.slice(0, 30);
       const [created] = await tx.insert(consegneTable).values({
         codice,
@@ -1096,10 +1132,13 @@ router.post(
         indirizzoConsegna,
         operatoreId: req.user!.id,
       }).where(eq(bolleTable.id, bollaId));
-      await reconcileConsegnaPlanningTx(tx, null, created, req);
+      await reconcileConsegnaPlanningTx(tx, null, created, req, planning.nuovo);
       return { consegna: created, existing: false };
     });
   } catch (error) {
+    if (isPlanningConcurrencyError(error)) {
+      res.status(409).json({ error: PLANNING_CONCURRENCY_MESSAGE }); return;
+    }
     if (error instanceof ConsegnaPlanningError) {
       res.status(error.status).json({ error: error.message }); return;
     }

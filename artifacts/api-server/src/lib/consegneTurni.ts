@@ -12,6 +12,7 @@ import {
   fasciaTurnoFromConsegna,
   isFasciaConsegna,
   type FasciaConsegna,
+  type PlanningSlot,
   type FasciaTurno,
 } from "./logisticaPolicy";
 
@@ -30,10 +31,32 @@ export function fasciaTurnoConsegnaSql() {
   return canonicalFasciaTurnoConsegnaSql(sql`${consegneTable.fasciaOraria}`);
 }
 
-type PlanningInput = Pick<
+export type ConsegnaPlanningInput = Pick<
   typeof consegneTable.$inferSelect,
   "beneficiarioId" | "dataPrevista" | "fasciaOraria" | "volontarioId" | "mezzoId" | "mezzoAltro"
 >;
+
+export type ConsegnaPlanningContext = {
+  centroAscoltoId: number | null;
+  fasciaTurno: FasciaTurno | null;
+  slot: PlanningSlot | null;
+};
+
+export async function resolveConsegnaPlanningContextTx(
+  tx: Tx,
+  input: ConsegnaPlanningInput,
+): Promise<ConsegnaPlanningContext> {
+  const [beneficiario] = await tx
+    .select({ centroAscoltoId: beneficiariTable.centroAscoltoId })
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, input.beneficiarioId));
+  const centroAscoltoId = beneficiario?.centroAscoltoId ?? null;
+  const fasciaTurno = fasciaTurnoFromConsegna(input.fasciaOraria);
+  const slot = beneficiario != null && centroAscoltoId != null && fasciaTurno != null
+    ? { centroAscoltoId, data: input.dataPrevista, fascia: fasciaTurno }
+    : null;
+  return { centroAscoltoId, fasciaTurno, slot };
+}
 
 /**
  * Validazione autoritativa delle assegnazioni della consegna. Viene eseguita
@@ -42,17 +65,16 @@ type PlanningInput = Pick<
  */
 export async function validateConsegnaPlanningTx(
   tx: Tx,
-  input: PlanningInput,
-  options: { excludeConsegnaId?: number } = {},
-): Promise<{ centroAscoltoId: number | null; fasciaTurno: string | null }> {
-  const [beneficiario] = await tx
-    .select({ centroAscoltoId: beneficiariTable.centroAscoltoId })
-    .from(beneficiariTable)
-    .where(eq(beneficiariTable.id, input.beneficiarioId));
-  if (!beneficiario) throw new ConsegnaPlanningError(400, "Beneficiario non trovato");
-
-  const centroAscoltoId = beneficiario.centroAscoltoId ?? null;
-  const fasciaTurno = fasciaTurnoFromConsegna(input.fasciaOraria);
+  input: ConsegnaPlanningInput,
+  options: { excludeConsegnaId?: number; context?: ConsegnaPlanningContext } = {},
+): Promise<ConsegnaPlanningContext> {
+  const context = options.context ?? await resolveConsegnaPlanningContextTx(tx, input);
+  const { centroAscoltoId, fasciaTurno } = context;
+  if (centroAscoltoId == null && context.slot == null) {
+    const [beneficiario] = await tx.select({ id: beneficiariTable.id }).from(beneficiariTable)
+      .where(eq(beneficiariTable.id, input.beneficiarioId));
+    if (!beneficiario) throw new ConsegnaPlanningError(400, "Beneficiario non trovato");
+  }
   if (input.fasciaOraria != null && fasciaTurno == null) {
     throw new ConsegnaPlanningError(400, "fasciaOraria non valida: usare Mattina, Pomeriggio o Sera");
   }
@@ -72,10 +94,11 @@ export async function validateConsegnaPlanningTx(
         eq(turniTable.centroAscoltoId, centroAscoltoId),
         eq(turniTable.data, input.dataPrevista),
         eq(turniTable.fascia, fasciaTurno),
-      )).limit(1)
+      )).limit(1).for("update")
     : [];
 
-  // Lock order canonico: mezzo, proprietario effettivo, volontario assegnato.
+  // Slot e Turni sono già serializzati dal chiamante; seguono Mezzo,
+  // proprietario effettivo e Volontario assegnato.
   if (input.mezzoId != null) {
     try {
       await assertMezzoAssignableTx(tx, {
@@ -124,5 +147,5 @@ export async function validateConsegnaPlanningTx(
     }
   }
 
-  return { centroAscoltoId, fasciaTurno };
+  return context;
 }

@@ -31,8 +31,13 @@ import {
   assertVolontarioAssignableTx,
   isFasciaTurno,
   isLogisticaUniqueViolation,
+  isPlanningConcurrencyError,
+  lockPlanningSlotsTx,
+  lockPlanningTurnsTx,
   LogisticaPolicyError,
   parseRequiredVersion,
+  PLANNING_CONCURRENCY_MESSAGE,
+  type PlanningSlot,
 } from "../lib/logisticaPolicy";
 import { auditLogistica } from "../lib/logisticaAudit";
 
@@ -277,10 +282,13 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
   let turnoId: number | null;
   try {
     turnoId = await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(
-        hashtext('turno-centro-slot'),
-        hashtext(${`${centroAscoltoId}:${body.data}:${body.fascia}`})
-      )`);
+      const planningSlot: PlanningSlot = {
+        centroAscoltoId,
+        data: body.data!,
+        fascia: body.fascia as PlanningSlot["fascia"],
+      };
+      await lockPlanningSlotsTx(tx, [planningSlot]);
+      await lockPlanningTurnsTx(tx, [planningSlot]);
       const [existing] = await tx
         .select()
         .from(turniTable)
@@ -334,7 +342,7 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
           excludeTurnoId: existing?.id,
         });
       }
-      for (const volontarioId of effectiveVolontariMap.keys()) await assertVolontarioAssignableTx(tx, {
+      for (const volontarioId of [...effectiveVolontariMap.keys()].sort((a, b) => a - b)) await assertVolontarioAssignableTx(tx, {
         volontarioId, centroAscoltoId, data: body.data!, fascia: body.fascia as "09-13" | "14-18" | "18-20", excludeTurnoId: existing?.id,
       });
 
@@ -419,6 +427,10 @@ router.put("/turni", requirePermission("logistica.turni.manage"), async (req, re
       return id;
     });
   } catch (error) {
+    if (isPlanningConcurrencyError(error)) {
+      res.status(409).json({ error: PLANNING_CONCURRENCY_MESSAGE });
+      return;
+    }
     if (error instanceof LogisticaPolicyError) {
       res.status(error.status).json({ error: error.message });
       return;
@@ -646,6 +658,15 @@ router.patch(
     };
     try {
       await db.transaction(async (tx) => {
+        const [snapshot] = await tx.select().from(turniTable).where(eq(turniTable.id, id));
+        if (!snapshot) throw new LogisticaPolicyError(404, "Not found");
+        const planningSlot: PlanningSlot = {
+          centroAscoltoId: snapshot.centroAscoltoId,
+          data: snapshot.data,
+          fascia: snapshot.fascia as PlanningSlot["fascia"],
+        };
+        await lockPlanningSlotsTx(tx, [planningSlot]);
+        await lockPlanningTurnsTx(tx, [planningSlot]);
         const [current] = await tx.select().from(turniTable).where(eq(turniTable.id, id)).for("update");
         if (!current) throw new LogisticaPolicyError(404, "Not found");
         if (!canAccessCentro(current.centroAscoltoId, callerCentroId(req))) {
@@ -662,11 +683,11 @@ router.patch(
         }
         if (target === "confermato") {
           const volontari = await tx.select({ volontarioId: turniVolontariTable.volontarioId }).from(turniVolontariTable).where(eq(turniVolontariTable.turnoId, id));
-          for (const volontario of volontari) {
-            await assertVolontarioAssignableTx(tx, { volontarioId: volontario.volontarioId, centroAscoltoId: current.centroAscoltoId, data: current.data, fascia: current.fascia as "09-13" | "14-18" | "18-20", excludeTurnoId: id });
-          }
           if (current.mezzoId != null) {
             await assertMezzoAssignableTx(tx, { mezzoId: current.mezzoId, centroAscoltoId: current.centroAscoltoId, data: current.data, fascia: current.fascia as "09-13" | "14-18" | "18-20", excludeTurnoId: id });
+          }
+          for (const volontario of volontari.sort((a, b) => a.volontarioId - b.volontarioId)) {
+            await assertVolontarioAssignableTx(tx, { volontarioId: volontario.volontarioId, centroAscoltoId: current.centroAscoltoId, data: current.data, fascia: current.fascia as "09-13" | "14-18" | "18-20", excludeTurnoId: id });
           }
         }
         const [updated] = await tx.update(turniTable).set({
@@ -680,6 +701,10 @@ router.patch(
         await auditLogistica(tx, req, { entita: "turno", id, azione: target, precedente: { stato: current.stato, versione: current.versione }, nuovo: { stato: target, versione: updated.versione }, note: target === "annullato" ? trimText(req.body?.motivoAnnullamento) : null });
       });
     } catch (error) {
+      if (isPlanningConcurrencyError(error)) {
+        res.status(409).json({ error: PLANNING_CONCURRENCY_MESSAGE });
+        return;
+      }
       if (error instanceof LogisticaPolicyError) {
         res.status(error.status).json({ error: error.message });
         return;

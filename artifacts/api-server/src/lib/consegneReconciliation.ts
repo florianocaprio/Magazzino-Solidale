@@ -1,6 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
-  beneficiariTable,
   consegneTable,
   db,
   turniConsegneTable,
@@ -9,22 +8,51 @@ import {
 } from "@workspace/db";
 import type { Request } from "express";
 import { auditLogistica } from "./logisticaAudit";
-import { fasciaTurnoFromConsegna, type FasciaTurno } from "./logisticaPolicy";
-import { ConsegnaPlanningError } from "./consegneTurni";
+import {
+  lockPlanningSlotsTx,
+  lockPlanningTurnsTx,
+  type PlanningSlot,
+} from "./logisticaPolicy";
+import {
+  ConsegnaPlanningError,
+  resolveConsegnaPlanningContextTx,
+  type ConsegnaPlanningContext,
+  type ConsegnaPlanningInput,
+} from "./consegneTurni";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ConsegnaRow = typeof consegneTable.$inferSelect;
+type PreviousConsegna = ConsegnaPlanningInput & { id: number };
 
-async function centroTx(tx: Tx, consegna: ConsegnaRow) {
-  const [row] = await tx.select({ id: beneficiariTable.centroAscoltoId }).from(beneficiariTable)
-    .where(eq(beneficiariTable.id, consegna.beneficiarioId));
-  return row?.id ?? null;
-}
-
-async function lockSlot(tx: Tx, centroId: number, data: string, fascia: FasciaTurno) {
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(
-    hashtext('turno-centro-slot'), hashtext(${`${centroId}:${data}:${fascia}`})
-  )`);
+/** Serializza slot e Turni prima che la validazione blocchi Mezzi/Volontari. */
+export async function lockConsegnaPlanningContextTx(
+  tx: Tx,
+  precedente: PreviousConsegna | null,
+  nuovo: ConsegnaPlanningInput | null,
+): Promise<{ nuovo: ConsegnaPlanningContext | null; slots: PlanningSlot[] }> {
+  const [linkedTurno] = precedente == null
+    ? []
+    : await tx.select({
+        centroAscoltoId: turniTable.centroAscoltoId,
+        data: turniTable.data,
+        fascia: turniTable.fascia,
+      }).from(turniConsegneTable)
+        .innerJoin(turniTable, eq(turniConsegneTable.turnoId, turniTable.id))
+        .where(eq(turniConsegneTable.consegnaId, precedente.id));
+  const oldContext = linkedTurno == null && precedente != null
+    ? await resolveConsegnaPlanningContextTx(tx, precedente)
+    : null;
+  const oldSlot: PlanningSlot | null = linkedTurno == null
+    ? (oldContext?.slot ?? null)
+    : {
+        centroAscoltoId: linkedTurno.centroAscoltoId,
+        data: linkedTurno.data,
+        fascia: linkedTurno.fascia as PlanningSlot["fascia"],
+      };
+  const newContext = nuovo == null ? null : await resolveConsegnaPlanningContextTx(tx, nuovo);
+  const slots = await lockPlanningSlotsTx(tx, [oldSlot, newContext?.slot]);
+  await lockPlanningTurnsTx(tx, slots);
+  return { nuovo: newContext, slots };
 }
 
 /** Riconcilia solo le assegnazioni con provenienza persistita dalla Consegna. */
@@ -33,22 +61,18 @@ export async function reconcileConsegnaPlanningTx(
   precedente: ConsegnaRow | null,
   nuovo: ConsegnaRow | null,
   req?: Request,
+  planningContext?: ConsegnaPlanningContext | null,
 ): Promise<void> {
   const consegnaId = nuovo?.id ?? precedente?.id;
   if (consegnaId == null) return;
   const [oldSource] = await tx.select().from(turniConsegneTable)
     .where(eq(turniConsegneTable.consegnaId, consegnaId)).for("update");
-  const [oldTurno] = oldSource
-    ? await tx.select().from(turniTable).where(eq(turniTable.id, oldSource.turnoId))
-    : [];
-  const centroId = nuovo ? await centroTx(tx, nuovo) : null;
-  const fascia = nuovo ? fasciaTurnoFromConsegna(nuovo.fasciaOraria) : null;
+  const context = nuovo == null
+    ? null
+    : (planningContext ?? await resolveConsegnaPlanningContextTx(tx, nuovo));
+  const centroId = context?.centroAscoltoId ?? null;
+  const fascia = context?.fasciaTurno ?? null;
   const hasSource = Boolean(nuovo && (nuovo.volontarioId != null || nuovo.mezzoId != null) && centroId != null && fascia != null);
-
-  const slots = new Map<string, [number, string, FasciaTurno]>();
-  if (oldTurno) slots.set(`${oldTurno.centroAscoltoId}:${oldTurno.data}:${oldTurno.fascia}`, [oldTurno.centroAscoltoId, oldTurno.data, oldTurno.fascia as FasciaTurno]);
-  if (hasSource) slots.set(`${centroId}:${nuovo!.dataPrevista}:${fascia}`, [centroId!, nuovo!.dataPrevista, fascia!]);
-  for (const [, slot] of [...slots].sort(([a], [b]) => a.localeCompare(b))) await lockSlot(tx, ...slot);
 
   if (oldSource) await tx.delete(turniConsegneTable).where(eq(turniConsegneTable.id, oldSource.id));
   const affected = new Set<number>(oldSource ? [oldSource.turnoId] : []);

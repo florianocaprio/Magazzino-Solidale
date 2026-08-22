@@ -33,7 +33,14 @@ import {
   ConsegnaPlanningError,
   validateConsegnaPlanningTx,
 } from "../lib/consegneTurni";
-import { reconcileConsegnaPlanningTx } from "../lib/consegneReconciliation";
+import {
+  lockConsegnaPlanningContextTx,
+  reconcileConsegnaPlanningTx,
+} from "../lib/consegneReconciliation";
+import {
+  isPlanningConcurrencyError,
+  PLANNING_CONCURRENCY_MESSAGE,
+} from "../lib/logisticaPolicy";
 import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
@@ -43,6 +50,10 @@ const router: IRouter = Router();
 router.use("/consegne", requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]));
 
 function handlePlanningError(error: unknown, res: Response): boolean {
+  if (isPlanningConcurrencyError(error)) {
+    res.status(409).json({ error: PLANNING_CONCURRENCY_MESSAGE });
+    return true;
+  }
   if (error instanceof ConsegnaPlanningError) {
     res.status(error.status).json({ error: error.message });
     return true;
@@ -209,16 +220,18 @@ router.post("/consegne", async (req, res) => {
   const codice = `CON-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   try {
     const row = await db.transaction(async (tx) => {
-      await validateConsegnaPlanningTx(tx, {
+      const planningInput = {
         beneficiarioId: Number(body.beneficiarioId),
         dataPrevista: String(body.dataPrevista),
         fasciaOraria: body.fasciaOraria ?? null,
         volontarioId: body.volontarioId ?? null,
         mezzoId: body.mezzoId ?? null,
         mezzoAltro: Boolean(body.mezzoAltro),
-      });
+      };
+      const planning = await lockConsegnaPlanningContextTx(tx, null, planningInput);
+      await validateConsegnaPlanningTx(tx, planningInput, { context: planning.nuovo ?? undefined });
       const [created] = await tx.insert(consegneTable).values({ ...body, codice, tipoPianificazione: TIPO_CONSEGNA_PACCO } as typeof consegneTable.$inferInsert).returning();
-      await reconcileConsegnaPlanningTx(tx, null, created, req);
+      await reconcileConsegnaPlanningTx(tx, null, created, req, planning.nuovo);
       return created;
     });
     res.status(201).json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
@@ -277,9 +290,10 @@ router.patch("/consegne/:id", async (req, res) => {
       const [locked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, id)).for("update");
       if (!locked) throw new ConsegnaPlanningError(404, "Not found");
       const next = { ...locked, ...body };
-      await validateConsegnaPlanningTx(tx, next, { excludeConsegnaId: id });
+      const planning = await lockConsegnaPlanningContextTx(tx, locked, next);
+      await validateConsegnaPlanningTx(tx, next, { excludeConsegnaId: id, context: planning.nuovo ?? undefined });
       const [updated] = await tx.update(consegneTable).set(body).where(eq(consegneTable.id, id)).returning();
-      await reconcileConsegnaPlanningTx(tx, locked, updated, req);
+      await reconcileConsegnaPlanningTx(tx, locked, updated, req, planning.nuovo);
       return updated;
     });
     res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
@@ -307,6 +321,7 @@ router.delete("/consegne/:id", async (req, res) => {
     await db.transaction(async (tx) => {
       const [locked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, id)).for("update");
       if (!locked) throw new ConsegnaPlanningError(404, "Not found");
+      await lockConsegnaPlanningContextTx(tx, locked, null);
       await reconcileConsegnaPlanningTx(tx, locked, null, req);
       await tx.update(bolleTable).set({ consegnaId: null }).where(eq(bolleTable.consegnaId, id));
       await tx.delete(consegneTable).where(eq(consegneTable.id, id));
