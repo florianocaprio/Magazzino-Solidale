@@ -11,6 +11,7 @@ export interface ConsegnaInput {
   tipoConsegna: string;
   dataPrevista: string;
   fasciaOraria?: string;
+  /** @maxLength 200 */
   indirizzoConsegna?: string;
   zona?: string;
   magazzinoId: number;

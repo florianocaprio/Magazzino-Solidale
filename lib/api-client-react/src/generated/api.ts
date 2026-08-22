@@ -7222,7 +7222,7 @@ export const createConsegna = async (consegnaInput: ConsegnaInput, options?: Req
 
 
 
-export const getCreateConsegnaMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateConsegnaMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConsegna>>, TError,{data: BodyType<ConsegnaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createConsegna>>, TError,{data: BodyType<ConsegnaInput>}, TContext> => {
 
@@ -7251,9 +7251,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateConsegnaMutationResult = NonNullable<Awaited<ReturnType<typeof createConsegna>>>
     export type CreateConsegnaMutationBody = BodyType<ConsegnaInput>
-    export type CreateConsegnaMutationError = ErrorType<unknown>
+    export type CreateConsegnaMutationError = ErrorType<void>
 
-    export const useCreateConsegna = <TError = ErrorType<unknown>,
+    export const useCreateConsegna = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConsegna>>, TError,{data: BodyType<ConsegnaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createConsegna>>,
@@ -7359,7 +7359,7 @@ export const updateConsegna = async (id: number,
 
 
 
-export const getUpdateConsegnaMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateConsegnaMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConsegna>>, TError,{id: number;data: BodyType<ConsegnaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateConsegna>>, TError,{id: number;data: BodyType<ConsegnaUpdate>}, TContext> => {
 
@@ -7388,9 +7388,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateConsegnaMutationResult = NonNullable<Awaited<ReturnType<typeof updateConsegna>>>
     export type UpdateConsegnaMutationBody = BodyType<ConsegnaUpdate>
-    export type UpdateConsegnaMutationError = ErrorType<unknown>
+    export type UpdateConsegnaMutationError = ErrorType<void>
 
-    export const useUpdateConsegna = <TError = ErrorType<unknown>,
+    export const useUpdateConsegna = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConsegna>>, TError,{id: number;data: BodyType<ConsegnaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateConsegna>>,
@@ -10605,7 +10605,7 @@ export const getGetMapsInterventiSocialiQueryKey = (params?: GetMapsInterventiSo
     }
 
 
-export const getGetMapsInterventiSocialiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError = ErrorType<unknown>>(params?: GetMapsInterventiSocialiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetMapsInterventiSocialiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError = ErrorType<void>>(params?: GetMapsInterventiSocialiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -10624,11 +10624,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMapsInterventiSocialiQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsInterventiSociali>>>
-export type GetMapsInterventiSocialiQueryError = ErrorType<unknown>
+export type GetMapsInterventiSocialiQueryError = ErrorType<void>
 
 
 
-export function useGetMapsInterventiSociali<TData = Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError = ErrorType<unknown>>(
+export function useGetMapsInterventiSociali<TData = Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError = ErrorType<void>>(
  params?: GetMapsInterventiSocialiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsInterventiSociali>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -10683,7 +10683,7 @@ export const getGetMapsConsegneQueryKey = (params?: GetMapsConsegneParams,) => {
     }
 
 
-export const getGetMapsConsegneQueryOptions = <TData = Awaited<ReturnType<typeof getMapsConsegne>>, TError = ErrorType<unknown>>(params?: GetMapsConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetMapsConsegneQueryOptions = <TData = Awaited<ReturnType<typeof getMapsConsegne>>, TError = ErrorType<void>>(params?: GetMapsConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -10702,11 +10702,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMapsConsegneQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsConsegne>>>
-export type GetMapsConsegneQueryError = ErrorType<unknown>
+export type GetMapsConsegneQueryError = ErrorType<void>
 
 
 
-export function useGetMapsConsegne<TData = Awaited<ReturnType<typeof getMapsConsegne>>, TError = ErrorType<unknown>>(
+export function useGetMapsConsegne<TData = Awaited<ReturnType<typeof getMapsConsegne>>, TError = ErrorType<void>>(
  params?: GetMapsConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -10761,7 +10761,7 @@ export const getGetMapsRitiriNonEffettuatiQueryKey = (params?: GetMapsRitiriNonE
     }
 
 
-export const getGetMapsRitiriNonEffettuatiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError = ErrorType<unknown>>(params?: GetMapsRitiriNonEffettuatiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetMapsRitiriNonEffettuatiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError = ErrorType<void>>(params?: GetMapsRitiriNonEffettuatiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -10780,11 +10780,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMapsRitiriNonEffettuatiQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>>
-export type GetMapsRitiriNonEffettuatiQueryError = ErrorType<unknown>
+export type GetMapsRitiriNonEffettuatiQueryError = ErrorType<void>
 
 
 
-export function useGetMapsRitiriNonEffettuati<TData = Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError = ErrorType<unknown>>(
+export function useGetMapsRitiriNonEffettuati<TData = Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError = ErrorType<void>>(
  params?: GetMapsRitiriNonEffettuatiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsRitiriNonEffettuati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -10832,7 +10832,7 @@ export const getGetMapsPuntiOperativiQueryKey = () => {
     }
 
 
-export const getGetMapsPuntiOperativiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetMapsPuntiOperativiQueryOptions = <TData = Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -10851,11 +10851,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMapsPuntiOperativiQueryResult = NonNullable<Awaited<ReturnType<typeof getMapsPuntiOperativi>>>
-export type GetMapsPuntiOperativiQueryError = ErrorType<unknown>
+export type GetMapsPuntiOperativiQueryError = ErrorType<void>
 
 
 
-export function useGetMapsPuntiOperativi<TData = Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError = ErrorType<unknown>>(
+export function useGetMapsPuntiOperativi<TData = Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError = ErrorType<void>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMapsPuntiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

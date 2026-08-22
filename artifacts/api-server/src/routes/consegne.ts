@@ -87,11 +87,30 @@ function normalizeConsegnaPayload(raw: Record<string, any>) {
   delete body.statoAccessoEmporio;
   delete body.motivoAnnullamento;
   delete body.noteAccessoEmporio;
+  if ("indirizzoConsegna" in body) {
+    body.indirizzoConsegna = typeof body.indirizzoConsegna === "string"
+      ? body.indirizzoConsegna.trim() || null
+      : body.indirizzoConsegna;
+  }
   if ("volontarioAltro" in body) {
     body.volontarioAltro = normalizeText(body.volontarioAltro);
     if (body.volontarioAltro) body.volontarioId = null;
   }
   return body;
+}
+
+function assertConsegnaAddress(input: { tipoConsegna?: unknown; indirizzoConsegna?: unknown }): void {
+  if (input.tipoConsegna !== "domicilio") return;
+  if (
+    typeof input.indirizzoConsegna !== "string"
+    || input.indirizzoConsegna.trim().length === 0
+    || input.indirizzoConsegna.trim().length > 200
+  ) {
+    throw new ConsegnaPlanningError(
+      400,
+      "Per una consegna a domicilio è obbligatorio un indirizzo valido (massimo 200 caratteri)",
+    );
+  }
 }
 
 /** Ritorna, per ogni consegnaId, la bolla collegata più rilevante (non annullata). */
@@ -220,6 +239,7 @@ router.post("/consegne", async (req, res) => {
   const codice = `CON-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   try {
     const row = await db.transaction(async (tx) => {
+      assertConsegnaAddress(body);
       const planningInput = {
         beneficiarioId: Number(body.beneficiarioId),
         dataPrevista: String(body.dataPrevista),
@@ -290,6 +310,7 @@ router.patch("/consegne/:id", async (req, res) => {
       const [locked] = await tx.select().from(consegneTable).where(eq(consegneTable.id, id)).for("update");
       if (!locked) throw new ConsegnaPlanningError(404, "Not found");
       const next = { ...locked, ...body };
+      assertConsegnaAddress(next);
       const planning = await lockConsegnaPlanningContextTx(tx, locked, next);
       await validateConsegnaPlanningTx(tx, next, { excludeConsegnaId: id, context: planning.nuovo ?? undefined });
       const [updated] = await tx.update(consegneTable).set(body).where(eq(consegneTable.id, id)).returning();

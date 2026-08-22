@@ -2439,6 +2439,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consegna"
+        "400": { description: Dati non validi o indirizzo domiciliare mancante }
 
   /consegne/{id}:
     get:
@@ -2479,6 +2480,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consegna"
+        "400": { description: Stato risultante non valido o indirizzo domiciliare mancante }
     delete:
       operationId: deleteConsegna
       tags: [consegne]
@@ -3575,6 +3577,8 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
+        "403": { description: "Permission MAPS o Interventi Sociali, area o modulo non consentiti" }
+        "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/pacchi/consegne:
     get:
@@ -3593,6 +3597,8 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
+        "403": { description: "Permission MAPS, area, moduli o scope non consentiti" }
+        "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/pacchi/ritiri-non-effettuati:
     get:
@@ -3611,6 +3617,8 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
+        "403": { description: "Permission MAPS o Bolle, area, moduli o scope non consentiti" }
+        "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/centro/punti-operativi:
     get:
@@ -3626,6 +3634,8 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
+        "403": { description: "Permission MAPS, area, modulo o scope non consentiti" }
+        "422": { description: Troppi punti operativi; restringere i filtri }
 
   /maps/routes/consegne/{id}:
     get:
@@ -3645,6 +3655,7 @@ paths:
               schema: { $ref: "#/components/schemas/MapsRoute" }
         "403": { description: "Permission, area o scope non consentiti" }
         "404": { description: Consegna non trovata }
+        "409": { description: Consegna non più pianificata }
         "422": { description: Tipo o indirizzi non compatibili con il routing }
 
   # ─── CENTRI DI ASCOLTO ─────────────────────────────────────────────────────
@@ -12454,6 +12465,7 @@ components:
           type: string
         indirizzoConsegna:
           type: string
+          maxLength: 200
         zona:
           type: string
         magazzinoId:
@@ -12481,6 +12493,7 @@ components:
           type: string
         indirizzoConsegna:
           type: string
+          maxLength: 200
         zona:
           type: string
         volontarioId:

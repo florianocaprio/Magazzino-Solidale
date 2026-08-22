@@ -3924,12 +3924,16 @@ export const ListConsegneResponseItem = zod.object({
 export const ListConsegneResponse = zod.array(ListConsegneResponseItem)
 
 
+export const createConsegnaBodyIndirizzoConsegnaMax = 200;
+
+
+
 export const CreateConsegnaBody = zod.object({
   "beneficiarioId": zod.number(),
   "tipoConsegna": zod.string(),
   "dataPrevista": zod.string(),
   "fasciaOraria": zod.string().optional(),
-  "indirizzoConsegna": zod.string().optional(),
+  "indirizzoConsegna": zod.string().max(createConsegnaBodyIndirizzoConsegnaMax).optional(),
   "zona": zod.string().optional(),
   "magazzinoId": zod.number(),
   "volontarioId": zod.number().optional(),
@@ -3978,11 +3982,15 @@ export const UpdateConsegnaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateConsegnaBodyIndirizzoConsegnaMax = 200;
+
+
+
 export const UpdateConsegnaBody = zod.object({
   "tipoConsegna": zod.string().optional(),
   "dataPrevista": zod.string().optional(),
   "fasciaOraria": zod.string().optional(),
-  "indirizzoConsegna": zod.string().optional(),
+  "indirizzoConsegna": zod.string().max(updateConsegnaBodyIndirizzoConsegnaMax).optional(),
   "zona": zod.string().optional(),
   "volontarioId": zod.number().optional(),
   "volontarioAltro": zod.string().nullish(),
