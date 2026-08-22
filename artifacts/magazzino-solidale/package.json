@@ -86,7 +86,7 @@
     "vite": "catalog:",
     "vitest": "^4.1.9",
     "wouter": "^3.3.5",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "catalog:"
   }
 }

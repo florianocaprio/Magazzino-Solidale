@@ -73,6 +73,51 @@ function absolute(value: string | null): string | null {
     : InventoryDecimal.parse(value, { allowNegative: true }).abs().toDb();
 }
 
+function sign(value: string | null): -1 | 0 | 1 {
+  if (value == null) return 0;
+  const parsed = InventoryDecimal.parse(value, { allowNegative: true });
+  return parsed.isZero() ? 0 : parsed.isPositive() ? 1 : -1;
+}
+
+function effectiveLot(row: typeof importazioniAgeaRigheTable.$inferSelect) {
+  return {
+    raw: row.lottoEffettivoRaw ?? row.lottoRaw,
+    normalized: row.lottoEffettivoNormalizzato ?? row.lottoNormalizzato,
+  };
+}
+
+function partyKeyForRow(
+  row: typeof importazioniAgeaRigheTable.$inferSelect,
+): string {
+  const fund = row.fondoNormalizzato ?? "?";
+  const lot = effectiveLot(row).normalized ?? "∅";
+  return row.prodottoIdSnapshot == null
+    ? ["EXT", fund, row.prodottoNormalizzato, lot].join("|")
+    : ["INT", row.prodottoIdSnapshot, fund, lot].join("|");
+}
+
+function mutableRowState(
+  row: typeof importazioniAgeaRigheTable.$inferSelect,
+  mapped: boolean,
+): string {
+  if (row.blocking) return "BLOCCATA";
+  if (!mapped) return "DA_MAPPARE";
+  if (
+    [
+      "DUPLICATA",
+      "MODIFICATO_NEL_REGISTRO",
+      "IDENTITA_AMBIGUA",
+      "APPLICATO_INCREMENTALE",
+      "ASSORBITO_SALDO_INIZIALE",
+    ].includes(row.statoRiga)
+  )
+    return row.statoRiga;
+  if (row.tipoMovimentoEsterno === "CARICO") return "DA_APPLICARE";
+  return row.tipoMovimentoEsterno === "RESO"
+    ? "RESO_RIFERIMENTO"
+    : "SCARICO_RIFERIMENTO";
+}
+
 async function mappingsForRows(
   tx: InventoryTransaction,
   rows: ParsedAgeaRow[],
@@ -204,7 +249,11 @@ async function classifyAgainstLedger(
   }
 }
 
-async function rebuildImport(tx: InventoryTransaction, importId: number) {
+async function rebuildImport(
+  tx: InventoryTransaction,
+  importId: number,
+  expectedVersion?: number,
+) {
   const [importRow] = await tx
     .select()
     .from(importazioniAgeaTable)
@@ -222,18 +271,20 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
       "IMPORTAZIONE_IMMUTABILE",
       "L'importazione non è più modificabile",
     );
+  if (expectedVersion != null && importRow.versione !== expectedVersion)
+    throw new AgeaImportError(
+      409,
+      "VERSIONE_NON_CORRENTE",
+      "La preview è stata aggiornata: ricaricare i dati",
+    );
   const rows = await tx
     .select()
     .from(importazioniAgeaRigheTable)
     .where(eq(importazioniAgeaRigheTable.importazioneId, importId));
-  const missingKeys = [
-    ...new Set(
-      rows
-        .filter((row) => row.prodottoIdSnapshot == null)
-        .map((row) => row.prodottoNormalizzato),
-    ),
+  const descriptionKeys = [
+    ...new Set(rows.map((row) => row.prodottoNormalizzato)),
   ];
-  const mappings = missingKeys.length
+  const mappings = descriptionKeys.length
     ? await tx
         .select({
           mapping: mappatureProdottiEsterniTable,
@@ -250,7 +301,7 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
             eq(mappatureProdottiEsterniTable.attiva, true),
             inArray(
               mappatureProdottiEsterniTable.chiaveDescrizioneNormalizzata,
-              missingKeys,
+              descriptionKeys,
             ),
           ),
         )
@@ -258,30 +309,46 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
   const mappingByKey = new Map(
     mappings.map((item) => [item.mapping.chiaveDescrizioneNormalizzata, item]),
   );
-  for (const row of rows) {
-    if (row.prodottoIdSnapshot != null) continue;
+  const rowMappingUpdates = rows.map((row) => {
     const found = mappingByKey.get(row.prodottoNormalizzato);
-    if (!found) continue;
-    await tx
-      .update(importazioniAgeaRigheTable)
-      .set({
-        mappingProdottoId: found.mapping.id,
-        prodottoIdSnapshot: found.prodotto.id,
-        descrizioneProdottoSnapshot: found.prodotto.nome,
-        unitaMisuraSnapshot: found.prodotto.unitaMisura,
-        statoRiga: row.blocking
-          ? "BLOCCATA"
-          : row.statoRiga === "DA_MAPPARE"
-            ? row.tipoMovimentoEsterno === "CARICO"
-              ? "DA_APPLICARE"
-              : "SCARICO_RIFERIMENTO"
-            : row.statoRiga,
-      })
-      .where(eq(importazioniAgeaRigheTable.id, row.id));
-    row.mappingProdottoId = found.mapping.id;
-    row.prodottoIdSnapshot = found.prodotto.id;
-    row.descrizioneProdottoSnapshot = found.prodotto.nome;
-    row.unitaMisuraSnapshot = found.prodotto.unitaMisura;
+    return {
+      row,
+      mappingId: found?.mapping.id ?? null,
+      mappingVersion: found?.mapping.versione ?? null,
+      productId: found?.prodotto.id ?? null,
+      productName: found?.prodotto.nome ?? null,
+      unit: found?.prodotto.unitaMisura ?? null,
+      state: mutableRowState(row, Boolean(found)),
+    };
+  });
+  for (let offset = 0; offset < rowMappingUpdates.length; offset += 500) {
+    const chunk = rowMappingUpdates.slice(offset, offset + 500);
+    const values = sql.join(
+      chunk.map(
+        (item) =>
+          sql`(${item.row.id}::integer, ${item.mappingId}::integer, ${item.mappingVersion}::integer, ${item.productId}::integer, ${item.productName}::text, ${item.unit}::varchar, ${item.state}::varchar)`,
+      ),
+      sql`, `,
+    );
+    await tx.execute(sql`
+      UPDATE importazioni_agea_righe AS r
+      SET mapping_prodotto_id = v.mapping_id,
+          mapping_versione_snapshot = v.mapping_version,
+          prodotto_id_snapshot = v.product_id,
+          descrizione_prodotto_snapshot = v.product_name,
+          unita_misura_snapshot = v.unit,
+          stato_riga = v.state
+      FROM (VALUES ${values}) AS v(id, mapping_id, mapping_version, product_id, product_name, unit, state)
+      WHERE r.id = v.id
+    `);
+  }
+  for (const update of rowMappingUpdates) {
+    update.row.mappingProdottoId = update.mappingId;
+    update.row.mappingVersioneSnapshot = update.mappingVersion;
+    update.row.prodottoIdSnapshot = update.productId;
+    update.row.descrizioneProdottoSnapshot = update.productName;
+    update.row.unitaMisuraSnapshot = update.unit;
+    update.row.statoRiga = update.state;
   }
 
   const previousParties = await tx
@@ -332,22 +399,55 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
   }
   const groups = new Map<string, typeof rows>();
   for (const row of rows) {
-    const key = [
-      row.fondoNormalizzato ?? "?",
-      row.prodottoNormalizzato,
-      row.lottoNormalizzato ?? "∅",
-    ].join("|");
+    const key = partyKeyForRow(row);
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
   let positiveParties = 0;
   let blockingParties = 0;
+  const partyValues: Array<typeof importazioniAgeaPartiteTable.$inferInsert> =
+    [];
   for (const [key, group] of groups) {
     const first = group[0];
-    const previous = previousByKey.get(key);
+    const descriptions = [
+      ...new Set(group.map((row) => row.prodottoNormalizzato)),
+    ].sort();
+    const overlappingPrevious = previousParties.filter(
+      (party) =>
+        party.fondoOrigine === first.fondoNormalizzato &&
+        party.descrizioniEsterneJson.some((description) =>
+          descriptions.includes(description),
+        ),
+    );
+    const sameLotPrevious = overlappingPrevious.filter(
+      (party) => party.lottoNormalizzato === effectiveLot(first).normalized,
+    );
+    const exactPrevious = previousByKey.get(key);
+    const correctionCandidates =
+      sameLotPrevious.length > 0
+        ? sameLotPrevious
+        : exactPrevious
+          ? [exactPrevious]
+          : overlappingPrevious.length === 1
+            ? overlappingPrevious
+            : [];
+    const previous = [...correctionCandidates].sort(
+      (left, right) => left.id - right.id,
+    )[0];
+    const manualExpiryValues = new Set(
+      correctionCandidates
+        .filter(
+          (party) =>
+            party.dataScadenzaFonte === "INSERIMENTO_MANUALE" &&
+            party.dataScadenzaRisolta != null,
+        )
+        .map((party) => party.dataScadenzaRisolta!),
+    );
     const piecesSet = new Set(group.map((row) => row.saldoFinalePezzi ?? null));
     const kgSet = new Set(group.map((row) => row.saldoFinaleKgLt ?? null));
     const errors: string[] = [];
     const warnings: string[] = [];
+    if (manualExpiryValues.size > 1)
+      errors.push("CORREZIONI_PARTITA_CONFLITTO");
     if (piecesSet.size > 1 || kgSet.size > 1)
       errors.push("SALDO_FINALE_INCOERENTE");
     if (!first.fondoNormalizzato) errors.push("FONDO_NON_RICONOSCIUTO");
@@ -355,20 +455,25 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
       errors.push("MAPPING_PRODOTTO_MANCANTE");
     const pieces = first.saldoFinalePezzi;
     const kgLt = first.saldoFinaleKgLt;
+    const piecesSign = sign(pieces);
+    const kgLtSign = sign(kgLt);
+    if (piecesSign < 0 || kgLtSign < 0) errors.push("SALDO_FINALE_NEGATIVO");
+    if ((piecesSign < 0 && kgLtSign > 0) || (piecesSign > 0 && kgLtSign < 0))
+      errors.push("SALDO_FINALE_SEGNO_INCOERENTE");
     const hasPositiveBalance = positive(pieces) || positive(kgLt);
     if (hasPositiveBalance) positiveParties += 1;
     let existingLotto: typeof lottiTable.$inferSelect | undefined;
     if (
       first.prodottoIdSnapshot &&
       first.fondoNormalizzato &&
-      first.lottoNormalizzato
+      effectiveLot(first).normalized
     ) {
       const matches =
         lotsByKey.get(
           [
             first.prodottoIdSnapshot,
             first.fondoNormalizzato,
-            first.lottoNormalizzato,
+            effectiveLot(first).normalized,
           ].join("|"),
         ) ?? [];
       if (matches.length > 1) errors.push("PARTITA_LOCALE_AMBIGUA");
@@ -393,7 +498,7 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
       warnings.push("FATTORE_MANCANTE");
     if (hasPositiveBalance && first.prodottoIdSnapshot) {
       const product = productsById.get(first.prodottoIdSnapshot);
-      if (product?.gestioneLotto && !first.lottoNormalizzato)
+      if (product?.gestioneLotto && !effectiveLot(first).normalized)
         errors.push("LOTTO_DA_COMPLETARE");
       if (
         product?.gestioneScadenza &&
@@ -404,14 +509,16 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
     }
     const blocking = errors.length > 0 || group.some((row) => row.blocking);
     if (blocking) blockingParties += 1;
-    await tx.insert(importazioniAgeaPartiteTable).values({
+    partyValues.push({
       importazioneId: importId,
       partyKey: key,
       fondoOrigine: first.fondoNormalizzato ?? "NON_RICONOSCIUTO",
       prodottoId: first.prodottoIdSnapshot,
-      prodottoNormalizzato: first.prodottoNormalizzato,
-      lottoRaw: first.lottoRaw,
-      lottoNormalizzato: first.lottoNormalizzato,
+      prodottoNormalizzato:
+        first.descrizioneProdottoSnapshot ?? first.prodottoNormalizzato,
+      descrizioniEsterneJson: descriptions,
+      lottoRaw: effectiveLot(first).raw,
+      lottoNormalizzato: effectiveLot(first).normalized,
       existingLottoId: existingLotto?.id,
       saldoFinalePezzi: pieces,
       saldoFinaleKgLt: kgLt,
@@ -424,6 +531,9 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
       dataScadenzaFonte: existingLotto?.dataScadenza
         ? "PARTITA_ESISTENTE"
         : previous?.dataScadenzaFonte,
+      correzioneMotivazione: previous?.correzioneMotivazione,
+      correttoDa: previous?.correttoDa,
+      dataCorrezione: previous?.dataCorrezione,
       stato: blocking
         ? "BLOCCATA"
         : hasPositiveBalance
@@ -434,6 +544,10 @@ async function rebuildImport(tx: InventoryTransaction, importId: number) {
       warningCodesJson: [...new Set(warnings)],
     });
   }
+  for (let offset = 0; offset < partyValues.length; offset += 500)
+    await tx
+      .insert(importazioniAgeaPartiteTable)
+      .values(partyValues.slice(offset, offset + 500));
   const unmapped = new Set(
     rows
       .filter((row) => row.prodottoIdSnapshot == null)
@@ -508,66 +622,72 @@ export async function analyzeAgeaImport(
       noteAudit: { warnings: parsed.warnings, binaryStored: false },
     })
     .returning();
-  await tx.insert(importazioniAgeaRigheTable).values(
-    parsed.rows.map((row) => {
-      const found = mappings.get(row.prodottoNormalizzato);
-      return {
-        importazioneId: created.id,
-        numeroRiga: row.numeroRiga,
-        rawJson: row.rawJson,
-        fondoRaw: row.fondoRaw,
-        fondoNormalizzato: row.fondoNormalizzato,
-        prodottoRaw: row.prodottoRaw,
-        prodottoNormalizzato: row.prodottoNormalizzato,
-        lottoRaw: row.lottoRaw,
-        lottoNormalizzato: row.lottoNormalizzato,
-        numeroDocumentoRaw: row.numeroDocumentoRaw,
-        numeroDocumentoNormalizzato: row.numeroDocumentoNormalizzato,
-        dataDocumentoRaw: row.dataDocumentoRaw,
-        dataDocumento: row.dataDocumento,
-        dataCaricoMagazzinoRaw: row.dataCaricoMagazzinoRaw,
-        dataCaricoRisolta: row.dataCaricoRisolta,
-        dataCaricoFonte: row.dataCaricoFonte,
-        mittenteDestinatarioRaw: row.mittenteDestinatarioRaw,
-        movimentoKgLtRaw: row.movimentoKgLtRaw,
-        movimentoKgLt: row.movimentoKgLt,
-        movimentoPezziRaw: row.movimentoPezziRaw,
-        movimentoPezzi: row.movimentoPezzi,
-        saldoMovimentoKgLtRaw: row.saldoMovimentoKgLtRaw,
-        saldoMovimentoKgLt: row.saldoMovimentoKgLt,
-        saldoMovimentoPezziRaw: row.saldoMovimentoPezziRaw,
-        saldoMovimentoPezzi: row.saldoMovimentoPezzi,
-        saldoFinaleKgLtRaw: row.saldoFinaleKgLtRaw,
-        saldoFinaleKgLt: row.saldoFinaleKgLt,
-        saldoFinalePezziRaw: row.saldoFinalePezziRaw,
-        saldoFinalePezzi: row.saldoFinalePezzi,
-        noteRaw: row.noteRaw,
-        attivitaRaw: row.attivitaRaw,
-        attivitaNormalizzata: row.attivitaNormalizzata,
-        pacchiRaw: row.pacchiRaw,
-        pastiRaw: row.pastiRaw,
-        saltuariRaw: row.saltuariRaw,
-        continuativiRaw: row.continuativiRaw,
-        tipoMovimentoEsterno: row.tipoMovimentoEsterno,
-        identityBaseHash: row.identityBaseHash,
-        identityOccurrence: row.identityOccurrence,
-        identityKey: row.identityKey,
-        contentHash: row.contentHash,
-        mappingProdottoId: found?.mapping.id,
-        prodottoIdSnapshot: found?.prodotto.id,
-        descrizioneProdottoSnapshot: found?.prodotto.nome,
-        unitaMisuraSnapshot: found?.prodotto.unitaMisura,
-        statoRiga: found
-          ? row.statoRiga
-          : row.blocking
-            ? "BLOCCATA"
-            : "DA_MAPPARE",
-        blocking: row.blocking,
-        errorCodesJson: row.errorCodes,
-        warningCodesJson: row.warningCodes,
-      };
-    }),
-  );
+  const stagingRows = parsed.rows.map((row) => {
+    const found = mappings.get(row.prodottoNormalizzato);
+    return {
+      importazioneId: created.id,
+      numeroRiga: row.numeroRiga,
+      rawJson: row.rawJson,
+      fondoRaw: row.fondoRaw,
+      fondoNormalizzato: row.fondoNormalizzato,
+      prodottoRaw: row.prodottoRaw,
+      prodottoNormalizzato: row.prodottoNormalizzato,
+      lottoRaw: row.lottoRaw,
+      lottoNormalizzato: row.lottoNormalizzato,
+      lottoEffettivoRaw: row.lottoRaw,
+      lottoEffettivoNormalizzato: row.lottoNormalizzato,
+      numeroDocumentoRaw: row.numeroDocumentoRaw,
+      numeroDocumentoNormalizzato: row.numeroDocumentoNormalizzato,
+      dataDocumentoRaw: row.dataDocumentoRaw,
+      dataDocumento: row.dataDocumento,
+      dataCaricoMagazzinoRaw: row.dataCaricoMagazzinoRaw,
+      dataCaricoRisolta: row.dataCaricoRisolta,
+      dataCaricoFonte: row.dataCaricoFonte,
+      dataCaricoEffettiva: row.dataCaricoRisolta,
+      mittenteDestinatarioRaw: row.mittenteDestinatarioRaw,
+      movimentoKgLtRaw: row.movimentoKgLtRaw,
+      movimentoKgLt: row.movimentoKgLt,
+      movimentoPezziRaw: row.movimentoPezziRaw,
+      movimentoPezzi: row.movimentoPezzi,
+      saldoMovimentoKgLtRaw: row.saldoMovimentoKgLtRaw,
+      saldoMovimentoKgLt: row.saldoMovimentoKgLt,
+      saldoMovimentoPezziRaw: row.saldoMovimentoPezziRaw,
+      saldoMovimentoPezzi: row.saldoMovimentoPezzi,
+      saldoFinaleKgLtRaw: row.saldoFinaleKgLtRaw,
+      saldoFinaleKgLt: row.saldoFinaleKgLt,
+      saldoFinalePezziRaw: row.saldoFinalePezziRaw,
+      saldoFinalePezzi: row.saldoFinalePezzi,
+      noteRaw: row.noteRaw,
+      attivitaRaw: row.attivitaRaw,
+      attivitaNormalizzata: row.attivitaNormalizzata,
+      pacchiRaw: row.pacchiRaw,
+      pastiRaw: row.pastiRaw,
+      saltuariRaw: row.saltuariRaw,
+      continuativiRaw: row.continuativiRaw,
+      tipoMovimentoEsterno: row.tipoMovimentoEsterno,
+      identityBaseHash: row.identityBaseHash,
+      identityOccurrence: row.identityOccurrence,
+      identityKey: row.identityKey,
+      contentHash: row.contentHash,
+      mappingProdottoId: found?.mapping.id,
+      mappingVersioneSnapshot: found?.mapping.versione,
+      prodottoIdSnapshot: found?.prodotto.id,
+      descrizioneProdottoSnapshot: found?.prodotto.nome,
+      unitaMisuraSnapshot: found?.prodotto.unitaMisura,
+      statoRiga: found
+        ? row.statoRiga
+        : row.blocking
+          ? "BLOCCATA"
+          : "DA_MAPPARE",
+      blocking: row.blocking,
+      errorCodesJson: row.errorCodes,
+      warningCodesJson: row.warningCodes,
+    };
+  });
+  for (let offset = 0; offset < stagingRows.length; offset += 500)
+    await tx
+      .insert(importazioniAgeaRigheTable)
+      .values(stagingRows.slice(offset, offset + 500));
   await rebuildImport(tx, created.id);
   const [result] = await tx
     .select()
@@ -593,12 +713,212 @@ export async function analyzeAgeaImport(
 export async function recalculateAgeaImport(
   tx: InventoryTransaction,
   importId: number,
+  expectedVersion: number,
 ) {
-  await rebuildImport(tx, importId);
+  await rebuildImport(tx, importId, expectedVersion);
   const [result] = await tx
     .select()
     .from(importazioniAgeaTable)
     .where(eq(importazioniAgeaTable.id, importId));
+  return result;
+}
+
+function requireMutableImport(
+  row: typeof importazioniAgeaTable.$inferSelect | undefined,
+  expectedVersion: number,
+) {
+  if (!row)
+    throw new AgeaImportError(
+      404,
+      "IMPORTAZIONE_NON_TROVATA",
+      "Importazione non trovata",
+    );
+  if (["CONFERMATA", "ANNULLATA"].includes(row.stato))
+    throw new AgeaImportError(
+      409,
+      "IMPORTAZIONE_IMMUTABILE",
+      "L'importazione non è più modificabile",
+    );
+  if (row.versione !== expectedVersion)
+    throw new AgeaImportError(
+      409,
+      "VERSIONE_NON_CORRENTE",
+      "La preview è stata aggiornata: ricaricare i dati",
+    );
+}
+
+export async function correctAgeaImportRow(
+  tx: InventoryTransaction,
+  input: {
+    importId: number;
+    rowId: number;
+    expectedVersion: number;
+    userId: number;
+    motivation: string;
+    field: "DATA_CARICO" | "LOTTO";
+    value: string | null;
+  },
+) {
+  const [importRow] = await tx
+    .select()
+    .from(importazioniAgeaTable)
+    .where(eq(importazioniAgeaTable.id, input.importId))
+    .for("update");
+  requireMutableImport(importRow, input.expectedVersion);
+  const [row] = await tx
+    .select()
+    .from(importazioniAgeaRigheTable)
+    .where(
+      and(
+        eq(importazioniAgeaRigheTable.id, input.rowId),
+        eq(importazioniAgeaRigheTable.importazioneId, input.importId),
+      ),
+    )
+    .for("update");
+  if (!row)
+    throw new AgeaImportError(404, "RIGA_NON_TROVATA", "Riga non trovata");
+  const previous =
+    input.field === "DATA_CARICO"
+      ? (row.dataCaricoEffettiva ?? row.dataCaricoRisolta)
+      : (row.lottoEffettivoRaw ?? row.lottoRaw);
+  const correctedErrorCode =
+    input.field === "DATA_CARICO"
+      ? "DATA_CARICO_DA_COMPLETARE"
+      : "LOTTO_DA_COMPLETARE";
+  const remainingErrors = row.errorCodesJson.filter(
+    (code) => code !== correctedErrorCode,
+  );
+  if (
+    input.field === "DATA_CARICO" &&
+    input.value == null &&
+    row.dataCaricoRisolta == null &&
+    row.tipoMovimentoEsterno === "CARICO"
+  )
+    remainingErrors.push("DATA_CARICO_DA_COMPLETARE");
+  if (
+    input.field === "LOTTO" &&
+    input.value == null &&
+    row.lottoNormalizzato == null
+  )
+    remainingErrors.push("LOTTO_DA_COMPLETARE");
+  await tx
+    .update(importazioniAgeaRigheTable)
+    .set(
+      input.field === "DATA_CARICO"
+        ? {
+            dataCaricoEffettiva: input.value ?? row.dataCaricoRisolta,
+            correzioneMotivazione: input.motivation,
+            correttoDa: input.userId,
+            dataCorrezione: new Date(),
+            errorCodesJson: [...new Set(remainingErrors)],
+            blocking: remainingErrors.length > 0,
+          }
+        : {
+            lottoEffettivoRaw: input.value ?? row.lottoRaw,
+            lottoEffettivoNormalizzato:
+              normalizeAgeaKey(input.value) ?? row.lottoNormalizzato,
+            correzioneMotivazione: input.motivation,
+            correttoDa: input.userId,
+            dataCorrezione: new Date(),
+            errorCodesJson: [...new Set(remainingErrors)],
+            blocking: remainingErrors.length > 0,
+          },
+    )
+    .where(eq(importazioniAgeaRigheTable.id, row.id));
+  await tx.insert(systemLogsTable).values({
+    evento: `MAGAZZINO_AGEA_CORREZIONE_${input.field}`,
+    esito: "SUCCESS",
+    actorUserId: input.userId,
+    details: {
+      importazioneId: input.importId,
+      rigaId: input.rowId,
+      campo: input.field,
+      valorePrecedente: previous,
+      valoreNuovo: input.value,
+      rimozione: input.value == null,
+      motivazione: input.motivation,
+      versionePrecedente: input.expectedVersion,
+      versioneNuova: input.expectedVersion + 1,
+    },
+  });
+  await rebuildImport(tx, input.importId, input.expectedVersion);
+  const [result] = await tx
+    .select()
+    .from(importazioniAgeaTable)
+    .where(eq(importazioniAgeaTable.id, input.importId));
+  return result;
+}
+
+export async function correctAgeaImportExpiry(
+  tx: InventoryTransaction,
+  input: {
+    importId: number;
+    partyId: number;
+    expectedVersion: number;
+    userId: number;
+    motivation: string;
+    value: string | null;
+  },
+) {
+  const [importRow] = await tx
+    .select()
+    .from(importazioniAgeaTable)
+    .where(eq(importazioniAgeaTable.id, input.importId))
+    .for("update");
+  requireMutableImport(importRow, input.expectedVersion);
+  const [party] = await tx
+    .select()
+    .from(importazioniAgeaPartiteTable)
+    .where(
+      and(
+        eq(importazioniAgeaPartiteTable.id, input.partyId),
+        eq(importazioniAgeaPartiteTable.importazioneId, input.importId),
+      ),
+    )
+    .for("update");
+  if (!party)
+    throw new AgeaImportError(
+      404,
+      "PARTITA_NON_TROVATA",
+      "Partita preview non trovata",
+    );
+  if (party.existingLottoId && party.dataScadenzaRisolta !== input.value)
+    throw new AgeaImportError(
+      409,
+      "SCADENZA_PARTITA_ESISTENTE_NON_MODIFICABILE",
+      "La scadenza è determinata dalla partita locale esistente",
+    );
+  await tx
+    .update(importazioniAgeaPartiteTable)
+    .set({
+      dataScadenzaRisolta: input.value,
+      dataScadenzaFonte: input.value ? "INSERIMENTO_MANUALE" : null,
+      correzioneMotivazione: input.motivation,
+      correttoDa: input.userId,
+      dataCorrezione: new Date(),
+      dataAggiornamento: new Date(),
+    })
+    .where(eq(importazioniAgeaPartiteTable.id, party.id));
+  await tx.insert(systemLogsTable).values({
+    evento: "MAGAZZINO_AGEA_CORREZIONE_SCADENZA",
+    esito: "SUCCESS",
+    actorUserId: input.userId,
+    details: {
+      importazioneId: input.importId,
+      partitaId: input.partyId,
+      valorePrecedente: party.dataScadenzaRisolta,
+      valoreNuovo: input.value,
+      rimozione: input.value == null,
+      motivazione: input.motivation,
+      versionePrecedente: input.expectedVersion,
+      versioneNuova: input.expectedVersion + 1,
+    },
+  });
+  await rebuildImport(tx, input.importId, input.expectedVersion);
+  const [result] = await tx
+    .select()
+    .from(importazioniAgeaTable)
+    .where(eq(importazioniAgeaTable.id, input.importId));
   return result;
 }
 
@@ -611,55 +931,87 @@ async function registerCanonicalRows(
     number,
     typeof movimentiEsterniAgeaTable.$inferSelect
   >();
+  const knownRows: Array<typeof movimentiEsterniAgeaTable.$inferSelect> = [];
+  const identityKeys = [...new Set(rows.map((row) => row.identityKey))];
+  for (let offset = 0; offset < identityKeys.length; offset += 1_000) {
+    const chunk = identityKeys.slice(offset, offset + 1_000);
+    knownRows.push(
+      ...(await tx
+        .select()
+        .from(movimentiEsterniAgeaTable)
+        .where(
+          and(
+            eq(movimentiEsterniAgeaTable.magazzinoId, importRow.magazzinoId),
+            inArray(movimentiEsterniAgeaTable.identityKey, chunk),
+          ),
+        )
+        .for("update")),
+    );
+  }
+  const knownByIdentity = new Map(
+    knownRows.map((movement) => [movement.identityKey, movement]),
+  );
   for (const row of rows) {
-    const [known] = await tx
-      .select()
-      .from(movimentiEsterniAgeaTable)
-      .where(
-        and(
-          eq(movimentiEsterniAgeaTable.magazzinoId, importRow.magazzinoId),
-          eq(movimentiEsterniAgeaTable.identityKey, row.identityKey),
-        ),
-      )
-      .for("update");
-    if (known) {
-      if (known.acceptedContentHash !== row.contentHash)
-        throw new AgeaImportError(
-          409,
-          "MODIFICATO_NEL_REGISTRO",
-          `La riga ${row.numeroRiga} è cambiata rispetto alla versione già acquisita`,
-        );
-      const [updated] = await tx
-        .update(movimentiEsterniAgeaTable)
-        .set({
-          lastSeenImportId: importRow.id,
-          dataUltimoRiscontro: new Date(),
-        })
-        .where(eq(movimentiEsterniAgeaTable.id, known.id))
-        .returning();
-      result.set(row.id, updated);
-      continue;
-    }
-    const [created] = await tx
-      .insert(movimentiEsterniAgeaTable)
-      .values({
-        magazzinoId: importRow.magazzinoId,
-        identityKey: row.identityKey,
-        identityBaseHash: row.identityBaseHash,
-        identityOccurrence: row.identityOccurrence,
-        acceptedContentHash: row.contentHash,
-        acceptedImportRowId: row.id,
-        tipoMovimentoEsterno: row.tipoMovimentoEsterno,
-        prodottoIdSnapshot: row.prodottoIdSnapshot,
-        firstSeenImportId: importRow.id,
-        lastSeenImportId: importRow.id,
-        statoApplicazione:
-          row.tipoMovimentoEsterno === "CARICO"
-            ? "DA_APPLICARE"
-            : "NON_APPLICABILE_RIFERIMENTO",
-      })
-      .returning();
-    result.set(row.id, created);
+    const known = knownByIdentity.get(row.identityKey);
+    if (known && known.acceptedContentHash !== row.contentHash)
+      throw new AgeaImportError(
+        409,
+        "MODIFICATO_NEL_REGISTRO",
+        `La riga ${row.numeroRiga} è cambiata rispetto alla versione già acquisita`,
+      );
+  }
+  for (let offset = 0; offset < knownRows.length; offset += 1_000) {
+    const ids = knownRows.slice(offset, offset + 1_000).map((row) => row.id);
+    if (!ids.length) continue;
+    await tx
+      .update(movimentiEsterniAgeaTable)
+      .set({ lastSeenImportId: importRow.id, dataUltimoRiscontro: new Date() })
+      .where(inArray(movimentiEsterniAgeaTable.id, ids));
+  }
+  const newRows = rows.filter((row) => !knownByIdentity.has(row.identityKey));
+  const createdRows: Array<typeof movimentiEsterniAgeaTable.$inferSelect> = [];
+  for (let offset = 0; offset < newRows.length; offset += 500) {
+    const chunk = newRows.slice(offset, offset + 500);
+    if (!chunk.length) continue;
+    createdRows.push(
+      ...(await tx
+        .insert(movimentiEsterniAgeaTable)
+        .values(
+          chunk.map((row) => ({
+            magazzinoId: importRow.magazzinoId,
+            identityKey: row.identityKey,
+            identityBaseHash: row.identityBaseHash,
+            identityOccurrence: row.identityOccurrence,
+            acceptedContentHash: row.contentHash,
+            acceptedImportRowId: row.id,
+            tipoMovimentoEsterno: row.tipoMovimentoEsterno,
+            prodottoIdSnapshot: row.prodottoIdSnapshot,
+            firstSeenImportId: importRow.id,
+            lastSeenImportId: importRow.id,
+            statoApplicazione:
+              row.tipoMovimentoEsterno === "CARICO"
+                ? "DA_APPLICARE"
+                : "NON_APPLICABILE_RIFERIMENTO",
+          })),
+        )
+        .returning()),
+    );
+  }
+  const allByIdentity = new Map(
+    [...knownRows, ...createdRows].map((movement) => [
+      movement.identityKey,
+      movement,
+    ]),
+  );
+  for (const row of rows) {
+    const movement = allByIdentity.get(row.identityKey);
+    if (!movement)
+      throw new AgeaImportError(
+        409,
+        "REGISTRO_CANONICO_INCOMPLETO",
+        `Registrazione canonica mancante per la riga ${row.numeroRiga}`,
+      );
+    result.set(row.id, movement);
   }
   return result;
 }
@@ -668,7 +1020,7 @@ export async function confirmAgeaImport(
   tx: InventoryTransaction,
   importId: number,
   userId: number,
-  expectedVersion?: number,
+  expectedVersion: number,
 ) {
   await tx.execute(
     sql`SELECT pg_advisory_xact_lock(hashtextextended(${`agea-import:${importId}`}, 0))`,
@@ -684,26 +1036,42 @@ export async function confirmAgeaImport(
       "IMPORTAZIONE_NON_TROVATA",
       "Importazione non trovata",
     );
-  if (importRow.stato === "CONFERMATA")
-    return { importazione: importRow, replay: true, carichi: [] as number[] };
-  if (expectedVersion != null && importRow.versione !== expectedVersion)
+  if (importRow.versione !== expectedVersion)
     throw new AgeaImportError(
       409,
       "VERSIONE_NON_CORRENTE",
       "La preview è stata aggiornata: ricaricare prima di confermare",
     );
-  await rebuildImport(tx, importId);
-  const [fresh] = await tx
-    .select()
-    .from(importazioniAgeaTable)
-    .where(eq(importazioniAgeaTable.id, importId))
-    .for("update");
-  if (!fresh || fresh.stato !== "PRONTA")
+  if (importRow.stato === "CONFERMATA") {
+    await tx.insert(systemLogsTable).values({
+      evento: "MAGAZZINO_AGEA_IMPORT_REPLAY",
+      esito: "SUCCESS",
+      actorUserId: userId,
+      details: {
+        importazioneId: importId,
+        versione: expectedVersion,
+        carichiCreati: 0,
+      },
+    });
+    return {
+      importazione: importRow,
+      replay: true,
+      carichi: [] as number[],
+    };
+  }
+  if (["ANNULLATA"].includes(importRow.stato))
+    throw new AgeaImportError(
+      409,
+      "IMPORTAZIONE_IMMUTABILE",
+      "L'importazione non è più modificabile",
+    );
+  if (importRow.stato !== "PRONTA")
     throw new AgeaImportError(
       409,
       "PREFLIGHT_NON_SUPERATO",
       "Mapping, date, lotti o saldi richiedono ancora intervento",
     );
+  const fresh = importRow;
   await tx.execute(
     sql`SELECT pg_advisory_xact_lock(hashtextextended(${`agea-warehouse:${fresh.magazzinoId}`}, 0))`,
   );
@@ -732,7 +1100,9 @@ export async function confirmAgeaImport(
         if (row.mappingProdottoId == null) return false;
         const mapping = byId.get(row.mappingProdottoId);
         return (
-          !mapping?.attiva || mapping.prodottoId !== row.prodottoIdSnapshot
+          !mapping?.attiva ||
+          mapping.prodottoId !== row.prodottoIdSnapshot ||
+          mapping.versione !== row.mappingVersioneSnapshot
         );
       })
     )
@@ -866,11 +1236,7 @@ export async function confirmAgeaImport(
       const loadLineId = result.righe[index].riga.id;
       for (const row of rows.filter(
         (item) =>
-          [
-            item.fondoNormalizzato ?? "?",
-            item.prodottoNormalizzato,
-            item.lottoNormalizzato ?? "∅",
-          ].join("|") === party.partyKey &&
+          partyKeyForRow(item) === party.partyKey &&
           item.tipoMovimentoEsterno === "CARICO",
       )) {
         const movement = canonical.get(row.id)!;
@@ -933,38 +1299,70 @@ export async function confirmAgeaImport(
       const key = [
         row.numeroDocumentoNormalizzato ?? "∅",
         row.dataDocumento ?? "∅",
-        row.dataCaricoRisolta ?? "∅",
+        row.dataCaricoEffettiva ?? row.dataCaricoRisolta ?? "∅",
         normalizeAgeaKey(row.mittenteDestinatarioRaw) ?? "∅",
       ].join("|");
       groups.set(key, [...(groups.get(key) ?? []), row]);
     }
-    for (const [key, group] of groups) {
+    const previewParties = await tx
+      .select()
+      .from(importazioniAgeaPartiteTable)
+      .where(eq(importazioniAgeaPartiteTable.importazioneId, importId));
+    const partyByKey = new Map(
+      previewParties.map((party) => [party.partyKey, party]),
+    );
+    for (const group of groups.values()) {
       const first = group[0];
-      if (!first.dataCaricoRisolta)
+      const effectiveLoadDate =
+        first.dataCaricoEffettiva ?? first.dataCaricoRisolta;
+      if (!effectiveLoadDate)
         throw new AgeaImportError(
           409,
           "DATA_CARICO_DA_COMPLETARE",
           "Data carico mancante",
         );
+      const idempotencyHash = createHash("sha256")
+        .update(
+          JSON.stringify({
+            fonte: "AGEA_SIFEAD",
+            magazzinoId: fresh.magazzinoId,
+            documento: first.numeroDocumentoNormalizzato,
+            dataDocumento: first.dataDocumento,
+            dataCarico: effectiveLoadDate,
+            mittenteDestinatario: normalizeAgeaKey(
+              first.mittenteDestinatarioRaw,
+            ),
+            righe: group
+              .map((row) => [row.identityKey, row.contentHash])
+              .sort((left, right) =>
+                JSON.stringify(left).localeCompare(JSON.stringify(right)),
+              ),
+          }),
+        )
+        .digest("hex");
       const result = await createWarehouseLoad(tx, {
         magazzinoId: fresh.magazzinoId,
         origineCarico: "AGEA_SIFEAD",
-        numeroDocumento: first.numeroDocumentoRaw,
+        numeroDocumento:
+          normalizeAgeaKey(first.numeroDocumentoRaw)?.slice(0, 100) ?? null,
         dataDocumento: first.dataDocumento,
-        dataCarico: first.dataCaricoRisolta,
+        dataCarico: effectiveLoadDate,
         descrizione: `Import incrementale AGEA/SIFEAD #${fresh.id}`,
         note:
           first.dataCaricoFonte === "DATA_DOCUMENTO_FALLBACK"
             ? "Data carico derivata dalla data documento"
             : null,
-        idempotencyKey:
-          `agea-incremental:${fresh.magazzinoId}:${key}:${fresh.id}`.slice(
-            0,
-            120,
-          ),
+        idempotencyKey: `agea-inc:${fresh.magazzinoId}:${idempotencyHash}`,
         executionContext: "system",
         creatoDa: userId,
         righe: group.map((row) => {
+          const party = partyByKey.get(partyKeyForRow(row));
+          if (!party)
+            throw new AgeaImportError(
+              409,
+              "PARTITA_PREVIEW_NON_TROVATA",
+              `Partita preview mancante in riga ${row.numeroRiga}`,
+            );
           const quantity = operationalQuantity(
             row.unitaMisuraSnapshot!,
             absolute(row.movimentoPezzi),
@@ -986,13 +1384,13 @@ export async function confirmAgeaImport(
             unitaMisuraOperativa: row.unitaMisuraSnapshot,
             quantitaPezzi: absolute(row.movimentoPezzi),
             quantitaKgLt: absolute(row.movimentoKgLt),
-            fattoreKgLtPezzo: ratioHalfUp(
-              row.movimentoKgLt,
-              row.movimentoPezzi,
-            ),
-            codiceLotto: row.lottoRaw,
+            fattoreKgLtPezzo:
+              party.fattoreKgLtPezzo ??
+              ratioHalfUp(row.movimentoKgLt, row.movimentoPezzi),
+            codiceLotto: effectiveLot(row).raw,
+            dataScadenza: party.dataScadenzaRisolta,
             descrizioneEsterna: row.prodottoRaw,
-            riferimentoEsterno: row.identityKey,
+            riferimentoEsterno: `AGEA:${fresh.magazzinoId}:${row.identityKey}`,
           };
         }),
       });

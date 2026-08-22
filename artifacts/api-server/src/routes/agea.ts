@@ -13,8 +13,11 @@ import {
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import {
   analyzeAgeaImport,
+  AgeaImportError,
   asAgeaImportError,
   confirmAgeaImport,
+  correctAgeaImportExpiry,
+  correctAgeaImportRow,
   recalculateAgeaImport,
 } from "../lib/ageaImportService";
 import {
@@ -33,7 +36,6 @@ import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
-class AgeaImportCancellationError extends Error {}
 
 const xlsxBody: RequestHandler = express.raw({
   type: AGEA_XLSX_MIME,
@@ -45,6 +47,32 @@ router.use("/agea", requireModulo("LOTTI"));
 function idParam(value: unknown): number | null {
   const id = Number(value);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function requiredVersion(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : null;
+}
+
+function requiredMotivation(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const motivation = value.trim();
+  return motivation.length >= 3 && motivation.length <= 500 ? motivation : null;
+}
+
+function isCivilDate(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const date = new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+  );
+  return (
+    date.getUTCFullYear() === Number(match[1]) &&
+    date.getUTCMonth() === Number(match[2]) - 1 &&
+    date.getUTCDate() === Number(match[3])
+  );
 }
 
 function pageParams(query: Record<string, unknown>) {
@@ -89,6 +117,25 @@ function sendKnownError(
     code: "code" in known ? known.code : "INVENTORY_ERROR",
   });
   return true;
+}
+
+async function auditAgeaConflict(
+  req: Parameters<RequestHandler>[0],
+  target: Record<string, unknown>,
+  error: unknown,
+) {
+  const known = asAgeaImportError(error);
+  if (!known || known.status !== 409) return;
+  await db.insert(systemLogsTable).values({
+    evento: "MAGAZZINO_AGEA_CONFLITTO",
+    esito: "FAILURE",
+    actorUserId: req.user!.id,
+    details: {
+      ...target,
+      codiceErrore: "code" in known ? known.code : "INVENTORY_ERROR",
+      messaggio: known.message,
+    },
+  });
 }
 
 router.get(
@@ -300,21 +347,12 @@ router.get(
   },
 );
 
-router.patch(
-  "/agea/importazioni/:id/partite/:partitaId",
-  requirePermission("magazzino.agea.import"),
+router.get(
+  "/agea/importazioni/:id/descrizioni-da-mappare",
+  requirePermission("magazzino.agea.view"),
   async (req, res) => {
     const id = idParam(req.params.id);
-    const partitaId = idParam(req.params.partitaId);
-    if (
-      !id ||
-      !partitaId ||
-      (req.body.dataScadenza != null &&
-        !/^\d{4}-\d{2}-\d{2}$/.test(req.body.dataScadenza))
-    )
-      return void res
-        .status(400)
-        .json({ error: "ID o data scadenza non validi" });
+    if (!id) return void res.status(400).json({ error: "ID non valido" });
     const access = await accessibleImport(req, id);
     if (!access.row)
       return void res.status(404).json({ error: "Importazione non trovata" });
@@ -322,38 +360,176 @@ router.patch(
       return void res
         .status(403)
         .json({ error: "Importazione non accessibile" });
-    if (["CONFERMATA", "ANNULLATA"].includes(access.row.stato))
-      return void res
-        .status(409)
-        .json({ error: "L'importazione non è più modificabile" });
-    const [updated] = await db
-      .update(importazioniAgeaPartiteTable)
-      .set({
-        dataScadenzaRisolta: req.body.dataScadenza ?? null,
-        dataScadenzaFonte: req.body.dataScadenza ? "INSERIMENTO_MANUALE" : null,
-        dataAggiornamento: new Date(),
+    const rows = await db
+      .select({
+        chiaveDescrizioneNormalizzata:
+          importazioniAgeaRigheTable.prodottoNormalizzato,
+        descrizioneRawRappresentativa: sql<string>`min(${importazioniAgeaRigheTable.prodottoRaw})`,
+        numeroRighe: sql<number>`count(*)::int`,
+        fondi: sql<
+          string[]
+        >`array_remove(array_agg(DISTINCT ${importazioniAgeaRigheTable.fondoNormalizzato} ORDER BY ${importazioniAgeaRigheTable.fondoNormalizzato}), NULL)`,
+        mappingId: mappatureProdottiEsterniTable.id,
+        mappingAttiva: mappatureProdottiEsterniTable.attiva,
+        mappingVersione: mappatureProdottiEsterniTable.versione,
+        prodottoId: mappatureProdottiEsterniTable.prodottoId,
+        prodottoNome: prodottiTable.nome,
       })
-      .where(
+      .from(importazioniAgeaRigheTable)
+      .leftJoin(
+        mappatureProdottiEsterniTable,
         and(
-          eq(importazioniAgeaPartiteTable.id, partitaId),
-          eq(importazioniAgeaPartiteTable.importazioneId, id),
+          eq(mappatureProdottiEsterniTable.fonte, "AGEA_SIFEAD"),
+          eq(
+            mappatureProdottiEsterniTable.chiaveDescrizioneNormalizzata,
+            importazioniAgeaRigheTable.prodottoNormalizzato,
+          ),
         ),
       )
-      .returning();
-    if (!updated)
-      return void res
-        .status(404)
-        .json({ error: "Partita preview non trovata" });
-    res.json(updated);
+      .leftJoin(
+        prodottiTable,
+        eq(prodottiTable.id, mappatureProdottiEsterniTable.prodottoId),
+      )
+      .where(eq(importazioniAgeaRigheTable.importazioneId, id))
+      .groupBy(
+        importazioniAgeaRigheTable.prodottoNormalizzato,
+        mappatureProdottiEsterniTable.id,
+        prodottiTable.id,
+      )
+      .orderBy(asc(importazioniAgeaRigheTable.prodottoNormalizzato));
+    res.json(rows);
   },
 );
+
+router.patch(
+  "/agea/importazioni/:id/partite/:partitaId",
+  requirePermission("magazzino.agea.import"),
+  async (req, res) => {
+    const id = idParam(req.params.id);
+    const partitaId = idParam(req.params.partitaId);
+    const versione = requiredVersion(req.body?.versione);
+    const motivazione = requiredMotivation(req.body?.motivazione);
+    if (!id || !partitaId || !versione || !motivazione)
+      return void res.status(400).json({
+        error: "ID, versione o motivazione non validi",
+        code: "RICHIESTA_NON_VALIDA",
+      });
+    if (req.body.dataScadenza !== null && !isCivilDate(req.body.dataScadenza))
+      return void res.status(400).json({
+        error: "Data scadenza non valida",
+        code: "DATA_CIVILE_NON_VALIDA",
+      });
+    const access = await accessibleImport(req, id);
+    if (!access.row)
+      return void res.status(404).json({ error: "Importazione non trovata" });
+    if (!access.allowed)
+      return void res
+        .status(403)
+        .json({ error: "Importazione non accessibile" });
+    try {
+      const updated = await db.transaction((tx) =>
+        correctAgeaImportExpiry(tx, {
+          importId: id,
+          partyId: partitaId,
+          expectedVersion: versione,
+          userId: req.user!.id,
+          motivation: motivazione,
+          value: req.body.dataScadenza,
+        }),
+      );
+      res.json(updated);
+    } catch (error) {
+      await auditAgeaConflict(req, { importazioneId: id, partitaId }, error);
+      if (!sendKnownError(res, error)) throw error;
+    }
+  },
+);
+
+for (const correction of [
+  { path: "data-carico", field: "DATA_CARICO" as const },
+  { path: "lotto", field: "LOTTO" as const },
+]) {
+  router.patch(
+    `/agea/importazioni/:id/righe/:rigaId/${correction.path}`,
+    requirePermission("magazzino.agea.import"),
+    async (req, res) => {
+      const id = idParam(req.params.id);
+      const rowId = idParam(req.params.rigaId);
+      const versione = requiredVersion(req.body?.versione);
+      const motivazione = requiredMotivation(req.body?.motivazione);
+      const value = req.body?.valore;
+      if (
+        !id ||
+        !rowId ||
+        !versione ||
+        !motivazione ||
+        (value !== null && typeof value !== "string")
+      )
+        return void res.status(400).json({
+          error: "ID, versione, valore o motivazione non validi",
+          code: "RICHIESTA_NON_VALIDA",
+        });
+      if (
+        correction.field === "DATA_CARICO" &&
+        value !== null &&
+        !isCivilDate(value)
+      )
+        return void res.status(400).json({
+          error: "Data carico non valida",
+          code: "DATA_CIVILE_NON_VALIDA",
+        });
+      if (
+        correction.field === "LOTTO" &&
+        value !== null &&
+        (value.trim().length === 0 || value.length > 255)
+      )
+        return void res.status(400).json({
+          error: "Lotto non valido",
+          code: "LOTTO_NON_VALIDO",
+        });
+      const access = await accessibleImport(req, id);
+      if (!access.row)
+        return void res.status(404).json({ error: "Importazione non trovata" });
+      if (!access.allowed)
+        return void res
+          .status(403)
+          .json({ error: "Importazione non accessibile" });
+      try {
+        const updated = await db.transaction((tx) =>
+          correctAgeaImportRow(tx, {
+            importId: id,
+            rowId,
+            expectedVersion: versione,
+            userId: req.user!.id,
+            motivation: motivazione,
+            field: correction.field,
+            value: value === null ? null : value,
+          }),
+        );
+        res.json(updated);
+      } catch (error) {
+        await auditAgeaConflict(
+          req,
+          { importazioneId: id, rigaId: rowId },
+          error,
+        );
+        if (!sendKnownError(res, error)) throw error;
+      }
+    },
+  );
+}
 
 router.post(
   "/agea/importazioni/:id/ricalcola",
   requirePermission("magazzino.agea.import"),
   async (req, res) => {
     const id = idParam(req.params.id);
-    if (!id) return void res.status(400).json({ error: "ID non valido" });
+    const versione = requiredVersion(req.body?.versione);
+    if (!id || !versione)
+      return void res.status(400).json({
+        error: "ID o versione non validi",
+        code: "VERSIONE_RICHIESTA",
+      });
     const access = await accessibleImport(req, id);
     if (!access.row)
       return void res.status(404).json({ error: "Importazione non trovata" });
@@ -364,7 +540,7 @@ router.post(
     try {
       res.json(
         await db.transaction(async (tx) => {
-          const result = await recalculateAgeaImport(tx, id);
+          const result = await recalculateAgeaImport(tx, id, versione);
           await tx.insert(systemLogsTable).values({
             evento: "MAGAZZINO_AGEA_PREVIEW_RICALCOLATA",
             esito: result.stato === "BLOCCATA" ? "FAILURE" : "SUCCESS",
@@ -374,12 +550,19 @@ router.post(
               magazzinoId: result.magazzinoId,
               stato: result.stato,
               righeBloccanti: result.righeBloccanti,
+              versionePrecedente: versione,
+              versioneNuova: result.versione,
             },
           });
           return result;
         }),
       );
     } catch (error) {
+      await auditAgeaConflict(
+        req,
+        { importazioneId: id, azione: "RICALCOLA" },
+        error,
+      );
       if (!sendKnownError(res, error)) throw error;
     }
   },
@@ -390,7 +573,12 @@ router.post(
   requirePermission("magazzino.agea.import"),
   async (req, res) => {
     const id = idParam(req.params.id);
-    if (!id) return void res.status(400).json({ error: "ID non valido" });
+    const versione = requiredVersion(req.body?.versione);
+    if (!id || !versione)
+      return void res.status(400).json({
+        error: "ID o versione non validi",
+        code: "VERSIONE_RICHIESTA",
+      });
     const access = await accessibleImport(req, id);
     if (!access.row)
       return void res.status(404).json({ error: "Importazione non trovata" });
@@ -410,10 +598,15 @@ router.post(
     try {
       res.json(
         await db.transaction((tx) =>
-          confirmAgeaImport(tx, id, req.user!.id, req.body?.versione),
+          confirmAgeaImport(tx, id, req.user!.id, versione),
         ),
       );
     } catch (error) {
+      await auditAgeaConflict(
+        req,
+        { importazioneId: id, azione: "CONFERMA" },
+        error,
+      );
       if (!sendKnownError(res, error)) throw error;
     }
   },
@@ -424,7 +617,12 @@ router.post(
   requirePermission("magazzino.agea.import"),
   async (req, res) => {
     const id = idParam(req.params.id);
-    if (!id) return void res.status(400).json({ error: "ID non valido" });
+    const versione = requiredVersion(req.body?.versione);
+    if (!id || !versione)
+      return void res.status(400).json({
+        error: "ID o versione non validi",
+        code: "VERSIONE_RICHIESTA",
+      });
     const access = await accessibleImport(req, id);
     if (!access.row)
       return void res.status(404).json({ error: "Importazione non trovata" });
@@ -442,7 +640,17 @@ router.post(
         if (!locked)
           throw new Error("Importazione non trovata durante l'annullamento");
         if (locked.stato === "CONFERMATA")
-          throw new AgeaImportCancellationError();
+          throw new AgeaImportError(
+            409,
+            "IMPORTAZIONE_IMMUTABILE",
+            "Un'importazione confermata non può essere annullata",
+          );
+        if (locked.versione !== versione)
+          throw new AgeaImportError(
+            409,
+            "VERSIONE_NON_CORRENTE",
+            "La preview è stata aggiornata: ricaricare i dati",
+          );
         if (locked.stato === "ANNULLATA") return locked;
         const [result] = await tx
           .update(importazioniAgeaTable)
@@ -461,17 +669,20 @@ router.post(
           details: {
             importazioneId: result.id,
             magazzinoId: result.magazzinoId,
+            versionePrecedente: versione,
+            versioneNuova: result.versione,
           },
         });
         return result;
       });
       res.json(updated);
     } catch (error) {
-      if (error instanceof AgeaImportCancellationError)
-        return void res.status(409).json({
-          error: "Un'importazione confermata non può essere annullata",
-        });
-      throw error;
+      await auditAgeaConflict(
+        req,
+        { importazioneId: id, azione: "ANNULLA" },
+        error,
+      );
+      if (!sendKnownError(res, error)) throw error;
     }
   },
 );
@@ -518,46 +729,64 @@ router.post(
       return void res
         .status(400)
         .json({ error: "Prodotto non trovato o non attivo" });
-    const created = await db.transaction(async (tx) => {
-      const [mapping] = await tx
-        .insert(mappatureProdottiEsterniTable)
-        .values({
-          fonte: "AGEA_SIFEAD",
-          descrizioneEsterna: description,
-          chiaveDescrizioneNormalizzata: key,
-          prodottoId: productId,
-          creatoDa: req.user!.id,
-          aggiornatoDa: req.user!.id,
-        })
-        .onConflictDoUpdate({
-          target: [
-            mappatureProdottiEsterniTable.fonte,
-            mappatureProdottiEsterniTable.chiaveDescrizioneNormalizzata,
-          ],
-          set: {
+    try {
+      const created = await db.transaction(async (tx) => {
+        const [previous] = await tx
+          .select()
+          .from(mappatureProdottiEsterniTable)
+          .where(
+            and(
+              eq(mappatureProdottiEsterniTable.fonte, "AGEA_SIFEAD"),
+              eq(
+                mappatureProdottiEsterniTable.chiaveDescrizioneNormalizzata,
+                key,
+              ),
+            ),
+          )
+          .for("update");
+        if (previous)
+          throw new AgeaImportError(
+            409,
+            "MAPPATURA_GIA_ESISTENTE",
+            "La descrizione è già mappata: usare l'aggiornamento versionato",
+          );
+        const [mapping] = await tx
+          .insert(mappatureProdottiEsterniTable)
+          .values({
+            fonte: "AGEA_SIFEAD",
             descrizioneEsterna: description,
+            chiaveDescrizioneNormalizzata: key,
             prodottoId: productId,
-            attiva: true,
+            creatoDa: req.user!.id,
             aggiornatoDa: req.user!.id,
-            dataUltimoAggiornamento: new Date(),
-            dataUltimoRiscontro: new Date(),
-            versione: sql`${mappatureProdottiEsterniTable.versione} + 1`,
+          })
+          .returning();
+        await tx.insert(systemLogsTable).values({
+          evento: "MAGAZZINO_AGEA_MAPPATURA_SALVATA",
+          esito: "SUCCESS",
+          actorUserId: req.user!.id,
+          details: {
+            mappingId: mapping.id,
+            valorePrecedente: null,
+            valoreNuovo: {
+              prodottoId: productId,
+              attiva: true,
+              versione: mapping.versione,
+            },
+            fonte: "AGEA_SIFEAD",
           },
-        })
-        .returning();
-      await tx.insert(systemLogsTable).values({
-        evento: "MAGAZZINO_AGEA_MAPPATURA_SALVATA",
-        esito: "SUCCESS",
-        actorUserId: req.user!.id,
-        details: {
-          mappingId: mapping.id,
-          prodottoId: productId,
-          fonte: "AGEA_SIFEAD",
-        },
+        });
+        return mapping;
       });
-      return mapping;
-    });
-    res.status(201).json(created);
+      res.status(201).json(created);
+    } catch (error) {
+      await auditAgeaConflict(
+        req,
+        { descrizioneNormalizzata: key, azione: "CREA_MAPPING" },
+        error,
+      );
+      if (!sendKnownError(res, error)) throw error;
+    }
   },
 );
 
@@ -567,8 +796,12 @@ router.patch(
   async (req, res) => {
     const id = idParam(req.params.id);
     const productId = Number(req.body.prodottoId);
-    if (!id || !Number.isSafeInteger(productId) || productId <= 0)
-      return void res.status(400).json({ error: "ID o prodotto non validi" });
+    const versione = requiredVersion(req.body?.versione);
+    if (!id || !versione || !Number.isSafeInteger(productId) || productId <= 0)
+      return void res.status(400).json({
+        error: "ID, prodotto o versione non validi",
+        code: "VERSIONE_RICHIESTA",
+      });
     const [product] = await db
       .select()
       .from(prodottiTable)
@@ -577,32 +810,62 @@ router.patch(
       return void res
         .status(400)
         .json({ error: "Prodotto non trovato o non attivo" });
-    const updated = await db.transaction(async (tx) => {
-      const [mapping] = await tx
-        .update(mappatureProdottiEsterniTable)
-        .set({
-          prodottoId: productId,
-          attiva: req.body.attiva ?? true,
-          aggiornatoDa: req.user!.id,
-          dataUltimoAggiornamento: new Date(),
-          versione: sql`${mappatureProdottiEsterniTable.versione} + 1`,
-        })
-        .where(eq(mappatureProdottiEsterniTable.id, id))
-        .returning();
-      if (!mapping) return null;
-      await tx.insert(systemLogsTable).values({
-        evento: "MAGAZZINO_AGEA_MAPPATURA_MODIFICATA",
-        esito: "SUCCESS",
-        actorUserId: req.user!.id,
-        details: {
-          mappingId: mapping.id,
-          prodottoId: productId,
-          attiva: mapping.attiva,
-          fonte: "AGEA_SIFEAD",
-        },
+    let updated: typeof mappatureProdottiEsterniTable.$inferSelect | null;
+    try {
+      updated = await db.transaction(async (tx) => {
+        const [previous] = await tx
+          .select()
+          .from(mappatureProdottiEsterniTable)
+          .where(eq(mappatureProdottiEsterniTable.id, id))
+          .for("update");
+        if (!previous) return null;
+        if (previous.versione !== versione)
+          throw new AgeaImportError(
+            409,
+            "VERSIONE_NON_CORRENTE",
+            "La mappatura è stata aggiornata: ricaricare i dati",
+          );
+        const [mapping] = await tx
+          .update(mappatureProdottiEsterniTable)
+          .set({
+            prodottoId: productId,
+            attiva: req.body.attiva ?? true,
+            aggiornatoDa: req.user!.id,
+            dataUltimoAggiornamento: new Date(),
+            versione: sql`${mappatureProdottiEsterniTable.versione} + 1`,
+          })
+          .where(eq(mappatureProdottiEsterniTable.id, id))
+          .returning();
+        await tx.insert(systemLogsTable).values({
+          evento: "MAGAZZINO_AGEA_MAPPATURA_MODIFICATA",
+          esito: "SUCCESS",
+          actorUserId: req.user!.id,
+          details: {
+            mappingId: mapping.id,
+            valorePrecedente: {
+              prodottoId: previous.prodottoId,
+              attiva: previous.attiva,
+              versione: previous.versione,
+            },
+            valoreNuovo: {
+              prodottoId: mapping.prodottoId,
+              attiva: mapping.attiva,
+              versione: mapping.versione,
+            },
+            fonte: "AGEA_SIFEAD",
+          },
+        });
+        return mapping;
       });
-      return mapping;
-    });
+    } catch (error) {
+      await auditAgeaConflict(
+        req,
+        { mappingId: id, azione: "AGGIORNA_MAPPING" },
+        error,
+      );
+      if (!sendKnownError(res, error)) throw error;
+      return;
+    }
     if (!updated)
       return void res.status(404).json({ error: "Mappatura non trovata" });
     res.json(updated);

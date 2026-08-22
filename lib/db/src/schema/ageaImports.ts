@@ -183,6 +183,8 @@ export const importazioniAgeaRigheTable = pgTable(
     prodottoNormalizzato: text("prodotto_normalizzato").notNull(),
     lottoRaw: text("lotto_raw"),
     lottoNormalizzato: text("lotto_normalizzato"),
+    lottoEffettivoRaw: text("lotto_effettivo_raw"),
+    lottoEffettivoNormalizzato: text("lotto_effettivo_normalizzato"),
     numeroDocumentoRaw: text("numero_documento_raw"),
     numeroDocumentoNormalizzato: text("numero_documento_normalizzato"),
     dataDocumentoRaw: text("data_documento_raw"),
@@ -190,6 +192,7 @@ export const importazioniAgeaRigheTable = pgTable(
     dataCaricoMagazzinoRaw: text("data_carico_magazzino_raw"),
     dataCaricoRisolta: date("data_carico_risolta"),
     dataCaricoFonte: varchar("data_carico_fonte", { length: 40 }),
+    dataCaricoEffettiva: date("data_carico_effettiva"),
     mittenteDestinatarioRaw: text("mittente_destinatario_raw"),
     movimentoKgLtRaw: text("movimento_kg_lt_raw"),
     movimentoKgLt: numeric("movimento_kg_lt", { precision: 18, scale: 6 }),
@@ -230,6 +233,7 @@ export const importazioniAgeaRigheTable = pgTable(
     mappingProdottoId: integer("mapping_prodotto_id").references(
       () => mappatureProdottiEsterniTable.id,
     ),
+    mappingVersioneSnapshot: integer("mapping_versione_snapshot"),
     prodottoIdSnapshot: integer("prodotto_id_snapshot").references(
       () => prodottiTable.id,
     ),
@@ -248,6 +252,9 @@ export const importazioniAgeaRigheTable = pgTable(
       .$type<string[]>()
       .notNull()
       .default([]),
+    correzioneMotivazione: text("correzione_motivazione"),
+    correttoDa: integer("corretto_da").references(() => utentiTable.id),
+    dataCorrezione: timestamp("data_correzione", { withTimezone: true }),
     dataCreazione: timestamp("data_creazione", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -276,6 +283,10 @@ export const importazioniAgeaPartiteTable = pgTable(
     fondoOrigine: varchar("fondo_origine", { length: 50 }).notNull(),
     prodottoId: integer("prodotto_id").references(() => prodottiTable.id),
     prodottoNormalizzato: text("prodotto_normalizzato").notNull(),
+    descrizioniEsterneJson: jsonb("descrizioni_esterne_json")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     lottoRaw: text("lotto_raw"),
     lottoNormalizzato: text("lotto_normalizzato"),
     existingLottoId: integer("existing_lotto_id").references(
@@ -297,6 +308,9 @@ export const importazioniAgeaPartiteTable = pgTable(
     }),
     dataScadenzaRisolta: date("data_scadenza_risolta"),
     dataScadenzaFonte: varchar("data_scadenza_fonte", { length: 40 }),
+    correzioneMotivazione: text("correzione_motivazione"),
+    correttoDa: integer("corretto_da").references(() => utentiTable.id),
+    dataCorrezione: timestamp("data_correzione", { withTimezone: true }),
     stato: varchar("stato", { length: 60 }).notNull(),
     blocking: boolean("blocking").notNull().default(false),
     errorCodesJson: jsonb("error_codes_json")

@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AgeaMappaturaProdottoUpdate {
-  /** @minimum 1 */
-  prodottoId: number;
-  attiva?: boolean;
+export interface AgeaCorrezioneDataInput {
+  /** @nullable */
+  valore: Date | null;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
   /** @minimum 1 */
   versione: number;
 }

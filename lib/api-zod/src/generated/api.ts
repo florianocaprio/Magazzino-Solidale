@@ -766,6 +766,24 @@ export const ListAgeaImportazioneRigheParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const listAgeaImportazioneRigheQueryPageDefault = 1;
+
+export const listAgeaImportazioneRigheQueryPageSizeDefault = 50;
+export const listAgeaImportazioneRigheQueryPageSizeMax = 200;
+
+export const listAgeaImportazioneRigheQueryQMax = 100;
+
+
+
+export const ListAgeaImportazioneRigheQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listAgeaImportazioneRigheQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listAgeaImportazioneRigheQueryPageSizeMax).default(listAgeaImportazioneRigheQueryPageSizeDefault),
+  "stato": zod.coerce.string().optional(),
+  "fondo": zod.coerce.string().optional(),
+  "tipo": zod.enum(['CARICO', 'DISTRIBUZIONE', 'RESO', 'MOVIMENTO_NEGATIVO_NON_CLASSIFICATO', 'SEGNO_INCOERENTE', 'RIGA_SENZA_MOVIMENTO']).optional(),
+  "q": zod.coerce.string().max(listAgeaImportazioneRigheQueryQMax).optional()
+})
+
 export const listAgeaImportazioneRigheResponseItemsItemMovimentoKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
 export const listAgeaImportazioneRigheResponseItemsItemMovimentoPezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
 export const listAgeaImportazioneRigheResponseItemsItemSaldoFinaleKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
@@ -783,9 +801,13 @@ export const ListAgeaImportazioneRigheResponse = zod.object({
   "prodottoRaw": zod.string(),
   "prodottoNormalizzato": zod.string(),
   "lottoRaw": zod.string().nullish(),
+  "lottoEffettivoRaw": zod.string().nullish(),
+  "lottoEffettivoNormalizzato": zod.string().nullish(),
   "numeroDocumentoRaw": zod.string().nullish(),
   "dataDocumento": zod.coerce.date().nullish(),
+  "dataCaricoMagazzinoRaw": zod.string().nullish(),
   "dataCaricoRisolta": zod.coerce.date().nullish(),
+  "dataCaricoEffettiva": zod.coerce.date().nullish(),
   "dataCaricoFonte": zod.string().nullish(),
   "movimentoKgLt": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemMovimentoKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
   "movimentoPezzi": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemMovimentoPezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
@@ -796,12 +818,14 @@ export const ListAgeaImportazioneRigheResponse = zod.object({
   "identityKey": zod.string(),
   "contentHash": zod.string().regex(listAgeaImportazioneRigheResponseItemsItemContentHashRegExp),
   "prodottoIdSnapshot": zod.number().nullish(),
+  "mappingVersioneSnapshot": zod.number().nullish(),
   "descrizioneProdottoSnapshot": zod.string().nullish(),
   "unitaMisuraSnapshot": zod.string().nullish(),
   "statoRiga": zod.string(),
   "blocking": zod.boolean(),
   "errorCodesJson": zod.array(zod.string()),
-  "warningCodesJson": zod.array(zod.string())
+  "warningCodesJson": zod.array(zod.string()),
+  "correzioneMotivazione": zod.string().nullish()
 })),
   "total": zod.number(),
   "page": zod.number(),
@@ -826,6 +850,7 @@ export const ListAgeaImportazionePartiteResponseItem = zod.object({
   "fondoOrigine": zod.string(),
   "prodottoId": zod.number().nullish(),
   "prodottoNormalizzato": zod.string(),
+  "descrizioniEsterneJson": zod.array(zod.string()).optional(),
   "lottoRaw": zod.string().nullish(),
   "existingLottoId": zod.number().nullish(),
   "saldoFinalePezzi": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseSaldoFinalePezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
@@ -843,46 +868,212 @@ export const ListAgeaImportazionePartiteResponseItem = zod.object({
 export const ListAgeaImportazionePartiteResponse = zod.array(ListAgeaImportazionePartiteResponseItem)
 
 
+/**
+ * @summary Elenca le descrizioni esterne distinte dell'intera importazione
+ */
+export const ListAgeaImportazioneDescrizioniDaMappareParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const ListAgeaImportazioneDescrizioniDaMappareResponseItem = zod.object({
+  "chiaveDescrizioneNormalizzata": zod.string(),
+  "descrizioneRawRappresentativa": zod.string(),
+  "numeroRighe": zod.number().min(1),
+  "fondi": zod.array(zod.string()),
+  "mappingId": zod.number().nullish(),
+  "mappingAttiva": zod.boolean().nullish(),
+  "mappingVersione": zod.number().nullish(),
+  "prodottoId": zod.number().nullish(),
+  "prodottoNome": zod.string().nullish()
+})
+export const ListAgeaImportazioneDescrizioniDaMappareResponse = zod.array(ListAgeaImportazioneDescrizioniDaMappareResponseItem)
+
+
+export const UpdateAgeaImportazioneRigaDataCaricoParams = zod.object({
+  "id": zod.coerce.number(),
+  "rigaId": zod.coerce.number()
+})
+
+export const updateAgeaImportazioneRigaDataCaricoBodyMotivazioneMin = 3;
+export const updateAgeaImportazioneRigaDataCaricoBodyMotivazioneMax = 500;
+
+
+
+
+export const UpdateAgeaImportazioneRigaDataCaricoBody = zod.object({
+  "valore": zod.coerce.date().nullable(),
+  "motivazione": zod.string().min(updateAgeaImportazioneRigaDataCaricoBodyMotivazioneMin).max(updateAgeaImportazioneRigaDataCaricoBodyMotivazioneMax),
+  "versione": zod.number().min(1)
+})
+
+export const updateAgeaImportazioneRigaDataCaricoResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const UpdateAgeaImportazioneRigaDataCaricoResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(updateAgeaImportazioneRigaDataCaricoResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const UpdateAgeaImportazioneRigaLottoParams = zod.object({
+  "id": zod.coerce.number(),
+  "rigaId": zod.coerce.number()
+})
+
+export const updateAgeaImportazioneRigaLottoBodyValoreMax = 255;
+
+export const updateAgeaImportazioneRigaLottoBodyMotivazioneMin = 3;
+export const updateAgeaImportazioneRigaLottoBodyMotivazioneMax = 500;
+
+
+
+
+export const UpdateAgeaImportazioneRigaLottoBody = zod.object({
+  "valore": zod.string().min(1).max(updateAgeaImportazioneRigaLottoBodyValoreMax).nullable(),
+  "motivazione": zod.string().min(updateAgeaImportazioneRigaLottoBodyMotivazioneMin).max(updateAgeaImportazioneRigaLottoBodyMotivazioneMax),
+  "versione": zod.number().min(1)
+})
+
+export const updateAgeaImportazioneRigaLottoResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const UpdateAgeaImportazioneRigaLottoResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(updateAgeaImportazioneRigaLottoResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
 export const UpdateAgeaImportazionePartitaParams = zod.object({
   "id": zod.coerce.number(),
   "partitaId": zod.coerce.number()
 })
 
+export const updateAgeaImportazionePartitaBodyMotivazioneMin = 3;
+export const updateAgeaImportazionePartitaBodyMotivazioneMax = 500;
+
+
+
+
 export const UpdateAgeaImportazionePartitaBody = zod.object({
-  "dataScadenza": zod.coerce.date().nullish()
+  "dataScadenza": zod.coerce.date().nullable(),
+  "motivazione": zod.string().min(updateAgeaImportazionePartitaBodyMotivazioneMin).max(updateAgeaImportazionePartitaBodyMotivazioneMax),
+  "versione": zod.number().min(1)
 })
 
-export const updateAgeaImportazionePartitaResponseSaldoFinalePezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
-export const updateAgeaImportazionePartitaResponseSaldoFinaleKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
-export const updateAgeaImportazionePartitaResponseQuantitaOperativaOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
-export const updateAgeaImportazionePartitaResponseFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+export const updateAgeaImportazionePartitaResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
 
 
 export const UpdateAgeaImportazionePartitaResponse = zod.object({
   "id": zod.number(),
-  "importazioneId": zod.number(),
-  "partyKey": zod.string(),
-  "fondoOrigine": zod.string(),
-  "prodottoId": zod.number().nullish(),
-  "prodottoNormalizzato": zod.string(),
-  "lottoRaw": zod.string().nullish(),
-  "existingLottoId": zod.number().nullish(),
-  "saldoFinalePezzi": zod.union([zod.string().regex(updateAgeaImportazionePartitaResponseSaldoFinalePezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
-  "saldoFinaleKgLt": zod.union([zod.string().regex(updateAgeaImportazionePartitaResponseSaldoFinaleKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
-  "quantitaOperativa": zod.union([zod.string().regex(updateAgeaImportazionePartitaResponseQuantitaOperativaOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
-  "unitaMisuraOperativa": zod.string().nullish(),
-  "fattoreKgLtPezzo": zod.union([zod.string().regex(updateAgeaImportazionePartitaResponseFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
-  "dataScadenzaRisolta": zod.coerce.date().nullish(),
-  "dataScadenzaFonte": zod.string().nullish(),
-  "stato": zod.string(),
-  "blocking": zod.boolean(),
-  "errorCodesJson": zod.array(zod.string()),
-  "warningCodesJson": zod.array(zod.string())
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(updateAgeaImportazionePartitaResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
 })
 
 
 export const RecalculateAgeaImportazioneParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+
+
+export const RecalculateAgeaImportazioneBody = zod.object({
+  "versione": zod.number().min(1)
 })
 
 export const recalculateAgeaImportazioneResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -933,7 +1124,7 @@ export const ConfirmAgeaImportazioneParams = zod.object({
 
 
 export const ConfirmAgeaImportazioneBody = zod.object({
-  "versione": zod.number().min(1).optional()
+  "versione": zod.number().min(1)
 })
 
 export const confirmAgeaImportazioneResponseImportazioneSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -982,6 +1173,13 @@ export const ConfirmAgeaImportazioneResponse = zod.object({
 
 export const CancelAgeaImportazioneParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+
+
+export const CancelAgeaImportazioneBody = zod.object({
+  "versione": zod.number().min(1)
 })
 
 export const cancelAgeaImportazioneResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -1080,9 +1278,11 @@ export const UpdateAgeaMappaturaProdottoParams = zod.object({
 
 
 
+
 export const UpdateAgeaMappaturaProdottoBody = zod.object({
   "prodottoId": zod.number().min(1),
-  "attiva": zod.boolean().optional()
+  "attiva": zod.boolean().optional(),
+  "versione": zod.number().min(1)
 })
 
 export const UpdateAgeaMappaturaProdottoResponse = zod.object({

@@ -2,18 +2,24 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   analyzeAgeaImportazioneBinary,
+  getListAgeaImportazioneDescrizioniDaMappareQueryKey,
   getListAgeaImportazionePartiteQueryKey,
   getListAgeaImportazioniQueryKey,
   listAgeaImportazioneRigheFiltered,
   useConfirmAgeaImportazione,
+  useCancelAgeaImportazione,
   useCreateAgeaMappaturaProdotto,
   useListAgeaImportazionePartite,
+  useListAgeaImportazioneDescrizioniDaMappare,
   useListAgeaImportazioni,
   useListAgeaMappatureProdotti,
   useListMagazzini,
   useListProdotti,
   useRecalculateAgeaImportazione,
+  useUpdateAgeaImportazioneRigaDataCarico,
+  useUpdateAgeaImportazioneRigaLotto,
   useUpdateAgeaImportazionePartita,
+  useUpdateAgeaMappaturaProdotto,
   type AgeaImportModalita,
   type AgeaImportazione,
 } from "@workspace/api-client-react";
@@ -73,6 +79,9 @@ function StepTitle({ number, children }: { number: number; children: string }) {
 
 export function AgeaImportWizard() {
   const { hasPermission } = useAuth();
+  const canImport = hasPermission("magazzino.agea.import");
+  const canManageMapping = hasPermission("magazzino.agea.mapping.manage");
+  const canCreateProduct = hasPermission("magazzino.products.manage");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: magazzini } = useListMagazzini();
@@ -83,6 +92,16 @@ export function AgeaImportWizard() {
   const [mode, setMode] = useState<AgeaImportModalita>("PRIMA_ACQUISIZIONE");
   const [file, setFile] = useState<File | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [rowPage, setRowPage] = useState(1);
+  const [rowPageSize, setRowPageSize] = useState(25);
+  const [rowState, setRowState] = useState("all");
+  const [rowType, setRowType] = useState("all");
+  const [rowFund, setRowFund] = useState("all");
+  const [rowSearch, setRowSearch] = useState("");
+  const [correctionDrafts, setCorrectionDrafts] = useState<
+    Record<number, { date?: string; lot?: string; motivation?: string }>
+  >({});
+  const [expiryMotivation, setExpiryMotivation] = useState("");
   const [productByDescription, setProductByDescription] = useState<
     Record<string, string>
   >({});
@@ -124,36 +143,46 @@ export function AgeaImportWizard() {
     },
   });
   const rowsQuery = useQuery({
-    queryKey: ["agea-import-rows", selectedId, "preview"],
-    queryFn: () =>
-      listAgeaImportazioneRigheFiltered(selectedId!, { page: 1, pageSize: 50 }),
-    enabled: selectedId != null,
-  });
-  const missingRowsQuery = useQuery({
-    queryKey: ["agea-import-rows", selectedId, "missing"],
+    queryKey: [
+      "agea-import-rows",
+      selectedId,
+      rowPage,
+      rowPageSize,
+      rowState,
+      rowType,
+      rowFund,
+      rowSearch,
+    ],
     queryFn: () =>
       listAgeaImportazioneRigheFiltered(selectedId!, {
-        page: 1,
-        pageSize: 200,
-        stato: "DA_MAPPARE",
+        page: rowPage,
+        pageSize: rowPageSize,
+        stato: rowState === "all" ? undefined : rowState,
+        tipo: rowType === "all" ? undefined : rowType,
+        fondo: rowFund === "all" ? undefined : rowFund,
+        q: rowSearch || undefined,
       }),
     enabled: selectedId != null,
   });
-  const missingDescriptions = useMemo(
-    () => [
-      ...new Map(
-        (missingRowsQuery.data?.items ?? []).map((row) => [
-          row.prodottoNormalizzato,
-          row.prodottoRaw,
-        ]),
-      ).entries(),
-    ],
-    [missingRowsQuery.data],
+  const descriptionsQuery = useListAgeaImportazioneDescrizioniDaMappare(
+    selectedId ?? 0,
+    {
+      query: {
+        enabled: selectedId != null,
+        queryKey: getListAgeaImportazioneDescrizioniDaMappareQueryKey(
+          selectedId ?? 0,
+        ),
+      },
+    },
   );
   const createMapping = useCreateAgeaMappaturaProdotto();
+  const updateMapping = useUpdateAgeaMappaturaProdotto();
   const recalculate = useRecalculateAgeaImportazione();
   const updateParty = useUpdateAgeaImportazionePartita();
+  const updateLoadDate = useUpdateAgeaImportazioneRigaDataCarico();
+  const updateLot = useUpdateAgeaImportazioneRigaLotto();
   const confirm = useConfirmAgeaImportazione();
+  const cancel = useCancelAgeaImportazione();
 
   const refreshImport = async (next?: AgeaImportazione) => {
     if (next) setSelectedId(next.id);
@@ -164,6 +193,15 @@ export function AgeaImportWizard() {
       queryClient.invalidateQueries({
         queryKey: ["agea-import-rows", selectedId],
       }),
+      queryClient.invalidateQueries({
+        queryKey: ["/api/agea/mappature-prodotti"],
+      }),
+      selectedId
+        ? queryClient.invalidateQueries({
+            queryKey:
+              getListAgeaImportazioneDescrizioniDaMappareQueryKey(selectedId),
+          })
+        : Promise.resolve(),
       selectedId
         ? queryClient.invalidateQueries({
             queryKey: getListAgeaImportazionePartiteQueryKey(selectedId),
@@ -172,9 +210,45 @@ export function AgeaImportWizard() {
     ]);
   };
 
-  const mapDescription = (description: string, raw: string) => {
-    const productId = Number(productByDescription[description]);
+  const mapDescription = (
+    description: string,
+    raw: string,
+    currentProductId?: number | null,
+    currentMapping?: {
+      id: number;
+      version: number;
+      active: boolean;
+    } | null,
+  ) => {
+    const productId = Number(
+      productByDescription[description] ?? currentProductId,
+    );
     if (!productId) return;
+    if (currentMapping) {
+      updateMapping.mutate(
+        {
+          id: currentMapping.id,
+          data: {
+            prodottoId: productId,
+            attiva: currentMapping.active,
+            versione: currentMapping.version,
+          },
+        },
+        {
+          onSuccess: () => {
+            void refreshImport();
+            toast({ title: "Mapping aggiornato", description: raw });
+          },
+          onError: (error) =>
+            toast({
+              title: "Mapping non aggiornato",
+              description: errorMessage(error),
+              variant: "destructive",
+            }),
+        },
+      );
+      return;
+    }
     createMapping.mutate(
       { data: { descrizioneEsterna: raw, prodottoId: productId } },
       {
@@ -182,11 +256,47 @@ export function AgeaImportWizard() {
           queryClient.invalidateQueries({
             queryKey: ["/api/agea/mappature-prodotti"],
           });
+          void refreshImport();
           toast({ title: "Mapping salvato", description: raw });
         },
         onError: (error) =>
           toast({
             title: "Mapping non salvato",
+            description: errorMessage(error),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  const saveRowCorrection = (rowId: number, field: "date" | "lot") => {
+    if (!selected) return;
+    const draft = correctionDrafts[rowId] ?? {};
+    const motivation = draft.motivation?.trim();
+    if (!motivation) {
+      toast({
+        title: "Motivazione richiesta",
+        description: "Indica il motivo della correzione manuale.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const mutation = field === "date" ? updateLoadDate : updateLot;
+    mutation.mutate(
+      {
+        id: selected.id,
+        rigaId: rowId,
+        data: {
+          valore: field === "date" ? draft.date || null : draft.lot || null,
+          motivazione: motivation,
+          versione: selected.versione,
+        },
+      },
+      {
+        onSuccess: (result) => void refreshImport(result),
+        onError: (error) =>
+          toast({
+            title: "Correzione non salvata",
             description: errorMessage(error),
             variant: "destructive",
           }),
@@ -261,10 +371,7 @@ export function AgeaImportWizard() {
             <Button
               onClick={() => analyze.mutate()}
               disabled={
-                !file ||
-                !magazzinoId ||
-                analyze.isPending ||
-                !hasPermission("magazzino.agea.import")
+                !file || !magazzinoId || analyze.isPending || !canImport
               }
             >
               <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -337,29 +444,50 @@ export function AgeaImportWizard() {
             {mappingsQuery.data?.length ?? 0} mapping globali confermati.
             Nessuna associazione viene creata automaticamente.
           </p>
-          {missingDescriptions.length === 0 ? (
+          {descriptionsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Caricamento descrizioni…
+            </p>
+          ) : descriptionsQuery.isError ? (
+            <p className="text-sm text-destructive">
+              Impossibile caricare le descrizioni dell'importazione.
+            </p>
+          ) : (descriptionsQuery.data?.length ?? 0) === 0 ? (
             <div className="flex items-center gap-2 text-sm text-green-700">
               <CheckCircle2 className="h-4 w-4" />
-              Nessuna descrizione visibile da mappare.
+              Nessuna descrizione presente.
             </div>
           ) : (
-            missingDescriptions.map(([normalized, raw]) => (
+            descriptionsQuery.data?.map((description) => (
               <div
-                key={normalized}
+                key={description.chiaveDescrizioneNormalizzata}
                 className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_1fr_auto] md:items-center"
               >
                 <div>
-                  <div className="font-medium">{raw}</div>
+                  <div className="font-medium">
+                    {description.descrizioneRawRappresentativa}
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    {normalized}
+                    {description.chiaveDescrizioneNormalizzata} ·{" "}
+                    {description.numeroRighe} righe ·{" "}
+                    {description.fondi.join(", ")}
+                  </div>
+                  <div className="text-xs">
+                    {description.mappingId
+                      ? `${description.prodottoNome ?? "Prodotto"} · ${description.mappingAttiva ? "attivo" : "disabilitato"}`
+                      : "Non associato"}
                   </div>
                 </div>
                 <Select
-                  value={productByDescription[normalized] ?? ""}
+                  value={
+                    productByDescription[
+                      description.chiaveDescrizioneNormalizzata
+                    ] ?? String(description.prodottoId ?? "")
+                  }
                   onValueChange={(value) =>
                     setProductByDescription((current) => ({
                       ...current,
-                      [normalized]: value,
+                      [description.chiaveDescrizioneNormalizzata]: value,
                     }))
                   }
                 >
@@ -376,24 +504,82 @@ export function AgeaImportWizard() {
                       ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="outline"
-                  disabled={
-                    !productByDescription[normalized] || createMapping.isPending
-                  }
-                  onClick={() => mapDescription(normalized, raw)}
-                >
-                  Associa
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={
+                      !(
+                        productByDescription[
+                          description.chiaveDescrizioneNormalizzata
+                        ] ?? description.prodottoId
+                      ) ||
+                      createMapping.isPending ||
+                      !canManageMapping
+                    }
+                    onClick={() =>
+                      mapDescription(
+                        description.chiaveDescrizioneNormalizzata,
+                        description.descrizioneRawRappresentativa,
+                        description.prodottoId,
+                        description.mappingId && description.mappingVersione
+                          ? {
+                              id: description.mappingId,
+                              version: description.mappingVersione,
+                              active: description.mappingAttiva ?? true,
+                            }
+                          : null,
+                      )
+                    }
+                  >
+                    {description.mappingId ? "Aggiorna" : "Associa"}
+                  </Button>
+                  {description.mappingId &&
+                    description.mappingVersione &&
+                    description.prodottoId && (
+                      <Button
+                        variant="ghost"
+                        disabled={updateMapping.isPending || !canManageMapping}
+                        onClick={() =>
+                          updateMapping.mutate(
+                            {
+                              id: description.mappingId!,
+                              data: {
+                                prodottoId: description.prodottoId!,
+                                attiva: !description.mappingAttiva,
+                                versione: description.mappingVersione!,
+                              },
+                            },
+                            {
+                              onSuccess: () => void refreshImport(),
+                              onError: (error) =>
+                                toast({
+                                  title: "Mapping non aggiornato",
+                                  description: errorMessage(error),
+                                  variant: "destructive",
+                                }),
+                            },
+                          )
+                        }
+                      >
+                        {description.mappingAttiva ? "Disabilita" : "Riabilita"}
+                      </Button>
+                    )}
+                </div>
               </div>
             ))
           )}
-          {selectedId && (
+          {canCreateProduct && (
+            <Button variant="link" asChild className="px-0">
+              <a href="/prodotti">Crea un prodotto nel flusso Prodotti</a>
+            </Button>
+          )}
+          {selected && (
             <Button
               variant="secondary"
+              disabled={!canImport || recalculate.isPending}
               onClick={() =>
                 recalculate.mutate(
-                  { id: selectedId },
+                  { id: selected.id, data: { versione: selected.versione } },
                   {
                     onSuccess: (result) => void refreshImport(result),
                     onError: (error) =>
@@ -417,7 +603,18 @@ export function AgeaImportWizard() {
         <CardHeader>
           <StepTitle number={4}>Partite preview</StepTitle>
         </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
+        <CardContent className="space-y-3 p-0 overflow-x-auto">
+          <div className="px-4">
+            <Label htmlFor="agea-expiry-motivation">
+              Motivazione correzione scadenza
+            </Label>
+            <Input
+              id="agea-expiry-motivation"
+              value={expiryMotivation}
+              onChange={(event) => setExpiryMotivation(event.target.value)}
+              placeholder="Motivo obbligatorio per salvare o rimuovere"
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -441,29 +638,41 @@ export function AgeaImportWizard() {
                   <TableCell>{party.saldoFinaleKgLt ?? "—"}</TableCell>
                   <TableCell>{party.fattoreKgLtPezzo ?? "—"}</TableCell>
                   <TableCell>
-                    {party.dataScadenzaRisolta ??
-                      (party.errorCodesJson.includes(
-                        "SCADENZA_DA_COMPLETARE",
-                      ) ? (
-                        <Input
-                          type="date"
-                          className="min-w-36"
-                          onBlur={(event) =>
-                            event.target.value &&
-                            selectedId &&
-                            updateParty.mutate(
-                              {
-                                id: selectedId,
-                                partitaId: party.id,
-                                data: { dataScadenza: event.target.value },
+                    {party.existingLottoId ? (
+                      (party.dataScadenzaRisolta ?? "—")
+                    ) : (
+                      <Input
+                        type="date"
+                        className="min-w-36"
+                        disabled={!canImport}
+                        defaultValue={party.dataScadenzaRisolta ?? ""}
+                        onBlur={(event) =>
+                          selectedId &&
+                          selected &&
+                          expiryMotivation.trim() &&
+                          updateParty.mutate(
+                            {
+                              id: selectedId,
+                              partitaId: party.id,
+                              data: {
+                                dataScadenza: event.target.value || null,
+                                motivazione: expiryMotivation.trim(),
+                                versione: selected.versione,
                               },
-                              { onSuccess: () => void refreshImport() },
-                            )
-                          }
-                        />
-                      ) : (
-                        "—"
-                      ))}
+                            },
+                            {
+                              onSuccess: (result) => void refreshImport(result),
+                              onError: (error) =>
+                                toast({
+                                  title: "Scadenza non salvata",
+                                  description: errorMessage(error),
+                                  variant: "destructive",
+                                }),
+                            },
+                          )
+                        }
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={party.blocking ? "destructive" : "outline"}>
@@ -481,16 +690,114 @@ export function AgeaImportWizard() {
         <CardHeader>
           <StepTitle number={5}>Righe preview</StepTitle>
         </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
+        <CardContent className="space-y-3 p-0 overflow-x-auto">
+          <div className="grid gap-2 px-4 md:grid-cols-5">
+            <Input
+              value={rowSearch}
+              onChange={(event) => {
+                setRowSearch(event.target.value);
+                setRowPage(1);
+              }}
+              placeholder="Cerca prodotto, lotto, documento"
+            />
+            <Select
+              value={rowState}
+              onValueChange={(value) => {
+                setRowState(value);
+                setRowPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Stato" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti gli stati</SelectItem>
+                <SelectItem value="DA_MAPPARE">Da mappare</SelectItem>
+                <SelectItem value="BLOCCATA">Bloccata</SelectItem>
+                <SelectItem value="DA_APPLICARE">Da applicare</SelectItem>
+                <SelectItem value="DUPLICATA">Duplicata</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={rowType}
+              onValueChange={(value) => {
+                setRowType(value);
+                setRowPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti i tipi</SelectItem>
+                <SelectItem value="CARICO">Carico</SelectItem>
+                <SelectItem value="DISTRIBUZIONE">Distribuzione</SelectItem>
+                <SelectItem value="RESO">Reso</SelectItem>
+                <SelectItem value="MOVIMENTO_NEGATIVO_NON_CLASSIFICATO">
+                  Negativo non classificato
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={rowFund}
+              onValueChange={(value) => {
+                setRowFund(value);
+                setRowPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Fondo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti i fondi</SelectItem>
+                <SelectItem value="FSE_PLUS">FSE+</SelectItem>
+                <SelectItem value="FONDO_NAZIONALE">Fondo nazionale</SelectItem>
+                <SelectItem value="FONDO_NAZIONALE_COFINANZIATO">
+                  Fondo nazionale cofinanziato
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={String(rowPageSize)}
+              onValueChange={(value) => {
+                setRowPageSize(Number(value));
+                setRowPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[10, 25, 50, 100].map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size} per pagina
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {rowsQuery.isLoading && (
+            <p className="px-4 text-sm text-muted-foreground">
+              Caricamento preview…
+            </p>
+          )}
+          {rowsQuery.isError && (
+            <p className="px-4 text-sm text-destructive">
+              Preview non disponibile.
+            </p>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Riga</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Prodotto</TableHead>
-                <TableHead>Lotto</TableHead>
+                <TableHead>Data carico raw / effettiva</TableHead>
+                <TableHead>Lotto raw / effettivo</TableHead>
                 <TableHead>Documento</TableHead>
                 <TableHead>Stato</TableHead>
+                <TableHead>Errori / avvisi</TableHead>
+                <TableHead>Correzioni manuali</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -499,21 +806,125 @@ export function AgeaImportWizard() {
                   <TableCell>{row.numeroRiga}</TableCell>
                   <TableCell>{row.tipoMovimentoEsterno}</TableCell>
                   <TableCell>{row.prodottoRaw}</TableCell>
-                  <TableCell>{row.lottoRaw ?? "—"}</TableCell>
+                  <TableCell>
+                    <div>{row.dataCaricoMagazzinoRaw ?? "—"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.dataCaricoEffettiva ?? row.dataCaricoRisolta ?? "—"}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>{row.lottoRaw ?? "—"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.lottoEffettivoRaw ?? row.lottoRaw ?? "—"}
+                    </div>
+                  </TableCell>
                   <TableCell>{row.numeroDocumentoRaw ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={row.blocking ? "destructive" : "secondary"}>
                       {row.statoRiga}
                     </Badge>
                   </TableCell>
+                  <TableCell className="min-w-52 text-xs">
+                    {row.errorCodesJson.length > 0 && (
+                      <div className="text-destructive">
+                        {row.errorCodesJson.join(", ")}
+                      </div>
+                    )}
+                    {row.warningCodesJson.length > 0 && (
+                      <div className="text-amber-700">
+                        {row.warningCodesJson.join(", ")}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="min-w-72 space-y-2">
+                    <Input
+                      type="date"
+                      value={correctionDrafts[row.id]?.date ?? ""}
+                      onChange={(event) =>
+                        setCorrectionDrafts((current) => ({
+                          ...current,
+                          [row.id]: {
+                            ...current[row.id],
+                            date: event.target.value,
+                          },
+                        }))
+                      }
+                    />
+                    <Input
+                      value={correctionDrafts[row.id]?.lot ?? ""}
+                      onChange={(event) =>
+                        setCorrectionDrafts((current) => ({
+                          ...current,
+                          [row.id]: {
+                            ...current[row.id],
+                            lot: event.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Lotto effettivo (vuoto = rimuovi)"
+                    />
+                    <Input
+                      value={correctionDrafts[row.id]?.motivation ?? ""}
+                      onChange={(event) =>
+                        setCorrectionDrafts((current) => ({
+                          ...current,
+                          [row.id]: {
+                            ...current[row.id],
+                            motivation: event.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Motivazione obbligatoria"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!canImport}
+                        onClick={() => saveRowCorrection(row.id, "date")}
+                      >
+                        Salva data
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!canImport}
+                        onClick={() => saveRowCorrection(row.id, "lot")}
+                      >
+                        Salva lotto
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          <div className="border-t p-3 text-xs text-muted-foreground">
-            Prime {rowsQuery.data?.items.length ?? 0} di{" "}
-            {rowsQuery.data?.total ?? 0} righe; la preview completa è paginata
-            lato server e filtrabile via API.
+          <div className="flex items-center justify-between border-t p-3 text-xs text-muted-foreground">
+            <span>
+              Pagina {rowPage} · {rowsQuery.data?.items.length ?? 0} di{" "}
+              {rowsQuery.data?.total ?? 0} righe filtrate
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={rowPage <= 1 || rowsQuery.isFetching}
+                onClick={() => setRowPage((page) => page - 1)}
+              >
+                Precedente
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={
+                  rowsQuery.isFetching ||
+                  rowPage * rowPageSize >= (rowsQuery.data?.total ?? 0)
+                }
+                onClick={() => setRowPage((page) => page + 1)}
+              >
+                Successiva
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -576,6 +987,7 @@ export function AgeaImportWizard() {
               !selected ||
               selected.stato !== "PRONTA" ||
               confirm.isPending ||
+              !canImport ||
               (selected.modalita === "PRIMA_ACQUISIZIONE" &&
                 !hasPermission("magazzino.agea.bootstrap"))
             }
@@ -604,6 +1016,38 @@ export function AgeaImportWizard() {
             }
           >
             {confirm.isPending ? "Conferma…" : "Conferma importazione"}
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={
+              !selected ||
+              ["CONFERMATA", "ANNULLATA"].includes(selected.stato) ||
+              cancel.isPending ||
+              !canImport
+            }
+            onClick={() => {
+              if (
+                !selected ||
+                !window.confirm(
+                  `Annullare l'importazione #${selected.id}? L'operazione rende la preview immutabile.`,
+                )
+              )
+                return;
+              cancel.mutate(
+                { id: selected.id, data: { versione: selected.versione } },
+                {
+                  onSuccess: (result) => void refreshImport(result),
+                  onError: (error) =>
+                    toast({
+                      title: "Annullamento non riuscito",
+                      description: errorMessage(error),
+                      variant: "destructive",
+                    }),
+                },
+              );
+            }}
+          >
+            {cancel.isPending ? "Annullamento…" : "Annulla importazione"}
           </Button>
         </CardContent>
       </Card>

@@ -17,6 +17,7 @@ export interface AgeaImportPartita {
   /** @nullable */
   prodottoId?: number | null;
   prodottoNormalizzato: string;
+  descrizioniEsterneJson?: string[];
   /** @nullable */
   lottoRaw?: string | null;
   /** @nullable */

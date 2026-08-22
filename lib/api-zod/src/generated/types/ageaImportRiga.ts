@@ -21,11 +21,19 @@ export interface AgeaImportRiga {
   /** @nullable */
   lottoRaw?: string | null;
   /** @nullable */
+  lottoEffettivoRaw?: string | null;
+  /** @nullable */
+  lottoEffettivoNormalizzato?: string | null;
+  /** @nullable */
   numeroDocumentoRaw?: string | null;
   /** @nullable */
   dataDocumento?: Date | null;
   /** @nullable */
+  dataCaricoMagazzinoRaw?: string | null;
+  /** @nullable */
   dataCaricoRisolta?: Date | null;
+  /** @nullable */
+  dataCaricoEffettiva?: Date | null;
   /** @nullable */
   dataCaricoFonte?: string | null;
   movimentoKgLt?: QuantitaContabileConSegno | null;
@@ -41,6 +49,8 @@ export interface AgeaImportRiga {
   /** @nullable */
   prodottoIdSnapshot?: number | null;
   /** @nullable */
+  mappingVersioneSnapshot?: number | null;
+  /** @nullable */
   descrizioneProdottoSnapshot?: string | null;
   /** @nullable */
   unitaMisuraSnapshot?: string | null;
@@ -48,4 +58,6 @@ export interface AgeaImportRiga {
   blocking: boolean;
   errorCodesJson: string[];
   warningCodesJson: string[];
+  /** @nullable */
+  correzioneMotivazione?: string | null;
 }

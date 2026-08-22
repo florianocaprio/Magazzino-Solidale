@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { InventoryDecimal, InventoryDecimalError } from "./inventoryDecimal";
 
 export const AGEA_TRACE_CODE = "SIFEAD_REGISTRO_XLSX_OSSERVATO_V1";
-export const AGEA_PARSER_VERSION = "2.0B.1";
+export const AGEA_PARSER_VERSION = "2.0B-R1.1";
 export const AGEA_XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 export const AGEA_MAX_BYTES = 10 * 1024 * 1024;
@@ -32,16 +32,16 @@ const STATIC_HEADERS = [
 
 const FUND_MAP: Record<string, string> = {
   "FSE+": "FSE_PLUS",
-  "Fondo Nazionale": "FONDO_NAZIONALE",
-  "Fondo Nazionale cofinanziato": "FONDO_NAZIONALE_COFINANZIATO",
+  "FONDO NAZIONALE": "FONDO_NAZIONALE",
+  "FONDO NAZIONALE COFINANZIATO": "FONDO_NAZIONALE_COFINANZIATO",
 };
 
 const ACTIVITY_MAP: Record<string, string> = {
-  Pacchi: "PACCHI",
-  Emporio: "EMPORIO",
-  Domiciliare: "DOMICILIARE",
-  Mensa: "MENSA",
-  Strada: "UDS_STRADA",
+  PACCHI: "PACCHI",
+  EMPORIO: "EMPORIO",
+  DOMICILIARE: "DOMICILIARE",
+  MENSA: "MENSA",
+  STRADA: "UDS_STRADA",
 };
 
 export class AgeaParserError extends Error {
@@ -185,7 +185,8 @@ function rawText(cell: XLSX.CellObject | undefined): string | null {
   if (cell.v instanceof Date) {
     return `${String(cell.v.getUTCDate()).padStart(2, "0")}/${String(cell.v.getUTCMonth() + 1).padStart(2, "0")}/${cell.v.getUTCFullYear()}`;
   }
-  return String(cell.w ?? cell.v).trim() || null;
+  const raw = String(cell.w ?? cell.v);
+  return raw === "" ? null : raw;
 }
 
 function decimalText(
@@ -240,13 +241,25 @@ function validateSheet(
     { length: columns },
     (_, index) => rawText(cellAt(sheet, range.s.r, range.s.c + index)) ?? "",
   );
-  const pieces = /^Giacenza al (\d{2}\/\d{2}\/\d{4}) Pezzi$/.exec(headers[2]);
-  const kgLt = /^Giacenza al (\d{2}\/\d{2}\/\d{4}) KgLt$/.exec(headers[3]);
+  const normalizedHeaders = headers.map((header) => normalizeAgeaKey(header));
+  const pieces = /^GIACENZA AL (\d{2}\/\d{2}\/\d{4}) PEZZI$/.exec(
+    normalizedHeaders[2] ?? "",
+  );
+  const kgLt = /^GIACENZA AL (\d{2}\/\d{2}\/\d{4}) KGLT$/.exec(
+    normalizedHeaders[3] ?? "",
+  );
   if (!pieces || !kgLt || pieces[1] !== kgLt[1]) return null;
-  const required = [headers[0], headers[1], ...headers.slice(4)];
+  const required = [
+    normalizedHeaders[0],
+    normalizedHeaders[1],
+    ...normalizedHeaders.slice(4),
+  ];
+  const normalizedStaticHeaders = STATIC_HEADERS.map((header) =>
+    normalizeAgeaKey(header),
+  );
   if (
     required.length !== STATIC_HEADERS.length ||
-    required.some((header, index) => header !== STATIC_HEADERS[index])
+    required.some((header, index) => header !== normalizedStaticHeaders[index])
   )
     return null;
   const dataRiferimento = parseAgeaDate(pieces[1]);
@@ -472,7 +485,8 @@ export function parseAgeaWorkbook(buffer: Buffer): ParsedAgeaWorkbook {
     const dataCarico = parseAgeaDate(cells[6]?.v as CellValue);
     const warnings: string[] = [];
     const errors: string[] = [];
-    if (!FUND_MAP[fondoRaw ?? ""]) errors.push("FONDO_NON_RICONOSCIUTO");
+    const normalizedFund = normalizeAgeaKey(fondoRaw);
+    if (!FUND_MAP[normalizedFund ?? ""]) errors.push("FONDO_NON_RICONOSCIUTO");
     if (tipo === "SEGNO_INCOERENTE") errors.push("SEGNO_INCOERENTE");
     if (tipo === "MOVIMENTO_NEGATIVO_NON_CLASSIFICATO")
       warnings.push("MOVIMENTO_NEGATIVO_NON_CLASSIFICATO");
@@ -482,15 +496,23 @@ export function parseAgeaWorkbook(buffer: Buffer): ParsedAgeaWorkbook {
     if (!dataCarico && !dataDocumento && tipo === "CARICO")
       errors.push("DATA_CARICO_DA_COMPLETARE");
     const noteRaw = rawText(cells[13]);
-    if (dataCaricoRaw === "23" || noteRaw === "23")
+    if (
+      normalizeAgeaText(dataCaricoRaw) === "23" ||
+      normalizeAgeaText(noteRaw) === "23"
+    )
       warnings.push("PLACEHOLDER_23_OSSERVATO");
     const attivitaRaw = rawText(cells[14]);
-    if (tipo !== "CARICO" && attivitaRaw && !ACTIVITY_MAP[attivitaRaw])
+    const normalizedActivity = normalizeAgeaKey(attivitaRaw);
+    if (
+      tipo !== "CARICO" &&
+      attivitaRaw &&
+      !ACTIVITY_MAP[normalizedActivity ?? ""]
+    )
       warnings.push("ATTIVITA_NON_RICONOSCIUTA");
     const normalizedProduct = normalizeAgeaKey(prodottoRaw)!;
     const base = hash({
       fonte: "AGEA_SIFEAD",
-      fondo: FUND_MAP[fondoRaw ?? ""] ?? null,
+      fondo: FUND_MAP[normalizedFund ?? ""] ?? null,
       prodotto: normalizedProduct,
       documento: normalizeAgeaKey(rawText(cells[4])),
       dataDocumento,
@@ -524,12 +546,19 @@ export function parseAgeaWorkbook(buffer: Buffer): ParsedAgeaWorkbook {
       pasti: rawText(cells[16]),
       saltuari: rawText(cells[17]),
       continuativi: rawText(cells[18]),
+      dataCaricoRisolta: dataCarico ?? dataDocumento,
+      dataCaricoFonte: dataCarico
+        ? "DATA_CARICO_MAGAZZINO"
+        : dataDocumento
+          ? "DATA_DOCUMENTO_FALLBACK"
+          : null,
+      note: normalizeAgeaText(noteRaw),
     });
     rows.push({
       numeroRiga: r + 1,
       rawJson,
       fondoRaw,
-      fondoNormalizzato: FUND_MAP[fondoRaw ?? ""] ?? null,
+      fondoNormalizzato: FUND_MAP[normalizedFund ?? ""] ?? null,
       prodottoRaw,
       prodottoNormalizzato: normalizedProduct,
       lottoRaw: rawText(cells[7]),
@@ -568,7 +597,7 @@ export function parseAgeaWorkbook(buffer: Buffer): ParsedAgeaWorkbook {
       saldoFinaleKgLt: decimalText(cells[3], validation.headers[3], r + 1),
       noteRaw,
       attivitaRaw,
-      attivitaNormalizzata: ACTIVITY_MAP[attivitaRaw ?? ""] ?? null,
+      attivitaNormalizzata: ACTIVITY_MAP[normalizedActivity ?? ""] ?? null,
       pacchiRaw: rawText(cells[15]),
       pastiRaw: rawText(cells[16]),
       saltuariRaw: rawText(cells[17]),

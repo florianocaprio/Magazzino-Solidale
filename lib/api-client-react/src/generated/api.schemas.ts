@@ -852,11 +852,19 @@ export interface AgeaImportRiga {
   /** @nullable */
   lottoRaw?: string | null;
   /** @nullable */
+  lottoEffettivoRaw?: string | null;
+  /** @nullable */
+  lottoEffettivoNormalizzato?: string | null;
+  /** @nullable */
   numeroDocumentoRaw?: string | null;
   /** @nullable */
   dataDocumento?: string | null;
   /** @nullable */
+  dataCaricoMagazzinoRaw?: string | null;
+  /** @nullable */
   dataCaricoRisolta?: string | null;
+  /** @nullable */
+  dataCaricoEffettiva?: string | null;
   /** @nullable */
   dataCaricoFonte?: string | null;
   movimentoKgLt?: QuantitaContabileConSegno | null;
@@ -872,6 +880,8 @@ export interface AgeaImportRiga {
   /** @nullable */
   prodottoIdSnapshot?: number | null;
   /** @nullable */
+  mappingVersioneSnapshot?: number | null;
+  /** @nullable */
   descrizioneProdottoSnapshot?: string | null;
   /** @nullable */
   unitaMisuraSnapshot?: string | null;
@@ -879,6 +889,8 @@ export interface AgeaImportRiga {
   blocking: boolean;
   errorCodesJson: string[];
   warningCodesJson: string[];
+  /** @nullable */
+  correzioneMotivazione?: string | null;
 }
 
 export interface AgeaImportRighePage {
@@ -902,6 +914,7 @@ export interface AgeaImportPartita {
   /** @nullable */
   prodottoId?: number | null;
   prodottoNormalizzato: string;
+  descrizioniEsterneJson?: string[];
   /** @nullable */
   lottoRaw?: string | null;
   /** @nullable */
@@ -922,6 +935,24 @@ export interface AgeaImportPartita {
   warningCodesJson: string[];
 }
 
+export interface AgeaDescrizioneDaMappare {
+  chiaveDescrizioneNormalizzata: string;
+  descrizioneRawRappresentativa: string;
+  /** @minimum 1 */
+  numeroRighe: number;
+  fondi: string[];
+  /** @nullable */
+  mappingId?: number | null;
+  /** @nullable */
+  mappingAttiva?: boolean | null;
+  /** @nullable */
+  mappingVersione?: number | null;
+  /** @nullable */
+  prodottoId?: number | null;
+  /** @nullable */
+  prodottoNome?: string | null;
+}
+
 export interface AgeaMappaturaProdottoInput {
   /** @minLength 1 */
   descrizioneEsterna: string;
@@ -933,16 +964,58 @@ export interface AgeaMappaturaProdottoUpdate {
   /** @minimum 1 */
   prodottoId: number;
   attiva?: boolean;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface AgeaImportPartitaUpdate {
   /** @nullable */
-  dataScadenza?: string | null;
+  dataScadenza: string | null;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface AgeaVersioneInput {
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface AgeaCorrezioneDataInput {
+  /** @nullable */
+  valore: string | null;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface AgeaCorrezioneLottoInput {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     * @nullable
+     */
+  valore: string | null;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface AgeaImportConfermaInput {
   /** @minimum 1 */
-  versione?: number;
+  versione: number;
 }
 
 export type AgeaMappaturaProdottoFonte = typeof AgeaMappaturaProdottoFonte[keyof typeof AgeaMappaturaProdottoFonte];
@@ -6667,6 +6740,25 @@ modalita: AgeaImportModalita;
  * @pattern .*\.xlsx$
  */
 nomeFile: string;
+};
+
+export type ListAgeaImportazioneRigheParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+stato?: string;
+fondo?: string;
+tipo?: AgeaTipoMovimento;
+/**
+ * @maxLength 100
+ */
+q?: string;
 };
 
 export type ListLottiParams = {

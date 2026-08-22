@@ -8,5 +8,5 @@
 
 export interface AgeaImportConfermaInput {
   /** @minimum 1 */
-  versione?: number;
+  versione: number;
 }

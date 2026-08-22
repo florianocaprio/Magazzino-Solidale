@@ -6,10 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AgeaMappaturaProdottoUpdate {
-  /** @minimum 1 */
-  prodottoId: number;
-  attiva?: boolean;
+export interface AgeaVersioneInput {
   /** @minimum 1 */
   versione: number;
 }

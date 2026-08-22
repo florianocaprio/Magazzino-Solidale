@@ -27,6 +27,9 @@ import type {
   AccessoEmporioStatoUpdate,
   AccessoEmporioUpdate,
   ActionResult,
+  AgeaCorrezioneDataInput,
+  AgeaCorrezioneLottoInput,
+  AgeaDescrizioneDaMappare,
   AgeaImportConfermaInput,
   AgeaImportConfermaResult,
   AgeaImportPartita,
@@ -36,6 +39,7 @@ import type {
   AgeaMappaturaProdotto,
   AgeaMappaturaProdottoInput,
   AgeaMappaturaProdottoUpdate,
+  AgeaVersioneInput,
   Alert,
   AllocazioneMezziReport,
   AnalyzeAgeaImportazioneParams,
@@ -173,6 +177,7 @@ import type {
   InterventoUpdate,
   ListAccessiEmporioParams,
   ListAccessiMensaParams,
+  ListAgeaImportazioneRigheParams,
   ListApprovvigionamentiParams,
   ListBeneficiariParams,
   ListBolleParams,
@@ -1955,17 +1960,26 @@ export function useGetAgeaImportazione<TData = Awaited<ReturnType<typeof getAgea
 
 
 
-export const getListAgeaImportazioneRigheUrl = (id: number,) => {
+export const getListAgeaImportazioneRigheUrl = (id: number,
+    params?: ListAgeaImportazioneRigheParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/agea/importazioni/${id}/righe`
+  return stringifiedParams.length > 0 ? `/api/agea/importazioni/${id}/righe?${stringifiedParams}` : `/api/agea/importazioni/${id}/righe`
 }
 
-export const listAgeaImportazioneRighe = async (id: number, options?: RequestInit): Promise<AgeaImportRighePage> => {
+export const listAgeaImportazioneRighe = async (id: number,
+    params?: ListAgeaImportazioneRigheParams, options?: RequestInit): Promise<AgeaImportRighePage> => {
 
-  return customFetch<AgeaImportRighePage>(getListAgeaImportazioneRigheUrl(id),
+  return customFetch<AgeaImportRighePage>(getListAgeaImportazioneRigheUrl(id,params),
   {
     ...options,
     method: 'GET'
@@ -1978,23 +1992,25 @@ export const listAgeaImportazioneRighe = async (id: number, options?: RequestIni
 
 
 
-export const getListAgeaImportazioneRigheQueryKey = (id: number,) => {
+export const getListAgeaImportazioneRigheQueryKey = (id: number,
+    params?: ListAgeaImportazioneRigheParams,) => {
     return [
-    `/api/agea/importazioni/${id}/righe`
+    `/api/agea/importazioni/${id}/righe`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListAgeaImportazioneRigheQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAgeaImportazioneRigheQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<unknown>>(id: number,
+    params?: ListAgeaImportazioneRigheParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListAgeaImportazioneRigheQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getListAgeaImportazioneRigheQueryKey(id,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>> = ({ signal }) => listAgeaImportazioneRighe(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>> = ({ signal }) => listAgeaImportazioneRighe(id,params, { signal, ...requestOptions });
 
 
 
@@ -2009,11 +2025,12 @@ export type ListAgeaImportazioneRigheQueryError = ErrorType<unknown>
 
 
 export function useListAgeaImportazioneRighe<TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<unknown>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ id: number,
+    params?: ListAgeaImportazioneRigheParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListAgeaImportazioneRigheQueryOptions(id,options)
+  const queryOptions = getListAgeaImportazioneRigheQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2097,6 +2114,219 @@ export function useListAgeaImportazionePartite<TData = Awaited<ReturnType<typeof
 
 
 
+export const getListAgeaImportazioneDescrizioniDaMappareUrl = (id: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/descrizioni-da-mappare`
+}
+
+/**
+ * @summary Elenca le descrizioni esterne distinte dell'intera importazione
+ */
+export const listAgeaImportazioneDescrizioniDaMappare = async (id: number, options?: RequestInit): Promise<AgeaDescrizioneDaMappare[]> => {
+
+  return customFetch<AgeaDescrizioneDaMappare[]>(getListAgeaImportazioneDescrizioniDaMappareUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAgeaImportazioneDescrizioniDaMappareQueryKey = (id: number,) => {
+    return [
+    `/api/agea/importazioni/${id}/descrizioni-da-mappare`
+    ] as const;
+    }
+
+
+export const getListAgeaImportazioneDescrizioniDaMappareQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgeaImportazioneDescrizioniDaMappareQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>> = ({ signal }) => listAgeaImportazioneDescrizioniDaMappare(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAgeaImportazioneDescrizioniDaMappareQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>>
+export type ListAgeaImportazioneDescrizioniDaMappareQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Elenca le descrizioni esterne distinte dell'intera importazione
+ */
+
+export function useListAgeaImportazioneDescrizioniDaMappare<TData = Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAgeaImportazioneDescrizioniDaMappareQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateAgeaImportazioneRigaDataCaricoUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/righe/${rigaId}/data-carico`
+}
+
+export const updateAgeaImportazioneRigaDataCarico = async (id: number,
+    rigaId: number,
+    ageaCorrezioneDataInput: AgeaCorrezioneDataInput, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getUpdateAgeaImportazioneRigaDataCaricoUrl(id,rigaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaCorrezioneDataInput,)
+  }
+);}
+
+
+
+
+export const getUpdateAgeaImportazioneRigaDataCaricoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext> => {
+
+const mutationKey = ['updateAgeaImportazioneRigaDataCarico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, {id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  updateAgeaImportazioneRigaDataCarico(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAgeaImportazioneRigaDataCaricoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>>
+    export type UpdateAgeaImportazioneRigaDataCaricoMutationBody = BodyType<AgeaCorrezioneDataInput>
+    export type UpdateAgeaImportazioneRigaDataCaricoMutationError = ErrorType<void>
+
+    export const useUpdateAgeaImportazioneRigaDataCarico = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAgeaImportazioneRigaDataCaricoMutationOptions(options));
+    }
+
+export const getUpdateAgeaImportazioneRigaLottoUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/righe/${rigaId}/lotto`
+}
+
+export const updateAgeaImportazioneRigaLotto = async (id: number,
+    rigaId: number,
+    ageaCorrezioneLottoInput: AgeaCorrezioneLottoInput, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getUpdateAgeaImportazioneRigaLottoUrl(id,rigaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaCorrezioneLottoInput,)
+  }
+);}
+
+
+
+
+export const getUpdateAgeaImportazioneRigaLottoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext> => {
+
+const mutationKey = ['updateAgeaImportazioneRigaLotto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, {id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  updateAgeaImportazioneRigaLotto(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAgeaImportazioneRigaLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>>
+    export type UpdateAgeaImportazioneRigaLottoMutationBody = BodyType<AgeaCorrezioneLottoInput>
+    export type UpdateAgeaImportazioneRigaLottoMutationError = ErrorType<void>
+
+    export const useUpdateAgeaImportazioneRigaLotto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAgeaImportazioneRigaLottoMutationOptions(options));
+    }
+
 export const getUpdateAgeaImportazionePartitaUrl = (id: number,
     partitaId: number,) => {
 
@@ -2108,9 +2338,9 @@ export const getUpdateAgeaImportazionePartitaUrl = (id: number,
 
 export const updateAgeaImportazionePartita = async (id: number,
     partitaId: number,
-    ageaImportPartitaUpdate: AgeaImportPartitaUpdate, options?: RequestInit): Promise<AgeaImportPartita> => {
+    ageaImportPartitaUpdate: AgeaImportPartitaUpdate, options?: RequestInit): Promise<AgeaImportazione> => {
 
-  return customFetch<AgeaImportPartita>(getUpdateAgeaImportazionePartitaUrl(id,partitaId),
+  return customFetch<AgeaImportazione>(getUpdateAgeaImportazionePartitaUrl(id,partitaId),
   {
     ...options,
     method: 'PATCH',
@@ -2173,14 +2403,16 @@ export const getRecalculateAgeaImportazioneUrl = (id: number,) => {
   return `/api/agea/importazioni/${id}/ricalcola`
 }
 
-export const recalculateAgeaImportazione = async (id: number, options?: RequestInit): Promise<AgeaImportazione> => {
+export const recalculateAgeaImportazione = async (id: number,
+    ageaVersioneInput: AgeaVersioneInput, options?: RequestInit): Promise<AgeaImportazione> => {
 
   return customFetch<AgeaImportazione>(getRecalculateAgeaImportazioneUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaVersioneInput,)
   }
 );}
 
@@ -2188,8 +2420,8 @@ export const recalculateAgeaImportazione = async (id: number, options?: RequestI
 
 
 export const getRecalculateAgeaImportazioneMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext> => {
 
 const mutationKey = ['recalculateAgeaImportazione'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -2201,10 +2433,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, {id: number;data: BodyType<AgeaVersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  recalculateAgeaImportazione(id,requestOptions)
+          return  recalculateAgeaImportazione(id,data,requestOptions)
         }
 
 
@@ -2215,15 +2447,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type RecalculateAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof recalculateAgeaImportazione>>>
-
+    export type RecalculateAgeaImportazioneMutationBody = BodyType<AgeaVersioneInput>
     export type RecalculateAgeaImportazioneMutationError = ErrorType<unknown>
 
     export const useRecalculateAgeaImportazione = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof recalculateAgeaImportazione>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<AgeaVersioneInput>},
         TContext
       > => {
       return useMutation(getRecalculateAgeaImportazioneMutationOptions(options));
@@ -2238,7 +2470,7 @@ export const getConfirmAgeaImportazioneUrl = (id: number,) => {
 }
 
 export const confirmAgeaImportazione = async (id: number,
-    ageaImportConfermaInput?: AgeaImportConfermaInput, options?: RequestInit): Promise<AgeaImportConfermaResult> => {
+    ageaImportConfermaInput: AgeaImportConfermaInput, options?: RequestInit): Promise<AgeaImportConfermaResult> => {
 
   return customFetch<AgeaImportConfermaResult>(getConfirmAgeaImportazioneUrl(id),
   {
@@ -2254,8 +2486,8 @@ export const confirmAgeaImportazione = async (id: number,
 
 
 export const getConfirmAgeaImportazioneMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data?: BodyType<AgeaImportConfermaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data?: BodyType<AgeaImportConfermaInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext> => {
 
 const mutationKey = ['confirmAgeaImportazione'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -2267,7 +2499,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmAgeaImportazione>>, {id: number;data?: BodyType<AgeaImportConfermaInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmAgeaImportazione>>, {id: number;data: BodyType<AgeaImportConfermaInput>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  confirmAgeaImportazione(id,data,requestOptions)
@@ -2281,15 +2513,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ConfirmAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof confirmAgeaImportazione>>>
-    export type ConfirmAgeaImportazioneMutationBody = BodyType<AgeaImportConfermaInput> | undefined
+    export type ConfirmAgeaImportazioneMutationBody = BodyType<AgeaImportConfermaInput>
     export type ConfirmAgeaImportazioneMutationError = ErrorType<void>
 
     export const useConfirmAgeaImportazione = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data?: BodyType<AgeaImportConfermaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof confirmAgeaImportazione>>,
         TError,
-        {id: number;data?: BodyType<AgeaImportConfermaInput>},
+        {id: number;data: BodyType<AgeaImportConfermaInput>},
         TContext
       > => {
       return useMutation(getConfirmAgeaImportazioneMutationOptions(options));
@@ -2303,14 +2535,16 @@ export const getCancelAgeaImportazioneUrl = (id: number,) => {
   return `/api/agea/importazioni/${id}/annulla`
 }
 
-export const cancelAgeaImportazione = async (id: number, options?: RequestInit): Promise<AgeaImportazione> => {
+export const cancelAgeaImportazione = async (id: number,
+    ageaVersioneInput: AgeaVersioneInput, options?: RequestInit): Promise<AgeaImportazione> => {
 
   return customFetch<AgeaImportazione>(getCancelAgeaImportazioneUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaVersioneInput,)
   }
 );}
 
@@ -2318,8 +2552,8 @@ export const cancelAgeaImportazione = async (id: number, options?: RequestInit):
 
 
 export const getCancelAgeaImportazioneMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext> => {
 
 const mutationKey = ['cancelAgeaImportazione'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -2331,10 +2565,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelAgeaImportazione>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelAgeaImportazione>>, {id: number;data: BodyType<AgeaVersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  cancelAgeaImportazione(id,requestOptions)
+          return  cancelAgeaImportazione(id,data,requestOptions)
         }
 
 
@@ -2345,15 +2579,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CancelAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof cancelAgeaImportazione>>>
-
+    export type CancelAgeaImportazioneMutationBody = BodyType<AgeaVersioneInput>
     export type CancelAgeaImportazioneMutationError = ErrorType<unknown>
 
     export const useCancelAgeaImportazione = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof cancelAgeaImportazione>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<AgeaVersioneInput>},
         TContext
       > => {
       return useMutation(getCancelAgeaImportazioneMutationOptions(options));

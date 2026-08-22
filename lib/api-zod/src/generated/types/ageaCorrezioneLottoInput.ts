@@ -6,9 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AgeaImportPartitaUpdate {
-  /** @nullable */
-  dataScadenza: Date | null;
+export interface AgeaCorrezioneLottoInput {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     * @nullable
+     */
+  valore: string | null;
   /**
      * @minLength 3
      * @maxLength 500

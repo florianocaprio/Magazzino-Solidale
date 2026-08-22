@@ -485,6 +485,24 @@ paths:
       tags: [agea]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
+          }
+        - { name: stato, in: query, schema: { type: string } }
+        - { name: fondo, in: query, schema: { type: string } }
+        - {
+            name: tipo,
+            in: query,
+            schema: { $ref: "#/components/schemas/AgeaTipoMovimento" },
+          }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
       responses:
         "200":
           description: Preview paginata delle righe
@@ -507,6 +525,62 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/AgeaImportPartita" }
 
+  /agea/importazioni/{id}/descrizioni-da-mappare:
+    get:
+      operationId: listAgeaImportazioneDescrizioniDaMappare
+      tags: [agea]
+      summary: Elenca le descrizioni esterne distinte dell'intera importazione
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Descrizioni, frequenze, fondi e mapping corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeaDescrizioneDaMappare" }
+
+  /agea/importazioni/{id}/righe/{rigaId}/data-carico:
+    patch:
+      operationId: updateAgeaImportazioneRigaDataCarico
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: rigaId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaCorrezioneDataInput" }
+      responses:
+        "200":
+          description: Importazione con preview ricostruita
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "409": { description: Versione stale o importazione immutabile }
+
+  /agea/importazioni/{id}/righe/{rigaId}/lotto:
+    patch:
+      operationId: updateAgeaImportazioneRigaLotto
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: rigaId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaCorrezioneLottoInput" }
+      responses:
+        "200":
+          description: Importazione con preview ricostruita
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "409": { description: Versione stale o importazione immutabile }
+
   /agea/importazioni/{id}/partite/{partitaId}:
     patch:
       operationId: updateAgeaImportazionePartita
@@ -526,10 +600,10 @@ paths:
             schema: { $ref: "#/components/schemas/AgeaImportPartitaUpdate" }
       responses:
         "200":
-          description: Scadenza di staging aggiornata
+          description: Scadenza aggiornata e preview ricostruita
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/AgeaImportPartita" }
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
 
   /agea/importazioni/{id}/ricalcola:
     post:
@@ -537,6 +611,11 @@ paths:
       tags: [agea]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaVersioneInput" }
       responses:
         "200":
           description: Preflight ricalcolato
@@ -551,6 +630,7 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
+        required: true
         content:
           application/json:
             schema: { $ref: "#/components/schemas/AgeaImportConfermaInput" }
@@ -568,6 +648,11 @@ paths:
       tags: [agea]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaVersioneInput" }
       responses:
         "200":
           description: Importazione non confermata annullata
@@ -8014,9 +8099,13 @@ components:
         prodottoRaw: { type: string }
         prodottoNormalizzato: { type: string }
         lottoRaw: { type: [string, "null"] }
+        lottoEffettivoRaw: { type: [string, "null"] }
+        lottoEffettivoNormalizzato: { type: [string, "null"] }
         numeroDocumentoRaw: { type: [string, "null"] }
         dataDocumento: { type: [string, "null"], format: date }
+        dataCaricoMagazzinoRaw: { type: [string, "null"] }
         dataCaricoRisolta: { type: [string, "null"], format: date }
+        dataCaricoEffettiva: { type: [string, "null"], format: date }
         dataCaricoFonte: { type: [string, "null"] }
         movimentoKgLt:
           {
@@ -8055,12 +8144,14 @@ components:
         identityKey: { type: string }
         contentHash: { type: string, pattern: "^[0-9a-f]{64}$" }
         prodottoIdSnapshot: { type: [integer, "null"] }
+        mappingVersioneSnapshot: { type: [integer, "null"] }
         descrizioneProdottoSnapshot: { type: [string, "null"] }
         unitaMisuraSnapshot: { type: [string, "null"] }
         statoRiga: { type: string }
         blocking: { type: boolean }
         errorCodesJson: { type: array, items: { type: string } }
         warningCodesJson: { type: array, items: { type: string } }
+        correzioneMotivazione: { type: [string, "null"] }
 
     AgeaImportRighePage:
       type: object
@@ -8096,6 +8187,7 @@ components:
         fondoOrigine: { type: string }
         prodottoId: { type: [integer, "null"] }
         prodottoNormalizzato: { type: string }
+        descrizioniEsterneJson: { type: array, items: { type: string } }
         lottoRaw: { type: [string, "null"] }
         existingLottoId: { type: [integer, "null"] }
         saldoFinalePezzi:
@@ -8138,6 +8230,26 @@ components:
         errorCodesJson: { type: array, items: { type: string } }
         warningCodesJson: { type: array, items: { type: string } }
 
+    AgeaDescrizioneDaMappare:
+      type: object
+      required:
+        [
+          chiaveDescrizioneNormalizzata,
+          descrizioneRawRappresentativa,
+          numeroRighe,
+          fondi,
+        ]
+      properties:
+        chiaveDescrizioneNormalizzata: { type: string }
+        descrizioneRawRappresentativa: { type: string }
+        numeroRighe: { type: integer, minimum: 1 }
+        fondi: { type: array, items: { type: string } }
+        mappingId: { type: [integer, "null"] }
+        mappingAttiva: { type: [boolean, "null"] }
+        mappingVersione: { type: [integer, "null"] }
+        prodottoId: { type: [integer, "null"] }
+        prodottoNome: { type: [string, "null"] }
+
     AgeaMappaturaProdottoInput:
       type: object
       required: [descrizioneEsterna, prodottoId]
@@ -8147,18 +8259,45 @@ components:
 
     AgeaMappaturaProdottoUpdate:
       type: object
-      required: [prodottoId]
+      required: [prodottoId, versione]
       properties:
         prodottoId: { type: integer, minimum: 1 }
         attiva: { type: boolean }
+        versione: { type: integer, minimum: 1 }
 
     AgeaImportPartitaUpdate:
       type: object
+      required: [dataScadenza, motivazione, versione]
       properties:
         dataScadenza: { type: [string, "null"], format: date }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        versione: { type: integer, minimum: 1 }
+
+    AgeaVersioneInput:
+      type: object
+      required: [versione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+
+    AgeaCorrezioneDataInput:
+      type: object
+      required: [valore, motivazione, versione]
+      properties:
+        valore: { type: [string, "null"], format: date }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        versione: { type: integer, minimum: 1 }
+
+    AgeaCorrezioneLottoInput:
+      type: object
+      required: [valore, motivazione, versione]
+      properties:
+        valore: { type: [string, "null"], minLength: 1, maxLength: 255 }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        versione: { type: integer, minimum: 1 }
 
     AgeaImportConfermaInput:
       type: object
+      required: [versione]
       properties:
         versione: { type: integer, minimum: 1 }
 
