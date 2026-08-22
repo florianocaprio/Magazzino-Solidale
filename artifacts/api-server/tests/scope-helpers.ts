@@ -1,4 +1,8 @@
-import express, { type Express, type RequestHandler, type Router } from "express";
+import express, {
+  type Express,
+  type RequestHandler,
+  type Router,
+} from "express";
 import {
   db,
   centriAscoltoTable,
@@ -30,6 +34,9 @@ import {
   zoneUdsTable,
   auditConfigurazioniTable,
   ruoliVolontariTable,
+  carichiMagazzinoRigheTable,
+  carichiMagazzinoTable,
+  operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 
@@ -203,7 +210,10 @@ export function newScope(): SeedScope {
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
-export async function createCentro(scope: SeedScope, nome = `Centro ${rnd()}`): Promise<number> {
+export async function createCentro(
+  scope: SeedScope,
+  nome = `Centro ${rnd()}`,
+): Promise<number> {
   const [c] = await db
     .insert(centriAscoltoTable)
     .values({ nome })
@@ -233,7 +243,12 @@ export async function createMagazzino(
 ): Promise<number> {
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `MAG-${rnd()}`, nome: `Mag ${rnd()}`, centroAscoltoId: centroId, areaOperativaId: opts.areaOperativaId ?? null })
+    .values({
+      codice: `MAG-${rnd()}`,
+      nome: `Mag ${rnd()}`,
+      centroAscoltoId: centroId,
+      areaOperativaId: opts.areaOperativaId ?? null,
+    })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
   return m.id;
@@ -248,7 +263,12 @@ export async function createMagazzinoRec(
   const nome = `Mag ${rnd()}`;
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `MAG-${rnd()}`, nome, centroAscoltoId: centroId, areaOperativaId: opts.areaOperativaId ?? null })
+    .values({
+      codice: `MAG-${rnd()}`,
+      nome,
+      centroAscoltoId: centroId,
+      areaOperativaId: opts.areaOperativaId ?? null,
+    })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
   return { id: m.id, nome };
@@ -257,7 +277,12 @@ export async function createMagazzinoRec(
 export async function createBeneficiario(
   scope: SeedScope,
   centroId: number | null,
-  opts: { uds?: boolean; areaOperativaId?: number | null; zonaUdsId?: number | null; sesso?: string } = {},
+  opts: {
+    uds?: boolean;
+    areaOperativaId?: number | null;
+    zonaUdsId?: number | null;
+    sesso?: string;
+  } = {},
 ): Promise<number> {
   const [b] = await db
     .insert(beneficiariTable)
@@ -285,7 +310,10 @@ export async function createAreaOperativa(scope: SeedScope): Promise<number> {
   return c.id;
 }
 
-export async function createZona(scope: SeedScope, areaOperativaId: number): Promise<{ id: number; nome: string }> {
+export async function createZona(
+  scope: SeedScope,
+  areaOperativaId: number,
+): Promise<{ id: number; nome: string }> {
   const nome = `Zona ${rnd()}`;
   const [z] = await db
     .insert(zoneUdsTable)
@@ -347,7 +375,10 @@ export async function createRuoloVolontario(
 ): Promise<number> {
   const [ruolo] = await db
     .insert(ruoliVolontariTable)
-    .values({ nome: opts.nome ?? `Ruolo volontario ${rnd()}`, attivo: opts.attivo ?? true })
+    .values({
+      nome: opts.nome ?? `Ruolo volontario ${rnd()}`,
+      attivo: opts.attivo ?? true,
+    })
     .returning({ id: ruoliVolontariTable.id });
   scope.ruoloVolontarioIds.push(ruolo.id);
   return ruolo.id;
@@ -379,7 +410,11 @@ export async function createRuolo(
 ): Promise<number> {
   const [r] = await db
     .insert(ruoliTable)
-    .values({ nome: `Ruolo ${rnd()}`, aree: [], isAdmin: opts.isAdmin ?? false })
+    .values({
+      nome: `Ruolo ${rnd()}`,
+      aree: [],
+      isAdmin: opts.isAdmin ?? false,
+    })
     .returning({ id: ruoliTable.id });
   scope.ruoloIds.push(r.id);
   return r.id;
@@ -424,8 +459,9 @@ export async function createLotto(
       dataScadenza: opts.dataScadenza ?? null,
       quantitaCaricata: opts.quantita.toFixed(2),
       quantitaResidua: opts.quantita.toFixed(2),
-      fornitoreId: opts.fsePlus ? null : opts.fornitoreId ?? null,
+      fornitoreId: opts.fsePlus ? null : (opts.fornitoreId ?? null),
       fsePlus: opts.fsePlus ?? false,
+      fondoOrigine: opts.fsePlus ? "FSE_PLUS" : "NESSUN_FONDO",
     })
     .returning({ id: lottiTable.id });
   scope.lottoIds.push(l.id);
@@ -551,7 +587,13 @@ export async function insertTurno(
 /** Inserts a bolla riga (cleaned up with its bolla in {@link cleanup}). */
 export async function insertBollaRiga(
   scope: SeedScope,
-  opts: { bollaId: number; prodottoId: number; lottoId?: number | null; quantita: number; unitaMisura?: string },
+  opts: {
+    bollaId: number;
+    prodottoId: number;
+    lottoId?: number | null;
+    quantita: number;
+    unitaMisura?: string;
+  },
 ): Promise<number> {
   void scope;
   const [r] = await db
@@ -662,46 +704,100 @@ export async function insertMovimento(
 /** Deletes every row created under this scope, in FK-safe (child→parent) order. */
 export async function cleanup(scope: SeedScope): Promise<void> {
   if (scope.magazzinoIds.length > 0) {
-    await db.delete(movimentiTable).where(inArray(movimentiTable.magazzinoId, scope.magazzinoIds));
+    await db
+      .delete(movimentiTable)
+      .where(inArray(movimentiTable.magazzinoId, scope.magazzinoIds));
+    await db
+      .delete(carichiMagazzinoRigheTable)
+      .where(
+        inArray(
+          carichiMagazzinoRigheTable.lottoId,
+          db
+            .select({ id: lottiTable.id })
+            .from(lottiTable)
+            .where(inArray(lottiTable.magazzinoId, scope.magazzinoIds)),
+        ),
+      );
+    await db
+      .delete(carichiMagazzinoTable)
+      .where(inArray(carichiMagazzinoTable.magazzinoId, scope.magazzinoIds));
+    await db
+      .delete(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        inArray(
+          operazioniDistribuzioneMagazzinoTable.magazzinoId,
+          scope.magazzinoIds,
+        ),
+      );
   }
   if (scope.trasferimentoIds.length > 0) {
     await db
       .delete(trasferimentoRigheTable)
-      .where(inArray(trasferimentoRigheTable.trasferimentoId, scope.trasferimentoIds));
+      .where(
+        inArray(
+          trasferimentoRigheTable.trasferimentoId,
+          scope.trasferimentoIds,
+        ),
+      );
     await db
       .delete(trasferimentiTable)
       .where(inArray(trasferimentiTable.id, scope.trasferimentoIds));
   }
   if (scope.interventoIds.length > 0) {
-    await db.delete(interventiTable).where(inArray(interventiTable.id, scope.interventoIds));
+    await db
+      .delete(interventiTable)
+      .where(inArray(interventiTable.id, scope.interventoIds));
   }
   if (scope.turnoIds.length > 0) {
-    await db.delete(turniConsegneTable).where(inArray(turniConsegneTable.turnoId, scope.turnoIds));
-    await db.delete(turniVolontariTable).where(inArray(turniVolontariTable.turnoId, scope.turnoIds));
+    await db
+      .delete(turniConsegneTable)
+      .where(inArray(turniConsegneTable.turnoId, scope.turnoIds));
+    await db
+      .delete(turniVolontariTable)
+      .where(inArray(turniVolontariTable.turnoId, scope.turnoIds));
     await db.delete(turniTable).where(inArray(turniTable.id, scope.turnoIds));
   }
   if (scope.prenotazioneIds.length > 0) {
-    await db.delete(prenotazioniMagazzinoTable).where(inArray(prenotazioniMagazzinoTable.id, scope.prenotazioneIds));
+    await db
+      .delete(prenotazioniMagazzinoTable)
+      .where(inArray(prenotazioniMagazzinoTable.id, scope.prenotazioneIds));
   }
   if (scope.bollaIds.length > 0) {
-    await db.delete(interventiTable).where(inArray(interventiTable.bollaId, scope.bollaIds));
-    await db.delete(prenotazioniMagazzinoTable).where(inArray(prenotazioniMagazzinoTable.bollaId, scope.bollaIds));
-    await db.delete(bollaRigheTable).where(inArray(bollaRigheTable.bollaId, scope.bollaIds));
+    await db
+      .delete(interventiTable)
+      .where(inArray(interventiTable.bollaId, scope.bollaIds));
+    await db
+      .delete(prenotazioniMagazzinoTable)
+      .where(inArray(prenotazioniMagazzinoTable.bollaId, scope.bollaIds));
+    await db
+      .delete(bollaRigheTable)
+      .where(inArray(bollaRigheTable.bollaId, scope.bollaIds));
     await db.delete(bolleTable).where(inArray(bolleTable.id, scope.bollaIds));
   }
   if (scope.consegnaIds.length > 0) {
-    await db.delete(turniConsegneTable).where(inArray(turniConsegneTable.consegnaId, scope.consegnaIds));
-    await db.delete(consegneTable).where(inArray(consegneTable.id, scope.consegnaIds));
+    await db
+      .delete(turniConsegneTable)
+      .where(inArray(turniConsegneTable.consegnaId, scope.consegnaIds));
+    await db
+      .delete(consegneTable)
+      .where(inArray(consegneTable.id, scope.consegnaIds));
   }
   if (scope.scaricoIds.length > 0) {
-    await db.delete(scaricoRigheTable).where(inArray(scaricoRigheTable.scaricoId, scope.scaricoIds));
-    await db.delete(scarichiTable).where(inArray(scarichiTable.id, scope.scaricoIds));
+    await db
+      .delete(scaricoRigheTable)
+      .where(inArray(scaricoRigheTable.scaricoId, scope.scaricoIds));
+    await db
+      .delete(scarichiTable)
+      .where(inArray(scarichiTable.id, scope.scaricoIds));
   }
   if (scope.approvvigionamentoIds.length > 0) {
     await db
       .delete(approvvigionamentoRigheTable)
       .where(
-        inArray(approvvigionamentoRigheTable.approvvigionamentoId, scope.approvvigionamentoIds),
+        inArray(
+          approvvigionamentoRigheTable.approvvigionamentoId,
+          scope.approvvigionamentoIds,
+        ),
       );
     await db
       .delete(approvvigionamentiTable)
@@ -714,40 +810,62 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(mezziTable).where(inArray(mezziTable.id, scope.mezzoIds));
   }
   if (scope.prodottoIds.length > 0) {
-    await db.delete(prodottiTable).where(inArray(prodottiTable.id, scope.prodottoIds));
+    await db
+      .delete(prodottiTable)
+      .where(inArray(prodottiTable.id, scope.prodottoIds));
   }
   if (scope.fornitoreIds.length > 0) {
-    await db.delete(fornitoriTable).where(inArray(fornitoriTable.id, scope.fornitoreIds));
+    await db
+      .delete(fornitoriTable)
+      .where(inArray(fornitoriTable.id, scope.fornitoreIds));
   }
   if (scope.volontarioIds.length > 0) {
-    await db.delete(volontariTable).where(inArray(volontariTable.id, scope.volontarioIds));
+    await db
+      .delete(volontariTable)
+      .where(inArray(volontariTable.id, scope.volontarioIds));
   }
   if (scope.ruoloVolontarioIds.length > 0) {
-    await db.delete(ruoliVolontariTable).where(inArray(ruoliVolontariTable.id, scope.ruoloVolontarioIds));
+    await db
+      .delete(ruoliVolontariTable)
+      .where(inArray(ruoliVolontariTable.id, scope.ruoloVolontarioIds));
   }
   if (scope.beneficiarioIds.length > 0) {
-    await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, scope.beneficiarioIds));
+    await db
+      .delete(beneficiariTable)
+      .where(inArray(beneficiariTable.id, scope.beneficiarioIds));
   }
   if (scope.magazzinoIds.length > 0) {
-    await db.delete(magazziniTable).where(inArray(magazziniTable.id, scope.magazzinoIds));
+    await db
+      .delete(magazziniTable)
+      .where(inArray(magazziniTable.id, scope.magazzinoIds));
   }
   if (scope.utenteIds.length > 0) {
-    await db.delete(interventiTable).where(inArray(interventiTable.operatoreId, scope.utenteIds));
+    await db
+      .delete(interventiTable)
+      .where(inArray(interventiTable.operatoreId, scope.utenteIds));
     await db
       .delete(auditConfigurazioniTable)
       .where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
-    await db.delete(utentiTable).where(inArray(utentiTable.id, scope.utenteIds));
+    await db
+      .delete(utentiTable)
+      .where(inArray(utentiTable.id, scope.utenteIds));
   }
   if (scope.ruoloIds.length > 0) {
     await db.delete(ruoliTable).where(inArray(ruoliTable.id, scope.ruoloIds));
   }
   if (scope.centroIds.length > 0) {
-    await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, scope.centroIds));
+    await db
+      .delete(centriAscoltoTable)
+      .where(inArray(centriAscoltoTable.id, scope.centroIds));
   }
   if (scope.zonaIds.length > 0) {
-    await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, scope.zonaIds));
+    await db
+      .delete(zoneUdsTable)
+      .where(inArray(zoneUdsTable.id, scope.zonaIds));
   }
   if (scope.areaOperativaIds.length > 0) {
-    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, scope.areaOperativaIds));
+    await db
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, scope.areaOperativaIds));
   }
 }

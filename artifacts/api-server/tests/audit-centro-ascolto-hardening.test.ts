@@ -17,6 +17,7 @@ import {
   scarichiTable,
   scaricoRigheTable,
   utentiTable,
+  operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import { eq, inArray, sum } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
@@ -69,7 +70,8 @@ function app(
   server.use((req, _res, next) => {
     (req as unknown as { user: Record<string, unknown> }).user = {
       id: operatoreId,
-      areaOperativaId: options.areaOperativaId === undefined ? areaA : options.areaOperativaId,
+      areaOperativaId:
+        options.areaOperativaId === undefined ? areaA : options.areaOperativaId,
       centroAscoltoId:
         options.centroId === undefined ? centroA : options.centroId,
       zonaUdsId: null,
@@ -224,8 +226,16 @@ beforeAll(async () => {
   const magazzini = await db
     .insert(magazziniTable)
     .values([
-      { codice: `CDA-MA-${rnd()}`, nome: "Magazzino A", areaOperativaId: areaA },
-      { codice: `CDA-MB-${rnd()}`, nome: "Magazzino B", areaOperativaId: areaB },
+      {
+        codice: `CDA-MA-${rnd()}`,
+        nome: "Magazzino A",
+        areaOperativaId: areaA,
+      },
+      {
+        codice: `CDA-MB-${rnd()}`,
+        nome: "Magazzino B",
+        areaOperativaId: areaB,
+      },
       {
         codice: `CDA-MCB-${rnd()}`,
         nome: "Magazzino Centro B",
@@ -288,6 +298,15 @@ afterAll(async () => {
       .delete(interventiTable)
       .where(inArray(interventiTable.id, ids.interventi));
   }
+  if (ids.magazzini.length)
+    await db
+      .delete(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        inArray(
+          operazioniDistribuzioneMagazzinoTable.magazzinoId,
+          ids.magazzini,
+        ),
+      );
   if (ids.lotti.length)
     await db.delete(lottiTable).where(inArray(lottiTable.id, ids.lotti));
   await db.delete(prodottiTable).where(inArray(prodottiTable.id, ids.prodotti));
@@ -301,7 +320,9 @@ afterAll(async () => {
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));
-  await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, ids.areaOperativa));
+  await db
+    .delete(areeOperativeTable)
+    .where(inArray(areeOperativeTable.id, ids.areaOperativa));
   await pool.end();
 });
 

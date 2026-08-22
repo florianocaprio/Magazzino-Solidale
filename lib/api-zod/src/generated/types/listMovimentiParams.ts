@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { FondoOrigine } from './fondoOrigine';
 
 export type ListMovimentiParams = {
 tipo?: string;
@@ -13,6 +14,9 @@ prodottoId?: number;
 centroAscoltoId?: number;
 da?: string;
 a?: string;
+fondoOrigine?: FondoOrigine;
+naturaContabile?: string;
+canaleOperativo?: string;
 /**
  * @minimum 1
  */

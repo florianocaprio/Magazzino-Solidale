@@ -29,6 +29,7 @@ import {
   trasferimentiTable,
   utentiTable,
   zoneUdsTable,
+  operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import mensaRouter, {
   activeEligibility,
@@ -88,7 +89,10 @@ function makeApp(
   app.use((req, _res, next) => {
     req.user = {
       id: fixture.userId,
-      areaOperativaId: "areaOperativaId" in scope ? (scope.areaOperativaId ?? null) : fixture.romeId,
+      areaOperativaId:
+        "areaOperativaId" in scope
+          ? (scope.areaOperativaId ?? null)
+          : fixture.romeId,
       centroAscoltoId:
         "centroAscoltoId" in scope ? (scope.centroAscoltoId ?? null) : null,
       zonaUdsId: "zonaUdsId" in scope ? (scope.zonaUdsId ?? null) : null,
@@ -358,6 +362,15 @@ afterEach(async () => {
     await db
       .delete(beneficiariTable)
       .where(inArray(beneficiariTable.id, ids.beneficiaries.splice(0)));
+  if (ids.warehouses.length)
+    await db
+      .delete(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        inArray(
+          operazioniDistribuzioneMagazzinoTable.magazzinoId,
+          ids.warehouses,
+        ),
+      );
   if (ids.lots.length)
     await db
       .delete(lottiTable)
@@ -646,9 +659,9 @@ describe("Modulo Mensa", () => {
       },
     ];
 
-    const areaOperativaScoped = await request(makeApp(fixture, ["mensa.view"])).get(
-      path,
-    );
+    const areaOperativaScoped = await request(
+      makeApp(fixture, ["mensa.view"]),
+    ).get(path);
     expect(areaOperativaScoped.status).toBe(200);
     expect(
       areaOperativaScoped.body.map(
@@ -871,7 +884,9 @@ describe("Modulo Mensa", () => {
   it("non usa le chiavi idempotenti come capability di lettura cross-Area", async () => {
     const fixture = await createFixture();
     const appRome = makeApp(fixture);
-    const appMilan = makeApp(fixture, undefined, { areaOperativaId: fixture.milanId });
+    const appMilan = makeApp(fixture, undefined, {
+      areaOperativaId: fixture.milanId,
+    });
 
     const accessKey = `scope-access-${rnd()}`;
     const access = await verify(appRome, fixture, {
@@ -1247,7 +1262,10 @@ describe("Modulo Mensa", () => {
     const fixture = await createFixture();
     const [centroMilano] = await db
       .insert(centriAscoltoTable)
-      .values({ nome: `Centro Milano ${rnd()}`, areaOperativaId: fixture.milanId })
+      .values({
+        nome: `Centro Milano ${rnd()}`,
+        areaOperativaId: fixture.milanId,
+      })
       .returning({ id: centriAscoltoTable.id });
     ids.centers.push(centroMilano.id);
     const before = await db
@@ -1631,7 +1649,10 @@ describe("Modulo Mensa", () => {
     const fixture = await createFixture();
     const [center] = await db
       .insert(centriAscoltoTable)
-      .values({ nome: `Centro tessere ${rnd()}`, areaOperativaId: fixture.romeId })
+      .values({
+        nome: `Centro tessere ${rnd()}`,
+        areaOperativaId: fixture.romeId,
+      })
       .returning({ id: centriAscoltoTable.id });
     ids.centers.push(center.id);
     const [beneficiary] = await db
@@ -2867,7 +2888,7 @@ describe("Modulo Mensa", () => {
       .update(beneficiariTable)
       .set({
         sesso: "F",
-        dataNascita: "2008-08-21",
+        dataNascita: "2009-08-21",
         fasciaEtaPresunta: null,
         statoAnagrafica: "provvisoria",
       })

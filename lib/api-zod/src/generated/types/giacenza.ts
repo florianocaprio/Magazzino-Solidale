@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { QuantitaContabile } from './quantitaContabile';
 
 export interface Giacenza {
   prodottoId: number;
@@ -15,12 +16,16 @@ export interface Giacenza {
   magazzinoId: number;
   magazzinoNome: string;
   quantitaTotale: number;
+  quantitaTotalePrecisa?: QuantitaContabile;
   /** Quantità fisicamente presente, inclusi i lotti scaduti. */
   giacenzaFisica: number;
   /** Quantità fisicamente presente su lotti scaduti alla data civile Europe/Rome. */
   giacenzaScaduta: number;
   /** Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome. */
   giacenzaDistribuibile: number;
+  giacenzaFisicaPrecisa?: QuantitaContabile;
+  giacenzaScadutaPrecisa?: QuantitaContabile;
+  giacenzaDistribuibilePrecisa?: QuantitaContabile;
   impegnato: number;
   disponibileReale: number;
   scortaMinima: number;

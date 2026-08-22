@@ -11,6 +11,7 @@ tags:
   - name: dashboard
   - name: magazzini
   - name: prodotti
+  - name: carichi
   - name: lotti
   - name: movimenti
   - name: giacenze
@@ -130,6 +131,12 @@ paths:
             schema:
               $ref: "#/components/schemas/MagazzinoInput"
       responses:
+        "200":
+          description: Replay idempotente di un carico già contabilizzato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoMagazzinoDettaglio"
         "201":
           description: Created
           content:
@@ -322,6 +329,87 @@ paths:
               schema:
                 $ref: "#/components/schemas/Fornitore"
 
+  # ─── CARICHI MAGAZZINO 2.0 ───────────────────────────────────────────────────
+  /carichi:
+    get:
+      operationId: listCarichi
+      tags: [carichi]
+      parameters:
+        - name: magazzinoId
+          in: query
+          schema: { type: integer }
+        - name: origineCarico
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrigineCarico"
+        - name: da
+          in: query
+          schema: { type: string, format: date }
+        - name: a
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Elenco delle testate di carico visibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaricoMagazzino"
+    post:
+      operationId: createCarico
+      tags: [carichi]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoMagazzinoInput"
+      responses:
+        "201":
+          description: Carico multi-riga contabilizzato atomicamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoMagazzinoDettaglio"
+
+  /carichi/{id}:
+    get:
+      operationId: getCarico
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Carico con righe e Partite collegate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoMagazzinoDettaglio"
+
+  /carichi/{id}/righe:
+    get:
+      operationId: listCaricoRighe
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Righe del carico
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaricoMagazzinoRiga"
+
   # ─── LOTTI ───────────────────────────────────────────────────────────────────
   /lotti:
     get:
@@ -340,6 +428,14 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: fondoOrigine
+          in: query
+          schema:
+            $ref: "#/components/schemas/FondoOrigine"
+        - name: provenienza
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrigineCarico"
       responses:
         "200":
           description: List of lots
@@ -461,6 +557,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: fondoOrigine
+          in: query
+          schema:
+            $ref: "#/components/schemas/FondoOrigine"
+        - name: naturaContabile
+          in: query
+          schema: { type: string }
+        - name: canaleOperativo
+          in: query
+          schema: { type: string }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -495,6 +601,23 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: prodottoId
+          in: query
+          schema: { type: integer }
+        - name: fondoOrigine
+          in: query
+          schema:
+            $ref: "#/components/schemas/FondoOrigine"
+        - name: provenienza
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrigineCarico"
+        - name: scadenzaDa
+          in: query
+          schema: { type: string, format: date }
+        - name: scadenzaA
+          in: query
+          schema: { type: string, format: date }
       responses:
         "200":
           description: Stock levels
@@ -7511,6 +7634,161 @@ components:
         fornitoreId:
           type: integer
 
+    # ── Contabilità Magazzino 2.0 ─────────────────────────────────────────
+    FondoOrigine:
+      type: string
+      enum:
+        [FSE_PLUS, FONDO_NAZIONALE, FONDO_NAZIONALE_COFINANZIATO, NESSUN_FONDO]
+
+    OrigineCarico:
+      type: string
+      enum:
+        [
+          AGEA_SIFEAD,
+          RACCOLTA_ALIMENTARE,
+          DONAZIONE,
+          ACQUISTO,
+          FORNITORE,
+          RETTIFICA_INVENTARIO,
+          SALDO_INIZIALE,
+          ALTRO,
+          LEGACY,
+        ]
+
+    QuantitaContabile:
+      type: string
+      pattern: "^[0-9]+(?:\\.[0-9]{1,6})?$"
+      example: "53.593120"
+      description: Decimale esatto; non convertire in number JavaScript per i calcoli.
+
+    CaricoMagazzino:
+      type: object
+      properties:
+        id: { type: integer }
+        magazzinoId: { type: integer }
+        magazzinoNome: { type: [string, "null"] }
+        origineCarico:
+          $ref: "#/components/schemas/OrigineCarico"
+        numeroDocumento: { type: [string, "null"] }
+        dataDocumento: { type: [string, "null"], format: date }
+        dataCarico: { type: string, format: date }
+        descrizione: { type: [string, "null"] }
+        fornitoreId: { type: [integer, "null"] }
+        fornitoreNome: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+        idempotencyKey: { type: [string, "null"] }
+        stato: { type: string, enum: [confermato, stornato] }
+        creatoDa: { type: integer }
+        numeroRighe: { type: integer }
+        dataCreazione: { type: string, format: date-time }
+      required:
+        [id, magazzinoId, origineCarico, dataCarico, stato, creatoDa, dataCreazione]
+
+    CaricoMagazzinoRiga:
+      type: object
+      properties:
+        id: { type: integer }
+        caricoMagazzinoId: { type: integer }
+        numeroRiga: { type: integer }
+        prodottoId: { type: integer }
+        prodottoNome: { type: [string, "null"] }
+        lottoId: { type: integer }
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        quantitaOperativa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        unitaMisuraOperativa: { type: string }
+        quantitaPezzi:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        quantitaKgLt:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        fattoreKgLtPezzo: { type: [string, "null"] }
+        codiceLottoOriginale: { type: [string, "null"] }
+        codiceLotto: { type: [string, "null"] }
+        codiceLottoNormalizzato: { type: [string, "null"] }
+        dataScadenza: { type: [string, "null"], format: date }
+        descrizioneEsterna: { type: [string, "null"] }
+        riferimentoEsterno: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+        partitaQuantitaCaricata:
+          $ref: "#/components/schemas/QuantitaContabile"
+        partitaQuantitaResidua:
+          $ref: "#/components/schemas/QuantitaContabile"
+        dataCreazione: { type: string, format: date-time }
+      required:
+        [
+          id,
+          caricoMagazzinoId,
+          numeroRiga,
+          prodottoId,
+          lottoId,
+          fondoOrigine,
+          quantitaOperativa,
+          unitaMisuraOperativa,
+          dataCreazione,
+        ]
+
+    CaricoMagazzinoDettaglio:
+      allOf:
+        - $ref: "#/components/schemas/CaricoMagazzino"
+        - type: object
+          properties:
+            replay: { type: boolean }
+            righe:
+              type: array
+              items:
+                $ref: "#/components/schemas/CaricoMagazzinoRiga"
+          required: [replay, righe]
+
+    CaricoMagazzinoRigaInput:
+      type: object
+      properties:
+        prodottoId: { type: integer, minimum: 1 }
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        quantitaOperativa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        unitaMisuraOperativa: { type: string }
+        quantitaPezzi:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        quantitaKgLt:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        fattoreKgLtPezzo: { type: [string, "null"] }
+        codiceLotto: { type: [string, "null"] }
+        dataScadenza: { type: [string, "null"], format: date }
+        descrizioneEsterna: { type: [string, "null"] }
+        riferimentoEsterno: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+      required: [prodottoId, fondoOrigine, quantitaOperativa]
+
+    CaricoMagazzinoInput:
+      type: object
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+        origineCarico:
+          $ref: "#/components/schemas/OrigineCarico"
+        numeroDocumento: { type: [string, "null"] }
+        dataDocumento: { type: [string, "null"], format: date }
+        dataCarico: { type: string, format: date }
+        descrizione: { type: [string, "null"] }
+        fornitoreId: { type: [integer, "null"] }
+        note: { type: [string, "null"] }
+        idempotencyKey: { type: [string, "null"], maxLength: 120 }
+        righe:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CaricoMagazzinoRigaInput"
+      required: [magazzinoId, origineCarico, dataCarico, righe]
+
     # ── Lotti ─────────────────────────────────────────────────────────────
     Lotto:
       type: object
@@ -7531,6 +7809,10 @@ components:
           type: number
         quantitaResidua:
           type: number
+        quantitaCaricataPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        quantitaResiduaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         magazzinoId:
           type: integer
         magazzinoNome:
@@ -7541,6 +7823,15 @@ components:
           type: ["string", "null"]
         fsePlus:
           type: boolean
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        codiceLottoNormalizzato:
+          type: [string, "null"]
+        dataUltimoCarico:
+          type: [string, "null"]
+          format: date
+        fattoreKgLtPezzo:
+          type: [string, "null"]
         documentoCarico:
           type: ["string", "null"]
         note:
@@ -7554,8 +7845,11 @@ components:
           dataCarico,
           quantitaCaricata,
           quantitaResidua,
+          quantitaCaricataPrecisa,
+          quantitaResiduaPrecisa,
           magazzinoId,
           fsePlus,
+          fondoOrigine,
           dataCreazione,
         ]
 
@@ -7639,6 +7933,12 @@ components:
           type: ["integer", "null"]
         quantita:
           type: number
+        quantitaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        quantitaPezzi:
+          type: [string, "null"]
+        quantitaKgLt:
+          type: [string, "null"]
         unitaMisura:
           type: string
         fornitoreId:
@@ -7647,6 +7947,24 @@ components:
           type: ["integer", "null"]
         movimentoOrigineId:
           type: ["integer", "null"]
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        naturaContabile:
+          type: string
+        dominioOrigine:
+          type: [string, "null"]
+        entitaOrigineTipo:
+          type: [string, "null"]
+        entitaOrigineId:
+          type: [integer, "null"]
+        rigaOrigineId:
+          type: [integer, "null"]
+        caricoMagazzinoRigaId:
+          type: [integer, "null"]
+        operazioneDistribuzioneId:
+          type: [integer, "null"]
+        canaleOperativo:
+          type: [string, "null"]
         operatoreId:
           type: ["integer", "null"]
         documentoRiferimento:
@@ -7664,7 +7982,10 @@ components:
           magazzinoId,
           prodottoId,
           quantita,
+          quantitaPrecisa,
           unitaMisura,
+          fondoOrigine,
+          naturaContabile,
           dataCreazione,
         ]
 
@@ -7726,6 +8047,8 @@ components:
           type: string
         quantitaTotale:
           type: number
+        quantitaTotalePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         giacenzaFisica:
           type: number
           description: Quantità fisicamente presente, inclusi i lotti scaduti.
@@ -7735,6 +8058,12 @@ components:
         giacenzaDistribuibile:
           type: number
           description: Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome.
+        giacenzaFisicaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        giacenzaScadutaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        giacenzaDistribuibilePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         impegnato:
           type: number
         disponibileReale:
@@ -8042,7 +8371,15 @@ components:
           type: string
         causale:
           type: string
-          enum: [deteriorata, rubata, scaduta, altro]
+          enum: [deteriorata, rubata, scaduta, consegna_beneficiario, altro]
+        beneficiarioId:
+          type: integer
+          minimum: 1
+          description: Obbligatorio con causale consegna_beneficiario.
+        canaleOperativo:
+          type: string
+          enum: [PACCHI, RITIRO_SEDE, DOMICILIARE]
+          description: Obbligatorio con causale consegna_beneficiario.
         causaleAltro:
           type: string
         note:

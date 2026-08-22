@@ -5,6 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { FondoOrigine } from './fondoOrigine';
+import type { QuantitaContabile } from './quantitaContabile';
 
 export interface Movimento {
   id: number;
@@ -20,6 +22,11 @@ export interface Movimento {
   /** @nullable */
   lottoId?: number | null;
   quantita: number;
+  quantitaPrecisa: QuantitaContabile;
+  /** @nullable */
+  quantitaPezzi?: string | null;
+  /** @nullable */
+  quantitaKgLt?: string | null;
   unitaMisura: string;
   /** @nullable */
   fornitoreId?: number | null;
@@ -27,6 +34,22 @@ export interface Movimento {
   beneficiarioId?: number | null;
   /** @nullable */
   movimentoOrigineId?: number | null;
+  fondoOrigine: FondoOrigine;
+  naturaContabile: string;
+  /** @nullable */
+  dominioOrigine?: string | null;
+  /** @nullable */
+  entitaOrigineTipo?: string | null;
+  /** @nullable */
+  entitaOrigineId?: number | null;
+  /** @nullable */
+  rigaOrigineId?: number | null;
+  /** @nullable */
+  caricoMagazzinoRigaId?: number | null;
+  /** @nullable */
+  operazioneDistribuzioneId?: number | null;
+  /** @nullable */
+  canaleOperativo?: string | null;
   /** @nullable */
   operatoreId?: number | null;
   /** @nullable */

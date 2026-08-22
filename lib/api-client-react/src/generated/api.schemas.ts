@@ -699,6 +699,157 @@ export interface ProdottoUpdate {
   fornitoreId?: number;
 }
 
+export type FondoOrigine = typeof FondoOrigine[keyof typeof FondoOrigine];
+
+
+export const FondoOrigine = {
+  FSE_PLUS: 'FSE_PLUS',
+  FONDO_NAZIONALE: 'FONDO_NAZIONALE',
+  FONDO_NAZIONALE_COFINANZIATO: 'FONDO_NAZIONALE_COFINANZIATO',
+  NESSUN_FONDO: 'NESSUN_FONDO',
+} as const;
+
+export type OrigineCarico = typeof OrigineCarico[keyof typeof OrigineCarico];
+
+
+export const OrigineCarico = {
+  AGEA_SIFEAD: 'AGEA_SIFEAD',
+  RACCOLTA_ALIMENTARE: 'RACCOLTA_ALIMENTARE',
+  DONAZIONE: 'DONAZIONE',
+  ACQUISTO: 'ACQUISTO',
+  FORNITORE: 'FORNITORE',
+  RETTIFICA_INVENTARIO: 'RETTIFICA_INVENTARIO',
+  SALDO_INIZIALE: 'SALDO_INIZIALE',
+  ALTRO: 'ALTRO',
+  LEGACY: 'LEGACY',
+} as const;
+
+/**
+ * Decimale esatto; non convertire in number JavaScript per i calcoli.
+ * @pattern ^[0-9]+(?:\.[0-9]{1,6})?$
+ */
+export type QuantitaContabile = string;
+
+export type CaricoMagazzinoStato = typeof CaricoMagazzinoStato[keyof typeof CaricoMagazzinoStato];
+
+
+export const CaricoMagazzinoStato = {
+  confermato: 'confermato',
+  stornato: 'stornato',
+} as const;
+
+export interface CaricoMagazzino {
+  id: number;
+  magazzinoId: number;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  origineCarico: OrigineCarico;
+  /** @nullable */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  dataCarico: string;
+  /** @nullable */
+  descrizione?: string | null;
+  /** @nullable */
+  fornitoreId?: number | null;
+  /** @nullable */
+  fornitoreNome?: string | null;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  idempotencyKey?: string | null;
+  stato: CaricoMagazzinoStato;
+  creatoDa: number;
+  numeroRighe?: number;
+  dataCreazione: string;
+}
+
+export interface CaricoMagazzinoRiga {
+  id: number;
+  caricoMagazzinoId: number;
+  numeroRiga: number;
+  prodottoId: number;
+  /** @nullable */
+  prodottoNome?: string | null;
+  lottoId: number;
+  fondoOrigine: FondoOrigine;
+  quantitaOperativa: QuantitaContabile;
+  unitaMisuraOperativa: string;
+  quantitaPezzi?: QuantitaContabile | null;
+  quantitaKgLt?: QuantitaContabile | null;
+  /** @nullable */
+  fattoreKgLtPezzo?: string | null;
+  /** @nullable */
+  codiceLottoOriginale?: string | null;
+  /** @nullable */
+  codiceLotto?: string | null;
+  /** @nullable */
+  codiceLottoNormalizzato?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  descrizioneEsterna?: string | null;
+  /** @nullable */
+  riferimentoEsterno?: string | null;
+  /** @nullable */
+  note?: string | null;
+  partitaQuantitaCaricata?: QuantitaContabile;
+  partitaQuantitaResidua?: QuantitaContabile;
+  dataCreazione: string;
+}
+
+export type CaricoMagazzinoDettaglio = CaricoMagazzino & {
+  replay: boolean;
+  righe: CaricoMagazzinoRiga[];
+};
+
+export interface CaricoMagazzinoRigaInput {
+  /** @minimum 1 */
+  prodottoId: number;
+  fondoOrigine: FondoOrigine;
+  quantitaOperativa: QuantitaContabile;
+  unitaMisuraOperativa?: string;
+  quantitaPezzi?: QuantitaContabile | null;
+  quantitaKgLt?: QuantitaContabile | null;
+  /** @nullable */
+  fattoreKgLtPezzo?: string | null;
+  /** @nullable */
+  codiceLotto?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  descrizioneEsterna?: string | null;
+  /** @nullable */
+  riferimentoEsterno?: string | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CaricoMagazzinoInput {
+  /** @minimum 1 */
+  magazzinoId: number;
+  origineCarico: OrigineCarico;
+  /** @nullable */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  dataCarico: string;
+  /** @nullable */
+  descrizione?: string | null;
+  /** @nullable */
+  fornitoreId?: number | null;
+  /** @nullable */
+  note?: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  idempotencyKey?: string | null;
+  /** @minItems 1 */
+  righe: CaricoMagazzinoRigaInput[];
+}
+
 export interface Lotto {
   id: number;
   prodottoId: number;
@@ -711,6 +862,8 @@ export interface Lotto {
   dataCarico: string;
   quantitaCaricata: number;
   quantitaResidua: number;
+  quantitaCaricataPrecisa: QuantitaContabile;
+  quantitaResiduaPrecisa: QuantitaContabile;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
@@ -719,6 +872,13 @@ export interface Lotto {
   /** @nullable */
   fornitoreNome?: string | null;
   fsePlus: boolean;
+  fondoOrigine: FondoOrigine;
+  /** @nullable */
+  codiceLottoNormalizzato?: string | null;
+  /** @nullable */
+  dataUltimoCarico?: string | null;
+  /** @nullable */
+  fattoreKgLtPezzo?: string | null;
   /** @nullable */
   documentoCarico?: string | null;
   /** @nullable */
@@ -788,6 +948,11 @@ export interface Movimento {
   /** @nullable */
   lottoId?: number | null;
   quantita: number;
+  quantitaPrecisa: QuantitaContabile;
+  /** @nullable */
+  quantitaPezzi?: string | null;
+  /** @nullable */
+  quantitaKgLt?: string | null;
   unitaMisura: string;
   /** @nullable */
   fornitoreId?: number | null;
@@ -795,6 +960,22 @@ export interface Movimento {
   beneficiarioId?: number | null;
   /** @nullable */
   movimentoOrigineId?: number | null;
+  fondoOrigine: FondoOrigine;
+  naturaContabile: string;
+  /** @nullable */
+  dominioOrigine?: string | null;
+  /** @nullable */
+  entitaOrigineTipo?: string | null;
+  /** @nullable */
+  entitaOrigineId?: number | null;
+  /** @nullable */
+  rigaOrigineId?: number | null;
+  /** @nullable */
+  caricoMagazzinoRigaId?: number | null;
+  /** @nullable */
+  operazioneDistribuzioneId?: number | null;
+  /** @nullable */
+  canaleOperativo?: string | null;
   /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
@@ -828,12 +1009,16 @@ export interface Giacenza {
   magazzinoId: number;
   magazzinoNome: string;
   quantitaTotale: number;
+  quantitaTotalePrecisa?: QuantitaContabile;
   /** Quantità fisicamente presente, inclusi i lotti scaduti. */
   giacenzaFisica: number;
   /** Quantità fisicamente presente su lotti scaduti alla data civile Europe/Rome. */
   giacenzaScaduta: number;
   /** Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome. */
   giacenzaDistribuibile: number;
+  giacenzaFisicaPrecisa?: QuantitaContabile;
+  giacenzaScadutaPrecisa?: QuantitaContabile;
+  giacenzaDistribuibilePrecisa?: QuantitaContabile;
   impegnato: number;
   disponibileReale: number;
   scortaMinima: number;
@@ -1015,7 +1200,20 @@ export const ScaricoInputCausale = {
   deteriorata: 'deteriorata',
   rubata: 'rubata',
   scaduta: 'scaduta',
+  consegna_beneficiario: 'consegna_beneficiario',
   altro: 'altro',
+} as const;
+
+/**
+ * Obbligatorio con causale consegna_beneficiario.
+ */
+export type ScaricoInputCanaleOperativo = typeof ScaricoInputCanaleOperativo[keyof typeof ScaricoInputCanaleOperativo];
+
+
+export const ScaricoInputCanaleOperativo = {
+  PACCHI: 'PACCHI',
+  RITIRO_SEDE: 'RITIRO_SEDE',
+  DOMICILIARE: 'DOMICILIARE',
 } as const;
 
 export interface ScaricoRigaInput {
@@ -1031,6 +1229,13 @@ export interface ScaricoInput {
   centroAscoltoId?: number | null;
   dataScarico: string;
   causale: ScaricoInputCausale;
+  /**
+     * Obbligatorio con causale consegna_beneficiario.
+     * @minimum 1
+     */
+  beneficiarioId?: number;
+  /** Obbligatorio con causale consegna_beneficiario. */
+  canaleOperativo?: ScaricoInputCanaleOperativo;
   causaleAltro?: string;
   note?: string;
   righe: ScaricoRigaInput[];
@@ -6204,10 +6409,19 @@ tipo?: string;
 search?: string;
 };
 
+export type ListCarichiParams = {
+magazzinoId?: number;
+origineCarico?: OrigineCarico;
+da?: string;
+a?: string;
+};
+
 export type ListLottiParams = {
 prodottoId?: number;
 magazzinoId?: number;
 inScadenza?: boolean;
+fondoOrigine?: FondoOrigine;
+provenienza?: OrigineCarico;
 };
 
 export type ListMovimentiParams = {
@@ -6217,6 +6431,9 @@ prodottoId?: number;
 centroAscoltoId?: number;
 da?: string;
 a?: string;
+fondoOrigine?: FondoOrigine;
+naturaContabile?: string;
+canaleOperativo?: string;
 /**
  * @minimum 1
  */
@@ -6232,6 +6449,11 @@ export type ListGiacenzeParams = {
 magazzinoId?: number;
 sottoscortaOnly?: boolean;
 fsePlusOnly?: boolean;
+prodottoId?: number;
+fondoOrigine?: FondoOrigine;
+provenienza?: OrigineCarico;
+scadenzaDa?: string;
+scadenzaA?: string;
 };
 
 export type GetPreparazioneConsegneParams = {

@@ -52,6 +52,11 @@ import {
   isLottoDistribuibile,
   lottoDistribuibileCondition,
 } from "./lottoPolicy";
+import { InventoryDecimal } from "./inventoryDecimal";
+import {
+  ensureDistributionOperation,
+  markDistributionOperationReversed,
+} from "./distributionLedger";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 
@@ -209,7 +214,7 @@ function generateCodiceScarico(dataOperativa: string): string {
 async function activeReservationsForLotto(
   tx: Tx,
   lottoId: number,
-): Promise<number> {
+): Promise<InventoryDecimal> {
   const [row] = await tx
     .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
     .from(prenotazioniMagazzinoTable)
@@ -219,7 +224,7 @@ async function activeReservationsForLotto(
         eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
       ),
     );
-  return parseDbNumber(row?.totale);
+  return InventoryDecimal.parse(row?.totale ?? "0");
 }
 
 export async function quantitaNettaMensileProdotto(
@@ -375,9 +380,10 @@ async function scaricaRigaEmporio(
     dataMovimento: string;
     dataOperativa: string;
     operatoreId: number | null;
+    operazioneDistribuzioneId: number;
   },
 ) {
-  let remaining = parseDbNumber(opts.riga.quantita);
+  let remaining = InventoryDecimal.parse(opts.riga.quantita);
   const unitaMisura = opts.riga.unitaMisura ?? opts.prodotto.unitaMisura;
   const lotti = await tx
     .select()
@@ -397,7 +403,7 @@ async function scaricaRigaEmporio(
     );
 
   for (const lotto of lotti) {
-    if (remaining <= 0) break;
+    if (!remaining.isPositive()) break;
     await tx.execute(
       sql`SELECT id FROM ${lottiTable} WHERE ${lottiTable.id} = ${lotto.id} FOR UPDATE`,
     );
@@ -408,17 +414,18 @@ async function scaricaRigaEmporio(
     if (!locked) continue;
     if (!isLottoDistribuibile(locked.dataScadenza, opts.dataOperativa))
       continue;
-    const residua = parseDbNumber(locked.quantitaResidua);
-    const disponibile = Math.max(
-      0,
-      residua - (await activeReservationsForLotto(tx, locked.id)),
+    const residua = InventoryDecimal.parse(locked.quantitaResidua);
+    const netto = residua.subtract(
+      await activeReservationsForLotto(tx, locked.id),
     );
-    const take = Math.min(disponibile, remaining);
-    if (take <= 0) continue;
+    const disponibile = netto.isNegative() ? InventoryDecimal.zero() : netto;
+    const take = disponibile.min(remaining);
+    if (!take.isPositive()) continue;
+    const takeNumber = Number(take.toCanonical());
 
     await tx
       .update(lottiTable)
-      .set({ quantitaResidua: asDecimal(residua - take) })
+      .set({ quantitaResidua: residua.subtract(take).toDb() })
       .where(eq(lottiTable.id, locked.id));
 
     const [bollaRiga] = await tx
@@ -427,7 +434,7 @@ async function scaricaRigaEmporio(
         bollaId: opts.bollaId,
         prodottoId: opts.riga.prodottoId,
         lottoId: locked.id,
-        quantita: asDecimal(take),
+        quantita: take.toDb(),
         unitaMisura,
         note: `Spesa Emporio ${opts.numeroSpesa}`,
       })
@@ -436,7 +443,7 @@ async function scaricaRigaEmporio(
     await tx.insert(scaricoRigheTable).values({
       scaricoId: opts.scaricoId,
       prodottoId: opts.riga.prodottoId,
-      quantita: asDecimal(take),
+      quantita: take.toDb(),
       unitaMisura,
       note: `Bolla Emporio ${opts.numeroBolla}`,
     });
@@ -448,11 +455,23 @@ async function scaricaRigaEmporio(
       magazzinoId: opts.magazzinoId,
       prodottoId: opts.riga.prodottoId,
       lottoId: locked.id,
-      quantita: asDecimal(take),
+      quantita: take.toDb(),
+      quantitaPezzi: unitaMisura.toLowerCase() === "pz" ? take.toDb() : null,
+      quantitaKgLt: ["kg", "lt", "l"].includes(unitaMisura.toLowerCase())
+        ? take.toDb()
+        : null,
       unitaMisura,
       beneficiarioId: opts.beneficiarioId,
       bollaId: opts.bollaId,
       bollaRigaId: bollaRiga.id,
+      fondoOrigine: locked.fondoOrigine,
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+      dominioOrigine: "EMPORIO",
+      entitaOrigineTipo: "spesa_emporio",
+      entitaOrigineId: opts.spesaId,
+      rigaOrigineId: opts.riga.id,
+      operazioneDistribuzioneId: opts.operazioneDistribuzioneId,
+      canaleOperativo: "EMPORIO",
       operatoreId: opts.operatoreId,
       documentoRiferimento: opts.numeroBolla,
       note: `Scarico da Spesa Emporio ${opts.numeroSpesa}`,
@@ -465,18 +484,20 @@ async function scaricaRigaEmporio(
       lottoId: locked.id,
       codiceProdotto: opts.riga.codiceProdotto,
       descrizioneProdotto: opts.riga.descrizioneProdotto,
-      quantita: asDecimal(take),
+      quantita: take.toDb(),
       unitaMisura,
       creditoUnitario: opts.riga.creditoUnitario,
-      creditoTotale: asDecimal(parseDbNumber(opts.riga.creditoUnitario) * take),
+      creditoTotale: asDecimal(
+        parseDbNumber(opts.riga.creditoUnitario) * takeNumber,
+      ),
       scaricoId: opts.scaricoId,
       bollaRigaId: bollaRiga.id,
     });
 
-    remaining = round2(remaining - take);
+    remaining = remaining.subtract(take);
   }
 
-  if (remaining > 0) {
+  if (remaining.isPositive()) {
     throw new SpesaEmporioError(409, MSG_GIACENZA_INSUFFICIENTE);
   }
 }
@@ -628,6 +649,27 @@ export async function chiudiSessioneCassaEmporio(opts: {
       })
       .returning();
 
+    const operationActorId =
+      opts.operatoreId ??
+      sessione.operatoreUltimaModificaId ??
+      sessione.operatoreAperturaId;
+    if (operationActorId == null) {
+      throw new SpesaEmporioError(
+        409,
+        "Operatore Emporio non disponibile per l'audit contabile",
+      );
+    }
+    const operation = await ensureDistributionOperation(tx, {
+      magazzinoId: sessione.magazzinoEmporioId,
+      dataDistribuzione: dataDocumento,
+      canaleOperativo: "EMPORIO",
+      dominioOrigine: "EMPORIO",
+      entitaOrigineTipo: "spesa_emporio",
+      entitaOrigineId: spesa.id,
+      numeroDocumento: numeroSpesa,
+      creatoDa: operationActorId,
+    });
+
     for (const riga of righe) {
       const prodotto = productMap.get(riga.prodottoId);
       if (!prodotto) throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_TROVATO);
@@ -644,6 +686,7 @@ export async function chiudiSessioneCassaEmporio(opts: {
         dataMovimento: dataDocumento,
         dataOperativa: dataDocumento,
         operatoreId: opts.operatoreId,
+        operazioneDistribuzioneId: operation.id,
       });
     }
 
@@ -841,7 +884,10 @@ function baseSpeseQuery(conditions: SQL[] = []) {
       centriAscoltoTable,
       eq(speseEmporioTable.centroAscoltoId, centriAscoltoTable.id),
     )
-    .leftJoin(areeOperativeTable, eq(speseEmporioTable.areaOperativaId, areeOperativeTable.id))
+    .leftJoin(
+      areeOperativeTable,
+      eq(speseEmporioTable.areaOperativaId, areeOperativeTable.id),
+    )
     .leftJoin(
       magazziniTable,
       eq(speseEmporioTable.magazzinoEmporioId, magazziniTable.id),
@@ -897,7 +943,9 @@ export async function listSpeseEmporio(
       eq(speseEmporioTable.centroAscoltoId, params.centroAscoltoId),
     );
   if (params.areaOperativaId != null)
-    conditions.push(eq(speseEmporioTable.areaOperativaId, params.areaOperativaId));
+    conditions.push(
+      eq(speseEmporioTable.areaOperativaId, params.areaOperativaId),
+    );
   if (params.zonaUdsId != null)
     conditions.push(eq(beneficiariTable.zonaUdsId, params.zonaUdsId));
   const magazzinoFilter = magazzinoScopeFilter(
@@ -1186,6 +1234,7 @@ export async function stornaSpesaEmporio(
       .returning();
 
     const dataMovimento = dataOperativaEuropeRome();
+    const distributionOperationIds = new Set<number>();
     for (const [rowId, quantity] of requested) {
       const row = rowById.get(rowId)!;
       if (row.lottoId == null || row.bollaRigaId == null) {
@@ -1225,9 +1274,9 @@ export async function stornaSpesaEmporio(
       await tx
         .update(lottiTable)
         .set({
-          quantitaResidua: asDecimal(
-            parseDbNumber(lotto.quantitaResidua) + quantity,
-          ),
+          quantitaResidua: InventoryDecimal.parse(lotto.quantitaResidua)
+            .add(InventoryDecimal.parse(quantity))
+            .toDb(),
         })
         .where(eq(lottiTable.id, lotto.id));
       const [movement] = await tx
@@ -1239,16 +1288,31 @@ export async function stornaSpesaEmporio(
           magazzinoId: spesa.magazzinoEmporioId,
           prodottoId: row.prodottoId,
           lottoId: lotto.id,
-          quantita: asDecimal(quantity),
+          quantita: InventoryDecimal.parse(quantity).toDb(),
           unitaMisura,
           beneficiarioId: spesa.beneficiarioId,
           bollaId: spesa.bollaId,
           bollaRigaId: row.bollaRigaId,
+          quantitaPezzi: originalMovement.quantitaPezzi,
+          quantitaKgLt: originalMovement.quantitaKgLt,
+          fondoOrigine: originalMovement.fondoOrigine,
+          naturaContabile: "STORNO",
+          dominioOrigine: originalMovement.dominioOrigine,
+          entitaOrigineTipo: originalMovement.entitaOrigineTipo,
+          entitaOrigineId: originalMovement.entitaOrigineId,
+          rigaOrigineId: originalMovement.rigaOrigineId,
+          operazioneDistribuzioneId: originalMovement.operazioneDistribuzioneId,
+          canaleOperativo: originalMovement.canaleOperativo,
           operatoreId: opts.operatoreId,
           documentoRiferimento: `STORNO-${storno.id}`,
           note: `Storno compensativo Spesa Emporio ${spesa.numeroSpesa}: ${opts.motivo}`,
         })
         .returning();
+      if (originalMovement.operazioneDistribuzioneId != null) {
+        distributionOperationIds.add(
+          originalMovement.operazioneDistribuzioneId,
+        );
+      }
       await tx.insert(speseEmporioStorniRigheTable).values({
         stornoId: storno.id,
         spesaRigaId: row.id,
@@ -1301,6 +1365,11 @@ export async function stornaSpesaEmporio(
       return round2(residual - (requested.get(row.id) ?? 0)) === 0;
     });
     const statoSpesa = fullyReversed ? "stornata" : "stornata_parzialmente";
+    if (fullyReversed) {
+      for (const operationId of distributionOperationIds) {
+        await markDistributionOperationReversed(tx, operationId);
+      }
+    }
     await tx
       .update(speseEmporioTable)
       .set({ statoSpesa, updatedAt: now })
