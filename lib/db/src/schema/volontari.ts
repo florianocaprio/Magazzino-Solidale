@@ -2,6 +2,7 @@ import { pgTable, serial, varchar, text, boolean, timestamp, integer, uniqueInde
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { centriAscoltoTable } from "./centri";
+import { ruoliVolontariTable } from "./ruoliVolontari";
 
 export const volontariTable = pgTable(
   "volontari",
@@ -14,17 +15,28 @@ export const volontariTable = pgTable(
     telefono: varchar("telefono", { length: 20 }),
     email: varchar("email", { length: 120 }),
     ruolo: varchar("ruolo", { length: 40 }).notNull(),
+    ruoloVolontarioId: integer("ruolo_volontario_id").references(
+      () => ruoliVolontariTable.id,
+      { onDelete: "restrict" },
+    ),
     patente: boolean("patente").notNull().default(false),
     mezzoPersonale: boolean("mezzo_personale").notNull().default(false),
     maxConsegneTurno: integer("max_consegne_turno").notNull().default(5),
-    attivo: boolean("attivo").notNull().default(true),
-    statoApprovazione: varchar("stato_approvazione", { length: 20 }).notNull().default("approvato"),
+    attivo: boolean("attivo").notNull().default(false),
+    statoApprovazione: varchar("stato_approvazione", { length: 20 }).notNull().default("in_attesa"),
     note: text("note"),
+    versione: integer("versione").notNull().default(1),
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
+    dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
   },
   (table) => [uniqueIndex("volontari_matricola_unique").on(table.matricola)],
 );
 
-export const insertVolontarioSchema = createInsertSchema(volontariTable).omit({ id: true, dataCreazione: true });
+export const insertVolontarioSchema = createInsertSchema(volontariTable).omit({
+  id: true,
+  versione: true,
+  dataCreazione: true,
+  dataAggiornamento: true,
+});
 export type InsertVolontario = z.infer<typeof insertVolontarioSchema>;
 export type Volontario = typeof volontariTable.$inferSelect;

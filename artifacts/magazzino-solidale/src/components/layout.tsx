@@ -222,6 +222,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "sociale",
     area: "sociale",
     moduloCodice: "CENTRO_ASCOLTO",
+    permission: "logistica.turni.view",
   },
   {
     key: "scarichi",
@@ -349,7 +350,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "uds",
     area: "uds",
     moduloCodice: "UDS",
-    permission: "beneficiari.view",
+    permission: "uds.directory.view",
   },
   {
     key: "udsInterventi",
@@ -358,6 +359,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "uds",
     area: "uds",
     moduloCodice: "UDS",
+    permission: "uds.interventi.view",
   },
   {
     key: "udsReportGiornaliero",
@@ -366,6 +368,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "uds",
     area: "uds",
     moduloCodice: "UDS",
+    permission: "uds.reports.view",
   },
 
   {
@@ -375,6 +378,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodice: "VOLONTARI",
+    permission: "logistica.volontari.view",
   },
   {
     key: "mezzi",
@@ -383,6 +387,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodice: "MEZZI",
+    permission: "logistica.mezzi.view",
   },
   {
     key: "approvazioniLogistica",
@@ -391,6 +396,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "logistica",
     area: "logistica",
     moduloCodiciAny: ["VOLONTARI", "MEZZI"],
+    permission: "logistica.approvazioni.view",
   },
   {
     key: "fornitori",
@@ -480,6 +486,7 @@ export const NAV_ITEMS: NavItem[] = [
     area: "analisi",
     sourceAreas: ["uds"],
     moduloCodiciAll: ["REPORT", "UDS"],
+    permission: "uds.reports.view",
   },
   {
     key: "reportLogistica",
@@ -522,6 +529,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "amministrazione",
     area: "amministrazione",
     moduloCodice: "UDS",
+    permission: "uds.directory.view",
   },
   {
     key: "utenti",

@@ -31,7 +31,6 @@ export interface InterventoUpdate {
   esito?: string;
   prossimAzione?: string;
   note?: string;
-  noteUds?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;

@@ -62,7 +62,7 @@ describe("Report UDS — interventi-per-mese", () => {
 
     const areaOperativa = await createAreaOperativa(scope);
     const udsBen = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa });
-    await insertIntervento(scope, { beneficiarioId: udsBen }); // data 2026-06-01
+    await insertIntervento(scope, { beneficiarioId: udsBen, ambito: "uds", areaOperativaIdSnapshot: areaOperativa }); // data 2026-06-01
     // A non-UDS beneficiary intervention must NOT be counted.
     const plainBen = await createBeneficiario(scope, null, { uds: false, areaOperativaId: areaOperativa });
     await insertIntervento(scope, { beneficiarioId: plainBen });
@@ -87,7 +87,7 @@ describe("Report UDS — area operativa HARD scope", () => {
 
     // A UDS intervention belonging to area operativa B.
     const benB = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativaB });
-    await insertIntervento(scope, { beneficiarioId: benB });
+    await insertIntervento(scope, { beneficiarioId: benB, ambito: "uds", areaOperativaIdSnapshot: areaOperativaB });
 
     const afterA = monthTotal((await request(appAreaOperativa(areaOperativaA)).get(q)).body, "2026-06");
     const afterG = monthTotal((await request(appGlobal()).get(q)).body, "2026-06");
@@ -108,7 +108,7 @@ describe("Report UDS — interventi-per-tipo", () => {
 
     const areaOperativa = await createAreaOperativa(scope);
     const udsBen = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa });
-    await insertIntervento(scope, { beneficiarioId: udsBen });
+    await insertIntervento(scope, { beneficiarioId: udsBen, ambito: "uds", areaOperativaIdSnapshot: areaOperativa });
 
     const res = await request(appGlobal()).get(q);
     expect(res.status).toBe(200);
@@ -129,7 +129,12 @@ describe("Report UDS — interventi-per-zona", () => {
       areaOperativaId: areaOperativa,
       zonaUdsId: zona.id,
     });
-    await insertIntervento(scope, { beneficiarioId: udsBen });
+    await insertIntervento(scope, {
+      beneficiarioId: udsBen,
+      ambito: "uds",
+      areaOperativaIdSnapshot: areaOperativa,
+      zonaUdsIdSnapshot: zona.id,
+    });
 
     const res = await request(appGlobal()).get(q);
     expect(res.status).toBe(200);

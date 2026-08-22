@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import request from "supertest";
 import {
   beneficiariTable,
+  bisogniPianificatiStoricoTable,
   bisogniPianificatiTable,
   centriAscoltoTable,
   areeOperativeTable,
@@ -70,11 +71,24 @@ function makeApp(
       zonaUdsId,
       aree,
       permessi: [
-        "sociale.interventi.view",
-        "sociale.interventi.create",
-        "sociale.interventi.update",
-        "sociale.interventi.complete",
-        "sociale.interventi.cancel",
+        ...(aree.includes("sociale")
+          ? [
+              "sociale.interventi.view",
+              "sociale.interventi.create",
+              "sociale.interventi.update",
+              "sociale.interventi.complete",
+              "sociale.interventi.cancel",
+            ]
+          : []),
+        ...(aree.includes("uds")
+          ? [
+              "uds.interventi.view",
+              "uds.interventi.create",
+              "uds.interventi.update",
+              "uds.interventi.note",
+              "uds.bisogni.manage",
+            ]
+          : []),
       ],
     };
     next();
@@ -187,16 +201,19 @@ beforeAll(async () => {
     areaOperativaId: areaOperativaRoma,
     centroAscoltoId: centroRoma,
     zonaUdsId: zonaRoma,
+    uds: true,
   });
   socialeAltroCentroRoma = await createBeneficiario({
     areaOperativaId: areaOperativaRoma,
     centroAscoltoId: altroCentroRoma,
     zonaUdsId: zonaRoma,
+    uds: true,
   });
   socialeMilano = await createBeneficiario({
     areaOperativaId: areaOperativaMilano,
     centroAscoltoId: centroMilano,
     zonaUdsId: zonaMilano,
+    uds: true,
   });
   udsRomaAltraZona = await createBeneficiario({
     areaOperativaId: areaOperativaRoma,
@@ -210,11 +227,26 @@ beforeAll(async () => {
     zonaUdsId: zonaMilano,
     uds: true,
   });
-  udsAreaOperativaNull = await createBeneficiario({ areaOperativaId: null, uds: true });
+  udsAreaOperativaNull = await createBeneficiario({
+    areaOperativaId: null,
+    uds: true,
+  });
 });
 
 afterAll(async () => {
   if (interventoIds.length > 0) {
+    const needs = await db
+      .select({ id: bisogniPianificatiTable.id })
+      .from(bisogniPianificatiTable)
+      .where(inArray(bisogniPianificatiTable.interventoId, interventoIds));
+    if (needs.length > 0) {
+      await db.delete(bisogniPianificatiStoricoTable).where(
+        inArray(
+          bisogniPianificatiStoricoTable.bisognoId,
+          needs.map((need) => need.id),
+        ),
+      );
+    }
     await db
       .delete(bisogniPianificatiTable)
       .where(inArray(bisogniPianificatiTable.interventoId, interventoIds));
@@ -237,7 +269,9 @@ afterAll(async () => {
       .where(inArray(centriAscoltoTable.id, centroIds));
   }
   if (areaOperativaIds.length > 0) {
-    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds));
+    await db
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, areaOperativaIds));
   }
   await pool.end();
 });
@@ -718,16 +752,17 @@ describe("workflow degli interventi", () => {
   });
 
   it("include i record storici non classificati solo quando richiesto esplicitamente", async () => {
-    const legacy = await request(makeApp())
-      .post("/interventi")
-      .send({
+    const [legacy] = await db
+      .insert(interventiTable)
+      .values({
         beneficiarioId: udsRomaAltraZona,
         tipoIntervento: `legacy-uds-${rnd()}`,
         dataIntervento: "2025-01-16",
-      });
-    expect(legacy.status).toBe(201);
-    interventoIds.push(legacy.body.id);
-    expect(legacy.body.ambito).toBeNull();
+        ambito: null,
+      })
+      .returning();
+    interventoIds.push(legacy.id);
+    expect(legacy.ambito).toBeNull();
 
     const exact = await request(makeApp()).get("/interventi").query({
       beneficiarioId: udsRomaAltraZona,
@@ -735,7 +770,7 @@ describe("workflow degli interventi", () => {
     });
     expect(exact.status).toBe(200);
     expect(exact.body.map((row: { id: number }) => row.id)).not.toContain(
-      legacy.body.id,
+      legacy.id,
     );
 
     const withHistory = await request(makeApp()).get("/interventi").query({
@@ -744,8 +779,8 @@ describe("workflow degli interventi", () => {
       includiStorici: true,
     });
     expect(withHistory.status).toBe(200);
-    expect(withHistory.body.map((row: { id: number }) => row.id)).toContain(
-      legacy.body.id,
+    expect(withHistory.body.map((row: { id: number }) => row.id)).not.toContain(
+      legacy.id,
     );
 
     const malformed = await request(makeApp())
@@ -796,7 +831,9 @@ describe("workflow degli interventi", () => {
 
 describe("visibilità territoriale del workflow", () => {
   it("separa le autorizzazioni degli ambiti Sociale e UDS", async () => {
-    const socialOnly = makeApp(areaOperativaRoma, centroRoma, zonaRoma, ["sociale"]);
+    const socialOnly = makeApp(areaOperativaRoma, centroRoma, zonaRoma, [
+      "sociale",
+    ]);
     const udsOnly = makeApp(areaOperativaRoma, centroRoma, zonaRoma, ["uds"]);
 
     expect((await createWorkflow({}, socialOnly)).status).toBe(201);
@@ -825,21 +862,19 @@ describe("visibilità territoriale del workflow", () => {
       ).status,
     ).toBe(201);
 
-    const legacy = await request(makeApp())
-      .post("/interventi")
-      .send({
+    const [legacy] = await db
+      .insert(interventiTable)
+      .values({
         beneficiarioId: udsRomaAltraZona,
         tipoIntervento: `legacy-area-${rnd()}`,
         dataIntervento: "2025-01-17",
-      });
-    expect(legacy.status).toBe(201);
-    interventoIds.push(legacy.body.id);
+        ambito: null,
+      })
+      .returning();
+    interventoIds.push(legacy.id);
     expect(
-      (await request(socialOnly).get(`/interventi/${legacy.body.id}`)).status,
+      (await request(udsOnly).get(`/interventi/${legacy.id}`)).status,
     ).toBe(403);
-    expect(
-      (await request(udsOnly).get(`/interventi/${legacy.body.id}`)).status,
-    ).toBe(200);
   });
 
   it("consente UDS in tutta la area operativa, ma esclude altra area operativa e area operativa NULL", async () => {

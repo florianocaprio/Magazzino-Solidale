@@ -24,10 +24,12 @@ import {
   trasferimentoRigheTable,
   movimentiTable,
   turniTable,
+  turniConsegneTable,
   turniVolontariTable,
   areeOperativeTable,
   zoneUdsTable,
   auditConfigurazioniTable,
+  ruoliVolontariTable,
 } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 
@@ -88,6 +90,13 @@ export function makeScopedApp(
         "sociale.interventi.update",
         "sociale.interventi.complete",
         "sociale.interventi.cancel",
+        "uds.directory.view",
+        "uds.interventi.view",
+        "uds.interventi.create",
+        "uds.interventi.update",
+        "uds.interventi.note",
+        "uds.bisogni.manage",
+        "uds.reports.view",
         "magazzino.view",
         "magazzino.products.manage",
         "magazzino.stock.receive",
@@ -103,6 +112,16 @@ export function makeScopedApp(
         "approvvigionamenti.view",
         "approvvigionamenti.manage",
         "approvvigionamenti.receive",
+        "logistica.volontari.view",
+        "logistica.volontari.manage",
+        "logistica.volontari.export",
+        "logistica.mezzi.view",
+        "logistica.mezzi.manage",
+        "logistica.mezzi.export",
+        "logistica.turni.view",
+        "logistica.turni.manage",
+        "logistica.approvazioni.view",
+        "logistica.approvazioni.manage",
       ],
       isAdmin: user.isAdmin ?? false,
       isSuperAdmin: user.isSuperAdmin ?? false,
@@ -141,6 +160,7 @@ export interface SeedScope {
   volontarioIds: number[];
   mezzoIds: number[];
   ruoloIds: number[];
+  ruoloVolontarioIds: number[];
   utenteIds: number[];
   lottoIds: number[];
   scaricoIds: number[];
@@ -165,6 +185,7 @@ export function newScope(): SeedScope {
     volontarioIds: [],
     mezzoIds: [],
     ruoloIds: [],
+    ruoloVolontarioIds: [],
     utenteIds: [],
     lottoIds: [],
     scaricoIds: [],
@@ -307,10 +328,29 @@ export async function createVolontario(
 ): Promise<number> {
   const [v] = await db
     .insert(volontariTable)
-    .values({ nome: "Vol", cognome: rnd(), ruolo: "autista", centroAscoltoId: centroId })
+    .values({
+      nome: "Vol",
+      cognome: rnd(),
+      ruolo: "autista",
+      centroAscoltoId: centroId,
+      attivo: true,
+      statoApprovazione: "approvato",
+    })
     .returning({ id: volontariTable.id });
   scope.volontarioIds.push(v.id);
   return v.id;
+}
+
+export async function createRuoloVolontario(
+  scope: SeedScope,
+  opts: { nome?: string; attivo?: boolean } = {},
+): Promise<number> {
+  const [ruolo] = await db
+    .insert(ruoliVolontariTable)
+    .values({ nome: opts.nome ?? `Ruolo volontario ${rnd()}`, attivo: opts.attivo ?? true })
+    .returning({ id: ruoliVolontariTable.id });
+  scope.ruoloVolontarioIds.push(ruolo.id);
+  return ruolo.id;
 }
 
 export async function createMezzo(
@@ -325,6 +365,8 @@ export async function createMezzo(
       proprieta: "centro",
       centroAscoltoId: opts.centroId ?? null,
       volontarioId: opts.volontarioId ?? null,
+      stato: "disponibile",
+      statoApprovazione: "approvato",
     })
     .returning({ id: mezziTable.id });
   scope.mezzoIds.push(m.id);
@@ -484,15 +526,22 @@ export async function insertBolla(
 
 export async function insertTurno(
   scope: SeedScope,
-  opts: { centroAscoltoId: number; data?: string; fascia?: string; mezzoId?: number | null },
+  opts: {
+    centroAscoltoId: number;
+    data?: string;
+    fascia?: string;
+    mezzoId?: number | null;
+    stato?: "pianificato" | "confermato" | "completato" | "annullato";
+  },
 ): Promise<number> {
   const [t] = await db
     .insert(turniTable)
     .values({
       centroAscoltoId: opts.centroAscoltoId,
       data: opts.data ?? "2026-06-01",
-      fascia: opts.fascia ?? "mattina",
+      fascia: opts.fascia ?? "09-13",
       mezzoId: opts.mezzoId ?? null,
+      ...(opts.stato ? { stato: opts.stato } : {}),
     })
     .returning({ id: turniTable.id });
   scope.turnoIds.push(t.id);
@@ -548,7 +597,14 @@ export async function insertPrenotazioneMagazzino(
 
 export async function insertIntervento(
   scope: SeedScope,
-  opts: { beneficiarioId: number; dataIntervento?: string; tipoIntervento?: string },
+  opts: {
+    beneficiarioId: number;
+    dataIntervento?: string;
+    tipoIntervento?: string;
+    ambito?: "sociale" | "uds" | null;
+    areaOperativaIdSnapshot?: number | null;
+    zonaUdsIdSnapshot?: number | null;
+  },
 ): Promise<number> {
   const [i] = await db
     .insert(interventiTable)
@@ -556,6 +612,9 @@ export async function insertIntervento(
       beneficiarioId: opts.beneficiarioId,
       dataIntervento: opts.dataIntervento ?? "2026-06-01",
       tipoIntervento: opts.tipoIntervento ?? "pacco_alimentare",
+      ambito: opts.ambito,
+      areaOperativaIdSnapshot: opts.areaOperativaIdSnapshot,
+      zonaUdsIdSnapshot: opts.zonaUdsIdSnapshot,
     })
     .returning({ id: interventiTable.id });
   scope.interventoIds.push(i.id);
@@ -617,6 +676,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(interventiTable).where(inArray(interventiTable.id, scope.interventoIds));
   }
   if (scope.turnoIds.length > 0) {
+    await db.delete(turniConsegneTable).where(inArray(turniConsegneTable.turnoId, scope.turnoIds));
     await db.delete(turniVolontariTable).where(inArray(turniVolontariTable.turnoId, scope.turnoIds));
     await db.delete(turniTable).where(inArray(turniTable.id, scope.turnoIds));
   }
@@ -630,6 +690,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(bolleTable).where(inArray(bolleTable.id, scope.bollaIds));
   }
   if (scope.consegnaIds.length > 0) {
+    await db.delete(turniConsegneTable).where(inArray(turniConsegneTable.consegnaId, scope.consegnaIds));
     await db.delete(consegneTable).where(inArray(consegneTable.id, scope.consegnaIds));
   }
   if (scope.scaricoIds.length > 0) {
@@ -660,6 +721,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   }
   if (scope.volontarioIds.length > 0) {
     await db.delete(volontariTable).where(inArray(volontariTable.id, scope.volontarioIds));
+  }
+  if (scope.ruoloVolontarioIds.length > 0) {
+    await db.delete(ruoliVolontariTable).where(inArray(ruoliVolontariTable.id, scope.ruoloVolontarioIds));
   }
   if (scope.beneficiarioIds.length > 0) {
     await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, scope.beneficiarioIds));

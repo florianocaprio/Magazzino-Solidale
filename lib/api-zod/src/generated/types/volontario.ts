@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { VolontarioStatoApprovazione } from './volontarioStatoApprovazione';
 
 export interface Volontario {
   id: number;
@@ -21,12 +22,20 @@ export interface Volontario {
   /** @nullable */
   email?: string | null;
   ruolo: string;
+  /** @nullable */
+  ruoloVolontarioId?: number | null;
+  /** @nullable */
+  ruoloCatalogoNome?: string | null;
   patente: boolean;
   mezzoPersonale: boolean;
+  /** @minimum 0 */
   maxConsegneTurno: number;
   attivo: boolean;
-  statoApprovazione?: string;
+  statoApprovazione: VolontarioStatoApprovazione;
   /** @nullable */
   note?: string | null;
+  /** @minimum 1 */
+  versione: number;
   dataCreazione: string;
+  dataAggiornamento: string;
 }

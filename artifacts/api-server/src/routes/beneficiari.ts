@@ -31,7 +31,6 @@ import { formatTesseraBeneficiario, issueTesseraBeneficiario, TesseraBeneficiari
 import { requirePermission } from "../middlewares/auth";
 import {
   canAccessBeneficiarioRecord,
-  canViewBeneficiarioRecord,
   hasPermission,
   validateBeneficiarioTerritorialAssignment,
   visibleInterventoAmbiti,
@@ -66,6 +65,12 @@ const CODICE_BENEFICIARIO_DUPLICATO_MSG = "Il codice beneficiario indicato è gi
 const SESSO_OBBLIGATORIO_MSG = "Il campo Sesso è obbligatorio.";
 const DATA_NASCITA_NON_VALIDA_MSG = "La data di nascita non è valida. Usa il formato AAAA-MM-GG.";
 const FASCIA_ETA_PRESUNTA_NON_VALIDA_MSG = "La fascia d'età presunta selezionata non è valida.";
+const UDS_CLASSIFICAZIONE_ETA_RICHIESTA_MSG =
+  "Se non conosci la data di nascita, seleziona la fascia d'età.";
+const UDS_AREA_PROVENIENZA_RICHIESTA_MSG =
+  "Seleziona l'Area di provenienza della persona UDS.";
+const UDS_LINK_AREA_PROVENIENZA_RICHIESTA_MSG =
+  "Per aggiungere la persona all'Unità di Strada indica l'Area di provenienza.";
 const CREDITO_SOLIDALE_CENTRO_ASCOLTO_RICHIESTO_MSG =
   "ATTENZIONE: il beneficiario non ha un Centro di Ascolto assegnato. Non è possibile assegnare Credito Solidale.";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
@@ -195,6 +200,16 @@ function normalizeEtaFields(
     }
   }
   return {};
+}
+
+function hasUdsAgeClassification(
+  dataNascita: unknown,
+  fasciaEtaPresunta: unknown,
+): boolean {
+  return (
+    (typeof dataNascita === "string" && calcolaEta(dataNascita) != null) ||
+    isFasciaEtaPresunta(fasciaEtaPresunta)
+  );
 }
 
 async function codiceBeneficiarioEsiste(codice: string, excludeId?: number): Promise<boolean> {
@@ -507,9 +522,7 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   if (requestedZonaId != null) conditions.push(eq(beneficiariTable.zonaUdsId, requestedZonaId as number));
   if (uds === "true") conditions.push(eq(beneficiariTable.uds, true));
   const caller = callerCentroId(req);
-  const areaWideUdsDirectory = req.user?.aree?.includes("uds") === true
-    && req.user?.aree?.includes("sociale") !== true;
-  if (caller != null && !areaWideUdsDirectory) {
+  if (caller != null) {
     const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
     if (f) conditions.push(f);
   } else if (requestedCentroId != null) {
@@ -517,7 +530,7 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   }
   const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
   if (areaOperativaFilter) conditions.push(areaOperativaFilter);
-  const zonaFilter = areaWideUdsDirectory ? undefined : zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
+  const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
   if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
   else if (attivo === "false") conditions.push(eq(beneficiariTable.attivo, false));
@@ -594,6 +607,12 @@ export async function createBeneficiarioOne(
   if (options.areaOperativaId != null) values.areaOperativaId = options.areaOperativaId;
   if ("centroAscoltoId" in options) values.centroAscoltoId = options.centroAscoltoId;
   if ("zonaUdsId" in options) values.zonaUdsId = options.zonaUdsId;
+  if (values.zonaUdsId != null && values.uds !== true) {
+    return {
+      error: "Una Zona UDS può essere assegnata soltanto a una persona con UDS attivo",
+      status: 400,
+    };
+  }
   const scopeError = await validateBeneficiarioTerritorialAssignment({
     areaOperativaId: values.areaOperativaId ?? null,
     centroAscoltoId: values.centroAscoltoId ?? null,
@@ -616,6 +635,19 @@ export async function createBeneficiarioOne(
     (zid != null && values.zonaUdsId != null);
   if (createsUdsData && !(await isUnitaStradaEnabled())) {
     return { error: UNITA_STRADA_DISABLED_MSG, status: 403 };
+  }
+  if (values.uds === true) {
+    if (!trimOrUndefined(values.areaProvenienza)) {
+      return { error: UDS_AREA_PROVENIENZA_RICHIESTA_MSG, status: 400 };
+    }
+    if (
+      !hasUdsAgeClassification(
+        values.dataNascita,
+        values.fasciaEtaPresunta,
+      )
+    ) {
+      return { error: UDS_CLASSIFICAZIONE_ETA_RICHIESTA_MSG, status: 400 };
+    }
   }
   const completeError = validateBeneficiarioCompleto({
     statoAnagrafica: values.statoAnagrafica,
@@ -697,6 +729,15 @@ router.post("/beneficiari/bulk", requirePermission("beneficiari.manage"), async 
 // MUST stay registered before "/beneficiari/:id" so the literal segment is not
 // captured as an id.
 router.get("/beneficiari/cerca-simili", requirePermission("beneficiari.duplicates.search"), async (req, res) => {
+  if (
+    !req.user?.isAdmin &&
+    !req.user?.isSuperAdmin &&
+    req.user?.aree?.includes("uds") === true &&
+    req.user?.aree?.includes("sociale") !== true
+  ) {
+    res.status(403).json({ error: "Ricerca anagrafica completa non consentita al profilo UDS" });
+    return;
+  }
   const q = req.query as Record<string, string>;
   const search = (q.search ?? "").trim().toLowerCase();
   const nome = (q.nome ?? "").trim();
@@ -829,7 +870,7 @@ router.get("/beneficiari/:id", requirePermission("beneficiari.view"), async (req
   const id = Number(req.params.id);
   const [row] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canViewBeneficiarioRecord(row, req)) {
+  if (!canAccessBeneficiarioRecord(row, req)) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo profilo" });
     return;
   }
@@ -945,13 +986,21 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const patchKeys = Object.keys(input);
-  const isInitialUdsLink = !existing.uds
-    && toBool(input.uds) === true
-    && patchKeys.length > 0
-    && patchKeys.every((key) => key === "uds" || key === "zonaUdsId" || key === "fasciaEtaPresunta" || key === "versione");
-  const canLinkWithinCallerAreaOperativa = isInitialUdsLink
-    && cid != null
-    && existing.areaOperativaId === cid;
+  const isInitialUdsLink =
+    !existing.uds &&
+    toBool(input.uds) === true &&
+    patchKeys.length > 0 &&
+    patchKeys.every(
+      (key) =>
+        key === "uds" ||
+        key === "zonaUdsId" ||
+        key === "areaProvenienza" ||
+        key === "dataNascita" ||
+        key === "fasciaEtaPresunta" ||
+        key === "versione",
+    );
+  const canLinkWithinCallerAreaOperativa =
+    isInitialUdsLink && cid != null && existing.areaOperativaId === cid;
 
   // The shared-directory UDS action is the only mutation allowed across centro
   // and Zona boundaries, and only for a non-UDS person in the caller's exact
@@ -1100,6 +1149,43 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
   // assegna la propria Area anche ai record legacy; un caller globale deve
   // supply one explicitly.
   const resultingUds = "uds" in updates ? updates.uds === true : existing.uds === true;
+  const resultingZonaUds = "zonaUdsId" in updates
+    ? updates.zonaUdsId
+    : existing.zonaUdsId;
+  if (!resultingUds && resultingZonaUds != null) {
+    res.status(400).json({
+      error:
+        "Per disattivare UDS devi rimuovere esplicitamente anche la Zona UDS",
+    });
+    return;
+  }
+  if (enablesUds) {
+    const resultingAreaProvenienza =
+      "areaProvenienza" in updates
+        ? updates.areaProvenienza
+        : existing.areaProvenienza;
+    if (!trimOrUndefined(resultingAreaProvenienza)) {
+      res.status(400).json({
+        error: UDS_LINK_AREA_PROVENIENZA_RICHIESTA_MSG,
+      });
+      return;
+    }
+    const resultingDataNascita =
+      "dataNascita" in updates ? updates.dataNascita : existing.dataNascita;
+    const resultingFasciaEtaPresunta =
+      "fasciaEtaPresunta" in updates
+        ? updates.fasciaEtaPresunta
+        : existing.fasciaEtaPresunta;
+    if (
+      !hasUdsAgeClassification(
+        resultingDataNascita,
+        resultingFasciaEtaPresunta,
+      )
+    ) {
+      res.status(400).json({ error: UDS_CLASSIFICAZIONE_ETA_RICHIESTA_MSG });
+      return;
+    }
+  }
   const resultingAreaOperativa = "areaOperativaId" in updates ? updates.areaOperativaId : existing.areaOperativaId;
   if (resultingUds && resultingAreaOperativa == null) {
     if (cid != null) {

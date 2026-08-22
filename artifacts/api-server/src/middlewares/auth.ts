@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import { eq } from "drizzle-orm";
 import { db, utentiTable, ruoliTable, centriAscoltoTable, areeOperativeTable, zoneUdsTable } from "@workspace/db";
 import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
@@ -239,6 +239,23 @@ export const requireSuperAdmin: RequestHandler = (req, res, next) => {
 };
 
 /**
+ * Classifica tutte e sole le richieste report governate dall'Area UDS.
+ * `originalUrl` mantiene il path completo anche dentro router montati; il
+ * fallback a `path` rende l'helper testabile anche con richieste minimali.
+ */
+export function isUdsReportRequest(
+  req: Pick<Request, "originalUrl" | "path" | "query">,
+): boolean {
+  const rawPath = (req.originalUrl || req.path).split("?", 1)[0];
+  const path = rawPath.replace(/^\/api(?=\/|$)/, "").replace(/\/+$/, "") || "/";
+  if (path === "/report/uds" || path.startsWith("/report/uds/")) return true;
+  return (
+    (path === "/report/filter-options" || path === "/report/drilldown") &&
+    req.query.section === "uds"
+  );
+}
+
+/**
  * Enforces that the authenticated user's role grants access to the area that
  * governs the requested path. Admins bypass all checks. SuperAdmin bypasses
  * only the MAPS application-area gate; MAPS handlers still apply every caller
@@ -246,7 +263,9 @@ export const requireSuperAdmin: RequestHandler = (req, res, next) => {
  */
 export const areaGuard: RequestHandler = (req, res, next) => {
   const segment = req.path.split("/").filter(Boolean)[0];
-  const mapped = segment ? AREA_BY_SEGMENT[segment] : undefined;
+  const mapped = segment === "report" && isUdsReportRequest(req)
+    ? "uds"
+    : segment ? AREA_BY_SEGMENT[segment] : undefined;
   if (!mapped) {
     next();
     return;

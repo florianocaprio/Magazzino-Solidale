@@ -8,4 +8,6 @@
 
 export interface ActionResult {
   ok: boolean;
+  /** @minimum 1 */
+  versione: number;
 }

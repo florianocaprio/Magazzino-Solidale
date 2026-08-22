@@ -42,6 +42,23 @@ export function todayEuropeRome(referenceDate = new Date()): string {
   return civilDateEuropeRome(referenceDate);
 }
 
+export function formatDateEuropeRome(value: string | Date): string {
+  const civil =
+    typeof value === "string" && isCivilDate(value)
+      ? value
+      : civilDateEuropeRome(value);
+  const [year, month, day] = civil.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+export function formatDateOrDateTimeEuropeRome(value: string | Date): string {
+  if (typeof value === "string" && isCivilDate(value)) {
+    return formatDateEuropeRome(value);
+  }
+  const formatted = parts(typeof value === "string" ? new Date(value) : value);
+  return `${formatted.day}/${formatted.month}/${formatted.year} ${formatted.hour}:${formatted.minute}`;
+}
+
 export function dateTimeEuropeRomeToIso(
   dateOnly: string,
   time: string,

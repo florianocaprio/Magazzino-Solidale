@@ -10,6 +10,7 @@ export interface ConsegnaUpdate {
   tipoConsegna?: string;
   dataPrevista?: string;
   fasciaOraria?: string;
+  /** @maxLength 200 */
   indirizzoConsegna?: string;
   zona?: string;
   volontarioId?: number;

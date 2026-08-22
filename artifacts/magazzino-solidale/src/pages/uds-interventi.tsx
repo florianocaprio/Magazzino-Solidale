@@ -1,17 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  useListBeneficiari,
+  useListUdsDirectory,
   useListInterventi,
-  useCreateIntervento,
-  useUpdateIntervento,
+  useCreateUdsIntervento,
+  useUpdateUdsInterventoNota,
+  useRectifyUdsIntervento,
   useListAreeOperative,
   useListZoneUds,
   useListTipiIntervento,
   getListInterventiQueryKey,
   getListAreeOperativeQueryKey,
-  listBisogniPianificati,
-  type Beneficiario,
-  type BisognoPianificato,
   type Intervento,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -50,7 +48,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
@@ -62,7 +67,11 @@ import {
   BisogniPianificatiEditor,
   type BisognoPianificatoDraft,
 } from "@/components/bisogni-pianificati-editor";
-import { InterventoStatoBadge, interventoDataLabel, withInterventoAmbito } from "@/components/intervento-workflow";
+import { UdsBisogniDialog } from "@/components/uds-bisogni-dialog";
+import {
+  InterventoStatoBadge,
+  interventoDataLabel,
+} from "@/components/intervento-workflow";
 import {
   AlertTriangle,
   CalendarClock,
@@ -76,6 +85,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 const ALL_ZONE = "__all__";
 
@@ -84,6 +94,7 @@ function makeSchema(t: (k: string) => string) {
     .object({
       clientKey: z.string(),
       id: z.number().int().positive().optional(),
+      versione: z.number().int().positive().optional(),
       tipo: z.enum(["richiesta", "azione"]),
       descrizione: z
         .string()
@@ -115,6 +126,7 @@ function makeSchema(t: (k: string) => string) {
     tipoIntervento: z.string().min(1, t("common.requiredField")),
     descrizione: z.string().optional(),
     note: z.string().optional(),
+    motivoRettifica: z.string().max(2000).optional(),
     bisogniPianificati: z.array(bisognoSchema),
   });
 }
@@ -130,6 +142,15 @@ function extractError(err: unknown, fallback: string): string {
   return fallback;
 }
 
+function isConflict(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err != null &&
+    "status" in err &&
+    (err as { status?: unknown }).status === 409
+  );
+}
+
 function personLabel(b: {
   nome: string;
   cognome: string;
@@ -139,48 +160,34 @@ function personLabel(b: {
   return b.soprannome ? `${base} (${b.soprannome})` : base;
 }
 
-function bisognoToDraft(bisogno: BisognoPianificato): BisognoPianificatoDraft {
-  return {
-    clientKey: `bisogno-${bisogno.id}`,
-    id: bisogno.id,
-    tipo: bisogno.tipo,
-    descrizione: bisogno.descrizione,
-    stato: bisogno.stato,
-    dataPrevista: bisogno.dataPrevista ?? "",
-    priorita: bisogno.priorita,
-    note: bisogno.note ?? "",
-    dataCompletamento: bisogno.dataCompletamento,
-  };
-}
-
 export default function UdsInterventi() {
   const { t } = useTranslation();
-  const { user, hasArea } = useAuth();
+  const { user, hasArea, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const schema = makeSchema(t);
-  const canCreatePerson = hasArea("uds");
+  const canCreatePerson = hasArea("uds") && hasPermission("beneficiari.manage");
 
   const isGlobal = user?.areaOperativaId == null;
   const [selectedPerson, setSelectedPerson] = useState<string>("");
   const [personSearch, setPersonSearch] = useState("");
   const [filterAreaOperativa, setFilterAreaOperativa] = useState<string>("");
-  const [filterZona, setFilterZona] = useState<string>(
-    user?.zonaUdsId != null ? String(user.zonaUdsId) : ALL_ZONE,
-  );
+  const [filterZona, setFilterZona] = useState<string>(ALL_ZONE);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isNewPersonOpen, setIsNewPersonOpen] = useState(false);
-  const [selectedPersonFallback, setSelectedPersonFallback] = useState<UdsPersonaSelection | null>(null);
+  const [selectedPersonFallback, setSelectedPersonFallback] =
+    useState<UdsPersonaSelection | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [noteEditing, setNoteEditing] = useState<Intervento | null>(null);
+  const [bisogniEditingId, setBisogniEditingId] = useState<number | null>(null);
   const [noteText, setNoteText] = useState("");
   const [bisogniFilter, setBisogniFilter] = useState<
     "tutti" | "aperti" | "scaduti" | "nessuno"
   >("tutti");
-  const [isLoadingBisogni, setIsLoadingBisogni] = useState(false);
-  const bisogniLoadRequest = useRef(0);
 
-  const { data: areaOperativaList } = useListAreeOperative({ query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal } });
+  const { data: areaOperativaList } = useListAreeOperative({
+    query: { queryKey: getListAreeOperativeQueryKey(), enabled: isGlobal },
+  });
 
   const effectiveAreaOperativa = isGlobal
     ? filterAreaOperativa
@@ -189,24 +196,38 @@ export default function UdsInterventi() {
     : (user?.areaOperativaId ?? undefined);
 
   const { data: zoneList } = useListZoneUds(
-    effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : undefined,
-    { query: { queryKey: ["zoneUds", "udsInt", effectiveAreaOperativa], enabled: effectiveAreaOperativa != null } },
+    effectiveAreaOperativa
+      ? { areaOperativaId: effectiveAreaOperativa }
+      : undefined,
+    {
+      query: {
+        queryKey: ["zoneUds", "udsInt", effectiveAreaOperativa],
+        enabled: effectiveAreaOperativa != null,
+      },
+    },
   );
 
   const personeParams = {
-    uds: true,
     ...(personSearch.trim() ? { search: personSearch.trim() } : {}),
-    ...(isGlobal && effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : {}),
+    ...(isGlobal && effectiveAreaOperativa
+      ? { areaOperativaId: effectiveAreaOperativa }
+      : {}),
     ...(filterZona !== ALL_ZONE ? { zonaUdsId: parseInt(filterZona) } : {}),
   };
-  const { data: persone } = useListBeneficiari(personeParams);
+  const { data: persone } = useListUdsDirectory({
+    ...personeParams,
+    page: 1,
+    limit: 100,
+  });
   const personId = selectedPerson ? parseInt(selectedPerson) : undefined;
 
   const interventiParams = {
     beneficiarioId: personId,
     ambito: "uds" as const,
     includiStorici: true,
-    ...(isGlobal && effectiveAreaOperativa ? { areaOperativaId: effectiveAreaOperativa } : {}),
+    ...(isGlobal && effectiveAreaOperativa
+      ? { areaOperativaId: effectiveAreaOperativa }
+      : {}),
     ...(bisogniFilter !== "tutti" ? { bisogni: bisogniFilter } : {}),
   };
   const { data: interventi, isLoading } = useListInterventi(interventiParams, {
@@ -216,27 +237,33 @@ export default function UdsInterventi() {
     },
   });
 
-  const createIntervento = useCreateIntervento();
-  const updateIntervento = useUpdateIntervento();
+  const createIntervento = useCreateUdsIntervento();
+  const updateNote = useUpdateUdsInterventoNota();
+  const rectifyIntervento = useRectifyUdsIntervento();
   const { data: tipiIntervento } = useListTipiIntervento();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      dataIntervento: new Date().toISOString().slice(0, 10),
+      dataIntervento: todayEuropeRome(),
       tipoIntervento: "ascolto",
       descrizione: "",
       note: "",
+      motivoRettifica: "",
       bisogniPianificati: [],
     },
   });
 
   const selectedBenef = persone?.find((p) => p.id === personId);
   const selectedPersonData =
-    selectedBenef ?? (selectedPersonFallback?.id === personId ? selectedPersonFallback : undefined);
+    selectedBenef ??
+    (selectedPersonFallback?.id === personId
+      ? selectedPersonFallback
+      : undefined);
 
   // Built-in type keys are translated; admin-added custom names display as typed.
-  const tipoLabel = (tipo: string) => t(`tipiIntervento.opt.${tipo}`, { defaultValue: tipo.replace(/_/g, " ") });
+  const tipoLabel = (tipo: string) =>
+    t(`tipiIntervento.opt.${tipo}`, { defaultValue: tipo.replace(/_/g, " ") });
 
   const defaultTipo =
     tipiIntervento?.find((tp) => tp.attivo && tp.nome === "ascolto")?.nome ??
@@ -244,58 +271,40 @@ export default function UdsInterventi() {
     "ascolto";
 
   const handlePersonReady = (person: UdsPersonaSelection) => {
-    if (isGlobal && person.areaOperativaId != null) setFilterAreaOperativa(String(person.areaOperativaId));
-    setFilterZona(person.zonaUdsId != null ? String(person.zonaUdsId) : ALL_ZONE);
+    if (isGlobal && person.areaOperativaId != null)
+      setFilterAreaOperativa(String(person.areaOperativaId));
+    setFilterZona(
+      person.zonaUdsId != null ? String(person.zonaUdsId) : ALL_ZONE,
+    );
     setPersonSearch("");
     setSelectedPersonFallback(person);
     setSelectedPerson(String(person.id));
   };
 
   const handleCreate = () => {
-    bisogniLoadRequest.current += 1;
-    setIsLoadingBisogni(false);
     setEditingId(null);
     form.reset({
-      dataIntervento: new Date().toISOString().slice(0, 10),
+      dataIntervento: todayEuropeRome(),
       tipoIntervento: defaultTipo,
       descrizione: "",
       note: "",
+      motivoRettifica: "",
       bisogniPianificati: [],
     });
     setIsFormOpen(true);
   };
 
   const handleEdit = (i: Intervento) => {
-    const requestId = ++bisogniLoadRequest.current;
     setEditingId(i.id);
     form.reset({
       dataIntervento: i.dataIntervento?.slice(0, 10) ?? "",
       tipoIntervento: i.tipoIntervento,
       descrizione: i.descrizione ?? "",
       note: i.note ?? "",
+      motivoRettifica: "",
       bisogniPianificati: [],
     });
     setIsFormOpen(true);
-    setIsLoadingBisogni(true);
-    void listBisogniPianificati(i.id)
-      .then((bisogni) => {
-        if (requestId !== bisogniLoadRequest.current) return;
-        form.setValue("bisogniPianificati", bisogni.map(bisognoToDraft), {
-          shouldDirty: false,
-        });
-      })
-      .catch((err) => {
-        if (requestId !== bisogniLoadRequest.current) return;
-        toast({
-          title: t("udsInterventi.bisogniPianificatiTitle"),
-          description: extractError(err, t("udsInterventi.bisogniLoadError")),
-          variant: "destructive",
-        });
-      })
-      .finally(() => {
-        if (requestId === bisogniLoadRequest.current)
-          setIsLoadingBisogni(false);
-      });
   };
 
   const invalidateList = () => {
@@ -308,32 +317,42 @@ export default function UdsInterventi() {
 
   const onSubmit = (data: FormValues) => {
     if (personId == null) return;
-    const payload = {
-      beneficiarioId: personId,
-      dataIntervento: data.dataIntervento,
-      tipoIntervento: data.tipoIntervento,
-      descrizione: data.descrizione || undefined,
-      note: data.note || undefined,
-      bisogniPianificati: data.bisogniPianificati.map((bisogno) => ({
-        ...(bisogno.id != null ? { id: bisogno.id } : {}),
-        tipo: bisogno.tipo,
-        descrizione: bisogno.descrizione.trim(),
-        stato: bisogno.stato,
-        dataPrevista: bisogno.dataPrevista || null,
-        priorita: bisogno.priorita,
-        note: bisogno.note.trim() || null,
-      })),
-    };
     const onError = (err: unknown) => {
+      if (isConflict(err)) invalidateList();
       toast({
-        title: editingId != null ? t("udsInterventi.editTitle") : t("udsInterventi.newTitle"),
-        description: extractError(err, t("common.requiredField")),
+        title:
+          editingId != null
+            ? t("udsInterventi.editTitle")
+            : t("udsInterventi.newTitle"),
+        description: isConflict(err)
+          ? t("udsInterventi.concurrencyConflict")
+          : extractError(err, t("common.requiredField")),
         variant: "destructive",
       });
     };
     if (editingId != null) {
-      updateIntervento.mutate(
-        { id: editingId, data: payload as never },
+      const current = interventi?.find((item) => item.id === editingId);
+      const motivo = data.motivoRettifica?.trim();
+      if (!current?.dataAggiornamento || !motivo) {
+        toast({
+          title: t("udsInterventi.editTitle"),
+          description: t("common.requiredField"),
+          variant: "destructive",
+        });
+        return;
+      }
+      rectifyIntervento.mutate(
+        {
+          id: editingId,
+          data: {
+            versione: current.dataAggiornamento,
+            motivo,
+            dataIntervento: data.dataIntervento,
+            tipoIntervento: data.tipoIntervento,
+            descrizione: data.descrizione || null,
+            note: data.note || null,
+          },
+        },
         {
           onSuccess: () => {
             invalidateList();
@@ -345,7 +364,22 @@ export default function UdsInterventi() {
       );
     } else {
       createIntervento.mutate(
-        { data: withInterventoAmbito(payload, "uds") as never },
+        {
+          data: {
+            beneficiarioId: personId,
+            tipoIntervento: data.tipoIntervento,
+            descrizione: data.descrizione || null,
+            note: data.note || null,
+            bisogniPianificati: data.bisogniPianificati.map((bisogno) => ({
+              tipo: bisogno.tipo,
+              descrizione: bisogno.descrizione.trim(),
+              stato: bisogno.stato,
+              dataPrevista: bisogno.dataPrevista || null,
+              priorita: bisogno.priorita,
+              note: bisogno.note.trim() || null,
+            })),
+          },
+        },
         {
           onSuccess: () => {
             invalidateList();
@@ -360,8 +394,22 @@ export default function UdsInterventi() {
 
   const saveNote = () => {
     if (!noteEditing) return;
-    updateIntervento.mutate(
-      { id: noteEditing.id, data: { noteUds: noteText } as never },
+    if (!noteEditing.dataAggiornamento) {
+      toast({
+        title: t("udsInterventi.noteDialogTitle"),
+        description: t("common.requiredField"),
+        variant: "destructive",
+      });
+      return;
+    }
+    updateNote.mutate(
+      {
+        id: noteEditing.id,
+        data: {
+          versione: noteEditing.dataAggiornamento,
+          noteUds: noteText || null,
+        },
+      },
       {
         onSuccess: () => {
           invalidateList();
@@ -369,9 +417,12 @@ export default function UdsInterventi() {
           setNoteEditing(null);
         },
         onError: (err) => {
+          if (isConflict(err)) invalidateList();
           toast({
             title: t("udsInterventi.noteDialogTitle"),
-            description: extractError(err, t("common.requiredField")),
+            description: isConflict(err)
+              ? t("udsInterventi.concurrencyConflict")
+              : extractError(err, t("common.requiredField")),
             variant: "destructive",
           });
         },
@@ -380,6 +431,8 @@ export default function UdsInterventi() {
   };
 
   const rows = interventi ?? [];
+  const bisogniEditingIntervento =
+    rows.find((item) => item.id === bisogniEditingId) ?? null;
 
   const exportColumns = useMemo(
     () => [
@@ -420,10 +473,12 @@ export default function UdsInterventi() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("udsInterventi.title")}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("udsInterventi.title")}
+          </h1>
           <p className="text-muted-foreground">{t("udsInterventi.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <ExportButtons
             rows={rows}
             columns={exportColumns}
@@ -431,9 +486,15 @@ export default function UdsInterventi() {
             title={`${t("udsInterventi.exportTitle")}${selectedPersonData ? " — " + personLabel(selectedPersonData) : ""}`}
             disabled={personId == null}
           />
-          <Button onClick={handleCreate} className="gap-2" disabled={personId == null}>
-            <Plus className="h-4 w-4" /> {t("udsInterventi.newIntervento")}
-          </Button>
+          {hasPermission("uds.interventi.create") && (
+            <Button
+              onClick={handleCreate}
+              className="min-h-11 w-full gap-2 sm:w-auto"
+              disabled={personId == null}
+            >
+              <Plus className="h-4 w-4" /> {t("udsInterventi.newIntervento")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -441,7 +502,9 @@ export default function UdsInterventi() {
         <CardContent className="flex flex-wrap items-end gap-4 p-4">
           {isGlobal && (
             <div className="space-y-1">
-              <span className="text-sm font-medium">{t("udsAnagrafica.filterAreaOperativa")}</span>
+              <span className="text-sm font-medium">
+                {t("udsAnagrafica.filterAreaOperativa")}
+              </span>
               <Select
                 value={filterAreaOperativa || ALL_ZONE}
                 onValueChange={(v) => {
@@ -453,33 +516,55 @@ export default function UdsInterventi() {
                 }}
               >
                 <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder={t("udsAnagrafica.allAreaOperativa")} />
+                  <SelectValue
+                    placeholder={t("udsAnagrafica.allAreaOperativa")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allAreaOperativa")}</SelectItem>
+                  <SelectItem value={ALL_ZONE}>
+                    {t("udsAnagrafica.allAreaOperativa")}
+                  </SelectItem>
                   {areaOperativaList?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.nome}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
           <div className="space-y-1">
-            <span className="text-sm font-medium">{t("udsAnagrafica.filterZona")}</span>
-            <Select value={filterZona} onValueChange={(v) => { setFilterZona(v); setSelectedPerson(""); setSelectedPersonFallback(null); setPersonSearch(""); }}>
+            <span className="text-sm font-medium">
+              {t("udsAnagrafica.filterZona")}
+            </span>
+            <Select
+              value={filterZona}
+              onValueChange={(v) => {
+                setFilterZona(v);
+                setSelectedPerson("");
+                setSelectedPersonFallback(null);
+                setPersonSearch("");
+              }}
+            >
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder={t("udsAnagrafica.allZone")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>
+                <SelectItem value={ALL_ZONE}>
+                  {t("udsAnagrafica.allZone")}
+                </SelectItem>
                 {zoneList?.map((z) => (
-                  <SelectItem key={z.id} value={String(z.id)}>{z.nome}</SelectItem>
+                  <SelectItem key={z.id} value={String(z.id)}>
+                    {z.nome}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1 min-w-[220px] flex-1">
-            <span className="text-sm font-medium">{t("udsInterventi.selectPerson")}</span>
+            <span className="text-sm font-medium">
+              {t("udsInterventi.selectPerson")}
+            </span>
             <BeneficiarioCombobox
               items={persone ?? []}
               value={selectedPerson}
@@ -488,7 +573,9 @@ export default function UdsInterventi() {
                 setSelectedPersonFallback(null);
               }}
               placeholder={t("udsInterventi.selectPersonPlaceholder")}
-              selectedLabelFallback={selectedPersonData ? personLabel(selectedPersonData) : null}
+              selectedLabelFallback={
+                selectedPersonData ? personLabel(selectedPersonData) : null
+              }
               searchValue={personSearch}
               onSearchChange={setPersonSearch}
             />
@@ -525,7 +612,11 @@ export default function UdsInterventi() {
           {canCreatePerson && (
             <div className="space-y-1">
               <span className="text-sm font-medium">&nbsp;</span>
-              <Button type="button" onClick={() => setIsNewPersonOpen(true)} className="gap-2">
+              <Button
+                type="button"
+                onClick={() => setIsNewPersonOpen(true)}
+                className="gap-2"
+              >
                 <Plus className="h-4 w-4" /> {t("udsAnagrafica.newPerson")}
               </Button>
             </div>
@@ -554,172 +645,335 @@ export default function UdsInterventi() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <Table className="min-w-[1100px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">{t("udsInterventi.colData")}</TableHead>
-                  <TableHead>{t("udsInterventi.colTipo")}</TableHead>
-                  <TableHead>{t("interventi.workflowState")}</TableHead>
-                  <TableHead>{t("udsInterventi.colBisogni")}</TableHead>
-                  <TableHead>
-                    {t("udsInterventi.colBisogniPianificati")}
-                  </TableHead>
-                  <TableHead>{t("udsInterventi.colMateriale")}</TableHead>
-                  <TableHead>{t("udsInterventi.colNote")}</TableHead>
-                  <TableHead>{t("udsInterventi.colOperatore")}</TableHead>
-                  <TableHead className="text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array(3)
-                    .fill(0)
-                    .map((_, i) => (
-                      <TableRow key={i}>
-                        {Array(9)
-                          .fill(0)
-                          .map((_, j) => (
-                            <TableCell key={j}>
-                              <Skeleton className="h-5 w-24" />
-                            </TableCell>
-                          ))}
-                      </TableRow>
-                    ))
-                ) : rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={9}
-                      className="h-32 text-center text-muted-foreground"
-                    >
-                      {t("udsInterventi.noIntervento")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((i) => (
-                    <TableRow
-                      key={i.id}
-                      className={
-                        i.bisogniPianificatiScaduti > 0
-                          ? "bg-red-50/70"
-                          : i.noteUds
-                            ? "bg-amber-50/60"
-                            : ""
-                      }
-                    >
-                      <TableCell className="text-sm">
-                        {interventoDataLabel(i)}
-                      </TableCell>
-                      <TableCell>
+        <>
+          <div
+            data-testid="uds-interventi-mobile"
+            className="space-y-3 md:hidden"
+          >
+            {isLoading ? (
+              Array(3)
+                .fill(0)
+                .map((_, index) => (
+                  <Card key={index}>
+                    <CardContent className="space-y-3 p-4">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-12 w-full" />
+                    </CardContent>
+                  </Card>
+                ))
+            ) : rows.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  {t("udsInterventi.noIntervento")}
+                </CardContent>
+              </Card>
+            ) : (
+              rows.map((intervento) => (
+                <Card
+                  key={intervento.id}
+                  data-testid="uds-intervento-mobile-card"
+                  className={
+                    intervento.bisogniPianificatiScaduti > 0
+                      ? "border-red-300 bg-red-50/60"
+                      : intervento.noteUds
+                        ? "border-amber-300 bg-amber-50/60"
+                        : ""
+                  }
+                >
+                  <CardContent className="space-y-4 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold">
+                          {interventoDataLabel(intervento)}
+                        </div>
                         <Badge
                           variant="outline"
-                          className="gap-1 border-none bg-amber-500/10 text-amber-700"
+                          className="mt-1 gap-1 border-none bg-amber-500/10 text-amber-700"
                         >
-                          <HeartHandshake className="h-3 w-3" />{" "}
-                          {tipoLabel(i.tipoIntervento)}
+                          <HeartHandshake className="h-3.5 w-3.5" />
+                          {tipoLabel(intervento.tipoIntervento)}
                         </Badge>
-                      </TableCell>
-                      <TableCell><InterventoStatoBadge stato={i.stato} /></TableCell>
-                      <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
-                        {i.descrizione || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm min-w-[190px]">
-                        {i.bisogniPianificatiTotale === 0 ? (
-                          <span className="text-muted-foreground">
-                            {t("udsInterventi.noBisogniPianificati")}
-                          </span>
-                        ) : (
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap gap-1">
-                              <Badge variant="outline">
-                                {t("udsInterventi.bisogniTotale", {
-                                  count: i.bisogniPianificatiTotale,
-                                })}
-                              </Badge>
-                              <Badge
-                                variant={
-                                  i.bisogniPianificatiAperti > 0
-                                    ? "secondary"
-                                    : "outline"
-                                }
-                              >
-                                {t("udsInterventi.bisogniAperti", {
-                                  count: i.bisogniPianificatiAperti,
-                                })}
-                              </Badge>
-                              {i.bisogniPianificatiScaduti > 0 && (
-                                <Badge variant="destructive" className="gap-1">
-                                  <AlertTriangle className="h-3 w-3" />
-                                  {t("udsInterventi.bisogniScaduti", {
-                                    count: i.bisogniPianificatiScaduti,
-                                  })}
-                                </Badge>
-                              )}
-                            </div>
-                            {i.bisogniPianificatiProssimaScadenza && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <CalendarClock className="h-3.5 w-3.5" />
-                                {t("udsInterventi.bisogniProssimaScadenza", {
-                                  date: new Date(
-                                    `${i.bisogniPianificatiProssimaScadenza}T12:00:00`,
-                                  ).toLocaleDateString("it-IT"),
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
-                        {i.note || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm max-w-xs">
-                        {i.noteUds ? (
-                          <div className="flex items-start gap-1 rounded-md bg-amber-100 px-2 py-1 text-amber-900 whitespace-pre-wrap">
-                            <StickyNote className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                            <span>{i.noteUds}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {i.operatoreCodice || "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant={i.noteUds ? "secondary" : "ghost"}
-                            size="sm"
-                            className={`gap-1 ${i.noteUds ? "bg-amber-100 text-amber-900 hover:bg-amber-200" : ""}`}
-                            onClick={() => {
-                              setNoteEditing(i);
-                              setNoteText(i.noteUds ?? "");
-                            }}
-                          >
-                            <StickyNote className="h-3.5 w-3.5" />
-                            {i.noteUds
-                              ? t("udsInterventi.editNote")
-                              : t("udsInterventi.addNote")}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(i)}
-                            title={t("udsInterventi.editAction")}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      </div>
+                      <InterventoStatoBadge stato={intervento.stato} />
+                    </div>
+
+                    <p className="line-clamp-3 whitespace-pre-wrap text-sm">
+                      {intervento.descrizione ||
+                        t("udsInterventi.noMeetingSummary")}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {intervento.bisogniPianificatiAperti > 0 && (
+                        <Badge variant="secondary">
+                          {t("udsInterventi.mobileOpenNeeds", {
+                            count: intervento.bisogniPianificatiAperti,
+                          })}
+                        </Badge>
+                      )}
+                      {intervento.bisogniPianificatiScaduti > 0 && (
+                        <Badge variant="destructive" className="gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          {t("udsInterventi.mobileOverdueNeeds", {
+                            count: intervento.bisogniPianificatiScaduti,
+                          })}
+                        </Badge>
+                      )}
+                      {intervento.noteUds && (
+                        <Badge variant="outline" className="gap-1">
+                          <StickyNote className="h-3.5 w-3.5" />
+                          {t("udsInterventi.notePresent")}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {hasPermission("uds.bisogni.manage") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="min-h-11 gap-2"
+                          onClick={() => setBisogniEditingId(intervento.id)}
+                        >
+                          <CalendarClock className="h-4 w-4" />
+                          {t("udsInterventi.manageBisogniAction")}
+                        </Button>
+                      )}
+                      {hasPermission("uds.interventi.note") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="min-h-11 gap-2"
+                          onClick={() => {
+                            setNoteEditing(intervento);
+                            setNoteText(intervento.noteUds ?? "");
+                          }}
+                        >
+                          <StickyNote className="h-4 w-4" />
+                          {t("udsInterventi.mobileNoteAction")}
+                        </Button>
+                      )}
+                      {hasPermission("uds.interventi.update") && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="col-span-2 min-h-11 gap-2"
+                          onClick={() => handleEdit(intervento)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                          {t("udsInterventi.editAction")}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          <Card
+            data-testid="uds-interventi-desktop"
+            className="hidden md:block"
+          >
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[1100px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[120px]">
+                      {t("udsInterventi.colData")}
+                    </TableHead>
+                    <TableHead>{t("udsInterventi.colTipo")}</TableHead>
+                    <TableHead>{t("interventi.workflowState")}</TableHead>
+                    <TableHead>{t("udsInterventi.colBisogni")}</TableHead>
+                    <TableHead>
+                      {t("udsInterventi.colBisogniPianificati")}
+                    </TableHead>
+                    <TableHead>{t("udsInterventi.colMateriale")}</TableHead>
+                    <TableHead>{t("udsInterventi.colNote")}</TableHead>
+                    <TableHead>{t("udsInterventi.colOperatore")}</TableHead>
+                    <TableHead className="text-right" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array(3)
+                      .fill(0)
+                      .map((_, i) => (
+                        <TableRow key={i}>
+                          {Array(9)
+                            .fill(0)
+                            .map((_, j) => (
+                              <TableCell key={j}>
+                                <Skeleton className="h-5 w-24" />
+                              </TableCell>
+                            ))}
+                        </TableRow>
+                      ))
+                  ) : rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={9}
+                        className="h-32 text-center text-muted-foreground"
+                      >
+                        {t("udsInterventi.noIntervento")}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  ) : (
+                    rows.map((i) => (
+                      <TableRow
+                        key={i.id}
+                        className={
+                          i.bisogniPianificatiScaduti > 0
+                            ? "bg-red-50/70"
+                            : i.noteUds
+                              ? "bg-amber-50/60"
+                              : ""
+                        }
+                      >
+                        <TableCell className="text-sm">
+                          {interventoDataLabel(i)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className="gap-1 border-none bg-amber-500/10 text-amber-700"
+                          >
+                            <HeartHandshake className="h-3 w-3" />{" "}
+                            {tipoLabel(i.tipoIntervento)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <InterventoStatoBadge stato={i.stato} />
+                        </TableCell>
+                        <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
+                          {i.descrizione || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm min-w-[190px]">
+                          {i.bisogniPianificatiTotale === 0 ? (
+                            <span className="text-muted-foreground">
+                              {t("udsInterventi.noBisogniPianificati")}
+                            </span>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap gap-1">
+                                <Badge variant="outline">
+                                  {t("udsInterventi.bisogniTotale", {
+                                    count: i.bisogniPianificatiTotale,
+                                  })}
+                                </Badge>
+                                <Badge
+                                  variant={
+                                    i.bisogniPianificatiAperti > 0
+                                      ? "secondary"
+                                      : "outline"
+                                  }
+                                >
+                                  {t("udsInterventi.bisogniAperti", {
+                                    count: i.bisogniPianificatiAperti,
+                                  })}
+                                </Badge>
+                                {i.bisogniPianificatiScaduti > 0 && (
+                                  <Badge
+                                    variant="destructive"
+                                    className="gap-1"
+                                  >
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {t("udsInterventi.bisogniScaduti", {
+                                      count: i.bisogniPianificatiScaduti,
+                                    })}
+                                  </Badge>
+                                )}
+                              </div>
+                              {i.bisogniPianificatiProssimaScadenza && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <CalendarClock className="h-3.5 w-3.5" />
+                                  {t("udsInterventi.bisogniProssimaScadenza", {
+                                    date: new Date(
+                                      `${i.bisogniPianificatiProssimaScadenza}T12:00:00`,
+                                    ).toLocaleDateString("it-IT"),
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm max-w-xs whitespace-pre-wrap">
+                          {i.note || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm max-w-xs">
+                          {i.noteUds ? (
+                            <div className="flex items-start gap-1 rounded-md bg-amber-100 px-2 py-1 text-amber-900 whitespace-pre-wrap">
+                              <StickyNote className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                              <span>{i.noteUds}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {i.operatoreCodice || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {hasPermission("uds.bisogni.manage") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => setBisogniEditingId(i.id)}
+                              >
+                                <CalendarClock className="h-3.5 w-3.5" />
+                                {t("udsInterventi.manageBisogniAction")}
+                              </Button>
+                            )}
+                            {hasPermission("uds.interventi.note") && (
+                              <Button
+                                variant={i.noteUds ? "secondary" : "ghost"}
+                                size="sm"
+                                className={`gap-1 ${i.noteUds ? "bg-amber-100 text-amber-900 hover:bg-amber-200" : ""}`}
+                                onClick={() => {
+                                  setNoteEditing(i);
+                                  setNoteText(i.noteUds ?? "");
+                                }}
+                              >
+                                <StickyNote className="h-3.5 w-3.5" />
+                                {i.noteUds
+                                  ? t("udsInterventi.editNote")
+                                  : t("udsInterventi.addNote")}
+                              </Button>
+                            )}
+                            {hasPermission("uds.interventi.update") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleEdit(i)}
+                                title={t("udsInterventi.editAction")}
+                              >
+                                <Pencil className="h-4 w-4" />
+                                {t("udsInterventi.editAction")}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
       )}
+
+      <UdsBisogniDialog
+        interventoId={bisogniEditingId}
+        interventoVersione={bisogniEditingIntervento?.dataAggiornamento ?? null}
+        open={bisogniEditingId != null}
+        onOpenChange={(open) => {
+          if (!open) setBisogniEditingId(null);
+        }}
+        onChanged={invalidateList}
+      />
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
@@ -738,19 +992,37 @@ export default function UdsInterventi() {
                 className="space-y-4"
               >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="dataIntervento"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("udsInterventi.fData")}</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {editingId == null ? (
+                    <div
+                      data-testid="uds-new-intervento-today"
+                      className="rounded-md border bg-muted/30 p-3"
+                    >
+                      <div className="text-sm font-medium">
+                        {t("udsInterventi.fData")}
+                      </div>
+                      <div className="mt-1">
+                        {t("udsInterventi.todayLabel", {
+                          date: new Date(
+                            `${todayEuropeRome()}T12:00:00`,
+                          ).toLocaleDateString("it-IT"),
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="dataIntervento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("udsInterventi.fData")}</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={form.control}
                     name="tipoIntervento"
@@ -786,25 +1058,56 @@ export default function UdsInterventi() {
                     )}
                   />
                 </div>
-                <FormField control={form.control} name="descrizione" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("udsInterventi.fBisogni")}</FormLabel>
-                    <FormControl><Textarea rows={3} placeholder={t("udsInterventi.bisogniPlaceholder")} {...field} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="note" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("udsInterventi.fMateriale")}</FormLabel>
-                    <FormControl><Textarea rows={3} placeholder={t("udsInterventi.materialePlaceholder")} {...field} /></FormControl>
-                  </FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="descrizione"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("udsInterventi.fBisogni")}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={3}
+                          placeholder={t("udsInterventi.bisogniPlaceholder")}
+                          {...field}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="note"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("udsInterventi.fMateriale")}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={3}
+                          placeholder={t("udsInterventi.materialePlaceholder")}
+                          {...field}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
-                {isLoadingBisogni ? (
-                  <div className="space-y-3 border-t pt-5">
-                    <Skeleton className="h-5 w-48" />
-                    <Skeleton className="h-40 w-full" />
-                  </div>
-                ) : (
+                {editingId != null && (
+                  <FormField
+                    control={form.control}
+                    name="motivoRettifica"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Motivo della rettifica</FormLabel>
+                        <FormControl>
+                          <Textarea rows={2} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {editingId == null && hasPermission("uds.bisogni.manage") && (
                   <FormField
                     control={form.control}
                     name="bisogniPianificati"
@@ -814,10 +1117,7 @@ export default function UdsInterventi() {
                           <BisogniPianificatiEditor
                             value={field.value}
                             onChange={field.onChange}
-                            disabled={
-                              createIntervento.isPending ||
-                              updateIntervento.isPending
-                            }
+                            disabled={createIntervento.isPending}
                           />
                         </FormControl>
                         <FormMessage />
@@ -836,21 +1136,28 @@ export default function UdsInterventi() {
                   </Button>
                   <Button
                     type="submit"
+                    className="min-h-11 min-w-28"
                     disabled={
-                      isLoadingBisogni ||
-                      createIntervento.isPending ||
-                      updateIntervento.isPending
+                      createIntervento.isPending || rectifyIntervento.isPending
                     }
                   >
-                    {t("common.save")}
-                  </Button>                </div>
+                    {createIntervento.isPending || rectifyIntervento.isPending
+                      ? t("udsInterventi.savingIntervention")
+                      : t("common.save")}
+                  </Button>{" "}
+                </div>
               </form>
             </Form>
           </div>
         </SheetContent>
       </Sheet>
 
-      <Dialog open={noteEditing != null} onOpenChange={(o) => { if (!o) setNoteEditing(null); }}>
+      <Dialog
+        open={noteEditing != null}
+        onOpenChange={(o) => {
+          if (!o) setNoteEditing(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("udsInterventi.noteDialogTitle")}</DialogTitle>
@@ -863,8 +1170,12 @@ export default function UdsInterventi() {
             className="bg-amber-50"
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNoteEditing(null)}>{t("common.cancel")}</Button>
-            <Button onClick={saveNote} disabled={updateIntervento.isPending}>{t("common.save")}</Button>
+            <Button variant="outline" onClick={() => setNoteEditing(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={saveNote} disabled={updateNote.isPending}>
+              {t("common.save")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

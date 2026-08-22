@@ -31,6 +31,7 @@ export * from "./trasferimenti";
 export * from "./scarichi";
 export * from "./approvvigionamenti";
 export * from "./turni";
+export * from "./turniConsegne";
 export * from "./impostazioni";
 export * from "./configurazioneAmbiente";
 export * from "./auth";

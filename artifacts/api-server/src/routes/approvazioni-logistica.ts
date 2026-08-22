@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { volontariTable, mezziTable, centriAscoltoTable } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
   andScoped,
   callerCentroId,
@@ -24,6 +24,17 @@ import {
   requireAnyModulo,
   requireModulo,
 } from "../lib/featureFlags";
+import { requirePermission } from "../middlewares/auth";
+import {
+  effectiveAreaOperativaFilter,
+  effectiveMezzoCentroExpr,
+  effectiveCentroFilter,
+  effectiveCentroMezzoTx,
+  loadAndLockEffectiveMezzoTx,
+  LogisticaPolicyError,
+  parseRequiredVersion,
+} from "../lib/logisticaPolicy";
+import { auditLogistica } from "../lib/logisticaAudit";
 
 const router: IRouter = Router();
 
@@ -48,6 +59,7 @@ const fmtVolontario = (r: {
   statoApprovazione: string;
   note: string | null;
   dataCreazione: Date;
+  versione: number;
 }) => ({
   id: r.id,
   nome: r.nome,
@@ -61,6 +73,7 @@ const fmtVolontario = (r: {
   attivo: r.attivo,
   statoApprovazione: r.statoApprovazione,
   note: r.note ?? null,
+  versione: r.versione,
   dataCreazione: r.dataCreazione.toISOString(),
 });
 
@@ -78,6 +91,7 @@ const fmtMezzo = (r: {
   statoApprovazione: string;
   note: string | null;
   dataCreazione: Date;
+  versione: number;
 }) => ({
   id: r.id,
   codice: r.codice,
@@ -91,6 +105,7 @@ const fmtMezzo = (r: {
   stato: r.stato,
   statoApprovazione: r.statoApprovazione,
   note: r.note ?? null,
+  versione: r.versione,
   dataCreazione: r.dataCreazione.toISOString(),
 });
 
@@ -99,7 +114,7 @@ async function ensureVisibleCentro(rowCentroId: number | null, req: Request) {
   return inVisibleCentroSet(rowCentroId, await visibleCentroIds(callerAreaOperativaId(req)));
 }
 
-router.get("/approvazioni-logistica", async (req, res) => {
+router.get("/approvazioni-logistica", requirePermission("logistica.approvazioni.view"), async (req, res) => {
   const [volontariAttivi, mezziAttivi] = await Promise.all([
     isModuloAttivo("VOLONTARI"),
     isModuloAttivo("MEZZI"),
@@ -123,6 +138,7 @@ router.get("/approvazioni-logistica", async (req, res) => {
       attivo: volontariTable.attivo,
       statoApprovazione: volontariTable.statoApprovazione,
       note: volontariTable.note,
+      versione: volontariTable.versione,
       dataCreazione: volontariTable.dataCreazione,
     })
     .from(volontariTable)
@@ -131,8 +147,8 @@ router.get("/approvazioni-logistica", async (req, res) => {
     .orderBy(desc(volontariTable.dataCreazione)) : [];
 
   const mezzoScope = andScoped(
-    centroScopeFilter(mezziTable.centroAscoltoId, callerCentroId(req)),
-    idSetScopeFilter(mezziTable.centroAscoltoId, areaOperativaCentroIds),
+    effectiveCentroFilter(callerCentroId(req)),
+    effectiveAreaOperativaFilter(areaOperativaCentroIds),
   );
   const mezzi = mezziAttivi ? await db
     .select({
@@ -142,23 +158,25 @@ router.get("/approvazioni-logistica", async (req, res) => {
       targa: mezziTable.targa,
       proprieta: mezziTable.proprieta,
       proprietarioNome: mezziTable.proprietarioNome,
-      centroAscoltoId: mezziTable.centroAscoltoId,
+      centroAscoltoId: effectiveMezzoCentroExpr,
       centroAscoltoNome: centriAscoltoTable.nome,
       descrizione: mezziTable.descrizione,
       stato: mezziTable.stato,
       statoApprovazione: mezziTable.statoApprovazione,
       note: mezziTable.note,
       dataCreazione: mezziTable.dataCreazione,
+      versione: mezziTable.versione,
     })
     .from(mezziTable)
-    .leftJoin(centriAscoltoTable, eq(mezziTable.centroAscoltoId, centriAscoltoTable.id))
+    .leftJoin(volontariTable, eq(mezziTable.volontarioId, volontariTable.id))
+    .leftJoin(centriAscoltoTable, sql`${centriAscoltoTable.id} = ${effectiveMezzoCentroExpr}`)
     .where(andScoped(eq(mezziTable.statoApprovazione, PENDING), mezzoScope))
     .orderBy(desc(mezziTable.dataCreazione)) : [];
 
   res.json({ volontari: volontari.map(fmtVolontario), mezzi: mezzi.map(fmtMezzo) });
 });
 
-router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLONTARI"), async (req, res) => {
+router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLONTARI"), requirePermission("logistica.approvazioni.manage"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
@@ -166,6 +184,9 @@ router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLO
     res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" });
     return;
   }
+  const versione = parseRequiredVersion(req.body?.versione);
+  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
+  if (existing.statoApprovazione !== PENDING) { res.status(409).json({ error: "Transizione di approvazione non consentita" }); return; }
   const matricola = normalizeVolontarioMatricola(existing.matricola);
   if (!matricola) {
     res.status(400).json({ error: MATRICOLA_OBBLIGATORIA_MSG });
@@ -176,10 +197,18 @@ router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLO
     return;
   }
   try {
-    await db
-      .update(volontariTable)
-      .set({ matricola, statoApprovazione: "approvato", attivo: true })
-      .where(eq(volontariTable.id, id));
+    const [updated] = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(volontariTable)
+        .set({ matricola, statoApprovazione: "approvato", attivo: true, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() })
+        .where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING)))
+        .returning({ versione: volontariTable.versione });
+      if (!row) return [];
+      await auditLogistica(tx, req, { entita: "volontario", id, azione: "approvazione", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "approvato", attivo: true, versione: row.versione } });
+      return [row];
+    });
+    if (!updated) { res.status(409).json({ error: "La richiesta è stata aggiornata da un altro operatore" }); return; }
+    res.json({ ok: true, versione: updated.versione });
   } catch (e) {
     if (isVolontarioMatricolaUniqueViolation(e)) {
       res.status(409).json(await matricolaVolontarioDuplicataPayload(matricola, id));
@@ -187,10 +216,9 @@ router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLO
     }
     throw e;
   }
-  res.json({ ok: true });
 });
 
-router.post("/approvazioni-logistica/volontari/:id/respingi", requireModulo("VOLONTARI"), async (req, res) => {
+router.post("/approvazioni-logistica/volontari/:id/respingi", requireModulo("VOLONTARI"), requirePermission("logistica.approvazioni.manage"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(volontariTable).where(eq(volontariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
@@ -198,41 +226,75 @@ router.post("/approvazioni-logistica/volontari/:id/respingi", requireModulo("VOL
     res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" });
     return;
   }
-  await db
-    .update(volontariTable)
-    .set({ statoApprovazione: "respinto", attivo: false })
-    .where(eq(volontariTable.id, id));
-  res.json({ ok: true });
+  const versione = parseRequiredVersion(req.body?.versione);
+  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
+  if (existing.statoApprovazione !== PENDING) { res.status(409).json({ error: "Transizione di approvazione non consentita" }); return; }
+  const [updated] = await db.transaction(async (tx) => {
+    const [row] = await tx.update(volontariTable).set({ statoApprovazione: "respinto", attivo: false, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING))).returning({ versione: volontariTable.versione });
+    if (!row) return [];
+    await auditLogistica(tx, req, { entita: "volontario", id, azione: "rifiuto", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "respinto", attivo: false, versione: row.versione } });
+    return [row];
+  });
+  if (!updated) { res.status(409).json({ error: "La richiesta è stata aggiornata da un altro operatore" }); return; }
+  res.json({ ok: true, versione: updated.versione });
 });
 
-router.post("/approvazioni-logistica/mezzi/:id/approva", requireModulo("MEZZI"), async (req, res) => {
+router.post("/approvazioni-logistica/mezzi/:id/approva", requireModulo("MEZZI"), requirePermission("logistica.approvazioni.manage"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(mezziTable).where(eq(mezziTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!(await ensureVisibleCentro(existing.centroAscoltoId ?? null, req))) {
+  const effectiveCentro = await db.transaction((tx) => effectiveCentroMezzoTx(tx, existing));
+  if (!(await ensureVisibleCentro(effectiveCentro, req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" });
     return;
   }
-  await db
-    .update(mezziTable)
-    .set({ statoApprovazione: "approvato", stato: "disponibile" })
-    .where(eq(mezziTable.id, id));
-  res.json({ ok: true });
+  const versione = parseRequiredVersion(req.body?.versione);
+  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
+  if (existing.statoApprovazione !== PENDING) { res.status(409).json({ error: "Transizione di approvazione non consentita" }); return; }
+  let updated;
+  try { [updated] = await db.transaction(async (tx) => {
+    const locked = await loadAndLockEffectiveMezzoTx(tx, id);
+    if (!(await ensureVisibleCentro(locked.effectiveCentroId, req))) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+    if (locked.mezzo.statoApprovazione !== PENDING) throw new LogisticaPolicyError(409, "Transizione di approvazione non consentita");
+    const [row] = await tx.update(mezziTable).set({ statoApprovazione: "approvato", stato: "disponibile", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione), eq(mezziTable.statoApprovazione, PENDING))).returning({ versione: mezziTable.versione });
+    if (!row) return [];
+    await auditLogistica(tx, req, { entita: "mezzo", id, azione: "approvazione", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "approvato", stato: "disponibile", versione: row.versione } });
+    return [row];
+  }); } catch (error) {
+    if (error instanceof LogisticaPolicyError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
+  if (!updated) { res.status(409).json({ error: "La richiesta è stata aggiornata da un altro operatore" }); return; }
+  res.json({ ok: true, versione: updated.versione });
 });
 
-router.post("/approvazioni-logistica/mezzi/:id/respingi", requireModulo("MEZZI"), async (req, res) => {
+router.post("/approvazioni-logistica/mezzi/:id/respingi", requireModulo("MEZZI"), requirePermission("logistica.approvazioni.manage"), async (req, res) => {
   const id = parseInt(req.params.id as string);
   const [existing] = await db.select().from(mezziTable).where(eq(mezziTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!(await ensureVisibleCentro(existing.centroAscoltoId ?? null, req))) {
+  const effectiveCentro = await db.transaction((tx) => effectiveCentroMezzoTx(tx, existing));
+  if (!(await ensureVisibleCentro(effectiveCentro, req))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo perimetro" });
     return;
   }
-  await db
-    .update(mezziTable)
-    .set({ statoApprovazione: "respinto", stato: "respinto" })
-    .where(eq(mezziTable.id, id));
-  res.json({ ok: true });
+  const versione = parseRequiredVersion(req.body?.versione);
+  if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
+  if (existing.statoApprovazione !== PENDING) { res.status(409).json({ error: "Transizione di approvazione non consentita" }); return; }
+  let updated;
+  try { [updated] = await db.transaction(async (tx) => {
+    const locked = await loadAndLockEffectiveMezzoTx(tx, id);
+    if (!(await ensureVisibleCentro(locked.effectiveCentroId, req))) throw new LogisticaPolicyError(403, "Risorsa non accessibile per il tuo perimetro");
+    if (locked.mezzo.statoApprovazione !== PENDING) throw new LogisticaPolicyError(409, "Transizione di approvazione non consentita");
+    const [row] = await tx.update(mezziTable).set({ statoApprovazione: "respinto", stato: "respinto", versione: sql`${mezziTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(mezziTable.id, id), eq(mezziTable.versione, versione), eq(mezziTable.statoApprovazione, PENDING))).returning({ versione: mezziTable.versione });
+    if (!row) return [];
+    await auditLogistica(tx, req, { entita: "mezzo", id, azione: "rifiuto", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "respinto", stato: "respinto", versione: row.versione } });
+    return [row];
+  }); } catch (error) {
+    if (error instanceof LogisticaPolicyError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
+  if (!updated) { res.status(409).json({ error: "La richiesta è stata aggiornata da un altro operatore" }); return; }
+  res.json({ ok: true, versione: updated.versione });
 });
 
 export default router;

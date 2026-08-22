@@ -1,8 +1,10 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
-import { callerCentroId, callerAreaOperativaId, callerZonaUdsId } from "../lib/centroScope";
+import { callerCentroId, callerAreaOperativaId } from "../lib/centroScope";
 import { requireAllModuli } from "../lib/featureFlags";
+import { isUdsReportRequest, requirePermission } from "../middlewares/auth";
+import { effectiveMezzoCentroSql } from "../lib/logisticaPolicy";
 
 const router: IRouter = Router();
 
@@ -10,11 +12,12 @@ const requireReportCentro = requireAllModuli(["CENTRO_ASCOLTO", "REPORT"]);
 const requireReportUds = requireAllModuli(["UDS", "REPORT"]);
 
 router.use("/report", (req, res, next) => {
-  const guard = req.path.startsWith("/uds/")
+  const guard = isUdsReportRequest(req)
     ? requireReportUds
     : requireReportCentro;
   guard(req, res, next);
 });
+router.use("/report/uds", requirePermission("uds.reports.view"));
 
 /**
  * Generic "own value OR shared/null" SQL fragment for a scoping column. Used for
@@ -194,8 +197,13 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
   // axis, by their centro's area operativa (derived via centri_di_ascolto; NULL = a
   // universal mezzo or a centro without area operativa, kept visible like magazzini).
   const mezzoConds: SQL[] = [];
-  if (centroAscoltoId) mezzoConds.push(sql`m.centro_ascolto_id = ${centroAscoltoId}`);
-  const mCentroCond = ownOrNullSql(sql`m.centro_ascolto_id`, caller);
+  const effectiveMezzoCentro = effectiveMezzoCentroSql(
+    sql`m.volontario_id`,
+    sql`mv.centro_ascolto_id`,
+    sql`m.centro_ascolto_id`,
+  );
+  if (centroAscoltoId) mezzoConds.push(sql`${effectiveMezzoCentro} = ${centroAscoltoId}`);
+  const mCentroCond = ownOrNullSql(effectiveMezzoCentro, caller);
   if (mCentroCond) mezzoConds.push(mCentroCond);
   const mAreaOperativaCond = ownOrNullSql(sql`ca.area_operativa_id`, areaOperativa);
   if (mAreaOperativaCond) mezzoConds.push(mAreaOperativaCond);
@@ -229,7 +237,7 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
     SELECT m.id as mezzo_id,
            m.codice as mezzo_codice,
            m.tipo as mezzo_tipo,
-           m.centro_ascolto_id as centro_id,
+           ${effectiveMezzoCentro} as centro_id,
            ca.nome as centro_nome,
            (SELECT COUNT(*) FROM consegne c
               JOIN beneficiari be ON be.id = c.beneficiario_id
@@ -242,9 +250,11 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
            (SELECT COUNT(*) FROM turni tu
               LEFT JOIN centri_di_ascolto tca ON tca.id = tu.centro_ascolto_id
               WHERE tu.mezzo_id = m.id
+                AND tu.stato <> 'annullato'
                 AND tu.data BETWEEN ${da} AND ${a}${turniScope}) as turni
     FROM mezzi m
-    LEFT JOIN centri_di_ascolto ca ON ca.id = m.centro_ascolto_id
+    LEFT JOIN volontari mv ON mv.id = m.volontario_id
+    LEFT JOIN centri_di_ascolto ca ON ca.id = ${effectiveMezzoCentro}
     ${mezzoWhere}
     ORDER BY m.codice
   `);
@@ -421,19 +431,27 @@ router.get("/report/fse-plus", async (req, res) => {
 
 /* ────────────────────────────────────────────────────────────────────────
  * UDS (Unità di Strada) reports. Street-outreach interventions / people.
- * Always restricted to UDS persons (beneficiari.uds = true). Area Operativa is a HARD
- * scope (caller's area operativa OR NULL legacy), optionally narrowed via ?areaOperativaId for a
- * global caller; zona is HARD when present on the caller and can be narrowed
- * via ?zonaUdsId by a zona-global caller.
+ * Historical activity is classified exclusively by explicit UDS scope and the
+ * immutable Area/Zona snapshots stored on each intervention. Current people
+ * continue to use the Beneficiario's current territorial assignment.
  * ──────────────────────────────────────────────────────────────────────── */
 
-function udsScopeConds(req: { query: Record<string, unknown> }, callerAreaOperativa: number | null, callerZona: number | null): SQL[] {
+function udsHistoricalScopeConds(req: { query: Record<string, unknown> }, callerAreaOperativa: number | null): SQL[] {
+  const conds: SQL[] = [sql`i.ambito = 'uds'`];
+  if (callerAreaOperativa != null) conds.push(sql`i.area_operativa_id_snapshot = ${callerAreaOperativa}`);
+  const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
+  if (qAreaOperativa) conds.push(sql`i.area_operativa_id_snapshot = ${qAreaOperativa}`);
+  const zonaId = parseIntParam(req.query.zonaUdsId);
+  if (zonaId) conds.push(sql`i.zona_uds_id_snapshot = ${zonaId}`);
+  return conds;
+}
+
+function udsCurrentPeopleScopeConds(req: { query: Record<string, unknown> }, callerAreaOperativa: number | null): SQL[] {
   const conds: SQL[] = [sql`be.uds = true`];
-  const areaOperativaCond = ownOrNullSql(sql`be.area_operativa_id`, callerAreaOperativa);
-  if (areaOperativaCond) conds.push(areaOperativaCond);
+  if (callerAreaOperativa != null) conds.push(sql`be.area_operativa_id = ${callerAreaOperativa}`);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
   if (qAreaOperativa) conds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
-  const zonaId = callerZona ?? parseIntParam(req.query.zonaUdsId);
+  const zonaId = parseIntParam(req.query.zonaUdsId);
   if (zonaId) conds.push(sql`be.zona_uds_id = ${zonaId}`);
   return conds;
 }
@@ -445,8 +463,7 @@ router.get("/report/uds/interventi-per-mese", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
-  conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
+  const conds = udsHistoricalScopeConds(req, callerAreaOperativaId(req));
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 
@@ -488,18 +505,26 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
   // Normalize so callers can pass the range in either order.
   const from = da <= aRaw ? da : aRaw;
   const to = da <= aRaw ? aRaw : da;
-  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
-  conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
+  const conds = udsHistoricalScopeConds(req, callerAreaOperativaId(req));
   const where = sql.join(conds, sql` AND `);
 
   const result = await db.execute(sql`
+    WITH sequenza_uds AS (
+      SELECT i.*,
+             ROW_NUMBER() OVER (
+               PARTITION BY i.beneficiario_id
+               ORDER BY i.data_intervento ASC, i.id ASC
+             ) AS numero
+      FROM interventi i
+      WHERE i.ambito = 'uds'
+    )
     SELECT * FROM (
       SELECT i.id,
              i.beneficiario_id,
              be.cognome,
              be.nome,
              be.soprannome,
-             be.zona_uds_id,
+             i.zona_uds_id_snapshot,
              z.nome AS zona_nome,
              i.data_intervento::text AS data_intervento,
              i.tipo_intervento,
@@ -508,13 +533,10 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
              i.note_uds,
              u.matricola AS operatore_matricola,
              u.username AS operatore_username,
-             ROW_NUMBER() OVER (
-               PARTITION BY i.beneficiario_id
-               ORDER BY i.data_intervento ASC, i.id ASC
-             ) AS numero
-      FROM interventi i
+             i.numero
+      FROM sequenza_uds i
       JOIN beneficiari be ON be.id = i.beneficiario_id
-      LEFT JOIN zone_uds z ON z.id = be.zona_uds_id
+      LEFT JOIN zone_uds z ON z.id = i.zona_uds_id_snapshot
       LEFT JOIN utenti u ON u.id = i.operatore_id
       WHERE ${where}
     ) s
@@ -531,7 +553,7 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
       beneficiarioId: Number(r.beneficiario_id),
       beneficiarioNome: cognome && nome ? `${cognome} ${nome}` : (cognome ?? nome ?? null),
       soprannome: (r.soprannome as string | null) ?? null,
-      zonaUdsId: r.zona_uds_id === null || r.zona_uds_id === undefined ? null : Number(r.zona_uds_id),
+      zonaUdsId: r.zona_uds_id_snapshot === null || r.zona_uds_id_snapshot === undefined ? null : Number(r.zona_uds_id_snapshot),
       zonaNome: (r.zona_nome as string | null) ?? null,
       dataIntervento: r.data_intervento as string,
       tipoIntervento: r.tipo_intervento as string,
@@ -552,8 +574,7 @@ router.get("/report/uds/interventi-per-tipo", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
-  conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
+  const conds = udsHistoricalScopeConds(req, callerAreaOperativaId(req));
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 
@@ -580,20 +601,19 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
     return;
   }
   const { da, a } = range;
-  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
-  conds.push(sql`(i.ambito = 'uds' OR i.ambito IS NULL)`);
+  const conds = udsHistoricalScopeConds(req, callerAreaOperativaId(req));
   conds.push(sql`i.data_intervento::date BETWEEN ${da} AND ${a}`);
   const where = sql.join(conds, sql` AND `);
 
   const result = await db.execute(sql`
-    SELECT be.zona_uds_id as zona_id,
+    SELECT i.zona_uds_id_snapshot as zona_id,
            COALESCE(z.nome, 'Senza zona') as zona_nome,
            COUNT(*) as tot_interventi
     FROM interventi i
     JOIN beneficiari be ON be.id = i.beneficiario_id
-    LEFT JOIN zone_uds z ON z.id = be.zona_uds_id
+    LEFT JOIN zone_uds z ON z.id = i.zona_uds_id_snapshot
     WHERE ${where}
-    GROUP BY be.zona_uds_id, z.nome
+    GROUP BY i.zona_uds_id_snapshot, z.nome
     ORDER BY tot_interventi DESC, zona_nome
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
@@ -605,7 +625,7 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
 });
 
 router.get("/report/uds/persone-per-zona", async (req, res) => {
-  const conds = udsScopeConds(req, callerAreaOperativaId(req), callerZonaUdsId(req));
+  const conds = udsCurrentPeopleScopeConds(req, callerAreaOperativaId(req));
   const where = sql.join(conds, sql` AND `);
 
   const result = await db.execute(sql`

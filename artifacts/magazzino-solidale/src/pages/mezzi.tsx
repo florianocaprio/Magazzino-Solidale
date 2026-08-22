@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListMezzi, useCreateMezzo, useUpdateMezzo, useDeleteMezzo, useBulkMezzi, useListVolontari, useListCentriAscolto, getListMezziQueryKey } from "@workspace/api-client-react";
+import { useListMezzi, useCreateMezzo, useUpdateMezzo, useBulkMezzi, useListVolontari, useListCentriAscolto, getListMezziQueryKey } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,10 +30,13 @@ const NO_VOLONTARIO = "__none__";
 
 export default function Mezzi() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
+  const canCreateGlobal = user?.areaOperativaId == null && !isCentroLocked;
+  const canManage = hasPermission("logistica.mezzi.manage");
+  const canExport = hasPermission("logistica.mezzi.export");
   const formSchema = z.object({
     codice: z.string().optional(),
     tipo: z.string().min(1, t("mezzi.valTipo")),
@@ -48,7 +51,13 @@ export default function Mezzi() {
     scadenzaAssicurazione: z.string().optional(),
     scadenzaRevisione: z.string().optional(),
     note: z.string().optional()
-  });
+  }).refine(
+    (value) => value.proprieta !== "volontario" || (value.volontarioId != null && value.volontarioId !== NO_VOLONTARIO),
+    { path: ["volontarioId"], message: t("mezzi.volontarioRequired", { defaultValue: "Seleziona il volontario proprietario" }) },
+  ).refine(
+    (value) => value.proprieta === "volontario" || canCreateGlobal || (value.centroAscoltoId != null && value.centroAscoltoId !== NO_CENTRO),
+    { path: ["centroAscoltoId"], message: t("mezzi.centroRequired", { defaultValue: "Seleziona un Centro della tua Area Operativa" }) },
+  );
   const { data: mezzi, isLoading } = useListMezzi();
   const { data: volontari } = useListVolontari();
   const { data: centri } = useListCentriAscolto();
@@ -58,11 +67,11 @@ export default function Mezzi() {
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingVersion, setEditingVersion] = useState<number | null>(null);
+  const [retiringMezzo, setRetiringMezzo] = useState<{ id: number; versione: number } | null>(null);
 
   const createMezzo = useCreateMezzo();
   const updateMezzo = useUpdateMezzo();
-  const deleteMezzo = useDeleteMezzo();
   const bulkMezzi = useBulkMezzi();
   const [isImportOpen, setIsImportOpen] = useState(false);
 
@@ -79,6 +88,7 @@ export default function Mezzi() {
 
   const handleEdit = (mezzo: any) => {
     setEditingId(mezzo.id);
+    setEditingVersion(mezzo.versione);
     form.reset({
       codice: mezzo.codice,
       tipo: mezzo.tipo,
@@ -99,6 +109,7 @@ export default function Mezzi() {
 
   const handleCreate = () => {
     setEditingId(null);
+    setEditingVersion(null);
     form.reset({
       codice: "", tipo: "furgone", targa: "", proprieta: "associazione", proprietarioNome: "",
       volontarioId: NO_VOLONTARIO,
@@ -120,8 +131,9 @@ export default function Mezzi() {
           ? null
           : parseInt(centroStr, 10);
     const payload = { ...rest, volontarioId, centroAscoltoId };
-    if (editingId) {
-      updateMezzo.mutate({ id: editingId, data: payload }, {
+    if (editingId && editingVersion != null) {
+      const { codice: _codice, ...update } = payload;
+      updateMezzo.mutate({ id: editingId, data: { ...update, versione: editingVersion } }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
           toast({ title: t("mezzi.toastUpdated") });
@@ -132,20 +144,23 @@ export default function Mezzi() {
       createMezzo.mutate({ data: payload }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
-          toast({ title: t("mezzi.toastCreated") });
+          toast({
+            title: t("mezzi.toastCreated"),
+            description: t("mezzi.pendingCreated", { defaultValue: "Mezzo inserito in attesa di approvazione" }),
+          });
           setIsFormOpen(false);
         }
       });
     }
   };
 
-  const handleDelete = () => {
-    if (!deletingId) return;
-    deleteMezzo.mutate({ id: deletingId }, {
+  const handleRetire = () => {
+    if (!retiringMezzo) return;
+    updateMezzo.mutate({ id: retiringMezzo.id, data: { stato: "ritirato", versione: retiringMezzo.versione } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
-        toast({ title: t("mezzi.toastDeleted") });
-        setDeletingId(null);
+        toast({ title: t("mezzi.toastRetired", { defaultValue: "Mezzo ritirato" }) });
+        setRetiringMezzo(null);
       }
     });
   };
@@ -191,7 +206,7 @@ export default function Mezzi() {
           <p className="text-muted-foreground">{t("mezzi.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons
+          {canExport && <ExportButtons
             rows={mezzi ?? []}
             columns={[
               { header: t("common.code"), accessor: (m) => m.codice },
@@ -208,13 +223,13 @@ export default function Mezzi() {
             filename="mezzi"
             title={t("mezzi.exportTitle")}
             orientation="landscape"
-          />
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+          />}
+          {canManage && <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" /> {t("bulkImport.button")}
-          </Button>
-          <Button onClick={handleCreate} className="gap-2">
+          </Button>}
+          {canManage && <Button onClick={handleCreate} className="gap-2">
             <Plus className="h-4 w-4" /> {t("mezzi.newMezzo")}
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -252,6 +267,9 @@ export default function Mezzi() {
             if (!c) return { error: t("bulkImport.unknownRef", { field: t("common.centro"), value: r.centro }) };
             centroAscoltoId = c.id;
           }
+          if (!volontarioId && !canCreateGlobal && !isCentroLocked && centroAscoltoId == null) {
+            return { error: t("mezzi.centroRequired", { defaultValue: "Seleziona un Centro della tua Area Operativa" }) };
+          }
           let capacitaColli: number | undefined;
           if (r.capacitaColli) {
             const n = Number(r.capacitaColli);
@@ -272,7 +290,7 @@ export default function Mezzi() {
               proprieta: r.proprieta,
               proprietarioNome: r.proprietarioNome || undefined,
               volontarioId,
-              centroAscoltoId,
+              centroAscoltoId: isCentroLocked && volontarioId == null ? lockedCentroId : centroAscoltoId,
               capacitaColli,
               capacitaKg,
               scadenzaAssicurazione: r.scadenzaAssicurazione || undefined,
@@ -384,15 +402,17 @@ export default function Mezzi() {
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={m.stato === 'disponibile' ? 'outline' : 'secondary'} className={
-                      m.stato === 'disponibile' ? 'bg-green-500/10 text-green-700 border-none' : 
-                      m.stato === 'in_uso' ? 'bg-blue-500/10 text-blue-700' : 'bg-destructive/10 text-destructive'
-                    }>
-                      {statoLabel(m.stato)}
-                    </Badge>
+                    <div className="flex flex-col items-center gap-1">
+                      <Badge variant={m.stato === 'disponibile' ? 'outline' : 'secondary'} className={m.stato === 'disponibile' ? 'bg-green-500/10 text-green-700 border-none' : 'bg-destructive/10 text-destructive'}>
+                        {statoLabel(m.stato)}
+                      </Badge>
+                      {m.statoApprovazione === "in_attesa" && (
+                        <Badge variant="secondary" className="bg-amber-500/10 text-amber-700">{t("mezzi.pending", { defaultValue: "In attesa di approvazione" })}</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
+                    {canManage && <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
                           <span className="sr-only">{t("mezzi.openMenu")}</span>
@@ -403,11 +423,11 @@ export default function Mezzi() {
                         <DropdownMenuItem onClick={() => handleEdit(m)}>
                           <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(m.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setRetiringMezzo({ id: m.id, versione: m.versione })}>
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("mezzi.retire", { defaultValue: "Ritira" })}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                    </DropdownMenu>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -490,7 +510,7 @@ export default function Mezzi() {
                         <Select onValueChange={field.onChange} value={field.value} disabled={isCentroLocked}>
                           <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent>
-                            <SelectItem value={NO_CENTRO}>{t("common.centroComune")}</SelectItem>
+                            {canCreateGlobal && <SelectItem value={NO_CENTRO}>{t("common.centroComune")}</SelectItem>}
                             {centri?.map((c) => (
                               <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
                             ))}
@@ -537,12 +557,12 @@ export default function Mezzi() {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+      <AlertDialog open={!!retiringMezzo} onOpenChange={(open) => !open && setRetiringMezzo(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>{t("mezzi.confirmDelete")}</AlertDialogTitle></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">{t("common.delete")}</AlertDialogAction>
+            <AlertDialogAction onClick={handleRetire} className="bg-destructive text-destructive-foreground">{t("mezzi.retire", { defaultValue: "Ritira" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

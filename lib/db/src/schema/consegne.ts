@@ -2,6 +2,8 @@ import { pgTable, serial, varchar, text, boolean, timestamp, integer, date } fro
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { magazziniTable } from "./magazzini";
+import { mezziTable } from "./mezzi";
+import { volontariTable } from "./volontari";
 
 export const consegneTable = pgTable("consegne", {
   id: serial("id").primaryKey(),
@@ -14,9 +16,13 @@ export const consegneTable = pgTable("consegne", {
   indirizzoConsegna: varchar("indirizzo_consegna", { length: 200 }),
   zona: varchar("zona", { length: 80 }),
   magazzinoId: integer("magazzino_id").notNull(),
-  volontarioId: integer("volontario_id"),
+  volontarioId: integer("volontario_id").references(() => volontariTable.id, {
+    onDelete: "restrict",
+  }),
   volontarioAltro: text("volontario_altro"),
-  mezzoId: integer("mezzo_id"),
+  mezzoId: integer("mezzo_id").references(() => mezziTable.id, {
+    onDelete: "restrict",
+  }),
   mezzoAltro: boolean("mezzo_altro").notNull().default(false),
   stato: varchar("stato", { length: 20 }).notNull().default("pianificata"),
   motivo_mancata: text("motivo_mancata"),

@@ -6,6 +6,8 @@ import {
   timestamp,
   integer,
   date,
+  text,
+  boolean,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -26,7 +28,12 @@ export const turniTable = pgTable(
     mezzoId: integer("mezzo_id").references(() => mezziTable.id, {
       onDelete: "set null",
     }),
+    mezzoManuale: boolean("mezzo_manuale").notNull().default(true),
+    stato: varchar("stato", { length: 20 }).notNull().default("pianificato"),
+    motivoAnnullamento: text("motivo_annullamento"),
+    versione: integer("versione").notNull().default(1),
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
+    dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("turni_centro_data_fascia_unique").on(
@@ -46,11 +53,12 @@ export const turniVolontariTable = pgTable(
     id: serial("id").primaryKey(),
     turnoId: integer("turno_id")
       .notNull()
-      .references(() => turniTable.id, { onDelete: "cascade" }),
+      .references(() => turniTable.id, { onDelete: "restrict" }),
     volontarioId: integer("volontario_id")
       .notNull()
       .references(() => volontariTable.id, { onDelete: "restrict" }),
     ruolo: varchar("ruolo", { length: 80 }),
+    manuale: boolean("manuale").notNull().default(true),
   },
   (table) => [
     uniqueIndex("turni_volontari_turno_volontario_unique").on(
@@ -62,7 +70,9 @@ export const turniVolontariTable = pgTable(
 
 export const insertTurnoSchema = createInsertSchema(turniTable).omit({
   id: true,
+  versione: true,
   dataCreazione: true,
+  dataAggiornamento: true,
 });
 export type InsertTurno = z.infer<typeof insertTurnoSchema>;
 export type Turno = typeof turniTable.$inferSelect;

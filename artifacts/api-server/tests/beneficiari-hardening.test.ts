@@ -250,7 +250,8 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
   it("accetta Area/Centro/Zona/Emporio coerenti e normalizza il codice fiscale", async () => {
     const response = await request(socialAreaA()).post("/beneficiari").send({
       nome: "Coerente", cognome: "Area", sesso: "ALTRO", centroAscoltoId: centerA,
-      zonaUdsId: zoneA, magazzinoEmporioPreferitoId: emporioA, codiceFiscale: "  abc123  ", priorita: "urgente",
+      uds: true, zonaUdsId: zoneA, areaProvenienza: "UE", fasciaEtaPresunta: "30_64",
+      magazzinoEmporioPreferitoId: emporioA, codiceFiscale: "  abc123  ", priorita: "urgente",
     });
     expect(response.status).toBe(201);
     expect(response.body.codiceFiscale).toBe("ABC123");
@@ -288,7 +289,7 @@ describe("hardening Beneficiari: RBAC, DTO e scope", () => {
 });
 
 describe("hardening Beneficiari: privacy, locking e storico", () => {
-  it("separa dossier Sociale/UDS e mantiene la directory UDS Area-wide", async () => {
+  it("separa il dossier Sociale e nega il dossier completo UDS fuori scope ordinario", async () => {
     const person = await insertBeneficiary({
       centroAscoltoId: centerA,
       zonaUdsId: zoneA,
@@ -299,17 +300,12 @@ describe("hardening Beneficiari: privacy, locking e storico", () => {
       creditoSolidaleSaldo: "77",
     });
     const [social] = await db.insert(interventiTable).values({ beneficiarioId: person.id, tipoIntervento: "Sociale", ambito: "sociale", note: "nota social" }).returning({ id: interventiTable.id });
-    const [uds] = await db.insert(interventiTable).values({ beneficiarioId: person.id, tipoIntervento: "UDS", ambito: "uds", noteUds: "nota uds" }).returning({ id: interventiTable.id });
+    const [uds] = await db.insert(interventiTable).values({ beneficiarioId: person.id, tipoIntervento: "UDS", ambito: "uds", areaOperativaIdSnapshot: areaA, zonaUdsIdSnapshot: zoneA, noteUds: "nota uds" }).returning({ id: interventiTable.id });
     interventionIds.push(social.id, uds.id);
 
     const udsApp = makeApp({ areaOperativaId: areaA, centroAscoltoId: centerB, zonaUdsId: null, aree: ["uds"], permessi: ["beneficiari.view", "beneficiari.manage"] });
     const udsDetail = await request(udsApp).get(`/beneficiari/${person.id}`);
-    expect(udsDetail.status).toBe(200);
-    expect(udsDetail.body).not.toHaveProperty("codiceFiscale");
-    expect(udsDetail.body).not.toHaveProperty("noteInterne");
-    expect(udsDetail.body).not.toHaveProperty("creditoSolidaleSaldo");
-    expect(udsDetail.body.nucleo).toEqual([]);
-    expect(udsDetail.body.interventi.map((row: { ambito: string }) => row.ambito)).toEqual(["uds"]);
+    expect(udsDetail.status).toBe(403);
 
     const socialDetail = await request(socialAreaA()).get(`/beneficiari/${person.id}`);
     expect(socialDetail.status).toBe(200);

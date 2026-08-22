@@ -374,11 +374,12 @@ export interface VolontarioInput {
   centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
-  ruolo: string;
+  /** @minimum 1 */
+  ruoloVolontarioId: number;
   patente?: boolean;
   mezzoPersonale?: boolean;
+  /** @minimum 0 */
   maxConsegneTurno?: number;
-  statoApprovazione?: string;
   note?: string;
 }
 
@@ -396,10 +397,11 @@ export interface MezzoInput {
   volontarioId?: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /** @minimum 0 */
   capacitaColli?: number;
+  /** @minimum 0 */
   capacitaKg?: number;
   descrizione?: string;
-  statoApprovazione?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;
@@ -1173,6 +1175,25 @@ export interface ApprovvigionamentoUpdate {
   righe?: ApprovvigionamentoRigaInput[];
 }
 
+export type TurnoFascia = typeof TurnoFascia[keyof typeof TurnoFascia];
+
+
+export const TurnoFascia = {
+  '09-13': '09-13',
+  '14-18': '14-18',
+  '18-20': '18-20',
+} as const;
+
+export type TurnoStato = typeof TurnoStato[keyof typeof TurnoStato];
+
+
+export const TurnoStato = {
+  pianificato: 'pianificato',
+  confermato: 'confermato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
 export interface TurnoVolontario {
   volontarioId: number;
   /** @nullable */
@@ -1189,7 +1210,7 @@ export interface Turno {
   /** @nullable */
   centroAscoltoNome?: string | null;
   data: string;
-  fascia: string;
+  fascia: TurnoFascia;
   /** @nullable */
   mezzoId?: number | null;
   /** @nullable */
@@ -1198,8 +1219,23 @@ export interface Turno {
   mezzoTipo?: string | null;
   /** @nullable */
   mezzoStatoApprovazione?: string | null;
+  stato: TurnoStato;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @minimum 1 */
+  versione: number;
+  dataAggiornamento: string;
   volontari: TurnoVolontario[];
 }
+
+export type TurnoInputFascia = typeof TurnoInputFascia[keyof typeof TurnoInputFascia];
+
+
+export const TurnoInputFascia = {
+  '09-13': '09-13',
+  '14-18': '14-18',
+  '18-20': '18-20',
+} as const;
 
 export interface TurnoVolontarioInput {
   volontarioId: number;
@@ -1209,10 +1245,12 @@ export interface TurnoVolontarioInput {
 export interface TurnoInput {
   centroAscoltoId: number;
   data: string;
-  fascia: string;
+  fascia: TurnoInputFascia;
   /** @nullable */
   mezzoId?: number | null;
   volontari: TurnoVolontarioInput[];
+  /** @minimum 1 */
+  versione?: number;
 }
 
 export interface TurnoVolontarioPendingInput {
@@ -1223,6 +1261,8 @@ export interface TurnoVolontarioPendingInput {
   telefono?: string;
   email?: string;
   ruolo?: string;
+  /** @minimum 1 */
+  ruoloVolontarioId: number;
   patente?: boolean;
   note?: string;
 }
@@ -1238,6 +1278,28 @@ export interface TurnoMezzoPendingInput {
   capacitaKg?: number;
   descrizione?: string;
   note?: string;
+}
+
+export type TurnoStatoInputStato = typeof TurnoStatoInputStato[keyof typeof TurnoStatoInputStato];
+
+
+export const TurnoStatoInputStato = {
+  confermato: 'confermato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+export interface TurnoStatoInput {
+  stato: TurnoStatoInputStato;
+  /** @minimum 1 */
+  versione: number;
+  motivoAnnullamento?: string;
+}
+
+export interface AnnullaTurnoInput {
+  /** @minimum 1 */
+  versione: number;
+  motivoAnnullamento?: string;
 }
 
 export interface BeneficiarioSimile {
@@ -1664,6 +1726,10 @@ export interface Intervento {
   centroAscoltoNome: string | null;
   /** @nullable */
   areaOperativaId: number | null;
+  /** @nullable */
+  areaOperativaIdSnapshot?: number | null;
+  /** @nullable */
+  zonaUdsIdSnapshot?: number | null;
   /** @nullable */
   dataIntervento: string | null;
   tipoIntervento: string;
@@ -2555,6 +2621,9 @@ export interface ZonaUds {
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
+  /** @minimum 1 */
+  versione: number;
+  dataAggiornamento: string;
 }
 
 export interface ZonaUdsInput {
@@ -2571,6 +2640,238 @@ export interface ZonaUdsUpdate {
   nome?: string;
   attivo?: boolean;
   note?: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface ZonaUdsVersioneInput {
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface UdsDirectoryExportInput {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  search?: string;
+  /** @minimum 1 */
+  areaOperativaId?: number;
+  /** @minimum 1 */
+  zonaUdsId?: number;
+}
+
+export type UdsDirectoryItemFasciaEtaCorrente = typeof UdsDirectoryItemFasciaEtaCorrente[keyof typeof UdsDirectoryItemFasciaEtaCorrente];
+
+
+export const UdsDirectoryItemFasciaEtaCorrente = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+export type UdsDirectoryItemCanale = typeof UdsDirectoryItemCanale[keyof typeof UdsDirectoryItemCanale];
+
+
+export const UdsDirectoryItemCanale = {
+  uds: 'uds',
+  uds_centro: 'uds_centro',
+} as const;
+
+/**
+ * Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.
+ */
+export interface UdsDirectoryItem {
+  id: number;
+  codice: string;
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  soprannome: string | null;
+  fasciaEtaCorrente: UdsDirectoryItemFasciaEtaCorrente;
+  /** @nullable */
+  zonaUdsId: number | null;
+  /** @nullable */
+  zonaUdsNome: string | null;
+  canale: UdsDirectoryItemCanale;
+  accessoCompleto: boolean;
+}
+
+export type UdsLinkCandidateItemFasciaEtaCorrente = typeof UdsLinkCandidateItemFasciaEtaCorrente[keyof typeof UdsLinkCandidateItemFasciaEtaCorrente];
+
+
+export const UdsLinkCandidateItemFasciaEtaCorrente = {
+  '0_17': '0_17',
+  '18_29': '18_29',
+  '30_64': '30_64',
+  '65_plus': '65_plus',
+  non_determinata: 'non_determinata',
+} as const;
+
+/**
+ * Candidato attivo non ancora UDS; non contiene dossier, Centro o PII estesa.
+ */
+export interface UdsLinkCandidateItem {
+  id: number;
+  codice: string;
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  soprannome: string | null;
+  fasciaEtaCorrente: UdsLinkCandidateItemFasciaEtaCorrente;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export type UdsInterventoStato = typeof UdsInterventoStato[keyof typeof UdsInterventoStato];
+
+
+export const UdsInterventoStato = {
+  concluso: 'concluso',
+} as const;
+
+export type UdsInterventoAmbito = typeof UdsInterventoAmbito[keyof typeof UdsInterventoAmbito];
+
+
+export const UdsInterventoAmbito = {
+  uds: 'uds',
+} as const;
+
+export interface UdsIntervento {
+  id: number;
+  beneficiarioId: number;
+  /** @nullable */
+  operatoreId: number | null;
+  /** @nullable */
+  dataIntervento: string | null;
+  tipoIntervento: string;
+  /** @nullable */
+  descrizione: string | null;
+  /** @nullable */
+  note: string | null;
+  /** @nullable */
+  noteUds: string | null;
+  stato: UdsInterventoStato;
+  ambito: UdsInterventoAmbito;
+  /** @nullable */
+  areaOperativaIdSnapshot: number | null;
+  /** @nullable */
+  zonaUdsIdSnapshot: number | null;
+  territorioStoricoClassificato: boolean;
+  /** @nullable */
+  dataOraConclusione: string | null;
+  dataCreazione: string;
+  /** @nullable */
+  dataAggiornamento: string | null;
+  /** @nullable */
+  versione: string | null;
+}
+
+export type BisognoPianificatoInputTipo = typeof BisognoPianificatoInputTipo[keyof typeof BisognoPianificatoInputTipo];
+
+
+export const BisognoPianificatoInputTipo = {
+  richiesta: 'richiesta',
+  azione: 'azione',
+} as const;
+
+export type BisognoPianificatoInputStato = typeof BisognoPianificatoInputStato[keyof typeof BisognoPianificatoInputStato];
+
+
+export const BisognoPianificatoInputStato = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+export type BisognoPianificatoInputPriorita = typeof BisognoPianificatoInputPriorita[keyof typeof BisognoPianificatoInputPriorita];
+
+
+export const BisognoPianificatoInputPriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export interface BisognoPianificatoInput {
+  tipo: BisognoPianificatoInputTipo;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  descrizione: string;
+  stato?: BisognoPianificatoInputStato;
+  /** @nullable */
+  dataPrevista?: string | null;
+  priorita?: BisognoPianificatoInputPriorita;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
+}
+
+export interface UdsInterventoInput {
+  beneficiarioId: number;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  tipoIntervento: string;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  descrizione?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  note?: string | null;
+  bisogniPianificati?: BisognoPianificatoInput[];
+}
+
+export interface UdsInterventoNotaInput {
+  versione: string;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  noteUds?: string | null;
+}
+
+export interface UdsInterventoRettificaInput {
+  versione: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  motivo: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  tipoIntervento?: string;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  descrizione?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  note?: string | null;
+  dataIntervento?: string;
 }
 
 export interface CentroAscolto {
@@ -3073,6 +3374,8 @@ export const BisognoPianificatoUpsertPriorita = {
 
 export interface BisognoPianificatoUpsert {
   id?: number;
+  /** @minimum 1 */
+  versione?: number;
   tipo: BisognoPianificatoUpsertTipo;
   /**
      * @minLength 1
@@ -3088,6 +3391,11 @@ export interface BisognoPianificatoUpsert {
      * @nullable
      */
   note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
 }
 
 export interface InterventoInput {
@@ -3157,7 +3465,6 @@ export interface InterventoUpdate {
   esito?: string;
   prossimAzione?: string;
   note?: string;
-  noteUds?: string;
   dataFollowup?: string;
   scadenzaIsee?: string;
   scadenzaRinnovo?: string;
@@ -3544,56 +3851,12 @@ export interface BisognoPianificato {
      * @nullable
      */
   note: string | null;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   dataCompletamento: string | null;
   dataCreazione: string;
   dataAggiornamento: string;
-}
-
-export type BisognoPianificatoInputTipo = typeof BisognoPianificatoInputTipo[keyof typeof BisognoPianificatoInputTipo];
-
-
-export const BisognoPianificatoInputTipo = {
-  richiesta: 'richiesta',
-  azione: 'azione',
-} as const;
-
-export type BisognoPianificatoInputStato = typeof BisognoPianificatoInputStato[keyof typeof BisognoPianificatoInputStato];
-
-
-export const BisognoPianificatoInputStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  completato: 'completato',
-  annullato: 'annullato',
-} as const;
-
-export type BisognoPianificatoInputPriorita = typeof BisognoPianificatoInputPriorita[keyof typeof BisognoPianificatoInputPriorita];
-
-
-export const BisognoPianificatoInputPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
-} as const;
-
-export interface BisognoPianificatoInput {
-  tipo: BisognoPianificatoInputTipo;
-  /**
-     * @minLength 1
-     * @maxLength 500
-     */
-  descrizione: string;
-  stato?: BisognoPianificatoInputStato;
-  /** @nullable */
-  dataPrevista?: string | null;
-  priorita?: BisognoPianificatoInputPriorita;
-  /**
-     * @maxLength 2000
-     * @nullable
-     */
-  note?: string | null;
 }
 
 export type BisognoPianificatoUpdateTipo = typeof BisognoPianificatoUpdateTipo[keyof typeof BisognoPianificatoUpdateTipo];
@@ -3625,6 +3888,8 @@ export const BisognoPianificatoUpdatePriorita = {
 } as const;
 
 export interface BisognoPianificatoUpdate {
+  /** @minimum 1 */
+  versione: number;
   tipo?: BisognoPianificatoUpdateTipo;
   /**
      * @minLength 1
@@ -3640,6 +3905,47 @@ export interface BisognoPianificatoUpdate {
      * @nullable
      */
   note?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
+}
+
+export type BisognoPianificatoStoricoStatoNuovo = typeof BisognoPianificatoStoricoStatoNuovo[keyof typeof BisognoPianificatoStoricoStatoNuovo];
+
+
+export const BisognoPianificatoStoricoStatoNuovo = {
+  da_pianificare: 'da_pianificare',
+  pianificato: 'pianificato',
+  completato: 'completato',
+  annullato: 'annullato',
+} as const;
+
+/**
+ * @nullable
+ */
+export type BisognoPianificatoStoricoValorePrecedente = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type BisognoPianificatoStoricoValoreNuovo = { [key: string]: unknown } | null;
+
+export interface BisognoPianificatoStorico {
+  id: number;
+  bisognoId: number;
+  statoPrecedente: 'da_pianificare' | 'pianificato' | 'completato' | 'annullato' | null;
+  statoNuovo: BisognoPianificatoStoricoStatoNuovo;
+  /** @nullable */
+  operatoreId: number | null;
+  dataTransizione: string;
+  /** @nullable */
+  motivo: string | null;
+  /** @nullable */
+  valorePrecedente: BisognoPianificatoStoricoValorePrecedente;
+  /** @nullable */
+  valoreNuovo: BisognoPianificatoStoricoValoreNuovo;
 }
 
 export type AccessoEmporioStato = typeof AccessoEmporioStato[keyof typeof AccessoEmporioStato];
@@ -4190,6 +4496,7 @@ export interface ConsegnaInput {
   tipoConsegna: string;
   dataPrevista: string;
   fasciaOraria?: string;
+  /** @maxLength 200 */
   indirizzoConsegna?: string;
   zona?: string;
   magazzinoId: number;
@@ -4204,6 +4511,7 @@ export interface ConsegnaUpdate {
   tipoConsegna?: string;
   dataPrevista?: string;
   fasciaOraria?: string;
+  /** @maxLength 200 */
   indirizzoConsegna?: string;
   zona?: string;
   volontarioId?: number;
@@ -4424,6 +4732,15 @@ export interface BollaUpdate {
   noteConsegna?: string | null;
 }
 
+export type VolontarioStatoApprovazione = typeof VolontarioStatoApprovazione[keyof typeof VolontarioStatoApprovazione];
+
+
+export const VolontarioStatoApprovazione = {
+  in_attesa: 'in_attesa',
+  approvato: 'approvato',
+  respinto: 'respinto',
+} as const;
+
 export interface Volontario {
   id: number;
   nome: string;
@@ -4439,14 +4756,22 @@ export interface Volontario {
   /** @nullable */
   email?: string | null;
   ruolo: string;
+  /** @nullable */
+  ruoloVolontarioId?: number | null;
+  /** @nullable */
+  ruoloCatalogoNome?: string | null;
   patente: boolean;
   mezzoPersonale: boolean;
+  /** @minimum 0 */
   maxConsegneTurno: number;
   attivo: boolean;
-  statoApprovazione?: string;
+  statoApprovazione: VolontarioStatoApprovazione;
   /** @nullable */
   note?: string | null;
+  /** @minimum 1 */
+  versione: number;
   dataCreazione: string;
+  dataAggiornamento: string;
 }
 
 export interface VolontarioUpdate {
@@ -4457,14 +4782,37 @@ export interface VolontarioUpdate {
   centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
-  ruolo?: string;
+  /** @minimum 1 */
+  ruoloVolontarioId?: number;
   patente?: boolean;
   mezzoPersonale?: boolean;
+  /** @minimum 0 */
   maxConsegneTurno?: number;
   attivo?: boolean;
-  statoApprovazione?: string;
   note?: string;
+  /** @minimum 1 */
+  versione: number;
 }
+
+export type MezzoStato = typeof MezzoStato[keyof typeof MezzoStato];
+
+
+export const MezzoStato = {
+  disponibile: 'disponibile',
+  non_disponibile: 'non_disponibile',
+  manutenzione: 'manutenzione',
+  respinto: 'respinto',
+  ritirato: 'ritirato',
+} as const;
+
+export type MezzoStatoApprovazione = typeof MezzoStatoApprovazione[keyof typeof MezzoStatoApprovazione];
+
+
+export const MezzoStatoApprovazione = {
+  in_attesa: 'in_attesa',
+  approvato: 'approvato',
+  respinto: 'respinto',
+} as const;
 
 export interface Mezzo {
   id: number;
@@ -4491,16 +4839,30 @@ export interface Mezzo {
   capacitaKg?: number | null;
   /** @nullable */
   descrizione?: string | null;
-  stato: string;
-  statoApprovazione?: string;
+  stato: MezzoStato;
+  statoApprovazione: MezzoStatoApprovazione;
   /** @nullable */
   scadenzaAssicurazione?: string | null;
   /** @nullable */
   scadenzaRevisione?: string | null;
   /** @nullable */
   note?: string | null;
+  /** @minimum 1 */
+  versione: number;
   dataCreazione: string;
+  dataAggiornamento: string;
 }
+
+export type MezzoUpdateStato = typeof MezzoUpdateStato[keyof typeof MezzoUpdateStato];
+
+
+export const MezzoUpdateStato = {
+  disponibile: 'disponibile',
+  non_disponibile: 'non_disponibile',
+  manutenzione: 'manutenzione',
+  respinto: 'respinto',
+  ritirato: 'ritirato',
+} as const;
 
 export interface MezzoUpdate {
   tipo?: string;
@@ -4511,18 +4873,23 @@ export interface MezzoUpdate {
   volontarioId?: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /** @minimum 0 */
   capacitaColli?: number;
+  /** @minimum 0 */
   capacitaKg?: number;
   descrizione?: string;
-  stato?: string;
-  statoApprovazione?: string;
+  stato?: MezzoUpdateStato;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface ActionResult {
   ok: boolean;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface ApprovazioneVolontario {
@@ -4545,6 +4912,8 @@ export interface ApprovazioneVolontario {
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface ApprovazioneMezzo {
@@ -4567,6 +4936,8 @@ export interface ApprovazioneMezzo {
   /** @nullable */
   note?: string | null;
   dataCreazione: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface ApprovazioniLogistica {
@@ -6133,6 +6504,41 @@ export const GetMaterialeDaPrepararePeriodo = {
   personalizzato: 'personalizzato',
 } as const;
 
+export type ListUdsDirectoryParams = {
+/**
+ * @minLength 2
+ * @maxLength 120
+ */
+search?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * Disponibile soltanto ai profili amministrativi globali.
+ */
+areaOperativaId?: number;
+zonaUdsId?: number;
+};
+
+export type ListUdsLinkCandidatesParams = {
+/**
+ * @minLength 2
+ * @maxLength 120
+ */
+search: string;
+/**
+ * Disponibile soltanto ai profili amministrativi globali.
+ * @minimum 1
+ */
+areaOperativaId?: number;
+};
+
 export type ListConsegneParams = {
 stato?: string;
 data?: string;
@@ -6275,6 +6681,10 @@ a?: MapsAParameter;
 
 export type ListZoneUdsParams = {
 areaOperativaId?: number;
+/**
+ * Riservato ai profili amministrativi.
+ */
+includiInattive?: boolean;
 };
 
 export type ListSuperAdminAuditConfigurazioniParams = {
@@ -6369,12 +6779,31 @@ export type GetVolontariCaricoParams = {
  */
 data: string;
 excludeConsegnaId?: number;
-excludeBollaId?: number;
+fascia: GetVolontariCaricoFascia;
 };
+
+export type GetVolontariCaricoFascia = typeof GetVolontariCaricoFascia[keyof typeof GetVolontariCaricoFascia];
+
+
+export const GetVolontariCaricoFascia = {
+  '09-13': '09-13',
+  '14-18': '14-18',
+  '18-20': '18-20',
+} as const;
 
 export type GetVolontariCarico200Item = {
   volontarioId: number;
   count: number;
+};
+
+export type DeleteVolontario200 = {
+  disattivato: true;
+  versione: number;
+};
+
+export type DeleteMezzo200 = {
+  ritirato: true;
+  versione: number;
 };
 
 export type ReportGiacenzePerMagazzinoParams = {

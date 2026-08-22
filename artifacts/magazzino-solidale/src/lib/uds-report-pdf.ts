@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable, { type CellHookData } from "jspdf-autotable";
 import { loadDocumentLogoDataUrl, resolveBrandingAmbiente, type BrandingAmbiente } from "@/lib/branding-ambiente";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 export type UdsReportPdfRow = {
   numeroIntervento: number;
@@ -38,7 +39,7 @@ export type UdsReportPdfMeta = {
 };
 
 function timestamp(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayEuropeRome();
 }
 
 function imageSize(dataUrl: string): Promise<{ w: number; h: number }> {

@@ -16,10 +16,11 @@ export interface MezzoInput {
   volontarioId?: number | null;
   /** @nullable */
   centroAscoltoId?: number | null;
+  /** @minimum 0 */
   capacitaColli?: number;
+  /** @minimum 0 */
   capacitaKg?: number;
   descrizione?: string;
-  statoApprovazione?: string;
   scadenzaAssicurazione?: string;
   scadenzaRevisione?: string;
   note?: string;

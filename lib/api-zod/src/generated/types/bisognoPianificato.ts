@@ -24,6 +24,8 @@ export interface BisognoPianificato {
      * @nullable
      */
   note: string | null;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   dataCompletamento: string | null;
   dataCreazione: string;

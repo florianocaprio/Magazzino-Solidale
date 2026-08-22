@@ -5,6 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { TurnoFascia } from './turnoFascia';
+import type { TurnoStato } from './turnoStato';
 import type { TurnoVolontario } from './turnoVolontario';
 
 export interface Turno {
@@ -13,7 +15,7 @@ export interface Turno {
   /** @nullable */
   centroAscoltoNome?: string | null;
   data: string;
-  fascia: string;
+  fascia: TurnoFascia;
   /** @nullable */
   mezzoId?: number | null;
   /** @nullable */
@@ -22,5 +24,11 @@ export interface Turno {
   mezzoTipo?: string | null;
   /** @nullable */
   mezzoStatoApprovazione?: string | null;
+  stato: TurnoStato;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @minimum 1 */
+  versione: number;
+  dataAggiornamento: string;
   volontari: TurnoVolontario[];
 }

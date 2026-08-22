@@ -102,6 +102,16 @@ export const SOCIALE_INTERVENTI_PERMISSIONS = [
   },
 ] as const;
 
+export const UDS_PERMISSIONS = [
+  { key: "uds.directory.view", label: "UDS: directory minimizzata" },
+  { key: "uds.interventi.view", label: "UDS: consultazione interventi" },
+  { key: "uds.interventi.create", label: "UDS: registrazione interventi" },
+  { key: "uds.interventi.update", label: "UDS: rettifica interventi" },
+  { key: "uds.interventi.note", label: "UDS: annotazioni operative" },
+  { key: "uds.bisogni.manage", label: "UDS: gestione Bisogni Pianificati" },
+  { key: "uds.reports.view", label: "UDS: consultazione report" },
+] as const;
+
 export const MAPS_PERMISSIONS = [
   {
     key: "maps.route",
@@ -110,6 +120,25 @@ export const MAPS_PERMISSIONS = [
   {
     key: "maps.operational",
     label: "MAPS: accesso alla mappa operativa",
+  },
+] as const;
+
+export const LOGISTICA_PERMISSIONS = [
+  { key: "logistica.volontari.view", label: "Logistica: consultazione volontari" },
+  { key: "logistica.volontari.manage", label: "Logistica: gestione volontari" },
+  { key: "logistica.volontari.export", label: "Logistica: esportazione volontari" },
+  { key: "logistica.mezzi.view", label: "Logistica: consultazione mezzi" },
+  { key: "logistica.mezzi.manage", label: "Logistica: gestione mezzi" },
+  { key: "logistica.mezzi.export", label: "Logistica: esportazione mezzi" },
+  { key: "logistica.turni.view", label: "Logistica: consultazione turni" },
+  { key: "logistica.turni.manage", label: "Logistica: gestione turni" },
+  {
+    key: "logistica.approvazioni.view",
+    label: "Logistica: consultazione approvazioni",
+  },
+  {
+    key: "logistica.approvazioni.manage",
+    label: "Logistica: gestione approvazioni",
   },
 ] as const;
 
@@ -165,7 +194,9 @@ export const ALL_PERMISSIONS = [
   ...EMPORIO_ACCESS_PERMISSIONS,
   ...EMPORIO_CASSA_SALES_PERMISSIONS,
   ...SOCIALE_INTERVENTI_PERMISSIONS,
+  ...UDS_PERMISSIONS,
   ...MAPS_PERMISSIONS,
+  ...LOGISTICA_PERMISSIONS,
   ...MAGAZZINO_PERMISSIONS,
   ...BOLLE_PERMISSIONS,
   ...APPROVVIGIONAMENTI_PERMISSIONS,

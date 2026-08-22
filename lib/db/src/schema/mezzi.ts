@@ -16,14 +16,21 @@ export const mezziTable = pgTable("mezzi", {
   capacitaColli: integer("capacita_colli"),
   capacitaKg: decimal("capacita_kg", { precision: 8, scale: 2 }),
   descrizione: text("descrizione"),
-  stato: varchar("stato", { length: 20 }).notNull().default("disponibile"),
-  statoApprovazione: varchar("stato_approvazione", { length: 20 }).notNull().default("approvato"),
+  stato: varchar("stato", { length: 20 }).notNull().default("non_disponibile"),
+  statoApprovazione: varchar("stato_approvazione", { length: 20 }).notNull().default("in_attesa"),
   scadenzaAssicurazione: date("scadenza_assicurazione"),
   scadenzaRevisione: date("scadenza_revisione"),
   note: text("note"),
+  versione: integer("versione").notNull().default(1),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
+  dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
 });
 
-export const insertMezzoSchema = createInsertSchema(mezziTable).omit({ id: true, dataCreazione: true });
+export const insertMezzoSchema = createInsertSchema(mezziTable).omit({
+  id: true,
+  versione: true,
+  dataCreazione: true,
+  dataAggiornamento: true,
+});
 export type InsertMezzo = z.infer<typeof insertMezzoSchema>;
 export type Mezzo = typeof mezziTable.$inferSelect;

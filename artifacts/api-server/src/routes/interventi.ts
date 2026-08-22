@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import {
   beneficiariTable,
   bisogniPianificatiTable,
+  bisogniPianificatiStoricoTable,
   centriAscoltoTable,
   db,
   interventiAttivitaTable,
@@ -79,6 +80,7 @@ import {
   creaScaricoInventariale,
   InventoryError,
 } from "../lib/scaricoInventory";
+import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
 
 const router: IRouter = Router();
 
@@ -103,6 +105,7 @@ type SocialInterventoPermission = Extract<
   PermissionKey,
   `sociale.interventi.${string}`
 >;
+type UdsPermission = Extract<PermissionKey, `uds.${string}`>;
 
 const MATERIALE_STATI = [
   "da_preparare",
@@ -149,12 +152,14 @@ interface DocumentoOperativoInput {
 
 interface BisognoInput {
   id?: number;
+  versione?: unknown;
   tipo?: unknown;
   descrizione?: unknown;
   stato?: unknown;
   dataPrevista?: unknown;
   priorita?: unknown;
   note?: unknown;
+  motivo?: unknown;
 }
 
 interface BisogniSummary {
@@ -213,6 +218,30 @@ function requireSocialInterventoPermission(
   if (!hasSocialInterventoPermission(req, permission)) {
     throw new RouteError(403, "Permesso Interventi Sociali non consentito");
   }
+}
+
+function hasUdsInterventoPermission(
+  req: Request,
+  permission: UdsPermission,
+): boolean {
+  return Boolean(req.user?.isAdmin || req.user?.permessi?.includes(permission));
+}
+
+function requireUdsInterventoPermission(
+  req: Request,
+  permission: UdsPermission,
+): void {
+  if (!hasUdsInterventoPermission(req, permission)) {
+    throw new RouteError(403, "Permesso Interventi UDS non consentito");
+  }
+}
+
+function udsPermissionForSocialPermission(
+  permission: SocialInterventoPermission,
+): UdsPermission {
+  return permission === "sociale.interventi.view"
+    ? "uds.interventi.view"
+    : "uds.interventi.update";
 }
 
 function moduloServizioIntervento(
@@ -571,6 +600,56 @@ function formatBisogno(row: BisognoPianificato) {
   };
 }
 
+function bisognoAuditValue(row: BisognoPianificato): Record<string, unknown> {
+  return {
+    id: row.id,
+    interventoId: row.interventoId,
+    tipo: row.tipo,
+    descrizione: row.descrizione,
+    stato: row.stato,
+    dataPrevista: row.dataPrevista,
+    priorita: row.priorita,
+    note: row.note,
+    versione: row.versione,
+    dataCompletamento: row.dataCompletamento?.toISOString() ?? null,
+    dataCreazione: row.dataCreazione.toISOString(),
+    dataAggiornamento: row.dataAggiornamento.toISOString(),
+  };
+}
+
+function expectedBisognoVersion(input: BisognoInput): number {
+  const versione = parsePositiveInteger(input.versione);
+  if (versione == null) {
+    throw new RouteError(
+      400,
+      "La versione del Bisogno Pianificato è obbligatoria",
+    );
+  }
+  return versione;
+}
+
+function bisognoMotivo(input: BisognoInput): string | null {
+  return nullableText(input.motivo, "Il motivo", 2000);
+}
+
+async function appendBisognoHistory(
+  tx: DbTransaction,
+  before: BisognoPianificato | null,
+  after: BisognoPianificato,
+  operatoreId: number,
+  motivo: string | null,
+): Promise<void> {
+  await tx.insert(bisogniPianificatiStoricoTable).values({
+    bisognoId: after.id,
+    statoPrecedente: before?.stato ?? null,
+    statoNuovo: after.stato,
+    operatoreId,
+    motivo,
+    valorePrecedente: before ? bisognoAuditValue(before) : null,
+    valoreNuovo: bisognoAuditValue(after),
+  });
+}
+
 const emptySummary = (): BisogniSummary => ({
   totale: 0,
   aperti: 0,
@@ -617,7 +696,12 @@ function formatIntervento(
     operatoreNome: details.operatoreNome ?? null,
     centroAscoltoId: details.centroAscoltoId ?? null,
     centroAscoltoNome: details.centroAscoltoNome ?? null,
-    areaOperativaId: details.areaOperativaId ?? null,
+    areaOperativaId:
+      row.ambito === "uds"
+        ? (row.areaOperativaIdSnapshot ?? null)
+        : (details.areaOperativaId ?? null),
+    areaOperativaIdSnapshot: row.areaOperativaIdSnapshot ?? null,
+    zonaUdsIdSnapshot: row.zonaUdsIdSnapshot ?? null,
     dataIntervento: row.dataIntervento ?? null,
     tipoIntervento: row.tipoIntervento,
     descrizione: row.descrizione ?? null,
@@ -1289,17 +1373,9 @@ function canAccessInterventoAmbito(
       canUseInterventoArea(req, "uds") &&
       beneficiario.uds === true &&
       beneficiario.areaOperativaId != null &&
-      (callerAreaOperativa == null || beneficiario.areaOperativaId === callerAreaOperativa)
+      (callerAreaOperativa == null ||
+        beneficiario.areaOperativaId === callerAreaOperativa)
     );
-  }
-  if (
-    ambito == null &&
-    canUseInterventoArea(req, "uds") &&
-    beneficiario.uds === true &&
-    beneficiario.areaOperativaId != null &&
-    (callerAreaOperativa == null || beneficiario.areaOperativaId === callerAreaOperativa)
-  ) {
-    return true;
   }
   return canAccessSensitiveSocialBeneficiary(beneficiario, req);
 }
@@ -1330,7 +1406,10 @@ function canAccessSensitiveSocialBeneficiary(
   req: Request,
 ): boolean {
   if (!canUseInterventoArea(req, "sociale")) return false;
-  if (beneficiario.areaOperativaId == null || beneficiario.centroAscoltoId == null) {
+  if (
+    beneficiario.areaOperativaId == null ||
+    beneficiario.centroAscoltoId == null
+  ) {
     return !isTerritoriallyScoped(req) && canAccessUnassignedSocialFolder(req);
   }
   if (!isTerritoriallyScoped(req)) return true;
@@ -1338,7 +1417,8 @@ function canAccessSensitiveSocialBeneficiary(
   const callerCentro = callerCentroId(req);
   const callerZona = callerZonaUdsId(req);
   return (
-    (callerAreaOperativa == null || beneficiario.areaOperativaId === callerAreaOperativa) &&
+    (callerAreaOperativa == null ||
+      beneficiario.areaOperativaId === callerAreaOperativa) &&
     (callerCentro == null || beneficiario.centroAscoltoId === callerCentro) &&
     (callerZona == null || beneficiario.zonaUdsId === callerZona)
   );
@@ -1389,7 +1469,8 @@ async function canAssignSocialOperator(
   const beneficiary = await beneficiarioAccess(beneficiarioId);
   if (!beneficiary) return false;
   return (
-    (target.areaOperativaId == null || target.areaOperativaId === beneficiary.areaOperativaId) &&
+    (target.areaOperativaId == null ||
+      target.areaOperativaId === beneficiary.areaOperativaId) &&
     (target.centroAscoltoId == null ||
       target.centroAscoltoId === beneficiary.centroAscoltoId) &&
     (target.zonaUdsId == null || target.zonaUdsId === beneficiary.zonaUdsId)
@@ -1435,37 +1516,42 @@ async function requireAccessibleIntervento(
     return result.intervento;
   }
   if (expectedAmbito === "uds") {
-    const callerAreaOperativa = callerAreaOperativaId(req);
     const udsAccessible =
-      result.intervento.ambito !== "sociale" &&
+      result.intervento.ambito === "uds" &&
       canUseInterventoArea(req, "uds") &&
-      result.beneficiario.uds === true &&
-      result.beneficiario.areaOperativaId != null &&
-      (callerAreaOperativa == null || result.beneficiario.areaOperativaId === callerAreaOperativa);
+      canAccessUdsInterventoTerritory(
+        req,
+        result.intervento,
+        result.beneficiario.areaOperativaId,
+      );
     if (!udsAccessible) throw new RouteError(403, "Intervento non accessibile");
+    requireUdsInterventoPermission(
+      req,
+      udsPermissionForSocialPermission(socialPermission),
+    );
     return result.intervento;
   }
-  if (
-    !canAccessInterventoAmbito(
-      result.intervento.ambito,
-      result.beneficiario,
+  if (result.intervento.ambito === "uds") {
+    if (
+      !canUseInterventoArea(req, "uds") ||
+      !canAccessUdsInterventoTerritory(
+        req,
+        result.intervento,
+        result.beneficiario.areaOperativaId,
+      )
+    ) {
+      throw new RouteError(403, "Intervento non accessibile");
+    }
+    requireUdsInterventoPermission(
       req,
-    )
-  ) {
+      udsPermissionForSocialPermission(socialPermission),
+    );
+    return result.intervento;
+  }
+  if (!canAccessSensitiveSocialBeneficiary(result.beneficiario, req)) {
     throw new RouteError(403, "Intervento non accessibile");
   }
-  if (result.intervento.ambito !== "uds") {
-    const udsLegacyAccess =
-      result.intervento.ambito == null &&
-      canUseInterventoArea(req, "uds") &&
-      result.beneficiario.uds === true &&
-      result.beneficiario.areaOperativaId != null &&
-      (callerAreaOperativaId(req) == null ||
-        result.beneficiario.areaOperativaId === callerAreaOperativaId(req));
-    if (!udsLegacyAccess) {
-      requireSocialInterventoPermission(req, socialPermission);
-    }
-  }
+  requireSocialInterventoPermission(req, socialPermission);
   return result.intervento;
 }
 
@@ -1583,9 +1669,16 @@ async function canManageBisogniForBeneficiario(
   beneficiarioId: number,
   req: Request,
 ): Promise<boolean> {
-  if (!canUseInterventoArea(req, "uds")) return false;
+  if (
+    !canUseInterventoArea(req, "uds") ||
+    !hasUdsInterventoPermission(req, "uds.bisogni.manage")
+  )
+    return false;
   const [beneficiario] = await db
-    .select({ uds: beneficiariTable.uds, areaOperativaId: beneficiariTable.areaOperativaId })
+    .select({
+      uds: beneficiariTable.uds,
+      areaOperativaId: beneficiariTable.areaOperativaId,
+    })
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId))
     .limit(1);
@@ -1596,7 +1689,10 @@ async function canManageBisogniForBeneficiario(
   )
     return false;
   const callerAreaOperativa = callerAreaOperativaId(req);
-  return callerAreaOperativa == null || beneficiario.areaOperativaId === callerAreaOperativa;
+  return (
+    callerAreaOperativa == null ||
+    beneficiario.areaOperativaId === callerAreaOperativa
+  );
 }
 
 async function requireManageableUdsIntervento(
@@ -1604,35 +1700,38 @@ async function requireManageableUdsIntervento(
   req: Request,
 ): Promise<InterventoRow> {
   await requireServizioInterventoAttivo("uds");
-  if (!canUseInterventoArea(req, "uds")) {
+  if (
+    !canUseInterventoArea(req, "uds") ||
+    !hasUdsInterventoPermission(req, "uds.bisogni.manage")
+  ) {
     throw new RouteError(403, "Intervento UDS non accessibile");
   }
   const [result] = await db
     .select({
       intervento: interventiTable,
-      uds: beneficiariTable.uds,
-      areaOperativaId: beneficiariTable.areaOperativaId,
+      beneficiarioAreaOperativaId: beneficiariTable.areaOperativaId,
     })
     .from(interventiTable)
-    .leftJoin(
+    .innerJoin(
       beneficiariTable,
       eq(interventiTable.beneficiarioId, beneficiariTable.id),
     )
     .where(eq(interventiTable.id, interventoId))
     .limit(1);
   if (!result) throw new RouteError(404, "Intervento non trovato");
-  if (
-    result.uds !== true ||
-    result.areaOperativaId == null ||
-    result.intervento.ambito === "sociale"
-  ) {
+  if (result.intervento.ambito !== "uds") {
     throw new RouteError(
       403,
       "Intervento UDS non accessibile per la tua area operativa",
     );
   }
-  const callerAreaOperativa = callerAreaOperativaId(req);
-  if (callerAreaOperativa != null && result.areaOperativaId !== callerAreaOperativa) {
+  if (
+    !canAccessUdsInterventoTerritory(
+      req,
+      result.intervento,
+      result.beneficiarioAreaOperativaId,
+    )
+  ) {
     throw new RouteError(
       403,
       "Intervento UDS non accessibile per la tua area operativa",
@@ -1645,14 +1744,21 @@ async function requireManageableInterventoNeeds(
   interventoId: number,
   req: Request,
 ): Promise<InterventoRow> {
-  const intervento = await requireAccessibleIntervento(
+  const [intervento] = await db
+    .select({ ambito: interventiTable.ambito })
+    .from(interventiTable)
+    .where(eq(interventiTable.id, interventoId))
+    .limit(1);
+  if (!intervento) throw new RouteError(404, "Intervento non trovato");
+  if (intervento.ambito === "uds") {
+    return requireManageableUdsIntervento(interventoId, req);
+  }
+  return requireAccessibleIntervento(
     interventoId,
     req,
-    null,
+    "sociale",
     "sociale.interventi.update",
   );
-  if (intervento.ambito === "sociale") return intervento;
-  return requireManageableUdsIntervento(interventoId, req);
 }
 
 async function validateInterventoPrecedente(
@@ -1755,7 +1861,8 @@ function socialScopeConditions(
   }
   if (callerAreaOperativa == null && query.areaOperativaId) {
     const areaOperativa = parsePositiveInteger(query.areaOperativaId);
-    if (areaOperativa == null) throw new RouteError(400, "areaOperativaId non valido");
+    if (areaOperativa == null)
+      throw new RouteError(400, "areaOperativaId non valido");
     conditions.push(eq(beneficiariTable.areaOperativaId, areaOperativa));
   }
   const scoped: SQL[] = [];
@@ -2054,6 +2161,13 @@ router.get("/interventi", async (req, res) => {
     return;
   }
   if (
+    ambito === "uds" &&
+    !hasUdsInterventoPermission(req, "uds.interventi.view")
+  ) {
+    res.status(403).json({ error: "Permesso Interventi UDS non consentito" });
+    return;
+  }
+  if (
     ambito === "sociale" &&
     !canAccessUnassignedSocialFolder(req) &&
     !isTerritoriallyScoped(req)
@@ -2081,14 +2195,16 @@ router.get("/interventi", async (req, res) => {
   if (ambito) {
     try {
       conditions.push(
-        ambito === "sociale" && (includeStorici || ambitoLegacy)
-          ? socialAmbitoCondition(ambitoLegacy)
-          : includeStorici && socialServiceActive
-            ? or(
-                eq(interventiTable.ambito, ambito),
-                isNull(interventiTable.ambito),
-              )!
-            : eq(interventiTable.ambito, ambito),
+        ambito === "uds"
+          ? eq(interventiTable.ambito, "uds")
+          : ambito === "sociale" && (includeStorici || ambitoLegacy)
+            ? socialAmbitoCondition(ambitoLegacy)
+            : includeStorici && socialServiceActive
+              ? or(
+                  eq(interventiTable.ambito, ambito),
+                  isNull(interventiTable.ambito),
+                )!
+              : eq(interventiTable.ambito, ambito),
       );
     } catch (error) {
       if (sendRouteError(error, res)) return;
@@ -2103,15 +2219,12 @@ router.get("/interventi", async (req, res) => {
     ) {
       featureScopes.push(socialAmbitoCondition(undefined));
     }
-    if (udsServiceActive && canUseInterventoArea(req, "uds")) {
-      featureScopes.push(
-        socialServiceActive
-          ? or(
-              eq(interventiTable.ambito, "uds"),
-              isNull(interventiTable.ambito),
-            )!
-          : eq(interventiTable.ambito, "uds"),
-      );
+    if (
+      udsServiceActive &&
+      canUseInterventoArea(req, "uds") &&
+      hasUdsInterventoPermission(req, "uds.interventi.view")
+    ) {
+      featureScopes.push(eq(interventiTable.ambito, "uds"));
     }
     if (featureScopes.length === 0) {
       res.status(403).json({ error: "Nessun servizio interventi abilitato" });
@@ -2210,7 +2323,12 @@ router.get("/interventi", async (req, res) => {
   const caller = callerCentroId(req);
   const callerAreaOperativa = callerAreaOperativaId(req);
   const callerZona = callerZonaUdsId(req);
-  if (callerAreaOperativa == null && ambito === "uds" && !areaOperativaId && !beneficiarioId) {
+  if (
+    callerAreaOperativa == null &&
+    ambito === "uds" &&
+    !areaOperativaId &&
+    !beneficiarioId
+  ) {
     res.status(400).json({
       error: "areaOperativaId è obbligatorio per elencare gli interventi UDS",
     });
@@ -2231,7 +2349,11 @@ router.get("/interventi", async (req, res) => {
       res.status(400).json({ error: "areaOperativaId non valido" });
       return;
     }
-    conditions.push(eq(beneficiariTable.areaOperativaId, parsedAreaOperativa));
+    conditions.push(
+      ambito === "uds"
+        ? eq(interventiTable.areaOperativaIdSnapshot, parsedAreaOperativa)
+        : eq(beneficiariTable.areaOperativaId, parsedAreaOperativa),
+    );
   }
   if (caller != null || callerAreaOperativa != null || callerZona != null) {
     conditions.push(isNotNull(beneficiariTable.id));
@@ -2256,26 +2378,15 @@ router.get("/interventi", async (req, res) => {
       ].filter((condition): condition is SQL => condition != null);
       scopeAlternatives.push(and(...socialConditions)!);
     }
-    if (canUseInterventoArea(req, "uds") && callerAreaOperativa != null) {
-      scopeAlternatives.push(
-        and(
-          eq(interventiTable.ambito, "uds"),
-          eq(beneficiariTable.uds, true),
-          eq(beneficiariTable.areaOperativaId, callerAreaOperativa),
-        )!,
-      );
-    }
     if (
       canUseInterventoArea(req, "uds") &&
-      callerAreaOperativa != null &&
-      requestedBeneficiarioId != null
+      hasUdsInterventoPermission(req, "uds.interventi.view") &&
+      callerAreaOperativa != null
     ) {
       scopeAlternatives.push(
         and(
-          isNull(interventiTable.ambito),
-          eq(beneficiariTable.id, requestedBeneficiarioId),
-          eq(beneficiariTable.uds, true),
-          eq(beneficiariTable.areaOperativaId, callerAreaOperativa),
+          eq(interventiTable.ambito, "uds"),
+          eq(interventiTable.areaOperativaIdSnapshot, callerAreaOperativa),
         )!,
       );
     }
@@ -2286,7 +2397,9 @@ router.get("/interventi", async (req, res) => {
     const canUseSociale =
       canUseInterventoArea(req, "sociale") &&
       hasSocialInterventoPermission(req, "sociale.interventi.view");
-    const canUseUds = canUseInterventoArea(req, "uds");
+    const canUseUds =
+      canUseInterventoArea(req, "uds") &&
+      hasUdsInterventoPermission(req, "uds.interventi.view");
     if (canUseSociale && !canUseUds) {
       conditions.push(
         or(ne(interventiTable.ambito, "uds"), isNull(interventiTable.ambito))!,
@@ -2490,19 +2603,26 @@ router.get(
     const callerCentro = callerCentroId(req);
     const selectedAreaOperativa =
       callerAreaOperativa ??
-      (query.areaOperativaId ? parsePositiveInteger(query.areaOperativaId) : null);
+      (query.areaOperativaId
+        ? parsePositiveInteger(query.areaOperativaId)
+        : null);
     const selectedCentro =
       callerCentro ??
       (query.centroAscoltoId
         ? parsePositiveInteger(query.centroAscoltoId)
         : null);
-    if (callerAreaOperativa == null && query.areaOperativaId && selectedAreaOperativa == null) {
+    if (
+      callerAreaOperativa == null &&
+      query.areaOperativaId &&
+      selectedAreaOperativa == null
+    ) {
       res.status(400).json({ error: "areaOperativaId non valido" });
       return;
     }
     if (selectedAreaOperativa == null) {
       res.status(400).json({
-        error: "areaOperativaId è obbligatorio per elencare gli operatori Sociali",
+        error:
+          "areaOperativaId è obbligatorio per elencare gli operatori Sociali",
       });
       return;
     }
@@ -2522,7 +2642,10 @@ router.get(
         eq(ruoliTable.isAdmin, true),
         sql`${ruoliTable.aree} ? 'sociale'`,
       )!,
-      or(eq(utentiTable.areaOperativaId, selectedAreaOperativa), isNull(utentiTable.areaOperativaId))!,
+      or(
+        eq(utentiTable.areaOperativaId, selectedAreaOperativa),
+        isNull(utentiTable.areaOperativaId),
+      )!,
     ];
     if (selectedCentro != null) {
       conditions.push(
@@ -2602,16 +2725,15 @@ router.post("/interventi", async (req, res) => {
     return;
   }
   const creationBeneficiario = await beneficiarioAccess(beneficiarioId);
-  const isUdsCreation =
-    workflow.values.ambito === "uds" ||
-    (workflow.values.ambito == null &&
-      creationBeneficiario != null &&
-      canUseInterventoArea(req, "uds") &&
-      creationBeneficiario.uds === true &&
-      creationBeneficiario.areaOperativaId != null &&
-      (callerAreaOperativaId(req) == null ||
-        creationBeneficiario.areaOperativaId === callerAreaOperativaId(req)));
-  if (!isUdsCreation) {
+  const isUdsCreation = workflow.values.ambito === "uds";
+  if (isUdsCreation) {
+    try {
+      requireUdsInterventoPermission(req, "uds.interventi.create");
+    } catch (error) {
+      if (sendRouteError(error, res)) return;
+      throw error;
+    }
+  } else {
     try {
       requireSocialInterventoPermission(req, "sociale.interventi.create");
     } catch (error) {
@@ -2671,6 +2793,12 @@ router.post("/interventi", async (req, res) => {
         beneficiarioId,
         interventoPrecedenteId,
         operatoreId: assignedOperatorId,
+        ...(workflow.values.ambito === "uds" && creationBeneficiario
+          ? {
+              areaOperativaIdSnapshot: creationBeneficiario.areaOperativaId,
+              zonaUdsIdSnapshot: creationBeneficiario.zonaUdsId,
+            }
+          : {}),
       } as never)
       .returning();
     await tx.insert(interventiStoricoStatiTable).values({
@@ -2693,6 +2821,15 @@ router.post("/interventi", async (req, res) => {
             )
             .returning()
         : [];
+    for (const need of createdNeeds) {
+      await appendBisognoHistory(
+        tx,
+        null,
+        need,
+        req.user!.id,
+        "Creazione contestuale all'intervento",
+      );
+    }
     return { intervento: created, bisogniCreati: createdNeeds };
   });
   res
@@ -3533,6 +3670,7 @@ router.patch("/interventi/:id", async (req, res) => {
     "dataOraAvvio",
     "dataOraConclusione",
     "motivoAnnullamento",
+    "noteUds",
   ];
   const forbiddenField = forbiddenWorkflowFields.find((field) =>
     hasOwn(body, field),
@@ -3543,22 +3681,29 @@ router.patch("/interventi/:id", async (req, res) => {
     });
     return;
   }
-  let existing: InterventoRow;
-  try {
-    existing = await requireAccessibleIntervento(
-      id,
-      req,
-      null,
-      "sociale.interventi.update",
-    );
-  } catch (error) {
-    if (sendRouteError(error, res)) return;
-    throw error;
-  }
   const bisogniInput = body.bisogniPianificati;
   if (bisogniInput != null && !Array.isArray(bisogniInput)) {
     res.status(400).json({ error: "Bisogni Pianificati non validi" });
     return;
+  }
+  const isNeedsOnlyPatch =
+    bisogniInput != null &&
+    Object.keys(body).every((key) =>
+      ["versione", "bisogniPianificati"].includes(key),
+    );
+  let existing: InterventoRow;
+  try {
+    existing = isNeedsOnlyPatch
+      ? await requireManageableInterventoNeeds(id, req)
+      : await requireAccessibleIntervento(
+          id,
+          req,
+          null,
+          "sociale.interventi.update",
+        );
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
   }
   const targetBeneficiarioId =
     body.beneficiarioId == null
@@ -3585,7 +3730,7 @@ router.patch("/interventi/:id", async (req, res) => {
     });
     return;
   }
-  if (bisogniInput != null) {
+  if (bisogniInput != null && !isNeedsOnlyPatch) {
     try {
       await requireManageableInterventoNeeds(id, req);
     } catch (error) {
@@ -3686,7 +3831,8 @@ router.patch("/interventi/:id", async (req, res) => {
       if (
         ["concluso", "annullato", "mancata_presentazione"].includes(
           current.stato,
-        )
+        ) &&
+        !isNeedsOnlyPatch
       ) {
         throw new RouteError(
           409,
@@ -3708,21 +3854,25 @@ router.patch("/interventi/:id", async (req, res) => {
           "L'operatore può essere modificato soltanto prima dell'avvio",
         );
       }
-      const [updated] = await tx
-        .update(interventiTable)
-        .set({
-          ...cleanInterventoBody(body),
-          ...workflowUpdates,
-          beneficiarioId: targetBeneficiarioId,
-        } as never)
-        .where(
-          and(
-            eq(interventiTable.id, id),
-            eq(interventiTable.dataAggiornamento, expectedVersion),
-          ),
-        )
-        .returning();
-      if (!updated) throw new RouteError(409, "Modifica concorrente rilevata");
+      let updated = current;
+      if (!isNeedsOnlyPatch) {
+        [updated] = await tx
+          .update(interventiTable)
+          .set({
+            ...cleanInterventoBody(body),
+            ...workflowUpdates,
+            beneficiarioId: targetBeneficiarioId,
+          } as never)
+          .where(
+            and(
+              eq(interventiTable.id, id),
+              eq(interventiTable.dataAggiornamento, expectedVersion),
+            ),
+          )
+          .returning();
+        if (!updated)
+          throw new RouteError(409, "Modifica concorrente rilevata");
+      }
 
       for (const item of (bisogniInput as BisognoInput[] | undefined) ?? []) {
         const bisognoId =
@@ -3731,10 +3881,20 @@ router.patch("/interventi/:id", async (req, res) => {
           throw new RouteError(400, "id del Bisogno Pianificato non valido");
         }
         if (bisognoId == null) {
-          await tx.insert(bisogniPianificatiTable).values({
-            ...normalizeBisogno(item),
-            interventoId: id,
-          });
+          const [createdNeed] = await tx
+            .insert(bisogniPianificatiTable)
+            .values({
+              ...normalizeBisogno(item),
+              interventoId: id,
+            })
+            .returning();
+          await appendBisognoHistory(
+            tx,
+            null,
+            createdNeed,
+            req.user!.id,
+            bisognoMotivo(item) ?? "Creazione contestuale all'intervento",
+          );
           continue;
         }
         const [existingNeed] = await tx
@@ -3745,17 +3905,47 @@ router.patch("/interventi/:id", async (req, res) => {
               eq(bisogniPianificatiTable.id, bisognoId),
               eq(bisogniPianificatiTable.interventoId, id),
             ),
-          );
+          )
+          .for("update");
         if (!existingNeed) {
           throw new RouteError(
             404,
             "Bisogno Pianificato non appartenente all'intervento",
           );
         }
-        await tx
+        const expectedVersion = expectedBisognoVersion(item);
+        if (expectedVersion !== existingNeed.versione) {
+          throw new RouteError(
+            409,
+            "Il Bisogno Pianificato è stato modificato da un altro operatore",
+          );
+        }
+        const [updatedNeed] = await tx
           .update(bisogniPianificatiTable)
-          .set(normalizeBisogno(item, existingNeed))
-          .where(eq(bisogniPianificatiTable.id, bisognoId));
+          .set({
+            ...normalizeBisogno(item, existingNeed),
+            versione: existingNeed.versione + 1,
+          })
+          .where(
+            and(
+              eq(bisogniPianificatiTable.id, bisognoId),
+              eq(bisogniPianificatiTable.versione, expectedVersion),
+            ),
+          )
+          .returning();
+        if (!updatedNeed) {
+          throw new RouteError(
+            409,
+            "Il Bisogno Pianificato è stato modificato da un altro operatore",
+          );
+        }
+        await appendBisognoHistory(
+          tx,
+          existingNeed,
+          updatedNeed,
+          req.user!.id,
+          bisognoMotivo(item),
+        );
       }
       return updated;
     });
@@ -3817,23 +4007,7 @@ router.post("/interventi/:id/transizioni", async (req, res) => {
         throw new RouteError(409, "Stato corrente non riconosciuto");
       }
       const target = body.stato as InterventoStato;
-      const [beneficiario] = await tx
-        .select({
-          uds: beneficiariTable.uds,
-          areaOperativaId: beneficiariTable.areaOperativaId,
-        })
-        .from(beneficiariTable)
-        .where(eq(beneficiariTable.id, current.beneficiarioId))
-        .limit(1);
-      const usesLegacyUdsWorkflow =
-        current.ambito == null &&
-        beneficiario?.uds === true &&
-        beneficiario.areaOperativaId != null &&
-        canUseInterventoArea(req, "uds") &&
-        (callerAreaOperativaId(req) == null ||
-          callerAreaOperativaId(req) === beneficiario.areaOperativaId);
-      const isSocialWorkflow =
-        current.ambito !== "uds" && !usesLegacyUdsWorkflow;
+      const isSocialWorkflow = current.ambito !== "uds";
       if (
         isSocialWorkflow &&
         target !== "da_pianificare" &&
@@ -3974,9 +4148,14 @@ router.post("/interventi/:id/successivi", async (req, res) => {
       precedenteId,
       req,
       null,
-      "sociale.interventi.create",
+      "sociale.interventi.view",
     );
     const workflow = workflowCreateValues(body);
+    if (workflow.values.ambito === "uds") {
+      requireUdsInterventoPermission(req, "uds.interventi.create");
+    } else {
+      requireSocialInterventoPermission(req, "sociale.interventi.create");
+    }
     if (
       !(await canCreateForAmbito(
         precedente.beneficiarioId,
@@ -3987,6 +4166,9 @@ router.post("/interventi/:id/successivi", async (req, res) => {
       throw new RouteError(403, "Beneficiario non accessibile");
     }
     await validateInterventoPrecedente(precedenteId, precedente.beneficiarioId);
+    const successorBeneficiario = await beneficiarioAccess(
+      precedente.beneficiarioId,
+    );
 
     const tipoIntervento = body.tipoIntervento;
     if (typeof tipoIntervento !== "string" || !tipoIntervento.trim()) {
@@ -4032,6 +4214,12 @@ router.post("/interventi/:id/successivi", async (req, res) => {
           beneficiarioId: precedente.beneficiarioId,
           interventoPrecedenteId: precedenteId,
           operatoreId: req.user!.id,
+          ...(workflow.values.ambito === "uds" && successorBeneficiario
+            ? {
+                areaOperativaIdSnapshot: successorBeneficiario.areaOperativaId,
+                zonaUdsIdSnapshot: successorBeneficiario.zonaUdsId,
+              }
+            : {}),
         } as never)
         .returning();
       await tx.insert(interventiStoricoStatiTable).values({
@@ -4080,10 +4268,21 @@ router.post(
     }
     try {
       await requireManageableInterventoNeeds(interventoId, req);
-      const [row] = await db
-        .insert(bisogniPianificatiTable)
-        .values({ ...normalizeBisogno(req.body as BisognoInput), interventoId })
-        .returning();
+      const input = req.body as BisognoInput;
+      const row = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(bisogniPianificatiTable)
+          .values({ ...normalizeBisogno(input), interventoId })
+          .returning();
+        await appendBisognoHistory(
+          tx,
+          null,
+          created,
+          req.user!.id,
+          bisognoMotivo(input) ?? "Creazione",
+        );
+        return created;
+      });
       res.status(201).json(formatBisogno(row));
     } catch (error) {
       if (sendRouteError(error, res)) return;
@@ -4103,26 +4302,107 @@ router.patch(
     }
     try {
       await requireManageableInterventoNeeds(interventoId, req);
-      const [existing] = await db
-        .select()
+      const input = req.body as BisognoInput;
+      const expectedVersion = expectedBisognoVersion(input);
+      const row = await db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(bisogniPianificatiTable)
+          .where(
+            and(
+              eq(bisogniPianificatiTable.id, bisognoId),
+              eq(bisogniPianificatiTable.interventoId, interventoId),
+            ),
+          )
+          .for("update");
+        if (!existing)
+          throw new RouteError(
+            404,
+            "Bisogno Pianificato non appartenente all'intervento",
+          );
+        if (existing.versione !== expectedVersion) {
+          throw new RouteError(
+            409,
+            "Il Bisogno Pianificato è stato modificato da un altro operatore",
+          );
+        }
+        const [updated] = await tx
+          .update(bisogniPianificatiTable)
+          .set({
+            ...normalizeBisogno(input, existing),
+            versione: existing.versione + 1,
+          })
+          .where(
+            and(
+              eq(bisogniPianificatiTable.id, bisognoId),
+              eq(bisogniPianificatiTable.versione, expectedVersion),
+            ),
+          )
+          .returning();
+        if (!updated) {
+          throw new RouteError(
+            409,
+            "Il Bisogno Pianificato è stato modificato da un altro operatore",
+          );
+        }
+        await appendBisognoHistory(
+          tx,
+          existing,
+          updated,
+          req.user!.id,
+          bisognoMotivo(input),
+        );
+        return updated;
+      });
+      res.json(formatBisogno(row));
+    } catch (error) {
+      if (sendRouteError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.get(
+  "/interventi/:interventoId/bisogni-pianificati/:bisognoId/storico",
+  async (req, res) => {
+    const interventoId = parsePositiveInteger(req.params.interventoId);
+    const bisognoId = parsePositiveInteger(req.params.bisognoId);
+    if (interventoId == null || bisognoId == null) {
+      res.status(400).json({ error: "Identificativo non valido" });
+      return;
+    }
+    try {
+      await requireAccessibleIntervento(interventoId, req);
+      const [need] = await db
+        .select({ id: bisogniPianificatiTable.id })
         .from(bisogniPianificatiTable)
         .where(
           and(
             eq(bisogniPianificatiTable.id, bisognoId),
             eq(bisogniPianificatiTable.interventoId, interventoId),
           ),
-        );
-      if (!existing)
+        )
+        .limit(1);
+      if (!need) {
         throw new RouteError(
           404,
           "Bisogno Pianificato non appartenente all'intervento",
         );
-      const [row] = await db
-        .update(bisogniPianificatiTable)
-        .set(normalizeBisogno(req.body as BisognoInput, existing))
-        .where(eq(bisogniPianificatiTable.id, bisognoId))
-        .returning();
-      res.json(formatBisogno(row));
+      }
+      const rows = await db
+        .select()
+        .from(bisogniPianificatiStoricoTable)
+        .where(eq(bisogniPianificatiStoricoTable.bisognoId, bisognoId))
+        .orderBy(
+          bisogniPianificatiStoricoTable.dataTransizione,
+          bisogniPianificatiStoricoTable.id,
+        );
+      res.json(
+        rows.map((row) => ({
+          ...row,
+          dataTransizione: row.dataTransizione.toISOString(),
+        })),
+      );
     } catch (error) {
       if (sendRouteError(error, res)) return;
       throw error;

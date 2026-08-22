@@ -100,6 +100,7 @@ async function createIntervento(
       beneficiarioId: input.beneficiarioId ?? beneficiarioA,
       tipoIntervento: `Audit CDA ${rnd()}`,
       ambito: input.ambito === undefined ? "sociale" : input.ambito,
+      areaOperativaIdSnapshot: input.ambito === "uds" ? areaA : null,
       stato: input.stato ?? "da_pianificare",
       descrizione: input.descrizione ?? "Descrizione sociale riservata",
       note: input.note ?? "Nota sociale riservata",
@@ -396,7 +397,7 @@ describe("audit hardening Centro di Ascolto", () => {
       areaOperativaId: areaA,
       centroId: null,
       aree: ["uds"],
-      permessi: [],
+      permessi: ["uds.interventi.view"],
     });
     expect(
       (await request(udsApp).get("/interventi").query({ ambito: "uds" }))

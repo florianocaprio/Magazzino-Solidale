@@ -233,7 +233,7 @@ describe("Bolle — ritiro non effettuato e conversione", () => {
     const limited = await createVolontario(scope, centre);
     await db.update(volontariTable).set({ maxConsegneTurno: 1 }).where(eq(volontariTable.id, limited));
     const existing = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse, dataPrevista: base.dataPrevista });
-    await db.update(consegneTable).set({ volontarioId: limited }).where(eq(consegneTable.id, existing));
+    await db.update(consegneTable).set({ volontarioId: limited, fasciaOraria: "Mattina" }).where(eq(consegneTable.id, existing));
     const bolla = await insertBolla(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse, stato: "confermato" });
     await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date(), ritiroNonEffettuatoOperatoreId: operator }).where(eq(bolleTable.id, bolla));
     expect((await request(app).post(`/bolle/${bolla}/converti-consegna`).send({ ...base, volontarioId: limited })).status).toBe(400);

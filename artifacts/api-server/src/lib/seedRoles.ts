@@ -1,7 +1,12 @@
 import { eq } from "drizzle-orm";
 import { db, ruoliTable } from "@workspace/db";
 import { ALL_AREA_KEYS, EMPORIO_AREA_KEY, MENSA_AREA_KEY } from "./areas";
-import { ALL_PERMISSION_KEYS, MENSA_PERMISSIONS } from "./permissions";
+import {
+  ALL_PERMISSION_KEYS,
+  LOGISTICA_PERMISSIONS,
+  MENSA_PERMISSIONS,
+  UDS_PERMISSIONS,
+} from "./permissions";
 import { logger } from "./logger";
 
 export const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
@@ -10,8 +15,8 @@ export const EMPORIO_ROLE_NAME = "Emporio";
 export const MENSA_ROLE_NAME = "Operatore Mensa";
 export const MAGAZZINO_ROLE_NAME = "Operatore Magazzino";
 export const LOGISTICA_ROLE_NAME = "Operatore Logistica";
-const OPERATOR_ROLE_NAME = "Operatore";
-const VOLUNTEER_ROLE_NAME = "Volontario";
+export const OPERATOR_ROLE_NAME = "Operatore";
+export const VOLUNTEER_ROLE_NAME = "Volontario";
 const UDS_ROLE_NAME = "Operatore UDS";
 
 const SOCIAL_OPERATOR_PERMISSIONS = [
@@ -34,11 +39,14 @@ const SOCIAL_OPERATOR_PERMISSIONS = [
   "bolle.manage",
   "bolle.deliver",
   "bolle.cancel",
+  "logistica.turni.view",
+  "logistica.turni.manage",
 ] as const;
 const UDS_OPERATOR_PERMISSIONS = [
   "beneficiari.view",
   "beneficiari.manage",
   "beneficiari.duplicates.search",
+  ...UDS_PERMISSIONS.map((permission) => permission.key),
 ] as const;
 const EMPORIO_OPERATOR_PERMISSIONS = [
   "credito.view",
@@ -53,6 +61,7 @@ const LOGISTICA_OPERATOR_PERMISSIONS = [
   "approvvigionamenti.view",
   "approvvigionamenti.manage",
   "approvvigionamenti.receive",
+  ...LOGISTICA_PERMISSIONS.map((permission) => permission.key),
 ] as const;
 const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "magazzino.view",
@@ -180,7 +189,7 @@ export async function seedRoles(): Promise<void> {
   }
 
   const [operatorRole] = await db
-    .select({ id: ruoliTable.id, permessi: ruoliTable.permessi })
+    .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, OPERATOR_ROLE_NAME));
   if (!operatorRole) {
@@ -196,6 +205,7 @@ export async function seedRoles(): Promise<void> {
     await db
       .update(ruoliTable)
       .set({
+        aree: mergePermissions(operatorRole.aree, ["generale", "sociale"]),
         permessi: mergePermissions(
           operatorRole.permessi,
           SOCIAL_OPERATOR_PERMISSIONS,

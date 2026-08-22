@@ -3,6 +3,7 @@ import express, { type Express, type Router } from "express";
 import request from "supertest";
 import { eq, inArray, or } from "drizzle-orm";
 import {
+  auditConfigurazioniTable,
   beneficiariTable,
   centriAscoltoTable,
   areeOperativeTable,
@@ -201,6 +202,9 @@ afterEach(async () => {
           inArray(systemLogsTable.targetUserId, ids.utenti),
         ),
       );
+    await db
+      .delete(auditConfigurazioniTable)
+      .where(inArray(auditConfigurazioniTable.utenteId, ids.utenti));
   }
   if (ids.beneficiari.length)
     await db
@@ -324,10 +328,13 @@ describe("audit hardening Amministrazione/Core", () => {
       (
         await request(app)
           .patch(`/zone-uds/${zonaB}`)
-          .send({ nome: "Violazione" })
+          .send({ nome: "Violazione", versione: 1 })
       ).status,
     ).toBe(403);
-    expect((await request(app).delete(`/zone-uds/${zonaB}`)).status).toBe(403);
+    expect(
+      (await request(app).delete(`/zone-uds/${zonaB}`).send({ versione: 1 }))
+        .status,
+    ).toBe(403);
     expect(
       (await request(app).post("/zone-uds").send({ areaOperativaId: areaA })).status,
     ).toBe(400);
@@ -336,10 +343,13 @@ describe("audit hardening Amministrazione/Core", () => {
       (
         await request(app)
           .patch(`/zone-uds/${zonaA}`)
-          .send({ nome: "Zona A aggiornata" })
+          .send({ nome: "Zona A aggiornata", versione: 1 })
       ).status,
     ).toBe(200);
-    expect((await request(app).delete(`/zone-uds/${zonaA}`)).status).toBe(204);
+    expect(
+      (await request(app).delete(`/zone-uds/${zonaA}`).send({ versione: 2 }))
+        .status,
+    ).toBe(204);
     const [own, other] = await db
       .select()
       .from(zoneUdsTable)

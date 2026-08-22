@@ -1,10 +1,41 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { isNavItemEnabledByAccess, NAV_ITEMS } from "@/components/layout";
 
+const appSource = readFileSync(
+  path.resolve(process.cwd(), "src/App.tsx"),
+  "utf8",
+);
+
+function routeSource(path: string, nextPath: string): string {
+  const start = appSource.indexOf(`<Route path="${path}">`);
+  const end = appSource.indexOf(`<Route path="${nextPath}">`, start + 1);
+  return appSource.slice(start, end);
+}
+
 describe("permission gate della navigazione operativa", () => {
+  it("separa lista Sociale, directory UDS e dossier completo", () => {
+    expect(routeSource("/beneficiari", "/beneficiari/:id")).toContain(
+      'permission="beneficiari.view"',
+    );
+    expect(routeSource("/beneficiari", "/beneficiari/:id")).not.toContain(
+      'permission="uds.directory.view"',
+    );
+    expect(routeSource("/beneficiari/:id", "/interventi")).toContain(
+      'permission="beneficiari.view"',
+    );
+    expect(routeSource("/uds/anagrafica", "/mensa/postazione")).toContain(
+      'permission="uds.directory.view"',
+    );
+    expect(routeSource("/uds/anagrafica", "/mensa/postazione")).not.toContain(
+      'permission="beneficiari.view"',
+    );
+  });
+
   it.each([
     ["beneficiari", "beneficiari.view"],
-    ["udsAnagrafica", "beneficiari.view"],
+    ["udsAnagrafica", "uds.directory.view"],
     ["interventi", "sociale.interventi.view"],
     ["emporioCreditiSaldo", "credito.view"],
     ["emporioAccessi", "emporio.access.view"],
@@ -19,6 +50,10 @@ describe("permission gate della navigazione operativa", () => {
     ["scarichi", "magazzino.view"],
     ["bolle", "bolle.view"],
     ["approvvigionamenti", "approvvigionamenti.view"],
+    ["turni", "logistica.turni.view"],
+    ["volontari", "logistica.volontari.view"],
+    ["mezzi", "logistica.mezzi.view"],
+    ["approvazioniLogistica", "logistica.approvazioni.view"],
   ])("protegge %s con %s", (key, permission) => {
     expect(NAV_ITEMS.find((item) => item.key === key)?.permission).toBe(
       permission,
@@ -63,5 +98,13 @@ describe("permission gate della navigazione operativa", () => {
     expect(
       NAV_ITEMS.find((item) => item.key === "mensaConsumi")?.permission,
     ).toBe("mensa.consumption.manage");
+  });
+
+  it("mostra Turni solo con Area Sociale e permesso dedicato", () => {
+    const item = NAV_ITEMS.find((candidate) => candidate.key === "turni")!;
+    expect(item.area).toBe("sociale");
+    expect(isNavItemEnabledByAccess(item, (area) => area === "sociale", () => true)).toBe(true);
+    expect(isNavItemEnabledByAccess(item, () => false, () => true)).toBe(false);
+    expect(isNavItemEnabledByAccess(item, () => true, () => false)).toBe(false);
   });
 });

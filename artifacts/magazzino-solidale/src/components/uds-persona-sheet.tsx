@@ -3,12 +3,18 @@ import {
   getCercaBeneficiariSimiliQueryKey,
   getListBeneficiariQueryKey,
   getListAreeOperativeQueryKey,
+  getListUdsDirectoryQueryKey,
+  getListUdsLinkCandidatesQueryKey,
   type BeneficiarioSimile,
+  type UdsDirectoryItem,
+  type UdsLinkCandidateItem,
   useCercaBeneficiariSimili,
   useCreateBeneficiario,
   useListCentriAscolto,
   useListAreeOperative,
   useListZoneUds,
+  useListUdsDirectory,
+  useListUdsLinkCandidates,
   useUpdateBeneficiario,
 } from "@workspace/api-client-react";
 import {
@@ -34,7 +40,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -44,7 +57,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -67,7 +86,10 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
       dataNascita: z
         .string()
         .optional()
-        .refine(isNotFutureDateOnly, "La data di nascita non può essere successiva alla data odierna."),
+        .refine(
+          isNotFutureDateOnly,
+          "La data di nascita non può essere successiva alla data odierna.",
+        ),
       fasciaEtaPresunta: z.string().optional(),
       sesso: z.string().min(1, t("beneficiari.sessoRequired")),
       cittadinanza: z.string().optional(),
@@ -89,8 +111,23 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
       uds: z.boolean().optional(),
     })
     .superRefine((data, ctx) => {
+      if (
+        (data.uds ?? true) &&
+        !data.dataNascita &&
+        !isFasciaEtaPresunta(data.fasciaEtaPresunta)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["fasciaEtaPresunta"],
+          message: t("udsAnagrafica.ageClassificationRequired"),
+        });
+      }
       if (isGlobal && (data.uds ?? true) && !data.areaOperativaId) {
-        ctx.addIssue({ code: "custom", path: ["areaOperativaId"], message: t("common.requiredField") });
+        ctx.addIssue({
+          code: "custom",
+          path: ["areaOperativaId"],
+          message: t("common.requiredField"),
+        });
       }
     });
 }
@@ -112,7 +149,10 @@ interface UdsPersonaSheetProps {
   onOpenChange: (open: boolean) => void;
   initialAreaOperativaId?: number | null;
   initialZonaUdsId?: number | null;
-  onPersonReady?: (person: UdsPersonaSelection, outcome: UdsPersonaOutcome) => void;
+  onPersonReady?: (
+    person: UdsPersonaSelection,
+    outcome: UdsPersonaOutcome,
+  ) => void;
 }
 
 function extractError(err: unknown, fallback: string): string {
@@ -131,7 +171,10 @@ function maskPhone(phone: string | null | undefined): string | null {
   return `•••• ${compact.slice(-4)}`;
 }
 
-function emptyFormValues(initialAreaOperativaId?: number | null, initialZonaUdsId?: number | null): FormValues {
+function emptyFormValues(
+  initialAreaOperativaId?: number | null,
+  initialZonaUdsId?: number | null,
+): FormValues {
   return {
     nome: "",
     cognome: "",
@@ -154,7 +197,8 @@ function emptyFormValues(initialAreaOperativaId?: number | null, initialZonaUdsI
     motivoConsegnaDomicilio: "",
     restrizioniAlimentari: "",
     zonaUdsId: initialZonaUdsId != null ? String(initialZonaUdsId) : NO_ZONE,
-    areaOperativaId: initialAreaOperativaId != null ? String(initialAreaOperativaId) : "",
+    areaOperativaId:
+      initialAreaOperativaId != null ? String(initialAreaOperativaId) : "",
     centroAscoltoId: "",
     uds: true,
   };
@@ -169,12 +213,22 @@ export function UdsPersonaSheet({
 }: UdsPersonaSheetProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const canViewSensitive = Boolean(user?.isAdmin || user?.permessi?.includes("beneficiari.sensitive.view"));
+  const canViewSensitive = Boolean(
+    user?.isAdmin || user?.permessi?.includes("beneficiari.sensitive.view"),
+  );
+  const canUseFullDuplicateSearch = Boolean(
+    user?.isAdmin ||
+      user?.isSuperAdmin ||
+      (user?.aree?.includes("sociale") &&
+        user?.permessi?.includes("beneficiari.duplicates.search")),
+  );
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const isGlobal = user?.areaOperativaId == null;
   const schema = useMemo(() => makeSchema(t, isGlobal), [t, isGlobal]);
-  const [linkCandidate, setLinkCandidate] = useState<BeneficiarioSimile | null>(null);
+  const [linkCandidate, setLinkCandidate] = useState<
+    BeneficiarioSimile | UdsLinkCandidateItem | null
+  >(null);
   const [dupDismissed, setDupDismissed] = useState(false);
   const [existingSearch, setExistingSearch] = useState("");
   const [debouncedExistingSearch, setDebouncedExistingSearch] = useState("");
@@ -189,7 +243,10 @@ export function UdsPersonaSheet({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: emptyFormValues(initialAreaOperativaId, initialZonaUdsId ?? user?.zonaUdsId),
+    defaultValues: emptyFormValues(
+      initialAreaOperativaId,
+      initialZonaUdsId ?? user?.zonaUdsId,
+    ),
   });
   const { reset } = form;
   const wasOpenRef = useRef(false);
@@ -215,7 +272,12 @@ export function UdsPersonaSheet({
     wasOpenRef.current = open;
     if (!hasJustOpened) return;
 
-    reset(emptyFormValues(initialAreaOperativaId, initialZonaUdsId ?? user?.zonaUdsId));
+    reset(
+      emptyFormValues(
+        initialAreaOperativaId,
+        initialZonaUdsId ?? user?.zonaUdsId,
+      ),
+    );
     setDupDismissed(false);
     setDupParams({});
     setExistingSearch("");
@@ -234,14 +296,13 @@ export function UdsPersonaSheet({
     wDataNascita,
     isFasciaEtaPresunta(wFasciaEtaPresunta) ? wFasciaEtaPresunta : null,
   );
-  const fasciaEtaPresuntaDirty = form.formState.dirtyFields.fasciaEtaPresunta;
   useEffect(() => {
     if (!open) return;
     const rawIdentityLength = [wNome, wCognome, wSoprannome, wTelefono]
       .map((value) => (value ?? "").trim())
-      .join("")
-      .length;
-    const hasRawLookup = existingSearch.trim().length >= 2 || rawIdentityLength >= 2;
+      .join("").length;
+    const hasRawLookup =
+      existingSearch.trim().length >= 2 || rawIdentityLength >= 2;
     setDupDebouncing(hasRawLookup);
     const handle = setTimeout(() => {
       setDebouncedExistingSearch(existingSearch.trim());
@@ -256,31 +317,92 @@ export function UdsPersonaSheet({
       setDupDebouncing(false);
     }, 300);
     return () => clearTimeout(handle);
-  }, [existingSearch, open, wCognome, wDataNascita, wNome, wSoprannome, wTelefono]);
+  }, [
+    existingSearch,
+    open,
+    wCognome,
+    wDataNascita,
+    wNome,
+    wSoprannome,
+    wTelefono,
+  ]);
 
   const dupHasInput =
     debouncedExistingSearch.length >= 2 ||
-    ((dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 2) ||
+    (dupParams.nome ?? "").length + (dupParams.cognome ?? "").length >= 2 ||
     (dupParams.soprannome ?? "").length >= 2 ||
     (dupParams.telefono ?? "").length >= 2;
   const selectedAreaOperativa = form.watch("areaOperativaId");
-  const dupAreaOperativa = isGlobal && selectedAreaOperativa ? parseInt(selectedAreaOperativa) : undefined;
+  const dupAreaOperativa =
+    isGlobal && selectedAreaOperativa
+      ? parseInt(selectedAreaOperativa)
+      : undefined;
   const dupScopeReady = !isGlobal || dupAreaOperativa != null;
   const dupQueryParams = {
     ...dupParams,
-    ...(debouncedExistingSearch.length >= 2 ? { search: debouncedExistingSearch } : {}),
+    ...(debouncedExistingSearch.length >= 2
+      ? { search: debouncedExistingSearch }
+      : {}),
     ...(dupAreaOperativa != null ? { areaOperativaId: dupAreaOperativa } : {}),
   };
-  const { data: dupMatches, isFetching: isDupFetching } = useCercaBeneficiariSimili(
-    dupQueryParams,
-    {
+  const { data: dupMatches, isFetching: isDupFetching } =
+    useCercaBeneficiariSimili(dupQueryParams, {
       query: {
         queryKey: getCercaBeneficiariSimiliQueryKey(dupQueryParams),
-        enabled: open && !dupDismissed && dupHasInput && dupScopeReady,
+        enabled:
+          canUseFullDuplicateSearch &&
+          open &&
+          !dupDismissed &&
+          dupHasInput &&
+          dupScopeReady,
       },
+    });
+  const directorySearch =
+    debouncedExistingSearch.length >= 2
+      ? debouncedExistingSearch
+      : ([
+          dupParams.cognome,
+          dupParams.nome,
+          dupParams.soprannome,
+          dupParams.telefono,
+        ]
+          .map((value) => value?.trim() ?? "")
+          .find((value) => value.length >= 2) ?? "");
+  const directoryParams = {
+    search: directorySearch,
+    ...(dupAreaOperativa != null ? { areaOperativaId: dupAreaOperativa } : {}),
+    page: 1,
+    limit: 20,
+  };
+  const { data: directoryMatches, isFetching: isDirectoryFetching } =
+    useListUdsDirectory(directoryParams, {
+      query: {
+        queryKey: getListUdsDirectoryQueryKey(directoryParams),
+        enabled:
+          open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
+      },
+    });
+  const linkCandidateParams = {
+    search: directorySearch,
+    ...(dupAreaOperativa != null ? { areaOperativaId: dupAreaOperativa } : {}),
+  };
+  const {
+    data: linkCandidateMatches,
+    isFetching: isLinkCandidatesFetching,
+  } = useListUdsLinkCandidates(linkCandidateParams, {
+    query: {
+      queryKey: getListUdsLinkCandidatesQueryKey(linkCandidateParams),
+      enabled:
+        open && !dupDismissed && directorySearch.length >= 2 && dupScopeReady,
     },
-  );
-  const suggestions = dupMatches ?? [];
+  });
+  const minimizedMatchIds = new Set([
+    ...(directoryMatches ?? []).map((item) => item.id),
+    ...(linkCandidateMatches ?? []).map((item) => item.id),
+  ]);
+  const suggestions = canUseFullDuplicateSearch
+    ? (dupMatches ?? []).filter((item) => !minimizedMatchIds.has(item.id))
+    : [];
 
   const formAreaOperativa = isGlobal
     ? selectedAreaOperativa
@@ -289,7 +411,12 @@ export function UdsPersonaSheet({
     : (user?.areaOperativaId ?? undefined);
   const { data: formZone } = useListZoneUds(
     formAreaOperativa ? { areaOperativaId: formAreaOperativa } : undefined,
-    { query: { queryKey: ["zoneUds", "personaForm", formAreaOperativa], enabled: formAreaOperativa != null } },
+    {
+      query: {
+        queryKey: ["zoneUds", "personaForm", formAreaOperativa],
+        enabled: formAreaOperativa != null,
+      },
+    },
   );
 
   const finish = (person: UdsPersonaSelection, outcome: UdsPersonaOutcome) => {
@@ -306,12 +433,34 @@ export function UdsPersonaSheet({
     setLinkCandidate(suggestion);
   };
 
+  const handleDirectorySuggestion = (suggestion: UdsDirectoryItem) => {
+    if (!onPersonReady) return;
+    finish(
+      {
+        id: suggestion.id,
+        nome: suggestion.nome,
+        cognome: suggestion.cognome,
+        soprannome: suggestion.soprannome,
+        zonaUdsId: suggestion.zonaUdsId,
+      },
+      "existing",
+    );
+  };
+
+  const handleLinkCandidate = (suggestion: UdsLinkCandidateItem) => {
+    setLinkCandidate(suggestion);
+  };
+
   const confirmLinkToUds = () => {
     const suggestion = linkCandidate;
     if (!suggestion) return;
     const zonaValue = form.getValues("zonaUdsId");
     const targetZona =
-      zonaValue && zonaValue !== NO_ZONE ? parseInt(zonaValue) : user?.zonaUdsId ?? null;
+      zonaValue && zonaValue !== NO_ZONE
+        ? parseInt(zonaValue)
+        : (user?.zonaUdsId ?? null);
+    const areaProvenienza = form.getValues("areaProvenienza")?.trim();
+    const dataNascita = form.getValues("dataNascita")?.trim();
     updateBenef.mutate(
       {
         id: suggestion.id,
@@ -319,18 +468,19 @@ export function UdsPersonaSheet({
           uds: true,
           versione: suggestion.versione,
           ...(targetZona != null ? { zonaUdsId: targetZona } : {}),
-          ...(fasciaEtaPresuntaDirty
-            ? {
-                fasciaEtaPresunta: isFasciaEtaPresunta(wFasciaEtaPresunta)
-                  ? wFasciaEtaPresunta
-                  : null,
-              }
-            : {}),
+          ...(areaProvenienza ? { areaProvenienza } : {}),
+          ...(dataNascita
+            ? { dataNascita, fasciaEtaPresunta: null }
+            : isFasciaEtaPresunta(wFasciaEtaPresunta)
+              ? { fasciaEtaPresunta: wFasciaEtaPresunta }
+              : {}),
         } as never,
       },
       {
         onSuccess: (linked) => {
-          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+          queryClient.invalidateQueries({
+            queryKey: getListBeneficiariQueryKey(),
+          });
           toast({ title: t("udsAnagrafica.dupLinked") });
           finish(linked, "linked");
         },
@@ -346,7 +496,16 @@ export function UdsPersonaSheet({
   };
 
   const onSubmit = (data: FormValues) => {
-    if (!dupDismissed && (dupDebouncing || isDupFetching || suggestions.length > 0)) {
+    if (
+      !dupDismissed &&
+      (dupDebouncing ||
+        isDupFetching ||
+        isDirectoryFetching ||
+        isLinkCandidatesFetching ||
+        suggestions.length > 0 ||
+        (linkCandidateMatches?.length ?? 0) > 0 ||
+        (directoryMatches?.length ?? 0) > 0)
+    ) {
       toast({
         title: t("udsAnagrafica.dupCheckRequired"),
         description: t("udsAnagrafica.dupCheckRequiredHint"),
@@ -357,7 +516,7 @@ export function UdsPersonaSheet({
     const payload: Record<string, unknown> = {
       nome: data.nome,
       cognome: data.cognome,
-      uds: data.uds ?? true,
+      uds: isGlobal ? (data.uds ?? true) : true,
       centroAscoltoId:
         data.centroAscoltoId && data.centroAscoltoId !== NO_CENTRO
           ? parseInt(data.centroAscoltoId)
@@ -366,7 +525,9 @@ export function UdsPersonaSheet({
     if (data.soprannome) payload.soprannome = data.soprannome;
     if (data.codiceFiscale) payload.codiceFiscale = data.codiceFiscale;
     if (data.dataNascita) payload.dataNascita = data.dataNascita;
-    payload.fasciaEtaPresunta = isFasciaEtaPresunta(data.fasciaEtaPresunta)
+    payload.fasciaEtaPresunta = data.dataNascita
+      ? null
+      : isFasciaEtaPresunta(data.fasciaEtaPresunta)
       ? data.fasciaEtaPresunta
       : null;
     payload.sesso = data.sesso;
@@ -378,21 +539,31 @@ export function UdsPersonaSheet({
     if (data.email) payload.email = data.email;
     if (data.comune) payload.comune = data.comune;
     if (data.zonaMunicipio) payload.zonaMunicipio = data.zonaMunicipio;
-    if (data.numComponenti) payload.numComponenti = parseInt(data.numComponenti);
+    if (data.numComponenti)
+      payload.numComponenti = parseInt(data.numComponenti);
     if (data.priorita) payload.priorita = data.priorita;
     payload.consegnaDomicilio = data.consegnaDomicilio ?? false;
-    if (data.motivoConsegnaDomicilio) payload.motivoConsegnaDomicilio = data.motivoConsegnaDomicilio;
-    if (data.restrizioniAlimentari) payload.restrizioniAlimentari = data.restrizioniAlimentari;
-    if (data.uds && data.zonaUdsId && data.zonaUdsId !== NO_ZONE) {
+    if (data.motivoConsegnaDomicilio)
+      payload.motivoConsegnaDomicilio = data.motivoConsegnaDomicilio;
+    if (data.restrizioniAlimentari)
+      payload.restrizioniAlimentari = data.restrizioniAlimentari;
+    if (
+      (isGlobal ? data.uds : true) &&
+      data.zonaUdsId &&
+      data.zonaUdsId !== NO_ZONE
+    ) {
       payload.zonaUdsId = parseInt(data.zonaUdsId);
     }
-    if (isGlobal && data.areaOperativaId) payload.areaOperativaId = parseInt(data.areaOperativaId);
+    if (isGlobal && data.areaOperativaId)
+      payload.areaOperativaId = parseInt(data.areaOperativaId);
 
     createBenef.mutate(
       { data: payload as never },
       {
         onSuccess: (created) => {
-          queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
+          queryClient.invalidateQueries({
+            queryKey: getListBeneficiariQueryKey(),
+          });
           toast({ title: t("udsAnagrafica.toastCreated") });
           finish(created, "created");
         },
@@ -408,6 +579,12 @@ export function UdsPersonaSheet({
   };
 
   const watchUds = form.watch("uds");
+  const duplicateCheckPending =
+    !dupDismissed &&
+    (dupDebouncing ||
+      isDupFetching ||
+      isDirectoryFetching ||
+      isLinkCandidatesFetching);
 
   return (
     <>
@@ -427,14 +604,19 @@ export function UdsPersonaSheet({
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
+              >
                 {isGlobal && (
                   <FormField
                     control={form.control}
                     name="areaOperativaId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("udsAnagrafica.fAreaOperativa")}</FormLabel>
+                        <FormLabel>
+                          {t("udsAnagrafica.fAreaOperativa")}
+                        </FormLabel>
                         <Select
                           value={field.value || ""}
                           onValueChange={(value) => {
@@ -447,12 +629,19 @@ export function UdsPersonaSheet({
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder={t("udsAnagrafica.selectAreaOperativaForSearch")} />
+                              <SelectValue
+                                placeholder={t(
+                                  "udsAnagrafica.selectAreaOperativaForSearch",
+                                )}
+                              />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {areaOperativaList?.map((areaOperativa) => (
-                              <SelectItem key={areaOperativa.id} value={String(areaOperativa.id)}>
+                              <SelectItem
+                                key={areaOperativa.id}
+                                value={String(areaOperativa.id)}
+                              >
                                 {areaOperativa.nome}
                               </SelectItem>
                             ))}
@@ -487,7 +676,116 @@ export function UdsPersonaSheet({
                       ? t("udsAnagrafica.selectAreaOperativaForSearch")
                       : t("udsAnagrafica.existingSearchHint")}
                   </p>
+                  {duplicateCheckPending && (
+                    <p
+                      role="status"
+                      className="text-sm font-medium text-amber-700"
+                    >
+                      {t("udsAnagrafica.duplicateCheckInProgress")}
+                    </p>
+                  )}
                 </div>
+
+                {!dupDismissed && (directoryMatches?.length ?? 0) > 0 && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                      <AlertTriangle className="h-4 w-4" />
+                      {t("udsAnagrafica.dupTitle")}
+                    </div>
+                    <p className="text-xs text-amber-700">
+                      {t("udsAnagrafica.dupHint")}
+                    </p>
+                    <div className="space-y-2">
+                      {directoryMatches?.map((suggestion) => (
+                        <div
+                          key={`directory-${suggestion.id}`}
+                          className="flex items-center justify-between gap-2 rounded bg-white px-2 py-1.5 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">
+                              {suggestion.cognome} {suggestion.nome}
+                              {suggestion.soprannome
+                                ? ` (${suggestion.soprannome})`
+                                : ""}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {[suggestion.codice, suggestion.zonaUdsNome]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </div>
+                          </div>
+                          {onPersonReady && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleDirectorySuggestion(suggestion)
+                              }
+                            >
+                              {t("udsAnagrafica.dupSelect")}
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!dupDismissed &&
+                  (linkCandidateMatches?.length ?? 0) > 0 && (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                        <AlertTriangle className="h-4 w-4" />
+                        {t("udsAnagrafica.dupTitle")}
+                      </div>
+                      <p className="text-xs text-amber-700">
+                        {t("udsAnagrafica.dupHint")}
+                      </p>
+                      <div className="space-y-2">
+                        {linkCandidateMatches?.map((suggestion) => (
+                          <div
+                            key={`link-candidate-${suggestion.id}`}
+                            className="flex items-center justify-between gap-2 rounded bg-white px-2 py-1.5 text-sm"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium truncate">
+                                  {suggestion.cognome} {suggestion.nome}
+                                  {suggestion.soprannome
+                                    ? ` (${suggestion.soprannome})`
+                                    : ""}
+                                </span>
+                                <Badge variant="outline" className="shrink-0">
+                                  {t("udsAnagrafica.dupStatusShared")}
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {[
+                                  suggestion.codice,
+                                  fasciaEtaLabel(
+                                    t,
+                                    suggestion.fasciaEtaCorrente,
+                                  ),
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleLinkCandidate(suggestion)}
+                              disabled={updateBenef.isPending}
+                            >
+                              {t("udsAnagrafica.dupAdd")}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                 {!dupDismissed && suggestions.length > 0 && (
                   <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
@@ -495,7 +793,9 @@ export function UdsPersonaSheet({
                       <AlertTriangle className="h-4 w-4" />
                       {t("udsAnagrafica.dupTitle")}
                     </div>
-                    <p className="text-xs text-amber-700">{t("udsAnagrafica.dupHint")}</p>
+                    <p className="text-xs text-amber-700">
+                      {t("udsAnagrafica.dupHint")}
+                    </p>
                     <div className="space-y-2">
                       {suggestions.map((suggestion) => {
                         const isUds = suggestion.uds;
@@ -508,9 +808,14 @@ export function UdsPersonaSheet({
                               <div className="flex items-center gap-2">
                                 <span className="font-medium truncate">
                                   {suggestion.cognome} {suggestion.nome}
-                                  {suggestion.soprannome ? ` (${suggestion.soprannome})` : ""}
+                                  {suggestion.soprannome
+                                    ? ` (${suggestion.soprannome})`
+                                    : ""}
                                 </span>
-                                <Badge variant={isUds ? "secondary" : "outline"} className="shrink-0">
+                                <Badge
+                                  variant={isUds ? "secondary" : "outline"}
+                                  className="shrink-0"
+                                >
                                   {isUds
                                     ? t("udsAnagrafica.dupStatusUds")
                                     : t("udsAnagrafica.dupStatusShared")}
@@ -535,23 +840,30 @@ export function UdsPersonaSheet({
                                 onClick={() => handleSuggestion(suggestion)}
                                 disabled={updateBenef.isPending}
                               >
-                                {isUds ? t("udsAnagrafica.dupSelect") : t("udsAnagrafica.dupAdd")}
+                                {isUds
+                                  ? t("udsAnagrafica.dupSelect")
+                                  : t("udsAnagrafica.dupAdd")}
                               </Button>
                             )}
                           </div>
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {!dupDismissed &&
+                  ((directoryMatches?.length ?? 0) > 0 ||
+                    (linkCandidateMatches?.length ?? 0) > 0 ||
+                    suggestions.length > 0) && (
                     <Button
                       type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="text-amber-800"
+                      variant="outline"
+                      className="w-full min-h-11 border-amber-300 text-amber-900"
                       onClick={() => setDupDismissed(true)}
                     >
                       {t("udsAnagrafica.dupContinueNew")}
                     </Button>
-                  </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
@@ -560,8 +872,10 @@ export function UdsPersonaSheet({
                     name="nome"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("udsAnagrafica.fNome")}</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormLabel>{t("udsAnagrafica.fNome")} *</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -571,8 +885,10 @@ export function UdsPersonaSheet({
                     name="cognome"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("udsAnagrafica.fCognome")}</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormLabel>{t("udsAnagrafica.fCognome")} *</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -581,11 +897,27 @@ export function UdsPersonaSheet({
 
                 <FormField
                   control={form.control}
-                  name="soprannome"
+                  name="areaProvenienza"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("udsAnagrafica.fSoprannome")}</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormLabel>
+                        {t("beneficiarioDettaglio.areaProvenienza")} *
+                      </FormLabel>
+                      <Select
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                      >
+                      <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="-" />
+                          </SelectTrigger>
+                      </FormControl>
+                        <SelectContent>
+                          <SelectItem value="UE">UE</SelectItem>
+                          <SelectItem value="Extra-UE">Extra-UE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -596,7 +928,9 @@ export function UdsPersonaSheet({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t("udsAnagrafica.fDataNascita")}</FormLabel>
-                        <FormControl><Input type="date" max={todayDateOnly()} {...field} /></FormControl>
+                        <FormControl>
+                          <Input type="date" max={todayDateOnly()} {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -606,14 +940,24 @@ export function UdsPersonaSheet({
                     name="sesso"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("udsAnagrafica.fSesso")}</FormLabel>
-                        <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <FormLabel>{t("udsAnagrafica.fSesso")} *</FormLabel>
+                        <Select
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                        >
                           <FormControl>
-                            <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.sessoNd")} /></SelectTrigger>
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={t("udsAnagrafica.sessoNd")}
+                              />
+                            </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {SESSO_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
+                              <SelectItem
+                                key={option.value}
+                                value={option.value}
+                              >
                                 {t(`udsAnagrafica.${option.udsLabelKey}`)}
                               </SelectItem>
                             ))}
@@ -624,16 +968,26 @@ export function UdsPersonaSheet({
                     )}
                   />
                 </div>
+                {!wDataNascita && (
                 <FormField
                   control={form.control}
                   name="fasciaEtaPresunta"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("udsAnagrafica.fasciaEtaPresuntaLabel")}</FormLabel>
-                      <Select value={field.value || NO_FASCIA_ETA} onValueChange={field.onChange}>
+                      <FormLabel>
+                          {t("udsAnagrafica.fasciaEtaLabel")} *
+                      </FormLabel>
+                      <Select
+                        value={field.value || NO_FASCIA_ETA}
+                        onValueChange={field.onChange}
+                      >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue />
+                              <SelectValue
+                                placeholder={t(
+                                  "udsAnagrafica.fasciaEtaPlaceholder",
+                                )}
+                              />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -642,41 +996,68 @@ export function UdsPersonaSheet({
                               {fasciaEtaLabel(t, fascia)}
                             </SelectItem>
                           ))}
-                          <SelectItem value={NO_FASCIA_ETA}>
-                            {fasciaEtaLabel(t, "non_determinata")}
-                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        {t("udsAnagrafica.fasciaEtaPresuntaHint")}
+                          {t("udsAnagrafica.fasciaEtaRequiredHint")}
                       </p>
+                        <FormMessage />
                     </FormItem>
                   )}
                 />
+                )}
                 <div
                   className="rounded-md border bg-muted/30 p-3 text-sm"
                   data-testid="fascia-eta-corrente"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{t("udsAnagrafica.fasciaEtaCorrenteLabel")}</span>
+                    <span className="font-medium">
+                      {t("udsAnagrafica.fasciaEtaCorrenteLabel")}
+                    </span>
                     <Badge variant="outline">
                       {fasciaEtaOrigineLabel(t, fasciaEtaCorrente.origine)}
                     </Badge>
                   </div>
-                  <div className="mt-1">{fasciaEtaLabel(t, fasciaEtaCorrente.fascia)}</div>
+                  <div className="mt-1">
+                    {fasciaEtaLabel(t, fasciaEtaCorrente.fascia)}
+                  </div>
                   {fasciaEtaCorrente.origine === "calcolata" && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       {t("udsAnagrafica.fasciaEtaCalcolataHint")}
                     </p>
                   )}
                 </div>
+                <details className="rounded-lg border bg-muted/20 p-3">
+                  <summary className="cursor-pointer font-medium min-h-11 flex items-center">
+                    {t("udsAnagrafica.optionalDataTitle")}
+                  </summary>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    {t("udsAnagrafica.optionalDataHint")}
+                  </p>
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="soprannome"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t("udsAnagrafica.fSoprannome")}
+                          </FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                 <FormField
                   control={form.control}
                   name="telefono"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("udsAnagrafica.fTelefono")}</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -686,7 +1067,9 @@ export function UdsPersonaSheet({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("common.email")}</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -695,47 +1078,44 @@ export function UdsPersonaSheet({
                   name="codiceFiscale"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("beneficiarioDettaglio.codiceFiscale")}</FormLabel>
-                      <FormControl><Input {...field} className="font-mono uppercase" maxLength={16} /></FormControl>
+                      <FormLabel>
+                        {t("beneficiarioDettaglio.codiceFiscale")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          className="font-mono uppercase"
+                          maxLength={16}
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="cittadinanza"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("beneficiarioDettaglio.cittadinanza")}</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormLabel>
+                          {t("beneficiarioDettaglio.cittadinanza")}
+                        </FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="areaProvenienza"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("beneficiarioDettaglio.areaProvenienza")} *</FormLabel>
-                        <Select value={field.value || ""} onValueChange={field.onChange}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            <SelectItem value="UE">UE</SelectItem>
-                            <SelectItem value="Extra-UE">Extra-UE</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
                 <FormField
                   control={form.control}
                   name="residenza"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("beneficiarioDettaglio.residenza")}</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormLabel>
+                        {t("beneficiarioDettaglio.residenza")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -744,8 +1124,12 @@ export function UdsPersonaSheet({
                   name="domicilio"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("beneficiarioDettaglio.domicilio")}</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormLabel>
+                        {t("beneficiarioDettaglio.domicilio")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -756,7 +1140,9 @@ export function UdsPersonaSheet({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t("beneficiari.comune")}</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
@@ -765,8 +1151,12 @@ export function UdsPersonaSheet({
                     name="zonaMunicipio"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("beneficiari.zonaMunicipio")}</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                            <FormLabel>
+                              {t("beneficiari.zonaMunicipio")}
+                            </FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
@@ -777,8 +1167,12 @@ export function UdsPersonaSheet({
                     name="numComponenti"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("beneficiari.numComponenti")}</FormLabel>
-                        <FormControl><Input type="number" min="1" {...field} /></FormControl>
+                            <FormLabel>
+                              {t("beneficiari.numComponenti")}
+                            </FormLabel>
+                        <FormControl>
+                          <Input type="number" min="1" {...field} />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
@@ -787,14 +1181,31 @@ export function UdsPersonaSheet({
                     name="priorita"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("beneficiari.prioritaAssistenziale")}</FormLabel>
-                        <Select value={field.value || "media"} onValueChange={field.onChange}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <FormLabel>
+                          {t("beneficiari.prioritaAssistenziale")}
+                        </FormLabel>
+                        <Select
+                          value={field.value || "media"}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
                           <SelectContent>
-                            <SelectItem value="bassa">{t("beneficiari.prioBassa")}</SelectItem>
-                            <SelectItem value="media">{t("beneficiari.prioMedia")}</SelectItem>
-                            <SelectItem value="alta">{t("beneficiari.prioAlta")}</SelectItem>
-                            <SelectItem value="urgente">{t("beneficiari.prioUrgente")}</SelectItem>
+                            <SelectItem value="bassa">
+                              {t("beneficiari.prioBassa")}
+                            </SelectItem>
+                            <SelectItem value="media">
+                              {t("beneficiari.prioMedia")}
+                            </SelectItem>
+                            <SelectItem value="alta">
+                              {t("beneficiari.prioAlta")}
+                            </SelectItem>
+                            <SelectItem value="urgente">
+                              {t("beneficiari.prioUrgente")}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </FormItem>
@@ -807,8 +1218,12 @@ export function UdsPersonaSheet({
                     name="restrizioniAlimentari"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("beneficiarioDettaglio.restrizioniAlimentari")}</FormLabel>
-                        <FormControl><Textarea rows={2} {...field} /></FormControl>
+                        <FormLabel>
+                          {t("beneficiarioDettaglio.restrizioniAlimentari")}
+                        </FormLabel>
+                        <FormControl>
+                          <Textarea rows={2} {...field} />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
@@ -819,15 +1234,27 @@ export function UdsPersonaSheet({
                   name="centroAscoltoId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("beneficiari.centroRiferimento")}</FormLabel>
-                      <Select value={field.value || NO_CENTRO} onValueChange={field.onChange}>
+                      <FormLabel>
+                        {t("beneficiari.centroRiferimento")}
+                      </FormLabel>
+                      <Select
+                        value={field.value || NO_CENTRO}
+                        onValueChange={field.onChange}
+                      >
                         <FormControl>
-                          <SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t("common.none")} />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={NO_CENTRO}>{t("common.none")}</SelectItem>
+                          <SelectItem value={NO_CENTRO}>
+                            {t("common.none")}
+                          </SelectItem>
                           {centri?.map((centro) => (
-                            <SelectItem key={centro.id} value={String(centro.id)}>
+                            <SelectItem
+                              key={centro.id}
+                              value={String(centro.id)}
+                            >
                               {centro.nome}
                             </SelectItem>
                           ))}
@@ -836,36 +1263,61 @@ export function UdsPersonaSheet({
                     </FormItem>
                   )}
                 />
+                  </div>
+                </details>
 
                 <div className="rounded-md border p-3 space-y-3">
+                  {isGlobal && (
                   <FormField
                     control={form.control}
                     name="uds"
                     render={({ field }) => (
                       <FormItem className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <FormLabel className="!mt-0">{t("beneficiari.udsToggle")}</FormLabel>
-                          <p className="text-xs text-muted-foreground">{t("beneficiari.udsToggleHint")}</p>
+                          <FormLabel className="!mt-0">
+                            {t("beneficiari.udsToggle")}
+                          </FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            {t("beneficiari.udsToggleHint")}
+                          </p>
                         </div>
-                        <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
-                  {watchUds && (
+                  )}
+                  {(!isGlobal || watchUds) && (
                     <FormField
                       control={form.control}
                       name="zonaUdsId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t("udsAnagrafica.fZona")}</FormLabel>
-                          <Select value={field.value || NO_ZONE} onValueChange={field.onChange}>
+                          <Select
+                            value={field.value || NO_ZONE}
+                            onValueChange={field.onChange}
+                          >
                             <FormControl>
-                              <SelectTrigger><SelectValue placeholder={t("udsAnagrafica.allZone")} /></SelectTrigger>
+                              <SelectTrigger>
+                                <SelectValue
+                                  placeholder={t("udsAnagrafica.allZone")}
+                                />
+                              </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value={NO_ZONE}>{t("udsAnagrafica.allZone")}</SelectItem>
+                              <SelectItem value={NO_ZONE}>
+                                {t("udsAnagrafica.allZone")}
+                              </SelectItem>
                               {formZone?.map((zona) => (
-                                <SelectItem key={zona.id} value={String(zona.id)}>
+                                <SelectItem
+                                  key={zona.id}
+                                  value={String(zona.id)}
+                                >
                                   {zona.nome}
                                 </SelectItem>
                               ))}
@@ -878,17 +1330,33 @@ export function UdsPersonaSheet({
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                  >
                     {t("common.cancel")}
                   </Button>
                   <Button
                     type="submit"
+                    className="min-h-11 min-w-28"
                     disabled={
                       createBenef.isPending ||
-                      (!dupDismissed && (dupDebouncing || isDupFetching || suggestions.length > 0))
+                      (!dupDismissed &&
+                        (dupDebouncing ||
+                          isDupFetching ||
+                          isDirectoryFetching ||
+                          isLinkCandidatesFetching ||
+                          suggestions.length > 0 ||
+                          (linkCandidateMatches?.length ?? 0) > 0 ||
+                          (directoryMatches?.length ?? 0) > 0))
                     }
                   >
-                    {t("common.save")}
+                    {duplicateCheckPending
+                      ? t("udsAnagrafica.duplicateCheckInProgress")
+                      : createBenef.isPending
+                        ? t("udsAnagrafica.savingPerson")
+                        : t("common.save")}
                   </Button>
                 </div>
               </form>
@@ -905,16 +1373,23 @@ export function UdsPersonaSheet({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("udsAnagrafica.dupConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("udsAnagrafica.dupConfirmTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("udsAnagrafica.dupConfirmDescription", {
-                nome: linkCandidate ? `${linkCandidate.cognome} ${linkCandidate.nome}` : "",
+                nome: linkCandidate
+                  ? `${linkCandidate.cognome} ${linkCandidate.nome}`
+                  : "",
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmLinkToUds} disabled={updateBenef.isPending}>
+            <AlertDialogAction
+              onClick={confirmLinkToUds}
+              disabled={updateBenef.isPending}
+            >
               {t("udsAnagrafica.dupConfirmAction")}
             </AlertDialogAction>
           </AlertDialogFooter>

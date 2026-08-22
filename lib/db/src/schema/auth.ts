@@ -9,7 +9,10 @@ import {
   json,
   index,
   uniqueIndex,
+  check,
+  foreignKey,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { centriAscoltoTable } from "./centri";
 import { areeOperativeTable } from "./areeOperative";
 import { zoneUdsTable } from "./zoneUds";
@@ -54,6 +57,12 @@ export const utentiTable = pgTable(
   (table) => [
     uniqueIndex("utenti_matricola_unique").on(table.matricola),
     uniqueIndex("utenti_email_unique").on(table.email),
+    check("utenti_zona_richiede_area_check", sql`${table.zonaUdsId} is null or ${table.areaOperativaId} is not null`),
+    foreignKey({
+      name: "utenti_zona_area_fk",
+      columns: [table.zonaUdsId, table.areaOperativaId],
+      foreignColumns: [zoneUdsTable.id, zoneUdsTable.areaOperativaId],
+    }),
   ],
 );
 

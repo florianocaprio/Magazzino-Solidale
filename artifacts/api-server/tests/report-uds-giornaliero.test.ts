@@ -62,8 +62,8 @@ describe("Report UDS — interventi-giornalieri", () => {
   it("supporta un intervallo di date (da..a) e ordina per data", async () => {
     const areaOperativa = await createAreaOperativa(scope);
     const ben = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa });
-    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-01" });
-    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-03" });
+    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-01", ambito: "uds", areaOperativaIdSnapshot: areaOperativa });
+    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-07-03", ambito: "uds", areaOperativaIdSnapshot: areaOperativa });
 
     const range = await request(appGlobal()).get(
       "/report/uds/interventi-giornalieri?da=2026-07-01&a=2026-07-03",
@@ -90,11 +90,13 @@ describe("Report UDS — interventi-giornalieri", () => {
     ).toHaveLength(1);
   });
 
-  it("numera gli interventi per persona e segna il primo come primoIntervento", async () => {
+  it("numera esclusivamente gli interventi UDS e segna il primo come primoIntervento", async () => {
     const areaOperativa = await createAreaOperativa(scope);
     const ben = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa });
-    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-06-01" });
-    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-06-02" });
+    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-05-01", ambito: "sociale" });
+    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-05-02", ambito: null });
+    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-06-01", ambito: "uds", areaOperativaIdSnapshot: areaOperativa });
+    await insertIntervento(scope, { beneficiarioId: ben, dataIntervento: "2026-06-02", ambito: "uds", areaOperativaIdSnapshot: areaOperativa });
 
     const day1 = await request(appGlobal()).get("/report/uds/interventi-giornalieri?da=2026-06-01");
     expect(day1.status).toBe(200);
@@ -129,8 +131,8 @@ describe("Report UDS — interventi-giornalieri", () => {
     const zonaB = await createZona(scope, areaOperativa);
     const benA = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa, zonaUdsId: zonaA.id });
     const benB = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativa, zonaUdsId: zonaB.id });
-    await insertIntervento(scope, { beneficiarioId: benA, dataIntervento: "2026-06-04" });
-    await insertIntervento(scope, { beneficiarioId: benB, dataIntervento: "2026-06-04" });
+    await insertIntervento(scope, { beneficiarioId: benA, dataIntervento: "2026-06-04", ambito: "uds", areaOperativaIdSnapshot: areaOperativa, zonaUdsIdSnapshot: zonaA.id });
+    await insertIntervento(scope, { beneficiarioId: benB, dataIntervento: "2026-06-04", ambito: "uds", areaOperativaIdSnapshot: areaOperativa, zonaUdsIdSnapshot: zonaB.id });
 
     const res = await request(appGlobal()).get(
       `/report/uds/interventi-giornalieri?da=2026-06-04&zonaUdsId=${zonaA.id}`,
@@ -145,7 +147,7 @@ describe("Report UDS — interventi-giornalieri", () => {
     const areaOperativaA = await createAreaOperativa(scope);
     const areaOperativaB = await createAreaOperativa(scope);
     const benB = await createBeneficiario(scope, null, { uds: true, areaOperativaId: areaOperativaB });
-    await insertIntervento(scope, { beneficiarioId: benB, dataIntervento: "2026-06-05" });
+    await insertIntervento(scope, { beneficiarioId: benB, dataIntervento: "2026-06-05", ambito: "uds", areaOperativaIdSnapshot: areaOperativaB });
 
     const fromA = await request(appAreaOperativa(areaOperativaA)).get("/report/uds/interventi-giornalieri?da=2026-06-05");
     expect(fromA.status).toBe(200);

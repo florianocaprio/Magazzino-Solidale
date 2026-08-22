@@ -125,6 +125,7 @@ async function createIntervento(input: {
       tipoIntervento: `Preparazione ${rnd()}`,
       stato: input.stato ?? "pianificato",
       ambito: input.ambito ?? "sociale",
+      areaOperativaIdSnapshot: input.ambito === "uds" ? roma : null,
       priorita: input.priorita ?? "normale",
       dataOraPianificata: input.planned,
       dataOraAvvio:

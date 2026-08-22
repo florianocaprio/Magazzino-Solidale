@@ -14,11 +14,14 @@ export interface VolontarioUpdate {
   centroAscoltoId?: number | null;
   telefono?: string;
   email?: string;
-  ruolo?: string;
+  /** @minimum 1 */
+  ruoloVolontarioId?: number;
   patente?: boolean;
   mezzoPersonale?: boolean;
+  /** @minimum 0 */
   maxConsegneTurno?: number;
   attivo?: boolean;
-  statoApprovazione?: string;
   note?: string;
+  /** @minimum 1 */
+  versione: number;
 }

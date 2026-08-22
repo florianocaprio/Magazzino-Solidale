@@ -6,11 +6,14 @@ import {
   pool,
   beneficiariTable,
   areeOperativeTable,
+  auditConfigurazioniTable,
   interventiTable,
   utentiTable,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
+import udsRouter from "../src/routes/uds";
+import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
 /**
  * UDS note: interventi carry a dedicated `noteUds` field (distinct from `note`,
@@ -34,6 +37,7 @@ function makeApp(): Express {
           centroAscoltoId: number | null;
           areaOperativaId: number | null;
           aree: string[];
+          permessi: string[];
         };
       }
     ).user = {
@@ -41,9 +45,15 @@ function makeApp(): Express {
       centroAscoltoId: null,
       areaOperativaId,
       aree: ["sociale", "uds"],
+      permessi: [
+        "uds.interventi.view",
+        "uds.interventi.create",
+        "uds.interventi.note",
+      ],
     };
     next();
   });
+  app.use(udsRouter);
   app.use(interventiRouter);
   return app;
 }
@@ -53,6 +63,7 @@ const beneficiarioIds: number[] = [];
 let beneficiarioId: number;
 
 beforeAll(async () => {
+  await updateModuloAmbiente("UDS", true, null);
   const [areaOperativa] = await db
     .insert(areeOperativeTable)
     .values({ nome: `Area Note UDS ${rnd()}` })
@@ -96,29 +107,31 @@ afterAll(async () => {
       .delete(beneficiariTable)
       .where(inArray(beneficiariTable.id, beneficiarioIds));
   }
+  await db
+    .delete(auditConfigurazioniTable)
+    .where(eq(auditConfigurazioniTable.utenteId, operatorUserId));
   await db.delete(utentiTable).where(eq(utentiTable.id, operatorUserId));
-  await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, areaOperativaId));
+  await db
+    .delete(areeOperativeTable)
+    .where(eq(areeOperativeTable.id, areaOperativaId));
   await pool.end();
 });
 
-describe("noteUds su /interventi", () => {
-  it("persiste noteUds in PATCH e lo ritorna nella LIST", async () => {
+describe("Nota UDS dedicata", () => {
+  it("persiste noteUds con versione e lo ritorna nella LIST", async () => {
     const app = makeApp();
-    const created = await request(app).post("/interventi").send({
+    const created = await request(app).post("/uds/interventi").send({
       beneficiarioId,
       tipoIntervento: "ascolto",
-      ambito: "uds",
-      stato: "da_pianificare",
     });
     expect(created.status).toBe(201);
     const id = created.body.id as number;
     interventoIds.push(id);
     expect(created.body.noteUds ?? null).toBeNull();
 
-    const patched = await request(app).patch(`/interventi/${id}`).send({
-      versione: created.body.dataAggiornamento,
-      noteUds: "Nota gialla",
-    });
+    const patched = await request(app)
+      .patch(`/uds/interventi/${id}/nota`)
+      .send({ versione: created.body.versione, noteUds: "Nota gialla" });
     expect(patched.status).toBe(200);
     expect(patched.body.noteUds).toBe("Nota gialla");
 
@@ -134,17 +147,20 @@ describe("noteUds su /interventi", () => {
 
   it("mantiene note (materiale) e noteUds come campi distinti", async () => {
     const app = makeApp();
-    const created = await request(app).post("/interventi").send({
+    const created = await request(app).post("/uds/interventi").send({
       beneficiarioId,
       tipoIntervento: "distribuzione",
-      ambito: "uds",
-      stato: "da_pianificare",
       note: "Coperta",
-      noteUds: "Da ricontattare",
     });
     expect(created.status).toBe(201);
     const id = created.body.id as number;
     interventoIds.push(id);
+
+    const noted = await request(app).patch(`/uds/interventi/${id}/nota`).send({
+      versione: created.body.versione,
+      noteUds: "Da ricontattare",
+    });
+    expect(noted.status).toBe(200);
 
     const list = await request(app)
       .get("/interventi")
