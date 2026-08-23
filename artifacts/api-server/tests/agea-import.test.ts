@@ -32,6 +32,7 @@ import {
 } from "../src/lib/configurazioneAmbiente";
 import { AGEA_XLSX_MIME, parseAgeaWorkbook } from "../src/lib/ageaSifeadParser";
 import { InventoryDecimal } from "../src/lib/inventoryDecimal";
+import { createWarehouseLoad } from "../src/lib/inventoryLedger";
 
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 let app: Express;
@@ -655,6 +656,115 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
     });
   });
 
+  it("conta separatamente una riga nuova, duplicata, modificata e ambigua", async () => {
+    const [{ id: countWarehouseId }] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `AGEACT-${suffix}`.slice(0, 20),
+        nome: `AGEA conteggi ${suffix}`,
+      })
+      .returning({ id: magazziniTable.id });
+    concurrencyWarehouseIds.push(countWarehouseId);
+    const buffer = workbookFromRows([
+      ageaRow({ 4: "COUNT-NEW", 9: 1, 10: 2 }),
+      ageaRow({ 4: "COUNT-DUPLICATE", 9: 2, 10: 4 }),
+      ageaRow({ 4: "COUNT-MODIFIED", 9: 3, 10: 6 }),
+      ageaRow({ 4: "COUNT-AMBIGUOUS", 9: 4, 10: 8 }),
+    ]);
+    const parsed = parseAgeaWorkbook(buffer);
+    const seed = await analyzeForWarehouse(
+      "SOLO_ANALISI",
+      buffer,
+      countWarehouseId,
+    );
+    const seedRows = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .where(eq(importazioniAgeaRigheTable.importazioneId, seed.body.id));
+    const seedByNumber = new Map(seedRows.map((row) => [row.numeroRiga, row]));
+    const byDocument = new Map(
+      parsed.rows.map((row) => [
+        row.numeroDocumentoNormalizzato,
+        { parsed: row, stored: seedByNumber.get(row.numeroRiga)! },
+      ]),
+    );
+    const duplicate = byDocument.get("COUNT-DUPLICATE")!;
+    const modified = byDocument.get("COUNT-MODIFIED")!;
+    const ambiguous = byDocument.get("COUNT-AMBIGUOUS")!;
+    await db.insert(movimentiEsterniAgeaTable).values([
+      {
+        magazzinoId: countWarehouseId,
+        identityKey: `${duplicate.parsed.identityBaseHash}:1`,
+        identityBaseHash: duplicate.parsed.identityBaseHash,
+        identityOccurrence: 1,
+        acceptedContentHash: duplicate.parsed.contentHash,
+        acceptedImportRowId: duplicate.stored.id,
+        tipoMovimentoEsterno: "CARICO",
+        prodottoIdSnapshot: productId,
+        firstSeenImportId: seed.body.id,
+        lastSeenImportId: seed.body.id,
+        statoApplicazione: "NON_APPLICABILE_RIFERIMENTO",
+      },
+      {
+        magazzinoId: countWarehouseId,
+        identityKey: `${modified.parsed.identityBaseHash}:1`,
+        identityBaseHash: modified.parsed.identityBaseHash,
+        identityOccurrence: 1,
+        acceptedContentHash: "f".repeat(64),
+        acceptedImportRowId: modified.stored.id,
+        tipoMovimentoEsterno: "CARICO",
+        prodottoIdSnapshot: productId,
+        firstSeenImportId: seed.body.id,
+        lastSeenImportId: seed.body.id,
+        statoApplicazione: "NON_APPLICABILE_RIFERIMENTO",
+      },
+      ...[1, 2].map((occurrence) => ({
+        magazzinoId: countWarehouseId,
+        identityKey: `${ambiguous.parsed.identityBaseHash}:${occurrence}`,
+        identityBaseHash: ambiguous.parsed.identityBaseHash,
+        identityOccurrence: occurrence,
+        acceptedContentHash: (occurrence === 1 ? "e" : "d").repeat(64),
+        acceptedImportRowId: ambiguous.stored.id,
+        tipoMovimentoEsterno: "CARICO",
+        prodottoIdSnapshot: productId,
+        firstSeenImportId: seed.body.id,
+        lastSeenImportId: seed.body.id,
+        statoApplicazione: "NON_APPLICABILE_RIFERIMENTO",
+      })),
+    ]);
+
+    const analyzed = await analyzeForWarehouse(
+      "SOLO_ANALISI",
+      buffer,
+      countWarehouseId,
+    );
+    expect(analyzed.body).toMatchObject({
+      stato: "BLOCCATA",
+      righeNuove: 1,
+      righeDuplicate: 1,
+      righeModificate: 1,
+      righeAmbigue: 1,
+    });
+    const classified = await request(app).get(
+      `/agea/importazioni/${analyzed.body.id}/righe`,
+    );
+    expect(
+      classified.body.items.map((row: { statoRiga: string }) => row.statoRiga),
+    ).toEqual([
+      "DA_APPLICARE",
+      "DUPLICATA",
+      "MODIFICATO_NEL_REGISTRO",
+      "IDENTITA_AMBIGUA",
+    ]);
+    expect(
+      classified.body.items.flatMap(
+        (row: { errorCodesJson: string[] }) => row.errorCodesJson,
+      ),
+    ).toEqual(
+      expect.arrayContaining(["MODIFICATO_NEL_REGISTRO", "IDENTITA_AMBIGUA"]),
+    );
+  });
+
   it("non collide su documenti lunghi e mantiene l'idempotenza invertendo l'ordine", async () => {
     const prefix = "DOC-" + "X".repeat(130);
     const firstBuffer = workbookFromRows([
@@ -1069,6 +1179,15 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       });
     expect(invalid.status).toBe(400);
     expect(invalid.body.code).toBe("DATA_CIVILE_NON_VALIDA");
+    const invalidLot = await request(app)
+      .patch(`/agea/importazioni/${analyzed.body.id}/righe/${rowId}/lotto`)
+      .send({
+        valore: "X".repeat(81),
+        motivazione: "Lotto oltre il limite ledger",
+        versione: analyzed.body.versione,
+      });
+    expect(invalidLot.status).toBe(400);
+    expect(invalidLot.body.code).toBe("LOTTO_NON_VALIDO");
     const correctedDate = await request(app)
       .patch(
         `/agea/importazioni/${analyzed.body.id}/righe/${rowId}/data-carico`,
@@ -1154,6 +1273,119 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
     ).toBe(true);
   });
 
+  it("mantiene il lotto raw di 81 caratteri bloccante e consente una correzione effective a 80", async () => {
+    const rawLot = "R".repeat(81);
+    const effectiveLot = "E".repeat(80);
+    const analyzed = await analyze(
+      "SOLO_ANALISI",
+      workbookFromRows([ageaRow({ 4: "LOT-LIMIT-R2", 7: rawLot })]),
+    );
+    expect(analyzed.body.stato).toBe("BLOCCATA");
+    const rows = await request(app).get(
+      `/agea/importazioni/${analyzed.body.id}/righe`,
+    );
+    expect(rows.body.items[0]).toMatchObject({
+      lottoRaw: rawLot,
+      blocking: true,
+      errorCodesJson: expect.arrayContaining(["LOTTO_NON_VALIDO"]),
+    });
+    const corrected = await request(app)
+      .patch(
+        `/agea/importazioni/${analyzed.body.id}/righe/${rows.body.items[0].id}/lotto`,
+      )
+      .send({
+        valore: effectiveLot,
+        motivazione: "Allineamento al limite del ledger",
+        versione: analyzed.body.versione,
+      });
+    expect(corrected.status, JSON.stringify(corrected.body)).toBe(200);
+    expect(corrected.body.stato).toBe("PRONTA");
+    const [stored] = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .where(eq(importazioniAgeaRigheTable.id, rows.body.items[0].id));
+    expect(stored).toMatchObject({
+      lottoRaw: rawLot,
+      lottoEffettivoRaw: effectiveLot,
+      lottoEffettivoNormalizzato: effectiveLot,
+      blocking: false,
+    });
+  });
+
+  it("rivalida sotto gli stessi party lock una Partita locale creata dopo la preview bootstrap", async () => {
+    const [{ id: raceWarehouseId }] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `AGEAPR-${suffix}`.slice(0, 20),
+        nome: `AGEA party race ${suffix}`,
+      })
+      .returning({ id: magazziniTable.id });
+    concurrencyWarehouseIds.push(raceWarehouseId);
+    const analyzed = await analyzeForWarehouse(
+      "PRIMA_ACQUISIZIONE",
+      workbookFromRows([ageaRow({ 4: "PARTY-RACE-R2" })]),
+      raceWarehouseId,
+    );
+    expect(analyzed.body.stato).toBe("PRONTA");
+
+    await db.transaction((tx) =>
+      createWarehouseLoad(tx, {
+        magazzinoId: raceWarehouseId,
+        origineCarico: "DONAZIONE",
+        numeroDocumento: "MANUAL-RACE-R2",
+        dataDocumento: "2026-08-20",
+        dataCarico: "2026-08-20",
+        creatoDa: userId,
+        righe: [
+          {
+            prodottoId: productId,
+            fondoOrigine: "FSE_PLUS",
+            quantitaOperativa: "1.100000",
+            unitaMisuraOperativa: "kg",
+            quantitaPezzi: "2.000000",
+            quantitaKgLt: "1.100000",
+            fattoreKgLtPezzo: "0.550000000",
+            codiceLotto: "LOT-R1",
+          },
+        ],
+      }),
+    );
+    const [before] = await db
+      .select()
+      .from(lottiTable)
+      .where(
+        and(
+          eq(lottiTable.magazzinoId, raceWarehouseId),
+          eq(lottiTable.codiceLottoNormalizzato, "LOT-R1"),
+        ),
+      );
+    const confirmed = await request(app)
+      .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
+      .send({ versione: analyzed.body.versione });
+    expect(confirmed.status).toBe(409);
+    expect(confirmed.body.code).toBe("PREVIEW_DA_RICALCOLARE");
+    const saldoLoads = await db
+      .select()
+      .from(carichiMagazzinoTable)
+      .where(
+        and(
+          eq(carichiMagazzinoTable.magazzinoId, raceWarehouseId),
+          eq(carichiMagazzinoTable.origineCarico, "SALDO_INIZIALE"),
+        ),
+      );
+    expect(saldoLoads).toHaveLength(0);
+    const [after] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, before.id));
+    expect(after.quantitaResidua).toBe(before.quantitaResidua);
+    const canonicalRows = await db
+      .select()
+      .from(movimentiEsterniAgeaTable)
+      .where(eq(movimentiEsterniAgeaTable.firstSeenImportId, analyzed.body.id));
+    expect(canonicalRows).toHaveLength(0);
+  });
+
   it("serializza correzioni, annullamento, conferme e due bootstrap concorrenti", async () => {
     const expectOneWinner = (
       responses: Array<{ status: number; body: { code?: string } }>,
@@ -1185,9 +1417,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
 
     const expiryImport = await analyze(
       "SOLO_ANALISI",
-      workbookFromRows([
-        ageaRow({ 4: "RACE-EXPIRY", 7: "RACE-EXPIRY-LOT" }),
-      ]),
+      workbookFromRows([ageaRow({ 4: "RACE-EXPIRY", 7: "RACE-EXPIRY-LOT" })]),
     );
     const expiryParties = await request(app).get(
       `/agea/importazioni/${expiryImport.body.id}/partite`,
@@ -1297,6 +1527,103 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       .from(carichiMagazzinoTable)
       .where(eq(carichiMagazzinoTable.magazzinoId, bootstrapWarehouseId));
     expect(bootstrapLoads).toHaveLength(1);
+  });
+
+  it("crea un solo Carico multi-riga per documento e blocca date effettive divergenti", async () => {
+    const [{ id: groupWarehouseId }] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `AGEAGD-${suffix}`.slice(0, 20),
+        nome: `AGEA date gruppo ${suffix}`,
+      })
+      .returning({ id: magazziniTable.id });
+    concurrencyWarehouseIds.push(groupWarehouseId);
+    const bootstrap = await analyzeForWarehouse(
+      "PRIMA_ACQUISIZIONE",
+      workbookFromRows([ageaRow({ 4: "GROUP-BOOTSTRAP" })]),
+      groupWarehouseId,
+    );
+    const bootstrapped = await request(app)
+      .post(`/agea/importazioni/${bootstrap.body.id}/conferma`)
+      .send({ versione: bootstrap.body.versione });
+    expect(bootstrapped.status, JSON.stringify(bootstrapped.body)).toBe(200);
+
+    const sameDate = await analyzeForWarehouse(
+      "AGGIORNAMENTO",
+      workbookFromRows([
+        ageaRow({ 4: "GROUP-SAME-DATE", 9: 1.1, 10: 2 }),
+        ageaRow({ 4: "GROUP-SAME-DATE", 9: 2.2, 10: 4 }),
+      ]),
+      groupWarehouseId,
+    );
+    expect(sameDate.body.stato).toBe("PRONTA");
+    const sameDateConfirmed = await request(app)
+      .post(`/agea/importazioni/${sameDate.body.id}/conferma`)
+      .send({ versione: sameDate.body.versione });
+    expect(
+      sameDateConfirmed.status,
+      JSON.stringify(sameDateConfirmed.body),
+    ).toBe(200);
+    expect(sameDateConfirmed.body.carichi).toHaveLength(1);
+    const sameDateLoadRows = await db
+      .select()
+      .from(carichiMagazzinoRigheTable)
+      .where(
+        eq(
+          carichiMagazzinoRigheTable.caricoMagazzinoId,
+          sameDateConfirmed.body.carichi[0],
+        ),
+      );
+    expect(sameDateLoadRows).toHaveLength(2);
+
+    const divergent = await analyzeForWarehouse(
+      "AGGIORNAMENTO",
+      workbookFromRows([
+        ageaRow({ 4: "GROUP-DIVERGENT", 9: 3.3, 10: 6 }),
+        ageaRow({ 4: "GROUP-DIVERGENT", 9: 4.4, 10: 8 }),
+      ]),
+      groupWarehouseId,
+    );
+    expect(divergent.body.stato).toBe("PRONTA");
+    const divergentRows = await request(app).get(
+      `/agea/importazioni/${divergent.body.id}/righe`,
+    );
+    const corrected = await request(app)
+      .patch(
+        `/agea/importazioni/${divergent.body.id}/righe/${divergentRows.body.items[0].id}/data-carico`,
+      )
+      .send({
+        valore: "2026-08-21",
+        motivazione: "Data verificata su documento",
+        versione: divergent.body.versione,
+      });
+    expect(corrected.status, JSON.stringify(corrected.body)).toBe(200);
+    expect(corrected.body.stato).toBe("BLOCCATA");
+    const blockedRows = await request(app).get(
+      `/agea/importazioni/${divergent.body.id}/righe`,
+    );
+    expect(
+      blockedRows.body.items.every(
+        (row: { errorCodesJson: string[]; blocking: boolean }) =>
+          row.blocking &&
+          row.errorCodesJson.includes("DATA_CARICO_GRUPPO_INCOERENTE"),
+      ),
+    ).toBe(true);
+    const loadsBeforeRejectedConfirm = await db
+      .select()
+      .from(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.magazzinoId, groupWarehouseId));
+    const rejected = await request(app)
+      .post(`/agea/importazioni/${divergent.body.id}/conferma`)
+      .send({ versione: corrected.body.versione });
+    expect(rejected.status).toBe(409);
+    const loadsAfterRejectedConfirm = await db
+      .select()
+      .from(carichiMagazzinoTable)
+      .where(eq(carichiMagazzinoTable.magazzinoId, groupWarehouseId));
+    expect(loadsAfterRejectedConfirm).toHaveLength(
+      loadsBeforeRejectedConfirm.length,
+    );
   });
 
   it("propaga scadenza, lotto e fattore dalla partita preview a un carico incrementale", async () => {

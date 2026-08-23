@@ -22,8 +22,10 @@ import {
 } from "../lib/ageaImportService";
 import {
   AGEA_MAX_BYTES,
+  AGEA_MAX_LOT_LENGTH,
   AGEA_XLSX_MIME,
   normalizeAgeaKey,
+  normalizeAgeaText,
 } from "../lib/ageaSifeadParser";
 import {
   callerAreaOperativaId,
@@ -481,7 +483,8 @@ for (const correction of [
       if (
         correction.field === "LOTTO" &&
         value !== null &&
-        (value.trim().length === 0 || value.length > 255)
+        (value.trim().length === 0 ||
+          (normalizeAgeaText(value)?.length ?? 0) > AGEA_MAX_LOT_LENGTH)
       )
         return void res.status(400).json({
           error: "Lotto non valido",

@@ -753,6 +753,11 @@ export const AgeaImportModalita = {
   SOLO_ANALISI: 'SOLO_ANALISI',
 } as const;
 
+export interface AgeaErrorResponse {
+  error: string;
+  code?: string;
+}
+
 export type AgeaImportStato = typeof AgeaImportStato[keyof typeof AgeaImportStato];
 
 
@@ -1000,7 +1005,7 @@ export interface AgeaCorrezioneDataInput {
 export interface AgeaCorrezioneLottoInput {
   /**
      * @minLength 1
-     * @maxLength 255
+     * @maxLength 80
      * @nullable
      */
   valore: string | null;
@@ -6661,6 +6666,36 @@ export interface RuoloUpdate {
   permessi?: string[];
   isAdmin?: boolean;
 }
+
+/**
+ * Richiesta AGEA non valida
+ */
+export type AgeaBadRequestResponse = AgeaErrorResponse;
+
+/**
+ * Permesso o scope AGEA non consentito
+ */
+export type AgeaForbiddenResponse = AgeaErrorResponse;
+
+/**
+ * Risorsa AGEA non trovata
+ */
+export type AgeaNotFoundResponse = AgeaErrorResponse;
+
+/**
+ * Versione, preflight o concorrenza AGEA non validi
+ */
+export type AgeaConflictResponse = AgeaErrorResponse;
+
+/**
+ * Limite di 10 MB superato
+ */
+export type AgeaPayloadTooLargeResponse = AgeaErrorResponse;
+
+/**
+ * MIME XLSX richiesto
+ */
+export type AgeaUnsupportedMediaTypeResponse = AgeaErrorResponse;
 
 /**
  * Pagina richiesta, indicizzata da 1

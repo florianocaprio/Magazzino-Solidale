@@ -9,7 +9,7 @@
 export interface AgeaCorrezioneLottoInput {
   /**
      * @minLength 1
-     * @maxLength 255
+     * @maxLength 80
      * @nullable
      */
   valore: string | null;

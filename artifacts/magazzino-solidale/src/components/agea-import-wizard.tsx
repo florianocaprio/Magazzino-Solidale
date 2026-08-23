@@ -105,6 +105,9 @@ export function AgeaImportWizard() {
   const [productByDescription, setProductByDescription] = useState<
     Record<string, string>
   >({});
+  const [previewDirtyByImport, setPreviewDirtyByImport] = useState<
+    Record<number, boolean>
+  >({});
   const analyze = useMutation({
     mutationFn: () => {
       if (!file || !magazzinoId)
@@ -117,6 +120,10 @@ export function AgeaImportWizard() {
     },
     onSuccess: (result) => {
       setSelectedId(result.id);
+      setPreviewDirtyByImport((current) => ({
+        ...current,
+        [result.id]: false,
+      }));
       queryClient.invalidateQueries({
         queryKey: getListAgeaImportazioniQueryKey(),
       });
@@ -136,6 +143,15 @@ export function AgeaImportWizard() {
     () => importsQuery.data?.find((item) => item.id === selectedId) ?? null,
     [importsQuery.data, selectedId],
   );
+  const previewDirty =
+    selectedId != null && previewDirtyByImport[selectedId] === true;
+  const markSelectedPreviewDirty = () => {
+    if (selectedId == null) return;
+    setPreviewDirtyByImport((current) => ({
+      ...current,
+      [selectedId]: true,
+    }));
+  };
   const partiesQuery = useListAgeaImportazionePartite(selectedId ?? 0, {
     query: {
       enabled: selectedId != null,
@@ -236,6 +252,7 @@ export function AgeaImportWizard() {
         },
         {
           onSuccess: () => {
+            markSelectedPreviewDirty();
             void refreshImport();
             toast({ title: "Mapping aggiornato", description: raw });
           },
@@ -253,6 +270,7 @@ export function AgeaImportWizard() {
       { data: { descrizioneEsterna: raw, prodottoId: productId } },
       {
         onSuccess: () => {
+          markSelectedPreviewDirty();
           queryClient.invalidateQueries({
             queryKey: ["/api/agea/mappature-prodotti"],
           });
@@ -550,7 +568,10 @@ export function AgeaImportWizard() {
                               },
                             },
                             {
-                              onSuccess: () => void refreshImport(),
+                              onSuccess: () => {
+                                markSelectedPreviewDirty();
+                                void refreshImport();
+                              },
                               onError: (error) =>
                                 toast({
                                   title: "Mapping non aggiornato",
@@ -581,7 +602,13 @@ export function AgeaImportWizard() {
                 recalculate.mutate(
                   { id: selected.id, data: { versione: selected.versione } },
                   {
-                    onSuccess: (result) => void refreshImport(result),
+                    onSuccess: (result) => {
+                      setPreviewDirtyByImport((current) => ({
+                        ...current,
+                        [result.id]: false,
+                      }));
+                      void refreshImport(result);
+                    },
                     onError: (error) =>
                       toast({
                         title: "Preflight non ricalcolato",
@@ -852,6 +879,7 @@ export function AgeaImportWizard() {
                     />
                     <Input
                       value={correctionDrafts[row.id]?.lot ?? ""}
+                      maxLength={80}
                       onChange={(event) =>
                         setCorrectionDrafts((current) => ({
                           ...current,
@@ -935,34 +963,42 @@ export function AgeaImportWizard() {
         </CardHeader>
         <CardContent>
           {selected ? (
-            <div className="grid gap-3 sm:grid-cols-3 text-sm">
-              <div>
-                <strong>{selected.partiteSaldoPositivo}</strong> Partite da
-                inizializzare
-              </div>
-              <div>
-                <strong>{selected.righeCarico}</strong> carichi storici/positivi
-              </div>
-              <div>
-                <strong>
-                  {selected.righeDistribuzione + selected.righeReso}
-                </strong>{" "}
-                movimenti negativi di riferimento
-              </div>
-              <div>
-                <strong>{selected.righeDuplicate}</strong> duplicati
-              </div>
-              <div>
-                <strong>{selected.righeModificate}</strong> conflitti
-              </div>
-              <div>
-                <Badge
-                  variant={
-                    selected.stato === "PRONTA" ? "default" : "destructive"
-                  }
-                >
-                  {selected.stato}
-                </Badge>
+            <div className="space-y-3 text-sm">
+              {previewDirty && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 font-medium text-amber-900">
+                  Preview da ricalcolare
+                </div>
+              )}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <strong>{selected.partiteSaldoPositivo}</strong> Partite da
+                  inizializzare
+                </div>
+                <div>
+                  <strong>{selected.righeCarico}</strong> carichi
+                  storici/positivi
+                </div>
+                <div>
+                  <strong>
+                    {selected.righeDistribuzione + selected.righeReso}
+                  </strong>{" "}
+                  movimenti negativi di riferimento
+                </div>
+                <div>
+                  <strong>{selected.righeDuplicate}</strong> duplicati
+                </div>
+                <div>
+                  <strong>{selected.righeModificate}</strong> conflitti
+                </div>
+                <div>
+                  <Badge
+                    variant={
+                      selected.stato === "PRONTA" ? "default" : "destructive"
+                    }
+                  >
+                    {selected.stato}
+                  </Badge>
+                </div>
               </div>
             </div>
           ) : (
@@ -986,6 +1022,7 @@ export function AgeaImportWizard() {
             disabled={
               !selected ||
               selected.stato !== "PRONTA" ||
+              previewDirty ||
               confirm.isPending ||
               !canImport ||
               (selected.modalita === "PRIMA_ACQUISIZIONE" &&

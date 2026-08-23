@@ -243,6 +243,28 @@ describe("parser AGEA/SIFEAD osservato", () => {
     });
   });
 
+  it("accetta lotti di 80 caratteri e conserva raw bloccando quelli di 81", () => {
+    const lot80 = "L".repeat(80);
+    const lot81 = "X".repeat(81);
+    const parsed = parseAgeaWorkbook(
+      workbookBuffer([
+        row({ 4: "DOC-LOT-80", 7: lot80 }),
+        row({ 4: "DOC-LOT-81", 7: lot81 }),
+      ]),
+    );
+    expect(parsed.rows[0]).toMatchObject({
+      lottoRaw: lot80,
+      lottoNormalizzato: lot80,
+      blocking: false,
+    });
+    expect(parsed.rows[1]).toMatchObject({
+      lottoRaw: lot81,
+      lottoNormalizzato: lot81,
+      blocking: true,
+      errorCodes: ["LOTTO_NON_VALIDO"],
+    });
+  });
+
   it("non confonde valori semanticamente diversi e non inquina Object.prototype", () => {
     const before = Object.prototype.hasOwnProperty.call(
       Object.prototype,

@@ -461,10 +461,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportazione" }
-        "400": { description: File o tracciato non valido }
-        "403": { description: Permesso o scope non consentito }
-        "413": { description: Limite di 10 MB superato }
-        "415": { description: MIME XLSX richiesto }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "413": { $ref: "#/components/responses/AgeaPayloadTooLarge" }
+        "415": { $ref: "#/components/responses/AgeaUnsupportedMediaType" }
 
   /agea/importazioni/{id}:
     get:
@@ -478,6 +478,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
 
   /agea/importazioni/{id}/righe:
     get:
@@ -509,6 +512,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportRighePage" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
 
   /agea/importazioni/{id}/partite:
     get:
@@ -524,6 +530,9 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/AgeaImportPartita" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
 
   /agea/importazioni/{id}/descrizioni-da-mappare:
     get:
@@ -540,6 +549,9 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/AgeaDescrizioneDaMappare" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
 
   /agea/importazioni/{id}/righe/{rigaId}/data-carico:
     patch:
@@ -559,7 +571,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportazione" }
-        "409": { description: Versione stale o importazione immutabile }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
 
   /agea/importazioni/{id}/righe/{rigaId}/lotto:
     patch:
@@ -579,7 +594,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportazione" }
-        "409": { description: Versione stale o importazione immutabile }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
 
   /agea/importazioni/{id}/partite/{partitaId}:
     patch:
@@ -604,6 +622,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
 
   /agea/importazioni/{id}/ricalcola:
     post:
@@ -622,6 +644,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
 
   /agea/importazioni/{id}/conferma:
     post:
@@ -640,7 +666,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportConfermaResult" }
-        "409": { description: "Preflight, versione o concorrenza non validi" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
 
   /agea/importazioni/{id}/annulla:
     post:
@@ -659,6 +688,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
 
   /agea/mappature-prodotti:
     get:
@@ -686,6 +719,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaMappaturaProdotto" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
 
   /agea/mappature-prodotti/{id}:
     patch:
@@ -704,6 +740,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgeaMappaturaProdotto" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
 
   # ─── LOTTI ───────────────────────────────────────────────────────────────────
   /lotti:
@@ -7175,6 +7215,37 @@ components:
       in: query
       description: Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
       schema: { type: string, format: date }
+  responses:
+    AgeaBadRequest:
+      description: Richiesta AGEA non valida
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaForbidden:
+      description: Permesso o scope AGEA non consentito
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaNotFound:
+      description: Risorsa AGEA non trovata
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaConflict:
+      description: Versione, preflight o concorrenza AGEA non validi
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaPayloadTooLarge:
+      description: Limite di 10 MB superato
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaUnsupportedMediaType:
+      description: MIME XLSX richiesto
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
   schemas:
     MapsLayerCode:
       type: string
@@ -7980,6 +8051,13 @@ components:
       type: string
       enum: [PRIMA_ACQUISIZIONE, AGGIORNAMENTO, SOLO_ANALISI]
 
+    AgeaErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        code: { type: string }
+
     AgeaImportStato:
       type: string
       enum:
@@ -8291,7 +8369,7 @@ components:
       type: object
       required: [valore, motivazione, versione]
       properties:
-        valore: { type: [string, "null"], minLength: 1, maxLength: 255 }
+        valore: { type: [string, "null"], minLength: 1, maxLength: 80 }
         motivazione: { type: string, minLength: 3, maxLength: 500 }
         versione: { type: integer, minimum: 1 }
 

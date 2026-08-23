@@ -10,16 +10,25 @@ import {
   prodottiTable,
   systemLogsTable,
   type AgeaImportMode,
+  type FondoOrigine,
 } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { InventoryDecimal } from "./inventoryDecimal";
-import { createWarehouseLoad, InventoryLedgerError } from "./inventoryLedger";
+import {
+  createWarehouseLoad,
+  findInventoryPartyCandidates,
+  inventoryPartyBusinessKey,
+  InventoryLedgerError,
+  lockInventoryPartyBusinessKeys,
+} from "./inventoryLedger";
 import type { InventoryTransaction } from "./scaricoInventory";
 import {
   AGEA_PARSER_VERSION,
   AGEA_TRACE_CODE,
+  AGEA_MAX_LOT_LENGTH,
   AGEA_XLSX_MIME,
   normalizeAgeaKey,
+  normalizeAgeaText,
   parseAgeaWorkbook,
   type ParsedAgeaRow,
 } from "./ageaSifeadParser";
@@ -100,8 +109,6 @@ function mutableRowState(
   row: typeof importazioniAgeaRigheTable.$inferSelect,
   mapped: boolean,
 ): string {
-  if (row.blocking) return "BLOCCATA";
-  if (!mapped) return "DA_MAPPARE";
   if (
     [
       "DUPLICATA",
@@ -112,10 +119,116 @@ function mutableRowState(
     ].includes(row.statoRiga)
   )
     return row.statoRiga;
+  if (row.blocking) return "BLOCCATA";
+  if (!mapped) return "DA_MAPPARE";
   if (row.tipoMovimentoEsterno === "CARICO") return "DA_APPLICARE";
   return row.tipoMovimentoEsterno === "RESO"
     ? "RESO_RIFERIMENTO"
     : "SCARICO_RIFERIMENTO";
+}
+
+const DATA_CARICO_GRUPPO_INCOERENTE = "DATA_CARICO_GRUPPO_INCOERENTE";
+const LOTTO_NON_VALIDO = "LOTTO_NON_VALIDO";
+
+function documentGroupKey(
+  row: typeof importazioniAgeaRigheTable.$inferSelect,
+): string | null {
+  if (row.tipoMovimentoEsterno !== "CARICO" || !row.numeroDocumentoNormalizzato)
+    return null;
+  return [
+    row.numeroDocumentoNormalizzato,
+    row.dataDocumento ?? "∅",
+    normalizeAgeaKey(row.mittenteDestinatarioRaw) ?? "∅",
+  ].join("|");
+}
+
+function effectiveLoadDate(
+  row: typeof importazioniAgeaRigheTable.$inferSelect,
+): string | null {
+  return row.dataCaricoEffettiva ?? row.dataCaricoRisolta;
+}
+
+async function applyDynamicRowPreflight(
+  tx: InventoryTransaction,
+  rows: Array<typeof importazioniAgeaRigheTable.$inferSelect>,
+) {
+  const documentGroups = new Map<
+    string,
+    Array<typeof importazioniAgeaRigheTable.$inferSelect>
+  >();
+  for (const row of rows) {
+    const key = documentGroupKey(row);
+    if (key) documentGroups.set(key, [...(documentGroups.get(key) ?? []), row]);
+  }
+  const inconsistentRowIds = new Set<number>();
+  for (const group of documentGroups.values()) {
+    const dates = new Set(group.map(effectiveLoadDate));
+    if (dates.size > 1) group.forEach((row) => inconsistentRowIds.add(row.id));
+  }
+
+  const changed: Array<typeof importazioniAgeaRigheTable.$inferSelect> = [];
+  for (const row of rows) {
+    const errors = row.errorCodesJson.filter(
+      (code) =>
+        code !== DATA_CARICO_GRUPPO_INCOERENTE && code !== LOTTO_NON_VALIDO,
+    );
+    if (
+      (normalizeAgeaText(effectiveLot(row).raw)?.length ?? 0) >
+      AGEA_MAX_LOT_LENGTH
+    )
+      errors.push(LOTTO_NON_VALIDO);
+    if (inconsistentRowIds.has(row.id))
+      errors.push(DATA_CARICO_GRUPPO_INCOERENTE);
+    const nextErrors = [...new Set(errors)];
+    const nextBlocking = nextErrors.length > 0;
+    if (
+      nextBlocking !== row.blocking ||
+      JSON.stringify(nextErrors) !== JSON.stringify(row.errorCodesJson)
+    )
+      changed.push(row);
+    row.errorCodesJson = nextErrors;
+    row.blocking = nextBlocking;
+  }
+  for (let offset = 0; offset < changed.length; offset += 500) {
+    const chunk = changed.slice(offset, offset + 500);
+    const values = sql.join(
+      chunk.map(
+        (row) =>
+          sql`(${row.id}::integer, ${JSON.stringify(row.errorCodesJson)}::jsonb, ${row.blocking}::boolean)`,
+      ),
+      sql`, `,
+    );
+    await tx.execute(sql`
+      UPDATE importazioni_agea_righe AS r
+      SET error_codes_json = v.error_codes,
+          blocking = v.blocking
+      FROM (VALUES ${values}) AS v(id, error_codes, blocking)
+      WHERE r.id = v.id
+    `);
+  }
+}
+
+function assertConsistentDocumentGroupDates(
+  rows: Array<typeof importazioniAgeaRigheTable.$inferSelect>,
+): void {
+  const groups = new Map<
+    string,
+    Array<typeof importazioniAgeaRigheTable.$inferSelect>
+  >();
+  for (const row of rows) {
+    const key = documentGroupKey(row);
+    if (key) groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  if (
+    [...groups.values()].some(
+      (group) => new Set(group.map(effectiveLoadDate)).size > 1,
+    )
+  )
+    throw new AgeaImportError(
+      409,
+      DATA_CARICO_GRUPPO_INCOERENTE,
+      "Le righe dello stesso documento hanno date carico effettive diverse",
+    );
 }
 
 async function mappingsForRows(
@@ -281,6 +394,7 @@ async function rebuildImport(
     .select()
     .from(importazioniAgeaRigheTable)
     .where(eq(importazioniAgeaRigheTable.importazioneId, importId));
+  await applyDynamicRowPreflight(tx, rows);
   const descriptionKeys = [
     ...new Set(rows.map((row) => row.prodottoNormalizzato)),
   ];
@@ -610,12 +724,19 @@ export async function analyzeAgeaImport(
       righeNonClassificate: parsed.counts.nonClassificate,
       righeNuove: parsed.rows.filter(
         (row) =>
-          !["DUPLICATA", "MODIFICATO_NEL_REGISTRO"].includes(row.statoRiga),
+          ![
+            "DUPLICATA",
+            "MODIFICATO_NEL_REGISTRO",
+            "IDENTITA_AMBIGUA",
+          ].includes(row.statoRiga),
       ).length,
       righeDuplicate: parsed.rows.filter((row) => row.statoRiga === "DUPLICATA")
         .length,
       righeModificate: parsed.rows.filter(
         (row) => row.statoRiga === "MODIFICATO_NEL_REGISTRO",
+      ).length,
+      righeAmbigue: parsed.rows.filter(
+        (row) => row.statoRiga === "IDENTITA_AMBIGUA",
       ).length,
       righeBloccanti: parsed.counts.bloccanti,
       creatoDa: input.creatoDa,
@@ -765,6 +886,16 @@ export async function correctAgeaImportRow(
     .where(eq(importazioniAgeaTable.id, input.importId))
     .for("update");
   requireMutableImport(importRow, input.expectedVersion);
+  if (
+    input.field === "LOTTO" &&
+    input.value != null &&
+    (normalizeAgeaText(input.value)?.length ?? 0) > AGEA_MAX_LOT_LENGTH
+  )
+    throw new AgeaImportError(
+      400,
+      LOTTO_NON_VALIDO,
+      `Il lotto non può superare ${AGEA_MAX_LOT_LENGTH} caratteri`,
+    );
   const [row] = await tx
     .select()
     .from(importazioniAgeaRigheTable)
@@ -781,12 +912,12 @@ export async function correctAgeaImportRow(
     input.field === "DATA_CARICO"
       ? (row.dataCaricoEffettiva ?? row.dataCaricoRisolta)
       : (row.lottoEffettivoRaw ?? row.lottoRaw);
-  const correctedErrorCode =
+  const correctedErrorCodes =
     input.field === "DATA_CARICO"
-      ? "DATA_CARICO_DA_COMPLETARE"
-      : "LOTTO_DA_COMPLETARE";
+      ? ["DATA_CARICO_DA_COMPLETARE"]
+      : ["LOTTO_DA_COMPLETARE", LOTTO_NON_VALIDO];
   const remainingErrors = row.errorCodesJson.filter(
-    (code) => code !== correctedErrorCode,
+    (code) => !correctedErrorCodes.includes(code),
   );
   if (
     input.field === "DATA_CARICO" &&
@@ -801,6 +932,15 @@ export async function correctAgeaImportRow(
     row.lottoNormalizzato == null
   )
     remainingErrors.push("LOTTO_DA_COMPLETARE");
+  const effectiveLotAfterCorrection =
+    input.field === "LOTTO"
+      ? (input.value ?? row.lottoRaw)
+      : effectiveLot(row).raw;
+  if (
+    (normalizeAgeaText(effectiveLotAfterCorrection)?.length ?? 0) >
+    AGEA_MAX_LOT_LENGTH
+  )
+    remainingErrors.push(LOTTO_NON_VALIDO);
   await tx
     .update(importazioniAgeaRigheTable)
     .set(
@@ -1016,6 +1156,68 @@ async function registerCanonicalRows(
   return result;
 }
 
+async function revalidateBootstrapParties(
+  tx: InventoryTransaction,
+  magazzinoId: number,
+  parties: Array<typeof importazioniAgeaPartiteTable.$inferSelect>,
+): Promise<void> {
+  const keyed = parties.map((party) => {
+    if (
+      party.prodottoId == null ||
+      !["FSE_PLUS", "FONDO_NAZIONALE", "FONDO_NAZIONALE_COFINANZIATO"].includes(
+        party.fondoOrigine,
+      )
+    )
+      throw new AgeaImportError(
+        409,
+        "PREVIEW_DA_RICALCOLARE",
+        "La Partita bootstrap non ha più una business key valida",
+      );
+    const fondoOrigine = party.fondoOrigine as FondoOrigine;
+    return {
+      party,
+      fondoOrigine,
+      key: party.lottoNormalizzato
+        ? inventoryPartyBusinessKey({
+            magazzinoId,
+            prodottoId: party.prodottoId,
+            fondoOrigine,
+            lottoNormalizzato: party.lottoNormalizzato,
+          })
+        : null,
+    };
+  });
+  await lockInventoryPartyBusinessKeys(
+    tx,
+    keyed.map((item) => item.key).filter((key): key is string => key != null),
+  );
+  for (const { party, fondoOrigine } of keyed) {
+    if (!party.lottoNormalizzato) continue;
+    const candidates = await findInventoryPartyCandidates(tx, {
+      magazzinoId,
+      prodottoId: party.prodottoId!,
+      fondoOrigine,
+      lottoNormalizzato: party.lottoNormalizzato!,
+    });
+    const expectedId = party.existingLottoId ?? null;
+    const candidate = candidates.length === 1 ? candidates[0] : null;
+    const realityChanged =
+      candidates.length > 1 ||
+      (candidate?.id ?? null) !== expectedId ||
+      (candidate != null &&
+        ((candidate.dataScadenza ?? null) !==
+          (party.dataScadenzaRisolta ?? null) ||
+          (candidate.fattoreKgLtPezzo ?? null) !==
+            (party.fattoreKgLtPezzo ?? null)));
+    if (realityChanged)
+      throw new AgeaImportError(
+        409,
+        "PREVIEW_DA_RICALCOLARE",
+        "Le Partite locali sono cambiate dopo la preview bootstrap",
+      );
+  }
+}
+
 export async function confirmAgeaImport(
   tx: InventoryTransaction,
   importId: number,
@@ -1079,6 +1281,7 @@ export async function confirmAgeaImport(
     .select()
     .from(importazioniAgeaRigheTable)
     .where(eq(importazioniAgeaRigheTable.importazioneId, importId));
+  assertConsistentDocumentGroupDates(rows);
   const mappingIds = [
     ...new Set(
       rows
@@ -1166,11 +1369,9 @@ export async function confirmAgeaImport(
         "Confermare prima la prima acquisizione AGEA",
       );
   }
-  const canonical =
-    fresh.modalita === "SOLO_ANALISI"
-      ? new Map<number, typeof movimentiEsterniAgeaTable.$inferSelect>()
-      : await registerCanonicalRows(tx, fresh, rows);
-  const createdLoadIds: number[] = [];
+  let bootstrapPositiveParties: Array<
+    typeof importazioniAgeaPartiteTable.$inferSelect
+  > = [];
   if (fresh.modalita === "PRIMA_ACQUISIZIONE") {
     const parties = await tx
       .select()
@@ -1181,9 +1382,22 @@ export async function confirmAgeaImport(
           eq(importazioniAgeaPartiteTable.stato, "PRONTA"),
         ),
       );
-    const positiveParties = parties.filter((party) =>
+    bootstrapPositiveParties = parties.filter((party) =>
       positive(party.quantitaOperativa),
     );
+    await revalidateBootstrapParties(
+      tx,
+      fresh.magazzinoId,
+      bootstrapPositiveParties,
+    );
+  }
+  const canonical =
+    fresh.modalita === "SOLO_ANALISI"
+      ? new Map<number, typeof movimentiEsterniAgeaTable.$inferSelect>()
+      : await registerCanonicalRows(tx, fresh, rows);
+  const createdLoadIds: number[] = [];
+  if (fresh.modalita === "PRIMA_ACQUISIZIONE") {
+    const positiveParties = bootstrapPositiveParties;
     const balanceHash = createHash("sha256")
       .update(
         JSON.stringify(
@@ -1299,7 +1513,6 @@ export async function confirmAgeaImport(
       const key = [
         row.numeroDocumentoNormalizzato ?? "∅",
         row.dataDocumento ?? "∅",
-        row.dataCaricoEffettiva ?? row.dataCaricoRisolta ?? "∅",
         normalizeAgeaKey(row.mittenteDestinatarioRaw) ?? "∅",
       ].join("|");
       groups.set(key, [...(groups.get(key) ?? []), row]);

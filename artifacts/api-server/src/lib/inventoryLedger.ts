@@ -83,6 +83,55 @@ export function normalizeInventoryLotCode(value: string | null | undefined): {
   };
 }
 
+export function inventoryPartyBusinessKey(input: {
+  magazzinoId: number;
+  prodottoId: number;
+  fondoOrigine: FondoOrigine;
+  lottoNormalizzato: string;
+}): string {
+  return `${input.magazzinoId}:${input.prodottoId}:${input.fondoOrigine}:${input.lottoNormalizzato}`;
+}
+
+export async function lockInventoryPartyBusinessKeys(
+  tx: InventoryTransaction,
+  keys: string[],
+): Promise<void> {
+  for (const key of [...new Set(keys)].sort()) {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`,
+    );
+  }
+}
+
+export async function findInventoryPartyCandidates(
+  tx: InventoryTransaction,
+  input: {
+    magazzinoId: number;
+    prodottoId: number;
+    fondoOrigine: FondoOrigine;
+    lottoNormalizzato: string;
+  },
+) {
+  return tx
+    .select()
+    .from(lottiTable)
+    .where(
+      and(
+        eq(lottiTable.magazzinoId, input.magazzinoId),
+        eq(lottiTable.prodottoId, input.prodottoId),
+        eq(lottiTable.fondoOrigine, input.fondoOrigine),
+        or(
+          eq(lottiTable.codiceLottoNormalizzato, input.lottoNormalizzato),
+          and(
+            sql`${lottiTable.codiceLottoNormalizzato} is null`,
+            sql`upper(regexp_replace(btrim(${lottiTable.codiceLotto}), '\\s+', ' ', 'g')) = ${input.lottoNormalizzato}`,
+          ),
+        ),
+      ),
+    )
+    .for("update");
+}
+
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   if (value != null && typeof value === "object") {
@@ -305,7 +354,12 @@ export async function createWarehouseLoad(
       partyKey:
         lotto.normalized == null
           ? null
-          : `${input.magazzinoId}:${prodotto.id}:${riga.fondoOrigine}:${lotto.normalized}`,
+          : inventoryPartyBusinessKey({
+              magazzinoId: input.magazzinoId,
+              prodottoId: prodotto.id,
+              fondoOrigine: riga.fondoOrigine,
+              lottoNormalizzato: lotto.normalized,
+            }),
       dimensions: null as ReturnType<
         typeof resolveInventoryQuantityDimensions
       > | null,
@@ -317,16 +371,8 @@ export async function createWarehouseLoad(
 
   const lockKeys = normalizedLines
     .filter((line) => line.lotto.normalized != null)
-    .map(
-      (line) =>
-        `${input.magazzinoId}:${line.prodotto.id}:${line.input.fondoOrigine}:${line.lotto.normalized}`,
-    )
-    .sort();
-  for (const key of [...new Set(lockKeys)]) {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`,
-    );
-  }
+    .map((line) => line.partyKey!);
+  await lockInventoryPartyBusinessKeys(tx, lockKeys);
 
   const candidateByParty = new Map<
     string,
@@ -340,24 +386,12 @@ export async function createWarehouseLoad(
         const cached = candidateByParty.get(line.partyKey!);
         candidates = cached ? [cached] : [];
       } else {
-        candidates = await tx
-          .select()
-          .from(lottiTable)
-          .where(
-            and(
-              eq(lottiTable.magazzinoId, input.magazzinoId),
-              eq(lottiTable.prodottoId, line.prodotto.id),
-              eq(lottiTable.fondoOrigine, line.input.fondoOrigine),
-              or(
-                eq(lottiTable.codiceLottoNormalizzato, line.lotto.normalized),
-                and(
-                  sql`${lottiTable.codiceLottoNormalizzato} is null`,
-                  sql`upper(regexp_replace(btrim(${lottiTable.codiceLotto}), '\\s+', ' ', 'g')) = ${line.lotto.normalized}`,
-                ),
-              ),
-            ),
-          )
-          .for("update");
+        candidates = await findInventoryPartyCandidates(tx, {
+          magazzinoId: input.magazzinoId,
+          prodottoId: line.prodotto.id,
+          fondoOrigine: line.input.fondoOrigine,
+          lottoNormalizzato: line.lotto.normalized,
+        });
       }
       if (candidates.length > 1) {
         throw new InventoryLedgerError(
@@ -368,7 +402,8 @@ export async function createWarehouseLoad(
       line.existingLotto = candidates[0];
       candidateByParty.set(line.partyKey!, candidates[0]);
       line.adoptedLegacy =
-        candidates[0]?.codiceLottoNormalizzato == null && candidates.length === 1;
+        candidates[0]?.codiceLottoNormalizzato == null &&
+        candidates.length === 1;
       if (
         line.existingLotto &&
         (line.existingLotto.dataScadenza ?? null) !== line.dataScadenza
@@ -452,9 +487,7 @@ export async function createWarehouseLoad(
         line.input.quantitaKgLt == null
           ? null
           : InventoryDecimal.parse(line.input.quantitaKgLt).toDb(),
-      fattoreKgLtPezzo: canonicalInventoryFactor(
-        line.input.fattoreKgLtPezzo,
-      ),
+      fattoreKgLtPezzo: canonicalInventoryFactor(line.input.fattoreKgLtPezzo),
       codiceLotto: line.lotto.original,
       codiceLottoNormalizzato: line.lotto.normalized,
       dataScadenza: line.dataScadenza,

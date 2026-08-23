@@ -954,7 +954,7 @@ export const UpdateAgeaImportazioneRigaLottoParams = zod.object({
   "rigaId": zod.coerce.number()
 })
 
-export const updateAgeaImportazioneRigaLottoBodyValoreMax = 255;
+export const updateAgeaImportazioneRigaLottoBodyValoreMax = 80;
 
 export const updateAgeaImportazioneRigaLottoBodyMotivazioneMin = 3;
 export const updateAgeaImportazioneRigaLottoBodyMotivazioneMax = 500;

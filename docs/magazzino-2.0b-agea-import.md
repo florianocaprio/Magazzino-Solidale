@@ -1,5 +1,46 @@
 # Magazzino 2.0B — Import AGEA/SIFEAD
 
+## Chiusura residui R2 (23 agosto 2026)
+
+La conferma `PRIMA_ACQUISIZIONE` carica le Partite positive della preview,
+costruisce le stesse business key `magazzino/prodotto/Fondo/lotto` del ledger e
+acquisisce gli stessi advisory lock in ordine deterministico. Sotto lock rilegge
+le Partite locali con la medesima semantica, inclusa la compatibilità legacy, e
+confronta identità, scadenza e fattore con la preview. Se una Partita equivalente
+è stata creata dopo il preflight, risponde `409 PREVIEW_DA_RICALCOLARE`; la
+transazione non crea `SALDO_INIZIALE`, non registra identity canoniche parziali e
+non modifica lo stock.
+
+Il lotto effective AGEA ha lo stesso limite del ledger: massimo 80 caratteri,
+senza troncamento. Un valore di 81 caratteri proveniente dal file rimane integro
+nel raw audit e produce `LOTTO_NON_VALIDO` bloccante; la correzione versionata può
+sostituirlo con un valore valido. API, OpenAPI e input UI applicano lo stesso
+limite.
+
+I conteggi di testata distinguono esclusivamente righe nuove, duplicate,
+modificate e ambigue. `IDENTITA_AMBIGUA` incrementa `righeAmbigue`, non
+`righeNuove`, conserva lo stato specifico ed è bloccante; lo stesso criterio di
+esclusione vale per `MODIFICATO_NEL_REGISTRO` e `DUPLICATA`.
+
+Le righe positive con uguale numero documento, data documento e
+mittente/destinatario devono avere una sola `dataCaricoEffettiva`. Date divergenti
+producono `DATA_CARICO_GRUPPO_INCOERENTE` su tutte le righe del gruppo e bloccano
+la conferma; date coerenti generano un solo Carico multi-riga. La conferma ripete
+anche questa asserzione senza ricalcolare silenziosamente la preview.
+
+Nel wizard ogni create/update/disable/enable di un mapping marca la preview
+selezionata come `Preview da ricalcolare` e disabilita la conferma. Solo un
+ricalcolo riuscito ripulisce lo stato dirty; la conferma torna disponibile
+soltanto se il risultato è `PRONTA`.
+
+Il contratto OpenAPI riusa `AgeaErrorResponse` e componenti response comuni per
+gli status AGEA realmente applicabili (`400`, `403`, `404`, `409`, `413`,
+`415`). Il codegen Orval/Zod resta seguito dal fixer binario deterministico, che
+fallisce se l'occorrenza attesa non è esattamente una.
+
+R2 non introduce colonne o migration: riusa staging, versionamento e lock già
+presenti.
+
 ## Hardening R1 (23 agosto 2026)
 
 La revisione R1 usa SheetJS 0.20.3 dal CDN ufficiale, conserva i valori raw e
@@ -91,7 +132,10 @@ Il mapping normalizza soltanto Unicode NFC, case, trim e spazi multipli. Non usa
 
 `SOLO_ANALISI` conserva staging e preview ma non crea Carichi, Partite, Movimenti stock né identità canoniche che impediscano un successivo import operativo.
 
-La conferma acquisisce lock su importazione e Magazzino, ricontrolla versione, scope, mapping, saldi, date, scadenze, bootstrap e identity, poi aggiorna staging e audit nello stesso commit. Qualsiasi errore provoca rollback completo.
+La conferma acquisisce lock su importazione e Magazzino, e nel bootstrap anche i
+party lock del ledger, ricontrolla versione, scope, mapping, saldi, date,
+scadenze, bootstrap e identity, poi aggiorna staging e audit nello stesso commit.
+Qualsiasi errore provoca rollback completo.
 
 ## API e permessi
 
@@ -112,7 +156,14 @@ Ogni accesso a un'importazione è verificato sul Magazzino mediante gli scope Ar
 
 ## UI
 
-La pagina “Carichi e Lotti” contiene la tab “Import AGEA/SIFEAD” con sette sezioni: selezione, analisi, mapping, Partite, righe, preflight e conferma. Il pulsante di conferma è disabilitato finché lo stato non è `PRONTA`. Orval 8 serializza come JSON i body non-form anche quando OpenAPI dichiara `format: binary`; il comando di codegen applica quindi un post-process deterministico e verificato che fa inviare il `Blob` raw dal client generato. Un piccolo adapter riusa lo stesso metodo e i tipi generati.
+La pagina “Carichi e Lotti” contiene la tab “Import AGEA/SIFEAD” con sette
+sezioni: selezione, analisi, mapping, Partite, righe, preflight e conferma. Il
+pulsante di conferma è disabilitato finché lo stato non è `PRONTA` e quando la
+preview è dirty per una mutazione di mapping. Orval 8 serializza come JSON i body
+non-form anche quando OpenAPI dichiara `format: binary`; il comando di codegen
+applica quindi un post-process deterministico e verificato che fa inviare il
+`Blob` raw dal client generato. Un piccolo adapter riusa lo stesso metodo e i
+tipi generati.
 
 ## Esecuzione migration
 

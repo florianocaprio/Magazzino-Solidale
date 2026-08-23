@@ -3,12 +3,13 @@ import * as XLSX from "xlsx";
 import { InventoryDecimal, InventoryDecimalError } from "./inventoryDecimal";
 
 export const AGEA_TRACE_CODE = "SIFEAD_REGISTRO_XLSX_OSSERVATO_V1";
-export const AGEA_PARSER_VERSION = "2.0B-R1.1";
+export const AGEA_PARSER_VERSION = "2.0B-R2.0";
 export const AGEA_XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 export const AGEA_MAX_BYTES = 10 * 1024 * 1024;
 export const AGEA_MAX_ROWS = 10_000;
 export const AGEA_MAX_COLUMNS = 100;
+export const AGEA_MAX_LOT_LENGTH = 80;
 
 const STATIC_HEADERS = [
   "Fondo",
@@ -492,9 +493,13 @@ export function parseAgeaWorkbook(buffer: Buffer): ParsedAgeaWorkbook {
       warnings.push("MOVIMENTO_NEGATIVO_NON_CLASSIFICATO");
     if (tipo === "RIGA_SENZA_MOVIMENTO") warnings.push("RIGA_SENZA_MOVIMENTO");
     const dataCaricoRaw = rawText(cells[6]);
+    const lottoRaw = rawText(cells[7]);
+    const lottoNormalizzato = normalizeAgeaKey(lottoRaw);
     if (!dataCarico && dataDocumento) warnings.push("DATA_DOCUMENTO_FALLBACK");
     if (!dataCarico && !dataDocumento && tipo === "CARICO")
       errors.push("DATA_CARICO_DA_COMPLETARE");
+    if ((normalizeAgeaText(lottoRaw)?.length ?? 0) > AGEA_MAX_LOT_LENGTH)
+      errors.push("LOTTO_NON_VALIDO");
     const noteRaw = rawText(cells[13]);
     if (
       normalizeAgeaText(dataCaricoRaw) === "23" ||
@@ -516,7 +521,7 @@ export function parseAgeaWorkbook(buffer: Buffer): ParsedAgeaWorkbook {
       prodotto: normalizedProduct,
       documento: normalizeAgeaKey(rawText(cells[4])),
       dataDocumento,
-      lotto: normalizeAgeaKey(rawText(cells[7])),
+      lotto: lottoNormalizzato,
       mittenteDestinatario: normalizeAgeaKey(mittenteDestinatarioRaw),
       direzione:
         tipo === "CARICO"
@@ -561,8 +566,8 @@ export function parseAgeaWorkbook(buffer: Buffer): ParsedAgeaWorkbook {
       fondoNormalizzato: FUND_MAP[normalizedFund ?? ""] ?? null,
       prodottoRaw,
       prodottoNormalizzato: normalizedProduct,
-      lottoRaw: rawText(cells[7]),
-      lottoNormalizzato: normalizeAgeaKey(rawText(cells[7])),
+      lottoRaw,
+      lottoNormalizzato,
       numeroDocumentoRaw: rawText(cells[4]),
       numeroDocumentoNormalizzato: normalizeAgeaKey(rawText(cells[4])),
       dataDocumentoRaw: rawText(cells[5]),

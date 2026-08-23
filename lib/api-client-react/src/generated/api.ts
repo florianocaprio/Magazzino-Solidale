@@ -27,9 +27,12 @@ import type {
   AccessoEmporioStatoUpdate,
   AccessoEmporioUpdate,
   ActionResult,
+  AgeaBadRequestResponse,
+  AgeaConflictResponse,
   AgeaCorrezioneDataInput,
   AgeaCorrezioneLottoInput,
   AgeaDescrizioneDaMappare,
+  AgeaForbiddenResponse,
   AgeaImportConfermaInput,
   AgeaImportConfermaResult,
   AgeaImportPartita,
@@ -39,6 +42,9 @@ import type {
   AgeaMappaturaProdotto,
   AgeaMappaturaProdottoInput,
   AgeaMappaturaProdottoUpdate,
+  AgeaNotFoundResponse,
+  AgeaPayloadTooLargeResponse,
+  AgeaUnsupportedMediaTypeResponse,
   AgeaVersioneInput,
   Alert,
   AllocazioneMezziReport,
@@ -1844,7 +1850,7 @@ export const analyzeAgeaImportazione = async (analyzeAgeaImportazioneBody: Blob,
 
 
 
-export const getAnalyzeAgeaImportazioneMutationOptions = <TError = ErrorType<void>,
+export const getAnalyzeAgeaImportazioneMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaPayloadTooLargeResponse | AgeaUnsupportedMediaTypeResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeAgeaImportazione>>, TError,{data: BodyType<Blob>;params: AnalyzeAgeaImportazioneParams}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof analyzeAgeaImportazione>>, TError,{data: BodyType<Blob>;params: AnalyzeAgeaImportazioneParams}, TContext> => {
 
@@ -1873,12 +1879,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AnalyzeAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeAgeaImportazione>>>
     export type AnalyzeAgeaImportazioneMutationBody = BodyType<Blob>
-    export type AnalyzeAgeaImportazioneMutationError = ErrorType<void>
+    export type AnalyzeAgeaImportazioneMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaPayloadTooLargeResponse | AgeaUnsupportedMediaTypeResponse>
 
     /**
  * @summary Analizza localmente un registro XLSX senza modificare lo stock
  */
-export const useAnalyzeAgeaImportazione = <TError = ErrorType<void>,
+export const useAnalyzeAgeaImportazione = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaPayloadTooLargeResponse | AgeaUnsupportedMediaTypeResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeAgeaImportazione>>, TError,{data: BodyType<Blob>;params: AnalyzeAgeaImportazioneParams}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof analyzeAgeaImportazione>>,
@@ -1919,7 +1925,7 @@ export const getGetAgeaImportazioneQueryKey = (id: number,) => {
     }
 
 
-export const getGetAgeaImportazioneQueryOptions = <TData = Awaited<ReturnType<typeof getAgeaImportazione>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgeaImportazione>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAgeaImportazioneQueryOptions = <TData = Awaited<ReturnType<typeof getAgeaImportazione>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgeaImportazione>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1938,11 +1944,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetAgeaImportazioneQueryResult = NonNullable<Awaited<ReturnType<typeof getAgeaImportazione>>>
-export type GetAgeaImportazioneQueryError = ErrorType<unknown>
+export type GetAgeaImportazioneQueryError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>
 
 
 
-export function useGetAgeaImportazione<TData = Awaited<ReturnType<typeof getAgeaImportazione>>, TError = ErrorType<unknown>>(
+export function useGetAgeaImportazione<TData = Awaited<ReturnType<typeof getAgeaImportazione>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(
  id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgeaImportazione>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -2000,7 +2006,7 @@ export const getListAgeaImportazioneRigheQueryKey = (id: number,
     }
 
 
-export const getListAgeaImportazioneRigheQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<unknown>>(id: number,
+export const getListAgeaImportazioneRigheQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(id: number,
     params?: ListAgeaImportazioneRigheParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
@@ -2020,11 +2026,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListAgeaImportazioneRigheQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>>
-export type ListAgeaImportazioneRigheQueryError = ErrorType<unknown>
+export type ListAgeaImportazioneRigheQueryError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>
 
 
 
-export function useListAgeaImportazioneRighe<TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<unknown>>(
+export function useListAgeaImportazioneRighe<TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(
  id: number,
     params?: ListAgeaImportazioneRigheParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
@@ -2073,7 +2079,7 @@ export const getListAgeaImportazionePartiteQueryKey = (id: number,) => {
     }
 
 
-export const getListAgeaImportazionePartiteQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAgeaImportazionePartiteQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -2092,11 +2098,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListAgeaImportazionePartiteQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaImportazionePartite>>>
-export type ListAgeaImportazionePartiteQueryError = ErrorType<unknown>
+export type ListAgeaImportazionePartiteQueryError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>
 
 
 
-export function useListAgeaImportazionePartite<TData = Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError = ErrorType<unknown>>(
+export function useListAgeaImportazionePartite<TData = Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(
  id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -2147,7 +2153,7 @@ export const getListAgeaImportazioneDescrizioniDaMappareQueryKey = (id: number,)
     }
 
 
-export const getListAgeaImportazioneDescrizioniDaMappareQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAgeaImportazioneDescrizioniDaMappareQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -2166,14 +2172,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListAgeaImportazioneDescrizioniDaMappareQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>>
-export type ListAgeaImportazioneDescrizioniDaMappareQueryError = ErrorType<unknown>
+export type ListAgeaImportazioneDescrizioniDaMappareQueryError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>
 
 
 /**
  * @summary Elenca le descrizioni esterne distinte dell'intera importazione
  */
 
-export function useListAgeaImportazioneDescrizioniDaMappare<TData = Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError = ErrorType<unknown>>(
+export function useListAgeaImportazioneDescrizioniDaMappare<TData = Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(
  id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -2217,7 +2223,7 @@ export const updateAgeaImportazioneRigaDataCarico = async (id: number,
 
 
 
-export const getUpdateAgeaImportazioneRigaDataCaricoMutationOptions = <TError = ErrorType<void>,
+export const getUpdateAgeaImportazioneRigaDataCaricoMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext> => {
 
@@ -2246,9 +2252,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateAgeaImportazioneRigaDataCaricoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>>
     export type UpdateAgeaImportazioneRigaDataCaricoMutationBody = BodyType<AgeaCorrezioneDataInput>
-    export type UpdateAgeaImportazioneRigaDataCaricoMutationError = ErrorType<void>
+    export type UpdateAgeaImportazioneRigaDataCaricoMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
 
-    export const useUpdateAgeaImportazioneRigaDataCarico = <TError = ErrorType<void>,
+    export const useUpdateAgeaImportazioneRigaDataCarico = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>,
@@ -2285,7 +2291,7 @@ export const updateAgeaImportazioneRigaLotto = async (id: number,
 
 
 
-export const getUpdateAgeaImportazioneRigaLottoMutationOptions = <TError = ErrorType<void>,
+export const getUpdateAgeaImportazioneRigaLottoMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext> => {
 
@@ -2314,9 +2320,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateAgeaImportazioneRigaLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>>
     export type UpdateAgeaImportazioneRigaLottoMutationBody = BodyType<AgeaCorrezioneLottoInput>
-    export type UpdateAgeaImportazioneRigaLottoMutationError = ErrorType<void>
+    export type UpdateAgeaImportazioneRigaLottoMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
 
-    export const useUpdateAgeaImportazioneRigaLotto = <TError = ErrorType<void>,
+    export const useUpdateAgeaImportazioneRigaLotto = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>,
@@ -2353,7 +2359,7 @@ export const updateAgeaImportazionePartita = async (id: number,
 
 
 
-export const getUpdateAgeaImportazionePartitaMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateAgeaImportazionePartitaMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>, TError,{id: number;partitaId: number;data: BodyType<AgeaImportPartitaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>, TError,{id: number;partitaId: number;data: BodyType<AgeaImportPartitaUpdate>}, TContext> => {
 
@@ -2382,9 +2388,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateAgeaImportazionePartitaMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>>
     export type UpdateAgeaImportazionePartitaMutationBody = BodyType<AgeaImportPartitaUpdate>
-    export type UpdateAgeaImportazionePartitaMutationError = ErrorType<unknown>
+    export type UpdateAgeaImportazionePartitaMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
 
-    export const useUpdateAgeaImportazionePartita = <TError = ErrorType<unknown>,
+    export const useUpdateAgeaImportazionePartita = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>, TError,{id: number;partitaId: number;data: BodyType<AgeaImportPartitaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateAgeaImportazionePartita>>,
@@ -2419,7 +2425,7 @@ export const recalculateAgeaImportazione = async (id: number,
 
 
 
-export const getRecalculateAgeaImportazioneMutationOptions = <TError = ErrorType<unknown>,
+export const getRecalculateAgeaImportazioneMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext> => {
 
@@ -2448,9 +2454,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type RecalculateAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof recalculateAgeaImportazione>>>
     export type RecalculateAgeaImportazioneMutationBody = BodyType<AgeaVersioneInput>
-    export type RecalculateAgeaImportazioneMutationError = ErrorType<unknown>
+    export type RecalculateAgeaImportazioneMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
 
-    export const useRecalculateAgeaImportazione = <TError = ErrorType<unknown>,
+    export const useRecalculateAgeaImportazione = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof recalculateAgeaImportazione>>,
@@ -2485,7 +2491,7 @@ export const confirmAgeaImportazione = async (id: number,
 
 
 
-export const getConfirmAgeaImportazioneMutationOptions = <TError = ErrorType<void>,
+export const getConfirmAgeaImportazioneMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext> => {
 
@@ -2514,9 +2520,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ConfirmAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof confirmAgeaImportazione>>>
     export type ConfirmAgeaImportazioneMutationBody = BodyType<AgeaImportConfermaInput>
-    export type ConfirmAgeaImportazioneMutationError = ErrorType<void>
+    export type ConfirmAgeaImportazioneMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
 
-    export const useConfirmAgeaImportazione = <TError = ErrorType<void>,
+    export const useConfirmAgeaImportazione = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof confirmAgeaImportazione>>,
@@ -2551,7 +2557,7 @@ export const cancelAgeaImportazione = async (id: number,
 
 
 
-export const getCancelAgeaImportazioneMutationOptions = <TError = ErrorType<unknown>,
+export const getCancelAgeaImportazioneMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext> => {
 
@@ -2580,9 +2586,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CancelAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof cancelAgeaImportazione>>>
     export type CancelAgeaImportazioneMutationBody = BodyType<AgeaVersioneInput>
-    export type CancelAgeaImportazioneMutationError = ErrorType<unknown>
+    export type CancelAgeaImportazioneMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
 
-    export const useCancelAgeaImportazione = <TError = ErrorType<unknown>,
+    export const useCancelAgeaImportazione = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof cancelAgeaImportazione>>,
@@ -2687,7 +2693,7 @@ export const createAgeaMappaturaProdotto = async (ageaMappaturaProdottoInput: Ag
 
 
 
-export const getCreateAgeaMappaturaProdottoMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateAgeaMappaturaProdottoMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>, TError,{data: BodyType<AgeaMappaturaProdottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>, TError,{data: BodyType<AgeaMappaturaProdottoInput>}, TContext> => {
 
@@ -2716,9 +2722,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateAgeaMappaturaProdottoMutationResult = NonNullable<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>>
     export type CreateAgeaMappaturaProdottoMutationBody = BodyType<AgeaMappaturaProdottoInput>
-    export type CreateAgeaMappaturaProdottoMutationError = ErrorType<unknown>
+    export type CreateAgeaMappaturaProdottoMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaConflictResponse>
 
-    export const useCreateAgeaMappaturaProdotto = <TError = ErrorType<unknown>,
+    export const useCreateAgeaMappaturaProdotto = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>, TError,{data: BodyType<AgeaMappaturaProdottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>,
@@ -2753,7 +2759,7 @@ export const updateAgeaMappaturaProdotto = async (id: number,
 
 
 
-export const getUpdateAgeaMappaturaProdottoMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateAgeaMappaturaProdottoMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>, TError,{id: number;data: BodyType<AgeaMappaturaProdottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>, TError,{id: number;data: BodyType<AgeaMappaturaProdottoUpdate>}, TContext> => {
 
@@ -2782,9 +2788,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateAgeaMappaturaProdottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>>
     export type UpdateAgeaMappaturaProdottoMutationBody = BodyType<AgeaMappaturaProdottoUpdate>
-    export type UpdateAgeaMappaturaProdottoMutationError = ErrorType<unknown>
+    export type UpdateAgeaMappaturaProdottoMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
 
-    export const useUpdateAgeaMappaturaProdotto = <TError = ErrorType<unknown>,
+    export const useUpdateAgeaMappaturaProdotto = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>, TError,{id: number;data: BodyType<AgeaMappaturaProdottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>,

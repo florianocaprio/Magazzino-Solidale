@@ -33,4 +33,16 @@ describe("wizard AGEA 2.0B-R1", () => {
     expect(source).toContain("window.confirm");
     expect(source).toContain("Annulla importazione");
   });
+
+  it("marca dirty la preview dopo ogni mapping e la ripulisce solo dopo il preflight", async () => {
+    const source = await readFile(wizardUrl, "utf8");
+    expect(source).toContain("previewDirtyByImport");
+    expect(source).toContain("markSelectedPreviewDirty");
+    expect(source).toContain("Preview da ricalcolare");
+    expect(source).toMatch(
+      /selected\.stato !== "PRONTA" \|\|\s+previewDirty \|\|/,
+    );
+    expect(source).toContain("[result.id]: false");
+    expect(source).toContain("maxLength={80}");
+  });
 });

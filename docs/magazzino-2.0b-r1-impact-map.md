@@ -1,5 +1,24 @@
 # Magazzino 2.0B-R1 — Impact map
 
+## Addendum R2
+
+R2 parte dall'HEAD `0bb134c6721ef07db62c286477a3aa14ee91592f` dello
+stesso branch e chiude soltanto sei residui, senza migration e senza ampliare il
+perimetro 2.0B:
+
+| Residuo R2 | Correzione | Verifica |
+| --- | --- | --- |
+| Race bootstrap/Partita locale | helper business key, candidate lookup e party lock condivisi con `createWarehouseLoad()`; revalidation sotto lock e `409 PREVIEW_DA_RICALCOLARE` | Partita manuale creata dopo preview: zero `SALDO_INIZIALE`, stock invariato e zero identity parziali; due bootstrap: un vincitore |
+| Lotto ledger | limite unico 80 in parser, correzione API, preflight, OpenAPI e UI, senza troncamento del raw | 80 accettato; 81 da API rifiutato; 81 da file bloccante e correggibile |
+| Conteggi | `IDENTITA_AMBIGUA` esclusa da `righeNuove` e conteggiata in `righeAmbigue`; stati specifici preservati | dataset con una nuova, duplicata, modificata e ambigua |
+| Preview mapping dirty | stato frontend per importazione selezionata; conferma disabilitata fino al ricalcolo riuscito | mapping → dirty/disabled; ricalcolo `PRONTA` → clean/enabled |
+| Error responses | `AgeaErrorResponse` e response comuni `400/403/404/409/413/415`, client Orval e Zod rigenerati | contract test per tutti i path AGEA R2 e fixer binario a cardinalità esatta |
+| Data gruppo documento | chiave gruppo senza data carico effective; preflight dinamico e guardia in conferma | data uniforme: un Carico multi-riga; date divergenti: `DATA_CARICO_GRUPPO_INCOERENTE` e zero Carichi |
+
+Restano invariati il fixed-point, i raw AGEA, il mapping umano, la conferma
+atomica, `createWarehouseLoad()` come unico motore e l'esclusione dei movimenti
+negativi dallo stock.
+
 ## Obiettivo e confini
 
 R1 consolida l'import locale AGEA/SIFEAD introdotto dalla 2.0B. L'intervento resta

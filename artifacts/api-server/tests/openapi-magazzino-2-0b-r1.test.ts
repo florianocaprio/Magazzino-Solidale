@@ -63,4 +63,82 @@ describe("Magazzino 2.0B-R1 — contratto AGEA", () => {
     expect(fixer).toContain("occurrences !== 1");
     expect(fixer).toContain("duplicateOccurrences !== 1");
   });
+
+  it("dichiara gli error response AGEA applicabili con un DTO comune", async () => {
+    const spec = await readFile(specUrl, "utf8");
+    const cases = [
+      [
+        "/agea/importazioni/analizza",
+        "/agea/importazioni/{id}",
+        ["400", "403", "413", "415"],
+      ],
+      [
+        "/agea/importazioni/{id}",
+        "/agea/importazioni/{id}/righe",
+        ["400", "403", "404"],
+      ],
+      [
+        "/agea/importazioni/{id}/righe",
+        "/agea/importazioni/{id}/partite",
+        ["400", "403", "404"],
+      ],
+      [
+        "/agea/importazioni/{id}/partite",
+        "/agea/importazioni/{id}/descrizioni-da-mappare",
+        ["400", "403", "404"],
+      ],
+      [
+        "/agea/importazioni/{id}/descrizioni-da-mappare",
+        "/agea/importazioni/{id}/righe/{rigaId}/data-carico",
+        ["400", "403", "404"],
+      ],
+      [
+        "/agea/importazioni/{id}/righe/{rigaId}/data-carico",
+        "/agea/importazioni/{id}/righe/{rigaId}/lotto",
+        ["400", "403", "404", "409"],
+      ],
+      [
+        "/agea/importazioni/{id}/righe/{rigaId}/lotto",
+        "/agea/importazioni/{id}/partite/{partitaId}",
+        ["400", "403", "404", "409"],
+      ],
+      [
+        "/agea/importazioni/{id}/partite/{partitaId}",
+        "/agea/importazioni/{id}/ricalcola",
+        ["400", "403", "404", "409"],
+      ],
+      [
+        "/agea/importazioni/{id}/ricalcola",
+        "/agea/importazioni/{id}/conferma",
+        ["400", "403", "404", "409"],
+      ],
+      [
+        "/agea/importazioni/{id}/conferma",
+        "/agea/importazioni/{id}/annulla",
+        ["400", "403", "404", "409"],
+      ],
+      [
+        "/agea/importazioni/{id}/annulla",
+        "/agea/mappature-prodotti",
+        ["400", "403", "404", "409"],
+      ],
+      [
+        "/agea/mappature-prodotti",
+        "/agea/mappature-prodotti/{id}",
+        ["400", "403", "409"],
+      ],
+      ["/agea/mappature-prodotti/{id}", "/lotti", ["400", "403", "404", "409"]],
+    ] as const;
+    for (const [path, nextPath, statuses] of cases) {
+      const block = pathBlock(spec, path, nextPath);
+      for (const status of statuses)
+        expect(block).toContain(
+          `"${status}": { $ref: "#/components/responses/`,
+        );
+    }
+    expect(spec).toMatch(
+      /AgeaErrorResponse:[\s\S]*?required: \[error\][\s\S]*?code: \{ type: string \}/,
+    );
+    expect(spec).toMatch(/AgeaCorrezioneLottoInput:[\s\S]*?maxLength: 80/);
+  });
 });
