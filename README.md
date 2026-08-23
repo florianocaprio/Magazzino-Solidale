@@ -29,7 +29,6 @@ multilingua (it/es/en/fr/de/ar).
    ```
 
    Variabili richieste:
-
    - `DATABASE_URL` — stringa di connessione PostgreSQL
    - `SESSION_SECRET` — segreto per la firma delle sessioni (usa una stringa
      lunga e casuale, es. `openssl rand -hex 32`)
@@ -67,9 +66,41 @@ multilingua (it/es/en/fr/de/ar).
    docker compose up -d --remove-orphans
    ```
 
-Il comando `update` esegue in ordine gli script SQL in `lib/db/updates`, ognuno
-in una transazione e sotto lock advisory. Gli script devono essere idempotenti e
-non devono riconciliare automaticamente altre differenze dello schema.
+Il comando `update` usa il DB Migration Ledger 1.0-R1 in `app_meta`: verifica il
+manifest SHA-256 e il confine immutabile della storia legacy, quindi acquisisce
+in ordine il lock compatibile con il runner storico e il lock globale nuovo.
+Applica soltanto i file pendenti, registrando SQL e ledger nella stessa
+transazione. Alla prima adozione su un database esistente esegue un ultimo
+replay sicuro della storia censita e la registra; i run successivi verificano i
+checksum e saltano le migration già applicate.
+
+Comandi diagnostici non distruttivi:
+
+```bash
+pnpm --filter @workspace/db run migrations:status
+pnpm --filter @workspace/db run migrations:verify
+```
+
+`migrations:verify` su un ledger non inizializzato riporta tutti i file come
+pending e può terminare con exit code 0: questo conferma soltanto la coerenza
+del piano locale, non l'adozione. Un gate di rilascio richiede sia ledger
+inizializzato sia zero pending.
+
+Prima del gate PRE-2.0C e prima di qualunque futura prova su clone Hetzner
+eseguire esplicitamente con Node.js 24:
+
+```bash
+pnpm --filter @workspace/db run test:migrations
+```
+
+Una migration applicata non deve essere modificata, rimossa o rinominata. Le
+nuove migration devono essere append-only e avere un filename strettamente
+successivo al confine legacy, anche prima dell'adozione. Non esistono comandi
+automatici di repair o rebaseline. Se un clone fallisce la verifica legacy,
+fermarsi e ricreare il clone dal backup oppure ottenere una decisione DBA
+reviewata, senza modificare SQL storici, checksum o manifest. La procedura
+completa è in
+[`docs/db-migration-ledger.md`](docs/db-migration-ledger.md).
 
 ### Aggiornamento Fase 5-4 — Mensa
 
@@ -159,14 +190,44 @@ Il modulo `REPORT` espone in `/report` la landing della reportistica integrata:
 Dashboard generale, Pacchi Alimentari, Centro di Ascolto, Emporio, Mensa, UDS,
 Magazzino/Logistica e rendicontazione trasversale FSE+. I calcoli sono eseguiti
 dal reporting service server-side; grafici, tabelle, drill-down paginato ed
-export XLSX/PDF consumano lo stesso payload aggregato. Area Operativa, Centro e Zona UDS
+export XLSX/PDF consumano lo stesso payload `MAGAZZINO_2_0C_V1`. I KPI
+contabili espongono `exactValue` decimale per decisioni/export e una proiezione
+numerica separata per i grafici; `null` non viene trasformato in zero. Area Operativa, Centro e Zona UDS
 sono sempre riapplicati dal backend; per Mensa resta necessario anche il
 permesso `mensa.reports.view`.
 
-Le route storiche `/report-uds`, `/mensa/report` e gli endpoint legacy sotto
-`/report` restano disponibili per compatibilità. La nuova fase non introduce
-modifiche allo schema database. Le limitazioni del modello SIFEAD sono mostrate
+Le route storiche `/report-uds`, `/mensa/report` e i componenti legacy delegano
+ai builder integrati. La dashboard iniziale usa lo stesso builder generale e
+non conserva KPI paralleli. Le limitazioni del modello SIFEAD sono mostrate
 come dati mancanti, mai convertite in zeri o inferenze da note libere.
+
+### Magazzino 2.0C — FSE+
+
+La route `/report/fse-plus` aggiunge la sezione operativa Rendicontazione FSE+
+con tab di coda, esportazioni, riconciliazioni, indicatori e anomalie. Il
+sistema genera snapshot auditabili ma non trasmette automaticamente dati a
+SIFEAD. `SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1` è soltanto un file di
+controllo: il formato upload resta `EXTERNAL_FORMAT_UNVERIFIED`.
+
+L'update append-only `20260824_magazzino_2_0c_fse_reporting.sql` aggiunge
+soltanto snapshot di monitoraggio, export e riconciliazione. Non aggiunge una
+tabella di saldo e non modifica la contabilità 2.0A/2.0B. Applicarlo tramite il
+Migration Ledger dopo backup e preflight; verificare poi zero pending e
+riavviare soltanto la nuova versione applicativa. Dettagli:
+
+Il correttivo append-only R1 è
+`20260825_magazzino_2_0c_r1_reporting_hardening.sql`: completa snapshot di
+indicatori/saldi, copertura amministrativa, request hash/idempotenza, saldi di
+riconciliazione e audit delle risoluzioni. La migration 2.0C precedente e il
+manifest storico restano immutati. Gli export pre-R1 sono classificati
+conservativamente `LEGACY_2_0C_REVIEW_REQUIRED`. La coda distingue competenza,
+arretrati e copertura; i download canonico e osservato derivano dal medesimo
+snapshot immutabile. Il formato esterno resta `EXTERNAL_FORMAT_UNVERIFIED`.
+
+- [rendicontazione ed export FSE+](docs/magazzino-2.0c-fse-reporting.md);
+- [riconciliazione AGEA/SIFEAD](docs/magazzino-2.0c-reconciliation.md);
+- [modello reporting](docs/magazzino-2.0c-reporting-model.md);
+- [impact map](docs/magazzino-2.0c-impact-map.md).
 
 ## MAPS operativo
 
@@ -215,3 +276,13 @@ queste estensioni restano candidate per la 5-5.2.
 - I segreti vanno **solo** nel file `.env`, che è escluso dal versionamento.
   Non committare mai credenziali.
 - Per i dettagli su architettura, moduli e convenzioni vedi `replit.md`.
+
+### Magazzino 2.0C-R2
+
+R2 usa `scopeRequestHash` prima del calcolo della coda e rifiuta con
+`NESSUN_DATO_DA_RENDICONTARE` i pacchetti amministrativi vuoti. La copertura
+confronta chiave e contenuto; le righe tardive diventano correzioni
+deterministiche. Operazioni già collegate a Movimenti sono immutabili, i saldi
+progressivi fixed-point sono congelati nello snapshot e il lifecycle delle
+righe di riconciliazione garantisce target attivi univoci. Resta valido
+`EXTERNAL_FORMAT_UNVERIFIED`.

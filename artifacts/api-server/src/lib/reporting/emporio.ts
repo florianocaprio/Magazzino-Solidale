@@ -31,10 +31,12 @@ function accessConditions(filters: ReportFilters): SQL[] {
 export async function emporioMetrics(filters: ReportFilters) {
   const speseWhere = andSql(speseConditions(filters));
   const accessWhere = andSql(accessConditions(filters));
-  const scopeBeneficiari = andSql(reportScope(filters, {
-    areaOperativa: sql`be.area_operativa_id`,
-    centro: sql`be.centro_ascolto_id`,
-  }));
+  const scopeBeneficiari = andSql(
+    reportScope(filters, {
+      areaOperativa: sql`be.area_operativa_id`,
+      centro: sql`be.centro_ascolto_id`,
+    }),
+  );
   const [spese, accessi, enabled, stock] = await Promise.all([
     rows<Record<string, unknown>>(sql`
       SELECT COUNT(*) AS spese,
@@ -46,9 +48,13 @@ export async function emporioMetrics(filters: ReportFilters) {
                JOIN spese_emporio se2 ON se2.id = ser.spesa_emporio_id
                WHERE se2.id IN (SELECT se3.id FROM spese_emporio se3 WHERE se3.stato_spesa = 'chiusa'
                  AND se3.data_chiusura::date BETWEEN ${filters.da} AND ${filters.a}
-                 AND ${andSql(reportScope(filters, {
-                   areaOperativa: sql`se3.area_operativa_id`, centro: sql`se3.centro_ascolto_id`, magazzino: sql`se3.magazzino_emporio_id`,
-                 }))})) , 0) AS prodotti_distinti
+                 AND ${andSql(
+                   reportScope(filters, {
+                     areaOperativa: sql`se3.area_operativa_id`,
+                     centro: sql`se3.centro_ascolto_id`,
+                     magazzino: sql`se3.magazzino_emporio_id`,
+                   }),
+                 )})) , 0) AS prodotti_distinti
       FROM spese_emporio se WHERE ${speseWhere}
     `),
     rows<Record<string, unknown>>(sql`
@@ -71,9 +77,13 @@ export async function emporioMetrics(filters: ReportFilters) {
         JOIN magazzini mg ON mg.id = l.magazzino_id
         WHERE mg.tipo_magazzino IN ('emporio', 'misto')
           AND mg.stato = 'attivo'
-          AND ${andSql(reportScope(filters, {
-            areaOperativa: sql`mg.area_operativa_id`, centro: sql`mg.centro_ascolto_id`, magazzino: sql`mg.id`,
-          }))}
+          AND ${andSql(
+            reportScope(filters, {
+              areaOperativa: sql`mg.area_operativa_id`,
+              centro: sql`mg.centro_ascolto_id`,
+              magazzino: sql`mg.id`,
+            }),
+          )}
         GROUP BY l.magazzino_id, l.prodotto_id
       )
       SELECT COUNT(*) FILTER (WHERE stock.quantita > 0) AS prodotti_giacenza,
@@ -111,13 +121,19 @@ export async function buildEmporioReport(filters: ReportFilters) {
       GROUP BY 1 ORDER BY 1
     `),
     rows<Record<string, unknown>>(sql`
+      WITH fse_movimenti AS (
+        SELECT bolla_riga_id, SUM(abs(quantita::numeric)) AS quantita_fse
+        FROM movimenti
+        WHERE bolla_riga_id IS NOT NULL AND fondo_origine = 'FSE_PLUS'
+        GROUP BY bolla_riga_id
+      )
       SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, p.unita_misura,
              COALESCE(SUM(ser.quantita::numeric), 0) AS quantita,
-             COALESCE(SUM(ser.quantita::numeric) FILTER (WHERE l.fse_plus = true), 0) AS quantita_fse
+             COALESCE(SUM(fm.quantita_fse), 0) AS quantita_fse
       FROM spese_emporio se
       JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se.id
       JOIN prodotti p ON p.id = ser.prodotto_id
-      LEFT JOIN lotti l ON l.id = ser.lotto_id
+      LEFT JOIN fse_movimenti fm ON fm.bolla_riga_id = ser.bolla_riga_id
       WHERE ${where}
       GROUP BY p.id, p.nome, p.unita_misura ORDER BY quantita DESC, p.nome
     `),
@@ -150,35 +166,46 @@ export async function buildEmporioReport(filters: ReportFilters) {
   return dashboard({
     section: "emporio",
     filters,
-    kpi: [
-      kpi("utentiAbilitatiCredito", metrics.abilitati),
-      kpi("utentiServiti", metrics.utenti, "count", "utentiServiti"),
-      kpi("accessi", metrics.accessi, "count", "accessi"),
-      kpi("speseConcluse", metrics.spese, "count", "speseConcluse"),
-      kpi("prodottiDistintiDistribuiti", metrics.prodottiDistinti, "count", "prodottiDistintiDistribuiti"),
-      kpi("creditoUtilizzato", metrics.credito, "credit"),
-      kpi("creditoMedioSpesa", metrics.creditoMedio, "credit"),
-      kpi("saldoResiduo", metrics.saldo, "credit"),
-      kpi("prodottiInGiacenza", metrics.prodottiGiacenza),
-      kpi("prodottiSottoScorta", metrics.sottoScorta),
+    kpi: [kpi("utentiAbilitatiCredito", metrics.abilitati), kpi("utentiServiti", metrics.utenti, "count", "utentiServiti"), kpi("accessi", metrics.accessi, "count", "accessi"), kpi("speseConcluse", metrics.spese, "count", "speseConcluse"), kpi("prodottiDistintiDistribuiti", metrics.prodottiDistinti, "count", "prodottiDistintiDistribuiti"), kpi("creditoUtilizzato", metrics.credito, "credit"), kpi("creditoMedioSpesa", metrics.creditoMedio, "credit"), kpi("saldoResiduo", metrics.saldo, "credit"), kpi("prodottiInGiacenza", metrics.prodottiGiacenza), kpi("prodottiSottoScorta", metrics.sottoScorta)],
+    series: [
+      {
+        key: "spesePerMese",
+        points: monthSeries(monthly, "totale", "credito"),
+      },
     ],
-    series: [{ key: "spesePerMese", points: monthSeries(monthly, "totale", "credito") }],
     tables: [
-      { key: "prodotti", columns: ["prodottoId", "prodottoNome", "unitaMisura", "quantita", "quantitaFse"], rows: products.map((r) => ({ prodottoId: number(r.prodotto_id), prodottoNome: String(r.prodotto_nome), unitaMisura: String(r.unita_misura), quantita: number(r.quantita), quantitaFse: number(r.quantita_fse) })) },
-      { key: "centri", columns: ["centro", "spese", "utenti", "credito"], rows: centres.map((r) => ({ centro: String(r.centro), spese: number(r.spese), utenti: number(r.utenti), credito: number(r.credito) })) },
-      { key: "frequenza", columns: ["beneficiarioCodice", "spese"], rows: frequency.map((r) => ({ beneficiarioCodice: String(r.beneficiario_codice), spese: number(r.spese) })) },
+      {
+        key: "prodotti",
+        columns: ["prodottoId", "prodottoNome", "unitaMisura", "quantita", "quantitaFse"],
+        rows: products.map((r) => ({
+          prodottoId: number(r.prodotto_id),
+          prodottoNome: String(r.prodotto_nome),
+          unitaMisura: String(r.unita_misura),
+          quantita: number(r.quantita),
+          quantitaFse: number(r.quantita_fse),
+        })),
+      },
+      {
+        key: "centri",
+        columns: ["centro", "spese", "utenti", "credito"],
+        rows: centres.map((r) => ({
+          centro: String(r.centro),
+          spese: number(r.spese),
+          utenti: number(r.utenti),
+          credito: number(r.credito),
+        })),
+      },
+      {
+        key: "frequenza",
+        columns: ["beneficiarioCodice", "spese"],
+        rows: frequency.map((r) => ({
+          beneficiarioCodice: String(r.beneficiario_codice),
+          spese: number(r.spese),
+        })),
+      },
     ],
-    quality: [
-      quality("lottoMancante", number(dq.lotto_mancante), number(dq.lotto_mancante) ? "derivable" : "ok", "Senza lotto non è possibile attribuire con certezza la provenienza FSE+."),
-      quality("centroMancante", number(dq.centro_mancante), number(dq.centro_mancante) ? "derivable" : "ok"),
-    ],
-    definitions: [
-      "Spesa Emporio = record spese_emporio nello stato chiusa.",
-      "Prodotti distinti distribuiti = prodotti diversi presenti nelle sole spese chiuse.",
-      "Utente servito = beneficiario distinto con almeno una spesa chiusa nel periodo.",
-      "La provenienza FSE+ deriva dal lotto della riga di spesa.",
-      "Le quantità restano separate per prodotto e unità di misura e non vengono sommate tra unità eterogenee.",
-    ],
+    quality: [quality("lottoMancante", number(dq.lotto_mancante), number(dq.lotto_mancante) ? "derivable" : "ok", "Senza lotto non è possibile attribuire con certezza la provenienza FSE+."), quality("centroMancante", number(dq.centro_mancante), number(dq.centro_mancante) ? "derivable" : "ok")],
+    definitions: ["Spesa Emporio = record spese_emporio nello stato chiusa.", "Prodotti distinti distribuiti = prodotti diversi presenti nelle sole spese chiuse.", "Utente servito = beneficiario distinto con almeno una spesa chiusa nel periodo.", "La provenienza FSE+ deriva dallo snapshot Fondo dei Movimenti della spesa.", "Le quantità restano separate per prodotto e unità di misura e non vengono sommate tra unità eterogenee."],
   });
 }
 

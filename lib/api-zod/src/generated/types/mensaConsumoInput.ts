@@ -7,14 +7,14 @@
  */
 import type { MensaConsumoInputCausale } from './mensaConsumoInputCausale';
 import type { MensaConsumoInputTipoServizio } from './mensaConsumoInputTipoServizio';
+import type { QuantitaContabile } from './quantitaContabile';
 
 export interface MensaConsumoInput {
   mensaId: number;
   dataServizio: Date;
   tipoServizio: MensaConsumoInputTipoServizio;
   prodottoId: number;
-  /** @exclusiveMinimum 0 */
-  quantita: number;
+  quantita: QuantitaContabile;
   causale: MensaConsumoInputCausale;
   /**
      * @maxLength 2000

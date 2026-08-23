@@ -13,12 +13,12 @@ export function ReportKpiCard({
   onOpen?: () => void;
 }) {
   const { t } = useTranslation();
-  const unavailable = item.value == null;
-  const formatted = item.value == null
+  const unavailable = item.exactValue == null;
+  const formatted = item.exactValue == null
     ? t("reporting.unavailable")
     : new Intl.NumberFormat(undefined, {
-        maximumFractionDigits: item.unit === "average" || item.unit === "credit" ? 2 : 1,
-      }).format(item.value);
+        maximumFractionDigits: item.unit === "average" || item.unit === "credit" ? 2 : 6,
+      }).format(Number(item.exactValue));
   return (
     <Card className={unavailable ? "border-dashed" : undefined}>
       <CardHeader className="space-y-2 pb-2">

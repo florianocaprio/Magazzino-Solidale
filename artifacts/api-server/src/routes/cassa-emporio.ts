@@ -53,7 +53,7 @@ import { requireModulo } from "../lib/featureFlags";
 import {
   chiudiSessioneCassaEmporio,
   getSpesaEmporio,
-  quantitaNettaMensileProdotto,
+  quantitaNettaMensileProdottoPrecisa,
   SpesaEmporioError,
 } from "../lib/speseEmporio";
 import { lottoDistribuibileCondition } from "../lib/lottoPolicy";
@@ -65,6 +65,11 @@ import {
 } from "../lib/interventiViste";
 import { auditEmporioTx } from "../lib/emporioAudit";
 import { quantitaCompatibileConUnitaMisuraEmporio } from "../lib/emporioQuantita";
+import {
+  InventoryDecimal,
+  InventoryDecimalError,
+  positiveInventoryDecimal,
+} from "../lib/inventoryDecimal";
 
 const router: IRouter = Router();
 router.use(
@@ -237,16 +242,17 @@ function asInt(value: unknown): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-function asPositiveQuantity(value: unknown): number | null {
-  const n =
-    typeof value === "number"
-      ? value
-      : typeof value === "string" && value.trim()
-        ? Number(value)
-        : NaN;
-  if (!Number.isFinite(n) || n <= 0 || n > 99_999_999.99) return null;
-  const rounded = Math.round((n + Number.EPSILON) * 100) / 100;
-  return Math.abs(rounded - n) < 1e-9 ? rounded : null;
+function asPositiveQuantity(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  try {
+    const quantity = positiveInventoryDecimal(value);
+    return quantity.compare(InventoryDecimal.parse("99999999.99")) <= 0
+      ? quantity.toDb()
+      : null;
+  } catch (error) {
+    if (error instanceof InventoryDecimalError) return null;
+    throw error;
+  }
 }
 
 function asText(value: unknown): string | null {
@@ -522,12 +528,12 @@ async function recalcSessioneTx(
   return updated;
 }
 
-async function quantitaProdottoInSessione(
+async function quantitaProdottoInSessionePrecisa(
   executor: Tx | typeof db,
   sessioneId: number,
   prodottoId: number,
   excludeRigaId?: number,
-): Promise<number> {
+): Promise<InventoryDecimal> {
   const conditions: SQL[] = [
     eq(sessioniCassaEmporioRigheTable.sessioneCassaId, sessioneId),
     eq(sessioniCassaEmporioRigheTable.prodottoId, prodottoId),
@@ -538,7 +544,7 @@ async function quantitaProdottoInSessione(
     .select({ quantita: sum(sessioniCassaEmporioRigheTable.quantita) })
     .from(sessioniCassaEmporioRigheTable)
     .where(and(...conditions));
-  return parseDbNumber(row?.quantita);
+  return InventoryDecimal.parse(row?.quantita ?? "0");
 }
 
 async function firstLottoId(
@@ -566,7 +572,7 @@ async function buildRigaValues(
   executor: Tx | typeof db,
   sessione: typeof sessioniCassaEmporioTable.$inferSelect,
   prodottoId: number,
-  quantita: number,
+  quantita: string,
   excludeRigaId?: number,
 ) {
   const [prodotto] = await executor
@@ -584,31 +590,36 @@ async function buildRigaValues(
   if (!quantitaCompatibileConUnitaMisuraEmporio(quantita, prodotto.unitaMisura))
     return { error: MSG_QUANTITA_PZ_INTERA, status: 400 } as const;
 
-  const otherQuantity = await quantitaProdottoInSessione(
+  const quantity = InventoryDecimal.parse(quantita);
+  const creditQuantity = Number(quantity.toCanonical());
+  const otherQuantity = await quantitaProdottoInSessionePrecisa(
     executor,
     sessione.id,
     prodottoId,
     excludeRigaId,
   );
-  const totalQuantityForProduct = otherQuantity + quantita;
+  const totalQuantityForProduct = otherQuantity.add(quantity);
   const limitePerSpesa =
     prodotto.quantitaMassimaPerSpesa == null
       ? null
-      : parseDbNumber(prodotto.quantitaMassimaPerSpesa);
+      : InventoryDecimal.parse(prodotto.quantitaMassimaPerSpesa);
   const limiteMensile =
     prodotto.quantitaMassimaMensile == null
       ? null
-      : parseDbNumber(prodotto.quantitaMassimaMensile);
-  if (limitePerSpesa != null && totalQuantityForProduct > limitePerSpesa)
+      : InventoryDecimal.parse(prodotto.quantitaMassimaMensile);
+  if (
+    limitePerSpesa != null &&
+    totalQuantityForProduct.compare(limitePerSpesa) > 0
+  )
     return { error: MSG_LIMITE_SPESA, status: 400 } as const;
-  const alreadyDistributed = await quantitaNettaMensileProdotto(
+  const alreadyDistributed = await quantitaNettaMensileProdottoPrecisa(
     executor,
     sessione.beneficiarioId,
     prodottoId,
   );
   if (
     limiteMensile != null &&
-    alreadyDistributed + totalQuantityForProduct > limiteMensile
+    alreadyDistributed.add(totalQuantityForProduct).compare(limiteMensile) > 0
   )
     return { error: MSG_LIMITE_MENSILE, status: 400 } as const;
 
@@ -616,11 +627,15 @@ async function buildRigaValues(
     prodottoId,
     sessione.magazzinoEmporioId,
   );
-  const disponibile =
-    Math.round((disponibilita.disponibileReale + Number.EPSILON) * 100) / 100;
-  if (disponibile <= 0)
+  const disponibile = InventoryDecimal.parse(
+    disponibilita.disponibileRealePrecisa,
+    { allowNegative: true },
+  );
+  if (!disponibile.isPositive())
     return { error: MSG_GIACENZA_INSUFFICIENTE, status: 400 } as const;
-  if (totalQuantityForProduct > disponibile)
+  if (
+    totalQuantityForProduct.compare(disponibile) > 0
+  )
     return { error: MSG_GIACENZA_INSUFFICIENTE, status: 400 } as const;
 
   return {
@@ -634,13 +649,21 @@ async function buildRigaValues(
       ),
       codiceProdotto: prodotto.codiceBarre ?? prodotto.codice,
       descrizioneProdotto: prodotto.nome,
-      quantita: asMoney(quantita),
+      quantita: quantity.toDb(),
       unitaMisura: prodotto.unitaMisura,
       creditoUnitario: asMoney(creditoUnitario),
-      creditoTotale: asMoney(creditoUnitario * quantita),
-      giacenzaDisponibileAlMomento: asMoney(disponibile),
-      limitePerSpesa: limitePerSpesa == null ? null : asMoney(limitePerSpesa),
-      limiteMensile: limiteMensile == null ? null : asMoney(limiteMensile),
+      creditoTotale: asMoney(creditoUnitario * creditQuantity),
+      giacenzaDisponibileAlMomento: asMoney(
+        parseDbNumber(disponibile.toDb()),
+      ),
+      limitePerSpesa:
+        limitePerSpesa == null
+          ? null
+          : asMoney(Number(limitePerSpesa.toCanonical())),
+      limiteMensile:
+        limiteMensile == null
+          ? null
+          : asMoney(Number(limiteMensile.toCanonical())),
       superaLimitePerSpesa: false,
       superaLimiteMensile: false,
       superaGiacenza: false,
@@ -927,10 +950,14 @@ router.get(
         prodotto.id,
         magazzinoEmporioId,
       );
-      const giacenzaDisponibile =
-        Math.round((disponibilita.disponibileReale + Number.EPSILON) * 100) /
-        100;
-      if (giacenzaDisponibile <= 0) continue;
+      const giacenzaDisponibilePrecisa = InventoryDecimal.parse(
+        disponibilita.disponibileRealePrecisa,
+        { allowNegative: true },
+      );
+      if (!giacenzaDisponibilePrecisa.isPositive()) continue;
+      const giacenzaDisponibile = parseDbNumber(
+        giacenzaDisponibilePrecisa.toDb(),
+      );
       result.push({
         prodottoId: prodotto.id,
         codice: prodotto.codice,

@@ -11,9 +11,12 @@ export type ReportKpiUnit = typeof ReportKpiUnit[keyof typeof ReportKpiUnit];
 
 export const ReportKpiUnit = {
   count: 'count',
-  quantity: 'quantity',
-  kg: 'kg',
+  pieces: 'pieces',
+  kgLt: 'kgLt',
+  percentage: 'percentage',
   credit: 'credit',
   days: 'days',
   average: 'average',
+  quantity: 'quantity',
+  kg: 'kg',
 } as const;

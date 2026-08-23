@@ -89,7 +89,7 @@ export const speseEmporioRigheTable = pgTable("spese_emporio_righe", {
   lottoId: integer("lotto_id").references(() => lottiTable.id),
   codiceProdotto: varchar("codice_prodotto", { length: 80 }),
   descrizioneProdotto: text("descrizione_prodotto").notNull(),
-  quantita: decimal("quantita", { precision: 10, scale: 2 }).notNull(),
+  quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
   unitaMisura: varchar("unita_misura", { length: 20 }),
   creditoUnitario: decimal("credito_unitario", {
     precision: 10,

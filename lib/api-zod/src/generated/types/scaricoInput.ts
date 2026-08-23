@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ScaricoInputCanaleOperativo } from './scaricoInputCanaleOperativo';
 import type { ScaricoInputCausale } from './scaricoInputCausale';
 import type { ScaricoRigaInput } from './scaricoRigaInput';
 
@@ -14,6 +15,13 @@ export interface ScaricoInput {
   centroAscoltoId?: number | null;
   dataScarico: string;
   causale: ScaricoInputCausale;
+  /**
+     * Obbligatorio con causale consegna_beneficiario.
+     * @minimum 1
+     */
+  beneficiarioId?: number;
+  /** Obbligatorio con causale consegna_beneficiario. */
+  canaleOperativo?: ScaricoInputCanaleOperativo;
   causaleAltro?: string;
   note?: string;
   righe: ScaricoRigaInput[];

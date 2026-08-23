@@ -5,6 +5,301 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export interface FseErrorResponse {
+  /** Codice o messaggio stabile; include NESSUN_DATO_DA_RENDICONTARE per scope amministrativi vuoti */
+  error: string;
+}
+
+export interface FseRecord { [key: string]: unknown }
+
+export interface FseReportingPreview {
+  modelVersion: string;
+  /** @minimum 1 */
+  magazzinoId: number;
+  dataDa: string;
+  dataA: string;
+  dataAsOf: string;
+  /** @minimum 0 */
+  eventiTotali: number;
+  /** @minimum 0 */
+  righeTotali: number;
+  /** @minimum 0 */
+  eventiDaRendicontare: number;
+  /** @minimum 0 */
+  eventiArretrati: number;
+  /** @minimum 0 */
+  eventiBloccati: number;
+  /** @minimum 0 */
+  eventiGiaCoperti: number;
+  /** @minimum 0 */
+  righeDaRendicontare: number;
+  /** @minimum 0 */
+  bloccanti: number;
+  cutoff?: FseRecord;
+  [key: string]: unknown;
+ }
+
+export type FseRecordList = FseRecord[];
+
+export interface FseRecordPage {
+  /** @minimum 1 */
+  page: number;
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  pageSize: number;
+  /** @minimum 0 */
+  total: number;
+  rows: FseRecordList;
+  summary?: FseRecord;
+}
+
+export interface FseReconciliationRow {
+  /** @minimum 1 */
+  id?: number;
+  active?: boolean;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  supersededByRowId?: number | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9a-f]{64}$
+     */
+  resolutionGroupId?: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  companionRowId?: number | null;
+  [key: string]: unknown;
+ }
+
+export interface FseReconciliationRowsPage {
+  /** @minimum 1 */
+  page: number;
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  pageSize: number;
+  /** @minimum 0 */
+  total: number;
+  rows: FseReconciliationRow[];
+}
+
+export type FseExportInputFormatCode = typeof FseExportInputFormatCode[keyof typeof FseExportInputFormatCode];
+
+
+export const FseExportInputFormatCode = {
+  FSE_CANONICAL_AUDIT_XLSX_V1: 'FSE_CANONICAL_AUDIT_XLSX_V1',
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1: 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1',
+} as const;
+
+export interface FseExportInput {
+  /** @minimum 1 */
+  magazzinoId: number;
+  dataCompetenzaDa: string;
+  dataCompetenzaA: string;
+  dataAsOf: string;
+  formatCode: FseExportInputFormatCode;
+  /** @minimum 1 */
+  maxMovimentoId?: number;
+  /** @minimum 1 */
+  maxOperazioneDistribuzioneId?: number;
+  includeArretrati?: boolean;
+}
+
+export interface FseVersionInput {
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione?: string;
+  data?: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  riferimentoEsterno?: string;
+  conScostamenti?: boolean;
+}
+
+export interface FseMarkEnteredInput {
+  /** @minimum 1 */
+  versione: number;
+  data: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  riferimentoEsterno: string;
+}
+
+export interface FseCancelInput {
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+}
+
+export interface FseReconciliationInput {
+  /** @minimum 1 */
+  magazzinoId: number;
+  /** @minimum 1 */
+  importazioneAgeaId: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  importazioneAgeaPrecedenteId?: number | null;
+  dataRiferimento: string;
+  /** @minimum 1 */
+  maxMovimentoId?: number;
+  /** @minimum 1 */
+  maxOperazioneDistribuzioneId?: number;
+}
+
+export type FseResolutionInputAzione = typeof FseResolutionInputAzione[keyof typeof FseResolutionInputAzione];
+
+
+export const FseResolutionInputAzione = {
+  ABBINA: 'ABBINA',
+  DISABBINA: 'DISABBINA',
+  ACCETTA_SCOSTAMENTO: 'ACCETTA_SCOSTAMENTO',
+  SEGNALA_DA_CORREGGERE: 'SEGNALA_DA_CORREGGERE',
+  RIAPRI: 'RIAPRI',
+} as const;
+
+export interface FseResolutionInput {
+  /** @minimum 1 */
+  versione: number;
+  azione: FseResolutionInputAzione;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+  /** @minimum 1 */
+  movimentoId?: number;
+  /** @minimum 1 */
+  importazioneAgeaRigaId?: number;
+}
+
+export type FseMonitoringInputCanaleUfficiale = typeof FseMonitoringInputCanaleUfficiale[keyof typeof FseMonitoringInputCanaleUfficiale];
+
+
+export const FseMonitoringInputCanaleUfficiale = {
+  PACCHI: 'PACCHI',
+  MENSA: 'MENSA',
+  STRADA: 'STRADA',
+} as const;
+
+export type FseMonitoringInputFonte = typeof FseMonitoringInputFonte[keyof typeof FseMonitoringInputFonte];
+
+
+export const FseMonitoringInputFonte = {
+  RILEVAZIONE_MANUALE_VERIFICATA: 'RILEVAZIONE_MANUALE_VERIFICATA',
+  DERIVAZIONE_STRUTTURATA: 'DERIVAZIONE_STRUTTURATA',
+} as const;
+
+export type FseMonitoringInputCompletezza = typeof FseMonitoringInputCompletezza[keyof typeof FseMonitoringInputCompletezza];
+
+
+export const FseMonitoringInputCompletezza = {
+  PARZIALE: 'PARZIALE',
+  COMPLETA: 'COMPLETA',
+} as const;
+
+export interface FseMonitoringInput {
+  /** @minimum 1 */
+  magazzinoId: number;
+  /** @pattern ^[0-9]{4}-(0[1-9]|1[0-2])$ */
+  annoMese: string;
+  canaleUfficiale: FseMonitoringInputCanaleUfficiale;
+  dataRiferimento: string;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  operazioneDistribuzioneId?: number | null;
+  fonte: FseMonitoringInputFonte;
+  completezza: FseMonitoringInputCompletezza;
+  [key: string]: unknown;
+ }
+
+export interface FseMonitoringUpdate {
+  /** @minimum 1 */
+  versione: number;
+  [key: string]: unknown;
+ }
+
+export interface FseOpcReturnLineInput {
+  /** @minimum 1 */
+  prodottoId: number;
+  /** @minimum 1 */
+  lottoId?: number;
+  quantita: number | string;
+}
+
+export type FseOpcReturnInputVersione = typeof FseOpcReturnInputVersione[keyof typeof FseOpcReturnInputVersione];
+
+
+export const FseOpcReturnInputVersione = {
+  NUMBER_1: 1,
+} as const;
+
+export type FseOpcReturnInputModalitaSelezione = typeof FseOpcReturnInputModalitaSelezione[keyof typeof FseOpcReturnInputModalitaSelezione];
+
+
+export const FseOpcReturnInputModalitaSelezione = {
+  FEFO: 'FEFO',
+  PARTITA_ESATTA: 'PARTITA_ESATTA',
+} as const;
+
+export interface FseOpcReturnInput {
+  versione: FseOpcReturnInputVersione;
+  /**
+     * @minLength 8
+     * @maxLength 100
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  magazzinoId: number;
+  dataReso: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  destinazioneOpc: string;
+  /**
+     * @minLength 3
+     * @maxLength 2000
+     */
+  motivazione: string;
+  modalitaSelezione: FseOpcReturnInputModalitaSelezione;
+  /** @minItems 1 */
+  righe: FseOpcReturnLineInput[];
+}
+
+export interface FseOpcReturnReversalInput {
+  /** @minimum 1 */
+  versione: number;
+  data: string;
+  /**
+     * @minLength 3
+     * @maxLength 2000
+     */
+  motivazione: string;
+}
+
 export type MapsLayerCode = typeof MapsLayerCode[keyof typeof MapsLayerCode];
 
 
@@ -88,6 +383,13 @@ export interface MapsRoute {
   url: string;
 }
 
+export type ReportingDashboardReportingModelVersion = typeof ReportingDashboardReportingModelVersion[keyof typeof ReportingDashboardReportingModelVersion];
+
+
+export const ReportingDashboardReportingModelVersion = {
+  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+} as const;
+
 export type ReportingDashboardSection = typeof ReportingDashboardSection[keyof typeof ReportingDashboardSection];
 
 
@@ -136,11 +438,14 @@ export type ReportKpiUnit = typeof ReportKpiUnit[keyof typeof ReportKpiUnit];
 
 export const ReportKpiUnit = {
   count: 'count',
-  quantity: 'quantity',
-  kg: 'kg',
+  pieces: 'pieces',
+  kgLt: 'kgLt',
+  percentage: 'percentage',
   credit: 'credit',
   days: 'days',
   average: 'average',
+  quantity: 'quantity',
+  kg: 'kg',
 } as const;
 
 export type ReportKpiAvailability = typeof ReportKpiAvailability[keyof typeof ReportKpiAvailability];
@@ -156,6 +461,11 @@ export interface ReportKpi {
   key: string;
   /** @nullable */
   value: number | null;
+  /**
+     * Valore decimale esatto; le decisioni non usano la proiezione number.
+     * @nullable
+     */
+  exactValue: string | null;
   unit: ReportKpiUnit;
   availability: ReportKpiAvailability;
   /** @nullable */
@@ -201,6 +511,7 @@ export interface ReportQualityItem {
 }
 
 export interface ReportingDashboard {
+  reportingModelVersion: ReportingDashboardReportingModelVersion;
   section: ReportingDashboardSection;
   filters: ReportAppliedFilters;
   kpi: ReportKpi[];
@@ -212,9 +523,17 @@ export interface ReportingDashboard {
   timezone: ReportingDashboardTimezone;
 }
 
+export type ReportDrilldownReportingModelVersion = typeof ReportDrilldownReportingModelVersion[keyof typeof ReportDrilldownReportingModelVersion];
+
+
+export const ReportDrilldownReportingModelVersion = {
+  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+} as const;
+
 export type ReportDrilldownRowsItem = { [key: string]: unknown };
 
 export interface ReportDrilldown {
+  reportingModelVersion: ReportDrilldownReportingModelVersion;
   section: string;
   metric: string;
   page: number;
@@ -699,6 +1018,472 @@ export interface ProdottoUpdate {
   fornitoreId?: number;
 }
 
+export type FondoOrigine = typeof FondoOrigine[keyof typeof FondoOrigine];
+
+
+export const FondoOrigine = {
+  FSE_PLUS: 'FSE_PLUS',
+  FONDO_NAZIONALE: 'FONDO_NAZIONALE',
+  FONDO_NAZIONALE_COFINANZIATO: 'FONDO_NAZIONALE_COFINANZIATO',
+  NESSUN_FONDO: 'NESSUN_FONDO',
+} as const;
+
+export type OrigineCarico = typeof OrigineCarico[keyof typeof OrigineCarico];
+
+
+export const OrigineCarico = {
+  AGEA_SIFEAD: 'AGEA_SIFEAD',
+  RACCOLTA_ALIMENTARE: 'RACCOLTA_ALIMENTARE',
+  DONAZIONE: 'DONAZIONE',
+  ACQUISTO: 'ACQUISTO',
+  FORNITORE: 'FORNITORE',
+  RETTIFICA_INVENTARIO: 'RETTIFICA_INVENTARIO',
+  SALDO_INIZIALE: 'SALDO_INIZIALE',
+  ALTRO: 'ALTRO',
+  LEGACY: 'LEGACY',
+} as const;
+
+/**
+ * Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.
+ */
+export type OrigineCaricoManuale = typeof OrigineCaricoManuale[keyof typeof OrigineCaricoManuale];
+
+
+export const OrigineCaricoManuale = {
+  RACCOLTA_ALIMENTARE: 'RACCOLTA_ALIMENTARE',
+  DONAZIONE: 'DONAZIONE',
+  ACQUISTO: 'ACQUISTO',
+  FORNITORE: 'FORNITORE',
+  ALTRO: 'ALTRO',
+} as const;
+
+/**
+ * Decimale esatto; non convertire in number JavaScript per i calcoli.
+ * @pattern ^[0-9]+(?:\.[0-9]{1,6})?$
+ */
+export type QuantitaContabile = string;
+
+export type AgeaImportModalita = typeof AgeaImportModalita[keyof typeof AgeaImportModalita];
+
+
+export const AgeaImportModalita = {
+  PRIMA_ACQUISIZIONE: 'PRIMA_ACQUISIZIONE',
+  AGGIORNAMENTO: 'AGGIORNAMENTO',
+  SOLO_ANALISI: 'SOLO_ANALISI',
+} as const;
+
+export interface AgeaErrorResponse {
+  error: string;
+  code?: string;
+}
+
+export type AgeaImportStato = typeof AgeaImportStato[keyof typeof AgeaImportStato];
+
+
+export const AgeaImportStato = {
+  ANALIZZATA: 'ANALIZZATA',
+  DA_MAPPARE: 'DA_MAPPARE',
+  BLOCCATA: 'BLOCCATA',
+  PRONTA: 'PRONTA',
+  CONFERMATA: 'CONFERMATA',
+  ANNULLATA: 'ANNULLATA',
+  ERRORE: 'ERRORE',
+} as const;
+
+export type AgeaTipoMovimento = typeof AgeaTipoMovimento[keyof typeof AgeaTipoMovimento];
+
+
+export const AgeaTipoMovimento = {
+  CARICO: 'CARICO',
+  DISTRIBUZIONE: 'DISTRIBUZIONE',
+  RESO: 'RESO',
+  MOVIMENTO_NEGATIVO_NON_CLASSIFICATO: 'MOVIMENTO_NEGATIVO_NON_CLASSIFICATO',
+  SEGNO_INCOERENTE: 'SEGNO_INCOERENTE',
+  RIGA_SENZA_MOVIMENTO: 'RIGA_SENZA_MOVIMENTO',
+} as const;
+
+export type AgeaImportazioneTracciatoCodice = typeof AgeaImportazioneTracciatoCodice[keyof typeof AgeaImportazioneTracciatoCodice];
+
+
+export const AgeaImportazioneTracciatoCodice = {
+  SIFEAD_REGISTRO_XLSX_OSSERVATO_V1: 'SIFEAD_REGISTRO_XLSX_OSSERVATO_V1',
+} as const;
+
+/**
+ * @nullable
+ */
+export type AgeaImportazioneNoteAudit = { [key: string]: unknown } | null;
+
+export interface AgeaImportazione {
+  id: number;
+  magazzinoId: number;
+  nomeFile: string;
+  mimeType: string;
+  dimensioneBytes: number;
+  /** @pattern ^[0-9a-f]{64}$ */
+  sha256File: string;
+  tracciatoCodice: AgeaImportazioneTracciatoCodice;
+  parserVersion: string;
+  sheetName: string;
+  dataRiferimento: string;
+  modalita: AgeaImportModalita;
+  stato: AgeaImportStato;
+  versione: number;
+  righeTotali: number;
+  righeCarico: number;
+  righeDistribuzione: number;
+  righeReso: number;
+  righeNonClassificate: number;
+  righeNuove: number;
+  righeDuplicate: number;
+  righeModificate: number;
+  righeAmbigue: number;
+  righeBloccanti: number;
+  partiteTotali: number;
+  partiteSaldoPositivo: number;
+  /** @nullable */
+  bootstrapCaricoId?: number | null;
+  creatoDa: number;
+  dataCreazione: string;
+  /** @nullable */
+  confermatoDa?: number | null;
+  /** @nullable */
+  dataConferma?: string | null;
+  /** @nullable */
+  annullatoDa?: number | null;
+  /** @nullable */
+  dataAnnullamento?: string | null;
+  /** @nullable */
+  noteAudit?: AgeaImportazioneNoteAudit;
+}
+
+/**
+ * Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.
+ * @pattern ^-?[0-9]+(?:\.[0-9]{1,6})?$
+ */
+export type QuantitaContabileConSegno = string;
+
+export interface AgeaImportRiga {
+  id: number;
+  importazioneId: number;
+  numeroRiga: number;
+  /** @nullable */
+  fondoRaw?: string | null;
+  /** @nullable */
+  fondoNormalizzato?: string | null;
+  prodottoRaw: string;
+  prodottoNormalizzato: string;
+  /** @nullable */
+  lottoRaw?: string | null;
+  /** @nullable */
+  lottoEffettivoRaw?: string | null;
+  /** @nullable */
+  lottoEffettivoNormalizzato?: string | null;
+  /** @nullable */
+  numeroDocumentoRaw?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  /** @nullable */
+  dataCaricoMagazzinoRaw?: string | null;
+  /** @nullable */
+  dataCaricoRisolta?: string | null;
+  /** @nullable */
+  dataCaricoEffettiva?: string | null;
+  /** @nullable */
+  dataCaricoFonte?: string | null;
+  movimentoKgLt?: QuantitaContabileConSegno | null;
+  movimentoPezzi?: QuantitaContabileConSegno | null;
+  saldoFinaleKgLt?: QuantitaContabileConSegno | null;
+  saldoFinalePezzi?: QuantitaContabileConSegno | null;
+  /** @nullable */
+  attivitaRaw?: string | null;
+  tipoMovimentoEsterno: AgeaTipoMovimento;
+  identityKey: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  contentHash: string;
+  /** @nullable */
+  prodottoIdSnapshot?: number | null;
+  /** @nullable */
+  mappingVersioneSnapshot?: number | null;
+  /** @nullable */
+  descrizioneProdottoSnapshot?: string | null;
+  /** @nullable */
+  unitaMisuraSnapshot?: string | null;
+  statoRiga: string;
+  blocking: boolean;
+  errorCodesJson: string[];
+  warningCodesJson: string[];
+  /** @nullable */
+  correzioneMotivazione?: string | null;
+}
+
+export interface AgeaImportRighePage {
+  items: AgeaImportRiga[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Fattore Kg/Lt per pezzo esatto, positivo, scala massima 9.
+ * @pattern ^[0-9]+(?:\.[0-9]{1,9})?$
+ */
+export type FattoreContabile = string;
+
+export interface AgeaImportPartita {
+  id: number;
+  importazioneId: number;
+  partyKey: string;
+  fondoOrigine: string;
+  /** @nullable */
+  prodottoId?: number | null;
+  prodottoNormalizzato: string;
+  descrizioniEsterneJson?: string[];
+  /** @nullable */
+  lottoRaw?: string | null;
+  /** @nullable */
+  existingLottoId?: number | null;
+  saldoFinalePezzi?: QuantitaContabileConSegno | null;
+  saldoFinaleKgLt?: QuantitaContabileConSegno | null;
+  quantitaOperativa?: QuantitaContabile | null;
+  /** @nullable */
+  unitaMisuraOperativa?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
+  /** @nullable */
+  dataScadenzaRisolta?: string | null;
+  /** @nullable */
+  dataScadenzaFonte?: string | null;
+  stato: string;
+  blocking: boolean;
+  errorCodesJson: string[];
+  warningCodesJson: string[];
+}
+
+export interface AgeaDescrizioneDaMappare {
+  chiaveDescrizioneNormalizzata: string;
+  descrizioneRawRappresentativa: string;
+  /** @minimum 1 */
+  numeroRighe: number;
+  fondi: string[];
+  /** @nullable */
+  mappingId?: number | null;
+  /** @nullable */
+  mappingAttiva?: boolean | null;
+  /** @nullable */
+  mappingVersione?: number | null;
+  /** @nullable */
+  prodottoId?: number | null;
+  /** @nullable */
+  prodottoNome?: string | null;
+}
+
+export interface AgeaMappaturaProdottoInput {
+  /** @minLength 1 */
+  descrizioneEsterna: string;
+  /** @minimum 1 */
+  prodottoId: number;
+}
+
+export interface AgeaMappaturaProdottoUpdate {
+  /** @minimum 1 */
+  prodottoId: number;
+  attiva?: boolean;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface AgeaImportPartitaUpdate {
+  /** @nullable */
+  dataScadenza: string | null;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface AgeaVersioneInput {
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface AgeaCorrezioneDataInput {
+  /** @nullable */
+  valore: string | null;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface AgeaCorrezioneLottoInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     * @nullable
+     */
+  valore: string | null;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface AgeaImportConfermaInput {
+  /** @minimum 1 */
+  versione: number;
+}
+
+export type AgeaMappaturaProdottoFonte = typeof AgeaMappaturaProdottoFonte[keyof typeof AgeaMappaturaProdottoFonte];
+
+
+export const AgeaMappaturaProdottoFonte = {
+  AGEA_SIFEAD: 'AGEA_SIFEAD',
+} as const;
+
+export interface AgeaMappaturaProdotto {
+  id: number;
+  fonte: AgeaMappaturaProdottoFonte;
+  descrizioneEsterna: string;
+  chiaveDescrizioneNormalizzata: string;
+  prodottoId: number;
+  attiva: boolean;
+  versione: number;
+  prodotto?: Prodotto;
+}
+
+export interface AgeaImportConfermaResult {
+  importazione: AgeaImportazione;
+  replay: boolean;
+  carichi: number[];
+}
+
+export type CaricoMagazzinoStato = typeof CaricoMagazzinoStato[keyof typeof CaricoMagazzinoStato];
+
+
+export const CaricoMagazzinoStato = {
+  confermato: 'confermato',
+  stornato: 'stornato',
+} as const;
+
+export interface CaricoMagazzino {
+  id: number;
+  magazzinoId: number;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  origineCarico: OrigineCarico;
+  /** @nullable */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  dataCarico: string;
+  /** @nullable */
+  descrizione?: string | null;
+  /** @nullable */
+  fornitoreId?: number | null;
+  /** @nullable */
+  fornitoreNome?: string | null;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  idempotencyKey?: string | null;
+  stato: CaricoMagazzinoStato;
+  creatoDa: number;
+  numeroRighe?: number;
+  dataCreazione: string;
+}
+
+export interface CaricoMagazzinoRiga {
+  id: number;
+  caricoMagazzinoId: number;
+  numeroRiga: number;
+  prodottoId: number;
+  /** @nullable */
+  prodottoNome?: string | null;
+  lottoId: number;
+  fondoOrigine: FondoOrigine;
+  quantitaOperativa: QuantitaContabile;
+  unitaMisuraOperativa: string;
+  quantitaPezzi?: QuantitaContabile | null;
+  quantitaKgLt?: QuantitaContabile | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
+  /** @nullable */
+  codiceLottoOriginale?: string | null;
+  /** @nullable */
+  codiceLotto?: string | null;
+  /** @nullable */
+  codiceLottoNormalizzato?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  descrizioneEsterna?: string | null;
+  /** @nullable */
+  riferimentoEsterno?: string | null;
+  /** @nullable */
+  note?: string | null;
+  partitaQuantitaCaricata?: QuantitaContabile;
+  partitaQuantitaResidua?: QuantitaContabile;
+  dataCreazione: string;
+}
+
+export type CaricoMagazzinoDettaglio = CaricoMagazzino & {
+  replay: boolean;
+  righe: CaricoMagazzinoRiga[];
+};
+
+export interface CaricoMagazzinoRigaInput {
+  /** @minimum 1 */
+  prodottoId: number;
+  fondoOrigine: FondoOrigine;
+  quantitaOperativa: QuantitaContabile;
+  unitaMisuraOperativa?: string;
+  quantitaPezzi?: QuantitaContabile | null;
+  quantitaKgLt?: QuantitaContabile | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
+  /** @nullable */
+  codiceLotto?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  descrizioneEsterna?: string | null;
+  /** @nullable */
+  riferimentoEsterno?: string | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CaricoMagazzinoInput {
+  /** @minimum 1 */
+  magazzinoId: number;
+  origineCarico: OrigineCaricoManuale;
+  /** @nullable */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  dataCarico: string;
+  /** @nullable */
+  descrizione?: string | null;
+  /** @nullable */
+  fornitoreId?: number | null;
+  /** @nullable */
+  note?: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  idempotencyKey?: string | null;
+  /** @minItems 1 */
+  righe: CaricoMagazzinoRigaInput[];
+}
+
 export interface Lotto {
   id: number;
   prodottoId: number;
@@ -711,6 +1496,8 @@ export interface Lotto {
   dataCarico: string;
   quantitaCaricata: number;
   quantitaResidua: number;
+  quantitaCaricataPrecisa: QuantitaContabile;
+  quantitaResiduaPrecisa: QuantitaContabile;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
@@ -719,6 +1506,13 @@ export interface Lotto {
   /** @nullable */
   fornitoreNome?: string | null;
   fsePlus: boolean;
+  fondoOrigine: FondoOrigine;
+  /** @nullable */
+  codiceLottoNormalizzato?: string | null;
+  /** @nullable */
+  dataUltimoCarico?: string | null;
+  /** @nullable */
+  fattoreKgLtPezzo?: string | null;
   /** @nullable */
   documentoCarico?: string | null;
   /** @nullable */
@@ -751,10 +1545,8 @@ export interface LottoInput {
 }
 
 export interface LottoUpdate {
-  codiceLotto?: string;
-  dataScadenza?: string;
-  documentoCarico?: string;
-  note?: string;
+  /** @nullable */
+  note?: string | null;
 }
 
 export type RettificaLottoInputCausale = typeof RettificaLottoInputCausale[keyof typeof RettificaLottoInputCausale];
@@ -768,7 +1560,7 @@ export const RettificaLottoInputCausale = {
 } as const;
 
 export interface RettificaLottoInput {
-  delta: number;
+  delta: QuantitaContabileConSegno;
   causale: RettificaLottoInputCausale;
   motivazione?: string;
   note?: string;
@@ -788,6 +1580,12 @@ export interface Movimento {
   /** @nullable */
   lottoId?: number | null;
   quantita: number;
+  quantitaPrecisa: QuantitaContabile;
+  /** @nullable */
+  quantitaPezzi?: string | null;
+  /** @nullable */
+  quantitaKgLt?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
   unitaMisura: string;
   /** @nullable */
   fornitoreId?: number | null;
@@ -795,6 +1593,22 @@ export interface Movimento {
   beneficiarioId?: number | null;
   /** @nullable */
   movimentoOrigineId?: number | null;
+  fondoOrigine: FondoOrigine;
+  naturaContabile: string;
+  /** @nullable */
+  dominioOrigine?: string | null;
+  /** @nullable */
+  entitaOrigineTipo?: string | null;
+  /** @nullable */
+  entitaOrigineId?: number | null;
+  /** @nullable */
+  rigaOrigineId?: number | null;
+  /** @nullable */
+  caricoMagazzinoRigaId?: number | null;
+  /** @nullable */
+  operazioneDistribuzioneId?: number | null;
+  /** @nullable */
+  canaleOperativo?: string | null;
   /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
@@ -828,15 +1642,22 @@ export interface Giacenza {
   magazzinoId: number;
   magazzinoNome: string;
   quantitaTotale: number;
+  quantitaTotalePrecisa?: QuantitaContabile;
   /** Quantità fisicamente presente, inclusi i lotti scaduti. */
   giacenzaFisica: number;
   /** Quantità fisicamente presente su lotti scaduti alla data civile Europe/Rome. */
   giacenzaScaduta: number;
   /** Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome. */
   giacenzaDistribuibile: number;
+  giacenzaFisicaPrecisa: QuantitaContabile;
+  giacenzaScadutaPrecisa?: QuantitaContabile;
+  giacenzaDistribuibilePrecisa: QuantitaContabile;
   impegnato: number;
+  impegnatoPreciso: QuantitaContabile;
   disponibileReale: number;
+  disponibileRealePrecisa: QuantitaContabileConSegno;
   scortaMinima: number;
+  scortaMinimaPrecisa?: QuantitaContabile;
   scortaConsigliata: number;
   sottoscorta: boolean;
   lottiAttivi: number;
@@ -941,7 +1762,7 @@ export interface Trasferimento {
 export interface TrasferimentoRigaInput {
   prodottoId: number;
   lottoId?: number;
-  quantita: number;
+  quantita: QuantitaContabile;
   /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
   unitaMisura?: string;
   note?: string;
@@ -1015,12 +1836,25 @@ export const ScaricoInputCausale = {
   deteriorata: 'deteriorata',
   rubata: 'rubata',
   scaduta: 'scaduta',
+  consegna_beneficiario: 'consegna_beneficiario',
   altro: 'altro',
+} as const;
+
+/**
+ * Obbligatorio con causale consegna_beneficiario.
+ */
+export type ScaricoInputCanaleOperativo = typeof ScaricoInputCanaleOperativo[keyof typeof ScaricoInputCanaleOperativo];
+
+
+export const ScaricoInputCanaleOperativo = {
+  PACCHI: 'PACCHI',
+  RITIRO_SEDE: 'RITIRO_SEDE',
+  DOMICILIARE: 'DOMICILIARE',
 } as const;
 
 export interface ScaricoRigaInput {
   prodottoId: number;
-  quantita: number;
+  quantita: QuantitaContabile;
   unitaMisura: string;
   note?: string;
 }
@@ -1031,6 +1865,13 @@ export interface ScaricoInput {
   centroAscoltoId?: number | null;
   dataScarico: string;
   causale: ScaricoInputCausale;
+  /**
+     * Obbligatorio con causale consegna_beneficiario.
+     * @minimum 1
+     */
+  beneficiarioId?: number;
+  /** Obbligatorio con causale consegna_beneficiario. */
+  canaleOperativo?: ScaricoInputCanaleOperativo;
   causaleAltro?: string;
   note?: string;
   righe: ScaricoRigaInput[];
@@ -4183,8 +5024,7 @@ export interface SessioneCassaEmporioAperturaInput {
 
 export interface SessioneCassaEmporioAggiungiProdottoInput {
   prodottoId: number;
-  /** @minimum 0.01 */
-  quantita: number;
+  quantita: QuantitaContabile;
   /** @minimum 1 */
   versione: number;
   /** @nullable */
@@ -4192,8 +5032,7 @@ export interface SessioneCassaEmporioAggiungiProdottoInput {
 }
 
 export interface SessioneCassaEmporioAggiornaRigaInput {
-  /** @minimum 0.01 */
-  quantita: number;
+  quantita: QuantitaContabile;
   /** @minimum 1 */
   versione: number;
   /** @nullable */
@@ -4643,7 +5482,7 @@ export interface BollaDettaglio {
 export interface BollaRigaInput {
   prodottoId: number;
   lottoId?: number;
-  quantita: number;
+  quantita: QuantitaContabile;
   unitaMisura: string;
   note?: string;
 }
@@ -5598,10 +6437,15 @@ export interface MensaGiacenza {
   nome: string;
   unitaMisura: string;
   quantita: number;
+  quantitaPrecisa?: QuantitaContabile;
   giacenzaFisica: number;
+  giacenzaFisicaPrecisa?: QuantitaContabile;
   giacenzaDistribuibile: number;
+  giacenzaDistribuibilePrecisa?: QuantitaContabile;
   impegnato: number;
+  impegnatoPreciso?: QuantitaContabile;
   disponibileReale: number;
+  disponibileRealePrecisa?: QuantitaContabile;
 }
 
 export type MensaConsumoInputTipoServizio = typeof MensaConsumoInputTipoServizio[keyof typeof MensaConsumoInputTipoServizio];
@@ -5625,8 +6469,7 @@ export interface MensaConsumoInput {
   dataServizio: string;
   tipoServizio: MensaConsumoInputTipoServizio;
   prodottoId: number;
-  /** @exclusiveMinimum 0 */
-  quantita: number;
+  quantita: QuantitaContabile;
   causale: MensaConsumoInputCausale;
   /**
      * @maxLength 2000
@@ -5794,8 +6637,7 @@ export interface MensaTrasferimentiPage {
 
 export type MensaTrasferimentoInputRigheItem = {
   prodottoId: number;
-  /** @exclusiveMinimum 0 */
-  quantita: number;
+  quantita: QuantitaContabile;
   /** Campo legacy opzionale. Se valorizzato deve coincidere con l'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura. */
   unitaMisura?: string;
   /** @nullable */
@@ -6145,6 +6987,108 @@ export interface RuoloUpdate {
 }
 
 /**
+ * Richiesta FSE+ non valida
+ */
+export type FseBadRequestResponse = FseErrorResponse;
+
+/**
+ * Permesso o scope FSE+ non consentito
+ */
+export type FseForbiddenResponse = FseErrorResponse;
+
+/**
+ * Risorsa FSE+ non trovata
+ */
+export type FseNotFoundResponse = FseErrorResponse;
+
+/**
+ * Versione, cutoff, copertura o concorrenza non validi
+ */
+export type FseConflictResponse = FseErrorResponse;
+
+/**
+ * Payload FSE+ oltre il limite operativo
+ */
+export type FsePayloadTooLargeResponse = FseErrorResponse;
+
+/**
+ * Richiesta AGEA non valida
+ */
+export type AgeaBadRequestResponse = AgeaErrorResponse;
+
+/**
+ * Permesso o scope AGEA non consentito
+ */
+export type AgeaForbiddenResponse = AgeaErrorResponse;
+
+/**
+ * Risorsa AGEA non trovata
+ */
+export type AgeaNotFoundResponse = AgeaErrorResponse;
+
+/**
+ * Versione, preflight o concorrenza AGEA non validi
+ */
+export type AgeaConflictResponse = AgeaErrorResponse;
+
+/**
+ * Limite di 10 MB superato
+ */
+export type AgeaPayloadTooLargeResponse = AgeaErrorResponse;
+
+/**
+ * MIME XLSX richiesto
+ */
+export type AgeaUnsupportedMediaTypeResponse = AgeaErrorResponse;
+
+export type FseMagazzinoIdParameter = number;
+
+export type FseOptionalMagazzinoIdParameter = number;
+
+export type FseOptionalDataDaParameter = string;
+
+export type FseOptionalDataAParameter = string;
+
+export type FseOptionalStatoParameter = string;
+
+export type FseDataDaParameter = string;
+
+export type FseDataAParameter = string;
+
+export type FseDataAsOfParameter = string;
+
+export type FseIncludeArretratiParameter = boolean;
+
+export type FsePageParameter = number;
+
+export type FsePageSizeParameter = number;
+
+export type FseQueueStatoParameter = typeof FseQueueStatoParameter[keyof typeof FseQueueStatoParameter];
+
+
+export const FseQueueStatoParameter = {
+  DA_RENDICONTARE: 'DA_RENDICONTARE',
+  ARRETRATO_NON_RENDICONTATO: 'ARRETRATO_NON_RENDICONTATO',
+  BLOCCATO: 'BLOCCATO',
+} as const;
+
+export type FseQueueCanaleParameter = string;
+
+export type FseQueueFondoParameter = string;
+
+export type FseQueueProdottoIdParameter = number;
+
+export type FseQueueQualityCodeParameter = string;
+
+export type FseDownloadRepresentationParameter = typeof FseDownloadRepresentationParameter[keyof typeof FseDownloadRepresentationParameter];
+
+
+export const FseDownloadRepresentationParameter = {
+  FSE_CANONICAL_AUDIT_XLSX_V1: 'FSE_CANONICAL_AUDIT_XLSX_V1',
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1: 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1',
+} as const;
+
+/**
  * Pagina richiesta, indicizzata da 1
  */
 export type PageParamParameter = number;
@@ -6204,10 +7148,251 @@ tipo?: string;
 search?: string;
 };
 
+export type ListCarichiParams = {
+magazzinoId?: number;
+origineCarico?: OrigineCarico;
+da?: string;
+a?: string;
+};
+
+export type AnalyzeAgeaImportazioneParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: number;
+modalita: AgeaImportModalita;
+/**
+ * @maxLength 255
+ * @pattern .*\.xlsx$
+ */
+nomeFile: string;
+};
+
+export type ListAgeaImportazioneRigheParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+stato?: string;
+fondo?: string;
+tipo?: AgeaTipoMovimento;
+/**
+ * @maxLength 100
+ */
+q?: string;
+};
+
+export type GetFseReportingPreviewParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: FseMagazzinoIdParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
+dataAsOf?: FseDataAsOfParameter;
+includeArretrati?: FseIncludeArretratiParameter;
+};
+
+export type ListFseReportingEventsParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: FseMagazzinoIdParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
+includeArretrati?: FseIncludeArretratiParameter;
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+statoRendicontazione?: FseQueueStatoParameter;
+canale?: FseQueueCanaleParameter;
+fondo?: FseQueueFondoParameter;
+/**
+ * @minimum 1
+ */
+prodottoId?: FseQueueProdottoIdParameter;
+qualityCode?: FseQueueQualityCodeParameter;
+};
+
+export type ListFseReportingLinesParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: FseMagazzinoIdParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
+includeArretrati?: FseIncludeArretratiParameter;
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+statoRendicontazione?: FseQueueStatoParameter;
+canale?: FseQueueCanaleParameter;
+fondo?: FseQueueFondoParameter;
+/**
+ * @minimum 1
+ */
+prodottoId?: FseQueueProdottoIdParameter;
+qualityCode?: FseQueueQualityCodeParameter;
+};
+
+export type ListFseReportingQualityParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: FseMagazzinoIdParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
+includeArretrati?: FseIncludeArretratiParameter;
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+statoRendicontazione?: FseQueueStatoParameter;
+canale?: FseQueueCanaleParameter;
+fondo?: FseQueueFondoParameter;
+/**
+ * @minimum 1
+ */
+prodottoId?: FseQueueProdottoIdParameter;
+qualityCode?: FseQueueQualityCodeParameter;
+};
+
+export type ListFseExportsParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+/**
+ * @minimum 1
+ */
+magazzinoId?: FseOptionalMagazzinoIdParameter;
+dataCompetenzaDa?: FseOptionalDataDaParameter;
+dataCompetenzaA?: FseOptionalDataAParameter;
+/**
+ * @maxLength 60
+ */
+stato?: FseOptionalStatoParameter;
+};
+
+export type ListFseExportEventsParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseExportLinesParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type DownloadFseExportParams = {
+/**
+ * Rappresentazione derivata dallo stesso snapshot immutabile
+ */
+representation?: FseDownloadRepresentationParameter;
+};
+
+export type ListFseReconciliationsParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+/**
+ * @minimum 1
+ */
+magazzinoId?: FseOptionalMagazzinoIdParameter;
+dataCompetenzaDa?: FseOptionalDataDaParameter;
+dataCompetenzaA?: FseOptionalDataAParameter;
+/**
+ * @maxLength 60
+ */
+stato?: FseOptionalStatoParameter;
+};
+
+export type ListFseReconciliationLinesParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+};
+
+export type ListFseMonitoringParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+/**
+ * @minimum 1
+ */
+magazzinoId?: FseOptionalMagazzinoIdParameter;
+dataCompetenzaDa?: FseOptionalDataDaParameter;
+dataCompetenzaA?: FseOptionalDataAParameter;
+};
+
 export type ListLottiParams = {
 prodottoId?: number;
 magazzinoId?: number;
 inScadenza?: boolean;
+fondoOrigine?: FondoOrigine;
+/**
+ * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
+ */
+origineCaricoPresente?: OrigineCarico;
 };
 
 export type ListMovimentiParams = {
@@ -6217,6 +7402,9 @@ prodottoId?: number;
 centroAscoltoId?: number;
 da?: string;
 a?: string;
+fondoOrigine?: FondoOrigine;
+naturaContabile?: string;
+canaleOperativo?: string;
 /**
  * @minimum 1
  */
@@ -6232,6 +7420,10 @@ export type ListGiacenzeParams = {
 magazzinoId?: number;
 sottoscortaOnly?: boolean;
 fsePlusOnly?: boolean;
+prodottoId?: number;
+fondoOrigine?: FondoOrigine;
+scadenzaDa?: string;
+scadenzaA?: string;
 };
 
 export type GetPreparazioneConsegneParams = {

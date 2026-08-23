@@ -1,36 +1,5 @@
 import express, { type Express, type RequestHandler, type Router } from "express";
-import {
-  db,
-  centriAscoltoTable,
-  magazziniTable,
-  beneficiariTable,
-  prodottiTable,
-  fornitoriTable,
-  volontariTable,
-  mezziTable,
-  ruoliTable,
-  utentiTable,
-  lottiTable,
-  scarichiTable,
-  scaricoRigheTable,
-  approvvigionamentiTable,
-  approvvigionamentoRigheTable,
-  consegneTable,
-  bolleTable,
-  bollaRigheTable,
-  prenotazioniMagazzinoTable,
-  interventiTable,
-  trasferimentiTable,
-  trasferimentoRigheTable,
-  movimentiTable,
-  turniTable,
-  turniConsegneTable,
-  turniVolontariTable,
-  areeOperativeTable,
-  zoneUdsTable,
-  auditConfigurazioniTable,
-  ruoliVolontariTable,
-} from "@workspace/db";
+import { db, centriAscoltoTable, magazziniTable, beneficiariTable, prodottiTable, fornitoriTable, volontariTable, mezziTable, ruoliTable, utentiTable, lottiTable, scarichiTable, scaricoRigheTable, approvvigionamentiTable, approvvigionamentoRigheTable, consegneTable, bolleTable, bollaRigheTable, prenotazioniMagazzinoTable, interventiTable, trasferimentiTable, trasferimentoRigheTable, movimentiTable, turniTable, turniConsegneTable, turniVolontariTable, areeOperativeTable, zoneUdsTable, auditConfigurazioniTable, ruoliVolontariTable, carichiMagazzinoRigheTable, carichiMagazzinoTable, operazioniDistribuzioneMagazzinoTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 
 /**
@@ -80,49 +49,7 @@ export function makeScopedApp(
       zonaUdsId: user.zonaUdsId ?? null,
       aree: user.aree ?? ["sociale", "uds", "magazzino"],
       // Questi test isolano lo scoping territoriale, non l'RBAC.
-      permessi: user.permessi ?? [
-        "beneficiari.view",
-        "beneficiari.manage",
-        "beneficiari.sensitive.view",
-        "beneficiari.deactivate",
-        "sociale.interventi.view",
-        "sociale.interventi.create",
-        "sociale.interventi.update",
-        "sociale.interventi.complete",
-        "sociale.interventi.cancel",
-        "uds.directory.view",
-        "uds.interventi.view",
-        "uds.interventi.create",
-        "uds.interventi.update",
-        "uds.interventi.note",
-        "uds.bisogni.manage",
-        "uds.reports.view",
-        "magazzino.view",
-        "magazzino.products.manage",
-        "magazzino.stock.receive",
-        "magazzino.stock.issue",
-        "magazzino.stock.adjust",
-        "magazzino.transfers.create",
-        "magazzino.transfers.dispatch",
-        "magazzino.transfers.receive",
-        "bolle.view",
-        "bolle.manage",
-        "bolle.deliver",
-        "bolle.cancel",
-        "approvvigionamenti.view",
-        "approvvigionamenti.manage",
-        "approvvigionamenti.receive",
-        "logistica.volontari.view",
-        "logistica.volontari.manage",
-        "logistica.volontari.export",
-        "logistica.mezzi.view",
-        "logistica.mezzi.manage",
-        "logistica.mezzi.export",
-        "logistica.turni.view",
-        "logistica.turni.manage",
-        "logistica.approvazioni.view",
-        "logistica.approvazioni.manage",
-      ],
+      permessi: user.permessi ?? ["beneficiari.view", "beneficiari.manage", "beneficiari.sensitive.view", "beneficiari.deactivate", "sociale.interventi.view", "sociale.interventi.create", "sociale.interventi.update", "sociale.interventi.complete", "sociale.interventi.cancel", "uds.directory.view", "uds.interventi.view", "uds.interventi.create", "uds.interventi.update", "uds.interventi.note", "uds.bisogni.manage", "uds.reports.view", "magazzino.view", "magazzino.fse.view", "magazzino.products.manage", "magazzino.stock.receive", "magazzino.stock.issue", "magazzino.stock.adjust", "magazzino.transfers.create", "magazzino.transfers.dispatch", "magazzino.transfers.receive", "bolle.view", "bolle.manage", "bolle.deliver", "bolle.cancel", "approvvigionamenti.view", "approvvigionamenti.manage", "approvvigionamenti.receive", "logistica.volontari.view", "logistica.volontari.manage", "logistica.volontari.export", "logistica.mezzi.view", "logistica.mezzi.manage", "logistica.mezzi.export", "logistica.turni.view", "logistica.turni.manage", "logistica.approvazioni.view", "logistica.approvazioni.manage"],
       isAdmin: user.isAdmin ?? false,
       isSuperAdmin: user.isSuperAdmin ?? false,
     };
@@ -204,19 +131,13 @@ export function newScope(): SeedScope {
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
 export async function createCentro(scope: SeedScope, nome = `Centro ${rnd()}`): Promise<number> {
-  const [c] = await db
-    .insert(centriAscoltoTable)
-    .values({ nome })
-    .returning({ id: centriAscoltoTable.id });
+  const [c] = await db.insert(centriAscoltoTable).values({ nome }).returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return c.id;
 }
 
 /** Like {@link createCentro} but accepts a area operativa and returns id + nome. */
-export async function createCentroRec(
-  scope: SeedScope,
-  opts: { areaOperativaId?: number | null; nome?: string } = {},
-): Promise<{ id: number; nome: string }> {
+export async function createCentroRec(scope: SeedScope, opts: { areaOperativaId?: number | null; nome?: string } = {}): Promise<{ id: number; nome: string }> {
   const nome = opts.nome ?? `Centro ${rnd()}`;
   const [c] = await db
     .insert(centriAscoltoTable)
@@ -226,29 +147,31 @@ export async function createCentroRec(
   return { id: c.id, nome };
 }
 
-export async function createMagazzino(
-  scope: SeedScope,
-  centroId: number | null,
-  opts: { areaOperativaId?: number | null } = {},
-): Promise<number> {
+export async function createMagazzino(scope: SeedScope, centroId: number | null, opts: { areaOperativaId?: number | null } = {}): Promise<number> {
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `MAG-${rnd()}`, nome: `Mag ${rnd()}`, centroAscoltoId: centroId, areaOperativaId: opts.areaOperativaId ?? null })
+    .values({
+      codice: `MAG-${rnd()}`,
+      nome: `Mag ${rnd()}`,
+      centroAscoltoId: centroId,
+      areaOperativaId: opts.areaOperativaId ?? null,
+    })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
   return m.id;
 }
 
 /** Like {@link createMagazzino} but also returns the generated unique nome. */
-export async function createMagazzinoRec(
-  scope: SeedScope,
-  centroId: number | null,
-  opts: { areaOperativaId?: number | null } = {},
-): Promise<{ id: number; nome: string }> {
+export async function createMagazzinoRec(scope: SeedScope, centroId: number | null, opts: { areaOperativaId?: number | null } = {}): Promise<{ id: number; nome: string }> {
   const nome = `Mag ${rnd()}`;
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `MAG-${rnd()}`, nome, centroAscoltoId: centroId, areaOperativaId: opts.areaOperativaId ?? null })
+    .values({
+      codice: `MAG-${rnd()}`,
+      nome,
+      centroAscoltoId: centroId,
+      areaOperativaId: opts.areaOperativaId ?? null,
+    })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
   return { id: m.id, nome };
@@ -257,7 +180,12 @@ export async function createMagazzinoRec(
 export async function createBeneficiario(
   scope: SeedScope,
   centroId: number | null,
-  opts: { uds?: boolean; areaOperativaId?: number | null; zonaUdsId?: number | null; sesso?: string } = {},
+  opts: {
+    uds?: boolean;
+    areaOperativaId?: number | null;
+    zonaUdsId?: number | null;
+    sesso?: string;
+  } = {},
 ): Promise<number> {
   const [b] = await db
     .insert(beneficiariTable)
@@ -287,10 +215,7 @@ export async function createAreaOperativa(scope: SeedScope): Promise<number> {
 
 export async function createZona(scope: SeedScope, areaOperativaId: number): Promise<{ id: number; nome: string }> {
   const nome = `Zona ${rnd()}`;
-  const [z] = await db
-    .insert(zoneUdsTable)
-    .values({ areaOperativaId, nome })
-    .returning({ id: zoneUdsTable.id });
+  const [z] = await db.insert(zoneUdsTable).values({ areaOperativaId, nome }).returning({ id: zoneUdsTable.id });
   scope.zonaIds.push(z.id);
   return { id: z.id, nome };
 }
@@ -310,10 +235,7 @@ export async function createProdotto(scope: SeedScope): Promise<number> {
   return p.id;
 }
 
-export async function createFornitore(
-  scope: SeedScope,
-  areaOperativaId: number | null,
-): Promise<number> {
+export async function createFornitore(scope: SeedScope, areaOperativaId: number | null): Promise<number> {
   const [f] = await db
     .insert(fornitoriTable)
     .values({ nome: `Fornitore ${rnd()}`, tipo: "azienda", areaOperativaId })
@@ -322,10 +244,7 @@ export async function createFornitore(
   return f.id;
 }
 
-export async function createVolontario(
-  scope: SeedScope,
-  centroId: number | null,
-): Promise<number> {
+export async function createVolontario(scope: SeedScope, centroId: number | null): Promise<number> {
   const [v] = await db
     .insert(volontariTable)
     .values({
@@ -341,22 +260,19 @@ export async function createVolontario(
   return v.id;
 }
 
-export async function createRuoloVolontario(
-  scope: SeedScope,
-  opts: { nome?: string; attivo?: boolean } = {},
-): Promise<number> {
+export async function createRuoloVolontario(scope: SeedScope, opts: { nome?: string; attivo?: boolean } = {}): Promise<number> {
   const [ruolo] = await db
     .insert(ruoliVolontariTable)
-    .values({ nome: opts.nome ?? `Ruolo volontario ${rnd()}`, attivo: opts.attivo ?? true })
+    .values({
+      nome: opts.nome ?? `Ruolo volontario ${rnd()}`,
+      attivo: opts.attivo ?? true,
+    })
     .returning({ id: ruoliVolontariTable.id });
   scope.ruoloVolontarioIds.push(ruolo.id);
   return ruolo.id;
 }
 
-export async function createMezzo(
-  scope: SeedScope,
-  opts: { centroId?: number | null; volontarioId?: number | null } = {},
-): Promise<number> {
+export async function createMezzo(scope: SeedScope, opts: { centroId?: number | null; volontarioId?: number | null } = {}): Promise<number> {
   const [m] = await db
     .insert(mezziTable)
     .values({
@@ -373,22 +289,20 @@ export async function createMezzo(
   return m.id;
 }
 
-export async function createRuolo(
-  scope: SeedScope,
-  opts: { isAdmin?: boolean } = {},
-): Promise<number> {
+export async function createRuolo(scope: SeedScope, opts: { isAdmin?: boolean } = {}): Promise<number> {
   const [r] = await db
     .insert(ruoliTable)
-    .values({ nome: `Ruolo ${rnd()}`, aree: [], isAdmin: opts.isAdmin ?? false })
+    .values({
+      nome: `Ruolo ${rnd()}`,
+      aree: [],
+      isAdmin: opts.isAdmin ?? false,
+    })
     .returning({ id: ruoliTable.id });
   scope.ruoloIds.push(r.id);
   return r.id;
 }
 
-export async function createUtente(
-  scope: SeedScope,
-  opts: { centroId?: number | null; ruoloId?: number | null } = {},
-): Promise<number> {
+export async function createUtente(scope: SeedScope, opts: { centroId?: number | null; ruoloId?: number | null } = {}): Promise<number> {
   const [u] = await db
     .insert(utentiTable)
     .values({
@@ -422,20 +336,18 @@ export async function createLotto(
       magazzinoId: opts.magazzinoId,
       dataCarico: "2026-01-01",
       dataScadenza: opts.dataScadenza ?? null,
-      quantitaCaricata: opts.quantita.toFixed(2),
-      quantitaResidua: opts.quantita.toFixed(2),
-      fornitoreId: opts.fsePlus ? null : opts.fornitoreId ?? null,
+      quantitaCaricata: opts.quantita.toFixed(6),
+      quantitaResidua: opts.quantita.toFixed(6),
+      fornitoreId: opts.fsePlus ? null : (opts.fornitoreId ?? null),
       fsePlus: opts.fsePlus ?? false,
+      fondoOrigine: opts.fsePlus ? "FSE_PLUS" : "NESSUN_FONDO",
     })
     .returning({ id: lottiTable.id });
   scope.lottoIds.push(l.id);
   return l.id;
 }
 
-export async function insertScarico(
-  scope: SeedScope,
-  opts: { magazzinoId: number; centroId: number | null },
-): Promise<number> {
+export async function insertScarico(scope: SeedScope, opts: { magazzinoId: number; centroId: number | null }): Promise<number> {
   const [s] = await db
     .insert(scarichiTable)
     .values({
@@ -450,10 +362,7 @@ export async function insertScarico(
   return s.id;
 }
 
-export async function insertApprovvigionamento(
-  scope: SeedScope,
-  opts: { magazzinoId: number; centroId: number | null },
-): Promise<number> {
+export async function insertApprovvigionamento(scope: SeedScope, opts: { magazzinoId: number; centroId: number | null }): Promise<number> {
   const [a] = await db
     .insert(approvvigionamentiTable)
     .values({
@@ -551,7 +460,13 @@ export async function insertTurno(
 /** Inserts a bolla riga (cleaned up with its bolla in {@link cleanup}). */
 export async function insertBollaRiga(
   scope: SeedScope,
-  opts: { bollaId: number; prodottoId: number; lottoId?: number | null; quantita: number; unitaMisura?: string },
+  opts: {
+    bollaId: number;
+    prodottoId: number;
+    lottoId?: number | null;
+    quantita: number;
+    unitaMisura?: string;
+  },
 ): Promise<number> {
   void scope;
   const [r] = await db
@@ -560,7 +475,7 @@ export async function insertBollaRiga(
       bollaId: opts.bollaId,
       prodottoId: opts.prodottoId,
       lottoId: opts.lottoId ?? null,
-      quantita: opts.quantita.toFixed(2),
+      quantita: opts.quantita.toFixed(6),
       unitaMisura: opts.unitaMisura ?? "kg",
     })
     .returning({ id: bollaRigheTable.id });
@@ -587,7 +502,7 @@ export async function insertPrenotazioneMagazzino(
       prodottoId: opts.prodottoId,
       lottoId: opts.lottoId,
       magazzinoId: opts.magazzinoId,
-      quantita: opts.quantita.toFixed(2),
+      quantita: opts.quantita.toFixed(6),
       stato: opts.stato ?? "attiva",
     })
     .returning({ id: prenotazioniMagazzinoTable.id });
@@ -621,10 +536,7 @@ export async function insertIntervento(
   return i.id;
 }
 
-export async function insertTrasferimento(
-  scope: SeedScope,
-  opts: { origineId: number; destinoId: number },
-): Promise<number> {
+export async function insertTrasferimento(scope: SeedScope, opts: { origineId: number; destinoId: number }): Promise<number> {
   const [t] = await db
     .insert(trasferimentiTable)
     .values({
@@ -641,19 +553,31 @@ export async function insertTrasferimento(
 /** Inserts a movimento row (cleaned up via its magazzino in {@link cleanup}). */
 export async function insertMovimento(
   scope: SeedScope,
-  opts: { magazzinoId: number; prodottoId: number },
+  opts: {
+    magazzinoId: number;
+    prodottoId: number;
+    lottoId?: number | null;
+    bollaRigaId?: number | null;
+    tipoMovimento?: typeof movimentiTable.$inferInsert.tipoMovimento;
+    naturaContabile?: typeof movimentiTable.$inferInsert.naturaContabile;
+    fondoOrigine?: typeof movimentiTable.$inferInsert.fondoOrigine;
+  },
 ): Promise<number> {
   void scope;
   const [m] = await db
     .insert(movimentiTable)
     .values({
-      tipoMovimento: "carico",
+      tipoMovimento: opts.tipoMovimento ?? "carico",
       tipoDettaglio: "donazione",
       dataMovimento: "2026-06-01",
       magazzinoId: opts.magazzinoId,
       prodottoId: opts.prodottoId,
+      lottoId: opts.lottoId ?? null,
+      bollaRigaId: opts.bollaRigaId ?? null,
       quantita: "1.00",
       unitaMisura: "kg",
+      naturaContabile: opts.naturaContabile,
+      fondoOrigine: opts.fondoOrigine,
     })
     .returning({ id: movimentiTable.id });
   return m.id;
@@ -663,14 +587,13 @@ export async function insertMovimento(
 export async function cleanup(scope: SeedScope): Promise<void> {
   if (scope.magazzinoIds.length > 0) {
     await db.delete(movimentiTable).where(inArray(movimentiTable.magazzinoId, scope.magazzinoIds));
+    await db.delete(carichiMagazzinoRigheTable).where(inArray(carichiMagazzinoRigheTable.lottoId, db.select({ id: lottiTable.id }).from(lottiTable).where(inArray(lottiTable.magazzinoId, scope.magazzinoIds))));
+    await db.delete(carichiMagazzinoTable).where(inArray(carichiMagazzinoTable.magazzinoId, scope.magazzinoIds));
+    await db.delete(operazioniDistribuzioneMagazzinoTable).where(inArray(operazioniDistribuzioneMagazzinoTable.magazzinoId, scope.magazzinoIds));
   }
   if (scope.trasferimentoIds.length > 0) {
-    await db
-      .delete(trasferimentoRigheTable)
-      .where(inArray(trasferimentoRigheTable.trasferimentoId, scope.trasferimentoIds));
-    await db
-      .delete(trasferimentiTable)
-      .where(inArray(trasferimentiTable.id, scope.trasferimentoIds));
+    await db.delete(trasferimentoRigheTable).where(inArray(trasferimentoRigheTable.trasferimentoId, scope.trasferimentoIds));
+    await db.delete(trasferimentiTable).where(inArray(trasferimentiTable.id, scope.trasferimentoIds));
   }
   if (scope.interventoIds.length > 0) {
     await db.delete(interventiTable).where(inArray(interventiTable.id, scope.interventoIds));
@@ -698,14 +621,8 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(scarichiTable).where(inArray(scarichiTable.id, scope.scaricoIds));
   }
   if (scope.approvvigionamentoIds.length > 0) {
-    await db
-      .delete(approvvigionamentoRigheTable)
-      .where(
-        inArray(approvvigionamentoRigheTable.approvvigionamentoId, scope.approvvigionamentoIds),
-      );
-    await db
-      .delete(approvvigionamentiTable)
-      .where(inArray(approvvigionamentiTable.id, scope.approvvigionamentoIds));
+    await db.delete(approvvigionamentoRigheTable).where(inArray(approvvigionamentoRigheTable.approvvigionamentoId, scope.approvvigionamentoIds));
+    await db.delete(approvvigionamentiTable).where(inArray(approvvigionamentiTable.id, scope.approvvigionamentoIds));
   }
   if (scope.lottoIds.length > 0) {
     await db.delete(lottiTable).where(inArray(lottiTable.id, scope.lottoIds));
@@ -733,9 +650,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   }
   if (scope.utenteIds.length > 0) {
     await db.delete(interventiTable).where(inArray(interventiTable.operatoreId, scope.utenteIds));
-    await db
-      .delete(auditConfigurazioniTable)
-      .where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
+    await db.delete(auditConfigurazioniTable).where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
     await db.delete(utentiTable).where(inArray(utentiTable.id, scope.utenteIds));
   }
   if (scope.ruoloIds.length > 0) {

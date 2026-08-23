@@ -1,21 +1,31 @@
 import {
   db,
+  type CanaleOperativo,
   lottiTable,
   movimentiTable,
   prenotazioniMagazzinoTable,
   scarichiTable,
   scaricoRigheTable,
 } from "@workspace/db";
-import { and, asc, eq, gt, sum, type SQL } from "drizzle-orm";
-import {
-  PRENOTAZIONE_MAGAZZINO_ATTIVA,
-  parseDbNumber,
-} from "./disponibilitaMagazzino";
+import { and, asc, eq, gt, inArray, sum, type SQL } from "drizzle-orm";
+import { PRENOTAZIONE_MAGAZZINO_ATTIVA } from "./disponibilitaMagazzino";
 import {
   isLottoDistribuibile,
   lottoSelectionCondition,
   type LottoSelectionPolicy,
 } from "./lottoPolicy";
+import {
+  InventoryDecimal,
+  InventoryDecimalError,
+  positiveInventoryDecimal,
+} from "./inventoryDecimal";
+import {
+  ensureDistributionOperation,
+  markDistributionOperationReversed,
+  reconcileDistributionOperationState,
+  type DistributionOperationInput,
+} from "./distributionLedger";
+import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
 
 export type InventoryTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
@@ -25,12 +35,28 @@ export class InventoryError extends Error {}
 
 export interface ScaricoInventarialeRiga {
   prodottoId: number;
-  quantita: number;
+  quantita: string | number;
   unitaMisura: string;
+  lottoId?: number | null;
+  rigaOrigineId?: number | null;
   note?: string | null;
 }
 
-interface ScaricoInventarialeInput {
+export interface InventorySourceContext {
+  naturaContabile:
+    | "DISTRIBUZIONE_FINALE"
+    | "SCARTO"
+    | "RESO"
+    | "RETTIFICA_NEGATIVA"
+    | "ALTRO";
+  dominioOrigine: string;
+  entitaOrigineTipo: string;
+  entitaOrigineId: number;
+  canaleOperativo?: CanaleOperativo | null;
+  operazioneDistribuzioneId?: number | null;
+}
+
+export interface ScaricoInventarialeInput {
   codice: string;
   magazzinoId: number;
   centroAscoltoId: number | null;
@@ -42,6 +68,12 @@ interface ScaricoInventarialeInput {
   beneficiarioId?: number | null;
   documentoRiferimento?: string | null;
   lottoPolicy?: LottoSelectionPolicy;
+  allowedFondiOrigine?: string[];
+  source?: InventorySourceContext;
+  operazioneDistribuzione?: Omit<
+    DistributionOperationInput,
+    "magazzinoId" | "dataDistribuzione" | "creatoDa"
+  >;
   righe: ScaricoInventarialeRiga[];
 }
 
@@ -51,12 +83,13 @@ interface StornoScaricoInventarialeInput {
   operatoreId: number;
   tipoDettaglio: string;
   note: string;
+  rejectAlreadyReversed?: boolean;
 }
 
 async function impegnatoAttivoLotto(
   tx: InventoryTransaction,
   lottoId: number,
-): Promise<number> {
+): Promise<InventoryDecimal> {
   const [result] = await tx
     .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
     .from(prenotazioniMagazzinoTable)
@@ -66,15 +99,23 @@ async function impegnatoAttivoLotto(
         eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
       ),
     );
-  return parseDbNumber(result?.totale);
+  return InventoryDecimal.parse(result?.totale ?? "0");
 }
 
 async function scaricaRigaFefo(
   tx: InventoryTransaction,
   input: ScaricoInventarialeInput,
   riga: ScaricoInventarialeRiga,
+  operationId: number | null,
 ): Promise<void> {
-  let rimanente = riga.quantita;
+  let rimanente: InventoryDecimal;
+  try {
+    rimanente = positiveInventoryDecimal(riga.quantita);
+  } catch (error) {
+    if (error instanceof InventoryDecimalError)
+      throw new InventoryError(error.message);
+    throw error;
+  }
   const policyCondition = lottoSelectionCondition(
     input.lottoPolicy ?? "distribuibile",
     input.dataScarico,
@@ -85,6 +126,11 @@ async function scaricaRigaFefo(
     gt(lottiTable.quantitaResidua, "0"),
   ];
   if (policyCondition) conditions.push(policyCondition);
+  if (input.allowedFondiOrigine?.length) {
+    conditions.push(
+      inArray(lottiTable.fondoOrigine, input.allowedFondiOrigine),
+    );
+  }
   const lotti = await tx
     .select()
     .from(lottiTable)
@@ -93,8 +139,8 @@ async function scaricaRigaFefo(
     .for("update");
 
   for (const lotto of lotti) {
-    if (rimanente <= 0) break;
-    const residua = parseDbNumber(lotto.quantitaResidua);
+    if (!rimanente.isPositive()) break;
+    const residua = InventoryDecimal.parse(lotto.quantitaResidua);
     // Una prenotazione resta un impegno operativo soltanto finché il lotto è
     // distribuibile. Se nel frattempo è scaduto, non deve impedire la rettifica
     // fisica amministrativa (`scaduta`, `deteriorata`, `rubata`, `altro`).
@@ -103,15 +149,21 @@ async function scaricaRigaFefo(
       input.dataScarico,
     )
       ? await impegnatoAttivoLotto(tx, lotto.id)
-      : 0;
-    const disponibile = Math.max(0, residua - impegnato);
-    const prelievo = Math.min(disponibile, rimanente);
-    if (prelievo <= 0) continue;
+      : InventoryDecimal.zero();
+    const netto = residua.subtract(impegnato);
+    const disponibile = netto.isNegative() ? InventoryDecimal.zero() : netto;
+    const prelievo = disponibile.min(rimanente);
+    if (!prelievo.isPositive()) continue;
 
     await tx
       .update(lottiTable)
-      .set({ quantitaResidua: (residua - prelievo).toFixed(2) })
+      .set({ quantitaResidua: residua.subtract(prelievo).toDb() })
       .where(eq(lottiTable.id, lotto.id));
+    const dimensions = resolveInventoryQuantityDimensions({
+      quantitaOperativa: prelievo.toDb(),
+      unitaMisura: riga.unitaMisura,
+      fattorePartita: lotto.fattoreKgLtPezzo,
+    });
     await tx.insert(movimentiTable).values({
       tipoMovimento: "scarico",
       tipoDettaglio: input.causale,
@@ -119,21 +171,106 @@ async function scaricaRigaFefo(
       magazzinoId: input.magazzinoId,
       prodottoId: riga.prodottoId,
       lottoId: lotto.id,
-      quantita: prelievo.toFixed(2),
+      quantita: prelievo.toDb(),
+      quantitaPezzi: dimensions.quantitaPezzi,
+      quantitaKgLt: dimensions.quantitaKgLt,
+      fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
       unitaMisura: riga.unitaMisura,
       beneficiarioId: input.beneficiarioId ?? null,
       operatoreId: input.operatoreId,
+      fondoOrigine: lotto.fondoOrigine,
+      naturaContabile: input.source?.naturaContabile ?? "ALTRO",
+      dominioOrigine: input.source?.dominioOrigine ?? "MAGAZZINO",
+      entitaOrigineTipo: input.source?.entitaOrigineTipo ?? "scarico",
+      entitaOrigineId: input.source?.entitaOrigineId ?? null,
+      rigaOrigineId: riga.rigaOrigineId ?? null,
+      operazioneDistribuzioneId: operationId,
+      canaleOperativo: input.source?.canaleOperativo ?? null,
       documentoRiferimento: input.documentoRiferimento ?? null,
       note: `Scarico ${input.codice}${riga.note ? ` — ${riga.note}` : ""}`,
     });
-    rimanente = Math.round((rimanente - prelievo) * 100) / 100;
+    rimanente = rimanente.subtract(prelievo);
   }
 
-  if (rimanente > 0) {
+  if (rimanente.isPositive()) {
     throw new InventoryError(
-      `Disponibilità insufficiente per il prodotto #${riga.prodottoId}: mancano ${rimanente}`,
+      `Disponibilità insufficiente per il prodotto #${riga.prodottoId}: mancano ${rimanente.toCanonical()}`,
     );
   }
+}
+
+async function scaricaRigaLottoEsatto(
+  tx: InventoryTransaction,
+  input: ScaricoInventarialeInput,
+  riga: ScaricoInventarialeRiga,
+  operationId: number | null,
+): Promise<void> {
+  const quantity = positiveInventoryDecimal(riga.quantita);
+  const [lotto] = await tx
+    .select()
+    .from(lottiTable)
+    .where(
+      and(
+        eq(lottiTable.id, riga.lottoId!),
+        eq(lottiTable.prodottoId, riga.prodottoId),
+        eq(lottiTable.magazzinoId, input.magazzinoId),
+      ),
+    )
+    .for("update");
+  if (!lotto)
+    throw new InventoryError("Lotto non compatibile con prodotto e Magazzino");
+  if (
+    input.allowedFondiOrigine?.length &&
+    !input.allowedFondiOrigine.includes(lotto.fondoOrigine)
+  ) {
+    throw new InventoryError("Lotto non compatibile con i Fondi ammessi");
+  }
+
+  const residua = InventoryDecimal.parse(lotto.quantitaResidua);
+  const impegnato = isLottoDistribuibile(lotto.dataScadenza, input.dataScarico)
+    ? await impegnatoAttivoLotto(tx, lotto.id)
+    : InventoryDecimal.zero();
+  const disponibile = residua.subtract(impegnato);
+  if (disponibile.isNegative() || quantity.compare(disponibile) > 0) {
+    throw new InventoryError(
+      `Disponibilita insufficiente sul Lotto #${lotto.id}`,
+    );
+  }
+
+  await tx
+    .update(lottiTable)
+    .set({ quantitaResidua: residua.subtract(quantity).toDb() })
+    .where(eq(lottiTable.id, lotto.id));
+  const dimensions = resolveInventoryQuantityDimensions({
+    quantitaOperativa: quantity.toDb(),
+    unitaMisura: riga.unitaMisura,
+    fattorePartita: lotto.fattoreKgLtPezzo,
+  });
+  await tx.insert(movimentiTable).values({
+    tipoMovimento: "scarico",
+    tipoDettaglio: input.causale,
+    dataMovimento: input.dataScarico,
+    magazzinoId: input.magazzinoId,
+    prodottoId: riga.prodottoId,
+    lottoId: lotto.id,
+    quantita: quantity.toDb(),
+    quantitaPezzi: dimensions.quantitaPezzi,
+    quantitaKgLt: dimensions.quantitaKgLt,
+    fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
+    unitaMisura: riga.unitaMisura,
+    beneficiarioId: input.beneficiarioId ?? null,
+    operatoreId: input.operatoreId,
+    fondoOrigine: lotto.fondoOrigine,
+    naturaContabile: input.source?.naturaContabile ?? "ALTRO",
+    dominioOrigine: input.source?.dominioOrigine ?? "MAGAZZINO",
+    entitaOrigineTipo: input.source?.entitaOrigineTipo ?? "scarico",
+    entitaOrigineId: input.source?.entitaOrigineId ?? null,
+    rigaOrigineId: riga.rigaOrigineId ?? null,
+    operazioneDistribuzioneId: operationId,
+    canaleOperativo: input.source?.canaleOperativo ?? null,
+    documentoRiferimento: input.documentoRiferimento ?? null,
+    note: `Scarico ${input.codice}${riga.note ? ` — ${riga.note}` : ""}`,
+  });
 }
 
 /**
@@ -162,17 +299,67 @@ export async function creaScaricoInventariale(
     })
     .returning({ id: scarichiTable.id });
 
+  const source =
+    input.source?.entitaOrigineId === 0
+      ? { ...input.source, entitaOrigineId: scarico.id }
+      : input.source;
+  let operationId = source?.operazioneDistribuzioneId ?? null;
+  if (input.operazioneDistribuzione) {
+    const operation = await ensureDistributionOperation(tx, {
+      ...input.operazioneDistribuzione,
+      entitaOrigineId:
+        input.operazioneDistribuzione.entitaOrigineId === 0
+          ? scarico.id
+          : input.operazioneDistribuzione.entitaOrigineId,
+      magazzinoId: input.magazzinoId,
+      dataDistribuzione: input.dataScarico,
+      creatoDa: input.operatoreId,
+    });
+    operationId = operation.id;
+  }
+  if (
+    source?.naturaContabile === "DISTRIBUZIONE_FINALE" &&
+    operationId == null
+  ) {
+    throw new InventoryError(
+      "Una distribuzione finale richiede una operazione di distribuzione strutturata",
+    );
+  }
+
+  const movementInput: ScaricoInventarialeInput = source
+    ? { ...input, source }
+    : {
+        ...input,
+        source: {
+          naturaContabile: ["deteriorata", "scaduta", "rubata"].includes(
+            input.causale,
+          )
+            ? "SCARTO"
+            : "ALTRO",
+          dominioOrigine: "MAGAZZINO",
+          entitaOrigineTipo: "scarico",
+          entitaOrigineId: scarico.id,
+        },
+      };
+
   await tx.insert(scaricoRigheTable).values(
     input.righe.map((riga) => ({
       scaricoId: scarico.id,
       prodottoId: riga.prodottoId,
-      quantita: riga.quantita.toFixed(2),
+      quantita: positiveInventoryDecimal(riga.quantita).toDb(),
       unitaMisura: riga.unitaMisura,
       note: riga.note ?? null,
     })),
   );
   for (const riga of input.righe) {
-    await scaricaRigaFefo(tx, input, riga);
+    if (riga.lottoId != null) {
+      await scaricaRigaLottoEsatto(tx, movementInput, riga, operationId);
+    } else {
+      await scaricaRigaFefo(tx, movementInput, riga, operationId);
+    }
+  }
+  if (movementInput.source?.naturaContabile === "DISTRIBUZIONE_FINALE") {
+    await reconcileDistributionOperationState(tx, operationId);
   }
   return scarico.id;
 }
@@ -211,13 +398,23 @@ export async function stornaScaricoInventariale(
       .where(eq(lottiTable.id, movement.lottoId))
       .for("update");
     if (!lotto) throw new InventoryError("Lotto storico non disponibile");
-    const quantity = parseDbNumber(movement.quantita);
+    const [alreadyReversed] = await tx
+      .select({ id: movimentiTable.id })
+      .from(movimentiTable)
+      .where(eq(movimentiTable.movimentoOrigineId, movement.id));
+    if (alreadyReversed) {
+      if (input.rejectAlreadyReversed) {
+        throw new InventoryError("Lo scarico e gia stato stornato");
+      }
+      continue;
+    }
+    const quantity = InventoryDecimal.parse(movement.quantita);
     await tx
       .update(lottiTable)
       .set({
-        quantitaResidua: (
-          parseDbNumber(lotto.quantitaResidua) + quantity
-        ).toFixed(2),
+        quantitaResidua: InventoryDecimal.parse(lotto.quantitaResidua)
+          .add(quantity)
+          .toDb(),
       })
       .where(eq(lottiTable.id, lotto.id));
     await tx.insert(movimentiTable).values({
@@ -227,13 +424,28 @@ export async function stornaScaricoInventariale(
       magazzinoId: movement.magazzinoId,
       prodottoId: movement.prodottoId,
       lottoId: movement.lottoId,
-      quantita: quantity.toFixed(2),
+      quantita: quantity.toDb(),
+      quantitaPezzi: movement.quantitaPezzi,
+      quantitaKgLt: movement.quantitaKgLt,
+      fattoreKgLtPezzo: movement.fattoreKgLtPezzo,
       unitaMisura: movement.unitaMisura,
       movimentoOrigineId: movement.id,
+      fondoOrigine: movement.fondoOrigine,
+      naturaContabile: "STORNO",
+      dominioOrigine: movement.dominioOrigine,
+      entitaOrigineTipo: movement.entitaOrigineTipo,
+      entitaOrigineId: movement.entitaOrigineId,
+      rigaOrigineId: movement.rigaOrigineId,
+      operazioneDistribuzioneId: movement.operazioneDistribuzioneId,
+      canaleOperativo: movement.canaleOperativo,
       operatoreId: input.operatoreId,
       documentoRiferimento: input.documentoRiferimento,
       note: input.note,
     });
+    await markDistributionOperationReversed(
+      tx,
+      movement.operazioneDistribuzioneId,
+    );
   }
   return movements.length;
 }

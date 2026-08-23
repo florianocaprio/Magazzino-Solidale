@@ -69,7 +69,7 @@ export async function buildPacchiReport(filters: ReportFilters) {
     rows<Record<string, unknown>>(sql`
       WITH consumo_lotti AS (
         SELECT mv.bolla_riga_id,
-               SUM(abs(mv.quantita::numeric)) FILTER (WHERE l.fse_plus = true) AS quantita_fse
+               SUM(abs(mv.quantita::numeric)) FILTER (WHERE mv.fondo_origine = 'FSE_PLUS') AS quantita_fse
         FROM movimenti mv
         JOIN lotti l ON l.id = mv.lotto_id
         WHERE mv.bolla_riga_id IS NOT NULL AND mv.tipo_movimento = 'scarico'
@@ -116,25 +116,19 @@ export async function buildPacchiReport(filters: ReportFilters) {
 
   const rowsTotal = products.reduce((sum, row) => sum + number(row.righe), 0);
   const distinctProducts = new Set(products.map((row) => number(row.prodotto_id))).size;
-  const calculableKg = products
-    .filter((row) => String(row.unita_misura).toLowerCase() === "kg")
-    .reduce((sum, row) => sum + number(row.quantita), 0);
+  const calculableKg = products.filter((row) => String(row.unita_misura).toLowerCase() === "kg").reduce((sum, row) => sum + number(row.quantita), 0);
   const dq = dataQuality[0] ?? {};
 
   return dashboard({
     section: "pacchi",
     filters,
-    kpi: [
-      kpi("pacchiDistribuiti", metrics.pacchi, "count", "pacchiDistribuiti"),
-      kpi("nucleiServiti", metrics.nuclei, "count", "nucleiServiti"),
-      kpi("personeRaggiunte", metrics.persone, "count", "personeRaggiunte"),
-      kpi("distribuzioniSede", metrics.sede),
-      kpi("distribuzioniDomiciliari", metrics.domiciliari),
-      kpi("prodottiDistinti", distinctProducts),
-      kpi("righeProdotto", rowsTotal),
-      kpi("kgCalcolabili", calculableKg, "kg"),
+    kpi: [kpi("pacchiDistribuiti", metrics.pacchi, "count", "pacchiDistribuiti"), kpi("nucleiServiti", metrics.nuclei, "count", "nucleiServiti"), kpi("personeRaggiunte", metrics.persone, "count", "personeRaggiunte"), kpi("distribuzioniSede", metrics.sede), kpi("distribuzioniDomiciliari", metrics.domiciliari), kpi("prodottiDistinti", distinctProducts), kpi("righeProdotto", rowsTotal), kpi("kgCalcolabili", calculableKg, "kg")],
+    series: [
+      {
+        key: "pacchiPerMese",
+        points: monthSeries(monthly, "totale", "nuclei"),
+      },
     ],
-    series: [{ key: "pacchiPerMese", points: monthSeries(monthly, "totale", "nuclei") }],
     tables: [
       {
         key: "prodotti",
@@ -159,18 +153,8 @@ export async function buildPacchiReport(filters: ReportFilters) {
         })),
       },
     ],
-    quality: [
-      quality("dataNascitaMancante", number(dq.nascita_mancante), number(dq.nascita_mancante) ? "derivable" : "ok"),
-      quality("sessoMancante", number(dq.sesso_mancante), number(dq.sesso_mancante) ? "derivable" : "ok"),
-      quality("nucleoIncompleto", number(dq.nucleo_incompleto), number(dq.nucleo_incompleto) ? "derivable" : "ok"),
-    ],
-    definitions: [
-      "Pacco distribuito = bolla nello stato consegnato nel periodo non associata a una spesa Emporio chiusa.",
-      "Nucleo servito = beneficiario distinto associato a una bolla consegnata.",
-      "Persone raggiunte = titolare più membri del nucleo registrati per i nuclei serviti.",
-      "La quantità FSE+ deriva esclusivamente dai lotti effettivamente scaricati.",
-      "Le quantità sono mostrate per prodotto e unità; soltanto i kg vengono aggregati nel KPI dedicato.",
-    ],
+    quality: [quality("dataNascitaMancante", number(dq.nascita_mancante), number(dq.nascita_mancante) ? "derivable" : "ok"), quality("sessoMancante", number(dq.sesso_mancante), number(dq.sesso_mancante) ? "derivable" : "ok"), quality("nucleoIncompleto", number(dq.nucleo_incompleto), number(dq.nucleo_incompleto) ? "derivable" : "ok")],
+    definitions: ["Pacco distribuito = bolla nello stato consegnato nel periodo non associata a una spesa Emporio chiusa.", "Nucleo servito = beneficiario distinto associato a una bolla consegnata.", "Persone raggiunte = titolare più membri del nucleo registrati per i nuclei serviti.", "La quantità FSE+ deriva dai Movimenti scaricati con snapshot Fondo FSE_PLUS.", "Le quantità sono mostrate per prodotto e unità; soltanto i kg vengono aggregati nel KPI dedicato."],
   });
 }
 

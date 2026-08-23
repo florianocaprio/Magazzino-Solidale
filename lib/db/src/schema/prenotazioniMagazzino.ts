@@ -16,7 +16,7 @@ export const prenotazioniMagazzinoTable = pgTable(
     prodottoId: integer("prodotto_id").notNull().references(() => prodottiTable.id),
     lottoId: integer("lotto_id").notNull().references(() => lottiTable.id),
     magazzinoId: integer("magazzino_id").notNull().references(() => magazziniTable.id),
-    quantita: decimal("quantita", { precision: 10, scale: 2 }).notNull(),
+    quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
     stato: varchar("stato", { length: 30 }).notNull().default("attiva"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

@@ -1,12 +1,4 @@
-export type ReportSection =
-  | "generale"
-  | "pacchi"
-  | "centro-ascolto"
-  | "emporio"
-  | "mensa"
-  | "uds"
-  | "magazzino-logistica"
-  | "fse-plus";
+export type ReportSection = "generale" | "pacchi" | "centro-ascolto" | "emporio" | "mensa" | "uds" | "magazzino-logistica" | "fse-plus";
 
 export type ReportAvailability = "ok" | "derivable" | "missing";
 
@@ -33,7 +25,8 @@ export type ReportFilters = {
 export type ReportKpi = {
   key: string;
   value: number | null;
-  unit: "count" | "quantity" | "kg" | "credit" | "days" | "average";
+  exactValue: string | null;
+  unit: "count" | "pieces" | "kgLt" | "percentage" | "credit" | "days" | "average" | "quantity" | "kg";
   availability: ReportAvailability;
   drilldownMetric: string | null;
 };
@@ -65,16 +58,9 @@ export type ReportQualityItem = {
 };
 
 export type ReportingDashboard = {
+  reportingModelVersion: "MAGAZZINO_2_0C_V1";
   section: ReportSection;
-  filters: Omit<
-    ReportFilters,
-    | "areaOperativaMode"
-    | "centroMode"
-    | "zonaMode"
-    | "callerAreas"
-    | "callerPermissions"
-    | "callerIsAdmin"
-  >;
+  filters: Omit<ReportFilters, "areaOperativaMode" | "centroMode" | "zonaMode" | "callerAreas" | "callerPermissions" | "callerIsAdmin">;
   kpi: ReportKpi[];
   series: ReportSeries[];
   tables: ReportTable[];
@@ -85,6 +71,7 @@ export type ReportingDashboard = {
 };
 
 export type ReportDrilldown = {
+  reportingModelVersion: "MAGAZZINO_2_0C_V1";
   section: ReportSection;
   metric: string;
   page: number;
@@ -95,14 +82,6 @@ export type ReportDrilldown = {
 };
 
 export function publicFilters(filters: ReportFilters): ReportingDashboard["filters"] {
-  const {
-    areaOperativaMode: _areaOperativaMode,
-    centroMode: _centroMode,
-    zonaMode: _zonaMode,
-    callerAreas: _callerAreas,
-    callerPermissions: _callerPermissions,
-    callerIsAdmin: _callerIsAdmin,
-    ...result
-  } = filters;
+  const { areaOperativaMode: _areaOperativaMode, centroMode: _centroMode, zonaMode: _zonaMode, callerAreas: _callerAreas, callerPermissions: _callerPermissions, callerIsAdmin: _callerIsAdmin, ...result } = filters;
   return result;
 }

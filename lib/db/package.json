@@ -8,7 +8,10 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "update": "node ./scripts/apply-updates.mjs",
+    "update": "node ./scripts/apply-updates.mjs update",
+    "migrations:status": "node ./scripts/apply-updates.mjs status",
+    "migrations:verify": "node ./scripts/apply-updates.mjs verify",
+    "test:migrations": "node --test ./scripts/migration-runner.test.mjs",
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
   },

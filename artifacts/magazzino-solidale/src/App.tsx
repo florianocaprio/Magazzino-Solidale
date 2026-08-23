@@ -696,7 +696,7 @@ function AppRoutes() {
           {() => (
             <Guard area="analisi">
               <RequireModulo codice="REPORT">
-                <ReportingRoute section="fse-plus" />
+                <ReportingRoute section="fse-plus" permission="magazzino.fse.view" />
               </RequireModulo>
             </Guard>
           )}

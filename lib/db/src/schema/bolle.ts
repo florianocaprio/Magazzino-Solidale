@@ -32,7 +32,7 @@ export const bollaRigheTable = pgTable("bolla_righe", {
   bollaId: integer("bolla_id").notNull(),
   prodottoId: integer("prodotto_id").notNull(),
   lottoId: integer("lotto_id"),
-  quantita: decimal("quantita", { precision: 10, scale: 2 }).notNull(),
+  quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
   unitaMisura: varchar("unita_misura", { length: 20 }).notNull().default("pz"),
   note: text("note"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),

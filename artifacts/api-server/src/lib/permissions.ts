@@ -124,9 +124,15 @@ export const MAPS_PERMISSIONS = [
 ] as const;
 
 export const LOGISTICA_PERMISSIONS = [
-  { key: "logistica.volontari.view", label: "Logistica: consultazione volontari" },
+  {
+    key: "logistica.volontari.view",
+    label: "Logistica: consultazione volontari",
+  },
   { key: "logistica.volontari.manage", label: "Logistica: gestione volontari" },
-  { key: "logistica.volontari.export", label: "Logistica: esportazione volontari" },
+  {
+    key: "logistica.volontari.export",
+    label: "Logistica: esportazione volontari",
+  },
   { key: "logistica.mezzi.view", label: "Logistica: consultazione mezzi" },
   { key: "logistica.mezzi.manage", label: "Logistica: gestione mezzi" },
   { key: "logistica.mezzi.export", label: "Logistica: esportazione mezzi" },
@@ -144,6 +150,40 @@ export const LOGISTICA_PERMISSIONS = [
 
 export const MAGAZZINO_PERMISSIONS = [
   { key: "magazzino.view", label: "Magazzino: consultazione" },
+  {
+    key: "magazzino.fse.view",
+    label: "Magazzino FSE+: consultazione rendicontazione",
+  },
+  {
+    key: "magazzino.fse.export",
+    label: "Magazzino FSE+: generazione e gestione export",
+  },
+  {
+    key: "magazzino.fse.reconcile",
+    label: "Magazzino FSE+: calcolo riconciliazioni",
+  },
+  {
+    key: "magazzino.fse.reconcile.manage",
+    label: "Magazzino FSE+: risoluzione e chiusura riconciliazioni",
+  },
+  {
+    key: "magazzino.fse.monitoring.manage",
+    label: "Magazzino FSE+: gestione indicatori mensili",
+  },
+  {
+    key: "magazzino.fse.return",
+    label: "Magazzino FSE+: gestione resi verso OpC",
+  },
+  { key: "magazzino.agea.view", label: "Magazzino AGEA: consultazione import" },
+  { key: "magazzino.agea.import", label: "Magazzino AGEA: analisi e import" },
+  {
+    key: "magazzino.agea.mapping.manage",
+    label: "Magazzino AGEA: gestione mapping prodotti",
+  },
+  {
+    key: "magazzino.agea.bootstrap",
+    label: "Magazzino AGEA: prima acquisizione",
+  },
   { key: "magazzino.products.manage", label: "Magazzino: gestione prodotti" },
   { key: "magazzino.stock.receive", label: "Magazzino: carico merce" },
   { key: "magazzino.stock.issue", label: "Magazzino: scarico merce" },

@@ -65,6 +65,11 @@ const LOGISTICA_OPERATOR_PERMISSIONS = [
 ] as const;
 const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "magazzino.view",
+  "magazzino.fse.view",
+  "magazzino.agea.view",
+  "magazzino.agea.import",
+  "magazzino.agea.mapping.manage",
+  "magazzino.agea.bootstrap",
   "magazzino.products.manage",
   "magazzino.stock.receive",
   "magazzino.stock.issue",
@@ -189,7 +194,11 @@ export async function seedRoles(): Promise<void> {
   }
 
   const [operatorRole] = await db
-    .select({ id: ruoliTable.id, aree: ruoliTable.aree, permessi: ruoliTable.permessi })
+    .select({
+      id: ruoliTable.id,
+      aree: ruoliTable.aree,
+      permessi: ruoliTable.permessi,
+    })
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, OPERATOR_ROLE_NAME));
   if (!operatorRole) {

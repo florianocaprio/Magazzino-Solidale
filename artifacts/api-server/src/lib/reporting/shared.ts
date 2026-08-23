@@ -15,8 +15,9 @@ export function kpi(
   unit: ReportKpi["unit"] = "count",
   drilldownMetric: string | null = null,
   availability: ReportKpi["availability"] = value == null ? "missing" : "ok",
+  exactValue: string | null = value == null ? null : String(value),
 ): ReportKpi {
-  return { key, value, unit, drilldownMetric, availability };
+  return { key, value, exactValue, unit, drilldownMetric, availability };
 }
 
 export function quality(
@@ -38,6 +39,7 @@ export function dashboard(input: {
   definitions: string[];
 }): ReportingDashboard {
   return {
+    reportingModelVersion: "MAGAZZINO_2_0C_V1",
     section: input.section,
     filters: publicFilters(input.filters),
     kpi: input.kpi,
@@ -49,4 +51,3 @@ export function dashboard(input: {
     timezone: "Europe/Rome",
   };
 }
-

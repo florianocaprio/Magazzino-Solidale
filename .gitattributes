@@ -1,0 +1,2 @@
+lib/db/updates/*.sql text eol=lf
+lib/db/legacy-migrations-baseline.json text eol=lf

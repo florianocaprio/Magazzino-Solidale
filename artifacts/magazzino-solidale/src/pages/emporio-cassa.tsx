@@ -677,7 +677,7 @@ export default function EmporioCassa() {
       id: activeSessione.id,
       data: {
         prodottoId: prodotto.prodottoId,
-        quantita: 1,
+        quantita: "1",
         versione: activeSessione.versione,
       },
     });
@@ -694,7 +694,7 @@ export default function EmporioCassa() {
     updateRiga.mutate({
       id: activeSessione.id,
       rigaId,
-      data: { quantita, versione: activeSessione.versione },
+      data: { quantita: String(quantita), versione: activeSessione.versione },
     });
   };
 

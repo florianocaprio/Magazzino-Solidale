@@ -42,7 +42,7 @@ export const speseEmporioStorniRigheTable = pgTable(
     spesaRigaId: integer("spesa_riga_id")
       .notNull()
       .references(() => speseEmporioRigheTable.id),
-    quantita: decimal("quantita", { precision: 10, scale: 2 }).notNull(),
+    quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
     creditoRestituito: decimal("credito_restituito", {
       precision: 10,
       scale: 2,

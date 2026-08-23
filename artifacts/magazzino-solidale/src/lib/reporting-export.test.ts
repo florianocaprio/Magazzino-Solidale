@@ -30,6 +30,7 @@ describe("export reportistica", () => {
     };
     const workbook = buildReportingWorkbook(
       {
+        reportingModelVersion: "MAGAZZINO_2_0C_V1",
         section: "fse-plus",
         filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, areaOperativaId: null, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
         kpi: [], series: [], tables: [], quality: [], definitions: [],
@@ -57,6 +58,7 @@ describe("export reportistica", () => {
   it("popola il dettaglio FSE+ con dati auditabili e senza nominativi", () => {
     const workbook = buildReportingWorkbook(
       {
+        reportingModelVersion: "MAGAZZINO_2_0C_V1",
         section: "fse-plus",
         filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, areaOperativaId: 1, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
         kpi: [], series: [], tables: [], quality: [], definitions: [],
@@ -75,5 +77,22 @@ describe("export reportistica", () => {
     expect(detail[0]).toMatchObject({ documento: "B-1", beneficiarioCodice: "BEN-1", canale: "pacchi" });
     expect(detail[0]).not.toHaveProperty("nome");
     expect(XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets["00_Riepilogo"], { header: 1 })).toContainEqual(["Area Operativa", "Roma"]);
+  });
+
+  it("usa exactValue negli export e non trasforma null in zero", () => {
+    const workbook = buildReportingWorkbook({
+      reportingModelVersion: "MAGAZZINO_2_0C_V1",
+      section: "fse-plus",
+      filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, areaOperativaId: null, centroAscoltoId: null, magazzinoId: 1, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
+      kpi: [
+        { key: "decimal", value: 1.234568, exactValue: "1.234567", unit: "kgLt", availability: "ok", drilldownMetric: null },
+        { key: "missing", value: null, exactValue: null, unit: "pieces", availability: "missing", drilldownMetric: null },
+      ],
+      series: [], tables: [], quality: [], definitions: [],
+      generatedAt: "2026-08-15T00:00:00.000Z", timezone: "Europe/Rome",
+    }, labels);
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets["00_Riepilogo"], { header: 1 });
+    expect(rows).toContainEqual(["decimal", "1.234567", "kgLt", "ok"]);
+    expect(rows).toContainEqual(["missing", "Dato non disponibile", "pieces", "missing"]);
   });
 });

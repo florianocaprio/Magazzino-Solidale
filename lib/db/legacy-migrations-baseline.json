@@ -1,0 +1,90 @@
+{
+  "formatVersion": 1,
+  "algorithm": "sha256",
+  "files": [
+    {
+      "filename": "20260814_fase5_1b_fascia_eta_presunta.sql",
+      "checksumSha256": "eae4d4f062cf4bbde14c38248880f62f8123d4ea0b61d16917fa02f37b11c704"
+    },
+    {
+      "filename": "20260814_fase5_2_bisogni_pianificati.sql",
+      "checksumSha256": "344fd061d3c50bf4d00c14b06456fa0711a98a8d4cd1b401b51b005d92afb5dd"
+    },
+    {
+      "filename": "20260814_fase5_3a_workflow_interventi.sql",
+      "checksumSha256": "09339e2d7976dcd5609d5f6e62fb0b46c5cbd18eabf5af38b42e26da6bd0bd3b"
+    },
+    {
+      "filename": "20260814_fase5_3c_gestione_operativa.sql",
+      "checksumSha256": "87acc141960954b62d93306c1f56b51cfd6c69d97d7bc3c3a4655138d4ebb661"
+    },
+    {
+      "filename": "20260814_fase5_3d_preparazione_materiali.sql",
+      "checksumSha256": "918be3729395b19f7908ae4910bdafbedbd8b342eac309aa67fa56e27a7caad7"
+    },
+    {
+      "filename": "20260814_fase5_4_modulo_mensa.sql",
+      "checksumSha256": "e2c50d110cfda419cc39b1910ae68828f29df43771476461e0e38105d1ffd99c"
+    },
+    {
+      "filename": "20260817_fase5_5_maps_ritiri.sql",
+      "checksumSha256": "81e40a776a046484164b9e9a2540ae3547066b01715b0d0475aff8d151f81094"
+    },
+    {
+      "filename": "20260819_audit_beneficiari_hardening.sql",
+      "checksumSha256": "a8fda3ddfb3478e2c415976b0c345dfe61da66aafef30fb70de9192a3ef26d55"
+    },
+    {
+      "filename": "20260819_audit_centro_ascolto_hardening.sql",
+      "checksumSha256": "7f07b11c97b5730d2c97a553d27a80233979de6f38280bac0e251f9b75bde277"
+    },
+    {
+      "filename": "20260819_audit_magazzino_hardening.sql",
+      "checksumSha256": "a34b593224282a5c4dafe527c7304f1cdad40383b5cbc84d3fcb6bf0c7067545"
+    },
+    {
+      "filename": "20260820_audit_emporio_operational_hardening.sql",
+      "checksumSha256": "07a8e86cadcfda0482d2677ae8780635985bbb0e26e7446bc5783831c3b541b2"
+    },
+    {
+      "filename": "20260820_audit_mensa_operational_hardening.sql",
+      "checksumSha256": "1e020170fddaacbbca812d20a48122c5062f9ba1d81bf67b1d014913514c4485"
+    },
+    {
+      "filename": "20260820_z_area_operativa_migration.sql",
+      "checksumSha256": "d7669831179d8747af8d8844af21906dbfd5ec8d7ae278cef3ca0540662a08a5"
+    },
+    {
+      "filename": "20260821_audit_logistica_operational_hardening.sql",
+      "checksumSha256": "0d04c6ef4f1137f65368592af88ae1d47180c3dbeb86bfd3e442339357d15343"
+    },
+    {
+      "filename": "20260821_audit_uds_operational_hardening.sql",
+      "checksumSha256": "ad3bf70975e67030aa1c82c8b02e2162ebf4c3a775b6af0bb02bcea350c2ae3d"
+    },
+    {
+      "filename": "20260821_zz_logistica_turno_fk_replay_guard.sql",
+      "checksumSha256": "02c856f1eda2814a39893006a2db63b09047598cbda25c25d79b985a0685b839"
+    },
+    {
+      "filename": "20260822_logistica_residual_reconciliation.sql",
+      "checksumSha256": "9ce9aee771bc6ea4e0021027e850f6c25051fe81cae8ad0758a12570e3a59f2d"
+    },
+    {
+      "filename": "20260822_magazzino_2_0a.sql",
+      "checksumSha256": "32a78e19fb861a360adacda7c6f9534b958a2daf83ea9ff2e763ee5f21751c38"
+    },
+    {
+      "filename": "20260822_magazzino_2_0a_r1.sql",
+      "checksumSha256": "0d23d0bd392f7ac5968d622b26b6a72b002014c34a5e824ebe35c13406925947"
+    },
+    {
+      "filename": "20260822_magazzino_2_0b_agea_import.sql",
+      "checksumSha256": "f73ca40c9a66e8d8086b567a2f6492e74128cf642e05ac81a6343d007ac234c1"
+    },
+    {
+      "filename": "20260823_magazzino_2_0b_r1_agea_hardening.sql",
+      "checksumSha256": "a871905ba78afb7c22377a1993683cf8c6f8505b0a4216fd94cf2d2f58657de0"
+    }
+  ]
+}

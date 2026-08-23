@@ -27,8 +27,28 @@ import type {
   AccessoEmporioStatoUpdate,
   AccessoEmporioUpdate,
   ActionResult,
+  AgeaBadRequestResponse,
+  AgeaConflictResponse,
+  AgeaCorrezioneDataInput,
+  AgeaCorrezioneLottoInput,
+  AgeaDescrizioneDaMappare,
+  AgeaForbiddenResponse,
+  AgeaImportConfermaInput,
+  AgeaImportConfermaResult,
+  AgeaImportPartita,
+  AgeaImportPartitaUpdate,
+  AgeaImportRighePage,
+  AgeaImportazione,
+  AgeaMappaturaProdotto,
+  AgeaMappaturaProdottoInput,
+  AgeaMappaturaProdottoUpdate,
+  AgeaNotFoundResponse,
+  AgeaPayloadTooLargeResponse,
+  AgeaUnsupportedMediaTypeResponse,
+  AgeaVersioneInput,
   Alert,
   AllocazioneMezziReport,
+  AnalyzeAgeaImportazioneParams,
   AnnullaTurnoInput,
   ApprovazioniLogistica,
   Approvvigionamento,
@@ -68,6 +88,10 @@ import type {
   BollaUpdate,
   BootstrapStatus,
   BulkImportResult,
+  CaricoMagazzino,
+  CaricoMagazzinoDettaglio,
+  CaricoMagazzinoInput,
+  CaricoMagazzinoRiga,
   CentroAscolto,
   CentroAscoltoInput,
   CentroAscoltoUpdate,
@@ -106,12 +130,33 @@ import type {
   DashboardStats,
   DeleteMezzo200,
   DeleteVolontario200,
+  DownloadFseExportParams,
   EmailSendResult,
   ForgotPasswordInput,
   Fornitore,
   FornitoreInput,
   FornitoreUpdate,
   FornitoriBulkInput,
+  FseBadRequestResponse,
+  FseCancelInput,
+  FseConflictResponse,
+  FseExportInput,
+  FseForbiddenResponse,
+  FseMarkEnteredInput,
+  FseMonitoringInput,
+  FseMonitoringUpdate,
+  FseNotFoundResponse,
+  FseOpcReturnInput,
+  FseOpcReturnReversalInput,
+  FsePayloadTooLargeResponse,
+  FseReconciliationInput,
+  FseReconciliationRowsPage,
+  FseRecord,
+  FseRecordPage,
+  FseReportingPreview,
+  FseResolutionInput,
+  FseVersionInput,
+  GetFseReportingPreviewParams,
   GetInterventiRiepilogoVisteParams,
   GetMapsConsegneParams,
   GetMapsInterventiSocialiParams,
@@ -159,15 +204,26 @@ import type {
   InterventoUpdate,
   ListAccessiEmporioParams,
   ListAccessiMensaParams,
+  ListAgeaImportazioneRigheParams,
   ListApprovvigionamentiParams,
   ListBeneficiariParams,
   ListBolleParams,
+  ListCarichiParams,
   ListConsegneParams,
   ListConsumiMensaParams,
   ListCreditoSolidaleBeneficiariParams,
   ListCreditoSolidaleMovimentiParams,
   ListEccezioniMensaParams,
   ListFornitoriParams,
+  ListFseExportEventsParams,
+  ListFseExportLinesParams,
+  ListFseExportsParams,
+  ListFseMonitoringParams,
+  ListFseReconciliationLinesParams,
+  ListFseReconciliationsParams,
+  ListFseReportingEventsParams,
+  ListFseReportingLinesParams,
+  ListFseReportingQualityParams,
   ListGiacenzeMensaParams,
   ListGiacenzeParams,
   ListGiornateMensaParams,
@@ -1429,6 +1485,3180 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getDeleteProdottoMutationOptions(options));
     }
 
+export const getListCarichiUrl = (params?: ListCarichiParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/carichi?${stringifiedParams}` : `/api/carichi`
+}
+
+export const listCarichi = async (params?: ListCarichiParams, options?: RequestInit): Promise<CaricoMagazzino[]> => {
+
+  return customFetch<CaricoMagazzino[]>(getListCarichiUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCarichiQueryKey = (params?: ListCarichiParams,) => {
+    return [
+    `/api/carichi`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCarichiQueryOptions = <TData = Awaited<ReturnType<typeof listCarichi>>, TError = ErrorType<unknown>>(params?: ListCarichiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCarichi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCarichiQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCarichi>>> = ({ signal }) => listCarichi(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCarichi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCarichiQueryResult = NonNullable<Awaited<ReturnType<typeof listCarichi>>>
+export type ListCarichiQueryError = ErrorType<unknown>
+
+
+
+export function useListCarichi<TData = Awaited<ReturnType<typeof listCarichi>>, TError = ErrorType<unknown>>(
+ params?: ListCarichiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCarichi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCarichiQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCaricoUrl = () => {
+
+
+
+
+  return `/api/carichi`
+}
+
+export const createCarico = async (caricoMagazzinoInput: CaricoMagazzinoInput, options?: RequestInit): Promise<CaricoMagazzinoDettaglio> => {
+
+  return customFetch<CaricoMagazzinoDettaglio>(getCreateCaricoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoMagazzinoInput,)
+  }
+);}
+
+
+
+
+export const getCreateCaricoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCarico>>, TError,{data: BodyType<CaricoMagazzinoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCarico>>, TError,{data: BodyType<CaricoMagazzinoInput>}, TContext> => {
+
+const mutationKey = ['createCarico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCarico>>, {data: BodyType<CaricoMagazzinoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCarico(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaricoMutationResult = NonNullable<Awaited<ReturnType<typeof createCarico>>>
+    export type CreateCaricoMutationBody = BodyType<CaricoMagazzinoInput>
+    export type CreateCaricoMutationError = ErrorType<unknown>
+
+    export const useCreateCarico = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCarico>>, TError,{data: BodyType<CaricoMagazzinoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCarico>>,
+        TError,
+        {data: BodyType<CaricoMagazzinoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCaricoMutationOptions(options));
+    }
+
+export const getGetCaricoUrl = (id: number,) => {
+
+
+
+
+  return `/api/carichi/${id}`
+}
+
+export const getCarico = async (id: number, options?: RequestInit): Promise<CaricoMagazzinoDettaglio> => {
+
+  return customFetch<CaricoMagazzinoDettaglio>(getGetCaricoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaricoQueryKey = (id: number,) => {
+    return [
+    `/api/carichi/${id}`
+    ] as const;
+    }
+
+
+export const getGetCaricoQueryOptions = <TData = Awaited<ReturnType<typeof getCarico>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCarico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaricoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCarico>>> = ({ signal }) => getCarico(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCarico>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaricoQueryResult = NonNullable<Awaited<ReturnType<typeof getCarico>>>
+export type GetCaricoQueryError = ErrorType<unknown>
+
+
+
+export function useGetCarico<TData = Awaited<ReturnType<typeof getCarico>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCarico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaricoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListCaricoRigheUrl = (id: number,) => {
+
+
+
+
+  return `/api/carichi/${id}/righe`
+}
+
+export const listCaricoRighe = async (id: number, options?: RequestInit): Promise<CaricoMagazzinoRiga[]> => {
+
+  return customFetch<CaricoMagazzinoRiga[]>(getListCaricoRigheUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCaricoRigheQueryKey = (id: number,) => {
+    return [
+    `/api/carichi/${id}/righe`
+    ] as const;
+    }
+
+
+export const getListCaricoRigheQueryOptions = <TData = Awaited<ReturnType<typeof listCaricoRighe>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCaricoRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCaricoRigheQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCaricoRighe>>> = ({ signal }) => listCaricoRighe(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCaricoRighe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCaricoRigheQueryResult = NonNullable<Awaited<ReturnType<typeof listCaricoRighe>>>
+export type ListCaricoRigheQueryError = ErrorType<unknown>
+
+
+
+export function useListCaricoRighe<TData = Awaited<ReturnType<typeof listCaricoRighe>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCaricoRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCaricoRigheQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListAgeaImportazioniUrl = () => {
+
+
+
+
+  return `/api/agea/importazioni`
+}
+
+/**
+ * @summary Elenca le importazioni AGEA visibili nello scope Magazzino/Area/Centro
+ */
+export const listAgeaImportazioni = async ( options?: RequestInit): Promise<AgeaImportazione[]> => {
+
+  return customFetch<AgeaImportazione[]>(getListAgeaImportazioniUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAgeaImportazioniQueryKey = () => {
+    return [
+    `/api/agea/importazioni`
+    ] as const;
+    }
+
+
+export const getListAgeaImportazioniQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioni>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioni>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgeaImportazioniQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgeaImportazioni>>> = ({ signal }) => listAgeaImportazioni({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioni>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAgeaImportazioniQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaImportazioni>>>
+export type ListAgeaImportazioniQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Elenca le importazioni AGEA visibili nello scope Magazzino/Area/Centro
+ */
+
+export function useListAgeaImportazioni<TData = Awaited<ReturnType<typeof listAgeaImportazioni>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioni>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAgeaImportazioniQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAnalyzeAgeaImportazioneUrl = (params: AnalyzeAgeaImportazioneParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/agea/importazioni/analizza?${stringifiedParams}` : `/api/agea/importazioni/analizza`
+}
+
+/**
+ * @summary Analizza localmente un registro XLSX senza modificare lo stock
+ */
+export const analyzeAgeaImportazione = async (analyzeAgeaImportazioneBody: Blob,
+    params: AnalyzeAgeaImportazioneParams, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getAnalyzeAgeaImportazioneUrl(params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ...options?.headers },
+    body: analyzeAgeaImportazioneBody
+  }
+);}
+
+
+
+
+export const getAnalyzeAgeaImportazioneMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaPayloadTooLargeResponse | AgeaUnsupportedMediaTypeResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeAgeaImportazione>>, TError,{data: BodyType<Blob>;params: AnalyzeAgeaImportazioneParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeAgeaImportazione>>, TError,{data: BodyType<Blob>;params: AnalyzeAgeaImportazioneParams}, TContext> => {
+
+const mutationKey = ['analyzeAgeaImportazione'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeAgeaImportazione>>, {data: BodyType<Blob>;params: AnalyzeAgeaImportazioneParams}> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  analyzeAgeaImportazione(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeAgeaImportazione>>>
+    export type AnalyzeAgeaImportazioneMutationBody = BodyType<Blob>
+    export type AnalyzeAgeaImportazioneMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaPayloadTooLargeResponse | AgeaUnsupportedMediaTypeResponse>
+
+    /**
+ * @summary Analizza localmente un registro XLSX senza modificare lo stock
+ */
+export const useAnalyzeAgeaImportazione = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaPayloadTooLargeResponse | AgeaUnsupportedMediaTypeResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeAgeaImportazione>>, TError,{data: BodyType<Blob>;params: AnalyzeAgeaImportazioneParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeAgeaImportazione>>,
+        TError,
+        {data: BodyType<Blob>;params: AnalyzeAgeaImportazioneParams},
+        TContext
+      > => {
+      return useMutation(getAnalyzeAgeaImportazioneMutationOptions(options));
+    }
+
+export const getGetAgeaImportazioneUrl = (id: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}`
+}
+
+export const getAgeaImportazione = async (id: number, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getGetAgeaImportazioneUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAgeaImportazioneQueryKey = (id: number,) => {
+    return [
+    `/api/agea/importazioni/${id}`
+    ] as const;
+    }
+
+
+export const getGetAgeaImportazioneQueryOptions = <TData = Awaited<ReturnType<typeof getAgeaImportazione>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgeaImportazione>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgeaImportazioneQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgeaImportazione>>> = ({ signal }) => getAgeaImportazione(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgeaImportazione>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAgeaImportazioneQueryResult = NonNullable<Awaited<ReturnType<typeof getAgeaImportazione>>>
+export type GetAgeaImportazioneQueryError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>
+
+
+
+export function useGetAgeaImportazione<TData = Awaited<ReturnType<typeof getAgeaImportazione>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgeaImportazione>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAgeaImportazioneQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListAgeaImportazioneRigheUrl = (id: number,
+    params?: ListAgeaImportazioneRigheParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/agea/importazioni/${id}/righe?${stringifiedParams}` : `/api/agea/importazioni/${id}/righe`
+}
+
+export const listAgeaImportazioneRighe = async (id: number,
+    params?: ListAgeaImportazioneRigheParams, options?: RequestInit): Promise<AgeaImportRighePage> => {
+
+  return customFetch<AgeaImportRighePage>(getListAgeaImportazioneRigheUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAgeaImportazioneRigheQueryKey = (id: number,
+    params?: ListAgeaImportazioneRigheParams,) => {
+    return [
+    `/api/agea/importazioni/${id}/righe`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAgeaImportazioneRigheQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(id: number,
+    params?: ListAgeaImportazioneRigheParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgeaImportazioneRigheQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>> = ({ signal }) => listAgeaImportazioneRighe(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAgeaImportazioneRigheQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>>
+export type ListAgeaImportazioneRigheQueryError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>
+
+
+
+export function useListAgeaImportazioneRighe<TData = Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(
+ id: number,
+    params?: ListAgeaImportazioneRigheParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneRighe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAgeaImportazioneRigheQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListAgeaImportazionePartiteUrl = (id: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/partite`
+}
+
+export const listAgeaImportazionePartite = async (id: number, options?: RequestInit): Promise<AgeaImportPartita[]> => {
+
+  return customFetch<AgeaImportPartita[]>(getListAgeaImportazionePartiteUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAgeaImportazionePartiteQueryKey = (id: number,) => {
+    return [
+    `/api/agea/importazioni/${id}/partite`
+    ] as const;
+    }
+
+
+export const getListAgeaImportazionePartiteQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgeaImportazionePartiteQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgeaImportazionePartite>>> = ({ signal }) => listAgeaImportazionePartite(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAgeaImportazionePartiteQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaImportazionePartite>>>
+export type ListAgeaImportazionePartiteQueryError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>
+
+
+
+export function useListAgeaImportazionePartite<TData = Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazionePartite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAgeaImportazionePartiteQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListAgeaImportazioneDescrizioniDaMappareUrl = (id: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/descrizioni-da-mappare`
+}
+
+/**
+ * @summary Elenca le descrizioni esterne distinte dell'intera importazione
+ */
+export const listAgeaImportazioneDescrizioniDaMappare = async (id: number, options?: RequestInit): Promise<AgeaDescrizioneDaMappare[]> => {
+
+  return customFetch<AgeaDescrizioneDaMappare[]>(getListAgeaImportazioneDescrizioniDaMappareUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAgeaImportazioneDescrizioniDaMappareQueryKey = (id: number,) => {
+    return [
+    `/api/agea/importazioni/${id}/descrizioni-da-mappare`
+    ] as const;
+    }
+
+
+export const getListAgeaImportazioneDescrizioniDaMappareQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgeaImportazioneDescrizioniDaMappareQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>> = ({ signal }) => listAgeaImportazioneDescrizioniDaMappare(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAgeaImportazioneDescrizioniDaMappareQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>>
+export type ListAgeaImportazioneDescrizioniDaMappareQueryError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>
+
+
+/**
+ * @summary Elenca le descrizioni esterne distinte dell'intera importazione
+ */
+
+export function useListAgeaImportazioneDescrizioniDaMappare<TData = Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaImportazioneDescrizioniDaMappare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAgeaImportazioneDescrizioniDaMappareQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateAgeaImportazioneRigaDataCaricoUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/righe/${rigaId}/data-carico`
+}
+
+export const updateAgeaImportazioneRigaDataCarico = async (id: number,
+    rigaId: number,
+    ageaCorrezioneDataInput: AgeaCorrezioneDataInput, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getUpdateAgeaImportazioneRigaDataCaricoUrl(id,rigaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaCorrezioneDataInput,)
+  }
+);}
+
+
+
+
+export const getUpdateAgeaImportazioneRigaDataCaricoMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext> => {
+
+const mutationKey = ['updateAgeaImportazioneRigaDataCarico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, {id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  updateAgeaImportazioneRigaDataCarico(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAgeaImportazioneRigaDataCaricoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>>
+    export type UpdateAgeaImportazioneRigaDataCaricoMutationBody = BodyType<AgeaCorrezioneDataInput>
+    export type UpdateAgeaImportazioneRigaDataCaricoMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
+
+    export const useUpdateAgeaImportazioneRigaDataCarico = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAgeaImportazioneRigaDataCarico>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<AgeaCorrezioneDataInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAgeaImportazioneRigaDataCaricoMutationOptions(options));
+    }
+
+export const getUpdateAgeaImportazioneRigaLottoUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/righe/${rigaId}/lotto`
+}
+
+export const updateAgeaImportazioneRigaLotto = async (id: number,
+    rigaId: number,
+    ageaCorrezioneLottoInput: AgeaCorrezioneLottoInput, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getUpdateAgeaImportazioneRigaLottoUrl(id,rigaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaCorrezioneLottoInput,)
+  }
+);}
+
+
+
+
+export const getUpdateAgeaImportazioneRigaLottoMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext> => {
+
+const mutationKey = ['updateAgeaImportazioneRigaLotto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, {id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  updateAgeaImportazioneRigaLotto(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAgeaImportazioneRigaLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>>
+    export type UpdateAgeaImportazioneRigaLottoMutationBody = BodyType<AgeaCorrezioneLottoInput>
+    export type UpdateAgeaImportazioneRigaLottoMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
+
+    export const useUpdateAgeaImportazioneRigaLotto = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>, TError,{id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAgeaImportazioneRigaLotto>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<AgeaCorrezioneLottoInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAgeaImportazioneRigaLottoMutationOptions(options));
+    }
+
+export const getUpdateAgeaImportazionePartitaUrl = (id: number,
+    partitaId: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/partite/${partitaId}`
+}
+
+export const updateAgeaImportazionePartita = async (id: number,
+    partitaId: number,
+    ageaImportPartitaUpdate: AgeaImportPartitaUpdate, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getUpdateAgeaImportazionePartitaUrl(id,partitaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaImportPartitaUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateAgeaImportazionePartitaMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>, TError,{id: number;partitaId: number;data: BodyType<AgeaImportPartitaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>, TError,{id: number;partitaId: number;data: BodyType<AgeaImportPartitaUpdate>}, TContext> => {
+
+const mutationKey = ['updateAgeaImportazionePartita'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>, {id: number;partitaId: number;data: BodyType<AgeaImportPartitaUpdate>}> = (props) => {
+          const {id,partitaId,data} = props ?? {};
+
+          return  updateAgeaImportazionePartita(id,partitaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAgeaImportazionePartitaMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>>
+    export type UpdateAgeaImportazionePartitaMutationBody = BodyType<AgeaImportPartitaUpdate>
+    export type UpdateAgeaImportazionePartitaMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
+
+    export const useUpdateAgeaImportazionePartita = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaImportazionePartita>>, TError,{id: number;partitaId: number;data: BodyType<AgeaImportPartitaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAgeaImportazionePartita>>,
+        TError,
+        {id: number;partitaId: number;data: BodyType<AgeaImportPartitaUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAgeaImportazionePartitaMutationOptions(options));
+    }
+
+export const getRecalculateAgeaImportazioneUrl = (id: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/ricalcola`
+}
+
+export const recalculateAgeaImportazione = async (id: number,
+    ageaVersioneInput: AgeaVersioneInput, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getRecalculateAgeaImportazioneUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaVersioneInput,)
+  }
+);}
+
+
+
+
+export const getRecalculateAgeaImportazioneMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext> => {
+
+const mutationKey = ['recalculateAgeaImportazione'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, {id: number;data: BodyType<AgeaVersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  recalculateAgeaImportazione(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecalculateAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof recalculateAgeaImportazione>>>
+    export type RecalculateAgeaImportazioneMutationBody = BodyType<AgeaVersioneInput>
+    export type RecalculateAgeaImportazioneMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
+
+    export const useRecalculateAgeaImportazione = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recalculateAgeaImportazione>>,
+        TError,
+        {id: number;data: BodyType<AgeaVersioneInput>},
+        TContext
+      > => {
+      return useMutation(getRecalculateAgeaImportazioneMutationOptions(options));
+    }
+
+export const getConfirmAgeaImportazioneUrl = (id: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/conferma`
+}
+
+export const confirmAgeaImportazione = async (id: number,
+    ageaImportConfermaInput: AgeaImportConfermaInput, options?: RequestInit): Promise<AgeaImportConfermaResult> => {
+
+  return customFetch<AgeaImportConfermaResult>(getConfirmAgeaImportazioneUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaImportConfermaInput,)
+  }
+);}
+
+
+
+
+export const getConfirmAgeaImportazioneMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext> => {
+
+const mutationKey = ['confirmAgeaImportazione'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmAgeaImportazione>>, {id: number;data: BodyType<AgeaImportConfermaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  confirmAgeaImportazione(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof confirmAgeaImportazione>>>
+    export type ConfirmAgeaImportazioneMutationBody = BodyType<AgeaImportConfermaInput>
+    export type ConfirmAgeaImportazioneMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
+
+    export const useConfirmAgeaImportazione = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaImportConfermaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmAgeaImportazione>>,
+        TError,
+        {id: number;data: BodyType<AgeaImportConfermaInput>},
+        TContext
+      > => {
+      return useMutation(getConfirmAgeaImportazioneMutationOptions(options));
+    }
+
+export const getCancelAgeaImportazioneUrl = (id: number,) => {
+
+
+
+
+  return `/api/agea/importazioni/${id}/annulla`
+}
+
+export const cancelAgeaImportazione = async (id: number,
+    ageaVersioneInput: AgeaVersioneInput, options?: RequestInit): Promise<AgeaImportazione> => {
+
+  return customFetch<AgeaImportazione>(getCancelAgeaImportazioneUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaVersioneInput,)
+  }
+);}
+
+
+
+
+export const getCancelAgeaImportazioneMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext> => {
+
+const mutationKey = ['cancelAgeaImportazione'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelAgeaImportazione>>, {id: number;data: BodyType<AgeaVersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  cancelAgeaImportazione(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelAgeaImportazioneMutationResult = NonNullable<Awaited<ReturnType<typeof cancelAgeaImportazione>>>
+    export type CancelAgeaImportazioneMutationBody = BodyType<AgeaVersioneInput>
+    export type CancelAgeaImportazioneMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
+
+    export const useCancelAgeaImportazione = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAgeaImportazione>>, TError,{id: number;data: BodyType<AgeaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelAgeaImportazione>>,
+        TError,
+        {id: number;data: BodyType<AgeaVersioneInput>},
+        TContext
+      > => {
+      return useMutation(getCancelAgeaImportazioneMutationOptions(options));
+    }
+
+export const getListAgeaMappatureProdottiUrl = () => {
+
+
+
+
+  return `/api/agea/mappature-prodotti`
+}
+
+export const listAgeaMappatureProdotti = async ( options?: RequestInit): Promise<AgeaMappaturaProdotto[]> => {
+
+  return customFetch<AgeaMappaturaProdotto[]>(getListAgeaMappatureProdottiUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAgeaMappatureProdottiQueryKey = () => {
+    return [
+    `/api/agea/mappature-prodotti`
+    ] as const;
+    }
+
+
+export const getListAgeaMappatureProdottiQueryOptions = <TData = Awaited<ReturnType<typeof listAgeaMappatureProdotti>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaMappatureProdotti>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgeaMappatureProdottiQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgeaMappatureProdotti>>> = ({ signal }) => listAgeaMappatureProdotti({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgeaMappatureProdotti>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAgeaMappatureProdottiQueryResult = NonNullable<Awaited<ReturnType<typeof listAgeaMappatureProdotti>>>
+export type ListAgeaMappatureProdottiQueryError = ErrorType<unknown>
+
+
+
+export function useListAgeaMappatureProdotti<TData = Awaited<ReturnType<typeof listAgeaMappatureProdotti>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgeaMappatureProdotti>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAgeaMappatureProdottiQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateAgeaMappaturaProdottoUrl = () => {
+
+
+
+
+  return `/api/agea/mappature-prodotti`
+}
+
+export const createAgeaMappaturaProdotto = async (ageaMappaturaProdottoInput: AgeaMappaturaProdottoInput, options?: RequestInit): Promise<AgeaMappaturaProdotto> => {
+
+  return customFetch<AgeaMappaturaProdotto>(getCreateAgeaMappaturaProdottoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaMappaturaProdottoInput,)
+  }
+);}
+
+
+
+
+export const getCreateAgeaMappaturaProdottoMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>, TError,{data: BodyType<AgeaMappaturaProdottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>, TError,{data: BodyType<AgeaMappaturaProdottoInput>}, TContext> => {
+
+const mutationKey = ['createAgeaMappaturaProdotto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>, {data: BodyType<AgeaMappaturaProdottoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAgeaMappaturaProdotto(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAgeaMappaturaProdottoMutationResult = NonNullable<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>>
+    export type CreateAgeaMappaturaProdottoMutationBody = BodyType<AgeaMappaturaProdottoInput>
+    export type CreateAgeaMappaturaProdottoMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaConflictResponse>
+
+    export const useCreateAgeaMappaturaProdotto = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>, TError,{data: BodyType<AgeaMappaturaProdottoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAgeaMappaturaProdotto>>,
+        TError,
+        {data: BodyType<AgeaMappaturaProdottoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateAgeaMappaturaProdottoMutationOptions(options));
+    }
+
+export const getUpdateAgeaMappaturaProdottoUrl = (id: number,) => {
+
+
+
+
+  return `/api/agea/mappature-prodotti/${id}`
+}
+
+export const updateAgeaMappaturaProdotto = async (id: number,
+    ageaMappaturaProdottoUpdate: AgeaMappaturaProdottoUpdate, options?: RequestInit): Promise<AgeaMappaturaProdotto> => {
+
+  return customFetch<AgeaMappaturaProdotto>(getUpdateAgeaMappaturaProdottoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ageaMappaturaProdottoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateAgeaMappaturaProdottoMutationOptions = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>, TError,{id: number;data: BodyType<AgeaMappaturaProdottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>, TError,{id: number;data: BodyType<AgeaMappaturaProdottoUpdate>}, TContext> => {
+
+const mutationKey = ['updateAgeaMappaturaProdotto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>, {id: number;data: BodyType<AgeaMappaturaProdottoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAgeaMappaturaProdotto(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAgeaMappaturaProdottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>>
+    export type UpdateAgeaMappaturaProdottoMutationBody = BodyType<AgeaMappaturaProdottoUpdate>
+    export type UpdateAgeaMappaturaProdottoMutationError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>
+
+    export const useUpdateAgeaMappaturaProdotto = <TError = ErrorType<AgeaBadRequestResponse | AgeaForbiddenResponse | AgeaNotFoundResponse | AgeaConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>, TError,{id: number;data: BodyType<AgeaMappaturaProdottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAgeaMappaturaProdotto>>,
+        TError,
+        {id: number;data: BodyType<AgeaMappaturaProdottoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAgeaMappaturaProdottoMutationOptions(options));
+    }
+
+export const getGetFseReportingPreviewUrl = (params: GetFseReportingPreviewParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/rendicontazione/preview?${stringifiedParams}` : `/api/fse/rendicontazione/preview`
+}
+
+/**
+ * @summary Preview canonica FSE+ con cutoff immutabile
+ */
+export const getFseReportingPreview = async (params: GetFseReportingPreviewParams, options?: RequestInit): Promise<FseReportingPreview> => {
+
+  return customFetch<FseReportingPreview>(getGetFseReportingPreviewUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFseReportingPreviewQueryKey = (params?: GetFseReportingPreviewParams,) => {
+    return [
+    `/api/fse/rendicontazione/preview`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFseReportingPreviewQueryOptions = <TData = Awaited<ReturnType<typeof getFseReportingPreview>>, TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>>(params: GetFseReportingPreviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFseReportingPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFseReportingPreviewQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFseReportingPreview>>> = ({ signal }) => getFseReportingPreview(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFseReportingPreview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFseReportingPreviewQueryResult = NonNullable<Awaited<ReturnType<typeof getFseReportingPreview>>>
+export type GetFseReportingPreviewQueryError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>
+
+
+/**
+ * @summary Preview canonica FSE+ con cutoff immutabile
+ */
+
+export function useGetFseReportingPreview<TData = Awaited<ReturnType<typeof getFseReportingPreview>>, TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>>(
+ params: GetFseReportingPreviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFseReportingPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFseReportingPreviewQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListFseReportingEventsUrl = (params: ListFseReportingEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/rendicontazione/eventi?${stringifiedParams}` : `/api/fse/rendicontazione/eventi`
+}
+
+export const listFseReportingEvents = async (params: ListFseReportingEventsParams, options?: RequestInit): Promise<FseRecordPage> => {
+
+  return customFetch<FseRecordPage>(getListFseReportingEventsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseReportingEventsQueryKey = (params?: ListFseReportingEventsParams,) => {
+    return [
+    `/api/fse/rendicontazione/eventi`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseReportingEventsQueryOptions = <TData = Awaited<ReturnType<typeof listFseReportingEvents>>, TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>>(params: ListFseReportingEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReportingEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseReportingEventsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseReportingEvents>>> = ({ signal }) => listFseReportingEvents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseReportingEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseReportingEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listFseReportingEvents>>>
+export type ListFseReportingEventsQueryError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>
+
+
+
+export function useListFseReportingEvents<TData = Awaited<ReturnType<typeof listFseReportingEvents>>, TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>>(
+ params: ListFseReportingEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReportingEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseReportingEventsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListFseReportingLinesUrl = (params: ListFseReportingLinesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/rendicontazione/righe?${stringifiedParams}` : `/api/fse/rendicontazione/righe`
+}
+
+export const listFseReportingLines = async (params: ListFseReportingLinesParams, options?: RequestInit): Promise<FseRecordPage> => {
+
+  return customFetch<FseRecordPage>(getListFseReportingLinesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseReportingLinesQueryKey = (params?: ListFseReportingLinesParams,) => {
+    return [
+    `/api/fse/rendicontazione/righe`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseReportingLinesQueryOptions = <TData = Awaited<ReturnType<typeof listFseReportingLines>>, TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>>(params: ListFseReportingLinesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReportingLines>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseReportingLinesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseReportingLines>>> = ({ signal }) => listFseReportingLines(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseReportingLines>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseReportingLinesQueryResult = NonNullable<Awaited<ReturnType<typeof listFseReportingLines>>>
+export type ListFseReportingLinesQueryError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>
+
+
+
+export function useListFseReportingLines<TData = Awaited<ReturnType<typeof listFseReportingLines>>, TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>>(
+ params: ListFseReportingLinesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReportingLines>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseReportingLinesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListFseReportingQualityUrl = (params: ListFseReportingQualityParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/rendicontazione/qualita?${stringifiedParams}` : `/api/fse/rendicontazione/qualita`
+}
+
+export const listFseReportingQuality = async (params: ListFseReportingQualityParams, options?: RequestInit): Promise<FseRecordPage> => {
+
+  return customFetch<FseRecordPage>(getListFseReportingQualityUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseReportingQualityQueryKey = (params?: ListFseReportingQualityParams,) => {
+    return [
+    `/api/fse/rendicontazione/qualita`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseReportingQualityQueryOptions = <TData = Awaited<ReturnType<typeof listFseReportingQuality>>, TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>>(params: ListFseReportingQualityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReportingQuality>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseReportingQualityQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseReportingQuality>>> = ({ signal }) => listFseReportingQuality(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseReportingQuality>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseReportingQualityQueryResult = NonNullable<Awaited<ReturnType<typeof listFseReportingQuality>>>
+export type ListFseReportingQualityQueryError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>
+
+
+
+export function useListFseReportingQuality<TData = Awaited<ReturnType<typeof listFseReportingQuality>>, TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>>(
+ params: ListFseReportingQualityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReportingQuality>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseReportingQualityQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListFseExportsUrl = (params?: ListFseExportsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/exportazioni?${stringifiedParams}` : `/api/fse/exportazioni`
+}
+
+export const listFseExports = async (params?: ListFseExportsParams, options?: RequestInit): Promise<FseRecordPage> => {
+
+  return customFetch<FseRecordPage>(getListFseExportsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseExportsQueryKey = (params?: ListFseExportsParams,) => {
+    return [
+    `/api/fse/exportazioni`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseExportsQueryOptions = <TData = Awaited<ReturnType<typeof listFseExports>>, TError = ErrorType<FseForbiddenResponse>>(params?: ListFseExportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseExports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseExportsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseExports>>> = ({ signal }) => listFseExports(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseExports>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseExportsQueryResult = NonNullable<Awaited<ReturnType<typeof listFseExports>>>
+export type ListFseExportsQueryError = ErrorType<FseForbiddenResponse>
+
+
+
+export function useListFseExports<TData = Awaited<ReturnType<typeof listFseExports>>, TError = ErrorType<FseForbiddenResponse>>(
+ params?: ListFseExportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseExports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseExportsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateFseExportUrl = () => {
+
+
+
+
+  return `/api/fse/exportazioni`
+}
+
+export const createFseExport = async (fseExportInput: FseExportInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getCreateFseExportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseExportInput,)
+  }
+);}
+
+
+
+
+export const getCreateFseExportMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse | FsePayloadTooLargeResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseExport>>, TError,{data: BodyType<FseExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFseExport>>, TError,{data: BodyType<FseExportInput>}, TContext> => {
+
+const mutationKey = ['createFseExport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFseExport>>, {data: BodyType<FseExportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFseExport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFseExportMutationResult = NonNullable<Awaited<ReturnType<typeof createFseExport>>>
+    export type CreateFseExportMutationBody = BodyType<FseExportInput>
+    export type CreateFseExportMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse | FsePayloadTooLargeResponse>
+
+    export const useCreateFseExport = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse | FsePayloadTooLargeResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseExport>>, TError,{data: BodyType<FseExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFseExport>>,
+        TError,
+        {data: BodyType<FseExportInput>},
+        TContext
+      > => {
+      return useMutation(getCreateFseExportMutationOptions(options));
+    }
+
+export const getGetFseExportUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/exportazioni/${id}`
+}
+
+export const getFseExport = async (id: number, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getGetFseExportUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFseExportQueryKey = (id: number,) => {
+    return [
+    `/api/fse/exportazioni/${id}`
+    ] as const;
+    }
+
+
+export const getGetFseExportQueryOptions = <TData = Awaited<ReturnType<typeof getFseExport>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFseExport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFseExportQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFseExport>>> = ({ signal }) => getFseExport(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFseExport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFseExportQueryResult = NonNullable<Awaited<ReturnType<typeof getFseExport>>>
+export type GetFseExportQueryError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>
+
+
+
+export function useGetFseExport<TData = Awaited<ReturnType<typeof getFseExport>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFseExport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFseExportQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListFseExportEventsUrl = (id: number,
+    params?: ListFseExportEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/exportazioni/${id}/eventi?${stringifiedParams}` : `/api/fse/exportazioni/${id}/eventi`
+}
+
+export const listFseExportEvents = async (id: number,
+    params?: ListFseExportEventsParams, options?: RequestInit): Promise<FseRecordPage> => {
+
+  return customFetch<FseRecordPage>(getListFseExportEventsUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseExportEventsQueryKey = (id: number,
+    params?: ListFseExportEventsParams,) => {
+    return [
+    `/api/fse/exportazioni/${id}/eventi`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseExportEventsQueryOptions = <TData = Awaited<ReturnType<typeof listFseExportEvents>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(id: number,
+    params?: ListFseExportEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseExportEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseExportEventsQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseExportEvents>>> = ({ signal }) => listFseExportEvents(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseExportEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseExportEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listFseExportEvents>>>
+export type ListFseExportEventsQueryError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>
+
+
+
+export function useListFseExportEvents<TData = Awaited<ReturnType<typeof listFseExportEvents>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(
+ id: number,
+    params?: ListFseExportEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseExportEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseExportEventsQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListFseExportLinesUrl = (id: number,
+    params?: ListFseExportLinesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/exportazioni/${id}/righe?${stringifiedParams}` : `/api/fse/exportazioni/${id}/righe`
+}
+
+export const listFseExportLines = async (id: number,
+    params?: ListFseExportLinesParams, options?: RequestInit): Promise<FseRecordPage> => {
+
+  return customFetch<FseRecordPage>(getListFseExportLinesUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseExportLinesQueryKey = (id: number,
+    params?: ListFseExportLinesParams,) => {
+    return [
+    `/api/fse/exportazioni/${id}/righe`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseExportLinesQueryOptions = <TData = Awaited<ReturnType<typeof listFseExportLines>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(id: number,
+    params?: ListFseExportLinesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseExportLines>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseExportLinesQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseExportLines>>> = ({ signal }) => listFseExportLines(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseExportLines>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseExportLinesQueryResult = NonNullable<Awaited<ReturnType<typeof listFseExportLines>>>
+export type ListFseExportLinesQueryError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>
+
+
+
+export function useListFseExportLines<TData = Awaited<ReturnType<typeof listFseExportLines>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(
+ id: number,
+    params?: ListFseExportLinesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseExportLines>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseExportLinesQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDownloadFseExportUrl = (id: number,
+    params?: DownloadFseExportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/exportazioni/${id}/download?${stringifiedParams}` : `/api/fse/exportazioni/${id}/download`
+}
+
+export const downloadFseExport = async (id: number,
+    params?: DownloadFseExportParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadFseExportUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadFseExportQueryKey = (id: number,
+    params?: DownloadFseExportParams,) => {
+    return [
+    `/api/fse/exportazioni/${id}/download`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getDownloadFseExportQueryOptions = <TData = Awaited<ReturnType<typeof downloadFseExport>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(id: number,
+    params?: DownloadFseExportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadFseExport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadFseExportQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadFseExport>>> = ({ signal }) => downloadFseExport(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadFseExport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadFseExportQueryResult = NonNullable<Awaited<ReturnType<typeof downloadFseExport>>>
+export type DownloadFseExportQueryError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>
+
+
+
+export function useDownloadFseExport<TData = Awaited<ReturnType<typeof downloadFseExport>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(
+ id: number,
+    params?: DownloadFseExportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadFseExport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadFseExportQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getMarkFseExportManuallyEnteredUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/exportazioni/${id}/marca-inserita`
+}
+
+export const markFseExportManuallyEntered = async (id: number,
+    fseMarkEnteredInput: FseMarkEnteredInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getMarkFseExportManuallyEnteredUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseMarkEnteredInput,)
+  }
+);}
+
+
+
+
+export const getMarkFseExportManuallyEnteredMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markFseExportManuallyEntered>>, TError,{id: number;data: BodyType<FseMarkEnteredInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markFseExportManuallyEntered>>, TError,{id: number;data: BodyType<FseMarkEnteredInput>}, TContext> => {
+
+const mutationKey = ['markFseExportManuallyEntered'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markFseExportManuallyEntered>>, {id: number;data: BodyType<FseMarkEnteredInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  markFseExportManuallyEntered(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkFseExportManuallyEnteredMutationResult = NonNullable<Awaited<ReturnType<typeof markFseExportManuallyEntered>>>
+    export type MarkFseExportManuallyEnteredMutationBody = BodyType<FseMarkEnteredInput>
+    export type MarkFseExportManuallyEnteredMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>
+
+    export const useMarkFseExportManuallyEntered = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markFseExportManuallyEntered>>, TError,{id: number;data: BodyType<FseMarkEnteredInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markFseExportManuallyEntered>>,
+        TError,
+        {id: number;data: BodyType<FseMarkEnteredInput>},
+        TContext
+      > => {
+      return useMutation(getMarkFseExportManuallyEnteredMutationOptions(options));
+    }
+
+export const getCancelFseExportUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/exportazioni/${id}/annulla`
+}
+
+export const cancelFseExport = async (id: number,
+    fseCancelInput: FseCancelInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getCancelFseExportUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseCancelInput,)
+  }
+);}
+
+
+
+
+export const getCancelFseExportMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelFseExport>>, TError,{id: number;data: BodyType<FseCancelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelFseExport>>, TError,{id: number;data: BodyType<FseCancelInput>}, TContext> => {
+
+const mutationKey = ['cancelFseExport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelFseExport>>, {id: number;data: BodyType<FseCancelInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  cancelFseExport(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelFseExportMutationResult = NonNullable<Awaited<ReturnType<typeof cancelFseExport>>>
+    export type CancelFseExportMutationBody = BodyType<FseCancelInput>
+    export type CancelFseExportMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>
+
+    export const useCancelFseExport = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelFseExport>>, TError,{id: number;data: BodyType<FseCancelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelFseExport>>,
+        TError,
+        {id: number;data: BodyType<FseCancelInput>},
+        TContext
+      > => {
+      return useMutation(getCancelFseExportMutationOptions(options));
+    }
+
+export const getListFseReconciliationsUrl = (params?: ListFseReconciliationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/riconciliazioni?${stringifiedParams}` : `/api/fse/riconciliazioni`
+}
+
+export const listFseReconciliations = async (params?: ListFseReconciliationsParams, options?: RequestInit): Promise<FseRecordPage> => {
+
+  return customFetch<FseRecordPage>(getListFseReconciliationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseReconciliationsQueryKey = (params?: ListFseReconciliationsParams,) => {
+    return [
+    `/api/fse/riconciliazioni`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseReconciliationsQueryOptions = <TData = Awaited<ReturnType<typeof listFseReconciliations>>, TError = ErrorType<FseForbiddenResponse>>(params?: ListFseReconciliationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReconciliations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseReconciliationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseReconciliations>>> = ({ signal }) => listFseReconciliations(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseReconciliations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseReconciliationsQueryResult = NonNullable<Awaited<ReturnType<typeof listFseReconciliations>>>
+export type ListFseReconciliationsQueryError = ErrorType<FseForbiddenResponse>
+
+
+
+export function useListFseReconciliations<TData = Awaited<ReturnType<typeof listFseReconciliations>>, TError = ErrorType<FseForbiddenResponse>>(
+ params?: ListFseReconciliationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReconciliations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseReconciliationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateFseReconciliationUrl = () => {
+
+
+
+
+  return `/api/fse/riconciliazioni`
+}
+
+export const createFseReconciliation = async (fseReconciliationInput: FseReconciliationInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getCreateFseReconciliationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseReconciliationInput,)
+  }
+);}
+
+
+
+
+export const getCreateFseReconciliationMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseReconciliation>>, TError,{data: BodyType<FseReconciliationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFseReconciliation>>, TError,{data: BodyType<FseReconciliationInput>}, TContext> => {
+
+const mutationKey = ['createFseReconciliation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFseReconciliation>>, {data: BodyType<FseReconciliationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFseReconciliation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFseReconciliationMutationResult = NonNullable<Awaited<ReturnType<typeof createFseReconciliation>>>
+    export type CreateFseReconciliationMutationBody = BodyType<FseReconciliationInput>
+    export type CreateFseReconciliationMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>
+
+    export const useCreateFseReconciliation = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseReconciliation>>, TError,{data: BodyType<FseReconciliationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFseReconciliation>>,
+        TError,
+        {data: BodyType<FseReconciliationInput>},
+        TContext
+      > => {
+      return useMutation(getCreateFseReconciliationMutationOptions(options));
+    }
+
+export const getGetFseReconciliationUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/riconciliazioni/${id}`
+}
+
+export const getFseReconciliation = async (id: number, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getGetFseReconciliationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFseReconciliationQueryKey = (id: number,) => {
+    return [
+    `/api/fse/riconciliazioni/${id}`
+    ] as const;
+    }
+
+
+export const getGetFseReconciliationQueryOptions = <TData = Awaited<ReturnType<typeof getFseReconciliation>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFseReconciliation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFseReconciliationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFseReconciliation>>> = ({ signal }) => getFseReconciliation(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFseReconciliation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFseReconciliationQueryResult = NonNullable<Awaited<ReturnType<typeof getFseReconciliation>>>
+export type GetFseReconciliationQueryError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>
+
+
+
+export function useGetFseReconciliation<TData = Awaited<ReturnType<typeof getFseReconciliation>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFseReconciliation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFseReconciliationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListFseReconciliationLinesUrl = (id: number,
+    params?: ListFseReconciliationLinesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/riconciliazioni/${id}/righe?${stringifiedParams}` : `/api/fse/riconciliazioni/${id}/righe`
+}
+
+export const listFseReconciliationLines = async (id: number,
+    params?: ListFseReconciliationLinesParams, options?: RequestInit): Promise<FseReconciliationRowsPage> => {
+
+  return customFetch<FseReconciliationRowsPage>(getListFseReconciliationLinesUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseReconciliationLinesQueryKey = (id: number,
+    params?: ListFseReconciliationLinesParams,) => {
+    return [
+    `/api/fse/riconciliazioni/${id}/righe`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseReconciliationLinesQueryOptions = <TData = Awaited<ReturnType<typeof listFseReconciliationLines>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(id: number,
+    params?: ListFseReconciliationLinesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReconciliationLines>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseReconciliationLinesQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseReconciliationLines>>> = ({ signal }) => listFseReconciliationLines(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseReconciliationLines>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseReconciliationLinesQueryResult = NonNullable<Awaited<ReturnType<typeof listFseReconciliationLines>>>
+export type ListFseReconciliationLinesQueryError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>
+
+
+
+export function useListFseReconciliationLines<TData = Awaited<ReturnType<typeof listFseReconciliationLines>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(
+ id: number,
+    params?: ListFseReconciliationLinesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseReconciliationLines>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseReconciliationLinesQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRecalculateFseReconciliationUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/riconciliazioni/${id}/ricalcola`
+}
+
+export const recalculateFseReconciliation = async (id: number,
+    fseVersionInput: FseVersionInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getRecalculateFseReconciliationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseVersionInput,)
+  }
+);}
+
+
+
+
+export const getRecalculateFseReconciliationMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recalculateFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext> => {
+
+const mutationKey = ['recalculateFseReconciliation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recalculateFseReconciliation>>, {id: number;data: BodyType<FseVersionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  recalculateFseReconciliation(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecalculateFseReconciliationMutationResult = NonNullable<Awaited<ReturnType<typeof recalculateFseReconciliation>>>
+    export type RecalculateFseReconciliationMutationBody = BodyType<FseVersionInput>
+    export type RecalculateFseReconciliationMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>
+
+    export const useRecalculateFseReconciliation = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recalculateFseReconciliation>>,
+        TError,
+        {id: number;data: BodyType<FseVersionInput>},
+        TContext
+      > => {
+      return useMutation(getRecalculateFseReconciliationMutationOptions(options));
+    }
+
+export const getResolveFseReconciliationLineUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/fse/riconciliazioni/${id}/righe/${rigaId}`
+}
+
+export const resolveFseReconciliationLine = async (id: number,
+    rigaId: number,
+    fseResolutionInput: FseResolutionInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getResolveFseReconciliationLineUrl(id,rigaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseResolutionInput,)
+  }
+);}
+
+
+
+
+export const getResolveFseReconciliationLineMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveFseReconciliationLine>>, TError,{id: number;rigaId: number;data: BodyType<FseResolutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveFseReconciliationLine>>, TError,{id: number;rigaId: number;data: BodyType<FseResolutionInput>}, TContext> => {
+
+const mutationKey = ['resolveFseReconciliationLine'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveFseReconciliationLine>>, {id: number;rigaId: number;data: BodyType<FseResolutionInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  resolveFseReconciliationLine(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveFseReconciliationLineMutationResult = NonNullable<Awaited<ReturnType<typeof resolveFseReconciliationLine>>>
+    export type ResolveFseReconciliationLineMutationBody = BodyType<FseResolutionInput>
+    export type ResolveFseReconciliationLineMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>
+
+    export const useResolveFseReconciliationLine = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveFseReconciliationLine>>, TError,{id: number;rigaId: number;data: BodyType<FseResolutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveFseReconciliationLine>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<FseResolutionInput>},
+        TContext
+      > => {
+      return useMutation(getResolveFseReconciliationLineMutationOptions(options));
+    }
+
+export const getCloseFseReconciliationUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/riconciliazioni/${id}/chiudi`
+}
+
+export const closeFseReconciliation = async (id: number,
+    fseVersionInput: FseVersionInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getCloseFseReconciliationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseVersionInput,)
+  }
+);}
+
+
+
+
+export const getCloseFseReconciliationMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof closeFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext> => {
+
+const mutationKey = ['closeFseReconciliation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeFseReconciliation>>, {id: number;data: BodyType<FseVersionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  closeFseReconciliation(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloseFseReconciliationMutationResult = NonNullable<Awaited<ReturnType<typeof closeFseReconciliation>>>
+    export type CloseFseReconciliationMutationBody = BodyType<FseVersionInput>
+    export type CloseFseReconciliationMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>
+
+    export const useCloseFseReconciliation = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof closeFseReconciliation>>,
+        TError,
+        {id: number;data: BodyType<FseVersionInput>},
+        TContext
+      > => {
+      return useMutation(getCloseFseReconciliationMutationOptions(options));
+    }
+
+export const getCancelFseReconciliationUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/riconciliazioni/${id}/annulla`
+}
+
+export const cancelFseReconciliation = async (id: number,
+    fseVersionInput: FseVersionInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getCancelFseReconciliationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseVersionInput,)
+  }
+);}
+
+
+
+
+export const getCancelFseReconciliationMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext> => {
+
+const mutationKey = ['cancelFseReconciliation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelFseReconciliation>>, {id: number;data: BodyType<FseVersionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  cancelFseReconciliation(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelFseReconciliationMutationResult = NonNullable<Awaited<ReturnType<typeof cancelFseReconciliation>>>
+    export type CancelFseReconciliationMutationBody = BodyType<FseVersionInput>
+    export type CancelFseReconciliationMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>
+
+    export const useCancelFseReconciliation = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelFseReconciliation>>, TError,{id: number;data: BodyType<FseVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelFseReconciliation>>,
+        TError,
+        {id: number;data: BodyType<FseVersionInput>},
+        TContext
+      > => {
+      return useMutation(getCancelFseReconciliationMutationOptions(options));
+    }
+
+export const getListFseMonitoringUrl = (params?: ListFseMonitoringParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse/monitoraggio?${stringifiedParams}` : `/api/fse/monitoraggio`
+}
+
+export const listFseMonitoring = async (params?: ListFseMonitoringParams, options?: RequestInit): Promise<FseRecordPage> => {
+
+  return customFetch<FseRecordPage>(getListFseMonitoringUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseMonitoringQueryKey = (params?: ListFseMonitoringParams,) => {
+    return [
+    `/api/fse/monitoraggio`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseMonitoringQueryOptions = <TData = Awaited<ReturnType<typeof listFseMonitoring>>, TError = ErrorType<FseForbiddenResponse>>(params?: ListFseMonitoringParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseMonitoring>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseMonitoringQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseMonitoring>>> = ({ signal }) => listFseMonitoring(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseMonitoring>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseMonitoringQueryResult = NonNullable<Awaited<ReturnType<typeof listFseMonitoring>>>
+export type ListFseMonitoringQueryError = ErrorType<FseForbiddenResponse>
+
+
+
+export function useListFseMonitoring<TData = Awaited<ReturnType<typeof listFseMonitoring>>, TError = ErrorType<FseForbiddenResponse>>(
+ params?: ListFseMonitoringParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseMonitoring>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseMonitoringQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateFseMonitoringUrl = () => {
+
+
+
+
+  return `/api/fse/monitoraggio`
+}
+
+export const createFseMonitoring = async (fseMonitoringInput: FseMonitoringInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getCreateFseMonitoringUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseMonitoringInput,)
+  }
+);}
+
+
+
+
+export const getCreateFseMonitoringMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseMonitoring>>, TError,{data: BodyType<FseMonitoringInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFseMonitoring>>, TError,{data: BodyType<FseMonitoringInput>}, TContext> => {
+
+const mutationKey = ['createFseMonitoring'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFseMonitoring>>, {data: BodyType<FseMonitoringInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFseMonitoring(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFseMonitoringMutationResult = NonNullable<Awaited<ReturnType<typeof createFseMonitoring>>>
+    export type CreateFseMonitoringMutationBody = BodyType<FseMonitoringInput>
+    export type CreateFseMonitoringMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>
+
+    export const useCreateFseMonitoring = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseMonitoring>>, TError,{data: BodyType<FseMonitoringInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFseMonitoring>>,
+        TError,
+        {data: BodyType<FseMonitoringInput>},
+        TContext
+      > => {
+      return useMutation(getCreateFseMonitoringMutationOptions(options));
+    }
+
+export const getUpdateFseMonitoringUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/monitoraggio/${id}`
+}
+
+export const updateFseMonitoring = async (id: number,
+    fseMonitoringUpdate: FseMonitoringUpdate, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getUpdateFseMonitoringUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseMonitoringUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateFseMonitoringMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFseMonitoring>>, TError,{id: number;data: BodyType<FseMonitoringUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateFseMonitoring>>, TError,{id: number;data: BodyType<FseMonitoringUpdate>}, TContext> => {
+
+const mutationKey = ['updateFseMonitoring'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateFseMonitoring>>, {id: number;data: BodyType<FseMonitoringUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateFseMonitoring(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateFseMonitoringMutationResult = NonNullable<Awaited<ReturnType<typeof updateFseMonitoring>>>
+    export type UpdateFseMonitoringMutationBody = BodyType<FseMonitoringUpdate>
+    export type UpdateFseMonitoringMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>
+
+    export const useUpdateFseMonitoring = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFseMonitoring>>, TError,{id: number;data: BodyType<FseMonitoringUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateFseMonitoring>>,
+        TError,
+        {id: number;data: BodyType<FseMonitoringUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateFseMonitoringMutationOptions(options));
+    }
+
+export const getCreateFseOpcReturnUrl = () => {
+
+
+
+
+  return `/api/fse/resi-opc`
+}
+
+/**
+ * @summary Registra un reso FSE+ verso OpC nel ledger condiviso
+ */
+export const createFseOpcReturn = async (fseOpcReturnInput: FseOpcReturnInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getCreateFseOpcReturnUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseOpcReturnInput,)
+  }
+);}
+
+
+
+
+export const getCreateFseOpcReturnMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseOpcReturn>>, TError,{data: BodyType<FseOpcReturnInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFseOpcReturn>>, TError,{data: BodyType<FseOpcReturnInput>}, TContext> => {
+
+const mutationKey = ['createFseOpcReturn'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFseOpcReturn>>, {data: BodyType<FseOpcReturnInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFseOpcReturn(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFseOpcReturnMutationResult = NonNullable<Awaited<ReturnType<typeof createFseOpcReturn>>>
+    export type CreateFseOpcReturnMutationBody = BodyType<FseOpcReturnInput>
+    export type CreateFseOpcReturnMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>
+
+    /**
+ * @summary Registra un reso FSE+ verso OpC nel ledger condiviso
+ */
+export const useCreateFseOpcReturn = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseOpcReturn>>, TError,{data: BodyType<FseOpcReturnInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFseOpcReturn>>,
+        TError,
+        {data: BodyType<FseOpcReturnInput>},
+        TContext
+      > => {
+      return useMutation(getCreateFseOpcReturnMutationOptions(options));
+    }
+
+export const getReverseFseOpcReturnUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse/resi-opc/${id}/storno`
+}
+
+/**
+ * @summary Storna un reso OpC mediante movimento compensativo
+ */
+export const reverseFseOpcReturn = async (id: number,
+    fseOpcReturnReversalInput: FseOpcReturnReversalInput, options?: RequestInit): Promise<FseRecord> => {
+
+  return customFetch<FseRecord>(getReverseFseOpcReturnUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseOpcReturnReversalInput,)
+  }
+);}
+
+
+
+
+export const getReverseFseOpcReturnMutationOptions = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reverseFseOpcReturn>>, TError,{id: number;data: BodyType<FseOpcReturnReversalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reverseFseOpcReturn>>, TError,{id: number;data: BodyType<FseOpcReturnReversalInput>}, TContext> => {
+
+const mutationKey = ['reverseFseOpcReturn'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reverseFseOpcReturn>>, {id: number;data: BodyType<FseOpcReturnReversalInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reverseFseOpcReturn(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReverseFseOpcReturnMutationResult = NonNullable<Awaited<ReturnType<typeof reverseFseOpcReturn>>>
+    export type ReverseFseOpcReturnMutationBody = BodyType<FseOpcReturnReversalInput>
+    export type ReverseFseOpcReturnMutationError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>
+
+    /**
+ * @summary Storna un reso OpC mediante movimento compensativo
+ */
+export const useReverseFseOpcReturn = <TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse | FseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reverseFseOpcReturn>>, TError,{id: number;data: BodyType<FseOpcReturnReversalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reverseFseOpcReturn>>,
+        TError,
+        {id: number;data: BodyType<FseOpcReturnReversalInput>},
+        TContext
+      > => {
+      return useMutation(getReverseFseOpcReturnMutationOptions(options));
+    }
+
 export const getListLottiUrl = (params?: ListLottiParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1643,6 +4873,78 @@ export function useGetLotto<TData = Awaited<ReturnType<typeof getLotto>>, TError
 
 
 
+export const getUpdateLottoUrl = (id: number,) => {
+
+
+
+
+  return `/api/lotti/${id}`
+}
+
+/**
+ * @summary Aggiorna esclusivamente le note non identificative della Partita
+ */
+export const updateLotto = async (id: number,
+    lottoUpdate: LottoUpdate, options?: RequestInit): Promise<Lotto> => {
+
+  return customFetch<Lotto>(getUpdateLottoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lottoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateLottoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext> => {
+
+const mutationKey = ['updateLotto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLotto>>, {id: number;data: BodyType<LottoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateLotto(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateLotto>>>
+    export type UpdateLottoMutationBody = BodyType<LottoUpdate>
+    export type UpdateLottoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Aggiorna esclusivamente le note non identificative della Partita
+ */
+export const useUpdateLotto = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateLotto>>,
+        TError,
+        {id: number;data: BodyType<LottoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateLottoMutationOptions(options));
+    }
+
 export const getRettificaLottoUrl = (id: number,) => {
 
 
@@ -1713,72 +5015,6 @@ export const useRettificaLotto = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRettificaLottoMutationOptions(options));
-    }
-
-export const getUpdateLottoUrl = (id: number,) => {
-
-
-
-
-  return `/api/lotti/${id}/rettifica`
-}
-
-export const updateLotto = async (id: number,
-    lottoUpdate: LottoUpdate, options?: RequestInit): Promise<Lotto> => {
-
-  return customFetch<Lotto>(getUpdateLottoUrl(id),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      lottoUpdate,)
-  }
-);}
-
-
-
-
-export const getUpdateLottoMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext> => {
-
-const mutationKey = ['updateLotto'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLotto>>, {id: number;data: BodyType<LottoUpdate>}> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  updateLotto(id,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateLottoMutationResult = NonNullable<Awaited<ReturnType<typeof updateLotto>>>
-    export type UpdateLottoMutationBody = BodyType<LottoUpdate>
-    export type UpdateLottoMutationError = ErrorType<unknown>
-
-    export const useUpdateLotto = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLotto>>, TError,{id: number;data: BodyType<LottoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof updateLotto>>,
-        TError,
-        {id: number;data: BodyType<LottoUpdate>},
-        TContext
-      > => {
-      return useMutation(getUpdateLottoMutationOptions(options));
     }
 
 export const getListMovimentiUrl = (params?: ListMovimentiParams,) => {
@@ -16506,7 +19742,8 @@ export const getReportFsePlusUrl = (params?: ReportFsePlusParams,) => {
 }
 
 /**
- * @summary FSE+ annual distribution report
+ * @deprecated
+ * @summary FSE+ annual distribution report (legacy; use /report/fse-plus/integrato)
  */
 export const reportFsePlus = async (params?: ReportFsePlusParams, options?: RequestInit): Promise<ReportFsePlus> => {
 
@@ -16553,7 +19790,8 @@ export type ReportFsePlusQueryError = ErrorType<unknown>
 
 
 /**
- * @summary FSE+ annual distribution report
+ * @deprecated
+ * @summary FSE+ annual distribution report (legacy; use /report/fse-plus/integrato)
  */
 
 export function useReportFsePlus<TData = Awaited<ReturnType<typeof reportFsePlus>>, TError = ErrorType<unknown>>(

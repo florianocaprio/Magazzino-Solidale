@@ -4,23 +4,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from
 import request from "supertest";
 import { pool } from "@workspace/db";
 import reportRouter from "../src/routes/report";
-import {
-  makeScopedApp,
-  newScope,
-  cleanup,
-  type SeedScope,
-  createCentro,
-  createMagazzino,
-  createMagazzinoRec,
-  createProdotto,
-  createBeneficiario,
-  createUtente,
-  createAreaOperativa,
-  createLotto,
-  insertConsegna,
-  insertBolla,
-  insertBollaRiga,
-} from "./scope-helpers";
+import { makeScopedApp, newScope, cleanup, type SeedScope, createCentro, createMagazzino, createMagazzinoRec, createProdotto, createBeneficiario, createUtente, createAreaOperativa, createLotto, insertConsegna, insertBolla, insertBollaRiga, insertMovimento } from "./scope-helpers";
 
 /**
  * Area Operativa-level data filtering on the global reports (B5).
@@ -40,8 +24,7 @@ let areaOperativaB: number;
 let magNull: number;
 let prod: number;
 
-const appAs = (centro: number | null, areaOperativa: number | null) =>
-  makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro, areaOperativaId: areaOperativa });
+const appAs = (centro: number | null, areaOperativa: number | null) => makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro, areaOperativaId: areaOperativa });
 
 beforeAll(async () => {
   bootScope = newScope();
@@ -98,8 +81,7 @@ describe("Report — filtro ?areaOperativaId (admin globale)", () => {
   });
 
   it("consegne-per-mese: ?areaOperativaId isola la consegna della area operativa scelta", async () => {
-    const monthTotal = (body: Array<{ mese: string; totConsegne: number }>, mese: string) =>
-      body.find((r) => r.mese === mese)?.totConsegne ?? 0;
+    const monthTotal = (body: Array<{ mese: string; totConsegne: number }>, mese: string) => body.find((r) => r.mese === mese)?.totConsegne ?? 0;
     const q = "/report/consegne-per-mese?da=2026-01-01&a=2026-12-31";
 
     const beforeFiltered = monthTotal((await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body, "2026-06");
@@ -122,21 +104,37 @@ describe("Report — filtro ?areaOperativaId (admin globale)", () => {
 
   it("fse-plus: ?areaOperativaId conta solo i beneficiari FSE+ della area operativa scelta", async () => {
     const q = "/report/fse-plus?anno=2026";
-    const beforeFiltered = (await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body
-      .beneficiariTotali as number;
+    const beforeFiltered = (await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body.beneficiariTotali as number;
 
     const benA = await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaA });
     const lotA = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 5, fsePlus: true });
     const bolA = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magNull, stato: "consegnato" });
-    await insertBollaRiga(scope, { bollaId: bolA, prodottoId: prod, lottoId: lotA, quantita: 5 });
+    const rowA = await insertBollaRiga(scope, { bollaId: bolA, prodottoId: prod, lottoId: lotA, quantita: 5 });
+    await insertMovimento(scope, {
+      magazzinoId: magNull,
+      prodottoId: prod,
+      lottoId: lotA,
+      bollaRigaId: rowA,
+      tipoMovimento: "scarico",
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+      fondoOrigine: "FSE_PLUS",
+    });
 
     const benB = await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaB });
     const lotB = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 5, fsePlus: true });
     const bolB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull, stato: "consegnato" });
-    await insertBollaRiga(scope, { bollaId: bolB, prodottoId: prod, lottoId: lotB, quantita: 5 });
+    const rowB = await insertBollaRiga(scope, { bollaId: bolB, prodottoId: prod, lottoId: lotB, quantita: 5 });
+    await insertMovimento(scope, {
+      magazzinoId: magNull,
+      prodottoId: prod,
+      lottoId: lotB,
+      bollaRigaId: rowB,
+      tipoMovimento: "scarico",
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+      fondoOrigine: "FSE_PLUS",
+    });
 
-    const afterFiltered = (await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body
-      .beneficiariTotali as number;
+    const afterFiltered = (await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body.beneficiariTotali as number;
     // Only area operativa-A's FSE+ beneficiary is counted under ?areaOperativaId=A.
     expect(afterFiltered).toBe(beforeFiltered + 1);
   });
@@ -144,8 +142,7 @@ describe("Report — filtro ?areaOperativaId (admin globale)", () => {
 
 describe("Report — ?areaOperativaId NON è un leak per chiamanti scoped", () => {
   it("consegne-per-mese: uno scoped su area operativa A che chiede ?areaOperativaId=B non vede nulla di B", async () => {
-    const monthTotal = (body: Array<{ mese: string; totConsegne: number }>, mese: string) =>
-      body.find((r) => r.mese === mese)?.totConsegne ?? 0;
+    const monthTotal = (body: Array<{ mese: string; totConsegne: number }>, mese: string) => body.find((r) => r.mese === mese)?.totConsegne ?? 0;
     const q = "/report/consegne-per-mese?da=2026-01-01&a=2026-12-31";
 
     // Caller is scoped to area operativa A.

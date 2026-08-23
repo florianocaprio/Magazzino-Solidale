@@ -49,6 +49,8 @@ import {
   normalizeTransferRows,
   TransferRequestError,
 } from "../lib/transferWorkflow";
+import { InventoryDecimal } from "../lib/inventoryDecimal";
+import { resolveInventoryQuantityDimensions } from "../lib/inventoryQuantityDimensions";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -214,7 +216,10 @@ async function fseBreakdownTrasferimenti(ids: number[]) {
   return result;
 }
 
-async function impegnatoAttivoLotto(tx: Tx, lottoId: number): Promise<number> {
+async function impegnatoAttivoLotto(
+  tx: Tx,
+  lottoId: number,
+): Promise<InventoryDecimal> {
   const [res] = await tx
     .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
     .from(prenotazioniMagazzinoTable)
@@ -224,7 +229,7 @@ async function impegnatoAttivoLotto(tx: Tx, lottoId: number): Promise<number> {
         eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
       ),
     );
-  return parseDbNumber(res?.totale);
+  return InventoryDecimal.parse(res?.totale ?? "0");
 }
 
 /**
@@ -238,15 +243,16 @@ async function trasferimentoUscitaFEFO(
   opts: {
     prodottoId: number;
     magazzinoId: number;
-    quantita: number;
+    quantita: string | number;
     unitaMisura: string;
     dataMovimento: string;
     trasferimentoId: number;
+    rigaOrigineId: number;
     trasferimentoCodice: string;
     operatoreId: number;
   },
 ) {
-  let rimanente = opts.quantita;
+  let rimanente = InventoryDecimal.parse(opts.quantita);
   const lotti = await tx
     .select()
     .from(lottiTable)
@@ -265,19 +271,25 @@ async function trasferimentoUscitaFEFO(
     .for("update");
 
   for (const lotto of lotti) {
-    if (rimanente <= 0) break;
-    const disp = parseDbNumber(lotto.quantitaResidua);
-    const disponibileReale = Math.max(
-      0,
-      disp - (await impegnatoAttivoLotto(tx, lotto.id)),
-    );
-    const scala = Math.min(disponibileReale, rimanente);
-    if (scala <= 0) continue;
+    if (!rimanente.isPositive()) break;
+    const disp = InventoryDecimal.parse(lotto.quantitaResidua);
+    const netto = disp.subtract(await impegnatoAttivoLotto(tx, lotto.id));
+    const disponibileReale = netto.isNegative()
+      ? InventoryDecimal.zero()
+      : netto;
+    const scala = disponibileReale.min(rimanente);
+    if (!scala.isPositive()) continue;
 
     await tx
       .update(lottiTable)
-      .set({ quantitaResidua: (disp - scala).toFixed(2) })
+      .set({ quantitaResidua: disp.subtract(scala).toDb() })
       .where(eq(lottiTable.id, lotto.id));
+
+    const dimensions = resolveInventoryQuantityDimensions({
+      quantitaOperativa: scala.toDb(),
+      unitaMisura: opts.unitaMisura,
+      fattorePartita: lotto.fattoreKgLtPezzo,
+    });
 
     await tx.insert(movimentiTable).values({
       tipoMovimento: "trasferimento",
@@ -286,18 +298,27 @@ async function trasferimentoUscitaFEFO(
       magazzinoId: opts.magazzinoId,
       prodottoId: opts.prodottoId,
       lottoId: lotto.id,
-      quantita: scala.toFixed(2),
+      quantita: scala.toDb(),
+      quantitaPezzi: dimensions.quantitaPezzi,
+      quantitaKgLt: dimensions.quantitaKgLt,
+      fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
       unitaMisura: opts.unitaMisura,
       fornitoreId: lotto.fornitoreId,
       operatoreId: opts.operatoreId,
       trasferimentoId: opts.trasferimentoId,
+      fondoOrigine: lotto.fondoOrigine,
+      naturaContabile: "TRASFERIMENTO_INTERNO_USCITA",
+      dominioOrigine: "TRASFERIMENTO",
+      entitaOrigineTipo: "trasferimento",
+      entitaOrigineId: opts.trasferimentoId,
+      rigaOrigineId: opts.rigaOrigineId,
       documentoRiferimento: opts.trasferimentoCodice,
       note: `Trasferimento ${opts.trasferimentoCodice} — uscita`,
     });
 
-    rimanente = Math.round((rimanente - scala) * 100) / 100;
+    rimanente = rimanente.subtract(scala);
   }
-  if (rimanente > 0) {
+  if (rimanente.isPositive()) {
     throw new Error(
       "Disponibilità FEFO insufficiente o composta solo da lotti scaduti",
     );
@@ -698,7 +719,7 @@ router.post("/trasferimenti", async (req, res) => {
   }
   const righeInput: Array<{
     prodottoId: number;
-    quantita: number;
+    quantita: string | number;
     unitaMisura?: string;
   }> = body.righe ?? [];
   if (
@@ -706,9 +727,7 @@ router.post("/trasferimenti", async (req, res) => {
     righeInput.some(
       (r) =>
         !Number.isSafeInteger(r.prodottoId) ||
-        r.prodottoId <= 0 ||
-        !Number.isFinite(r.quantita) ||
-        r.quantita <= 0,
+        r.prodottoId <= 0,
     )
   ) {
     res.status(400).json({
@@ -1066,11 +1085,13 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const prodottoMap = new Map(prodotti.map((p) => [p.id, p.nome]));
 
   // Valida la disponibilità all'origine sommando per prodotto.
-  const richiestaPerProdotto = new Map<number, number>();
+  const richiestaPerProdotto = new Map<number, InventoryDecimal>();
   for (const r of righe) {
     richiestaPerProdotto.set(
       r.prodottoId,
-      (richiestaPerProdotto.get(r.prodottoId) ?? 0) + parseFloat(r.quantita),
+      (richiestaPerProdotto.get(r.prodottoId) ?? InventoryDecimal.zero()).add(
+        InventoryDecimal.parse(r.quantita),
+      ),
     );
   }
   for (const [prodottoId, richiesta] of richiestaPerProdotto) {
@@ -1078,11 +1099,19 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
       prodottoId,
       current.magazzinoOrigineId,
     );
-    const disp = Math.max(0, disponibilita.disponibileReale);
-    if (richiesta > disp) {
+    const available = InventoryDecimal.parse(
+      disponibilita.disponibileRealePrecisa,
+      { allowNegative: true },
+    );
+    const disp = available.isNegative() ? InventoryDecimal.zero() : available;
+    if (richiesta.compare(disp) > 0) {
       if (
-        richiesta <= disponibilita.giacenzaFisica &&
-        disponibilita.giacenzaScaduta > 0
+        richiesta.compare(
+          InventoryDecimal.parse(disponibilita.giacenzaFisicaPrecisa),
+        ) <= 0 &&
+        InventoryDecimal.parse(
+          disponibilita.giacenzaScadutaPrecisa,
+        ).isPositive()
       ) {
         res.status(409).json({
           error:
@@ -1091,7 +1120,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
         return;
       }
       res.status(400).json({
-        error: `Disponibilità insufficiente all'origine per ${prodottoMap.get(prodottoId) ?? `prodotto #${prodottoId}`}: ${disp} disponibili, richiesti ${richiesta}`,
+        error: `Disponibilità insufficiente all'origine per ${prodottoMap.get(prodottoId) ?? `prodotto #${prodottoId}`}: ${disp.toCanonical()} disponibili, richiesti ${richiesta.toCanonical()}`,
       });
       return;
     }
@@ -1123,10 +1152,11 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
         await trasferimentoUscitaFEFO(tx, {
           prodottoId: r.prodottoId,
           magazzinoId: current.magazzinoOrigineId,
-          quantita: parseFloat(r.quantita),
+          quantita: r.quantita,
           unitaMisura: r.unitaMisura,
           dataMovimento: dataEsecuzione,
           trasferimentoId: id,
+          rigaOrigineId: r.id,
           trasferimentoCodice: current.codice,
           operatoreId: req.user!.id,
         });
@@ -1258,21 +1288,79 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
 
       for (const u of uscite) {
         const qty = u.m.quantita;
-        const [destLotto] = await tx
-          .insert(lottiTable)
-          .values({
-            prodottoId: u.m.prodottoId,
-            codiceLotto: u.lotto?.codiceLotto ?? null,
-            dataScadenza: u.lotto?.dataScadenza ?? null,
-            dataCarico: dataConferma,
-            quantitaCaricata: qty,
-            quantitaResidua: qty,
-            magazzinoId: current.magazzinoDestinoId,
-            fornitoreId: u.lotto?.fornitoreId ?? null,
-            fsePlus: u.lotto?.fsePlus ?? false,
-            note: `Da trasferimento ${current.codice}`,
-          })
-          .returning();
+        let destLotto: typeof lottiTable.$inferSelect | undefined;
+        const normalized = u.lotto?.codiceLottoNormalizzato ?? null;
+        if (normalized != null) {
+          const lockKey = `${current.magazzinoDestinoId}:${u.m.prodottoId}:${u.m.fondoOrigine}:${normalized}`;
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+          );
+          [destLotto] = await tx
+            .select()
+            .from(lottiTable)
+            .where(
+              and(
+                eq(lottiTable.magazzinoId, current.magazzinoDestinoId),
+                eq(lottiTable.prodottoId, u.m.prodottoId),
+                eq(lottiTable.fondoOrigine, u.m.fondoOrigine),
+                eq(lottiTable.codiceLottoNormalizzato, normalized),
+              ),
+            )
+            .for("update");
+        }
+        if (destLotto) {
+          if (
+            (destLotto.dataScadenza ?? null) !== (u.lotto?.dataScadenza ?? null)
+          ) {
+            throw new Error("PARTITA_DESTINAZIONE_INCOERENTE");
+          }
+          if (
+            destLotto.fattoreKgLtPezzo != null &&
+            u.m.fattoreKgLtPezzo != null &&
+            destLotto.fattoreKgLtPezzo !== u.m.fattoreKgLtPezzo
+          ) {
+            throw new Error("PARTITA_DESTINAZIONE_FATTORE_INCOERENTE");
+          }
+          const increment = InventoryDecimal.parse(qty);
+          [destLotto] = await tx
+            .update(lottiTable)
+            .set({
+              quantitaCaricata: InventoryDecimal.parse(
+                destLotto.quantitaCaricata,
+              )
+                .add(increment)
+                .toDb(),
+              quantitaResidua: InventoryDecimal.parse(destLotto.quantitaResidua)
+                .add(increment)
+                .toDb(),
+              dataUltimoCarico: dataConferma,
+              fattoreKgLtPezzo:
+                destLotto.fattoreKgLtPezzo ?? u.m.fattoreKgLtPezzo,
+            })
+            .where(eq(lottiTable.id, destLotto.id))
+            .returning();
+        } else {
+          [destLotto] = await tx
+            .insert(lottiTable)
+            .values({
+              prodottoId: u.m.prodottoId,
+              codiceLotto: u.lotto?.codiceLotto ?? null,
+              codiceLottoNormalizzato: normalized,
+              dataScadenza: u.lotto?.dataScadenza ?? null,
+              dataCarico: dataConferma,
+              dataUltimoCarico: dataConferma,
+              quantitaCaricata: qty,
+              quantitaResidua: qty,
+              magazzinoId: current.magazzinoDestinoId,
+              fornitoreId: u.lotto?.fornitoreId ?? null,
+              fsePlus: u.m.fondoOrigine === "FSE_PLUS",
+              fondoOrigine: u.m.fondoOrigine,
+              fattoreKgLtPezzo:
+                u.m.fattoreKgLtPezzo ?? u.lotto?.fattoreKgLtPezzo ?? null,
+              note: `Da trasferimento ${current.codice}`,
+            })
+            .returning();
+        }
 
         await tx.insert(movimentiTable).values({
           tipoMovimento: "trasferimento",
@@ -1282,10 +1370,20 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           prodottoId: u.m.prodottoId,
           lottoId: destLotto.id,
           quantita: qty,
+          quantitaPezzi: u.m.quantitaPezzi,
+          quantitaKgLt: u.m.quantitaKgLt,
+          fattoreKgLtPezzo: u.m.fattoreKgLtPezzo,
           unitaMisura: u.m.unitaMisura,
           fornitoreId: u.lotto?.fornitoreId ?? null,
           operatoreId: req.user!.id,
           trasferimentoId: id,
+          movimentoOrigineId: u.m.id,
+          fondoOrigine: u.m.fondoOrigine,
+          naturaContabile: "TRASFERIMENTO_INTERNO_ENTRATA",
+          dominioOrigine: "TRASFERIMENTO",
+          entitaOrigineTipo: "trasferimento",
+          entitaOrigineId: id,
+          rigaOrigineId: u.m.rigaOrigineId,
           documentoRiferimento: current.codice,
           note: `Trasferimento ${current.codice} — entrata`,
         });

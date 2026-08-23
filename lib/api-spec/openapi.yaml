@@ -11,6 +11,9 @@ tags:
   - name: dashboard
   - name: magazzini
   - name: prodotti
+  - name: carichi
+  - name: agea
+  - name: fse
   - name: lotti
   - name: movimenti
   - name: giacenze
@@ -322,6 +325,1089 @@ paths:
               schema:
                 $ref: "#/components/schemas/Fornitore"
 
+  # ─── CARICHI MAGAZZINO 2.0 ───────────────────────────────────────────────────
+  /carichi:
+    get:
+      operationId: listCarichi
+      tags: [carichi]
+      parameters:
+        - name: magazzinoId
+          in: query
+          schema: { type: integer }
+        - name: origineCarico
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrigineCarico"
+        - name: da
+          in: query
+          schema: { type: string, format: date }
+        - name: a
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Elenco delle testate di carico visibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaricoMagazzino"
+    post:
+      operationId: createCarico
+      tags: [carichi]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoMagazzinoInput"
+      responses:
+        "200":
+          description: Replay idempotente verificato per contenuto e Magazzino
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoMagazzinoDettaglio"
+        "201":
+          description: Carico multi-riga contabilizzato atomicamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoMagazzinoDettaglio"
+
+  /carichi/{id}:
+    get:
+      operationId: getCarico
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Carico con righe e Partite collegate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoMagazzinoDettaglio"
+
+  /carichi/{id}/righe:
+    get:
+      operationId: listCaricoRighe
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Righe del carico
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaricoMagazzinoRiga"
+
+  # ─── IMPORT AGEA/SIFEAD 2.0B ────────────────────────────────────────────────
+  /agea/importazioni:
+    get:
+      operationId: listAgeaImportazioni
+      tags: [agea]
+      summary: Elenca le importazioni AGEA visibili nello scope Magazzino/Area/Centro
+      responses:
+        "200":
+          description: Importazioni visibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeaImportazione" }
+
+  /agea/importazioni/analizza:
+    post:
+      operationId: analyzeAgeaImportazione
+      tags: [agea]
+      summary: Analizza localmente un registro XLSX senza modificare lo stock
+      parameters:
+        - {
+            name: magazzinoId,
+            in: query,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: modalita,
+            in: query,
+            required: true,
+            schema: { $ref: "#/components/schemas/AgeaImportModalita" },
+          }
+        - {
+            name: nomeFile,
+            in: query,
+            required: true,
+            schema: { type: string, maxLength: 255, pattern: ".*\\.xlsx$" },
+          }
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          description: Staging creato e preflight eseguito
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "413": { $ref: "#/components/responses/AgeaPayloadTooLarge" }
+        "415": { $ref: "#/components/responses/AgeaUnsupportedMediaType" }
+
+  /agea/importazioni/{id}:
+    get:
+      operationId: getAgeaImportazione
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Importazione
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+
+  /agea/importazioni/{id}/righe:
+    get:
+      operationId: listAgeaImportazioneRighe
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
+          }
+        - { name: stato, in: query, schema: { type: string } }
+        - { name: fondo, in: query, schema: { type: string } }
+        - {
+            name: tipo,
+            in: query,
+            schema: { $ref: "#/components/schemas/AgeaTipoMovimento" },
+          }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+      responses:
+        "200":
+          description: Preview paginata delle righe
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportRighePage" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+
+  /agea/importazioni/{id}/partite:
+    get:
+      operationId: listAgeaImportazionePartite
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Partite di preview
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeaImportPartita" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+
+  /agea/importazioni/{id}/descrizioni-da-mappare:
+    get:
+      operationId: listAgeaImportazioneDescrizioniDaMappare
+      tags: [agea]
+      summary: Elenca le descrizioni esterne distinte dell'intera importazione
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Descrizioni, frequenze, fondi e mapping corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeaDescrizioneDaMappare" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+
+  /agea/importazioni/{id}/righe/{rigaId}/data-carico:
+    patch:
+      operationId: updateAgeaImportazioneRigaDataCarico
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: rigaId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaCorrezioneDataInput" }
+      responses:
+        "200":
+          description: Importazione con preview ricostruita
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  /agea/importazioni/{id}/righe/{rigaId}/lotto:
+    patch:
+      operationId: updateAgeaImportazioneRigaLotto
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: rigaId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaCorrezioneLottoInput" }
+      responses:
+        "200":
+          description: Importazione con preview ricostruita
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  /agea/importazioni/{id}/partite/{partitaId}:
+    patch:
+      operationId: updateAgeaImportazionePartita
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: partitaId,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaImportPartitaUpdate" }
+      responses:
+        "200":
+          description: Scadenza aggiornata e preview ricostruita
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  /agea/importazioni/{id}/ricalcola:
+    post:
+      operationId: recalculateAgeaImportazione
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaVersioneInput" }
+      responses:
+        "200":
+          description: Preflight ricalcolato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  /agea/importazioni/{id}/conferma:
+    post:
+      operationId: confirmAgeaImportazione
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaImportConfermaInput" }
+      responses:
+        "200":
+          description: Conferma atomica o replay idempotente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportConfermaResult" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  /agea/importazioni/{id}/annulla:
+    post:
+      operationId: cancelAgeaImportazione
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaVersioneInput" }
+      responses:
+        "200":
+          description: Importazione non confermata annullata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaImportazione" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  /agea/mappature-prodotti:
+    get:
+      operationId: listAgeaMappatureProdotti
+      tags: [agea]
+      responses:
+        "200":
+          description: Mapping globali AGEA
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AgeaMappaturaProdotto" }
+    post:
+      operationId: createAgeaMappaturaProdotto
+      tags: [agea]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaMappaturaProdottoInput" }
+      responses:
+        "201":
+          description: Mapping associato esplicitamente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaMappaturaProdotto" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  /agea/mappature-prodotti/{id}:
+    patch:
+      operationId: updateAgeaMappaturaProdotto
+      tags: [agea]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgeaMappaturaProdottoUpdate" }
+      responses:
+        "200":
+          description: Mapping aggiornato senza alterare gli snapshot storici
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgeaMappaturaProdotto" }
+        "400": { $ref: "#/components/responses/AgeaBadRequest" }
+        "403": { $ref: "#/components/responses/AgeaForbidden" }
+        "404": { $ref: "#/components/responses/AgeaNotFound" }
+        "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  # ─── RENDICONTAZIONE FSE+ 2.0C ─────────────────────────────────────────────
+  /fse/rendicontazione/preview:
+    get:
+      operationId: getFseReportingPreview
+      tags: [fse]
+      summary: Preview canonica FSE+ con cutoff immutabile
+      parameters:
+        - { $ref: "#/components/parameters/FseMagazzinoId" }
+        - { $ref: "#/components/parameters/FseDataDa" }
+        - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FseDataAsOf" }
+        - { $ref: "#/components/parameters/FseIncludeArretrati" }
+      responses:
+        "200":
+          {
+            description: Preview,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      { $ref: "#/components/schemas/FseReportingPreview" },
+                  },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+  /fse/rendicontazione/eventi:
+    get:
+      operationId: listFseReportingEvents
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FseMagazzinoId" }
+        - { $ref: "#/components/parameters/FseDataDa" }
+        - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FseIncludeArretrati" }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseQueueStato" }
+        - { $ref: "#/components/parameters/FseQueueCanale" }
+        - { $ref: "#/components/parameters/FseQueueFondo" }
+        - { $ref: "#/components/parameters/FseQueueProdottoId" }
+        - { $ref: "#/components/parameters/FseQueueQualityCode" }
+      responses:
+        "200":
+          {
+            description: Eventi canonici,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+  /fse/rendicontazione/righe:
+    get:
+      operationId: listFseReportingLines
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FseMagazzinoId" }
+        - { $ref: "#/components/parameters/FseDataDa" }
+        - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FseIncludeArretrati" }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseQueueStato" }
+        - { $ref: "#/components/parameters/FseQueueCanale" }
+        - { $ref: "#/components/parameters/FseQueueFondo" }
+        - { $ref: "#/components/parameters/FseQueueProdottoId" }
+        - { $ref: "#/components/parameters/FseQueueQualityCode" }
+      responses:
+        "200":
+          {
+            description: Righe prodotto-lotto,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+  /fse/rendicontazione/qualita:
+    get:
+      operationId: listFseReportingQuality
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FseMagazzinoId" }
+        - { $ref: "#/components/parameters/FseDataDa" }
+        - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FseIncludeArretrati" }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseQueueStato" }
+        - { $ref: "#/components/parameters/FseQueueCanale" }
+        - { $ref: "#/components/parameters/FseQueueFondo" }
+        - { $ref: "#/components/parameters/FseQueueProdottoId" }
+        - { $ref: "#/components/parameters/FseQueueQualityCode" }
+      responses:
+        "200":
+          {
+            description: Qualità e blocchi,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+
+  /fse/exportazioni:
+    get:
+      operationId: listFseExports
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseOptionalMagazzinoId" }
+        - { $ref: "#/components/parameters/FseOptionalDataDa" }
+        - { $ref: "#/components/parameters/FseOptionalDataA" }
+        - { $ref: "#/components/parameters/FseOptionalStato" }
+      responses:
+        "200":
+          {
+            description: Esportazioni visibili,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+    post:
+      operationId: createFseExport
+      tags: [fse]
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/FseExportInput" } },
+          }
+      responses:
+        "201":
+          {
+            description: Snapshot creato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+        "413": { $ref: "#/components/responses/FsePayloadTooLarge" }
+  /fse/exportazioni/{id}:
+    get:
+      operationId: getFseExport
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          {
+            description: Esportazione,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/eventi:
+    get:
+      operationId: listFseExportEvents
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Eventi snapshot,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/righe:
+    get:
+      operationId: listFseExportLines
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Righe snapshot,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/download:
+    get:
+      operationId: downloadFseExport
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { $ref: "#/components/parameters/FseDownloadRepresentation" }
+      responses:
+        "200":
+          description: XLSX generato dallo snapshot
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/marca-inserita:
+    post:
+      operationId: markFseExportManuallyEntered
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema: { $ref: "#/components/schemas/FseMarkEnteredInput" },
+                },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Marcatura auditata,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/exportazioni/{id}/annulla:
+    post:
+      operationId: cancelFseExport
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseCancelInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: "Copertura disattivata, snapshot conservato",
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+
+  /fse/riconciliazioni:
+    get:
+      operationId: listFseReconciliations
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseOptionalMagazzinoId" }
+        - { $ref: "#/components/parameters/FseOptionalDataDa" }
+        - { $ref: "#/components/parameters/FseOptionalDataA" }
+        - { $ref: "#/components/parameters/FseOptionalStato" }
+      responses:
+        "200":
+          {
+            description: Riconciliazioni visibili,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+    post:
+      operationId: createFseReconciliation
+      tags: [fse]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    { $ref: "#/components/schemas/FseReconciliationInput" },
+                },
+            },
+        }
+      responses:
+        "201":
+          {
+            description: Riconciliazione calcolata,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/riconciliazioni/{id}:
+    get:
+      operationId: getFseReconciliation
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200":
+          {
+            description: Riconciliazione,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/riconciliazioni/{id}/righe:
+    get:
+      operationId: listFseReconciliationLines
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
+          }
+      responses:
+        "200":
+          {
+            description: Righe paginata,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        $ref: "#/components/schemas/FseReconciliationRowsPage",
+                      },
+                  },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/riconciliazioni/{id}/ricalcola:
+    post:
+      operationId: recalculateFseReconciliation
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseVersionInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Snapshot ricalcolato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/riconciliazioni/{id}/righe/{rigaId}:
+    patch:
+      operationId: resolveFseReconciliationLine
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: rigaId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseResolutionInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Risoluzione auditata,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/riconciliazioni/{id}/chiudi:
+    post:
+      operationId: closeFseReconciliation
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseVersionInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Snapshot chiuso,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/riconciliazioni/{id}/annulla:
+    post:
+      operationId: cancelFseReconciliation
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseVersionInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Riconciliazione annullata,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+
+  /fse/monitoraggio:
+    get:
+      operationId: listFseMonitoring
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseOptionalMagazzinoId" }
+        - { $ref: "#/components/parameters/FseOptionalDataDa" }
+        - { $ref: "#/components/parameters/FseOptionalDataA" }
+      responses:
+        "200":
+          {
+            description: Rilevazioni mensili,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+    post:
+      operationId: createFseMonitoring
+      tags: [fse]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseMonitoringInput" } },
+            },
+        }
+      responses:
+        "201":
+          {
+            description: Snapshot mensile creato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/monitoraggio/{id}:
+    patch:
+      operationId: updateFseMonitoring
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema: { $ref: "#/components/schemas/FseMonitoringUpdate" },
+                },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Snapshot mensile aggiornato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+
+  /fse/resi-opc:
+    post:
+      operationId: createFseOpcReturn
+      tags: [fse]
+      summary: Registra un reso FSE+ verso OpC nel ledger condiviso
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/FseOpcReturnInput" } },
+          }
+      responses:
+        "200":
+          {
+            description: Replay idempotente,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "201":
+          {
+            description: Reso registrato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/resi-opc/{id}/storno:
+    post:
+      operationId: reverseFseOpcReturn
+      tags: [fse]
+      summary: Storna un reso OpC mediante movimento compensativo
+      parameters:
+        [
+          {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          },
+        ]
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  { $ref: "#/components/schemas/FseOpcReturnReversalInput" },
+              },
+          }
+      responses:
+        "200":
+          {
+            description: Reso stornato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+
   # ─── LOTTI ───────────────────────────────────────────────────────────────────
   /lotti:
     get:
@@ -340,6 +1426,17 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: fondoOrigine
+          in: query
+          schema:
+            $ref: "#/components/schemas/FondoOrigine"
+        - name: origineCaricoPresente
+          in: query
+          description: >-
+            Restituisce Partite alimentate almeno una volta da questa origine.
+            Non attribuisce la quantità residua alla provenienza selezionata.
+          schema:
+            $ref: "#/components/schemas/OrigineCarico"
       responses:
         "200":
           description: List of lots
@@ -383,6 +1480,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Lotto"
+    patch:
+      operationId: updateLotto
+      tags: [lotti]
+      summary: Aggiorna esclusivamente le note non identificative della Partita
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LottoUpdate"
+      responses:
+        "200":
+          description: Note aggiornate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lotto"
 
   /lotti/{id}/rettifica:
     post:
@@ -404,28 +1524,6 @@ paths:
       responses:
         "200":
           description: Lot adjusted and movement appended
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Lotto"
-    patch:
-      operationId: updateLotto
-      tags: [lotti]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LottoUpdate"
-      responses:
-        "200":
-          description: Updated
           content:
             application/json:
               schema:
@@ -461,6 +1559,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: fondoOrigine
+          in: query
+          schema:
+            $ref: "#/components/schemas/FondoOrigine"
+        - name: naturaContabile
+          in: query
+          schema: { type: string }
+        - name: canaleOperativo
+          in: query
+          schema: { type: string }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -495,6 +1603,19 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: prodottoId
+          in: query
+          schema: { type: integer }
+        - name: fondoOrigine
+          in: query
+          schema:
+            $ref: "#/components/schemas/FondoOrigine"
+        - name: scadenzaDa
+          in: query
+          schema: { type: string, format: date }
+        - name: scadenzaA
+          in: query
+          schema: { type: string, format: date }
       responses:
         "200":
           description: Stock levels
@@ -2480,7 +3601,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consegna"
-        "400": { description: Stato risultante non valido o indirizzo domiciliare mancante }
+        "400":
+          {
+            description: Stato risultante non valido o indirizzo domiciliare mancante,
+          }
     delete:
       operationId: deleteConsegna
       tags: [consegne]
@@ -3577,7 +4701,10 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
-        "403": { description: "Permission MAPS o Interventi Sociali, area o modulo non consentiti" }
+        "403":
+          {
+            description: "Permission MAPS o Interventi Sociali, area o modulo non consentiti",
+          }
         "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/pacchi/consegne:
@@ -3597,7 +4724,10 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
-        "403": { description: "Permission MAPS, area, moduli o scope non consentiti" }
+        "403":
+          {
+            description: "Permission MAPS, area, moduli o scope non consentiti",
+          }
         "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/pacchi/ritiri-non-effettuati:
@@ -3617,7 +4747,10 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
-        "403": { description: "Permission MAPS o Bolle, area, moduli o scope non consentiti" }
+        "403":
+          {
+            description: "Permission MAPS o Bolle, area, moduli o scope non consentiti",
+          }
         "422": { description: Troppe attività; restringere intervallo o filtri }
 
   /maps/layers/centro/punti-operativi:
@@ -3634,7 +4767,10 @@ paths:
                   type: array,
                   items: { $ref: "#/components/schemas/MapsMarker" },
                 }
-        "403": { description: "Permission MAPS, area, modulo o scope non consentiti" }
+        "403":
+          {
+            description: "Permission MAPS, area, modulo o scope non consentiti",
+          }
         "422": { description: Troppi punti operativi; restringere i filtri }
 
   /maps/routes/consegne/{id}:
@@ -5333,7 +6469,8 @@ paths:
     get:
       operationId: reportFsePlus
       tags: [report]
-      summary: FSE+ annual distribution report
+      deprecated: true
+      summary: FSE+ annual distribution report (legacy; use /report/fse-plus/integrato)
       parameters:
         - name: anno
           in: query
@@ -6674,6 +7811,83 @@ paths:
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
   parameters:
+    FseMagazzinoId:
+      name: magazzinoId
+      in: query
+      required: true
+      schema: { type: integer, minimum: 1 }
+    FseOptionalMagazzinoId:
+      name: magazzinoId
+      in: query
+      schema: { type: integer, minimum: 1 }
+    FseOptionalDataDa:
+      name: dataCompetenzaDa
+      in: query
+      schema: { type: string, format: date }
+    FseOptionalDataA:
+      name: dataCompetenzaA
+      in: query
+      schema: { type: string, format: date }
+    FseOptionalStato:
+      name: stato
+      in: query
+      schema: { type: string, maxLength: 60 }
+    FseDataDa:
+      name: dataCompetenzaDa
+      in: query
+      required: true
+      schema: { type: string, format: date }
+    FseDataA:
+      name: dataCompetenzaA
+      in: query
+      required: true
+      schema: { type: string, format: date }
+    FseDataAsOf:
+      name: dataAsOf
+      in: query
+      schema: { type: string, format: date }
+    FseIncludeArretrati:
+      name: includeArretrati
+      in: query
+      schema: { type: boolean, default: true }
+    FsePage:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    FsePageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    FseQueueStato:
+      name: statoRendicontazione
+      in: query
+      schema:
+        type: string
+        enum: [DA_RENDICONTARE, ARRETRATO_NON_RENDICONTATO, BLOCCATO]
+    FseQueueCanale:
+      name: canale
+      in: query
+      schema: { type: string }
+    FseQueueFondo:
+      name: fondo
+      in: query
+      schema: { type: string }
+    FseQueueProdottoId:
+      name: prodottoId
+      in: query
+      schema: { type: integer, minimum: 1 }
+    FseQueueQualityCode:
+      name: qualityCode
+      in: query
+      schema: { type: string }
+    FseDownloadRepresentation:
+      name: representation
+      in: query
+      description: Rappresentazione derivata dallo stesso snapshot immutabile
+      schema:
+        type: string
+        enum:
+          [FSE_CANONICAL_AUDIT_XLSX_V1, SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1]
     PageParam:
       name: page
       in: query
@@ -6742,7 +7956,291 @@ components:
       in: query
       description: Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
       schema: { type: string, format: date }
+  responses:
+    FseBadRequest:
+      description: Richiesta FSE+ non valida
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    FseForbidden:
+      description: Permesso o scope FSE+ non consentito
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    FseNotFound:
+      description: Risorsa FSE+ non trovata
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    FseConflict:
+      description: Versione, cutoff, copertura o concorrenza non validi
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    FsePayloadTooLarge:
+      description: Payload FSE+ oltre il limite operativo
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    AgeaBadRequest:
+      description: Richiesta AGEA non valida
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaForbidden:
+      description: Permesso o scope AGEA non consentito
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaNotFound:
+      description: Risorsa AGEA non trovata
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaConflict:
+      description: Versione, preflight o concorrenza AGEA non validi
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaPayloadTooLarge:
+      description: Limite di 10 MB superato
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    AgeaUnsupportedMediaType:
+      description: MIME XLSX richiesto
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
   schemas:
+    FseErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Codice o messaggio stabile; include NESSUN_DATO_DA_RENDICONTARE per scope amministrativi vuoti
+    FseRecord:
+      type: object
+      additionalProperties: true
+    FseReportingPreview:
+      type: object
+      additionalProperties: true
+      required:
+        [
+          modelVersion,
+          magazzinoId,
+          dataDa,
+          dataA,
+          dataAsOf,
+          eventiTotali,
+          righeTotali,
+          eventiDaRendicontare,
+          eventiArretrati,
+          eventiBloccati,
+          eventiGiaCoperti,
+          righeDaRendicontare,
+          bloccanti,
+        ]
+      properties:
+        modelVersion: { type: string }
+        magazzinoId: { type: integer, minimum: 1 }
+        dataDa: { type: string, format: date }
+        dataA: { type: string, format: date }
+        dataAsOf: { type: string, format: date }
+        eventiTotali: { type: integer, minimum: 0 }
+        righeTotali: { type: integer, minimum: 0 }
+        eventiDaRendicontare: { type: integer, minimum: 0 }
+        eventiArretrati: { type: integer, minimum: 0 }
+        eventiBloccati: { type: integer, minimum: 0 }
+        eventiGiaCoperti: { type: integer, minimum: 0 }
+        righeDaRendicontare: { type: integer, minimum: 0 }
+        bloccanti: { type: integer, minimum: 0 }
+        cutoff: { $ref: "#/components/schemas/FseRecord" }
+    FseRecordList:
+      type: array
+      items: { $ref: "#/components/schemas/FseRecord" }
+    FseRecordPage:
+      type: object
+      required: [page, pageSize, total, rows]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 200 }
+        total: { type: integer, minimum: 0 }
+        rows: { $ref: "#/components/schemas/FseRecordList" }
+        summary: { $ref: "#/components/schemas/FseRecord" }
+    FseReconciliationRowsPage:
+      type: object
+      required: [page, pageSize, total, rows]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 200 }
+        total: { type: integer, minimum: 0 }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/FseReconciliationRow" }
+    FseReconciliationRow:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: integer, minimum: 1 }
+        active: { type: boolean }
+        supersededByRowId: { type: [integer, "null"], minimum: 1 }
+        resolutionGroupId: { type: [string, "null"], pattern: "^[0-9a-f]{64}$" }
+        companionRowId: { type: [integer, "null"], minimum: 1 }
+    FseExportInput:
+      type: object
+      required:
+        [magazzinoId, dataCompetenzaDa, dataCompetenzaA, dataAsOf, formatCode]
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+        dataCompetenzaDa: { type: string, format: date }
+        dataCompetenzaA: { type: string, format: date }
+        dataAsOf: { type: string, format: date }
+        formatCode:
+          type: string
+          enum:
+            [
+              FSE_CANONICAL_AUDIT_XLSX_V1,
+              SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1,
+            ]
+        maxMovimentoId: { type: integer, minimum: 1 }
+        maxOperazioneDistribuzioneId: { type: integer, minimum: 1 }
+        includeArretrati: { type: boolean, default: true }
+    FseVersionInput:
+      type: object
+      required: [versione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        data: { type: string, format: date }
+        riferimentoEsterno: { type: string, minLength: 3, maxLength: 500 }
+        conScostamenti: { type: boolean }
+    FseMarkEnteredInput:
+      type: object
+      required: [versione, data, riferimentoEsterno]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        data: { type: string, format: date }
+        riferimentoEsterno: { type: string, minLength: 3, maxLength: 500 }
+    FseCancelInput:
+      type: object
+      required: [versione, motivazione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+    FseReconciliationInput:
+      type: object
+      required: [magazzinoId, importazioneAgeaId, dataRiferimento]
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+        importazioneAgeaId: { type: integer, minimum: 1 }
+        importazioneAgeaPrecedenteId: { type: [integer, "null"], minimum: 1 }
+        dataRiferimento: { type: string, format: date }
+        maxMovimentoId: { type: integer, minimum: 1 }
+        maxOperazioneDistribuzioneId: { type: integer, minimum: 1 }
+    FseResolutionInput:
+      type: object
+      required: [versione, azione, motivazione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        azione:
+          type: string
+          enum:
+            [
+              ABBINA,
+              DISABBINA,
+              ACCETTA_SCOSTAMENTO,
+              SEGNALA_DA_CORREGGERE,
+              RIAPRI,
+            ]
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        movimentoId: { type: integer, minimum: 1 }
+        importazioneAgeaRigaId: { type: integer, minimum: 1 }
+    FseMonitoringInput:
+      type: object
+      required:
+        [
+          magazzinoId,
+          annoMese,
+          canaleUfficiale,
+          dataRiferimento,
+          fonte,
+          completezza,
+        ]
+      additionalProperties: true
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+        annoMese: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        canaleUfficiale: { type: string, enum: [PACCHI, MENSA, STRADA] }
+        dataRiferimento: { type: string, format: date }
+        operazioneDistribuzioneId: { type: [integer, "null"], minimum: 1 }
+        fonte:
+          type: string
+          enum: [RILEVAZIONE_MANUALE_VERIFICATA, DERIVAZIONE_STRUTTURATA]
+        completezza: { type: string, enum: [PARZIALE, COMPLETA] }
+    FseMonitoringUpdate:
+      type: object
+      required: [versione]
+      additionalProperties: true
+      properties:
+        versione: { type: integer, minimum: 1 }
+    FseOpcReturnLineInput:
+      type: object
+      required: [prodottoId, quantita]
+      properties:
+        prodottoId: { type: integer, minimum: 1 }
+        lottoId: { type: integer, minimum: 1 }
+        quantita:
+          {
+            oneOf:
+              [
+                { type: number, exclusiveMinimum: 0 },
+                { type: string, pattern: "^[0-9]+([.][0-9]{1,6})?$" },
+              ],
+          }
+    FseOpcReturnInput:
+      type: object
+      required:
+        [
+          versione,
+          idempotencyKey,
+          magazzinoId,
+          dataReso,
+          destinazioneOpc,
+          motivazione,
+          modalitaSelezione,
+          righe,
+        ]
+      properties:
+        versione: { type: integer, enum: [1] }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+        magazzinoId: { type: integer, minimum: 1 }
+        dataReso: { type: string, format: date }
+        destinazioneOpc: { type: string, minLength: 3, maxLength: 500 }
+        motivazione: { type: string, minLength: 3, maxLength: 2000 }
+        modalitaSelezione: { type: string, enum: [FEFO, PARTITA_ESATTA] }
+        righe:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/FseOpcReturnLineInput" }
+    FseOpcReturnReversalInput:
+      type: object
+      required: [versione, data, motivazione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        data: { type: string, format: date }
+        motivazione: { type: string, minLength: 3, maxLength: 2000 }
     MapsLayerCode:
       type: string
       enum:
@@ -6815,6 +8313,7 @@ components:
       required:
         [
           section,
+          reportingModelVersion,
           filters,
           kpi,
           series,
@@ -6825,6 +8324,9 @@ components:
           timezone,
         ]
       properties:
+        reportingModelVersion:
+          type: string
+          enum: [MAGAZZINO_2_0C_V1]
         section:
           type: string
           enum:
@@ -6889,12 +8391,29 @@ components:
 
     ReportKpi:
       type: object
-      required: [key, value, unit, availability, drilldownMetric]
+      required: [key, value, exactValue, unit, availability, drilldownMetric]
       properties:
         key: { type: string }
         value: { type: [number, "null"] }
+        exactValue:
+          type: [string, "null"]
+          description: Valore decimale esatto; le decisioni non usano la proiezione number.
         unit:
-          { type: string, enum: [count, quantity, kg, credit, days, average] }
+          {
+            type: string,
+            enum:
+              [
+                count,
+                pieces,
+                kgLt,
+                percentage,
+                credit,
+                days,
+                average,
+                quantity,
+                kg,
+              ],
+          }
         availability: { type: string, enum: [ok, derivable, missing] }
         drilldownMetric: { type: [string, "null"] }
 
@@ -6938,8 +8457,19 @@ components:
 
     ReportDrilldown:
       type: object
-      required: [section, metric, page, pageSize, total, columns, rows]
+      required:
+        [
+          reportingModelVersion,
+          section,
+          metric,
+          page,
+          pageSize,
+          total,
+          columns,
+          rows,
+        ]
       properties:
+        reportingModelVersion: { type: string, enum: [MAGAZZINO_2_0C_V1] }
         section: { type: string }
         metric: { type: string }
         page: { type: integer }
@@ -7511,6 +9041,552 @@ components:
         fornitoreId:
           type: integer
 
+    # ── Contabilità Magazzino 2.0 ─────────────────────────────────────────
+    FondoOrigine:
+      type: string
+      enum:
+        [FSE_PLUS, FONDO_NAZIONALE, FONDO_NAZIONALE_COFINANZIATO, NESSUN_FONDO]
+
+    OrigineCarico:
+      type: string
+      enum:
+        [
+          AGEA_SIFEAD,
+          RACCOLTA_ALIMENTARE,
+          DONAZIONE,
+          ACQUISTO,
+          FORNITORE,
+          RETTIFICA_INVENTARIO,
+          SALDO_INIZIALE,
+          ALTRO,
+          LEGACY,
+        ]
+
+    OrigineCaricoManuale:
+      type: string
+      description: Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.
+      enum: [RACCOLTA_ALIMENTARE, DONAZIONE, ACQUISTO, FORNITORE, ALTRO]
+
+    QuantitaContabile:
+      type: string
+      pattern: "^[0-9]+(?:\\.[0-9]{1,6})?$"
+      example: "53.593120"
+      description: Decimale esatto; non convertire in number JavaScript per i calcoli.
+
+    AgeaImportModalita:
+      type: string
+      enum: [PRIMA_ACQUISIZIONE, AGGIORNAMENTO, SOLO_ANALISI]
+
+    AgeaErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        code: { type: string }
+
+    AgeaImportStato:
+      type: string
+      enum:
+        [
+          ANALIZZATA,
+          DA_MAPPARE,
+          BLOCCATA,
+          PRONTA,
+          CONFERMATA,
+          ANNULLATA,
+          ERRORE,
+        ]
+
+    AgeaTipoMovimento:
+      type: string
+      enum:
+        [
+          CARICO,
+          DISTRIBUZIONE,
+          RESO,
+          MOVIMENTO_NEGATIVO_NON_CLASSIFICATO,
+          SEGNO_INCOERENTE,
+          RIGA_SENZA_MOVIMENTO,
+        ]
+
+    AgeaImportazione:
+      type: object
+      required:
+        [
+          id,
+          magazzinoId,
+          nomeFile,
+          mimeType,
+          dimensioneBytes,
+          sha256File,
+          tracciatoCodice,
+          parserVersion,
+          sheetName,
+          dataRiferimento,
+          modalita,
+          stato,
+          versione,
+          righeTotali,
+          righeCarico,
+          righeDistribuzione,
+          righeReso,
+          righeNonClassificate,
+          righeNuove,
+          righeDuplicate,
+          righeModificate,
+          righeAmbigue,
+          righeBloccanti,
+          partiteTotali,
+          partiteSaldoPositivo,
+          creatoDa,
+          dataCreazione,
+        ]
+      properties:
+        id: { type: integer }
+        magazzinoId: { type: integer }
+        nomeFile: { type: string }
+        mimeType: { type: string }
+        dimensioneBytes: { type: integer }
+        sha256File: { type: string, pattern: "^[0-9a-f]{64}$" }
+        tracciatoCodice:
+          { type: string, enum: [SIFEAD_REGISTRO_XLSX_OSSERVATO_V1] }
+        parserVersion: { type: string }
+        sheetName: { type: string }
+        dataRiferimento: { type: string, format: date }
+        modalita: { $ref: "#/components/schemas/AgeaImportModalita" }
+        stato: { $ref: "#/components/schemas/AgeaImportStato" }
+        versione: { type: integer }
+        righeTotali: { type: integer }
+        righeCarico: { type: integer }
+        righeDistribuzione: { type: integer }
+        righeReso: { type: integer }
+        righeNonClassificate: { type: integer }
+        righeNuove: { type: integer }
+        righeDuplicate: { type: integer }
+        righeModificate: { type: integer }
+        righeAmbigue: { type: integer }
+        righeBloccanti: { type: integer }
+        partiteTotali: { type: integer }
+        partiteSaldoPositivo: { type: integer }
+        bootstrapCaricoId: { type: [integer, "null"] }
+        creatoDa: { type: integer }
+        dataCreazione: { type: string, format: date-time }
+        confermatoDa: { type: [integer, "null"] }
+        dataConferma: { type: [string, "null"], format: date-time }
+        annullatoDa: { type: [integer, "null"] }
+        dataAnnullamento: { type: [string, "null"], format: date-time }
+        noteAudit: { type: [object, "null"], additionalProperties: true }
+
+    AgeaImportRiga:
+      type: object
+      required:
+        [
+          id,
+          importazioneId,
+          numeroRiga,
+          prodottoRaw,
+          prodottoNormalizzato,
+          tipoMovimentoEsterno,
+          identityKey,
+          contentHash,
+          statoRiga,
+          blocking,
+          errorCodesJson,
+          warningCodesJson,
+        ]
+      properties:
+        id: { type: integer }
+        importazioneId: { type: integer }
+        numeroRiga: { type: integer }
+        fondoRaw: { type: [string, "null"] }
+        fondoNormalizzato: { type: [string, "null"] }
+        prodottoRaw: { type: string }
+        prodottoNormalizzato: { type: string }
+        lottoRaw: { type: [string, "null"] }
+        lottoEffettivoRaw: { type: [string, "null"] }
+        lottoEffettivoNormalizzato: { type: [string, "null"] }
+        numeroDocumentoRaw: { type: [string, "null"] }
+        dataDocumento: { type: [string, "null"], format: date }
+        dataCaricoMagazzinoRaw: { type: [string, "null"] }
+        dataCaricoRisolta: { type: [string, "null"], format: date }
+        dataCaricoEffettiva: { type: [string, "null"], format: date }
+        dataCaricoFonte: { type: [string, "null"] }
+        movimentoKgLt:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        movimentoPezzi:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        saldoFinaleKgLt:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        saldoFinalePezzi:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        attivitaRaw: { type: [string, "null"] }
+        tipoMovimentoEsterno: { $ref: "#/components/schemas/AgeaTipoMovimento" }
+        identityKey: { type: string }
+        contentHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+        prodottoIdSnapshot: { type: [integer, "null"] }
+        mappingVersioneSnapshot: { type: [integer, "null"] }
+        descrizioneProdottoSnapshot: { type: [string, "null"] }
+        unitaMisuraSnapshot: { type: [string, "null"] }
+        statoRiga: { type: string }
+        blocking: { type: boolean }
+        errorCodesJson: { type: array, items: { type: string } }
+        warningCodesJson: { type: array, items: { type: string } }
+        correzioneMotivazione: { type: [string, "null"] }
+
+    AgeaImportRighePage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/AgeaImportRiga" },
+          }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+
+    AgeaImportPartita:
+      type: object
+      required:
+        [
+          id,
+          importazioneId,
+          partyKey,
+          fondoOrigine,
+          prodottoNormalizzato,
+          stato,
+          blocking,
+          errorCodesJson,
+          warningCodesJson,
+        ]
+      properties:
+        id: { type: integer }
+        importazioneId: { type: integer }
+        partyKey: { type: string }
+        fondoOrigine: { type: string }
+        prodottoId: { type: [integer, "null"] }
+        prodottoNormalizzato: { type: string }
+        descrizioniEsterneJson: { type: array, items: { type: string } }
+        lottoRaw: { type: [string, "null"] }
+        existingLottoId: { type: [integer, "null"] }
+        saldoFinalePezzi:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        saldoFinaleKgLt:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabileConSegno" },
+                { type: "null" },
+              ],
+          }
+        quantitaOperativa:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/QuantitaContabile" },
+                { type: "null" },
+              ],
+          }
+        unitaMisuraOperativa: { type: [string, "null"] }
+        fattoreKgLtPezzo:
+          {
+            oneOf:
+              [
+                { $ref: "#/components/schemas/FattoreContabile" },
+                { type: "null" },
+              ],
+          }
+        dataScadenzaRisolta: { type: [string, "null"], format: date }
+        dataScadenzaFonte: { type: [string, "null"] }
+        stato: { type: string }
+        blocking: { type: boolean }
+        errorCodesJson: { type: array, items: { type: string } }
+        warningCodesJson: { type: array, items: { type: string } }
+
+    AgeaDescrizioneDaMappare:
+      type: object
+      required:
+        [
+          chiaveDescrizioneNormalizzata,
+          descrizioneRawRappresentativa,
+          numeroRighe,
+          fondi,
+        ]
+      properties:
+        chiaveDescrizioneNormalizzata: { type: string }
+        descrizioneRawRappresentativa: { type: string }
+        numeroRighe: { type: integer, minimum: 1 }
+        fondi: { type: array, items: { type: string } }
+        mappingId: { type: [integer, "null"] }
+        mappingAttiva: { type: [boolean, "null"] }
+        mappingVersione: { type: [integer, "null"] }
+        prodottoId: { type: [integer, "null"] }
+        prodottoNome: { type: [string, "null"] }
+
+    AgeaMappaturaProdottoInput:
+      type: object
+      required: [descrizioneEsterna, prodottoId]
+      properties:
+        descrizioneEsterna: { type: string, minLength: 1 }
+        prodottoId: { type: integer, minimum: 1 }
+
+    AgeaMappaturaProdottoUpdate:
+      type: object
+      required: [prodottoId, versione]
+      properties:
+        prodottoId: { type: integer, minimum: 1 }
+        attiva: { type: boolean }
+        versione: { type: integer, minimum: 1 }
+
+    AgeaImportPartitaUpdate:
+      type: object
+      required: [dataScadenza, motivazione, versione]
+      properties:
+        dataScadenza: { type: [string, "null"], format: date }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        versione: { type: integer, minimum: 1 }
+
+    AgeaVersioneInput:
+      type: object
+      required: [versione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+
+    AgeaCorrezioneDataInput:
+      type: object
+      required: [valore, motivazione, versione]
+      properties:
+        valore: { type: [string, "null"], format: date }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        versione: { type: integer, minimum: 1 }
+
+    AgeaCorrezioneLottoInput:
+      type: object
+      required: [valore, motivazione, versione]
+      properties:
+        valore: { type: [string, "null"], minLength: 1, maxLength: 80 }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        versione: { type: integer, minimum: 1 }
+
+    AgeaImportConfermaInput:
+      type: object
+      required: [versione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+
+    AgeaMappaturaProdotto:
+      type: object
+      required:
+        [
+          id,
+          fonte,
+          descrizioneEsterna,
+          chiaveDescrizioneNormalizzata,
+          prodottoId,
+          attiva,
+          versione,
+        ]
+      properties:
+        id: { type: integer }
+        fonte: { type: string, enum: [AGEA_SIFEAD] }
+        descrizioneEsterna: { type: string }
+        chiaveDescrizioneNormalizzata: { type: string }
+        prodottoId: { type: integer }
+        attiva: { type: boolean }
+        versione: { type: integer }
+        prodotto: { $ref: "#/components/schemas/Prodotto" }
+
+    AgeaImportConfermaResult:
+      type: object
+      required: [importazione, replay, carichi]
+      properties:
+        importazione: { $ref: "#/components/schemas/AgeaImportazione" }
+        replay: { type: boolean }
+        carichi: { type: array, items: { type: integer } }
+
+    QuantitaContabileConSegno:
+      type: string
+      pattern: "^-?[0-9]+(?:\\.[0-9]{1,6})?$"
+      description: Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.
+
+    FattoreContabile:
+      type: string
+      pattern: "^[0-9]+(?:\\.[0-9]{1,9})?$"
+      description: Fattore Kg/Lt per pezzo esatto, positivo, scala massima 9.
+
+    CaricoMagazzino:
+      type: object
+      properties:
+        id: { type: integer }
+        magazzinoId: { type: integer }
+        magazzinoNome: { type: [string, "null"] }
+        origineCarico:
+          $ref: "#/components/schemas/OrigineCarico"
+        numeroDocumento: { type: [string, "null"] }
+        dataDocumento: { type: [string, "null"], format: date }
+        dataCarico: { type: string, format: date }
+        descrizione: { type: [string, "null"] }
+        fornitoreId: { type: [integer, "null"] }
+        fornitoreNome: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+        idempotencyKey: { type: [string, "null"] }
+        stato: { type: string, enum: [confermato, stornato] }
+        creatoDa: { type: integer }
+        numeroRighe: { type: integer }
+        dataCreazione: { type: string, format: date-time }
+      required:
+        [
+          id,
+          magazzinoId,
+          origineCarico,
+          dataCarico,
+          stato,
+          creatoDa,
+          dataCreazione,
+        ]
+
+    CaricoMagazzinoRiga:
+      type: object
+      properties:
+        id: { type: integer }
+        caricoMagazzinoId: { type: integer }
+        numeroRiga: { type: integer }
+        prodottoId: { type: integer }
+        prodottoNome: { type: [string, "null"] }
+        lottoId: { type: integer }
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        quantitaOperativa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        unitaMisuraOperativa: { type: string }
+        quantitaPezzi:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        quantitaKgLt:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
+        codiceLottoOriginale: { type: [string, "null"] }
+        codiceLotto: { type: [string, "null"] }
+        codiceLottoNormalizzato: { type: [string, "null"] }
+        dataScadenza: { type: [string, "null"], format: date }
+        descrizioneEsterna: { type: [string, "null"] }
+        riferimentoEsterno: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+        partitaQuantitaCaricata:
+          $ref: "#/components/schemas/QuantitaContabile"
+        partitaQuantitaResidua:
+          $ref: "#/components/schemas/QuantitaContabile"
+        dataCreazione: { type: string, format: date-time }
+      required:
+        [
+          id,
+          caricoMagazzinoId,
+          numeroRiga,
+          prodottoId,
+          lottoId,
+          fondoOrigine,
+          quantitaOperativa,
+          unitaMisuraOperativa,
+          dataCreazione,
+        ]
+
+    CaricoMagazzinoDettaglio:
+      allOf:
+        - $ref: "#/components/schemas/CaricoMagazzino"
+        - type: object
+          properties:
+            replay: { type: boolean }
+            righe:
+              type: array
+              items:
+                $ref: "#/components/schemas/CaricoMagazzinoRiga"
+          required: [replay, righe]
+
+    CaricoMagazzinoRigaInput:
+      type: object
+      properties:
+        prodottoId: { type: integer, minimum: 1 }
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        quantitaOperativa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        unitaMisuraOperativa: { type: string }
+        quantitaPezzi:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        quantitaKgLt:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
+        codiceLotto: { type: [string, "null"] }
+        dataScadenza: { type: [string, "null"], format: date }
+        descrizioneEsterna: { type: [string, "null"] }
+        riferimentoEsterno: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+      required: [prodottoId, fondoOrigine, quantitaOperativa]
+
+    CaricoMagazzinoInput:
+      type: object
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+        origineCarico:
+          $ref: "#/components/schemas/OrigineCaricoManuale"
+        numeroDocumento: { type: [string, "null"] }
+        dataDocumento: { type: [string, "null"], format: date }
+        dataCarico: { type: string, format: date }
+        descrizione: { type: [string, "null"] }
+        fornitoreId: { type: [integer, "null"] }
+        note: { type: [string, "null"] }
+        idempotencyKey: { type: [string, "null"], maxLength: 120 }
+        righe:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CaricoMagazzinoRigaInput"
+      required: [magazzinoId, origineCarico, dataCarico, righe]
+
     # ── Lotti ─────────────────────────────────────────────────────────────
     Lotto:
       type: object
@@ -7531,6 +9607,10 @@ components:
           type: number
         quantitaResidua:
           type: number
+        quantitaCaricataPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        quantitaResiduaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         magazzinoId:
           type: integer
         magazzinoNome:
@@ -7541,6 +9621,15 @@ components:
           type: ["string", "null"]
         fsePlus:
           type: boolean
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        codiceLottoNormalizzato:
+          type: [string, "null"]
+        dataUltimoCarico:
+          type: [string, "null"]
+          format: date
+        fattoreKgLtPezzo:
+          type: [string, "null"]
         documentoCarico:
           type: ["string", "null"]
         note:
@@ -7554,8 +9643,11 @@ components:
           dataCarico,
           quantitaCaricata,
           quantitaResidua,
+          quantitaCaricataPrecisa,
+          quantitaResiduaPrecisa,
           magazzinoId,
           fsePlus,
+          fondoOrigine,
           dataCreazione,
         ]
 
@@ -7590,22 +9682,16 @@ components:
 
     LottoUpdate:
       type: object
+      additionalProperties: false
       properties:
-        codiceLotto:
-          type: string
-        dataScadenza:
-          type: string
-        documentoCarico:
-          type: string
         note:
-          type: string
+          type: [string, "null"]
 
     RettificaLottoInput:
       type: object
       properties:
         delta:
-          type: number
-          not: { const: 0 }
+          $ref: "#/components/schemas/QuantitaContabileConSegno"
         causale:
           type: string
           enum: [inventario_fisico, errore_registrazione, deterioramento, altro]
@@ -7639,6 +9725,16 @@ components:
           type: ["integer", "null"]
         quantita:
           type: number
+        quantitaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        quantitaPezzi:
+          type: [string, "null"]
+        quantitaKgLt:
+          type: [string, "null"]
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
         unitaMisura:
           type: string
         fornitoreId:
@@ -7647,6 +9743,24 @@ components:
           type: ["integer", "null"]
         movimentoOrigineId:
           type: ["integer", "null"]
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        naturaContabile:
+          type: string
+        dominioOrigine:
+          type: [string, "null"]
+        entitaOrigineTipo:
+          type: [string, "null"]
+        entitaOrigineId:
+          type: [integer, "null"]
+        rigaOrigineId:
+          type: [integer, "null"]
+        caricoMagazzinoRigaId:
+          type: [integer, "null"]
+        operazioneDistribuzioneId:
+          type: [integer, "null"]
+        canaleOperativo:
+          type: [string, "null"]
         operatoreId:
           type: ["integer", "null"]
         documentoRiferimento:
@@ -7664,7 +9778,10 @@ components:
           magazzinoId,
           prodottoId,
           quantita,
+          quantitaPrecisa,
           unitaMisura,
+          fondoOrigine,
+          naturaContabile,
           dataCreazione,
         ]
 
@@ -7726,6 +9843,8 @@ components:
           type: string
         quantitaTotale:
           type: number
+        quantitaTotalePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         giacenzaFisica:
           type: number
           description: Quantità fisicamente presente, inclusi i lotti scaduti.
@@ -7735,12 +9854,24 @@ components:
         giacenzaDistribuibile:
           type: number
           description: Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome.
+        giacenzaFisicaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        giacenzaScadutaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        giacenzaDistribuibilePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         impegnato:
           type: number
+        impegnatoPreciso:
+          $ref: "#/components/schemas/QuantitaContabile"
         disponibileReale:
           type: number
+        disponibileRealePrecisa:
+          $ref: "#/components/schemas/QuantitaContabileConSegno"
         scortaMinima:
           type: number
+        scortaMinimaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         scortaConsigliata:
           type: number
         sottoscorta:
@@ -7764,6 +9895,11 @@ components:
           giacenzaDistribuibile,
           impegnato,
           disponibileReale,
+          quantitaPrecisa,
+          giacenzaFisicaPrecisa,
+          giacenzaDistribuibilePrecisa,
+          impegnatoPreciso,
+          disponibileRealePrecisa,
           scortaMinima,
           scortaConsigliata,
           sottoscorta,
@@ -7985,7 +10121,7 @@ components:
         lottoId:
           type: integer
         quantita:
-          type: number
+          $ref: "#/components/schemas/QuantitaContabile"
         unitaMisura:
           type: string
           description: >-
@@ -8042,7 +10178,15 @@ components:
           type: string
         causale:
           type: string
-          enum: [deteriorata, rubata, scaduta, altro]
+          enum: [deteriorata, rubata, scaduta, consegna_beneficiario, altro]
+        beneficiarioId:
+          type: integer
+          minimum: 1
+          description: Obbligatorio con causale consegna_beneficiario.
+        canaleOperativo:
+          type: string
+          enum: [PACCHI, RITIRO_SEDE, DOMICILIARE]
+          description: Obbligatorio con causale consegna_beneficiario.
         causaleAltro:
           type: string
         note:
@@ -8082,7 +10226,7 @@ components:
         prodottoId:
           type: integer
         quantita:
-          type: number
+          $ref: "#/components/schemas/QuantitaContabile"
         unitaMisura:
           type: string
         note:
@@ -8377,7 +10521,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TurnoVolontario"
-      required: [id, centroAscoltoId, data, fascia, stato, versione, dataAggiornamento, volontari]
+      required:
+        [
+          id,
+          centroAscoltoId,
+          data,
+          fascia,
+          stato,
+          versione,
+          dataAggiornamento,
+          volontari,
+        ]
 
     TurnoVolontario:
       type: object
@@ -11981,9 +14135,7 @@ components:
         prodottoId:
           type: integer
         quantita:
-          type: number
-          minimum: 0.01
-          multipleOf: 0.01
+          $ref: "#/components/schemas/QuantitaContabile"
         versione:
           type: integer
           minimum: 1
@@ -11995,9 +14147,7 @@ components:
       type: object
       properties:
         quantita:
-          type: number
-          minimum: 0.01
-          multipleOf: 0.01
+          $ref: "#/components/schemas/QuantitaContabile"
         versione:
           type: integer
           minimum: 1
@@ -12694,7 +14844,7 @@ components:
         lottoId:
           type: integer
         quantita:
-          type: number
+          $ref: "#/components/schemas/QuantitaContabile"
         unitaMisura:
           type: string
         note:
@@ -12956,7 +15106,18 @@ components:
           type: string
         dataAggiornamento:
           type: string
-      required: [id, codice, tipo, proprieta, stato, statoApprovazione, versione, dataCreazione, dataAggiornamento]
+      required:
+        [
+          id,
+          codice,
+          tipo,
+          proprieta,
+          stato,
+          statoApprovazione,
+          versione,
+          dataCreazione,
+          dataAggiornamento,
+        ]
 
     MezzoInput:
       type: object
@@ -13072,7 +15233,16 @@ components:
           type: integer
           minimum: 1
       required:
-        [id, nome, cognome, ruolo, attivo, statoApprovazione, versione, dataCreazione]
+        [
+          id,
+          nome,
+          cognome,
+          ruolo,
+          attivo,
+          statoApprovazione,
+          versione,
+          dataCreazione,
+        ]
 
     ApprovazioneMezzo:
       type: object
@@ -13107,7 +15277,16 @@ components:
           type: integer
           minimum: 1
       required:
-        [id, codice, tipo, proprieta, stato, statoApprovazione, versione, dataCreazione]
+        [
+          id,
+          codice,
+          tipo,
+          proprieta,
+          stato,
+          statoApprovazione,
+          versione,
+          dataCreazione,
+        ]
 
     ApprovazioniLogistica:
       type: object
@@ -13677,10 +15856,20 @@ components:
         nome: { type: string }
         unitaMisura: { type: string }
         quantita: { type: number }
+        quantitaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         giacenzaFisica: { type: number }
+        giacenzaFisicaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         giacenzaDistribuibile: { type: number }
+        giacenzaDistribuibilePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         impegnato: { type: number }
+        impegnatoPreciso:
+          $ref: "#/components/schemas/QuantitaContabile"
         disponibileReale: { type: number }
+        disponibileRealePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
 
     MensaConsumoInput:
       type: object
@@ -13699,7 +15888,8 @@ components:
         dataServizio: { type: string, format: date }
         tipoServizio: { type: string, enum: [pranzo, cena] }
         prodottoId: { type: integer }
-        quantita: { type: number, exclusiveMinimum: 0 }
+        quantita:
+          $ref: "#/components/schemas/QuantitaContabile"
         causale: { type: string, enum: [consumo, scarto] }
         note: { type: [string, "null"], maxLength: 2000 }
         idempotencyKey: { type: string, minLength: 1, maxLength: 80 }
@@ -13854,7 +16044,8 @@ components:
             required: [prodottoId, quantita]
             properties:
               prodottoId: { type: integer }
-              quantita: { type: number, exclusiveMinimum: 0 }
+              quantita:
+                $ref: "#/components/schemas/QuantitaContabile"
               unitaMisura:
                 type: string
                 description: >-

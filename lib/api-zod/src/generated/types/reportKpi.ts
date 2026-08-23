@@ -12,6 +12,11 @@ export interface ReportKpi {
   key: string;
   /** @nullable */
   value: number | null;
+  /**
+     * Valore decimale esatto; le decisioni non usano la proiezione number.
+     * @nullable
+     */
+  exactValue: string | null;
   unit: ReportKpiUnit;
   availability: ReportKpiAvailability;
   /** @nullable */

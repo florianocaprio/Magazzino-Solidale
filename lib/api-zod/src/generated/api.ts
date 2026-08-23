@@ -441,11 +441,1561 @@ export const DeleteProdottoResponse = zod.object({
 })
 
 
+export const ListCarichiQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().optional(),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']).optional(),
+  "da": zod.date().optional(),
+  "a": zod.date().optional()
+})
+
+export const ListCarichiResponseItem = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "numeroDocumento": zod.string().nullish(),
+  "dataDocumento": zod.coerce.date().nullish(),
+  "dataCarico": zod.coerce.date(),
+  "descrizione": zod.string().nullish(),
+  "fornitoreId": zod.number().nullish(),
+  "fornitoreNome": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "stato": zod.enum(['confermato', 'stornato']),
+  "creatoDa": zod.number(),
+  "numeroRighe": zod.number().optional(),
+  "dataCreazione": zod.coerce.date()
+})
+export const ListCarichiResponse = zod.array(ListCarichiResponseItem)
+
+
+
+export const createCaricoBodyIdempotencyKeyMax = 120;
+
+
+export const createCaricoBodyRigheItemQuantitaOperativaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const createCaricoBodyRigheItemQuantitaPezziOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const createCaricoBodyRigheItemQuantitaKgLtOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const createCaricoBodyRigheItemFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+
+
+
+export const CreateCaricoBody = zod.object({
+  "magazzinoId": zod.number().min(1),
+  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "numeroDocumento": zod.string().nullish(),
+  "dataDocumento": zod.coerce.date().nullish(),
+  "dataCarico": zod.coerce.date(),
+  "descrizione": zod.string().nullish(),
+  "fornitoreId": zod.number().nullish(),
+  "note": zod.string().nullish(),
+  "idempotencyKey": zod.string().max(createCaricoBodyIdempotencyKeyMax).nullish(),
+  "righe": zod.array(zod.object({
+  "prodottoId": zod.number().min(1),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "quantitaOperativa": zod.string().regex(createCaricoBodyRigheItemQuantitaOperativaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisuraOperativa": zod.string().optional(),
+  "quantitaPezzi": zod.union([zod.string().regex(createCaricoBodyRigheItemQuantitaPezziOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "quantitaKgLt": zod.union([zod.string().regex(createCaricoBodyRigheItemQuantitaKgLtOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(createCaricoBodyRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "codiceLotto": zod.string().nullish(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "descrizioneEsterna": zod.string().nullish(),
+  "riferimentoEsterno": zod.string().nullish(),
+  "note": zod.string().nullish()
+})).min(1)
+})
+
+export const createCaricoResponseTwoRigheItemQuantitaOperativaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const createCaricoResponseTwoRigheItemQuantitaPezziOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const createCaricoResponseTwoRigheItemQuantitaKgLtOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const createCaricoResponseTwoRigheItemFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+export const createCaricoResponseTwoRigheItemPartitaQuantitaCaricataRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const createCaricoResponseTwoRigheItemPartitaQuantitaResiduaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const CreateCaricoResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "numeroDocumento": zod.string().nullish(),
+  "dataDocumento": zod.coerce.date().nullish(),
+  "dataCarico": zod.coerce.date(),
+  "descrizione": zod.string().nullish(),
+  "fornitoreId": zod.number().nullish(),
+  "fornitoreNome": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "stato": zod.enum(['confermato', 'stornato']),
+  "creatoDa": zod.number(),
+  "numeroRighe": zod.number().optional(),
+  "dataCreazione": zod.coerce.date()
+}).and(zod.object({
+  "replay": zod.boolean(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "caricoMagazzinoId": zod.number(),
+  "numeroRiga": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "quantitaOperativa": zod.string().regex(createCaricoResponseTwoRigheItemQuantitaOperativaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisuraOperativa": zod.string(),
+  "quantitaPezzi": zod.union([zod.string().regex(createCaricoResponseTwoRigheItemQuantitaPezziOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "quantitaKgLt": zod.union([zod.string().regex(createCaricoResponseTwoRigheItemQuantitaKgLtOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(createCaricoResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "codiceLottoOriginale": zod.string().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceLottoNormalizzato": zod.string().nullish(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "descrizioneEsterna": zod.string().nullish(),
+  "riferimentoEsterno": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "partitaQuantitaCaricata": zod.string().regex(createCaricoResponseTwoRigheItemPartitaQuantitaCaricataRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "partitaQuantitaResidua": zod.string().regex(createCaricoResponseTwoRigheItemPartitaQuantitaResiduaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "dataCreazione": zod.coerce.date()
+}))
+}))
+
+
+export const GetCaricoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getCaricoResponseTwoRigheItemQuantitaOperativaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getCaricoResponseTwoRigheItemQuantitaPezziOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getCaricoResponseTwoRigheItemQuantitaKgLtOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getCaricoResponseTwoRigheItemFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+export const getCaricoResponseTwoRigheItemPartitaQuantitaCaricataRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getCaricoResponseTwoRigheItemPartitaQuantitaResiduaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const GetCaricoResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "numeroDocumento": zod.string().nullish(),
+  "dataDocumento": zod.coerce.date().nullish(),
+  "dataCarico": zod.coerce.date(),
+  "descrizione": zod.string().nullish(),
+  "fornitoreId": zod.number().nullish(),
+  "fornitoreNome": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "stato": zod.enum(['confermato', 'stornato']),
+  "creatoDa": zod.number(),
+  "numeroRighe": zod.number().optional(),
+  "dataCreazione": zod.coerce.date()
+}).and(zod.object({
+  "replay": zod.boolean(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "caricoMagazzinoId": zod.number(),
+  "numeroRiga": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "quantitaOperativa": zod.string().regex(getCaricoResponseTwoRigheItemQuantitaOperativaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisuraOperativa": zod.string(),
+  "quantitaPezzi": zod.union([zod.string().regex(getCaricoResponseTwoRigheItemQuantitaPezziOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "quantitaKgLt": zod.union([zod.string().regex(getCaricoResponseTwoRigheItemQuantitaKgLtOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(getCaricoResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "codiceLottoOriginale": zod.string().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceLottoNormalizzato": zod.string().nullish(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "descrizioneEsterna": zod.string().nullish(),
+  "riferimentoEsterno": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "partitaQuantitaCaricata": zod.string().regex(getCaricoResponseTwoRigheItemPartitaQuantitaCaricataRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "partitaQuantitaResidua": zod.string().regex(getCaricoResponseTwoRigheItemPartitaQuantitaResiduaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "dataCreazione": zod.coerce.date()
+}))
+}))
+
+
+export const ListCaricoRigheParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listCaricoRigheResponseQuantitaOperativaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listCaricoRigheResponseQuantitaPezziOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listCaricoRigheResponseQuantitaKgLtOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listCaricoRigheResponseFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+export const listCaricoRigheResponsePartitaQuantitaCaricataRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listCaricoRigheResponsePartitaQuantitaResiduaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const ListCaricoRigheResponseItem = zod.object({
+  "id": zod.number(),
+  "caricoMagazzinoId": zod.number(),
+  "numeroRiga": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "quantitaOperativa": zod.string().regex(listCaricoRigheResponseQuantitaOperativaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisuraOperativa": zod.string(),
+  "quantitaPezzi": zod.union([zod.string().regex(listCaricoRigheResponseQuantitaPezziOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "quantitaKgLt": zod.union([zod.string().regex(listCaricoRigheResponseQuantitaKgLtOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(listCaricoRigheResponseFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "codiceLottoOriginale": zod.string().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceLottoNormalizzato": zod.string().nullish(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "descrizioneEsterna": zod.string().nullish(),
+  "riferimentoEsterno": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "partitaQuantitaCaricata": zod.string().regex(listCaricoRigheResponsePartitaQuantitaCaricataRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "partitaQuantitaResidua": zod.string().regex(listCaricoRigheResponsePartitaQuantitaResiduaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "dataCreazione": zod.coerce.date()
+})
+export const ListCaricoRigheResponse = zod.array(ListCaricoRigheResponseItem)
+
+
+/**
+ * @summary Elenca le importazioni AGEA visibili nello scope Magazzino/Area/Centro
+ */
+export const listAgeaImportazioniResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ListAgeaImportazioniResponseItem = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(listAgeaImportazioniResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+export const ListAgeaImportazioniResponse = zod.array(ListAgeaImportazioniResponseItem)
+
+
+/**
+ * @summary Analizza localmente un registro XLSX senza modificare lo stock
+ */
+
+export const analyzeAgeaImportazioneQueryNomeFileMax = 255;
+
+
+export const analyzeAgeaImportazioneQueryNomeFileRegExp = new RegExp('.\*\\.xlsx$');
+
+
+export const AnalyzeAgeaImportazioneQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().min(1),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "nomeFile": zod.coerce.string().max(analyzeAgeaImportazioneQueryNomeFileMax).regex(analyzeAgeaImportazioneQueryNomeFileRegExp)
+})
+
+
+export const GetAgeaImportazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getAgeaImportazioneResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const GetAgeaImportazioneResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(getAgeaImportazioneResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const ListAgeaImportazioneRigheParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listAgeaImportazioneRigheQueryPageDefault = 1;
+
+export const listAgeaImportazioneRigheQueryPageSizeDefault = 50;
+export const listAgeaImportazioneRigheQueryPageSizeMax = 200;
+
+export const listAgeaImportazioneRigheQueryQMax = 100;
+
+
+
+export const ListAgeaImportazioneRigheQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listAgeaImportazioneRigheQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listAgeaImportazioneRigheQueryPageSizeMax).default(listAgeaImportazioneRigheQueryPageSizeDefault),
+  "stato": zod.coerce.string().optional(),
+  "fondo": zod.coerce.string().optional(),
+  "tipo": zod.enum(['CARICO', 'DISTRIBUZIONE', 'RESO', 'MOVIMENTO_NEGATIVO_NON_CLASSIFICATO', 'SEGNO_INCOERENTE', 'RIGA_SENZA_MOVIMENTO']).optional(),
+  "q": zod.coerce.string().max(listAgeaImportazioneRigheQueryQMax).optional()
+})
+
+export const listAgeaImportazioneRigheResponseItemsItemMovimentoKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazioneRigheResponseItemsItemMovimentoPezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazioneRigheResponseItemsItemSaldoFinaleKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazioneRigheResponseItemsItemSaldoFinalePezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazioneRigheResponseItemsItemContentHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ListAgeaImportazioneRigheResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "importazioneId": zod.number(),
+  "numeroRiga": zod.number(),
+  "fondoRaw": zod.string().nullish(),
+  "fondoNormalizzato": zod.string().nullish(),
+  "prodottoRaw": zod.string(),
+  "prodottoNormalizzato": zod.string(),
+  "lottoRaw": zod.string().nullish(),
+  "lottoEffettivoRaw": zod.string().nullish(),
+  "lottoEffettivoNormalizzato": zod.string().nullish(),
+  "numeroDocumentoRaw": zod.string().nullish(),
+  "dataDocumento": zod.coerce.date().nullish(),
+  "dataCaricoMagazzinoRaw": zod.string().nullish(),
+  "dataCaricoRisolta": zod.coerce.date().nullish(),
+  "dataCaricoEffettiva": zod.coerce.date().nullish(),
+  "dataCaricoFonte": zod.string().nullish(),
+  "movimentoKgLt": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemMovimentoKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "movimentoPezzi": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemMovimentoPezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "saldoFinaleKgLt": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemSaldoFinaleKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "saldoFinalePezzi": zod.union([zod.string().regex(listAgeaImportazioneRigheResponseItemsItemSaldoFinalePezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "attivitaRaw": zod.string().nullish(),
+  "tipoMovimentoEsterno": zod.enum(['CARICO', 'DISTRIBUZIONE', 'RESO', 'MOVIMENTO_NEGATIVO_NON_CLASSIFICATO', 'SEGNO_INCOERENTE', 'RIGA_SENZA_MOVIMENTO']),
+  "identityKey": zod.string(),
+  "contentHash": zod.string().regex(listAgeaImportazioneRigheResponseItemsItemContentHashRegExp),
+  "prodottoIdSnapshot": zod.number().nullish(),
+  "mappingVersioneSnapshot": zod.number().nullish(),
+  "descrizioneProdottoSnapshot": zod.string().nullish(),
+  "unitaMisuraSnapshot": zod.string().nullish(),
+  "statoRiga": zod.string(),
+  "blocking": zod.boolean(),
+  "errorCodesJson": zod.array(zod.string()),
+  "warningCodesJson": zod.array(zod.string()),
+  "correzioneMotivazione": zod.string().nullish()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+export const ListAgeaImportazionePartiteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listAgeaImportazionePartiteResponseSaldoFinalePezziOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazionePartiteResponseSaldoFinaleKgLtOneRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazionePartiteResponseQuantitaOperativaOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listAgeaImportazionePartiteResponseFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+
+
+export const ListAgeaImportazionePartiteResponseItem = zod.object({
+  "id": zod.number(),
+  "importazioneId": zod.number(),
+  "partyKey": zod.string(),
+  "fondoOrigine": zod.string(),
+  "prodottoId": zod.number().nullish(),
+  "prodottoNormalizzato": zod.string(),
+  "descrizioniEsterneJson": zod.array(zod.string()).optional(),
+  "lottoRaw": zod.string().nullish(),
+  "existingLottoId": zod.number().nullish(),
+  "saldoFinalePezzi": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseSaldoFinalePezziOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "saldoFinaleKgLt": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseSaldoFinaleKgLtOneRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),zod.null()]).optional(),
+  "quantitaOperativa": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseQuantitaOperativaOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "unitaMisuraOperativa": zod.string().nullish(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(listAgeaImportazionePartiteResponseFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "dataScadenzaRisolta": zod.coerce.date().nullish(),
+  "dataScadenzaFonte": zod.string().nullish(),
+  "stato": zod.string(),
+  "blocking": zod.boolean(),
+  "errorCodesJson": zod.array(zod.string()),
+  "warningCodesJson": zod.array(zod.string())
+})
+export const ListAgeaImportazionePartiteResponse = zod.array(ListAgeaImportazionePartiteResponseItem)
+
+
+/**
+ * @summary Elenca le descrizioni esterne distinte dell'intera importazione
+ */
+export const ListAgeaImportazioneDescrizioniDaMappareParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const ListAgeaImportazioneDescrizioniDaMappareResponseItem = zod.object({
+  "chiaveDescrizioneNormalizzata": zod.string(),
+  "descrizioneRawRappresentativa": zod.string(),
+  "numeroRighe": zod.number().min(1),
+  "fondi": zod.array(zod.string()),
+  "mappingId": zod.number().nullish(),
+  "mappingAttiva": zod.boolean().nullish(),
+  "mappingVersione": zod.number().nullish(),
+  "prodottoId": zod.number().nullish(),
+  "prodottoNome": zod.string().nullish()
+})
+export const ListAgeaImportazioneDescrizioniDaMappareResponse = zod.array(ListAgeaImportazioneDescrizioniDaMappareResponseItem)
+
+
+export const UpdateAgeaImportazioneRigaDataCaricoParams = zod.object({
+  "id": zod.coerce.number(),
+  "rigaId": zod.coerce.number()
+})
+
+export const updateAgeaImportazioneRigaDataCaricoBodyMotivazioneMin = 3;
+export const updateAgeaImportazioneRigaDataCaricoBodyMotivazioneMax = 500;
+
+
+
+
+export const UpdateAgeaImportazioneRigaDataCaricoBody = zod.object({
+  "valore": zod.coerce.date().nullable(),
+  "motivazione": zod.string().min(updateAgeaImportazioneRigaDataCaricoBodyMotivazioneMin).max(updateAgeaImportazioneRigaDataCaricoBodyMotivazioneMax),
+  "versione": zod.number().min(1)
+})
+
+export const updateAgeaImportazioneRigaDataCaricoResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const UpdateAgeaImportazioneRigaDataCaricoResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(updateAgeaImportazioneRigaDataCaricoResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const UpdateAgeaImportazioneRigaLottoParams = zod.object({
+  "id": zod.coerce.number(),
+  "rigaId": zod.coerce.number()
+})
+
+export const updateAgeaImportazioneRigaLottoBodyValoreMax = 80;
+
+export const updateAgeaImportazioneRigaLottoBodyMotivazioneMin = 3;
+export const updateAgeaImportazioneRigaLottoBodyMotivazioneMax = 500;
+
+
+
+
+export const UpdateAgeaImportazioneRigaLottoBody = zod.object({
+  "valore": zod.string().min(1).max(updateAgeaImportazioneRigaLottoBodyValoreMax).nullable(),
+  "motivazione": zod.string().min(updateAgeaImportazioneRigaLottoBodyMotivazioneMin).max(updateAgeaImportazioneRigaLottoBodyMotivazioneMax),
+  "versione": zod.number().min(1)
+})
+
+export const updateAgeaImportazioneRigaLottoResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const UpdateAgeaImportazioneRigaLottoResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(updateAgeaImportazioneRigaLottoResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const UpdateAgeaImportazionePartitaParams = zod.object({
+  "id": zod.coerce.number(),
+  "partitaId": zod.coerce.number()
+})
+
+export const updateAgeaImportazionePartitaBodyMotivazioneMin = 3;
+export const updateAgeaImportazionePartitaBodyMotivazioneMax = 500;
+
+
+
+
+export const UpdateAgeaImportazionePartitaBody = zod.object({
+  "dataScadenza": zod.coerce.date().nullable(),
+  "motivazione": zod.string().min(updateAgeaImportazionePartitaBodyMotivazioneMin).max(updateAgeaImportazionePartitaBodyMotivazioneMax),
+  "versione": zod.number().min(1)
+})
+
+export const updateAgeaImportazionePartitaResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const UpdateAgeaImportazionePartitaResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(updateAgeaImportazionePartitaResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const RecalculateAgeaImportazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const RecalculateAgeaImportazioneBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
+export const recalculateAgeaImportazioneResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const RecalculateAgeaImportazioneResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(recalculateAgeaImportazioneResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const ConfirmAgeaImportazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const ConfirmAgeaImportazioneBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
+export const confirmAgeaImportazioneResponseImportazioneSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ConfirmAgeaImportazioneResponse = zod.object({
+  "importazione": zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(confirmAgeaImportazioneResponseImportazioneSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+}),
+  "replay": zod.boolean(),
+  "carichi": zod.array(zod.number())
+})
+
+
+export const CancelAgeaImportazioneParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const CancelAgeaImportazioneBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
+export const cancelAgeaImportazioneResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const CancelAgeaImportazioneResponse = zod.object({
+  "id": zod.number(),
+  "magazzinoId": zod.number(),
+  "nomeFile": zod.string(),
+  "mimeType": zod.string(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(cancelAgeaImportazioneResponseSha256FileRegExp),
+  "tracciatoCodice": zod.enum(['SIFEAD_REGISTRO_XLSX_OSSERVATO_V1']),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date(),
+  "modalita": zod.enum(['PRIMA_ACQUISIZIONE', 'AGGIORNAMENTO', 'SOLO_ANALISI']),
+  "stato": zod.enum(['ANALIZZATA', 'DA_MAPPARE', 'BLOCCATA', 'PRONTA', 'CONFERMATA', 'ANNULLATA', 'ERRORE']),
+  "versione": zod.number(),
+  "righeTotali": zod.number(),
+  "righeCarico": zod.number(),
+  "righeDistribuzione": zod.number(),
+  "righeReso": zod.number(),
+  "righeNonClassificate": zod.number(),
+  "righeNuove": zod.number(),
+  "righeDuplicate": zod.number(),
+  "righeModificate": zod.number(),
+  "righeAmbigue": zod.number(),
+  "righeBloccanti": zod.number(),
+  "partiteTotali": zod.number(),
+  "partiteSaldoPositivo": zod.number(),
+  "bootstrapCaricoId": zod.number().nullish(),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "confermatoDa": zod.number().nullish(),
+  "dataConferma": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "dataAnnullamento": zod.coerce.date().nullish(),
+  "noteAudit": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const ListAgeaMappatureProdottiResponseItem = zod.object({
+  "id": zod.number(),
+  "fonte": zod.enum(['AGEA_SIFEAD']),
+  "descrizioneEsterna": zod.string(),
+  "chiaveDescrizioneNormalizzata": zod.string(),
+  "prodottoId": zod.number(),
+  "attiva": zod.boolean(),
+  "versione": zod.number(),
+  "prodotto": zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "tipoProdotto": zod.string(),
+  "unitaMisura": zod.string(),
+  "codiceBarre": zod.string().nullish(),
+  "gestioneLotto": zod.boolean(),
+  "gestioneScadenza": zod.boolean(),
+  "fsePlus": zod.boolean(),
+  "scortaMinima": zod.number(),
+  "scortaConsigliata": zod.number(),
+  "abilitatoEmporio": zod.boolean(),
+  "creditoSolidaleValore": zod.number(),
+  "quantitaMassimaPerSpesa": zod.number().nullable(),
+  "quantitaMassimaMensile": zod.number().nullable(),
+  "conservazione": zod.string().nullish(),
+  "taglia": zod.string().nullish(),
+  "genere": zod.string().nullish(),
+  "stagione": zod.string().nullish(),
+  "condizione": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "fornitoreId": zod.number().nullish()
+}).optional()
+})
+export const ListAgeaMappatureProdottiResponse = zod.array(ListAgeaMappatureProdottiResponseItem)
+
+
+
+
+
+
+export const CreateAgeaMappaturaProdottoBody = zod.object({
+  "descrizioneEsterna": zod.string().min(1),
+  "prodottoId": zod.number().min(1)
+})
+
+
+export const UpdateAgeaMappaturaProdottoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+
+export const UpdateAgeaMappaturaProdottoBody = zod.object({
+  "prodottoId": zod.number().min(1),
+  "attiva": zod.boolean().optional(),
+  "versione": zod.number().min(1)
+})
+
+export const UpdateAgeaMappaturaProdottoResponse = zod.object({
+  "id": zod.number(),
+  "fonte": zod.enum(['AGEA_SIFEAD']),
+  "descrizioneEsterna": zod.string(),
+  "chiaveDescrizioneNormalizzata": zod.string(),
+  "prodottoId": zod.number(),
+  "attiva": zod.boolean(),
+  "versione": zod.number(),
+  "prodotto": zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "tipoProdotto": zod.string(),
+  "unitaMisura": zod.string(),
+  "codiceBarre": zod.string().nullish(),
+  "gestioneLotto": zod.boolean(),
+  "gestioneScadenza": zod.boolean(),
+  "fsePlus": zod.boolean(),
+  "scortaMinima": zod.number(),
+  "scortaConsigliata": zod.number(),
+  "abilitatoEmporio": zod.boolean(),
+  "creditoSolidaleValore": zod.number(),
+  "quantitaMassimaPerSpesa": zod.number().nullable(),
+  "quantitaMassimaMensile": zod.number().nullable(),
+  "conservazione": zod.string().nullish(),
+  "taglia": zod.string().nullish(),
+  "genere": zod.string().nullish(),
+  "stagione": zod.string().nullish(),
+  "condizione": zod.string().nullish(),
+  "attivo": zod.boolean(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string(),
+  "fornitoreId": zod.number().nullish()
+}).optional()
+})
+
+
+/**
+ * @summary Preview canonica FSE+ con cutoff immutabile
+ */
+
+export const getFseReportingPreviewQueryIncludeArretratiDefault = true;
+
+export const GetFseReportingPreviewQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().min(1),
+  "dataCompetenzaDa": zod.date(),
+  "dataCompetenzaA": zod.date(),
+  "dataAsOf": zod.date().optional(),
+  "includeArretrati": zod.coerce.boolean().default(getFseReportingPreviewQueryIncludeArretratiDefault)
+})
+
+
+export const getFseReportingPreviewResponseEventiTotaliMin = 0;
+
+export const getFseReportingPreviewResponseRigheTotaliMin = 0;
+
+export const getFseReportingPreviewResponseEventiDaRendicontareMin = 0;
+
+export const getFseReportingPreviewResponseEventiArretratiMin = 0;
+
+export const getFseReportingPreviewResponseEventiBloccatiMin = 0;
+
+export const getFseReportingPreviewResponseEventiGiaCopertiMin = 0;
+
+export const getFseReportingPreviewResponseRigheDaRendicontareMin = 0;
+
+export const getFseReportingPreviewResponseBloccantiMin = 0;
+
+
+
+export const GetFseReportingPreviewResponse = zod.object({
+  "modelVersion": zod.string(),
+  "magazzinoId": zod.number().min(1),
+  "dataDa": zod.coerce.date(),
+  "dataA": zod.coerce.date(),
+  "dataAsOf": zod.coerce.date(),
+  "eventiTotali": zod.number().min(getFseReportingPreviewResponseEventiTotaliMin),
+  "righeTotali": zod.number().min(getFseReportingPreviewResponseRigheTotaliMin),
+  "eventiDaRendicontare": zod.number().min(getFseReportingPreviewResponseEventiDaRendicontareMin),
+  "eventiArretrati": zod.number().min(getFseReportingPreviewResponseEventiArretratiMin),
+  "eventiBloccati": zod.number().min(getFseReportingPreviewResponseEventiBloccatiMin),
+  "eventiGiaCoperti": zod.number().min(getFseReportingPreviewResponseEventiGiaCopertiMin),
+  "righeDaRendicontare": zod.number().min(getFseReportingPreviewResponseRigheDaRendicontareMin),
+  "bloccanti": zod.number().min(getFseReportingPreviewResponseBloccantiMin),
+  "cutoff": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+
+export const listFseReportingEventsQueryIncludeArretratiDefault = true;
+export const listFseReportingEventsQueryPageDefault = 1;
+
+export const listFseReportingEventsQueryPageSizeDefault = 50;
+export const listFseReportingEventsQueryPageSizeMax = 200;
+
+
+
+
+export const ListFseReportingEventsQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().min(1),
+  "dataCompetenzaDa": zod.date(),
+  "dataCompetenzaA": zod.date(),
+  "includeArretrati": zod.coerce.boolean().default(listFseReportingEventsQueryIncludeArretratiDefault),
+  "page": zod.coerce.number().min(1).default(listFseReportingEventsQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseReportingEventsQueryPageSizeMax).default(listFseReportingEventsQueryPageSizeDefault),
+  "statoRendicontazione": zod.enum(['DA_RENDICONTARE', 'ARRETRATO_NON_RENDICONTATO', 'BLOCCATO']).optional(),
+  "canale": zod.coerce.string().optional(),
+  "fondo": zod.coerce.string().optional(),
+  "prodottoId": zod.coerce.number().min(1).optional(),
+  "qualityCode": zod.coerce.string().optional()
+})
+
+
+export const listFseReportingEventsResponsePageSizeMax = 200;
+
+export const listFseReportingEventsResponseTotalMin = 0;
+
+
+
+export const ListFseReportingEventsResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReportingEventsResponsePageSizeMax),
+  "total": zod.number().min(listFseReportingEventsResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+
+export const listFseReportingLinesQueryIncludeArretratiDefault = true;
+export const listFseReportingLinesQueryPageDefault = 1;
+
+export const listFseReportingLinesQueryPageSizeDefault = 50;
+export const listFseReportingLinesQueryPageSizeMax = 200;
+
+
+
+
+export const ListFseReportingLinesQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().min(1),
+  "dataCompetenzaDa": zod.date(),
+  "dataCompetenzaA": zod.date(),
+  "includeArretrati": zod.coerce.boolean().default(listFseReportingLinesQueryIncludeArretratiDefault),
+  "page": zod.coerce.number().min(1).default(listFseReportingLinesQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseReportingLinesQueryPageSizeMax).default(listFseReportingLinesQueryPageSizeDefault),
+  "statoRendicontazione": zod.enum(['DA_RENDICONTARE', 'ARRETRATO_NON_RENDICONTATO', 'BLOCCATO']).optional(),
+  "canale": zod.coerce.string().optional(),
+  "fondo": zod.coerce.string().optional(),
+  "prodottoId": zod.coerce.number().min(1).optional(),
+  "qualityCode": zod.coerce.string().optional()
+})
+
+
+export const listFseReportingLinesResponsePageSizeMax = 200;
+
+export const listFseReportingLinesResponseTotalMin = 0;
+
+
+
+export const ListFseReportingLinesResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReportingLinesResponsePageSizeMax),
+  "total": zod.number().min(listFseReportingLinesResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+
+export const listFseReportingQualityQueryIncludeArretratiDefault = true;
+export const listFseReportingQualityQueryPageDefault = 1;
+
+export const listFseReportingQualityQueryPageSizeDefault = 50;
+export const listFseReportingQualityQueryPageSizeMax = 200;
+
+
+
+
+export const ListFseReportingQualityQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().min(1),
+  "dataCompetenzaDa": zod.date(),
+  "dataCompetenzaA": zod.date(),
+  "includeArretrati": zod.coerce.boolean().default(listFseReportingQualityQueryIncludeArretratiDefault),
+  "page": zod.coerce.number().min(1).default(listFseReportingQualityQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseReportingQualityQueryPageSizeMax).default(listFseReportingQualityQueryPageSizeDefault),
+  "statoRendicontazione": zod.enum(['DA_RENDICONTARE', 'ARRETRATO_NON_RENDICONTATO', 'BLOCCATO']).optional(),
+  "canale": zod.coerce.string().optional(),
+  "fondo": zod.coerce.string().optional(),
+  "prodottoId": zod.coerce.number().min(1).optional(),
+  "qualityCode": zod.coerce.string().optional()
+})
+
+
+export const listFseReportingQualityResponsePageSizeMax = 200;
+
+export const listFseReportingQualityResponseTotalMin = 0;
+
+
+
+export const ListFseReportingQualityResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReportingQualityResponsePageSizeMax),
+  "total": zod.number().min(listFseReportingQualityResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+export const listFseExportsQueryPageDefault = 1;
+
+export const listFseExportsQueryPageSizeDefault = 50;
+export const listFseExportsQueryPageSizeMax = 200;
+
+
+export const listFseExportsQueryStatoMax = 60;
+
+
+
+export const ListFseExportsQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listFseExportsQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseExportsQueryPageSizeMax).default(listFseExportsQueryPageSizeDefault),
+  "magazzinoId": zod.coerce.number().min(1).optional(),
+  "dataCompetenzaDa": zod.date().optional(),
+  "dataCompetenzaA": zod.date().optional(),
+  "stato": zod.coerce.string().max(listFseExportsQueryStatoMax).optional()
+})
+
+
+export const listFseExportsResponsePageSizeMax = 200;
+
+export const listFseExportsResponseTotalMin = 0;
+
+
+
+export const ListFseExportsResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseExportsResponsePageSizeMax),
+  "total": zod.number().min(listFseExportsResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+
+
+
+export const createFseExportBodyIncludeArretratiDefault = true;
+
+export const CreateFseExportBody = zod.object({
+  "magazzinoId": zod.number().min(1),
+  "dataCompetenzaDa": zod.coerce.date(),
+  "dataCompetenzaA": zod.coerce.date(),
+  "dataAsOf": zod.coerce.date(),
+  "formatCode": zod.enum(['FSE_CANONICAL_AUDIT_XLSX_V1', 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1']),
+  "maxMovimentoId": zod.number().min(1).optional(),
+  "maxOperazioneDistribuzioneId": zod.number().min(1).optional(),
+  "includeArretrati": zod.boolean().default(createFseExportBodyIncludeArretratiDefault)
+})
+
+
+export const GetFseExportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetFseExportResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const ListFseExportEventsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listFseExportEventsQueryPageDefault = 1;
+
+export const listFseExportEventsQueryPageSizeDefault = 50;
+export const listFseExportEventsQueryPageSizeMax = 200;
+
+
+
+export const ListFseExportEventsQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listFseExportEventsQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseExportEventsQueryPageSizeMax).default(listFseExportEventsQueryPageSizeDefault)
+})
+
+
+export const listFseExportEventsResponsePageSizeMax = 200;
+
+export const listFseExportEventsResponseTotalMin = 0;
+
+
+
+export const ListFseExportEventsResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseExportEventsResponsePageSizeMax),
+  "total": zod.number().min(listFseExportEventsResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+export const ListFseExportLinesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listFseExportLinesQueryPageDefault = 1;
+
+export const listFseExportLinesQueryPageSizeDefault = 50;
+export const listFseExportLinesQueryPageSizeMax = 200;
+
+
+
+export const ListFseExportLinesQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listFseExportLinesQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseExportLinesQueryPageSizeMax).default(listFseExportLinesQueryPageSizeDefault)
+})
+
+
+export const listFseExportLinesResponsePageSizeMax = 200;
+
+export const listFseExportLinesResponseTotalMin = 0;
+
+
+
+export const ListFseExportLinesResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseExportLinesResponsePageSizeMax),
+  "total": zod.number().min(listFseExportLinesResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+export const DownloadFseExportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DownloadFseExportQueryParams = zod.object({
+  "representation": zod.enum(['FSE_CANONICAL_AUDIT_XLSX_V1', 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1']).optional().describe('Rappresentazione derivata dallo stesso snapshot immutabile')
+})
+
+
+export const MarkFseExportManuallyEnteredParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const markFseExportManuallyEnteredBodyRiferimentoEsternoMin = 3;
+export const markFseExportManuallyEnteredBodyRiferimentoEsternoMax = 500;
+
+
+
+export const MarkFseExportManuallyEnteredBody = zod.object({
+  "versione": zod.number().min(1),
+  "data": zod.coerce.date(),
+  "riferimentoEsterno": zod.string().min(markFseExportManuallyEnteredBodyRiferimentoEsternoMin).max(markFseExportManuallyEnteredBodyRiferimentoEsternoMax)
+})
+
+export const MarkFseExportManuallyEnteredResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const CancelFseExportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const cancelFseExportBodyMotivazioneMin = 3;
+export const cancelFseExportBodyMotivazioneMax = 500;
+
+
+
+export const CancelFseExportBody = zod.object({
+  "versione": zod.number().min(1),
+  "motivazione": zod.string().min(cancelFseExportBodyMotivazioneMin).max(cancelFseExportBodyMotivazioneMax)
+})
+
+export const CancelFseExportResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const listFseReconciliationsQueryPageDefault = 1;
+
+export const listFseReconciliationsQueryPageSizeDefault = 50;
+export const listFseReconciliationsQueryPageSizeMax = 200;
+
+
+export const listFseReconciliationsQueryStatoMax = 60;
+
+
+
+export const ListFseReconciliationsQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listFseReconciliationsQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseReconciliationsQueryPageSizeMax).default(listFseReconciliationsQueryPageSizeDefault),
+  "magazzinoId": zod.coerce.number().min(1).optional(),
+  "dataCompetenzaDa": zod.date().optional(),
+  "dataCompetenzaA": zod.date().optional(),
+  "stato": zod.coerce.string().max(listFseReconciliationsQueryStatoMax).optional()
+})
+
+
+export const listFseReconciliationsResponsePageSizeMax = 200;
+
+export const listFseReconciliationsResponseTotalMin = 0;
+
+
+
+export const ListFseReconciliationsResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReconciliationsResponsePageSizeMax),
+  "total": zod.number().min(listFseReconciliationsResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+
+
+
+
+
+
+
+export const CreateFseReconciliationBody = zod.object({
+  "magazzinoId": zod.number().min(1),
+  "importazioneAgeaId": zod.number().min(1),
+  "importazioneAgeaPrecedenteId": zod.number().min(1).nullish(),
+  "dataRiferimento": zod.coerce.date(),
+  "maxMovimentoId": zod.number().min(1).optional(),
+  "maxOperazioneDistribuzioneId": zod.number().min(1).optional()
+})
+
+
+export const GetFseReconciliationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetFseReconciliationResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const ListFseReconciliationLinesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listFseReconciliationLinesQueryPageDefault = 1;
+
+export const listFseReconciliationLinesQueryPageSizeDefault = 50;
+export const listFseReconciliationLinesQueryPageSizeMax = 200;
+
+
+
+export const ListFseReconciliationLinesQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listFseReconciliationLinesQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseReconciliationLinesQueryPageSizeMax).default(listFseReconciliationLinesQueryPageSizeDefault)
+})
+
+
+export const listFseReconciliationLinesResponsePageSizeMax = 200;
+
+export const listFseReconciliationLinesResponseTotalMin = 0;
+
+
+
+export const listFseReconciliationLinesResponseRowsItemResolutionGroupIdRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+
+export const ListFseReconciliationLinesResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReconciliationLinesResponsePageSizeMax),
+  "total": zod.number().min(listFseReconciliationLinesResponseTotalMin),
+  "rows": zod.array(zod.object({
+  "id": zod.number().min(1).optional(),
+  "active": zod.boolean().optional(),
+  "supersededByRowId": zod.number().min(1).nullish(),
+  "resolutionGroupId": zod.string().regex(listFseReconciliationLinesResponseRowsItemResolutionGroupIdRegExp).nullish(),
+  "companionRowId": zod.number().min(1).nullish()
+}))
+})
+
+
+export const RecalculateFseReconciliationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const recalculateFseReconciliationBodyMotivazioneMin = 3;
+export const recalculateFseReconciliationBodyMotivazioneMax = 500;
+
+export const recalculateFseReconciliationBodyRiferimentoEsternoMin = 3;
+export const recalculateFseReconciliationBodyRiferimentoEsternoMax = 500;
+
+
+
+export const RecalculateFseReconciliationBody = zod.object({
+  "versione": zod.number().min(1),
+  "motivazione": zod.string().min(recalculateFseReconciliationBodyMotivazioneMin).max(recalculateFseReconciliationBodyMotivazioneMax).optional(),
+  "data": zod.coerce.date().optional(),
+  "riferimentoEsterno": zod.string().min(recalculateFseReconciliationBodyRiferimentoEsternoMin).max(recalculateFseReconciliationBodyRiferimentoEsternoMax).optional(),
+  "conScostamenti": zod.boolean().optional()
+})
+
+export const RecalculateFseReconciliationResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const ResolveFseReconciliationLineParams = zod.object({
+  "id": zod.coerce.number(),
+  "rigaId": zod.coerce.number()
+})
+
+
+export const resolveFseReconciliationLineBodyMotivazioneMin = 3;
+export const resolveFseReconciliationLineBodyMotivazioneMax = 500;
+
+
+
+
+
+export const ResolveFseReconciliationLineBody = zod.object({
+  "versione": zod.number().min(1),
+  "azione": zod.enum(['ABBINA', 'DISABBINA', 'ACCETTA_SCOSTAMENTO', 'SEGNALA_DA_CORREGGERE', 'RIAPRI']),
+  "motivazione": zod.string().min(resolveFseReconciliationLineBodyMotivazioneMin).max(resolveFseReconciliationLineBodyMotivazioneMax),
+  "movimentoId": zod.number().min(1).optional(),
+  "importazioneAgeaRigaId": zod.number().min(1).optional()
+})
+
+export const ResolveFseReconciliationLineResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const CloseFseReconciliationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const closeFseReconciliationBodyMotivazioneMin = 3;
+export const closeFseReconciliationBodyMotivazioneMax = 500;
+
+export const closeFseReconciliationBodyRiferimentoEsternoMin = 3;
+export const closeFseReconciliationBodyRiferimentoEsternoMax = 500;
+
+
+
+export const CloseFseReconciliationBody = zod.object({
+  "versione": zod.number().min(1),
+  "motivazione": zod.string().min(closeFseReconciliationBodyMotivazioneMin).max(closeFseReconciliationBodyMotivazioneMax).optional(),
+  "data": zod.coerce.date().optional(),
+  "riferimentoEsterno": zod.string().min(closeFseReconciliationBodyRiferimentoEsternoMin).max(closeFseReconciliationBodyRiferimentoEsternoMax).optional(),
+  "conScostamenti": zod.boolean().optional()
+})
+
+export const CloseFseReconciliationResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const CancelFseReconciliationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const cancelFseReconciliationBodyMotivazioneMin = 3;
+export const cancelFseReconciliationBodyMotivazioneMax = 500;
+
+export const cancelFseReconciliationBodyRiferimentoEsternoMin = 3;
+export const cancelFseReconciliationBodyRiferimentoEsternoMax = 500;
+
+
+
+export const CancelFseReconciliationBody = zod.object({
+  "versione": zod.number().min(1),
+  "motivazione": zod.string().min(cancelFseReconciliationBodyMotivazioneMin).max(cancelFseReconciliationBodyMotivazioneMax).optional(),
+  "data": zod.coerce.date().optional(),
+  "riferimentoEsterno": zod.string().min(cancelFseReconciliationBodyRiferimentoEsternoMin).max(cancelFseReconciliationBodyRiferimentoEsternoMax).optional(),
+  "conScostamenti": zod.boolean().optional()
+})
+
+export const CancelFseReconciliationResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const listFseMonitoringQueryPageDefault = 1;
+
+export const listFseMonitoringQueryPageSizeDefault = 50;
+export const listFseMonitoringQueryPageSizeMax = 200;
+
+
+
+
+export const ListFseMonitoringQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listFseMonitoringQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listFseMonitoringQueryPageSizeMax).default(listFseMonitoringQueryPageSizeDefault),
+  "magazzinoId": zod.coerce.number().min(1).optional(),
+  "dataCompetenzaDa": zod.date().optional(),
+  "dataCompetenzaA": zod.date().optional()
+})
+
+
+export const listFseMonitoringResponsePageSizeMax = 200;
+
+export const listFseMonitoringResponseTotalMin = 0;
+
+
+
+export const ListFseMonitoringResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseMonitoringResponsePageSizeMax),
+  "total": zod.number().min(listFseMonitoringResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+
+export const createFseMonitoringBodyAnnoMeseRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
+
+
+
+export const CreateFseMonitoringBody = zod.object({
+  "magazzinoId": zod.number().min(1),
+  "annoMese": zod.string().regex(createFseMonitoringBodyAnnoMeseRegExp),
+  "canaleUfficiale": zod.enum(['PACCHI', 'MENSA', 'STRADA']),
+  "dataRiferimento": zod.coerce.date(),
+  "operazioneDistribuzioneId": zod.number().min(1).nullish(),
+  "fonte": zod.enum(['RILEVAZIONE_MANUALE_VERIFICATA', 'DERIVAZIONE_STRUTTURATA']),
+  "completezza": zod.enum(['PARZIALE', 'COMPLETA'])
+})
+
+
+export const UpdateFseMonitoringParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateFseMonitoringBody = zod.object({
+  "versione": zod.number().min(1)
+})
+
+export const UpdateFseMonitoringResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Registra un reso FSE+ verso OpC nel ledger condiviso
+ */
+export const createFseOpcReturnBodyIdempotencyKeyMin = 8;
+export const createFseOpcReturnBodyIdempotencyKeyMax = 100;
+
+
+export const createFseOpcReturnBodyDestinazioneOpcMin = 3;
+export const createFseOpcReturnBodyDestinazioneOpcMax = 500;
+
+export const createFseOpcReturnBodyMotivazioneMin = 3;
+export const createFseOpcReturnBodyMotivazioneMax = 2000;
+
+
+
+export const createFseOpcReturnBodyRigheItemQuantitaOneExclusiveMin = 0;
+
+export const createFseOpcReturnBodyRigheItemQuantitaTwoRegExp = new RegExp('^[0-9]+([.][0-9]{1,6})?$');
+
+
+
+export const CreateFseOpcReturnBody = zod.object({
+  "versione": zod.literal(1),
+  "idempotencyKey": zod.string().min(createFseOpcReturnBodyIdempotencyKeyMin).max(createFseOpcReturnBodyIdempotencyKeyMax),
+  "magazzinoId": zod.number().min(1),
+  "dataReso": zod.coerce.date(),
+  "destinazioneOpc": zod.string().min(createFseOpcReturnBodyDestinazioneOpcMin).max(createFseOpcReturnBodyDestinazioneOpcMax),
+  "motivazione": zod.string().min(createFseOpcReturnBodyMotivazioneMin).max(createFseOpcReturnBodyMotivazioneMax),
+  "modalitaSelezione": zod.enum(['FEFO', 'PARTITA_ESATTA']),
+  "righe": zod.array(zod.object({
+  "prodottoId": zod.number().min(1),
+  "lottoId": zod.number().min(1).optional(),
+  "quantita": zod.union([zod.number().gt(createFseOpcReturnBodyRigheItemQuantitaOneExclusiveMin),zod.string().regex(createFseOpcReturnBodyRigheItemQuantitaTwoRegExp)])
+})).min(1)
+})
+
+export const CreateFseOpcReturnResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Storna un reso OpC mediante movimento compensativo
+ */
+
+
+
+export const ReverseFseOpcReturnParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+export const reverseFseOpcReturnBodyMotivazioneMin = 3;
+export const reverseFseOpcReturnBodyMotivazioneMax = 2000;
+
+
+
+export const ReverseFseOpcReturnBody = zod.object({
+  "versione": zod.number().min(1),
+  "data": zod.coerce.date(),
+  "motivazione": zod.string().min(reverseFseOpcReturnBodyMotivazioneMin).max(reverseFseOpcReturnBodyMotivazioneMax)
+})
+
+export const ReverseFseOpcReturnResponse = zod.record(zod.string(), zod.unknown())
+
+
 export const ListLottiQueryParams = zod.object({
   "prodottoId": zod.coerce.number().optional(),
   "magazzinoId": zod.coerce.number().optional(),
-  "inScadenza": zod.coerce.boolean().optional()
+  "inScadenza": zod.coerce.boolean().optional(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']).optional(),
+  "origineCaricoPresente": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']).optional().describe('Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.')
 })
+
+export const listLottiResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listLottiResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
 
 export const ListLottiResponseItem = zod.object({
   "id": zod.number(),
@@ -456,11 +2006,17 @@ export const ListLottiResponseItem = zod.object({
   "dataCarico": zod.string(),
   "quantitaCaricata": zod.number(),
   "quantitaResidua": zod.number(),
+  "quantitaCaricataPrecisa": zod.string().regex(listLottiResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaResiduaPrecisa": zod.string().regex(listLottiResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "codiceLottoNormalizzato": zod.string().nullish(),
+  "dataUltimoCarico": zod.coerce.date().nullish(),
+  "fattoreKgLtPezzo": zod.string().nullish(),
   "documentoCarico": zod.string().nullish(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -491,6 +2047,10 @@ export const GetLottoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const getLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
 export const GetLottoResponse = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
@@ -500,11 +2060,58 @@ export const GetLottoResponse = zod.object({
   "dataCarico": zod.string(),
   "quantitaCaricata": zod.number(),
   "quantitaResidua": zod.number(),
+  "quantitaCaricataPrecisa": zod.string().regex(getLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaResiduaPrecisa": zod.string().regex(getLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "codiceLottoNormalizzato": zod.string().nullish(),
+  "dataUltimoCarico": zod.coerce.date().nullish(),
+  "fattoreKgLtPezzo": zod.string().nullish(),
+  "documentoCarico": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Aggiorna esclusivamente le note non identificative della Partita
+ */
+export const UpdateLottoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateLottoBody = zod.object({
+  "note": zod.string().nullish()
+})
+
+export const updateLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const updateLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const UpdateLottoResponse = zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "dataScadenza": zod.string().nullish(),
+  "dataCarico": zod.string(),
+  "quantitaCaricata": zod.number(),
+  "quantitaResidua": zod.number(),
+  "quantitaCaricataPrecisa": zod.string().regex(updateLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaResiduaPrecisa": zod.string().regex(updateLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "fornitoreId": zod.number().nullish(),
+  "fornitoreNome": zod.string().nullish(),
+  "fsePlus": zod.boolean(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "codiceLottoNormalizzato": zod.string().nullish(),
+  "dataUltimoCarico": zod.coerce.date().nullish(),
+  "fattoreKgLtPezzo": zod.string().nullish(),
   "documentoCarico": zod.string().nullish(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -518,12 +2125,19 @@ export const RettificaLottoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const rettificaLottoBodyDeltaRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
 export const RettificaLottoBody = zod.object({
-  "delta": zod.number(),
+  "delta": zod.string().regex(rettificaLottoBodyDeltaRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),
   "causale": zod.enum(['inventario_fisico', 'errore_registrazione', 'deterioramento', 'altro']),
   "motivazione": zod.string().optional(),
   "note": zod.string().optional()
 })
+
+export const rettificaLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const rettificaLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
 
 export const RettificaLottoResponse = zod.object({
   "id": zod.number(),
@@ -534,42 +2148,17 @@ export const RettificaLottoResponse = zod.object({
   "dataCarico": zod.string(),
   "quantitaCaricata": zod.number(),
   "quantitaResidua": zod.number(),
+  "quantitaCaricataPrecisa": zod.string().regex(rettificaLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaResiduaPrecisa": zod.string().regex(rettificaLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),
-  "documentoCarico": zod.string().nullish(),
-  "note": zod.string().nullish(),
-  "dataCreazione": zod.string()
-})
-
-
-export const UpdateLottoParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const UpdateLottoBody = zod.object({
-  "codiceLotto": zod.string().optional(),
-  "dataScadenza": zod.string().optional(),
-  "documentoCarico": zod.string().optional(),
-  "note": zod.string().optional()
-})
-
-export const UpdateLottoResponse = zod.object({
-  "id": zod.number(),
-  "prodottoId": zod.number(),
-  "prodottoNome": zod.string().nullish(),
-  "codiceLotto": zod.string().nullish(),
-  "dataScadenza": zod.string().nullish(),
-  "dataCarico": zod.string(),
-  "quantitaCaricata": zod.number(),
-  "quantitaResidua": zod.number(),
-  "magazzinoId": zod.number(),
-  "magazzinoNome": zod.string().nullish(),
-  "fornitoreId": zod.number().nullish(),
-  "fornitoreNome": zod.string().nullish(),
-  "fsePlus": zod.boolean(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "codiceLottoNormalizzato": zod.string().nullish(),
+  "dataUltimoCarico": zod.coerce.date().nullish(),
+  "fattoreKgLtPezzo": zod.string().nullish(),
   "documentoCarico": zod.string().nullish(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -590,9 +2179,16 @@ export const ListMovimentiQueryParams = zod.object({
   "centroAscoltoId": zod.coerce.number().optional(),
   "da": zod.coerce.string().optional(),
   "a": zod.coerce.string().optional(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']).optional(),
+  "naturaContabile": zod.coerce.string().optional(),
+  "canaleOperativo": zod.coerce.string().optional(),
   "page": zod.coerce.number().min(1).default(listMovimentiQueryPageDefault),
   "limit": zod.coerce.number().min(1).max(listMovimentiQueryLimitMax).default(listMovimentiQueryLimitDefault)
 })
+
+export const listMovimentiResponseQuantitaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listMovimentiResponseFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+
 
 export const ListMovimentiResponseItem = zod.object({
   "id": zod.number(),
@@ -605,10 +2201,23 @@ export const ListMovimentiResponseItem = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "quantita": zod.number(),
+  "quantitaPrecisa": zod.string().regex(listMovimentiResponseQuantitaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaPezzi": zod.string().nullish(),
+  "quantitaKgLt": zod.string().nullish(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(listMovimentiResponseFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
   "unitaMisura": zod.string(),
   "fornitoreId": zod.number().nullish(),
   "beneficiarioId": zod.number().nullish(),
   "movimentoOrigineId": zod.number().nullish(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']),
+  "naturaContabile": zod.string(),
+  "dominioOrigine": zod.string().nullish(),
+  "entitaOrigineTipo": zod.string().nullish(),
+  "entitaOrigineId": zod.number().nullish(),
+  "rigaOrigineId": zod.number().nullish(),
+  "caricoMagazzinoRigaId": zod.number().nullish(),
+  "operazioneDistribuzioneId": zod.number().nullish(),
+  "canaleOperativo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "documentoRiferimento": zod.string().nullish(),
   "note": zod.string().nullish(),
@@ -620,8 +2229,21 @@ export const ListMovimentiResponse = zod.array(ListMovimentiResponseItem)
 export const ListGiacenzeQueryParams = zod.object({
   "magazzinoId": zod.coerce.number().optional(),
   "sottoscortaOnly": zod.coerce.boolean().optional(),
-  "fsePlusOnly": zod.coerce.boolean().optional()
+  "fsePlusOnly": zod.coerce.boolean().optional(),
+  "prodottoId": zod.coerce.number().optional(),
+  "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']).optional(),
+  "scadenzaDa": zod.date().optional(),
+  "scadenzaA": zod.date().optional()
 })
+
+export const listGiacenzeResponseQuantitaTotalePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeResponseGiacenzaFisicaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeResponseGiacenzaScadutaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeResponseGiacenzaDistribuibilePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeResponseImpegnatoPrecisoRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeResponseDisponibileRealePrecisaRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeResponseScortaMinimaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
 
 export const ListGiacenzeResponseItem = zod.object({
   "prodottoId": zod.number(),
@@ -632,12 +2254,19 @@ export const ListGiacenzeResponseItem = zod.object({
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string(),
   "quantitaTotale": zod.number(),
+  "quantitaTotalePrecisa": zod.string().regex(listGiacenzeResponseQuantitaTotalePrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "giacenzaFisica": zod.number().describe('Quantità fisicamente presente, inclusi i lotti scaduti.'),
   "giacenzaScaduta": zod.number().describe('Quantità fisicamente presente su lotti scaduti alla data civile Europe\/Rome.'),
   "giacenzaDistribuibile": zod.number().describe('Quantità fisica non scaduta e quindi distribuibile alla data civile Europe\/Rome.'),
+  "giacenzaFisicaPrecisa": zod.string().regex(listGiacenzeResponseGiacenzaFisicaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "giacenzaScadutaPrecisa": zod.string().regex(listGiacenzeResponseGiacenzaScadutaPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "giacenzaDistribuibilePrecisa": zod.string().regex(listGiacenzeResponseGiacenzaDistribuibilePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "impegnato": zod.number(),
+  "impegnatoPreciso": zod.string().regex(listGiacenzeResponseImpegnatoPrecisoRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "disponibileReale": zod.number(),
+  "disponibileRealePrecisa": zod.string().regex(listGiacenzeResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),
   "scortaMinima": zod.number(),
+  "scortaMinimaPrecisa": zod.string().regex(listGiacenzeResponseScortaMinimaPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "scortaConsigliata": zod.number(),
   "sottoscorta": zod.boolean(),
   "lottiAttivi": zod.number(),
@@ -734,6 +2363,9 @@ export const ListTrasferimentiResponseItem = zod.object({
 export const ListTrasferimentiResponse = zod.array(ListTrasferimentiResponseItem)
 
 
+export const createTrasferimentoBodyRigheItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
 export const CreateTrasferimentoBody = zod.object({
   "magazzinoOrigineId": zod.number(),
   "magazzinoDestinoId": zod.number(),
@@ -744,7 +2376,7 @@ export const CreateTrasferimentoBody = zod.object({
   "righe": zod.array(zod.object({
   "prodottoId": zod.number(),
   "lottoId": zod.number().optional(),
-  "quantita": zod.number(),
+  "quantita": zod.string().regex(createTrasferimentoBodyRigheItemQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "unitaMisura": zod.string().optional().describe('Campo legacy opzionale. Se valorizzato deve coincidere con l\'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura.'),
   "note": zod.string().optional()
 }))
@@ -802,6 +2434,7 @@ export const UpdateTrasferimentoParams = zod.object({
 })
 
 
+export const updateTrasferimentoBodyRigheItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const UpdateTrasferimentoBody = zod.object({
@@ -812,7 +2445,7 @@ export const UpdateTrasferimentoBody = zod.object({
   "righe": zod.array(zod.object({
   "prodottoId": zod.number(),
   "lottoId": zod.number().optional(),
-  "quantita": zod.number(),
+  "quantita": zod.string().regex(updateTrasferimentoBodyRigheItemQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "unitaMisura": zod.string().optional().describe('Campo legacy opzionale. Se valorizzato deve coincidere con l\'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura.'),
   "note": zod.string().optional()
 })).optional()
@@ -1065,16 +2698,22 @@ export const ListScarichiResponseItem = zod.object({
 export const ListScarichiResponse = zod.array(ListScarichiResponseItem)
 
 
+
+export const createScaricoBodyRigheItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
 export const CreateScaricoBody = zod.object({
   "magazzinoId": zod.number(),
   "centroAscoltoId": zod.number().nullish(),
   "dataScarico": zod.string(),
-  "causale": zod.enum(['deteriorata', 'rubata', 'scaduta', 'altro']),
+  "causale": zod.enum(['deteriorata', 'rubata', 'scaduta', 'consegna_beneficiario', 'altro']),
+  "beneficiarioId": zod.number().min(1).optional().describe('Obbligatorio con causale consegna_beneficiario.'),
+  "canaleOperativo": zod.enum(['PACCHI', 'RITIRO_SEDE', 'DOMICILIARE']).optional().describe('Obbligatorio con causale consegna_beneficiario.'),
   "causaleAltro": zod.string().optional(),
   "note": zod.string().optional(),
   "righe": zod.array(zod.object({
   "prodottoId": zod.number(),
-  "quantita": zod.number(),
+  "quantita": zod.string().regex(createScaricoBodyRigheItemQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "unitaMisura": zod.string(),
   "note": zod.string().optional()
 }))
@@ -4507,15 +6146,13 @@ export const AddSessioneCassaEmporioRigaParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const addSessioneCassaEmporioRigaBodyQuantitaMin = 0.01;
-export const addSessioneCassaEmporioRigaBodyQuantitaMultipleOf = 0.01;
-
+export const addSessioneCassaEmporioRigaBodyQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 
 export const AddSessioneCassaEmporioRigaBody = zod.object({
   "prodottoId": zod.number(),
-  "quantita": zod.number().min(addSessioneCassaEmporioRigaBodyQuantitaMin).multipleOf(addSessioneCassaEmporioRigaBodyQuantitaMultipleOf),
+  "quantita": zod.string().regex(addSessioneCassaEmporioRigaBodyQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "versione": zod.number().min(1),
   "note": zod.string().nullish()
 })
@@ -4526,14 +6163,12 @@ export const UpdateSessioneCassaEmporioRigaParams = zod.object({
   "rigaId": zod.coerce.number()
 })
 
-export const updateSessioneCassaEmporioRigaBodyQuantitaMin = 0.01;
-export const updateSessioneCassaEmporioRigaBodyQuantitaMultipleOf = 0.01;
-
+export const updateSessioneCassaEmporioRigaBodyQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 
 export const UpdateSessioneCassaEmporioRigaBody = zod.object({
-  "quantita": zod.number().min(updateSessioneCassaEmporioRigaBodyQuantitaMin).multipleOf(updateSessioneCassaEmporioRigaBodyQuantitaMultipleOf),
+  "quantita": zod.string().regex(updateSessioneCassaEmporioRigaBodyQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "versione": zod.number().min(1),
   "note": zod.string().nullish()
 })
@@ -5849,10 +7484,13 @@ export const AddBollaRigaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const addBollaRigaBodyQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
 export const AddBollaRigaBody = zod.object({
   "prodottoId": zod.number(),
   "lottoId": zod.number().optional(),
-  "quantita": zod.number(),
+  "quantita": zod.string().regex(addBollaRigaBodyQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "unitaMisura": zod.string(),
   "note": zod.string().optional()
 })
@@ -8075,7 +9713,8 @@ export const ReportAllocazioneMezziResponse = zod.object({
 
 
 /**
- * @summary FSE+ annual distribution report
+ * @deprecated
+ * @summary FSE+ annual distribution report (legacy; use /report/fse-plus/integrato)
  */
 export const ReportFsePlusQueryParams = zod.object({
   "anno": zod.coerce.number().optional(),
@@ -8129,6 +9768,7 @@ export const GetReportDashboardGeneraleQueryParams = zod.object({
 })
 
 export const GetReportDashboardGeneraleResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
   "filters": zod.object({
   "da": zod.coerce.date(),
@@ -8146,7 +9786,8 @@ export const GetReportDashboardGeneraleResponse = zod.object({
   "kpi": zod.array(zod.object({
   "key": zod.string(),
   "value": zod.number().nullable(),
-  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "exactValue": zod.string().nullable().describe('Valore decimale esatto; le decisioni non usano la proiezione number.'),
+  "unit": zod.enum(['count', 'pieces', 'kgLt', 'percentage', 'credit', 'days', 'average', 'quantity', 'kg']),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
   "drilldownMetric": zod.string().nullable()
 })),
@@ -8187,6 +9828,7 @@ export const GetReportPacchiQueryParams = zod.object({
 })
 
 export const GetReportPacchiResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
   "filters": zod.object({
   "da": zod.coerce.date(),
@@ -8204,7 +9846,8 @@ export const GetReportPacchiResponse = zod.object({
   "kpi": zod.array(zod.object({
   "key": zod.string(),
   "value": zod.number().nullable(),
-  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "exactValue": zod.string().nullable().describe('Valore decimale esatto; le decisioni non usano la proiezione number.'),
+  "unit": zod.enum(['count', 'pieces', 'kgLt', 'percentage', 'credit', 'days', 'average', 'quantity', 'kg']),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
   "drilldownMetric": zod.string().nullable()
 })),
@@ -8247,6 +9890,7 @@ export const GetReportCentroAscoltoQueryParams = zod.object({
 })
 
 export const GetReportCentroAscoltoResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
   "filters": zod.object({
   "da": zod.coerce.date(),
@@ -8264,7 +9908,8 @@ export const GetReportCentroAscoltoResponse = zod.object({
   "kpi": zod.array(zod.object({
   "key": zod.string(),
   "value": zod.number().nullable(),
-  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "exactValue": zod.string().nullable().describe('Valore decimale esatto; le decisioni non usano la proiezione number.'),
+  "unit": zod.enum(['count', 'pieces', 'kgLt', 'percentage', 'credit', 'days', 'average', 'quantity', 'kg']),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
   "drilldownMetric": zod.string().nullable()
 })),
@@ -8305,6 +9950,7 @@ export const GetReportEmporioQueryParams = zod.object({
 })
 
 export const GetReportEmporioResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
   "filters": zod.object({
   "da": zod.coerce.date(),
@@ -8322,7 +9968,8 @@ export const GetReportEmporioResponse = zod.object({
   "kpi": zod.array(zod.object({
   "key": zod.string(),
   "value": zod.number().nullable(),
-  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "exactValue": zod.string().nullable().describe('Valore decimale esatto; le decisioni non usano la proiezione number.'),
+  "unit": zod.enum(['count', 'pieces', 'kgLt', 'percentage', 'credit', 'days', 'average', 'quantity', 'kg']),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
   "drilldownMetric": zod.string().nullable()
 })),
@@ -8366,6 +10013,7 @@ export const GetReportMensaIntegratoQueryParams = zod.object({
 })
 
 export const GetReportMensaIntegratoResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
   "filters": zod.object({
   "da": zod.coerce.date(),
@@ -8383,7 +10031,8 @@ export const GetReportMensaIntegratoResponse = zod.object({
   "kpi": zod.array(zod.object({
   "key": zod.string(),
   "value": zod.number().nullable(),
-  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "exactValue": zod.string().nullable().describe('Valore decimale esatto; le decisioni non usano la proiezione number.'),
+  "unit": zod.enum(['count', 'pieces', 'kgLt', 'percentage', 'credit', 'days', 'average', 'quantity', 'kg']),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
   "drilldownMetric": zod.string().nullable()
 })),
@@ -8426,6 +10075,7 @@ export const GetReportUdsIntegratoQueryParams = zod.object({
 })
 
 export const GetReportUdsIntegratoResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
   "filters": zod.object({
   "da": zod.coerce.date(),
@@ -8443,7 +10093,8 @@ export const GetReportUdsIntegratoResponse = zod.object({
   "kpi": zod.array(zod.object({
   "key": zod.string(),
   "value": zod.number().nullable(),
-  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "exactValue": zod.string().nullable().describe('Valore decimale esatto; le decisioni non usano la proiezione number.'),
+  "unit": zod.enum(['count', 'pieces', 'kgLt', 'percentage', 'credit', 'days', 'average', 'quantity', 'kg']),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
   "drilldownMetric": zod.string().nullable()
 })),
@@ -8484,6 +10135,7 @@ export const GetReportMagazzinoLogisticaQueryParams = zod.object({
 })
 
 export const GetReportMagazzinoLogisticaResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
   "filters": zod.object({
   "da": zod.coerce.date(),
@@ -8501,7 +10153,8 @@ export const GetReportMagazzinoLogisticaResponse = zod.object({
   "kpi": zod.array(zod.object({
   "key": zod.string(),
   "value": zod.number().nullable(),
-  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "exactValue": zod.string().nullable().describe('Valore decimale esatto; le decisioni non usano la proiezione number.'),
+  "unit": zod.enum(['count', 'pieces', 'kgLt', 'percentage', 'credit', 'days', 'average', 'quantity', 'kg']),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
   "drilldownMetric": zod.string().nullable()
 })),
@@ -8548,6 +10201,7 @@ export const GetReportFsePlusIntegratoQueryParams = zod.object({
 })
 
 export const GetReportFsePlusIntegratoResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.enum(['generale', 'pacchi', 'centro-ascolto', 'emporio', 'mensa', 'uds', 'magazzino-logistica', 'fse-plus']),
   "filters": zod.object({
   "da": zod.coerce.date(),
@@ -8565,7 +10219,8 @@ export const GetReportFsePlusIntegratoResponse = zod.object({
   "kpi": zod.array(zod.object({
   "key": zod.string(),
   "value": zod.number().nullable(),
-  "unit": zod.enum(['count', 'quantity', 'kg', 'credit', 'days', 'average']),
+  "exactValue": zod.string().nullable().describe('Valore decimale esatto; le decisioni non usano la proiezione number.'),
+  "unit": zod.enum(['count', 'pieces', 'kgLt', 'percentage', 'credit', 'days', 'average', 'quantity', 'kg']),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
   "drilldownMetric": zod.string().nullable()
 })),
@@ -8626,6 +10281,7 @@ export const GetReportDrilldownQueryParams = zod.object({
 })
 
 export const GetReportDrilldownResponse = zod.object({
+  "reportingModelVersion": zod.enum(['MAGAZZINO_2_0C_V1']),
   "section": zod.string(),
   "metric": zod.string(),
   "page": zod.number(),
@@ -9500,16 +11156,28 @@ export const ListGiacenzeMensaQueryParams = zod.object({
   "magazzinoId": zod.coerce.number()
 })
 
+export const listGiacenzeMensaResponseQuantitaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeMensaResponseGiacenzaFisicaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeMensaResponseGiacenzaDistribuibilePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeMensaResponseImpegnatoPrecisoRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeMensaResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
 export const ListGiacenzeMensaResponseItem = zod.object({
   "prodottoId": zod.number(),
   "codice": zod.string(),
   "nome": zod.string(),
   "unitaMisura": zod.string(),
   "quantita": zod.number(),
+  "quantitaPrecisa": zod.string().regex(listGiacenzeMensaResponseQuantitaPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "giacenzaFisica": zod.number(),
+  "giacenzaFisicaPrecisa": zod.string().regex(listGiacenzeMensaResponseGiacenzaFisicaPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "giacenzaDistribuibile": zod.number(),
+  "giacenzaDistribuibilePrecisa": zod.string().regex(listGiacenzeMensaResponseGiacenzaDistribuibilePrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "impegnato": zod.number(),
-  "disponibileReale": zod.number()
+  "impegnatoPreciso": zod.string().regex(listGiacenzeMensaResponseImpegnatoPrecisoRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "disponibileReale": zod.number(),
+  "disponibileRealePrecisa": zod.string().regex(listGiacenzeMensaResponseDisponibileRealePrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
 })
 export const ListGiacenzeMensaResponse = zod.array(ListGiacenzeMensaResponseItem)
 
@@ -9537,8 +11205,7 @@ export const ListTrasferimentiMensaResponse = zod.union([zod.array(zod.record(zo
 
 export const createTrasferimentoMensaBodyIdempotencyKeyMax = 80;
 
-export const createTrasferimentoMensaBodyRigheItemQuantitaExclusiveMin = 0;
-
+export const createTrasferimentoMensaBodyRigheItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 
@@ -9551,7 +11218,7 @@ export const CreateTrasferimentoMensaBody = zod.object({
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
   "prodottoId": zod.number(),
-  "quantita": zod.number().gt(createTrasferimentoMensaBodyRigheItemQuantitaExclusiveMin),
+  "quantita": zod.string().regex(createTrasferimentoMensaBodyRigheItemQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "unitaMisura": zod.string().optional().describe('Campo legacy opzionale. Se valorizzato deve coincidere con l\'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura.'),
   "note": zod.string().nullish()
 })).min(1)
@@ -9622,8 +11289,7 @@ export const ListConsumiMensaResponse = zod.union([zod.array(zod.object({
 })])
 
 
-export const createConsumoMensaBodyQuantitaExclusiveMin = 0;
-
+export const createConsumoMensaBodyQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const createConsumoMensaBodyNoteMax = 2000;
 
 export const createConsumoMensaBodyIdempotencyKeyMax = 80;
@@ -9635,7 +11301,7 @@ export const CreateConsumoMensaBody = zod.object({
   "dataServizio": zod.coerce.date(),
   "tipoServizio": zod.enum(['pranzo', 'cena']),
   "prodottoId": zod.number(),
-  "quantita": zod.number().gt(createConsumoMensaBodyQuantitaExclusiveMin),
+  "quantita": zod.string().regex(createConsumoMensaBodyQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "causale": zod.enum(['consumo', 'scarto']),
   "note": zod.string().max(createConsumoMensaBodyNoteMax).nullish(),
   "idempotencyKey": zod.string().min(1).max(createConsumoMensaBodyIdempotencyKeyMax)

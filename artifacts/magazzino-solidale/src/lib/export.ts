@@ -228,7 +228,7 @@ export function buildReportingWorkbook(
     [labels.metadata.indicator, labels.metadata.value, labels.metadata.unit, labels.metadata.availability],
     ...report.kpi.map((item) => [
       labels.kpi(item.key),
-      item.value ?? labels.unavailable,
+      item.exactValue ?? labels.unavailable,
       labels.unit(item.unit),
       labels.availability(item.availability),
     ]),
@@ -339,7 +339,7 @@ export async function exportReportingPdf(opts: {
 }): Promise<void> {
   const rows = opts.report.kpi.map((item) => ({
     indicatore: opts.kpiLabel(item.key),
-    valore: item.value ?? opts.unavailable,
+    valore: item.exactValue ?? opts.unavailable,
     unita: item.unit,
     disponibilita: item.availability,
   }));

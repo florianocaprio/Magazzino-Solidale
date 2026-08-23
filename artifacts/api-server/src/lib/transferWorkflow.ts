@@ -6,6 +6,10 @@ import {
 } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import { withDocumentCodeRetry } from "./documentCode";
+import {
+  InventoryDecimalError,
+  positiveInventoryDecimal,
+} from "./inventoryDecimal";
 
 export class TransferRequestError extends Error {
   constructor(
@@ -19,7 +23,7 @@ export class TransferRequestError extends Error {
 export interface TransferRequestRow {
   prodottoId: number;
   lottoId?: number | null;
-  quantita: number;
+  quantita: string | number;
   /** Valore legacy opzionale: se presente deve coincidere con il Prodotto. */
   unitaMisura?: string | null;
   note?: string | null;
@@ -54,8 +58,6 @@ export async function normalizeTransferRows(
       (row) =>
         !Number.isSafeInteger(row.prodottoId) ||
         row.prodottoId <= 0 ||
-        !Number.isFinite(row.quantita) ||
-        row.quantita <= 0 ||
         (row.unitaMisura != null && typeof row.unitaMisura !== "string"),
     )
   ) {
@@ -81,6 +83,13 @@ export async function normalizeTransferRows(
   }
   const productById = new Map(products.map((product) => [product.id, product]));
   return rows.map((row) => {
+    let quantity;
+    try {
+      quantity = positiveInventoryDecimal(row.quantita);
+    } catch (error) {
+      if (!(error instanceof InventoryDecimalError)) throw error;
+      throw new TransferRequestError(400, error.message);
+    }
     const product = productById.get(row.prodottoId)!;
     if (!product.attivo) {
       throw new TransferRequestError(400, "Il Prodotto non è attivo");
@@ -96,7 +105,11 @@ export async function normalizeTransferRows(
         );
       }
     }
-    return { ...row, unitaMisura: product.unitaMisura };
+    return {
+      ...row,
+      quantita: quantity.toDb(),
+      unitaMisura: product.unitaMisura,
+    };
   });
 }
 
@@ -129,7 +142,7 @@ export async function createTransferRequest(input: TransferRequestInput) {
           trasferimentoId: created.id,
           prodottoId: row.prodottoId,
           lottoId: row.lottoId ?? null,
-          quantita: row.quantita.toFixed(2),
+          quantita: row.quantita,
           unitaMisura: row.unitaMisura,
           note: row.note ?? null,
         })),
