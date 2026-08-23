@@ -692,22 +692,34 @@ function externalFingerprint(row: ReconciliationExternalLine): string {
   });
 }
 
-function currentExternalDelta(
+export function currentExternalDelta(
   current: ReconciliationExternalLine[],
   previous: ReconciliationExternalLine[],
 ) {
-  const prior = new Map<string, number>();
+  const prior = new Map<string, ReconciliationExternalLine[]>();
   for (const row of previous) {
     const key = externalFingerprint(row);
-    prior.set(key, (prior.get(key) ?? 0) + 1);
+    prior.set(key, [...(prior.get(key) ?? []), row]);
   }
-  return current.filter((row) => {
+  const added = current.filter((row) => {
     const key = externalFingerprint(row);
-    const remaining = prior.get(key) ?? 0;
-    if (remaining === 0) return true;
-    prior.set(key, remaining - 1);
+    const remaining = prior.get(key) ?? [];
+    if (remaining.length === 0) return true;
+    remaining.shift();
     return false;
   });
+  return { added, missing: [...prior.values()].flat() };
+}
+
+export function selectLocalReconciliationDelta(
+  local: ReconciliationLocalLine[],
+  previousReference: string | null,
+  previousMaxMovementId: number | null,
+) {
+  if (previousReference == null) return local;
+  return previousMaxMovementId == null
+    ? local.filter((row) => row.date > previousReference)
+    : local.filter((row) => row.movementId > previousMaxMovementId);
 }
 
 export async function calculateFseReconciliation(input: {
@@ -760,7 +772,7 @@ export async function calculateFseReconciliation(input: {
     const cutoff =
       input.cutoff ??
       (await currentFseCutoff(tx, input.magazzinoId, input.dataRiferimento));
-    const [local, externalCurrent, externalPrevious, balanceRows] =
+    const [local, externalCurrent, externalPrevious, balanceRows, previousRun] =
       await Promise.all([
         loadLocal(
           tx,
@@ -780,14 +792,49 @@ export async function calculateFseReconciliation(input: {
           maxMovimentoId: cutoff.maxMovimentoId,
           maxOperazioneDistribuzioneId: cutoff.maxOperazioneDistribuzioneId,
         }),
+        input.importazioneAgeaPrecedenteId == null
+          ? Promise.resolve([])
+          : tx
+              .select({
+                maxMovimentoId: riconciliazioniFseTable.maxMovimentoId,
+              })
+              .from(riconciliazioniFseTable)
+              .where(
+                and(
+                  eq(
+                    riconciliazioniFseTable.importazioneAgeaId,
+                    input.importazioneAgeaPrecedenteId,
+                  ),
+                  eq(riconciliazioniFseTable.magazzinoId, input.magazzinoId),
+                ),
+              )
+              .orderBy(sql`${riconciliazioniFseTable.id} DESC`)
+              .limit(1),
       ]);
-    const external = currentExternalDelta(externalCurrent, externalPrevious);
-    const localDelta =
-      previousReference == null
-        ? local
-        : local.filter((row) => row.date > previousReference!);
+    const externalDelta = currentExternalDelta(
+      externalCurrent,
+      externalPrevious,
+    );
+    const localDelta = selectLocalReconciliationDelta(
+      local,
+      previousReference,
+      previousRun[0]?.maxMovimentoId ?? null,
+    );
+    const missingRows = externalDelta.missing.map((row) => {
+      const base = externalOnly(row);
+      const missing = {
+        ...base,
+        businessKey: `${base.businessKey}:SCOMPARSO`,
+        status: "MOVIMENTO_AGEA_SCOMPARSO",
+        blocking: true,
+        exact: false,
+        qualityCodesJson: ["MOVIMENTO_AGEA_SCOMPARSO"],
+      };
+      return { ...missing, contentHash: canonicalSha256(missing) };
+    });
     const rows = [
-      ...reconcileFseLines(localDelta, external),
+      ...reconcileFseLines(localDelta, externalDelta.added),
+      ...missingRows,
       ...balanceRows,
     ].sort((a, b) => a.businessKey.localeCompare(b.businessKey));
     const summary = totals(rows);
@@ -867,7 +914,8 @@ export async function refreshReconciliationCounts(
       count(*) FILTER (WHERE status = 'IDENTITA_AMBIGUA')::int AS ambigue,
       count(*) FILTER (WHERE status = 'SCOSTAMENTO_ACCETTATO')::int AS scostamenti_accettati,
       count(*) FILTER (WHERE blocking)::int AS bloccanti
-    FROM riconciliazioni_fse_righe WHERE riconciliazione_id = ${id}
+    FROM riconciliazioni_fse_righe
+    WHERE riconciliazione_id = ${id} AND active = true
   `);
   const row = result.rows[0] as Record<string, number>;
   await executor.execute(
