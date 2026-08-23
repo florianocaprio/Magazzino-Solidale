@@ -4,6 +4,9 @@ import {
   esportazioniFseRigheTable,
   esportazioniFseTable,
   rilevazioniMonitoraggioFseTable,
+  riconciliazioniFseRigheTable,
+  riconciliazioniFseRisoluzioniTable,
+  riconciliazioniFseTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
@@ -26,6 +29,12 @@ import {
 } from "../lib/centroScope";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
+import {
+  calculateFseReconciliation,
+  recalculateFseReconciliation,
+  refreshReconciliationCounts,
+  requireOpenReconciliation,
+} from "../lib/fseReconciliation";
 
 const router: IRouter = Router();
 router.use("/fse", requireModulo("LOTTI"));
@@ -76,6 +85,13 @@ async function requireWarehouse(req: Request, magazzinoId: number) {
 async function accessibleExport(req: Request, id: number) {
   const [row] = await db.select().from(esportazioniFseTable).where(eq(esportazioniFseTable.id, id));
   if (!row) throw new FseReportingError(404, "Esportazione non trovata");
+  await requireWarehouse(req, row.magazzinoId);
+  return row;
+}
+
+async function accessibleReconciliation(req: Request, id: number) {
+  const [row] = await db.select().from(riconciliazioniFseTable).where(eq(riconciliazioniFseTable.id, id));
+  if (!row) throw new FseReportingError(404, "Riconciliazione non trovata");
   await requireWarehouse(req, row.magazzinoId);
   return row;
 }
@@ -300,6 +316,156 @@ router.patch("/fse/monitoraggio/:id", requirePermission("magazzino.fse.monitorin
       noteAudit: typeof req.body?.noteAudit === "string" ? req.body.noteAudit.trim() || null : current.noteAudit,
     }).where(and(eq(rilevazioniMonitoraggioFseTable.id, id), eq(rilevazioniMonitoraggioFseTable.versione, currentVersion))).returning();
     if (!updated) throw new FseReportingError(409, "Versione rilevazione non corrente");
+    res.json(updated);
+  } catch (error) {
+    if (!sendFseError(res, error)) throw error;
+  }
+});
+
+router.get("/fse/riconciliazioni", requirePermission("magazzino.fse.view"), async (req, res) => {
+  const visible = await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req));
+  const rows = visible == null
+    ? await db.select().from(riconciliazioniFseTable).orderBy(desc(riconciliazioniFseTable.dataCreazione))
+    : visible.length === 0 ? [] : await db.select().from(riconciliazioniFseTable).where(inArray(riconciliazioniFseTable.magazzinoId, visible)).orderBy(desc(riconciliazioniFseTable.dataCreazione));
+  res.json(rows);
+});
+
+router.post("/fse/riconciliazioni", requirePermission("magazzino.fse.reconcile"), async (req, res) => {
+  try {
+    const magazzinoId = positiveId(req.body?.magazzinoId);
+    const importazioneAgeaId = positiveId(req.body?.importazioneAgeaId);
+    const previousId = req.body?.importazioneAgeaPrecedenteId == null ? null : positiveId(req.body.importazioneAgeaPrecedenteId);
+    const dataRiferimento = String(req.body?.dataRiferimento ?? "");
+    const maxMovimentoId = req.body?.maxMovimentoId == null ? null : positiveId(req.body.maxMovimentoId);
+    const maxOperazioneDistribuzioneId = req.body?.maxOperazioneDistribuzioneId == null ? null : positiveId(req.body.maxOperazioneDistribuzioneId);
+    if (!magazzinoId || !importazioneAgeaId || !DATE.test(dataRiferimento) ||
+        (req.body?.importazioneAgeaPrecedenteId != null && !previousId) ||
+        (req.body?.maxMovimentoId != null && !maxMovimentoId) ||
+        (req.body?.maxOperazioneDistribuzioneId != null && !maxOperazioneDistribuzioneId))
+      throw new FseReportingError(400, "Input riconciliazione non valido");
+    await requireWarehouse(req, magazzinoId);
+    const result = await calculateFseReconciliation({
+      magazzinoId, importazioneAgeaId, importazioneAgeaPrecedenteId: previousId,
+      dataRiferimento, creatoDa: req.user!.id,
+      cutoff: maxMovimentoId != null && maxOperazioneDistribuzioneId != null
+        ? { maxMovimentoId, maxOperazioneDistribuzioneId } : undefined,
+    });
+    res.status(201).json(result.reconciliation);
+  } catch (error) {
+    if (!sendFseError(res, error)) throw error;
+  }
+});
+
+router.get("/fse/riconciliazioni/:id", requirePermission("magazzino.fse.view"), async (req, res) => {
+  try {
+    const id = positiveId(req.params.id);
+    if (!id) throw new FseReportingError(400, "ID non valido");
+    res.json(await accessibleReconciliation(req, id));
+  } catch (error) {
+    if (!sendFseError(res, error)) throw error;
+  }
+});
+
+router.get("/fse/riconciliazioni/:id/righe", requirePermission("magazzino.fse.view"), async (req, res) => {
+  try {
+    const id = positiveId(req.params.id);
+    const page = positiveId(req.query.page) ?? 1;
+    const pageSize = positiveId(req.query.pageSize) ?? 50;
+    if (!id || pageSize > 200) throw new FseReportingError(400, "ID o paginazione non validi");
+    await accessibleReconciliation(req, id);
+    const rows = await db.select().from(riconciliazioniFseRigheTable)
+      .where(eq(riconciliazioniFseRigheTable.riconciliazioneId, id))
+      .orderBy(riconciliazioniFseRigheTable.id).limit(pageSize).offset((page - 1) * pageSize);
+    res.json({ page, pageSize, rows });
+  } catch (error) {
+    if (!sendFseError(res, error)) throw error;
+  }
+});
+
+router.post("/fse/riconciliazioni/:id/ricalcola", requirePermission("magazzino.fse.reconcile"), async (req, res) => {
+  try {
+    const id = positiveId(req.params.id);
+    const currentVersion = version(req.body?.versione);
+    if (!id || !currentVersion) throw new FseReportingError(400, "ID o versione non validi");
+    await accessibleReconciliation(req, id);
+    res.json((await recalculateFseReconciliation({ id, versione: currentVersion, actorId: req.user!.id })).reconciliation);
+  } catch (error) {
+    if (!sendFseError(res, error)) throw error;
+  }
+});
+
+router.patch("/fse/riconciliazioni/:id/righe/:rigaId", requirePermission("magazzino.fse.reconcile.manage"), async (req, res) => {
+  try {
+    const id = positiveId(req.params.id);
+    const rowId = positiveId(req.params.rigaId);
+    const currentVersion = version(req.body?.versione);
+    const action = String(req.body?.azione ?? "");
+    const motivation = typeof req.body?.motivazione === "string" ? req.body.motivazione.trim() : "";
+    if (!id || !rowId || !currentVersion || !["ABBINA", "DISABBINA", "ACCETTA_SCOSTAMENTO", "SEGNALA_DA_CORREGGERE", "RIAPRI"].includes(action) || motivation.length < 3 || motivation.length > 500)
+      throw new FseReportingError(400, "Risoluzione manuale non valida");
+    await accessibleReconciliation(req, id);
+    const result = await db.transaction(async (tx) => {
+      const header = await requireOpenReconciliation(tx, id, currentVersion);
+      const [current] = await tx.select().from(riconciliazioniFseRigheTable)
+        .where(and(eq(riconciliazioniFseRigheTable.id, rowId), eq(riconciliazioniFseRigheTable.riconciliazioneId, id))).for("update");
+      if (!current) throw new FseReportingError(404, "Riga riconciliazione non trovata");
+      const accepted = action === "ABBINA" || action === "ACCETTA_SCOSTAMENTO";
+      const next = {
+        status: accepted ? "RICONCILIATA_ESATTA" : action === "DISABBINA" ? "IDENTITA_AMBIGUA" : "SOLO_LOCALE_DA_RENDICONTARE",
+        blocking: !accepted,
+        qualityCodesJson: accepted ? [`${action}_MANUALE`] : [action === "DISABBINA" ? "RICONCILIAZIONE_AMBIGUA" : "DA_CORREGGERE_MANUALMENTE"],
+      };
+      await tx.insert(riconciliazioniFseRisoluzioniTable).values({
+        riconciliazioneRigaId: rowId, azione: action, motivazione: motivation,
+        oldStateJson: current, newStateJson: next, creatoDa: req.user!.id,
+      });
+      const [updatedRow] = await tx.update(riconciliazioniFseRigheTable).set(next).where(eq(riconciliazioniFseRigheTable.id, rowId)).returning();
+      await refreshReconciliationCounts(tx, id);
+      await tx.update(riconciliazioniFseTable).set({ versione: header.versione + 1, stato: "DA_RIVEDERE" }).where(eq(riconciliazioniFseTable.id, id));
+      return updatedRow;
+    });
+    res.json(result);
+  } catch (error) {
+    if (!sendFseError(res, error)) throw error;
+  }
+});
+
+router.post("/fse/riconciliazioni/:id/chiudi", requirePermission("magazzino.fse.reconcile.manage"), async (req, res) => {
+  try {
+    const id = positiveId(req.params.id);
+    const currentVersion = version(req.body?.versione);
+    const withDifferences = req.body?.conScostamenti === true;
+    const motivation = typeof req.body?.motivazione === "string" ? req.body.motivazione.trim() : "";
+    if (!id || !currentVersion || (withDifferences && (motivation.length < 3 || motivation.length > 500)))
+      throw new FseReportingError(400, "Chiusura non valida");
+    await accessibleReconciliation(req, id);
+    const updated = await db.transaction(async (tx) => {
+      const header = await requireOpenReconciliation(tx, id, currentVersion);
+      if (!withDifferences && (header.bloccanti > 0 || header.scostamenti > 0))
+        throw new FseReportingError(409, "Sono presenti scostamenti o righe bloccanti");
+      const [row] = await tx.update(riconciliazioniFseTable).set({
+        stato: withDifferences ? "CHIUSA_CON_SCOSTAMENTI" : "RICONCILIATA",
+        motivazioneChiusura: withDifferences ? motivation : null,
+        chiusoDa: req.user!.id, dataChiusura: new Date(), versione: currentVersion + 1,
+      }).where(eq(riconciliazioniFseTable.id, id)).returning();
+      return row;
+    });
+    res.json(updated);
+  } catch (error) {
+    if (!sendFseError(res, error)) throw error;
+  }
+});
+
+router.post("/fse/riconciliazioni/:id/annulla", requirePermission("magazzino.fse.reconcile.manage"), async (req, res) => {
+  try {
+    const id = positiveId(req.params.id);
+    const currentVersion = version(req.body?.versione);
+    if (!id || !currentVersion) throw new FseReportingError(400, "ID o versione non validi");
+    await accessibleReconciliation(req, id);
+    const [updated] = await db.update(riconciliazioniFseTable).set({
+      stato: "ANNULLATA", annullatoDa: req.user!.id, dataAnnullamento: new Date(), versione: currentVersion + 1,
+    }).where(and(eq(riconciliazioniFseTable.id, id), eq(riconciliazioniFseTable.versione, currentVersion))).returning();
+    if (!updated) throw new FseReportingError(409, "Versione riconciliazione non corrente");
     res.json(updated);
   } catch (error) {
     if (!sendFseError(res, error)) throw error;
