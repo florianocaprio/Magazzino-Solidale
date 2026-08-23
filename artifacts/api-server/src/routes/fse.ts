@@ -13,7 +13,17 @@ import {
   riconciliazioniFseTable,
   scarichiTable,
 } from "@workspace/db";
-import { and, count, desc, eq, gte, inArray, lte, type SQL } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lte,
+  ne,
+  type SQL,
+} from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   buildFseCanonicalReport,
@@ -245,6 +255,17 @@ for (const [path, projection] of [
         await requireWarehouse(req, input.magazzinoId);
         if (projection === "preview") {
           const report = await buildFseCanonicalReport(input);
+          const generable = await buildFseCanonicalReport({
+            ...input,
+            cutoff: report.cutoff,
+            excludeCovered: true,
+          });
+          const generableEvents = generable.events.filter(
+            (event) => event.coverageEligible,
+          );
+          const historicalAdministrative = report.events.filter(
+            (event) => event.coverageEligible,
+          );
           res.json({
             modelVersion: report.modelVersion,
             timezone: report.timezone,
@@ -256,6 +277,21 @@ for (const [path, projection] of [
             canonicalHash: report.canonicalHash,
             eventiTotali: report.events.length,
             righeTotali: report.lines.length,
+            eventiDaRendicontare: generableEvents.filter(
+              (event) => !event.blocking,
+            ).length,
+            eventiArretrati: generableEvents.filter(
+              (event) => event.arretrato && !event.blocking,
+            ).length,
+            eventiBloccati: generable.events.filter((event) => event.blocking)
+              .length,
+            eventiGiaCoperti: Math.max(
+              0,
+              historicalAdministrative.length - generableEvents.length,
+            ),
+            righeDaRendicontare: generable.lines.filter(
+              (line) => line.coverageEligible,
+            ).length,
             bloccanti: report.quality
               .filter((item) => item.blocking)
               .reduce((sum, item) => sum + item.count, 0),
@@ -275,10 +311,7 @@ for (const [path, projection] of [
               "BLOCCATO",
             ].includes(statoRendicontazione)
           )
-            throw new FseReportingError(
-              400,
-              "statoRendicontazione non valido",
-            );
+            throw new FseReportingError(400, "statoRendicontazione non valido");
           const prodottoId =
             req.query.prodottoId == null
               ? undefined
@@ -298,9 +331,7 @@ for (const [path, projection] of [
                     ? undefined
                     : String(req.query.canale),
                 fondo:
-                  req.query.fondo == null
-                    ? undefined
-                    : String(req.query.fondo),
+                  req.query.fondo == null ? undefined : String(req.query.fondo),
                 prodottoId: prodottoId ?? undefined,
                 qualityCode:
                   req.query.qualityCode == null
@@ -1240,14 +1271,24 @@ router.get(
         db
           .select()
           .from(riconciliazioniFseRigheTable)
-          .where(eq(riconciliazioniFseRigheTable.riconciliazioneId, id))
+          .where(
+            and(
+              eq(riconciliazioniFseRigheTable.riconciliazioneId, id),
+              eq(riconciliazioniFseRigheTable.active, true),
+            ),
+          )
           .orderBy(riconciliazioniFseRigheTable.id)
           .limit(pageSize)
           .offset((page - 1) * pageSize),
         db
           .select({ value: count() })
           .from(riconciliazioniFseRigheTable)
-          .where(eq(riconciliazioniFseRigheTable.riconciliazioneId, id)),
+          .where(
+            and(
+              eq(riconciliazioniFseRigheTable.riconciliazioneId, id),
+              eq(riconciliazioniFseRigheTable.active, true),
+            ),
+          ),
       ]);
       res.json({
         rows: items,
@@ -1324,6 +1365,7 @@ router.patch(
             and(
               eq(riconciliazioniFseRigheTable.id, rowId),
               eq(riconciliazioniFseRigheTable.riconciliazioneId, id),
+              eq(riconciliazioniFseRigheTable.active, true),
             ),
           )
           .for("update");
@@ -1345,6 +1387,7 @@ router.patch(
               and(
                 eq(riconciliazioniFseRigheTable.riconciliazioneId, id),
                 eq(riconciliazioniFseRigheTable.movimentoId, targetMovementId),
+                eq(riconciliazioniFseRigheTable.active, true),
               ),
             );
           const [externalTarget] = await tx
@@ -1357,6 +1400,7 @@ router.patch(
                   riconciliazioniFseRigheTable.importazioneAgeaRigaId,
                   targetAgeaRowId,
                 ),
+                eq(riconciliazioniFseRigheTable.active, true),
               ),
             );
           if (!localTarget || !externalTarget)
@@ -1418,7 +1462,23 @@ router.patch(
             exact,
             workflowStatus: "ABBINATO_MANUALMENTE",
             qualityCodesJson: exact ? [] : ["ABBINATA_CON_SCOSTAMENTO"],
+            active: true,
           };
+          const resolutionGroupId = createHash("sha256")
+            .update(
+              `${id}:${header.versione}:${targetMovementId}:${targetAgeaRowId}`,
+            )
+            .digest("hex");
+          await tx
+            .update(riconciliazioniFseRigheTable)
+            .set({ active: false, resolutionGroupId })
+            .where(
+              inArray(riconciliazioniFseRigheTable.id, [
+                localTarget.id,
+                externalTarget.id,
+              ]),
+            );
+          structuredMatch.resolutionGroupId = resolutionGroupId;
         }
         if (action === "DISABBINA") {
           if (!current.movimentoId || !current.importazioneAgeaRigaId)
@@ -1426,6 +1486,13 @@ router.patch(
               409,
               "DISABBINA richiede una riga realmente abbinata",
             );
+          const resolutionGroupId = createHash("sha256")
+            .update(`${id}:${header.versione}:DISABBINA:${current.id}`)
+            .digest("hex");
+          await tx
+            .update(riconciliazioniFseRigheTable)
+            .set({ active: false, resolutionGroupId })
+            .where(eq(riconciliazioniFseRigheTable.id, current.id));
           const externalState = {
             ...current,
             id: undefined,
@@ -1449,12 +1516,18 @@ router.patch(
             exact: false,
             workflowStatus: "DISABBINATO",
             qualityCodesJson: ["SOLO_AGEA_DOPO_DISABBINAMENTO"],
+            active: true,
+            resolutionGroupId,
+            companionRowId: current.id,
           };
           externalState.contentHash = createHash("sha256")
             .update(JSON.stringify(externalState))
             .digest("hex");
           externalState.calculatedStateJson = { ...externalState };
-          await tx.insert(riconciliazioniFseRigheTable).values(externalState);
+          const [externalCompanion] = await tx
+            .insert(riconciliazioniFseRigheTable)
+            .values(externalState)
+            .returning({ id: riconciliazioniFseRigheTable.id });
           structuredMatch = {
             externalMovementId: null,
             importazioneAgeaRigaId: null,
@@ -1473,7 +1546,25 @@ router.patch(
             exact: false,
             workflowStatus: "DISABBINATO",
             qualityCodesJson: ["SOLO_LOCALE_DOPO_DISABBINAMENTO"],
+            active: true,
+            resolutionGroupId,
+            companionRowId: externalCompanion.id,
           };
+        }
+        if (action === "RIAPRI" && current.resolutionGroupId) {
+          await tx
+            .update(riconciliazioniFseRigheTable)
+            .set({ active: false })
+            .where(
+              and(
+                eq(riconciliazioniFseRigheTable.riconciliazioneId, id),
+                eq(
+                  riconciliazioniFseRigheTable.resolutionGroupId,
+                  current.resolutionGroupId,
+                ),
+                ne(riconciliazioniFseRigheTable.id, current.id),
+              ),
+            );
         }
         const next =
           structuredMatch ??
@@ -1487,6 +1578,7 @@ router.patch(
               }
             : action === "RIAPRI"
               ? {
+                  ...current.calculatedStateJson,
                   status: String(
                     current.calculatedStateJson.status ?? current.status,
                   ),
@@ -1495,6 +1587,8 @@ router.patch(
                   ),
                   exact: Boolean(current.calculatedStateJson.exact ?? false),
                   workflowStatus: "CALCOLATO",
+                  active: true,
+                  companionRowId: null,
                   qualityCodesJson: Array.isArray(
                     current.calculatedStateJson.qualityCodesJson,
                   )

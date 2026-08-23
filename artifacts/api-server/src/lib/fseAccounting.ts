@@ -74,6 +74,7 @@ export function accountingDisposition(input: {
     return "SOLO_AUDIT_TRASFERIMENTO";
   if (naturaContabile === "CARICO" && origineCarico === "AGEA_SIFEAD")
     return "GIA_PRESENTE_REGISTRO_ESTERNO";
+  if (naturaContabile === "CARICO") return "CARICO_FSE_DA_VERIFICARE";
   if (naturaContabile === "RESO") return "RESO_OPC";
   if (
     ["RETTIFICA_POSITIVA", "RETTIFICA_NEGATIVA", "SCARTO"].includes(

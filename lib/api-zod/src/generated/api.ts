@@ -1337,7 +1337,41 @@ export const GetFseReportingPreviewQueryParams = zod.object({
   "includeArretrati": zod.coerce.boolean().default(getFseReportingPreviewQueryIncludeArretratiDefault)
 })
 
-export const GetFseReportingPreviewResponse = zod.record(zod.string(), zod.unknown())
+
+export const getFseReportingPreviewResponseEventiTotaliMin = 0;
+
+export const getFseReportingPreviewResponseRigheTotaliMin = 0;
+
+export const getFseReportingPreviewResponseEventiDaRendicontareMin = 0;
+
+export const getFseReportingPreviewResponseEventiArretratiMin = 0;
+
+export const getFseReportingPreviewResponseEventiBloccatiMin = 0;
+
+export const getFseReportingPreviewResponseEventiGiaCopertiMin = 0;
+
+export const getFseReportingPreviewResponseRigheDaRendicontareMin = 0;
+
+export const getFseReportingPreviewResponseBloccantiMin = 0;
+
+
+
+export const GetFseReportingPreviewResponse = zod.object({
+  "modelVersion": zod.string(),
+  "magazzinoId": zod.number().min(1),
+  "dataDa": zod.coerce.date(),
+  "dataA": zod.coerce.date(),
+  "dataAsOf": zod.coerce.date(),
+  "eventiTotali": zod.number().min(getFseReportingPreviewResponseEventiTotaliMin),
+  "righeTotali": zod.number().min(getFseReportingPreviewResponseRigheTotaliMin),
+  "eventiDaRendicontare": zod.number().min(getFseReportingPreviewResponseEventiDaRendicontareMin),
+  "eventiArretrati": zod.number().min(getFseReportingPreviewResponseEventiArretratiMin),
+  "eventiBloccati": zod.number().min(getFseReportingPreviewResponseEventiBloccatiMin),
+  "eventiGiaCoperti": zod.number().min(getFseReportingPreviewResponseEventiGiaCopertiMin),
+  "righeDaRendicontare": zod.number().min(getFseReportingPreviewResponseRigheDaRendicontareMin),
+  "bloccanti": zod.number().min(getFseReportingPreviewResponseBloccantiMin),
+  "cutoff": zod.record(zod.string(), zod.unknown()).optional()
+})
 
 
 
@@ -1711,11 +1745,21 @@ export const listFseReconciliationLinesResponseTotalMin = 0;
 
 
 
+export const listFseReconciliationLinesResponseRowsItemResolutionGroupIdRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+
 export const ListFseReconciliationLinesResponse = zod.object({
   "page": zod.number().min(1),
   "pageSize": zod.number().min(1).max(listFseReconciliationLinesResponsePageSizeMax),
   "total": zod.number().min(listFseReconciliationLinesResponseTotalMin),
-  "rows": zod.array(zod.record(zod.string(), zod.unknown()))
+  "rows": zod.array(zod.object({
+  "id": zod.number().min(1).optional(),
+  "active": zod.boolean().optional(),
+  "supersededByRowId": zod.number().min(1).nullish(),
+  "resolutionGroupId": zod.string().regex(listFseReconciliationLinesResponseRowsItemResolutionGroupIdRegExp).nullish(),
+  "companionRowId": zod.number().min(1).nullish()
+}))
 })
 
 

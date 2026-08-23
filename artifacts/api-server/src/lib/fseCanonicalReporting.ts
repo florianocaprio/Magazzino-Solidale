@@ -103,6 +103,10 @@ export type FseCanonicalLine = {
   reportingDisposition: string;
   qualityCodes: string[];
   coverageEligible: boolean;
+  openingBalancePieces: string | null;
+  openingBalanceKgLt: string | null;
+  balanceAfterPieces: string | null;
+  balanceAfterKgLt: string | null;
 };
 
 export type FseIndicatorSnapshot = {
@@ -326,6 +330,12 @@ function qualityForEvent(
 
 function qualityForLine(row: LedgerRow): string[] {
   const result: string[] = [];
+  if (
+    row.fondo_origine === "FSE_PLUS" &&
+    row.natura_contabile === "CARICO" &&
+    row.origine_carico !== "AGEA_SIFEAD"
+  )
+    result.push("CARICO_FSE_LOCALE_DA_VERIFICARE");
   if (row.prodotto_gestione_lotto && row.lotto_id == null)
     result.push("LOTTO_MANCANTE");
   if (
@@ -341,19 +351,64 @@ function qualityForLine(row: LedgerRow): string[] {
 async function activeCoverageKeys(
   executor: DbExecutor,
   magazzinoId: number,
-): Promise<Set<string>> {
-  const result = await executor.execute(sql`
-    SELECT e.event_key
+): Promise<{
+  eventKeys: Set<string>;
+  eventHashes: Map<
+    string,
+    Array<{ contentHash: string; dataDa: string; dataA: string }>
+  >;
+  lineHashes: Map<string, Set<string>>;
+}> {
+  const [eventsResult, linesResult] = await Promise.all([
+    executor.execute(sql`
+    SELECT e.event_key, e.content_hash, x.data_da, x.data_a
     FROM esportazioni_fse_eventi e
     JOIN esportazioni_fse x ON x.id = e.esportazione_id
     WHERE x.magazzino_id = ${magazzinoId}
       AND x.coverage_purpose = 'ADMINISTRATIVE'
       AND x.stato IN ('PRONTA_PER_INSERIMENTO_MANUALE', 'INSERITA_MANUALMENTE')
       AND e.active_coverage = true
-  `);
-  return new Set(
-    (result.rows as Array<{ event_key: string }>).map((row) => row.event_key),
-  );
+  `),
+    executor.execute(sql`
+    SELECT r.line_key, r.content_hash
+    FROM esportazioni_fse_righe r
+    JOIN esportazioni_fse_eventi e ON e.id = r.esportazione_evento_id
+    JOIN esportazioni_fse x ON x.id = e.esportazione_id
+    WHERE x.magazzino_id = ${magazzinoId}
+      AND x.coverage_purpose = 'ADMINISTRATIVE'
+      AND x.stato IN ('PRONTA_PER_INSERIMENTO_MANUALE', 'INSERITA_MANUALMENTE')
+      AND r.active_coverage = true
+  `),
+  ]);
+  const eventHashes = new Map<
+    string,
+    Array<{ contentHash: string; dataDa: string; dataA: string }>
+  >();
+  for (const row of eventsResult.rows as Array<{
+    event_key: string;
+    content_hash: string;
+    data_da: string;
+    data_a: string;
+  }>) {
+    eventHashes.set(row.event_key, [
+      ...(eventHashes.get(row.event_key) ?? []),
+      {
+        contentHash: row.content_hash,
+        dataDa: row.data_da,
+        dataA: row.data_a,
+      },
+    ]);
+  }
+  const lineHashes = new Map<string, Set<string>>();
+  for (const row of linesResult.rows as Array<{
+    line_key: string;
+    content_hash: string;
+  }>) {
+    const hashes = lineHashes.get(row.line_key) ?? new Set<string>();
+    hashes.add(row.content_hash);
+    lineHashes.set(row.line_key, hashes);
+  }
+  return { eventKeys: new Set(eventHashes.keys()), eventHashes, lineHashes };
 }
 
 function originalEventKeySql(): SQL {
@@ -406,6 +461,24 @@ function isActiveCoverageSql(eventKey: SQL): SQL {
       ON covered_export.id = covered_event.esportazione_id
     WHERE covered_event.event_key = ${eventKey}
       AND covered_event.active_coverage = true
+      AND covered_export.coverage_purpose = 'ADMINISTRATIVE'
+      AND covered_export.stato IN (
+        'PRONTA_PER_INSERIMENTO_MANUALE',
+        'INSERITA_MANUALMENTE'
+      )
+  )`;
+}
+
+function isActiveLineCoverageSql(movementId: SQL): SQL {
+  return sql`EXISTS (
+    SELECT 1
+    FROM esportazioni_fse_righe covered_line
+    JOIN esportazioni_fse_eventi covered_event
+      ON covered_event.id = covered_line.esportazione_evento_id
+    JOIN esportazioni_fse covered_export
+      ON covered_export.id = covered_event.esportazione_id
+    WHERE covered_line.line_key = 'MOVIMENTO:' || ${movementId}::text
+      AND covered_line.active_coverage = true
       AND covered_export.coverage_purpose = 'ADMINISTRATIVE'
       AND covered_export.stato IN (
         'PRONTA_PER_INSERIMENTO_MANUALE',
@@ -539,7 +612,7 @@ function canonicalCandidateRowsSql(input: {
   const eventKey = canonicalEventKeySql();
   const originalKey = originalEventKeySql();
   const originalCovered = isActiveCoverageSql(originalKey);
-  const activeCoverage = isActiveCoverageSql(eventKey);
+  const activeCoverage = isActiveLineCoverageSql(sql`mv.id`);
   const channel = sql`COALESCE(mv.canale_operativo, original.canale_operativo)`;
   const officialChannel = sql`CASE ${channel}
     WHEN 'PACCHI' THEN 'PACCHI'
@@ -593,6 +666,15 @@ function canonicalCandidateRowsSql(input: {
         AND monitoring.canale_ufficiale = ${officialChannel}
         AND monitoring.data_riferimento <= ${input.dataA}
     )`;
+  const coverageEligible = sql`(
+    mv.natura_contabile IN (
+      'DISTRIBUZIONE_FINALE', 'RESO', 'RETTIFICA_POSITIVA',
+      'RETTIFICA_NEGATIVA', 'SCARTO'
+    ) OR (
+      mv.natura_contabile = 'STORNO'
+      AND COALESCE(original.natura_contabile, '') NOT LIKE 'TRASFERIMENTO_INTERNO_%'
+    )
+  )`;
   const qualityCodes = sql`array_remove(ARRAY[
     CASE WHEN ${operationMissing} THEN 'OPERAZIONE_DISTRIBUZIONE_MANCANTE' END,
     CASE WHEN ${channelMissing} THEN 'CANALE_FSE_NON_CLASSIFICATO' END,
@@ -608,6 +690,7 @@ function canonicalCandidateRowsSql(input: {
     SELECT mv.id, ${eventKey} AS event_key, ${eventDate}::date AS event_date,
            mv.fondo_origine, mv.prodotto_id, ${channel} AS internal_channel,
            ${officialChannel} AS official_channel, ${activeCoverage} AS active_coverage,
+           ${coverageEligible} AS coverage_eligible,
            (${operationMissing} OR ${channelMissing} OR ${statisticsMissing}
              OR ${mixedFund} OR ${lotMissing} OR ${adjustmentReasonMissing}
              OR ${monitoringMissing}) AS blocking,
@@ -646,6 +729,7 @@ function queueFilterSql(filters: FseCanonicalPageFilters): SQL {
   const conditions: SQL[] = [
     sql`candidate.fondo_origine = 'FSE_PLUS'`,
     sql`candidate.active_coverage = false`,
+    sql`candidate.coverage_eligible = true`,
   ];
   if (filters.fondo)
     conditions.push(sql`candidate.fondo_origine = ${filters.fondo}`);
@@ -679,8 +763,7 @@ export async function listFseCanonicalPage(input: {
 }> {
   const dataAsOf = input.dataAsOf ?? input.dataA;
   const cutoff =
-    input.cutoff ??
-    (await currentFseCutoff(db, input.magazzinoId, dataAsOf));
+    input.cutoff ?? (await currentFseCutoff(db, input.magazzinoId, dataAsOf));
   const candidate = canonicalCandidateRowsSql({
     ...input,
     ...cutoff,
@@ -834,13 +917,20 @@ export async function listFseCanonicalPage(input: {
     ...input,
     dataAsOf,
     cutoff,
-    eventKeys,
+    ...(input.projection === "events"
+      ? { eventKeys }
+      : { movementIds: selectedMovementIds! }),
     excludeCovered: true,
   });
   const rows =
     input.projection === "events"
       ? eventKeys
-          .map((key) => report.events.find((event) => event.eventKey === key))
+          .map((key) =>
+            report.events.find(
+              (event) =>
+                event.eventKey === key || event.correctionOfEventKey === key,
+            ),
+          )
           .filter((event): event is FseCanonicalEvent => event != null)
       : report.lines.filter((line) =>
           selectedMovementIds!.includes(line.movementId),
@@ -854,7 +944,8 @@ export async function listFseCanonicalPage(input: {
       cutoff,
       bloccanti: rows.filter(
         (row) =>
-          "blocking" in row && (row as { blocking?: boolean }).blocking === true,
+          "blocking" in row &&
+          (row as { blocking?: boolean }).blocking === true,
       ).length,
     },
   };
@@ -981,6 +1072,84 @@ export async function loadFseBalances(
   });
 }
 
+async function loadProgressiveBalances(
+  executor: DbExecutor,
+  input: {
+    magazzinoId: number;
+    dataAsOf: string;
+    maxMovimentoId: number;
+    movementIds: number[];
+  },
+): Promise<
+  Map<
+    number,
+    {
+      openingPieces: string | null;
+      openingKgLt: string | null;
+      afterPieces: string | null;
+      afterKgLt: string | null;
+    }
+  >
+> {
+  if (input.movementIds.length === 0) return new Map();
+  const pieces = signedMovementSql(
+    sql`mv.quantita_pezzi`,
+    sql`mv.natura_contabile`,
+    sql`original.natura_contabile`,
+  );
+  const kgLt = signedMovementSql(
+    sql`mv.quantita_kg_lt`,
+    sql`mv.natura_contabile`,
+    sql`original.natura_contabile`,
+  );
+  const result = await executor.execute(sql`
+    WITH signed AS (
+      SELECT mv.id, mv.data_movimento, mv.fondo_origine, mv.prodotto_id,
+             COALESCE(mv.lotto_id, 0) AS lotto_key,
+             CASE WHEN mv.quantita_pezzi IS NULL THEN NULL ELSE ${pieces} END AS pieces,
+             CASE WHEN mv.quantita_kg_lt IS NULL THEN NULL ELSE ${kgLt} END AS kg_lt
+      FROM movimenti mv
+      LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+      WHERE mv.magazzino_id = ${input.magazzinoId}
+        AND mv.id <= ${input.maxMovimentoId}
+        AND mv.data_movimento <= ${input.dataAsOf}
+    ), progressive AS (
+      SELECT *,
+        CASE WHEN count(pieces) OVER balance_window = 0 THEN NULL
+          ELSE sum(pieces) OVER balance_window END AS after_pieces,
+        CASE WHEN count(kg_lt) OVER balance_window = 0 THEN NULL
+          ELSE sum(kg_lt) OVER balance_window END AS after_kg_lt
+      FROM signed
+      WINDOW balance_window AS (
+        PARTITION BY fondo_origine, prodotto_id, lotto_key
+        ORDER BY data_movimento, id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      )
+    )
+    SELECT id,
+      CASE WHEN after_pieces IS NULL THEN NULL ELSE after_pieces - COALESCE(pieces, 0) END AS opening_pieces,
+      CASE WHEN after_kg_lt IS NULL THEN NULL ELSE after_kg_lt - COALESCE(kg_lt, 0) END AS opening_kg_lt,
+      after_pieces, after_kg_lt
+    FROM progressive
+    WHERE id IN (${sql.join(
+      input.movementIds.map((id) => sql`${id}`),
+      sql`, `,
+    )})
+  `);
+  return new Map(
+    (result.rows as Array<Record<string, unknown>>).map((row) => [
+      Number(row.id),
+      {
+        openingPieces:
+          row.opening_pieces == null ? null : String(row.opening_pieces),
+        openingKgLt:
+          row.opening_kg_lt == null ? null : String(row.opening_kg_lt),
+        afterPieces: row.after_pieces == null ? null : String(row.after_pieces),
+        afterKgLt: row.after_kg_lt == null ? null : String(row.after_kg_lt),
+      },
+    ]),
+  );
+}
+
 function addDecimal(total: InventoryDecimal, value: string): InventoryDecimal {
   return total.add(
     InventoryDecimal.parse(value, { allowNegative: true }).abs(),
@@ -1033,12 +1202,25 @@ export async function buildFseCanonicalReport(input: {
     input.cutoff ??
     (await currentFseCutoff(executor, input.magazzinoId, dataAsOf));
   const covered = await activeCoverageKeys(executor, input.magazzinoId);
-  const [source, metadata, indicators, balances] = await Promise.all([
-    ledgerRows(executor, { ...input, includeArretrati, ...cutoff }),
+  const source = await ledgerRows(executor, {
+    ...input,
+    includeArretrati,
+    ...cutoff,
+  });
+  const indicatorDataDa = includeArretrati
+    ? source.reduce(
+        (earliest, row) =>
+          (row.op_data ?? row.data_movimento) < earliest
+            ? (row.op_data ?? row.data_movimento)
+            : earliest,
+        input.dataDa,
+      )
+    : input.dataDa;
+  const [metadata, indicators, balances] = await Promise.all([
     loadMetadata(executor, input.magazzinoId),
     loadIndicators(executor, {
       magazzinoId: input.magazzinoId,
-      dataDa: input.dataDa,
+      dataDa: indicatorDataDa,
       dataAsOf,
       maxOperazioneDistribuzioneId: cutoff.maxOperazioneDistribuzioneId,
     }),
@@ -1061,8 +1243,7 @@ export async function buildFseCanonicalReport(input: {
   }
   const keyed = source
     .filter((row) => row.fondo_origine === "FSE_PLUS")
-    .map((row) => ({ row, key: eventKey(row, covered) }))
-    .filter(({ key }) => !(input.excludeCovered && covered.has(key)));
+    .map((row) => ({ row, key: eventKey(row, covered.eventKeys) }));
   const grouped = new Map<string, LedgerRow[]>();
   for (const { row, key } of keyed)
     grouped.set(key, [...(grouped.get(key) ?? []), row]);
@@ -1086,7 +1267,8 @@ export async function buildFseCanonicalReport(input: {
     const correctionOfEventKey =
       row.natura_contabile === "STORNO" ? originalEventKey(row) : null;
     const correctionAfterCoverage =
-      correctionOfEventKey != null && covered.has(correctionOfEventKey);
+      correctionOfEventKey != null &&
+      covered.eventKeys.has(correctionOfEventKey);
     const arretrato = (row.op_data ?? row.data_movimento) < input.dataDa;
     const blocking = qualityCodes.some((code) =>
       BLOCKING_FSE_QUALITY.has(code),
@@ -1194,11 +1376,92 @@ export async function buildFseCanonicalReport(input: {
         reportingDisposition: disposition,
         qualityCodes: lineQuality,
         coverageEligible,
+        openingBalancePieces: null,
+        openingBalanceKgLt: null,
+        balanceAfterPieces: null,
+        balanceAfterKgLt: null,
       };
       lines.push({ ...lineBase, contentHash: canonicalSha256(lineBase) });
       if (coverageEligible) eventBase.coverageEligible = true;
     }
     events.push({ ...eventBase, contentHash: canonicalSha256(eventBase) });
+  }
+
+  if (input.excludeCovered) {
+    for (const event of [...events]) {
+      const originalKey = event.eventKey;
+      const eventWasCovered = covered.eventKeys.has(originalKey);
+      if (!eventWasCovered) continue;
+      const comparableEventHashes = (covered.eventHashes.get(originalKey) ?? [])
+        .filter(
+          (item) => item.dataDa === input.dataDa && item.dataA === input.dataA,
+        )
+        .map((item) => item.contentHash);
+      const eventContentWasCovered =
+        comparableEventHashes.length === 0 ||
+        comparableEventHashes.includes(event.contentHash);
+      const eventLines = lines.filter((line) => line.eventKey === originalKey);
+      const uncoveredLines = eventLines.filter(
+        (line) => !covered.lineHashes.get(line.lineKey)?.has(line.contentHash),
+      );
+      if (eventContentWasCovered && uncoveredLines.length === 0) {
+        events.splice(events.indexOf(event), 1);
+        for (const line of eventLines) lines.splice(lines.indexOf(line), 1);
+        continue;
+      }
+      for (const line of eventLines) {
+        if (!uncoveredLines.includes(line))
+          lines.splice(lines.indexOf(line), 1);
+      }
+      const correctionKey = `CORREZIONE_CONTENUTO:${canonicalSha256({
+        eventKey: originalKey,
+        eventContentHash: event.contentHash,
+        lineContentHashes: uncoveredLines
+          .map((line) => line.contentHash)
+          .sort(),
+      }).slice(0, 64)}`;
+      const { contentHash: _eventHash, ...eventSnapshot } = event;
+      Object.assign(event, {
+        ...eventSnapshot,
+        eventKey: correctionKey,
+        eventType: "CORREZIONE_CONTENUTO",
+        administrativeStatus: "CORREZIONE_DA_GESTIRE_MANUALMENTE",
+        correctionOfEventKey: originalKey,
+        contentHash: canonicalSha256({
+          ...eventSnapshot,
+          eventKey: correctionKey,
+          eventType: "CORREZIONE_CONTENUTO",
+          administrativeStatus: "CORREZIONE_DA_GESTIRE_MANUALMENTE",
+          correctionOfEventKey: originalKey,
+        }),
+      });
+      for (const line of uncoveredLines) {
+        const { contentHash: _lineHash, ...lineSnapshot } = line;
+        Object.assign(line, {
+          ...lineSnapshot,
+          eventKey: correctionKey,
+          contentHash: canonicalSha256({
+            ...lineSnapshot,
+            eventKey: correctionKey,
+          }),
+        });
+      }
+    }
+  }
+
+  const progressiveBalances = await loadProgressiveBalances(executor, {
+    magazzinoId: input.magazzinoId,
+    dataAsOf,
+    maxMovimentoId: cutoff.maxMovimentoId,
+    movementIds: lines.map((line) => line.movementId),
+  });
+  for (const line of lines) {
+    const balance = progressiveBalances.get(line.movementId);
+    if (!balance) continue;
+    line.openingBalancePieces = balance.openingPieces;
+    line.openingBalanceKgLt = balance.openingKgLt;
+    line.balanceAfterPieces = balance.afterPieces;
+    line.balanceAfterKgLt = balance.afterKgLt;
   }
 
   events.sort((left, right) =>
@@ -1294,8 +1557,31 @@ export async function createFseExport(input: {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-export:${input.magazzinoId}`}, 0))`,
     );
+    const cutoff =
+      input.cutoff ??
+      (await currentFseCutoff(tx, input.magazzinoId, input.dataAsOf));
+    const scopeRequestHash = canonicalSha256({
+      magazzinoId: input.magazzinoId,
+      dataDa: input.dataDa,
+      dataA: input.dataA,
+      dataAsOf: input.dataAsOf,
+      includeArretrati: input.includeArretrati ?? true,
+      cutoff,
+      coveragePurpose: "ADMINISTRATIVE",
+    });
+    const [existing] = await tx
+      .select()
+      .from(esportazioniFseTable)
+      .where(
+        and(
+          eq(esportazioniFseTable.scopeRequestHash, scopeRequestHash),
+          ne(esportazioniFseTable.stato, "ANNULLATA"),
+        ),
+      );
+    if (existing) return { export: existing, report: null, replayed: true };
     const report = await buildFseCanonicalReport({
       ...input,
+      cutoff,
       includeArretrati: input.includeArretrati ?? true,
       excludeCovered: true,
       executor: tx,
@@ -1306,23 +1592,13 @@ export async function createFseExport(input: {
       dataA: input.dataA,
       dataAsOf: input.dataAsOf,
       includeArretrati: input.includeArretrati ?? true,
-      cutoff: report.cutoff,
+      cutoff,
       canonicalHash: report.canonicalHash,
     });
-    const [existing] = await tx
-      .select()
-      .from(esportazioniFseTable)
-      .where(
-        and(
-          eq(esportazioniFseTable.requestHash, requestHash),
-          ne(esportazioniFseTable.stato, "ANNULLATA"),
-        ),
-      );
-    if (existing) return { export: existing, report, replayed: true };
     const [lastCancelled] = await tx
       .select({ id: esportazioniFseTable.id })
       .from(esportazioniFseTable)
-      .where(eq(esportazioniFseTable.requestHash, requestHash))
+      .where(eq(esportazioniFseTable.scopeRequestHash, scopeRequestHash))
       .orderBy(sql`${esportazioniFseTable.id} DESC`)
       .limit(1);
     const idempotencyKey = canonicalSha256({
@@ -1335,6 +1611,12 @@ export async function createFseExport(input: {
     const warnings = report.quality
       .filter((item) => !item.blocking)
       .reduce((sum, item) => sum + item.count, 0);
+    const administrativeEvents = report.events.filter(
+      (event) => event.coverageEligible && !event.blocking,
+    );
+    if (administrativeEvents.length === 0 && blocking === 0) {
+      throw new FseReportingError(409, "NESSUN_DATO_DA_RENDICONTARE");
+    }
     const coveragePurpose = blocking === 0 ? "ADMINISTRATIVE" : "AUDIT_ONLY";
     const [created] = await tx
       .insert(esportazioniFseTable)
@@ -1355,6 +1637,7 @@ export async function createFseExport(input: {
         canonicalHash: report.canonicalHash,
         idempotencyKey,
         requestHash,
+        scopeRequestHash,
         coveragePurpose,
         snapshotMetadataJson: {
           ...report.metadata,
@@ -1451,6 +1734,10 @@ export async function createFseExport(input: {
             },
             reportingDisposition: line.reportingDisposition,
             qualityCodesJson: line.qualityCodes,
+            openingBalancePieces: line.openingBalancePieces,
+            openingBalanceKgLt: line.openingBalanceKgLt,
+            balanceAfterPieces: line.balanceAfterPieces,
+            balanceAfterKgLt: line.balanceAfterKgLt,
             activeCoverage:
               coveragePurpose === "ADMINISTRATIVE" &&
               line.coverageEligible &&

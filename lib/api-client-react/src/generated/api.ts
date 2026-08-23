@@ -153,6 +153,7 @@ import type {
   FseReconciliationRowsPage,
   FseRecord,
   FseRecordPage,
+  FseReportingPreview,
   FseResolutionInput,
   FseVersionInput,
   GetFseReportingPreviewParams,
@@ -2848,9 +2849,9 @@ export const getGetFseReportingPreviewUrl = (params: GetFseReportingPreviewParam
 /**
  * @summary Preview canonica FSE+ con cutoff immutabile
  */
-export const getFseReportingPreview = async (params: GetFseReportingPreviewParams, options?: RequestInit): Promise<FseRecord> => {
+export const getFseReportingPreview = async (params: GetFseReportingPreviewParams, options?: RequestInit): Promise<FseReportingPreview> => {
 
-  return customFetch<FseRecord>(getGetFseReportingPreviewUrl(params),
+  return customFetch<FseReportingPreview>(getGetFseReportingPreviewUrl(params),
   {
     ...options,
     method: 'GET'

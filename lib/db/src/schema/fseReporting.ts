@@ -135,6 +135,7 @@ export const esportazioniFseTable = pgTable(
     canonicalHash: varchar("canonical_hash", { length: 64 }).notNull(),
     idempotencyKey: varchar("idempotency_key", { length: 64 }).notNull(),
     requestHash: varchar("request_hash", { length: 64 }),
+    scopeRequestHash: varchar("scope_request_hash", { length: 64 }),
     coveragePurpose: varchar("coverage_purpose", { length: 30 })
       .notNull()
       .default("ADMINISTRATIVE"),
@@ -169,6 +170,11 @@ export const esportazioniFseTable = pgTable(
   },
   (table) => [
     uniqueIndex("esportazioni_fse_idempotency_unique").on(table.idempotencyKey),
+    uniqueIndex("esportazioni_fse_active_scope_unique")
+      .on(table.scopeRequestHash)
+      .where(
+        sql`${table.scopeRequestHash} IS NOT NULL AND ${table.stato} <> 'ANNULLATA'`,
+      ),
     index("esportazioni_fse_mag_period_state_idx").on(
       table.magazzinoId,
       table.dataDa,
@@ -233,8 +239,8 @@ export const esportazioniFseEventiTable = pgTable(
       table.esportazioneId,
       table.eventKey,
     ),
-    uniqueIndex("esportazioni_fse_eventi_active_coverage_unique")
-      .on(table.eventKey)
+    uniqueIndex("esportazioni_fse_eventi_active_content_unique")
+      .on(table.eventKey, table.contentHash)
       .where(sql`${table.activeCoverage} = true`),
     check(
       "esportazioni_fse_eventi_hash_check",
@@ -293,14 +299,30 @@ export const esportazioniFseRigheTable = pgTable(
       .notNull()
       .default([]),
     activeCoverage: boolean("active_coverage").notNull().default(true),
+    openingBalancePieces: numeric("opening_balance_pieces", {
+      precision: 30,
+      scale: 6,
+    }),
+    openingBalanceKgLt: numeric("opening_balance_kg_lt", {
+      precision: 30,
+      scale: 6,
+    }),
+    balanceAfterPieces: numeric("balance_after_pieces", {
+      precision: 30,
+      scale: 6,
+    }),
+    balanceAfterKgLt: numeric("balance_after_kg_lt", {
+      precision: 30,
+      scale: 6,
+    }),
   },
   (table) => [
     uniqueIndex("esportazioni_fse_righe_key_unique").on(
       table.esportazioneEventoId,
       table.lineKey,
     ),
-    uniqueIndex("esportazioni_fse_righe_active_coverage_unique")
-      .on(table.lineKey)
+    uniqueIndex("esportazioni_fse_righe_active_content_unique")
+      .on(table.lineKey, table.contentHash)
       .where(sql`${table.activeCoverage} = true`),
     check(
       "esportazioni_fse_righe_hash_check",
@@ -473,6 +495,10 @@ export const riconciliazioniFseRigheTable = pgTable(
     workflowStatus: varchar("workflow_status", { length: 40 })
       .notNull()
       .default("CALCOLATO"),
+    active: boolean("active").notNull().default(true),
+    supersededByRowId: integer("superseded_by_row_id"),
+    resolutionGroupId: varchar("resolution_group_id", { length: 64 }),
+    companionRowId: integer("companion_row_id"),
   },
   (table) => [
     uniqueIndex("riconciliazioni_fse_righe_key_unique").on(
@@ -482,6 +508,19 @@ export const riconciliazioniFseRigheTable = pgTable(
     index("riconciliazioni_fse_righe_state_block_idx").on(
       table.status,
       table.blocking,
+    ),
+    uniqueIndex("riconciliazioni_fse_righe_active_movement_unique")
+      .on(table.riconciliazioneId, table.movimentoId)
+      .where(sql`${table.active} = true AND ${table.movimentoId} IS NOT NULL`),
+    uniqueIndex("riconciliazioni_fse_righe_active_agea_unique")
+      .on(table.riconciliazioneId, table.importazioneAgeaRigaId)
+      .where(
+        sql`${table.active} = true AND ${table.importazioneAgeaRigaId} IS NOT NULL`,
+      ),
+    index("riconciliazioni_fse_righe_resolution_group_idx").on(
+      table.riconciliazioneId,
+      table.resolutionGroupId,
+      table.active,
     ),
     check(
       "riconciliazioni_fse_righe_hash_check",

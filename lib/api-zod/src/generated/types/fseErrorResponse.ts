@@ -7,5 +7,6 @@
  */
 
 export interface FseErrorResponse {
+  /** Codice o messaggio stabile; include NESSUN_DATO_DA_RENDICONTARE per scope amministrativi vuoti */
   error: string;
 }

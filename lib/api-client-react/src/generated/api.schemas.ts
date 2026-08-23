@@ -6,10 +6,38 @@
  * OpenAPI spec version: 0.1.0
  */
 export interface FseErrorResponse {
+  /** Codice o messaggio stabile; include NESSUN_DATO_DA_RENDICONTARE per scope amministrativi vuoti */
   error: string;
 }
 
 export interface FseRecord { [key: string]: unknown }
+
+export interface FseReportingPreview {
+  modelVersion: string;
+  /** @minimum 1 */
+  magazzinoId: number;
+  dataDa: string;
+  dataA: string;
+  dataAsOf: string;
+  /** @minimum 0 */
+  eventiTotali: number;
+  /** @minimum 0 */
+  righeTotali: number;
+  /** @minimum 0 */
+  eventiDaRendicontare: number;
+  /** @minimum 0 */
+  eventiArretrati: number;
+  /** @minimum 0 */
+  eventiBloccati: number;
+  /** @minimum 0 */
+  eventiGiaCoperti: number;
+  /** @minimum 0 */
+  righeDaRendicontare: number;
+  /** @minimum 0 */
+  bloccanti: number;
+  cutoff?: FseRecord;
+  [key: string]: unknown;
+ }
 
 export type FseRecordList = FseRecord[];
 
@@ -27,6 +55,28 @@ export interface FseRecordPage {
   summary?: FseRecord;
 }
 
+export interface FseReconciliationRow {
+  /** @minimum 1 */
+  id?: number;
+  active?: boolean;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  supersededByRowId?: number | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9a-f]{64}$
+     */
+  resolutionGroupId?: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  companionRowId?: number | null;
+  [key: string]: unknown;
+ }
+
 export interface FseReconciliationRowsPage {
   /** @minimum 1 */
   page: number;
@@ -37,7 +87,7 @@ export interface FseReconciliationRowsPage {
   pageSize: number;
   /** @minimum 0 */
   total: number;
-  rows: FseRecordList;
+  rows: FseReconciliationRow[];
 }
 
 export type FseExportInputFormatCode = typeof FseExportInputFormatCode[keyof typeof FseExportInputFormatCode];

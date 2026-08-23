@@ -765,7 +765,10 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+                  {
+                    schema:
+                      { $ref: "#/components/schemas/FseReportingPreview" },
+                  },
               },
           }
         "400": { $ref: "#/components/responses/FseBadRequest" }
@@ -7884,10 +7887,7 @@ components:
       schema:
         type: string
         enum:
-          [
-            FSE_CANONICAL_AUDIT_XLSX_V1,
-            SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1,
-          ]
+          [FSE_CANONICAL_AUDIT_XLSX_V1, SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1]
     PageParam:
       name: page
       in: query
@@ -8027,10 +8027,46 @@ components:
       type: object
       required: [error]
       properties:
-        error: { type: string }
+        error:
+          type: string
+          description: Codice o messaggio stabile; include NESSUN_DATO_DA_RENDICONTARE per scope amministrativi vuoti
     FseRecord:
       type: object
       additionalProperties: true
+    FseReportingPreview:
+      type: object
+      additionalProperties: true
+      required:
+        [
+          modelVersion,
+          magazzinoId,
+          dataDa,
+          dataA,
+          dataAsOf,
+          eventiTotali,
+          righeTotali,
+          eventiDaRendicontare,
+          eventiArretrati,
+          eventiBloccati,
+          eventiGiaCoperti,
+          righeDaRendicontare,
+          bloccanti,
+        ]
+      properties:
+        modelVersion: { type: string }
+        magazzinoId: { type: integer, minimum: 1 }
+        dataDa: { type: string, format: date }
+        dataA: { type: string, format: date }
+        dataAsOf: { type: string, format: date }
+        eventiTotali: { type: integer, minimum: 0 }
+        righeTotali: { type: integer, minimum: 0 }
+        eventiDaRendicontare: { type: integer, minimum: 0 }
+        eventiArretrati: { type: integer, minimum: 0 }
+        eventiBloccati: { type: integer, minimum: 0 }
+        eventiGiaCoperti: { type: integer, minimum: 0 }
+        righeDaRendicontare: { type: integer, minimum: 0 }
+        bloccanti: { type: integer, minimum: 0 }
+        cutoff: { $ref: "#/components/schemas/FseRecord" }
     FseRecordList:
       type: array
       items: { $ref: "#/components/schemas/FseRecord" }
@@ -8050,7 +8086,18 @@ components:
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 200 }
         total: { type: integer, minimum: 0 }
-        rows: { $ref: "#/components/schemas/FseRecordList" }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/FseReconciliationRow" }
+    FseReconciliationRow:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: integer, minimum: 1 }
+        active: { type: boolean }
+        supersededByRowId: { type: [integer, "null"], minimum: 1 }
+        resolutionGroupId: { type: [string, "null"], pattern: "^[0-9a-f]{64}$" }
+        companionRowId: { type: [integer, "null"], minimum: 1 }
     FseExportInput:
       type: object
       required:

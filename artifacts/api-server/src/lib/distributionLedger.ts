@@ -64,30 +64,45 @@ export async function ensureDistributionOperation(
         "La sorgente è già collegata a una diversa operazione di distribuzione",
       );
     }
+    const requested = {
+      numeroDocumento:
+        input.numeroDocumento !== undefined
+          ? input.numeroDocumento
+          : existing.numeroDocumento,
+      numeroPacchi:
+        input.numeroPacchi !== undefined
+          ? input.numeroPacchi
+          : existing.numeroPacchi,
+      numeroPasti:
+        input.numeroPasti !== undefined
+          ? input.numeroPasti
+          : existing.numeroPasti,
+      indigentiSaltuari:
+        input.indigentiSaltuari !== undefined
+          ? input.indigentiSaltuari
+          : existing.indigentiSaltuari,
+      indigentiContinuativi:
+        input.indigentiContinuativi !== undefined
+          ? input.indigentiContinuativi
+          : existing.indigentiContinuativi,
+    };
+    const changed = Object.entries(requested).some(
+      ([key, value]) => value !== existing[key as keyof typeof requested],
+    );
+    if (!changed) return existing;
+    const [linkedMovement] = await tx
+      .select({ id: movimentiTable.id })
+      .from(movimentiTable)
+      .where(eq(movimentiTable.operazioneDistribuzioneId, existing.id))
+      .limit(1);
+    if (linkedMovement) {
+      throw new DistributionLedgerError(
+        "OPERAZIONE_DISTRIBUZIONE_IMMUTABILE: esistono Movimenti collegati",
+      );
+    }
     const [updated] = await tx
       .update(operazioniDistribuzioneMagazzinoTable)
-      .set({
-        numeroDocumento:
-          input.numeroDocumento !== undefined
-            ? input.numeroDocumento
-            : existing.numeroDocumento,
-        numeroPacchi:
-          input.numeroPacchi !== undefined
-            ? input.numeroPacchi
-            : existing.numeroPacchi,
-        numeroPasti:
-          input.numeroPasti !== undefined
-            ? input.numeroPasti
-            : existing.numeroPasti,
-        indigentiSaltuari:
-          input.indigentiSaltuari !== undefined
-            ? input.indigentiSaltuari
-            : existing.indigentiSaltuari,
-        indigentiContinuativi:
-          input.indigentiContinuativi !== undefined
-            ? input.indigentiContinuativi
-            : existing.indigentiContinuativi,
-      })
+      .set(requested)
       .where(eq(operazioniDistribuzioneMagazzinoTable.id, existing.id))
       .returning();
     return updated;
@@ -164,8 +179,10 @@ export async function reconcileDistributionOperationState(
     if (reversal.movimentoOrigineId == null) continue;
     reversedByOriginal.set(
       reversal.movimentoOrigineId,
-      (reversedByOriginal.get(reversal.movimentoOrigineId) ??
-        InventoryDecimal.zero()).add(InventoryDecimal.parse(reversal.quantita)),
+      (
+        reversedByOriginal.get(reversal.movimentoOrigineId) ??
+        InventoryDecimal.zero()
+      ).add(InventoryDecimal.parse(reversal.quantita)),
     );
   }
   let anyReversed = false;

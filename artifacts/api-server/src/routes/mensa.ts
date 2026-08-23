@@ -2754,7 +2754,7 @@ router.post(
                   dominioOrigine: "MENSA",
                   entitaOrigineTipo: "mensa_giornata_servizio",
                   entitaOrigineId: giornata.id,
-                  numeroDocumento: codice,
+                  numeroDocumento: `MENSA-${giornata.id}`,
                   numeroPasti: Number(numeroPasti),
                 }
               : undefined,

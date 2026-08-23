@@ -135,24 +135,15 @@ export async function generateFseExportWorkbook(
   if (formatCode === FSE_OBSERVED_CONTROL_FORMAT) {
     const finalBalances = new Map(
       balances.map((balance) => [
-        `${balance.prodottoId}:${balance.lottoId ?? ""}`,
+        `${balance.fondo}:${balance.prodottoId}:${balance.lottoId ?? ""}`,
         balance,
       ]),
     );
-    const progressivePieces = new Map<string, number>();
-    const progressiveKgLt = new Map<string, number>();
     const seenEvents = new Set<number>();
     const dynamicPieces = `Giacenza finale pezzi al ${header.dataAsOf}`;
     const dynamicKgLt = `Giacenza finale al ${header.dataAsOf}`;
     const observed = joinedLines.map(({ line, event }) => {
-      const key = `${line.productId}:${line.lotId ?? ""}`;
-      const pieces =
-        (progressivePieces.get(key) ?? 0) +
-        Number(line.quantityPiecesSigned ?? 0);
-      const kgLt =
-        (progressiveKgLt.get(key) ?? 0) + Number(line.quantityKgLtSigned ?? 0);
-      progressivePieces.set(key, pieces);
-      progressiveKgLt.set(key, kgLt);
+      const key = `${line.fund}:${line.productId}:${line.lotId ?? ""}`;
       const balance = finalBalances.get(key);
       const firstEventLine = !seenEvents.has(event.id);
       seenEvents.add(event.id);
@@ -169,8 +160,8 @@ export async function generateFseExportWorkbook(
         "Mittente / destinatario": source.sourceDestinationSnapshot ?? null,
         "Carico / scarico": line.quantityKgLtSigned,
         "Carico / scarico pezzi": line.quantityPiecesSigned,
-        "Giacenza pezzi alla movimentazione": pieces.toString(),
-        "Giacenza alla movimentazione": kgLt.toString(),
+        "Giacenza pezzi alla movimentazione": line.balanceAfterPieces,
+        "Giacenza alla movimentazione": line.balanceAfterKgLt,
         Note: firstEventLine
           ? "Proiezione locale di controllo; statistiche evento esposte una sola volta"
           : "Proiezione locale di controllo; statistiche evento sulla prima riga",
