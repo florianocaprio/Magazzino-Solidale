@@ -66,12 +66,13 @@ multilingua (it/es/en/fr/de/ar).
    docker compose up -d --remove-orphans
    ```
 
-Il comando `update` usa il DB Migration Ledger in `app_meta`: verifica il
-manifest SHA-256 della storia legacy, acquisisce un lock advisory globale e
-applica in ordine soltanto i file pendenti, registrando SQL e ledger nella
-stessa transazione. Alla prima adozione su un database esistente esegue un
-ultimo replay sicuro di tutta la storia e la registra; i run successivi
-verificano i checksum e saltano le migration già applicate.
+Il comando `update` usa il DB Migration Ledger 1.0-R1 in `app_meta`: verifica il
+manifest SHA-256 e il confine immutabile della storia legacy, quindi acquisisce
+in ordine il lock compatibile con il runner storico e il lock globale nuovo.
+Applica soltanto i file pendenti, registrando SQL e ledger nella stessa
+transazione. Alla prima adozione su un database esistente esegue un ultimo
+replay sicuro della storia censita e la registra; i run successivi verificano i
+checksum e saltano le migration già applicate.
 
 Comandi diagnostici non distruttivi:
 
@@ -80,9 +81,25 @@ pnpm --filter @workspace/db run migrations:status
 pnpm --filter @workspace/db run migrations:verify
 ```
 
+`migrations:verify` su un ledger non inizializzato riporta tutti i file come
+pending e può terminare con exit code 0: questo conferma soltanto la coerenza
+del piano locale, non l'adozione. Un gate di rilascio richiede sia ledger
+inizializzato sia zero pending.
+
+Prima del gate PRE-2.0C e prima di qualunque futura prova su clone Hetzner
+eseguire esplicitamente con Node.js 24:
+
+```bash
+pnpm --filter @workspace/db run test:migrations
+```
+
 Una migration applicata non deve essere modificata, rimossa o rinominata. Le
-nuove migration devono essere append-only secondo l'ordine lessicografico. Non
-esistono comandi automatici di repair o rebaseline. La procedura completa è in
+nuove migration devono essere append-only e avere un filename strettamente
+successivo al confine legacy, anche prima dell'adozione. Non esistono comandi
+automatici di repair o rebaseline. Se un clone fallisce la verifica legacy,
+fermarsi e ricreare il clone dal backup oppure ottenere una decisione DBA
+reviewata, senza modificare SQL storici, checksum o manifest. La procedura
+completa è in
 [`docs/db-migration-ledger.md`](docs/db-migration-ledger.md).
 
 ### Aggiornamento Fase 5-4 — Mensa

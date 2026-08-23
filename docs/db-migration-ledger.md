@@ -1,10 +1,10 @@
-# DB Migration Ledger 1.0
+# DB Migration Ledger 1.0-R1
 
 ## Obiettivo e perimetro
 
 Il ledger sostituisce il replay completo a ogni avvio con un motore append-only
-dotato di checksum, lock globale e audit. Non modifica lo schema Drizzle o la
-semantica delle migration business esistenti.
+dotato di checksum, doppio lock compatibile e audit. Non modifica lo schema
+Drizzle o la semantica delle migration business esistenti.
 
 Il comando operativo resta:
 
@@ -73,7 +73,7 @@ Se mancano righe per una migration inclusa nel manifest legacy, il runner entra
 in modalità `REPLAY_AND_REGISTER`:
 
 1. verifica directory e manifest;
-2. acquisisce il lock di sessione globale;
+2. acquisisce in ordine i lock di sessione legacy e globale;
 3. crea e verifica le tabelle `app_meta`;
 4. considera la storia non registrata come pendente;
 5. esegue un ultimo replay in ordine;
@@ -92,6 +92,14 @@ essere corretta in-place.
 all'introduzione del ledger, incluso il replay guard Logistica. Usa SHA-256 sui
 byte esatti e viene protetto dalla normalizzazione LF in `.gitattributes`.
 
+L'ultimo filename ordinato del manifest è il confine legacy immutabile. Ogni
+file SQL non censito che ordina prima o allo stesso livello di quel confine
+viene rifiutato con `MIGRATION_LEGACY_BOUNDARY_VIOLATION`, anche quando il ledger
+non è ancora inizializzato. Il controllo avviene durante il caricamento del
+piano, prima di aprire la connessione PostgreSQL, per `update`, `verify` e
+`status`. Soltanto file con filename strettamente successivo al confine possono
+essere aggiunti in coda.
+
 Prima di accedere al database il runner verifica:
 
 - formato e algoritmo supportati;
@@ -105,13 +113,15 @@ Errori bloccanti:
 LEGACY_BASELINE_CHECKSUM_MISMATCH
 LEGACY_BASELINE_FILE_MISSING
 LEGACY_BASELINE_INVALID
+MIGRATION_LEGACY_BOUNDARY_VIOLATION
 MIGRATION_CHECKSUM_MISMATCH
 MIGRATION_APPLIED_FILE_MISSING
 MIGRATION_OUT_OF_ORDER
 ```
 
 Non sono disponibili `repair`, `accept-current-checksum` o auto-rebaseline.
-Ogni modifica al manifest richiede review esplicita.
+Il manifest non deve essere esteso con nuove migration: resta la fotografia
+immutabile dei 21 file legacy e ogni modifica richiede review esplicita.
 
 ## Ordine append-only
 
@@ -122,23 +132,34 @@ YYYYMMDD_descrizione.sql
 ```
 
 Il confronto usa l'ordine code-unit, equivalente al precedente `.sort()` del
-runner. Dopo la prima registrazione, un nuovo file che ordina prima dell'ultima
-migration applicata viene rifiutato. Rename e rimozione di file applicati sono
-bloccanti.
+runner. La regola append-only vale già prima della prima adozione rispetto al
+confine del manifest; dopo la registrazione vale anche rispetto all'ultima
+migration applicata. Un file fuori ordine viene quindi respinto prima
+dell'adozione dal confine legacy o, a ledger inizializzato, dal controllo
+`MIGRATION_OUT_OF_ORDER`. Rename e rimozione di file applicati sono bloccanti.
 
 ## Lock e concorrenza
 
-Il runner usa `pg_try_advisory_lock(hashtextextended(...))` con chiave:
+Per interoperare con il runner storico e con quello nuovo, il runner acquisisce
+due advisory lock di sessione in ordine deterministico:
 
 ```text
-magazzino-solidale:schema-migrations
+1. pg_try_advisory_lock(hashtext('magazzino-solidale:db-updates'))
+2. pg_try_advisory_lock(hashtextextended('magazzino-solidale:schema-migrations', 0))
 ```
 
-Il lock è di sessione e copre preflight DB, tutte le migration e audit finale.
-`DB_MIGRATION_LOCK_TIMEOUT_MS` configura il timeout, con default 120.000 ms.
-In caso di timeout il comando termina non-zero con
-`MIGRATION_LOCK_TIMEOUT`; se le metadata esistono, registra un run
-`LOCK_TIMEOUT`.
+Il primo collide con il precedente
+`pg_advisory_xact_lock(hashtext('magazzino-solidale:db-updates'))`: un vecchio
+runner già attivo fa attendere il nuovo e un nuovo runner impedisce al vecchio
+di entrare. Entrambi i lock coprono preflight DB, tutte le migration e audit
+finale. Condividono un unico budget configurato da
+`DB_MIGRATION_LOCK_TIMEOUT_MS` (default 120.000 ms), con polling limitato e
+senza busy loop. Vengono rilasciati in ordine inverso, globale poi legacy, nel
+blocco `finally`, prima della chiusura della connessione.
+
+In caso di timeout il comando termina non-zero con `MIGRATION_LOCK_TIMEOUT` e
+indica nell'errore sanitizzato se è scaduto il lock `legacy` o `global`; se le
+metadata esistono, registra un run `LOCK_TIMEOUT`.
 
 Due API concorrenti si serializzano: la prima applica, la seconda attende,
 verifica gli stessi checksum e salta i file già registrati.
@@ -185,8 +206,27 @@ pnpm --filter @workspace/db run migrations:verify
 ```
 
 Non applica SQL. Su un database non adottato verifica manifest e directory e
-riporta il ledger come non inizializzato. Su un database adottato acquisisce il
-lock, verifica ledger/checksum/ordine e registra un run `VERIFY_ONLY`.
+riporta il ledger come non inizializzato, tutti i file come pendenti e termina
+con exit code 0 se il piano filesystem è coerente. Questo exit code 0 non
+significa che il database sia stato adottato. Un gate rigoroso deve verificare
+entrambe le condizioni `initialized=true` e `pending=0`. Su un database adottato
+acquisisce i due lock, verifica ledger/checksum/ordine e registra un run
+`VERIFY_ONLY`.
+
+## Gate PRE-2.0C
+
+Prima di qualsiasi review di 2.0C eseguire esplicitamente:
+
+```bash
+pnpm --filter @workspace/db run test:migrations
+pnpm --filter @workspace/db run migrations:verify
+pnpm --filter @workspace/db run migrations:status
+```
+
+Il gate è superato soltanto se i test del runner sono verdi, `verify` conferma
+un ledger inizializzato e `status` riporta zero pending, zero checksum mismatch,
+zero file applicati mancanti e zero out-of-order. Un `verify` verde con ledger
+non inizializzato non è sufficiente.
 
 ## Impact map
 
@@ -199,10 +239,10 @@ lock, verifica ledger/checksum/ordine e registra un run `VERIFY_ONLY`.
 | Clone/staging      | Ambiente obbligatorio per la prima adozione controllata |
 | Hetzner futuro     | Nessun rollout in questa fase; procedura sotto          |
 | Test API/migration | Stesso DB reale, più test sintetici isolati del runner  |
-| Concorrenza        | Un lock di sessione per tutti i file                    |
+| Concorrenza        | Lock sessione legacy + globale per tutti i file         |
 | Rollback           | Per-file; le migration precedenti restano registrate    |
 | Checksum           | SHA-256 byte-esatto, storico protetto dal manifest      |
-| Ordinamento        | Code-unit, append-only dopo la prima riga ledger        |
+| Ordinamento        | Code-unit, boundary legacy e append-only                |
 | Audit              | Run e item persistenti, senza SQL o segreti             |
 | Drizzle push       | Ignora `app_meta`; resta separato dal ledger            |
 
@@ -216,18 +256,34 @@ lock, verifica ledger/checksum/ordine e registra un run `VERIFY_ONLY`.
 6. verificare una riga ledger per ogni file e i conteggi business;
 7. eseguire nuovamente `update`: 0 applicate, tutte skipped;
 8. eseguire `migrations:verify`, `migrations:status` e i test applicativi;
-9. provare start e restart Docker.
+9. eseguire `pnpm --filter @workspace/db run test:migrations`;
+10. provare start e restart Docker.
+
+Se il clone fallisce la verifica del manifest legacy, fermarsi: non modificare
+file storici, checksum o manifest e non usare repair automatici. Ripartire da
+un clone controllato e pulito del backup oppure sottoporre a un DBA una decisione
+documentata e reviewata. Nessuna correzione va improvvisata sul database fonte.
 
 ## Procedura futura Hetzner
 
 1. backup verificato del database Hetzner;
 2. restore su clone/staging separato;
-3. `migrations:verify` sul clone;
-4. prima adozione `REPLAY_AND_REGISTER` sul clone;
-5. secondo `update` con zero pending;
-6. suite applicative e smoke Docker sul clone;
-7. review umana dei run audit;
-8. soltanto dopo, rollout controllato in finestra approvata.
+3. `migrations:verify` sul clone, ricordando che prima dell'adozione un exit 0
+   con `initialized=false` non supera il gate rigoroso;
+4. `pnpm --filter @workspace/db run test:migrations` con Node.js 24;
+5. prima adozione `REPLAY_AND_REGISTER` sul clone, solo dopo review dei
+   preflight;
+6. secondo `update` con zero applicate e tutti i file skipped;
+7. nuovo `migrations:verify` e conferma esplicita del gate rigoroso con
+   `initialized=true` e `pending=0`;
+8. suite applicative e smoke Docker sul clone;
+9. review umana dei run audit, del backup e delle cardinalità business;
+10. soltanto dopo, rollout controllato in finestra separatamente approvata.
+
+Qualsiasi failure legacy sul clone Hetzner impone stop e review: non correggere
+SQL storici, checksum o manifest e non eseguire repair automatici. Conservare
+il backup verificato, ricreare eventualmente il clone in modo controllato e
+richiedere una decisione DBA reviewata prima di procedere.
 
 Questo incarico non autorizza alcun accesso o rollout Hetzner.
 
