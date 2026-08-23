@@ -150,6 +150,30 @@ export const LOGISTICA_PERMISSIONS = [
 
 export const MAGAZZINO_PERMISSIONS = [
   { key: "magazzino.view", label: "Magazzino: consultazione" },
+  {
+    key: "magazzino.fse.view",
+    label: "Magazzino FSE+: consultazione rendicontazione",
+  },
+  {
+    key: "magazzino.fse.export",
+    label: "Magazzino FSE+: generazione e gestione export",
+  },
+  {
+    key: "magazzino.fse.reconcile",
+    label: "Magazzino FSE+: calcolo riconciliazioni",
+  },
+  {
+    key: "magazzino.fse.reconcile.manage",
+    label: "Magazzino FSE+: risoluzione e chiusura riconciliazioni",
+  },
+  {
+    key: "magazzino.fse.monitoring.manage",
+    label: "Magazzino FSE+: gestione indicatori mensili",
+  },
+  {
+    key: "magazzino.fse.return",
+    label: "Magazzino FSE+: gestione resi verso OpC",
+  },
   { key: "magazzino.agea.view", label: "Magazzino AGEA: consultazione import" },
   { key: "magazzino.agea.import", label: "Magazzino AGEA: analisi e import" },
   {

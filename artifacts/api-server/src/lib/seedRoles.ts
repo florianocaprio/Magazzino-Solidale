@@ -65,6 +65,7 @@ const LOGISTICA_OPERATOR_PERMISSIONS = [
 ] as const;
 const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "magazzino.view",
+  "magazzino.fse.view",
   "magazzino.agea.view",
   "magazzino.agea.import",
   "magazzino.agea.mapping.manage",

@@ -41,6 +41,7 @@ import reportIntegratoRouter from "./report-integrato";
 import reportRouter from "./report";
 import mensaRouter from "./mensa";
 import ageaRouter from "./agea";
+import fseRouter from "./fse";
 import mapsRouter from "./maps";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
@@ -105,6 +106,7 @@ router.use(reportIntegratoRouter);
 router.use(reportRouter);
 router.use(mensaRouter);
 router.use(ageaRouter);
+router.use(fseRouter);
 router.use(mapsRouter);
 
 // Admin-only management endpoints.
