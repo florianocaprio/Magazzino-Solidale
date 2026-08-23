@@ -5,6 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { FseOptionalDataAParameter } from './fseOptionalDataAParameter';
+import type { FseOptionalDataDaParameter } from './fseOptionalDataDaParameter';
+import type { FseOptionalMagazzinoIdParameter } from './fseOptionalMagazzinoIdParameter';
+import type { FseOptionalStatoParameter } from './fseOptionalStatoParameter';
 import type { FsePageParameter } from './fsePageParameter';
 import type { FsePageSizeParameter } from './fsePageSizeParameter';
 
@@ -18,4 +22,14 @@ page?: FsePageParameter;
  * @maximum 200
  */
 pageSize?: FsePageSizeParameter;
+/**
+ * @minimum 1
+ */
+magazzinoId?: FseOptionalMagazzinoIdParameter;
+dataCompetenzaDa?: FseOptionalDataDaParameter;
+dataCompetenzaA?: FseOptionalDataAParameter;
+/**
+ * @maxLength 60
+ */
+stato?: FseOptionalStatoParameter;
 };

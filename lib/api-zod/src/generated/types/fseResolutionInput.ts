@@ -16,4 +16,8 @@ export interface FseResolutionInput {
      * @maxLength 500
      */
   motivazione: string;
+  /** @minimum 1 */
+  movimentoId?: number;
+  /** @minimum 1 */
+  importazioneAgeaRigaId?: number;
 }

@@ -24,6 +24,13 @@ modifiche si determinano mediante identity hash, content hash e occorrenza nel
 multinsieme; il numero riga non è un'identità business. Pezzi e Kg/Lt non sono
 mai sommati fra loro.
 
+La prima importazione confermata può essere assorbita come baseline: i carichi
+storici già materializzati da AGEA sono `BASELINE_ASSORBITA` e non falsi
+`SOLO_AGEA`. Dalla seconda importazione il confronto usa il delta cumulativo
+reale rispetto alla precedente. Le Partite con saldo esterno positivo
+producono inoltre righe `SALDO_PARTITA`, confrontate con il saldo locale as-of
+per Magazzino, Fondo, prodotto e lotto.
+
 ## Matching deterministico
 
 Ordine dei livelli:
@@ -54,6 +61,13 @@ permessa solo con zero bloccanti e zero scostamenti; la chiusura con
 scostamenti richiede accettazione e motivazione esplicite. Uno snapshot chiuso
 non viene riscritto.
 
+`ACCETTA_SCOSTAMENTO` conserva `exact=false` e lo stato
+`SCOSTAMENTO_ACCETTATO`: non equivale a una riconciliazione esatta. `ABBINA`
+richiede ID reali di Movimento e riga import, li verifica nello stesso
+snapshot/Magazzino e ricalcola valori, differenze e hash. `DISABBINA` separa
+le due componenti locale/esterna. Ogni risoluzione registra target, versione
+testata prima/dopo e stato calcolato prima/dopo.
+
 ## API, scope e concorrenza
 
 Gli endpoint `/api/fse/riconciliazioni` espongono lista, creazione, dettaglio,
@@ -67,6 +81,10 @@ Permessi: `magazzino.fse.reconcile` per calcolo/ricalcolo e
 vincoli univoci, lock di riga e optimistic version impediscono duplicazioni e
 chiusure concorrenti. Versione assente/malformata produce 400; versione stale
 produce 409.
+
+La richiesta è identificata da hash canonico e idempotency key. Un replay con
+stesso import, baseline, data e cutoff restituisce la riconciliazione esistente;
+payload divergenti o calcoli concorrenti non possono creare duplicati.
 
 ## Privacy e verifiche
 

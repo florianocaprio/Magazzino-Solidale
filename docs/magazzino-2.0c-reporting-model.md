@@ -29,14 +29,15 @@ formattazione possono arrotondare la proiezione, mai il valore decisionale.
 | storni                      | Movimenti                | nature `STORNO` con lineage                              |
 | distribuzione netta         | ledger                   | lordo meno compensazioni                                 |
 | eventi/pacchi/pasti/persone | Operazione distribuzione | evento distinto; statistiche una volta                   |
-| scadenze                    | Partite                  | confronto con data finale del report, non `CURRENT_DATE` |
+| scadenze                    | ledger + Partite         | saldo Partita ricostruito as-of e scadenza alla data finale |
 | trasferimenti               | Movimenti                | entrata e uscita separate                                |
 | persone uniche note         | sorgenti modulo          | beneficiario distinto affidabile; anonimi esclusi        |
 
 Il report Magazzino/Logistica distingue stock corrente/as-of Pezzi/KgLt,
 Partite, scadenze, carichi/scarichi, storni, resi, rettifiche e trasferimenti.
-Il report FSE+ usa soltanto il Fondo del Movimento, separa lordo/storni/netto,
-eventi e statistiche, espone qualità, coda amministrativa, export,
+Il report FSE+ usa soltanto il Fondo del Movimento, separa lordo/storni/netto
+per Pezzi e Kg/Lt; include Pacchi/Ritiro sede, Domiciliare, Emporio, Mensa e
+UDS Strada dal ledger/operazione. Espone qualità, coda amministrativa, export,
 riconciliazioni e rilevazioni tramite la sezione operativa.
 
 I moduli conservano la propria semantica: pacchi/eventi/nuclei distinti;
@@ -50,6 +51,17 @@ Periodo, Area Operativa, Centro, Magazzino, Mensa e Zona UDS vengono
 riapplicati server-side. Fondo, prodotto, canale e stati FSE+ sono esposti nei
 flussi amministrativi pertinenti. I drill-down sono server-side, paginati,
 usano lo stesso scope/formula e non includono PII non necessarie.
+La sezione FSE+ integrata, le relative filter-options e i drill-down richiedono
+sempre `magazzino.fse.view` lato server, oltre allo scope territoriale e di
+canale.
+
+## Matrice endpoint legacy
+
+| Endpoint legacy | Builder autorevole | Stato |
+| --- | --- | --- |
+| `/report/fse-plus` | `buildFsePlusReport` / `/report/fse-plus/integrato` | deprecato, header `Deprecation` e `Link` |
+| pagine report legacy | builder integrati | delega, nessuna formula UI parallela |
+| endpoint logistici specialistici | service del proprio dominio | mantenuti quando non duplicano KPI integrati |
 
 ## Frontend FSE+
 

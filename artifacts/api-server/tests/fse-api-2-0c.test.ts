@@ -117,6 +117,27 @@ describe("Magazzino 2.0C — API FSE+", () => {
       });
     expect(preview.status).toBe(200);
 
+    for (const projection of ["eventi", "righe", "qualita"]) {
+      const page = await request(viewOnly)
+        .get(`/fse/rendicontazione/${projection}`)
+        .query({
+          magazzinoId: magazzinoA,
+          dataCompetenzaDa: "2026-08-01",
+          dataCompetenzaA: "2026-08-31",
+          includeArretrati: true,
+          page: 1,
+          pageSize: 10,
+        });
+      expect(page.status, page.text).toBe(200);
+      expect(page.body).toMatchObject({
+        page: 1,
+        pageSize: 10,
+        total: 0,
+        rows: [],
+      });
+      expect(page.body.summary.cutoff).toBeDefined();
+    }
+
     const forbidden = await request(viewOnly).post("/fse/exportazioni").send({
       magazzinoId: magazzinoA,
       dataDa: "2026-08-01",
@@ -192,7 +213,7 @@ describe("Magazzino 2.0C — API FSE+", () => {
         await request(client)
           .post(`/fse/exportazioni/${created.body.id}/marca-inserita`)
           .send({
-            data: "2026-08-20T10:00:00.000Z",
+            data: "2026-08-20",
             riferimentoEsterno: "SIFEAD-TEST",
           })
       ).status,
@@ -202,7 +223,7 @@ describe("Magazzino 2.0C — API FSE+", () => {
       .post(`/fse/exportazioni/${created.body.id}/marca-inserita`)
       .send({
         versione: 1,
-        data: "2026-08-20T10:00:00.000Z",
+        data: "2026-08-20",
         riferimentoEsterno: "SIFEAD-TEST",
       });
     expect(updated.status).toBe(200);
@@ -214,7 +235,7 @@ describe("Magazzino 2.0C — API FSE+", () => {
           .post(`/fse/exportazioni/${created.body.id}/marca-inserita`)
           .send({
             versione: 1,
-            data: "2026-08-20T10:00:00.000Z",
+            data: "2026-08-20",
             riferimentoEsterno: "SIFEAD-STALE",
           })
       ).status,

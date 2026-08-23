@@ -7,17 +7,24 @@
  */
 import type { FseDataAParameter } from './fseDataAParameter';
 import type { FseDataDaParameter } from './fseDataDaParameter';
+import type { FseIncludeArretratiParameter } from './fseIncludeArretratiParameter';
 import type { FseMagazzinoIdParameter } from './fseMagazzinoIdParameter';
 import type { FsePageParameter } from './fsePageParameter';
 import type { FsePageSizeParameter } from './fsePageSizeParameter';
+import type { FseQueueCanaleParameter } from './fseQueueCanaleParameter';
+import type { FseQueueFondoParameter } from './fseQueueFondoParameter';
+import type { FseQueueProdottoIdParameter } from './fseQueueProdottoIdParameter';
+import type { FseQueueQualityCodeParameter } from './fseQueueQualityCodeParameter';
+import type { FseQueueStatoParameter } from './fseQueueStatoParameter';
 
 export type ListFseReportingEventsParams = {
 /**
  * @minimum 1
  */
 magazzinoId: FseMagazzinoIdParameter;
-dataDa: FseDataDaParameter;
-dataA: FseDataAParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
+includeArretrati?: FseIncludeArretratiParameter;
 /**
  * @minimum 1
  */
@@ -27,4 +34,12 @@ page?: FsePageParameter;
  * @maximum 200
  */
 pageSize?: FsePageSizeParameter;
+statoRendicontazione?: FseQueueStatoParameter;
+canale?: FseQueueCanaleParameter;
+fondo?: FseQueueFondoParameter;
+/**
+ * @minimum 1
+ */
+prodottoId?: FseQueueProdottoIdParameter;
+qualityCode?: FseQueueQualityCodeParameter;
 };

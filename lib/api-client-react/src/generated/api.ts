@@ -130,6 +130,7 @@ import type {
   DashboardStats,
   DeleteMezzo200,
   DeleteVolontario200,
+  DownloadFseExportParams,
   EmailSendResult,
   ForgotPasswordInput,
   Fornitore,
@@ -151,7 +152,7 @@ import type {
   FseReconciliationInput,
   FseReconciliationRowsPage,
   FseRecord,
-  FseRecordList,
+  FseRecordPage,
   FseResolutionInput,
   FseVersionInput,
   GetFseReportingPreviewParams,
@@ -2928,9 +2929,9 @@ export const getListFseReportingEventsUrl = (params: ListFseReportingEventsParam
   return stringifiedParams.length > 0 ? `/api/fse/rendicontazione/eventi?${stringifiedParams}` : `/api/fse/rendicontazione/eventi`
 }
 
-export const listFseReportingEvents = async (params: ListFseReportingEventsParams, options?: RequestInit): Promise<FseRecordList> => {
+export const listFseReportingEvents = async (params: ListFseReportingEventsParams, options?: RequestInit): Promise<FseRecordPage> => {
 
-  return customFetch<FseRecordList>(getListFseReportingEventsUrl(params),
+  return customFetch<FseRecordPage>(getListFseReportingEventsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3006,9 +3007,9 @@ export const getListFseReportingLinesUrl = (params: ListFseReportingLinesParams,
   return stringifiedParams.length > 0 ? `/api/fse/rendicontazione/righe?${stringifiedParams}` : `/api/fse/rendicontazione/righe`
 }
 
-export const listFseReportingLines = async (params: ListFseReportingLinesParams, options?: RequestInit): Promise<FseRecordList> => {
+export const listFseReportingLines = async (params: ListFseReportingLinesParams, options?: RequestInit): Promise<FseRecordPage> => {
 
-  return customFetch<FseRecordList>(getListFseReportingLinesUrl(params),
+  return customFetch<FseRecordPage>(getListFseReportingLinesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3084,9 +3085,9 @@ export const getListFseReportingQualityUrl = (params: ListFseReportingQualityPar
   return stringifiedParams.length > 0 ? `/api/fse/rendicontazione/qualita?${stringifiedParams}` : `/api/fse/rendicontazione/qualita`
 }
 
-export const listFseReportingQuality = async (params: ListFseReportingQualityParams, options?: RequestInit): Promise<FseRecordList> => {
+export const listFseReportingQuality = async (params: ListFseReportingQualityParams, options?: RequestInit): Promise<FseRecordPage> => {
 
-  return customFetch<FseRecordList>(getListFseReportingQualityUrl(params),
+  return customFetch<FseRecordPage>(getListFseReportingQualityUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3162,9 +3163,9 @@ export const getListFseExportsUrl = (params?: ListFseExportsParams,) => {
   return stringifiedParams.length > 0 ? `/api/fse/exportazioni?${stringifiedParams}` : `/api/fse/exportazioni`
 }
 
-export const listFseExports = async (params?: ListFseExportsParams, options?: RequestInit): Promise<FseRecordList> => {
+export const listFseExports = async (params?: ListFseExportsParams, options?: RequestInit): Promise<FseRecordPage> => {
 
-  return customFetch<FseRecordList>(getListFseExportsUrl(params),
+  return customFetch<FseRecordPage>(getListFseExportsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3378,9 +3379,9 @@ export const getListFseExportEventsUrl = (id: number,
 }
 
 export const listFseExportEvents = async (id: number,
-    params?: ListFseExportEventsParams, options?: RequestInit): Promise<FseRecordList> => {
+    params?: ListFseExportEventsParams, options?: RequestInit): Promise<FseRecordPage> => {
 
-  return customFetch<FseRecordList>(getListFseExportEventsUrl(id,params),
+  return customFetch<FseRecordPage>(getListFseExportEventsUrl(id,params),
   {
     ...options,
     method: 'GET'
@@ -3461,9 +3462,9 @@ export const getListFseExportLinesUrl = (id: number,
 }
 
 export const listFseExportLines = async (id: number,
-    params?: ListFseExportLinesParams, options?: RequestInit): Promise<FseRecordList> => {
+    params?: ListFseExportLinesParams, options?: RequestInit): Promise<FseRecordPage> => {
 
-  return customFetch<FseRecordList>(getListFseExportLinesUrl(id,params),
+  return customFetch<FseRecordPage>(getListFseExportLinesUrl(id,params),
   {
     ...options,
     method: 'GET'
@@ -3527,17 +3528,26 @@ export function useListFseExportLines<TData = Awaited<ReturnType<typeof listFseE
 
 
 
-export const getDownloadFseExportUrl = (id: number,) => {
+export const getDownloadFseExportUrl = (id: number,
+    params?: DownloadFseExportParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/fse/exportazioni/${id}/download`
+  return stringifiedParams.length > 0 ? `/api/fse/exportazioni/${id}/download?${stringifiedParams}` : `/api/fse/exportazioni/${id}/download`
 }
 
-export const downloadFseExport = async (id: number, options?: RequestInit): Promise<Blob> => {
+export const downloadFseExport = async (id: number,
+    params?: DownloadFseExportParams, options?: RequestInit): Promise<Blob> => {
 
-  return customFetch<Blob>(getDownloadFseExportUrl(id),
+  return customFetch<Blob>(getDownloadFseExportUrl(id,params),
   {
     ...options,
     method: 'GET'
@@ -3550,23 +3560,25 @@ export const downloadFseExport = async (id: number, options?: RequestInit): Prom
 
 
 
-export const getDownloadFseExportQueryKey = (id: number,) => {
+export const getDownloadFseExportQueryKey = (id: number,
+    params?: DownloadFseExportParams,) => {
     return [
-    `/api/fse/exportazioni/${id}/download`
+    `/api/fse/exportazioni/${id}/download`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getDownloadFseExportQueryOptions = <TData = Awaited<ReturnType<typeof downloadFseExport>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadFseExport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getDownloadFseExportQueryOptions = <TData = Awaited<ReturnType<typeof downloadFseExport>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(id: number,
+    params?: DownloadFseExportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadFseExport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getDownloadFseExportQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getDownloadFseExportQueryKey(id,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadFseExport>>> = ({ signal }) => downloadFseExport(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadFseExport>>> = ({ signal }) => downloadFseExport(id,params, { signal, ...requestOptions });
 
 
 
@@ -3581,11 +3593,12 @@ export type DownloadFseExportQueryError = ErrorType<FseForbiddenResponse | FseNo
 
 
 export function useDownloadFseExport<TData = Awaited<ReturnType<typeof downloadFseExport>>, TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadFseExport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ id: number,
+    params?: DownloadFseExportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadFseExport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getDownloadFseExportQueryOptions(id,options)
+  const queryOptions = getDownloadFseExportQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -3745,9 +3758,9 @@ export const getListFseReconciliationsUrl = (params?: ListFseReconciliationsPara
   return stringifiedParams.length > 0 ? `/api/fse/riconciliazioni?${stringifiedParams}` : `/api/fse/riconciliazioni`
 }
 
-export const listFseReconciliations = async (params?: ListFseReconciliationsParams, options?: RequestInit): Promise<FseRecordList> => {
+export const listFseReconciliations = async (params?: ListFseReconciliationsParams, options?: RequestInit): Promise<FseRecordPage> => {
 
-  return customFetch<FseRecordList>(getListFseReconciliationsUrl(params),
+  return customFetch<FseRecordPage>(getListFseReconciliationsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4308,9 +4321,9 @@ export const getListFseMonitoringUrl = (params?: ListFseMonitoringParams,) => {
   return stringifiedParams.length > 0 ? `/api/fse/monitoraggio?${stringifiedParams}` : `/api/fse/monitoraggio`
 }
 
-export const listFseMonitoring = async (params?: ListFseMonitoringParams, options?: RequestInit): Promise<FseRecordList> => {
+export const listFseMonitoring = async (params?: ListFseMonitoringParams, options?: RequestInit): Promise<FseRecordPage> => {
 
-  return customFetch<FseRecordList>(getListFseMonitoringUrl(params),
+  return customFetch<FseRecordPage>(getListFseMonitoringUrl(params),
   {
     ...options,
     method: 'GET'

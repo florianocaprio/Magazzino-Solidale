@@ -2,17 +2,23 @@ import {
   FseExportInputFormatCode,
   FseResolutionInputAzione,
   getGetFseReconciliationQueryKey,
+  getGetFseExportQueryKey,
   getGetFseReportingPreviewQueryKey,
   getListAgeaImportazioniQueryKey,
   getListFseExportsQueryKey,
+  getListFseMonitoringQueryKey,
   getListFseReportingEventsQueryKey,
   getListFseReportingQualityQueryKey,
   getListFseReconciliationsQueryKey,
   getListFseReconciliationLinesQueryKey,
   useCreateFseExport,
+  useCreateFseMonitoring,
+  useCancelFseExport,
   useCreateFseReconciliation,
   useCloseFseReconciliation,
+  useCancelFseReconciliation,
   useGetFseReconciliation,
+  useGetFseExport,
   useGetFseReportingPreview,
   useListAgeaImportazioni,
   useListFseExports,
@@ -22,6 +28,9 @@ import {
   useListFseReportingEvents,
   useListFseReportingQuality,
   useResolveFseReconciliationLine,
+  useRecalculateFseReconciliation,
+  useMarkFseExportManuallyEntered,
+  useUpdateFseMonitoring,
   type FseRecord,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -46,6 +55,40 @@ export const FSE_OPERATION_TABS = [
   "indicators",
   "anomalies",
 ] as const;
+
+export function fseExportActionAvailability(
+  record: FseRecord,
+  actionText: string,
+) {
+  const state = String(record.stato ?? "");
+  const hasAuditReference = actionText.trim().length >= 3;
+  return {
+    canMarkEntered:
+      state === "PRONTA_PER_INSERIMENTO_MANUALE" &&
+      Number(record.righeBloccanti ?? 0) === 0 &&
+      hasAuditReference,
+    canCancel:
+      !["INSERITA_MANUALMENTE", "ANNULLATA"].includes(state) &&
+      hasAuditReference,
+  };
+}
+
+export function fseResolutionReady(input: {
+  lineId: number | null;
+  action: FseResolutionInputAzione;
+  motivation: string;
+  targetMovementId: string;
+  targetAgeaRowId: string;
+  hasHeader: boolean;
+}) {
+  return (
+    input.lineId != null &&
+    input.motivation.trim().length >= 3 &&
+    input.hasHeader &&
+    (input.action !== FseResolutionInputAzione.ABBINA ||
+      (Number(input.targetMovementId) > 0 && Number(input.targetAgeaRowId) > 0))
+  );
+}
 
 function text(record: FseRecord, key: string): string {
   const value = record[key];
@@ -95,11 +138,22 @@ function RecordList({
               {text(row, "stato")}
             </span>
             {downloadExports && Number(row.id) > 0 && (
-              <Button asChild size="sm" variant="outline">
-                <a href={`/api/fse/exportazioni/${Number(row.id)}/download`}>
-                  {t("fseOperations.download")}
-                </a>
-              </Button>
+              <>
+                <Button asChild size="sm" variant="outline">
+                  <a
+                    href={`/api/fse/exportazioni/${Number(row.id)}/download?representation=FSE_CANONICAL_AUDIT_XLSX_V1`}
+                  >
+                    {t("fseOperations.download")} audit
+                  </a>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <a
+                    href={`/api/fse/exportazioni/${Number(row.id)}/download?representation=SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1`}
+                  >
+                    {t("fseOperations.download")} controllo
+                  </a>
+                </Button>
+              </>
             )}
             {onSelect && Number(row.id) > 0 && (
               <Button
@@ -132,12 +186,19 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
   const params = useMemo(
     () => ({
       magazzinoId: warehouseId,
-      dataDa: filters.da,
-      dataA: filters.a,
+      dataCompetenzaDa: filters.da,
+      dataCompetenzaA: filters.a,
+      includeArretrati: true,
     }),
     [warehouseId, filters.da, filters.a],
   );
   const previewParams = { ...params, dataAsOf: filters.a };
+  const listParams = {
+    magazzinoId: warehouseId,
+    dataCompetenzaDa: filters.da,
+    dataCompetenzaA: filters.a,
+    pageSize: 50,
+  };
   const preview = useGetFseReportingPreview(previewParams, {
     query: {
       enabled,
@@ -150,9 +211,18 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
   const quality = useListFseReportingQuality(params, {
     query: { enabled, queryKey: getListFseReportingQualityQueryKey(params) },
   });
-  const exportsQuery = useListFseExports();
-  const reconciliations = useListFseReconciliations();
-  const monitoring = useListFseMonitoring();
+  const exportsQuery = useListFseExports(listParams, {
+    query: { enabled, queryKey: getListFseExportsQueryKey(listParams) },
+  });
+  const reconciliations = useListFseReconciliations(listParams, {
+    query: {
+      enabled,
+      queryKey: getListFseReconciliationsQueryKey(listParams),
+    },
+  });
+  const monitoring = useListFseMonitoring(listParams, {
+    query: { enabled, queryKey: getListFseMonitoringQueryKey(listParams) },
+  });
   const ageaImports = useListAgeaImportazioni({
     query: {
       enabled: hasPermission("magazzino.fse.reconcile"),
@@ -162,6 +232,14 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
   const [format, setFormat] = useState<FseExportInputFormatCode>(
     FseExportInputFormatCode.FSE_CANONICAL_AUDIT_XLSX_V1,
   );
+  const [selectedExportId, setSelectedExportId] = useState<number | null>(null);
+  const [exportActionText, setExportActionText] = useState("");
+  const selectedExport = useGetFseExport(selectedExportId ?? 0, {
+    query: {
+      enabled: selectedExportId != null,
+      queryKey: getGetFseExportQueryKey(selectedExportId ?? 0),
+    },
+  });
   const [ageaId, setAgeaId] = useState("");
   const [previousAgeaId, setPreviousAgeaId] = useState("");
   const [selectedReconciliationId, setSelectedReconciliationId] = useState<
@@ -173,6 +251,14 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
       FseResolutionInputAzione.ACCETTA_SCOSTAMENTO,
     );
   const [resolutionMotivation, setResolutionMotivation] = useState("");
+  const [targetMovementId, setTargetMovementId] = useState("");
+  const [targetAgeaRowId, setTargetAgeaRowId] = useState("");
+  const [selectedMonitoringId, setSelectedMonitoringId] = useState<
+    number | null
+  >(null);
+  const [monitoringMonth, setMonitoringMonth] = useState(filters.a.slice(0, 7));
+  const [monitoringChannel, setMonitoringChannel] = useState("PACCHI");
+  const [monitoringTotal, setMonitoringTotal] = useState("");
   const selectedReconciliation = useGetFseReconciliation(
     selectedReconciliationId ?? 0,
     {
@@ -218,6 +304,22 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
       },
       onError: failed,
     },
+  });
+  const refreshSelectedExport = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: getListFseExportsQueryKey(),
+    });
+    if (selectedExportId != null)
+      await queryClient.invalidateQueries({
+        queryKey: getGetFseExportQueryKey(selectedExportId),
+      });
+    completed();
+  };
+  const markExport = useMarkFseExportManuallyEntered({
+    mutation: { onSuccess: refreshSelectedExport, onError: failed },
+  });
+  const cancelExport = useCancelFseExport({
+    mutation: { onSuccess: refreshSelectedExport, onError: failed },
   });
   const createReconciliation = useCreateFseReconciliation({
     mutation: {
@@ -265,6 +367,27 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
       onError: failed,
     },
   });
+  const recalculateReconciliation = useRecalculateFseReconciliation({
+    mutation: { onSuccess: refreshSelectedReconciliation, onError: failed },
+  });
+  const cancelReconciliation = useCancelFseReconciliation({
+    mutation: { onSuccess: refreshSelectedReconciliation, onError: failed },
+  });
+  const refreshMonitoring = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: getListFseMonitoringQueryKey(),
+    });
+    completed();
+  };
+  const createMonitoring = useCreateFseMonitoring({
+    mutation: { onSuccess: refreshMonitoring, onError: failed },
+  });
+  const updateMonitoring = useUpdateFseMonitoring({
+    mutation: { onSuccess: refreshMonitoring, onError: failed },
+  });
+  const selectedMonitoring = monitoring.data?.rows.find(
+    (row) => Number(row.id) === selectedMonitoringId,
+  );
 
   return (
     <section
@@ -312,9 +435,18 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
           >
             {t("fseOperations.ageaLink")} <ExternalLink className="h-4 w-4" />
           </a>
+          {hasPermission("magazzino.fse.return") && (
+            <a
+              className="inline-flex items-center gap-2 text-sm text-primary underline md:col-span-3"
+              href="/scarichi"
+            >
+              Registra reso FSE+ verso OpC nel flusso Scarichi
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          )}
         </TabsContent>
         <TabsContent value="queue">
-          <RecordList rows={events.data} />
+          <RecordList rows={events.data?.rows} />
         </TabsContent>
         <TabsContent value="exports" className="grid gap-4 lg:grid-cols-2">
           <Card>
@@ -364,10 +496,11 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                     createExport.mutate({
                       data: {
                         magazzinoId: warehouseId,
-                        dataDa: filters.da,
-                        dataA: filters.a,
+                        dataCompetenzaDa: filters.da,
+                        dataCompetenzaA: filters.a,
                         dataAsOf: filters.a,
                         formatCode: format,
+                        includeArretrati: true,
                       },
                     })
                   }
@@ -390,7 +523,76 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
               <CardTitle>{t("fseOperations.exports")}</CardTitle>
             </CardHeader>
             <CardContent>
-              <RecordList rows={exportsQuery.data} downloadExports />
+              <RecordList
+                rows={exportsQuery.data?.rows}
+                downloadExports
+                selectedId={selectedExportId}
+                onSelect={setSelectedExportId}
+              />
+              {selectedExport.data && (
+                <div className="mt-4 space-y-3 border-t pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    {t("fseOperations.status")}:{" "}
+                    {text(selectedExport.data, "stato")}
+                    {selectedExport.data.legacyReviewRequired === true
+                      ? " · legacy review required"
+                      : ""}
+                  </p>
+                  <Input
+                    placeholder={t("fseOperations.motivation")}
+                    value={exportActionText}
+                    onChange={(event) =>
+                      setExportActionText(event.target.value)
+                    }
+                  />
+                  {hasPermission("magazzino.fse.export") && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        disabled={
+                          !fseExportActionAvailability(
+                            selectedExport.data,
+                            exportActionText,
+                          ).canMarkEntered ||
+                          markExport.isPending
+                        }
+                        onClick={() =>
+                          markExport.mutate({
+                            id: selectedExportId!,
+                            data: {
+                              versione: Number(selectedExport.data?.versione),
+                              data: filters.a,
+                              riferimentoEsterno: exportActionText.trim(),
+                            },
+                          })
+                        }
+                      >
+                        Marca inserita
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        disabled={
+                          !fseExportActionAvailability(
+                            selectedExport.data,
+                            exportActionText,
+                          ).canCancel ||
+                          cancelExport.isPending
+                        }
+                        onClick={() =>
+                          cancelExport.mutate({
+                            id: selectedExportId!,
+                            data: {
+                              versione: Number(selectedExport.data?.versione),
+                              motivazione: exportActionText.trim(),
+                            },
+                          })
+                        }
+                      >
+                        Annulla export
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -457,7 +659,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
             </CardHeader>
             <CardContent>
               <RecordList
-                rows={reconciliations.data}
+                rows={reconciliations.data?.rows}
                 selectedId={selectedReconciliationId}
                 onSelect={(id) => {
                   setSelectedReconciliationId(id);
@@ -491,7 +693,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                   onSelect={setSelectedLineId}
                 />
                 {hasPermission("magazzino.fse.reconcile.manage") && (
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)_auto]">
+                  <div className="grid gap-3 md:grid-cols-2">
                     <select
                       aria-label={t("fseOperations.action")}
                       className="h-10 rounded-md border bg-background px-3 text-sm"
@@ -508,6 +710,28 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                         </option>
                       ))}
                     </select>
+                    {resolutionAction === FseResolutionInputAzione.ABBINA && (
+                      <>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="Movimento locale target"
+                          value={targetMovementId}
+                          onChange={(event) =>
+                            setTargetMovementId(event.target.value)
+                          }
+                        />
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="Riga AGEA target"
+                          value={targetAgeaRowId}
+                          onChange={(event) =>
+                            setTargetAgeaRowId(event.target.value)
+                          }
+                        />
+                      </>
+                    )}
                     <Input
                       aria-label={t("fseOperations.motivation")}
                       placeholder={t("fseOperations.motivation")}
@@ -518,9 +742,14 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                     />
                     <Button
                       disabled={
-                        selectedLineId == null ||
-                        resolutionMotivation.trim().length < 3 ||
-                        !selectedReconciliation.data ||
+                        !fseResolutionReady({
+                          lineId: selectedLineId,
+                          action: resolutionAction,
+                          motivation: resolutionMotivation,
+                          targetMovementId,
+                          targetAgeaRowId,
+                          hasHeader: selectedReconciliation.data != null,
+                        }) ||
                         resolveLine.isPending
                       }
                       onClick={() =>
@@ -533,6 +762,12 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                             ),
                             azione: resolutionAction,
                             motivazione: resolutionMotivation.trim(),
+                            movimentoId: targetMovementId
+                              ? Number(targetMovementId)
+                              : undefined,
+                            importazioneAgeaRigaId: targetAgeaRowId
+                              ? Number(targetAgeaRowId)
+                              : undefined,
                           },
                         })
                       }
@@ -543,6 +778,49 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                 )}
                 {hasPermission("magazzino.fse.reconcile.manage") && (
                   <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={
+                        !selectedReconciliation.data ||
+                        recalculateReconciliation.isPending
+                      }
+                      onClick={() =>
+                        recalculateReconciliation.mutate({
+                          id: selectedReconciliationId,
+                          data: {
+                            versione: Number(
+                              selectedReconciliation.data?.versione,
+                            ),
+                          },
+                        })
+                      }
+                    >
+                      Ricalcola
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      disabled={
+                        !selectedReconciliation.data ||
+                        [
+                          "RICONCILIATA",
+                          "CHIUSA_CON_SCOSTAMENTI",
+                          "ANNULLATA",
+                        ].includes(String(selectedReconciliation.data.stato)) ||
+                        cancelReconciliation.isPending
+                      }
+                      onClick={() =>
+                        cancelReconciliation.mutate({
+                          id: selectedReconciliationId,
+                          data: {
+                            versione: Number(
+                              selectedReconciliation.data?.versione,
+                            ),
+                          },
+                        })
+                      }
+                    >
+                      Annulla riconciliazione
+                    </Button>
                     <Button
                       variant="outline"
                       disabled={
@@ -591,11 +869,91 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
             </Card>
           )}
         </TabsContent>
-        <TabsContent value="indicators">
-          <RecordList rows={monitoring.data} />
+        <TabsContent value="indicators" className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Rilevazione mensile FSE+</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                type="month"
+                value={monitoringMonth}
+                onChange={(event) => setMonitoringMonth(event.target.value)}
+              />
+              <select
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                value={monitoringChannel}
+                onChange={(event) => setMonitoringChannel(event.target.value)}
+              >
+                <option value="PACCHI">PACCHI</option>
+                <option value="MENSA">MENSA</option>
+                <option value="STRADA">STRADA</option>
+              </select>
+              <Input
+                type="number"
+                min={0}
+                placeholder="Totale saltuari (vuoto = non rilevato)"
+                value={monitoringTotal}
+                onChange={(event) => setMonitoringTotal(event.target.value)}
+              />
+              {hasPermission("magazzino.fse.monitoring.manage") && (
+                <Button
+                  disabled={!enabled || !monitoringMonth}
+                  onClick={() => {
+                    if (selectedMonitoring) {
+                      updateMonitoring.mutate({
+                        id: Number(selectedMonitoring.id),
+                        data: {
+                          versione: Number(selectedMonitoring.versione),
+                          totaleSaltuari:
+                            monitoringTotal === ""
+                              ? null
+                              : Number(monitoringTotal),
+                        },
+                      });
+                    } else {
+                      createMonitoring.mutate({
+                        data: {
+                          magazzinoId: warehouseId,
+                          annoMese: monitoringMonth,
+                          canaleUfficiale: monitoringChannel as
+                            | "PACCHI"
+                            | "MENSA"
+                            | "STRADA",
+                          dataRiferimento: `${monitoringMonth}-01`,
+                          fonte: "RILEVAZIONE_MANUALE_VERIFICATA",
+                          completezza: "PARZIALE",
+                          totaleSaltuari:
+                            monitoringTotal === ""
+                              ? null
+                              : Number(monitoringTotal),
+                        },
+                      });
+                    }
+                  }}
+                >
+                  {selectedMonitoring
+                    ? "Aggiorna versione"
+                    : "Crea rilevazione"}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("fseOperations.indicators")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RecordList
+                rows={monitoring.data?.rows}
+                selectedId={selectedMonitoringId}
+                onSelect={setSelectedMonitoringId}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="anomalies">
-          <RecordList rows={quality.data} />
+          <RecordList rows={quality.data?.rows} />
         </TabsContent>
       </Tabs>
     </section>

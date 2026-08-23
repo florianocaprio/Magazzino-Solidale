@@ -215,6 +215,15 @@ tabella di saldo e non modifica la contabilità 2.0A/2.0B. Applicarlo tramite il
 Migration Ledger dopo backup e preflight; verificare poi zero pending e
 riavviare soltanto la nuova versione applicativa. Dettagli:
 
+Il correttivo append-only R1 è
+`20260825_magazzino_2_0c_r1_reporting_hardening.sql`: completa snapshot di
+indicatori/saldi, copertura amministrativa, request hash/idempotenza, saldi di
+riconciliazione e audit delle risoluzioni. La migration 2.0C precedente e il
+manifest storico restano immutati. Gli export pre-R1 sono classificati
+conservativamente `LEGACY_2_0C_REVIEW_REQUIRED`. La coda distingue competenza,
+arretrati e copertura; i download canonico e osservato derivano dal medesimo
+snapshot immutabile. Il formato esterno resta `EXTERNAL_FORMAT_UNVERIFIED`.
+
 - [rendicontazione ed export FSE+](docs/magazzino-2.0c-fse-reporting.md);
 - [riconciliazione AGEA/SIFEAD](docs/magazzino-2.0c-reconciliation.md);
 - [modello reporting](docs/magazzino-2.0c-reporting-model.md);

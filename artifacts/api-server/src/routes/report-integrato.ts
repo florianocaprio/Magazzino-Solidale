@@ -42,15 +42,23 @@ export function requireSourceArea(...areas: string[]): RequestHandler {
       res.status(401).json({ error: "Non autenticato" });
       return;
     }
-    if (req.user.isAdmin || areas.some((area) => req.user?.aree.includes(area))) {
+    if (
+      req.user.isAdmin ||
+      areas.some((area) => req.user?.aree.includes(area))
+    ) {
       next();
       return;
     }
-    res.status(403).json({ error: "Area sorgente non consentita per il ruolo" });
+    res
+      .status(403)
+      .json({ error: "Area sorgente non consentita per il ruolo" });
   };
 }
 
-function sendError(error: unknown, res: { status: (code: number) => { json: (body: unknown) => void } }): boolean {
+function sendError(
+  error: unknown,
+  res: { status: (code: number) => { json: (body: unknown) => void } },
+): boolean {
   if (!(error instanceof ReportingError)) return false;
   res.status(error.status).json({ error: error.message });
   return true;
@@ -133,15 +141,36 @@ router.get(
 );
 router.get(
   "/report/fse-plus/integrato",
-  requireSourceArea("sociale", "emporio", "mensa", "uds", "magazzino", "logistica"),
-  requireAnyModulo(["MAGAZZINO_SOLIDALE", "BOLLE", "EMPORIO_SOLIDALE", "MENSA", "UDS"]),
+  requirePermission("magazzino.fse.view"),
+  requireSourceArea(
+    "sociale",
+    "emporio",
+    "mensa",
+    "uds",
+    "magazzino",
+    "logistica",
+  ),
+  requireAnyModulo([
+    "MAGAZZINO_SOLIDALE",
+    "BOLLE",
+    "EMPORIO_SOLIDALE",
+    "MENSA",
+    "UDS",
+  ]),
   reportHandler(buildFsePlusReport),
 );
 
 router.get("/report/filter-options", async (req, res) => {
   try {
     const section = String(req.query.section ?? "") as ReportSection;
-    if (!sections.has(section)) throw new ReportingError(400, "section non valida");
+    if (!sections.has(section))
+      throw new ReportingError(400, "section non valida");
+    if (
+      section === "fse-plus" &&
+      !req.user?.isAdmin &&
+      !req.user?.permessi.includes("magazzino.fse.view")
+    )
+      throw new ReportingError(403, "Permesso magazzino.fse.view richiesto");
     if (
       section === "uds" &&
       !req.user?.isAdmin &&
@@ -150,14 +179,30 @@ router.get("/report/filter-options", async (req, res) => {
       throw new ReportingError(403, "Permesso uds.reports.view richiesto");
     }
     const rawAreaOperativaId = req.query.areaOperativaId;
-    const requestedAreaOperativaId = rawAreaOperativaId == null || rawAreaOperativaId === "" ? null : Number(rawAreaOperativaId);
-    if (requestedAreaOperativaId != null && (!Number.isInteger(requestedAreaOperativaId) || requestedAreaOperativaId <= 0)) {
+    const requestedAreaOperativaId =
+      rawAreaOperativaId == null || rawAreaOperativaId === ""
+        ? null
+        : Number(rawAreaOperativaId);
+    if (
+      requestedAreaOperativaId != null &&
+      (!Number.isInteger(requestedAreaOperativaId) ||
+        requestedAreaOperativaId <= 0)
+    ) {
       throw new ReportingError(400, "areaOperativaId non valido");
     }
-    if (req.user?.areaOperativaId != null && requestedAreaOperativaId != null && req.user.areaOperativaId !== requestedAreaOperativaId) {
-      throw new ReportingError(403, "La area operativa richiesta è fuori dal perimetro del ruolo");
+    if (
+      req.user?.areaOperativaId != null &&
+      requestedAreaOperativaId != null &&
+      req.user.areaOperativaId !== requestedAreaOperativaId
+    ) {
+      throw new ReportingError(
+        403,
+        "La area operativa richiesta è fuori dal perimetro del ruolo",
+      );
     }
-    res.json(await buildReportFilterOptions(req, section, requestedAreaOperativaId));
+    res.json(
+      await buildReportFilterOptions(req, section, requestedAreaOperativaId),
+    );
   } catch (error) {
     if (sendError(error, res)) return;
     throw error;
@@ -168,8 +213,16 @@ router.get("/report/drilldown", async (req, res) => {
   try {
     const section = String(req.query.section ?? "") as ReportSection;
     const metric = String(req.query.metric ?? "").trim();
-    if (!sections.has(section)) throw new ReportingError(400, "section non valida");
-    if (!metric || metric.length > 80) throw new ReportingError(400, "metric non valida");
+    if (!sections.has(section))
+      throw new ReportingError(400, "section non valida");
+    if (
+      section === "fse-plus" &&
+      !req.user?.isAdmin &&
+      !req.user?.permessi.includes("magazzino.fse.view")
+    )
+      throw new ReportingError(403, "Permesso magazzino.fse.view richiesto");
+    if (!metric || metric.length > 80)
+      throw new ReportingError(400, "metric non valida");
     const requiredModule: Partial<Record<ReportSection, string>> = {
       pacchi: "MAGAZZINO_SOLIDALE",
       "centro-ascolto": "CENTRO_ASCOLTO",
@@ -209,7 +262,10 @@ router.get("/report/drilldown", async (req, res) => {
       !req.user?.isAdmin &&
       !allowedAreas.some((area) => req.user?.aree.includes(area))
     ) {
-      throw new ReportingError(403, "Area sorgente non consentita per il ruolo");
+      throw new ReportingError(
+        403,
+        "Area sorgente non consentita per il ruolo",
+      );
     }
     const filters = parseReportFilters(req);
     const pagination = parsePagination(req);

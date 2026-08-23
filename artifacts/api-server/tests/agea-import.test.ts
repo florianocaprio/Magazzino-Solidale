@@ -20,6 +20,8 @@ import {
   movimentiTable,
   pool,
   prodottiTable,
+  riconciliazioniFseRigheTable,
+  riconciliazioniFseTable,
   systemLogsTable,
   utentiTable,
 } from "@workspace/db";
@@ -33,6 +35,7 @@ import {
 import { AGEA_XLSX_MIME, parseAgeaWorkbook } from "../src/lib/ageaSifeadParser";
 import { InventoryDecimal } from "../src/lib/inventoryDecimal";
 import { createWarehouseLoad } from "../src/lib/inventoryLedger";
+import { calculateFseReconciliation } from "../src/lib/fseReconciliation";
 
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 let app: Express;
@@ -46,6 +49,7 @@ let foreignAreaId: number;
 let productId: number;
 let originalLotti = true;
 let acceptanceWarehouseId: number | null = null;
+let acceptanceReconciliationId: number | null = null;
 let manyToOneWarehouseId: number | null = null;
 const concurrencyWarehouseIds: number[] = [];
 let acceptanceProductIds: number[] = [];
@@ -422,6 +426,19 @@ afterAll(async () => {
       .where(eq(magazziniTable.id, manyToOneWarehouseId));
   }
   if (acceptanceWarehouseId != null) {
+    if (acceptanceReconciliationId != null) {
+      await db
+        .delete(riconciliazioniFseRigheTable)
+        .where(
+          eq(
+            riconciliazioniFseRigheTable.riconciliazioneId,
+            acceptanceReconciliationId,
+          ),
+        );
+      await db
+        .delete(riconciliazioniFseTable)
+        .where(eq(riconciliazioniFseTable.id, acceptanceReconciliationId));
+    }
     const acceptanceImports = await db
       .select({ id: importazioniAgeaTable.id })
       .from(importazioniAgeaTable)
@@ -1837,6 +1854,29 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
           .from(movimentiTable)
           .where(eq(movimentiTable.magazzinoId, acceptanceWarehouseId)),
       ).toHaveLength(7);
+
+      const reconciliation = await calculateFseReconciliation({
+        magazzinoId: acceptanceWarehouseId,
+        importazioneAgeaId: analyzed.body.id,
+        dataRiferimento: parsed.dataRiferimento,
+        creatoDa: userId,
+      });
+      acceptanceReconciliationId = reconciliation.reconciliation.id;
+      expect(
+        reconciliation.rows.filter(
+          (row) => row.status === "BASELINE_ASSORBITA",
+        ),
+      ).toHaveLength(80);
+      expect(
+        reconciliation.rows.filter(
+          (row) => row.tipoRiga === "SALDO_PARTITA",
+        ),
+      ).toHaveLength(7);
+      expect(
+        reconciliation.rows.filter(
+          (row) => row.status === "SOLO_AGEA" && row.tipoRiga === "CARICO",
+        ),
+      ).toHaveLength(0);
     },
   );
 

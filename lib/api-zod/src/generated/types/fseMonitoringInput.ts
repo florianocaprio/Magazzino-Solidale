@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FseMonitoringInputCanaleUfficiale } from './fseMonitoringInputCanaleUfficiale';
+import type { FseMonitoringInputCompletezza } from './fseMonitoringInputCompletezza';
+import type { FseMonitoringInputFonte } from './fseMonitoringInputFonte';
 
 export interface FseMonitoringInput {
   /** @minimum 1 */
@@ -14,5 +16,12 @@ export interface FseMonitoringInput {
   annoMese: string;
   canaleUfficiale: FseMonitoringInputCanaleUfficiale;
   dataRiferimento: Date;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  operazioneDistribuzioneId?: number | null;
+  fonte: FseMonitoringInputFonte;
+  completezza: FseMonitoringInputCompletezza;
   [key: string]: unknown;
  }

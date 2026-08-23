@@ -13,6 +13,20 @@ export interface FseRecord { [key: string]: unknown }
 
 export type FseRecordList = FseRecord[];
 
+export interface FseRecordPage {
+  /** @minimum 1 */
+  page: number;
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  pageSize: number;
+  /** @minimum 0 */
+  total: number;
+  rows: FseRecordList;
+  summary?: FseRecord;
+}
+
 export interface FseReconciliationRowsPage {
   /** @minimum 1 */
   page: number;
@@ -21,6 +35,8 @@ export interface FseReconciliationRowsPage {
      * @maximum 200
      */
   pageSize: number;
+  /** @minimum 0 */
+  total: number;
   rows: FseRecordList;
 }
 
@@ -35,14 +51,15 @@ export const FseExportInputFormatCode = {
 export interface FseExportInput {
   /** @minimum 1 */
   magazzinoId: number;
-  dataDa: string;
-  dataA: string;
+  dataCompetenzaDa: string;
+  dataCompetenzaA: string;
   dataAsOf: string;
   formatCode: FseExportInputFormatCode;
   /** @minimum 1 */
   maxMovimentoId?: number;
   /** @minimum 1 */
   maxOperazioneDistribuzioneId?: number;
+  includeArretrati?: boolean;
 }
 
 export interface FseVersionInput {
@@ -120,6 +137,10 @@ export interface FseResolutionInput {
      * @maxLength 500
      */
   motivazione: string;
+  /** @minimum 1 */
+  movimentoId?: number;
+  /** @minimum 1 */
+  importazioneAgeaRigaId?: number;
 }
 
 export type FseMonitoringInputCanaleUfficiale = typeof FseMonitoringInputCanaleUfficiale[keyof typeof FseMonitoringInputCanaleUfficiale];
@@ -131,6 +152,22 @@ export const FseMonitoringInputCanaleUfficiale = {
   STRADA: 'STRADA',
 } as const;
 
+export type FseMonitoringInputFonte = typeof FseMonitoringInputFonte[keyof typeof FseMonitoringInputFonte];
+
+
+export const FseMonitoringInputFonte = {
+  RILEVAZIONE_MANUALE_VERIFICATA: 'RILEVAZIONE_MANUALE_VERIFICATA',
+  DERIVAZIONE_STRUTTURATA: 'DERIVAZIONE_STRUTTURATA',
+} as const;
+
+export type FseMonitoringInputCompletezza = typeof FseMonitoringInputCompletezza[keyof typeof FseMonitoringInputCompletezza];
+
+
+export const FseMonitoringInputCompletezza = {
+  PARZIALE: 'PARZIALE',
+  COMPLETA: 'COMPLETA',
+} as const;
+
 export interface FseMonitoringInput {
   /** @minimum 1 */
   magazzinoId: number;
@@ -138,6 +175,13 @@ export interface FseMonitoringInput {
   annoMese: string;
   canaleUfficiale: FseMonitoringInputCanaleUfficiale;
   dataRiferimento: string;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  operazioneDistribuzioneId?: number | null;
+  fonte: FseMonitoringInputFonte;
+  completezza: FseMonitoringInputCompletezza;
   [key: string]: unknown;
  }
 
@@ -6949,15 +6993,50 @@ export type AgeaUnsupportedMediaTypeResponse = AgeaErrorResponse;
 
 export type FseMagazzinoIdParameter = number;
 
+export type FseOptionalMagazzinoIdParameter = number;
+
+export type FseOptionalDataDaParameter = string;
+
+export type FseOptionalDataAParameter = string;
+
+export type FseOptionalStatoParameter = string;
+
 export type FseDataDaParameter = string;
 
 export type FseDataAParameter = string;
 
 export type FseDataAsOfParameter = string;
 
+export type FseIncludeArretratiParameter = boolean;
+
 export type FsePageParameter = number;
 
 export type FsePageSizeParameter = number;
+
+export type FseQueueStatoParameter = typeof FseQueueStatoParameter[keyof typeof FseQueueStatoParameter];
+
+
+export const FseQueueStatoParameter = {
+  DA_RENDICONTARE: 'DA_RENDICONTARE',
+  ARRETRATO_NON_RENDICONTATO: 'ARRETRATO_NON_RENDICONTATO',
+  BLOCCATO: 'BLOCCATO',
+} as const;
+
+export type FseQueueCanaleParameter = string;
+
+export type FseQueueFondoParameter = string;
+
+export type FseQueueProdottoIdParameter = number;
+
+export type FseQueueQualityCodeParameter = string;
+
+export type FseDownloadRepresentationParameter = typeof FseDownloadRepresentationParameter[keyof typeof FseDownloadRepresentationParameter];
+
+
+export const FseDownloadRepresentationParameter = {
+  FSE_CANONICAL_AUDIT_XLSX_V1: 'FSE_CANONICAL_AUDIT_XLSX_V1',
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1: 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1',
+} as const;
 
 /**
  * Pagina richiesta, indicizzata da 1
@@ -7063,9 +7142,10 @@ export type GetFseReportingPreviewParams = {
  * @minimum 1
  */
 magazzinoId: FseMagazzinoIdParameter;
-dataDa: FseDataDaParameter;
-dataA: FseDataAParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
 dataAsOf?: FseDataAsOfParameter;
+includeArretrati?: FseIncludeArretratiParameter;
 };
 
 export type ListFseReportingEventsParams = {
@@ -7073,8 +7153,9 @@ export type ListFseReportingEventsParams = {
  * @minimum 1
  */
 magazzinoId: FseMagazzinoIdParameter;
-dataDa: FseDataDaParameter;
-dataA: FseDataAParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
+includeArretrati?: FseIncludeArretratiParameter;
 /**
  * @minimum 1
  */
@@ -7084,6 +7165,14 @@ page?: FsePageParameter;
  * @maximum 200
  */
 pageSize?: FsePageSizeParameter;
+statoRendicontazione?: FseQueueStatoParameter;
+canale?: FseQueueCanaleParameter;
+fondo?: FseQueueFondoParameter;
+/**
+ * @minimum 1
+ */
+prodottoId?: FseQueueProdottoIdParameter;
+qualityCode?: FseQueueQualityCodeParameter;
 };
 
 export type ListFseReportingLinesParams = {
@@ -7091,8 +7180,9 @@ export type ListFseReportingLinesParams = {
  * @minimum 1
  */
 magazzinoId: FseMagazzinoIdParameter;
-dataDa: FseDataDaParameter;
-dataA: FseDataAParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
+includeArretrati?: FseIncludeArretratiParameter;
 /**
  * @minimum 1
  */
@@ -7102,6 +7192,14 @@ page?: FsePageParameter;
  * @maximum 200
  */
 pageSize?: FsePageSizeParameter;
+statoRendicontazione?: FseQueueStatoParameter;
+canale?: FseQueueCanaleParameter;
+fondo?: FseQueueFondoParameter;
+/**
+ * @minimum 1
+ */
+prodottoId?: FseQueueProdottoIdParameter;
+qualityCode?: FseQueueQualityCodeParameter;
 };
 
 export type ListFseReportingQualityParams = {
@@ -7109,8 +7207,9 @@ export type ListFseReportingQualityParams = {
  * @minimum 1
  */
 magazzinoId: FseMagazzinoIdParameter;
-dataDa: FseDataDaParameter;
-dataA: FseDataAParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
+includeArretrati?: FseIncludeArretratiParameter;
 /**
  * @minimum 1
  */
@@ -7120,6 +7219,14 @@ page?: FsePageParameter;
  * @maximum 200
  */
 pageSize?: FsePageSizeParameter;
+statoRendicontazione?: FseQueueStatoParameter;
+canale?: FseQueueCanaleParameter;
+fondo?: FseQueueFondoParameter;
+/**
+ * @minimum 1
+ */
+prodottoId?: FseQueueProdottoIdParameter;
+qualityCode?: FseQueueQualityCodeParameter;
 };
 
 export type ListFseExportsParams = {
@@ -7132,6 +7239,16 @@ page?: FsePageParameter;
  * @maximum 200
  */
 pageSize?: FsePageSizeParameter;
+/**
+ * @minimum 1
+ */
+magazzinoId?: FseOptionalMagazzinoIdParameter;
+dataCompetenzaDa?: FseOptionalDataDaParameter;
+dataCompetenzaA?: FseOptionalDataAParameter;
+/**
+ * @maxLength 60
+ */
+stato?: FseOptionalStatoParameter;
 };
 
 export type ListFseExportEventsParams = {
@@ -7158,6 +7275,13 @@ page?: FsePageParameter;
 pageSize?: FsePageSizeParameter;
 };
 
+export type DownloadFseExportParams = {
+/**
+ * Rappresentazione derivata dallo stesso snapshot immutabile
+ */
+representation?: FseDownloadRepresentationParameter;
+};
+
 export type ListFseReconciliationsParams = {
 /**
  * @minimum 1
@@ -7168,6 +7292,16 @@ page?: FsePageParameter;
  * @maximum 200
  */
 pageSize?: FsePageSizeParameter;
+/**
+ * @minimum 1
+ */
+magazzinoId?: FseOptionalMagazzinoIdParameter;
+dataCompetenzaDa?: FseOptionalDataDaParameter;
+dataCompetenzaA?: FseOptionalDataAParameter;
+/**
+ * @maxLength 60
+ */
+stato?: FseOptionalStatoParameter;
 };
 
 export type ListFseReconciliationLinesParams = {
@@ -7192,6 +7326,12 @@ page?: FsePageParameter;
  * @maximum 200
  */
 pageSize?: FsePageSizeParameter;
+/**
+ * @minimum 1
+ */
+magazzinoId?: FseOptionalMagazzinoIdParameter;
+dataCompetenzaDa?: FseOptionalDataDaParameter;
+dataCompetenzaA?: FseOptionalDataAParameter;
 };
 
 export type ListLottiParams = {

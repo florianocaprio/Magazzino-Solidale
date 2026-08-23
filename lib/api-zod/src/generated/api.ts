@@ -1327,19 +1327,21 @@ export const UpdateAgeaMappaturaProdottoResponse = zod.object({
  * @summary Preview canonica FSE+ con cutoff immutabile
  */
 
-
+export const getFseReportingPreviewQueryIncludeArretratiDefault = true;
 
 export const GetFseReportingPreviewQueryParams = zod.object({
   "magazzinoId": zod.coerce.number().min(1),
-  "dataDa": zod.date(),
-  "dataA": zod.date(),
-  "dataAsOf": zod.date().optional()
+  "dataCompetenzaDa": zod.date(),
+  "dataCompetenzaA": zod.date(),
+  "dataAsOf": zod.date().optional(),
+  "includeArretrati": zod.coerce.boolean().default(getFseReportingPreviewQueryIncludeArretratiDefault)
 })
 
 export const GetFseReportingPreviewResponse = zod.record(zod.string(), zod.unknown())
 
 
 
+export const listFseReportingEventsQueryIncludeArretratiDefault = true;
 export const listFseReportingEventsQueryPageDefault = 1;
 
 export const listFseReportingEventsQueryPageSizeDefault = 50;
@@ -1347,19 +1349,39 @@ export const listFseReportingEventsQueryPageSizeMax = 200;
 
 
 
+
 export const ListFseReportingEventsQueryParams = zod.object({
   "magazzinoId": zod.coerce.number().min(1),
-  "dataDa": zod.date(),
-  "dataA": zod.date(),
+  "dataCompetenzaDa": zod.date(),
+  "dataCompetenzaA": zod.date(),
+  "includeArretrati": zod.coerce.boolean().default(listFseReportingEventsQueryIncludeArretratiDefault),
   "page": zod.coerce.number().min(1).default(listFseReportingEventsQueryPageDefault),
-  "pageSize": zod.coerce.number().min(1).max(listFseReportingEventsQueryPageSizeMax).default(listFseReportingEventsQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().min(1).max(listFseReportingEventsQueryPageSizeMax).default(listFseReportingEventsQueryPageSizeDefault),
+  "statoRendicontazione": zod.enum(['DA_RENDICONTARE', 'ARRETRATO_NON_RENDICONTATO', 'BLOCCATO']).optional(),
+  "canale": zod.coerce.string().optional(),
+  "fondo": zod.coerce.string().optional(),
+  "prodottoId": zod.coerce.number().min(1).optional(),
+  "qualityCode": zod.coerce.string().optional()
 })
 
-export const ListFseReportingEventsResponseItem = zod.record(zod.string(), zod.unknown())
-export const ListFseReportingEventsResponse = zod.array(ListFseReportingEventsResponseItem)
+
+export const listFseReportingEventsResponsePageSizeMax = 200;
+
+export const listFseReportingEventsResponseTotalMin = 0;
 
 
 
+export const ListFseReportingEventsResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReportingEventsResponsePageSizeMax),
+  "total": zod.number().min(listFseReportingEventsResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+
+export const listFseReportingLinesQueryIncludeArretratiDefault = true;
 export const listFseReportingLinesQueryPageDefault = 1;
 
 export const listFseReportingLinesQueryPageSizeDefault = 50;
@@ -1367,19 +1389,39 @@ export const listFseReportingLinesQueryPageSizeMax = 200;
 
 
 
+
 export const ListFseReportingLinesQueryParams = zod.object({
   "magazzinoId": zod.coerce.number().min(1),
-  "dataDa": zod.date(),
-  "dataA": zod.date(),
+  "dataCompetenzaDa": zod.date(),
+  "dataCompetenzaA": zod.date(),
+  "includeArretrati": zod.coerce.boolean().default(listFseReportingLinesQueryIncludeArretratiDefault),
   "page": zod.coerce.number().min(1).default(listFseReportingLinesQueryPageDefault),
-  "pageSize": zod.coerce.number().min(1).max(listFseReportingLinesQueryPageSizeMax).default(listFseReportingLinesQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().min(1).max(listFseReportingLinesQueryPageSizeMax).default(listFseReportingLinesQueryPageSizeDefault),
+  "statoRendicontazione": zod.enum(['DA_RENDICONTARE', 'ARRETRATO_NON_RENDICONTATO', 'BLOCCATO']).optional(),
+  "canale": zod.coerce.string().optional(),
+  "fondo": zod.coerce.string().optional(),
+  "prodottoId": zod.coerce.number().min(1).optional(),
+  "qualityCode": zod.coerce.string().optional()
 })
 
-export const ListFseReportingLinesResponseItem = zod.record(zod.string(), zod.unknown())
-export const ListFseReportingLinesResponse = zod.array(ListFseReportingLinesResponseItem)
+
+export const listFseReportingLinesResponsePageSizeMax = 200;
+
+export const listFseReportingLinesResponseTotalMin = 0;
 
 
 
+export const ListFseReportingLinesResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReportingLinesResponsePageSizeMax),
+  "total": zod.number().min(listFseReportingLinesResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+
+export const listFseReportingQualityQueryIncludeArretratiDefault = true;
 export const listFseReportingQualityQueryPageDefault = 1;
 
 export const listFseReportingQualityQueryPageSizeDefault = 50;
@@ -1387,16 +1429,35 @@ export const listFseReportingQualityQueryPageSizeMax = 200;
 
 
 
+
 export const ListFseReportingQualityQueryParams = zod.object({
   "magazzinoId": zod.coerce.number().min(1),
-  "dataDa": zod.date(),
-  "dataA": zod.date(),
+  "dataCompetenzaDa": zod.date(),
+  "dataCompetenzaA": zod.date(),
+  "includeArretrati": zod.coerce.boolean().default(listFseReportingQualityQueryIncludeArretratiDefault),
   "page": zod.coerce.number().min(1).default(listFseReportingQualityQueryPageDefault),
-  "pageSize": zod.coerce.number().min(1).max(listFseReportingQualityQueryPageSizeMax).default(listFseReportingQualityQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().min(1).max(listFseReportingQualityQueryPageSizeMax).default(listFseReportingQualityQueryPageSizeDefault),
+  "statoRendicontazione": zod.enum(['DA_RENDICONTARE', 'ARRETRATO_NON_RENDICONTATO', 'BLOCCATO']).optional(),
+  "canale": zod.coerce.string().optional(),
+  "fondo": zod.coerce.string().optional(),
+  "prodottoId": zod.coerce.number().min(1).optional(),
+  "qualityCode": zod.coerce.string().optional()
 })
 
-export const ListFseReportingQualityResponseItem = zod.record(zod.string(), zod.unknown())
-export const ListFseReportingQualityResponse = zod.array(ListFseReportingQualityResponseItem)
+
+export const listFseReportingQualityResponsePageSizeMax = 200;
+
+export const listFseReportingQualityResponseTotalMin = 0;
+
+
+
+export const ListFseReportingQualityResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReportingQualityResponsePageSizeMax),
+  "total": zod.number().min(listFseReportingQualityResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
 
 
 export const listFseExportsQueryPageDefault = 1;
@@ -1405,29 +1466,49 @@ export const listFseExportsQueryPageSizeDefault = 50;
 export const listFseExportsQueryPageSizeMax = 200;
 
 
+export const listFseExportsQueryStatoMax = 60;
+
+
 
 export const ListFseExportsQueryParams = zod.object({
   "page": zod.coerce.number().min(1).default(listFseExportsQueryPageDefault),
-  "pageSize": zod.coerce.number().min(1).max(listFseExportsQueryPageSizeMax).default(listFseExportsQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().min(1).max(listFseExportsQueryPageSizeMax).default(listFseExportsQueryPageSizeDefault),
+  "magazzinoId": zod.coerce.number().min(1).optional(),
+  "dataCompetenzaDa": zod.date().optional(),
+  "dataCompetenzaA": zod.date().optional(),
+  "stato": zod.coerce.string().max(listFseExportsQueryStatoMax).optional()
 })
 
-export const ListFseExportsResponseItem = zod.record(zod.string(), zod.unknown())
-export const ListFseExportsResponse = zod.array(ListFseExportsResponseItem)
+
+export const listFseExportsResponsePageSizeMax = 200;
+
+export const listFseExportsResponseTotalMin = 0;
+
+
+
+export const ListFseExportsResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseExportsResponsePageSizeMax),
+  "total": zod.number().min(listFseExportsResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
 
 
 
 
 
-
+export const createFseExportBodyIncludeArretratiDefault = true;
 
 export const CreateFseExportBody = zod.object({
   "magazzinoId": zod.number().min(1),
-  "dataDa": zod.coerce.date(),
-  "dataA": zod.coerce.date(),
+  "dataCompetenzaDa": zod.coerce.date(),
+  "dataCompetenzaA": zod.coerce.date(),
   "dataAsOf": zod.coerce.date(),
   "formatCode": zod.enum(['FSE_CANONICAL_AUDIT_XLSX_V1', 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1']),
   "maxMovimentoId": zod.number().min(1).optional(),
-  "maxOperazioneDistribuzioneId": zod.number().min(1).optional()
+  "maxOperazioneDistribuzioneId": zod.number().min(1).optional(),
+  "includeArretrati": zod.boolean().default(createFseExportBodyIncludeArretratiDefault)
 })
 
 
@@ -1454,8 +1535,20 @@ export const ListFseExportEventsQueryParams = zod.object({
   "pageSize": zod.coerce.number().min(1).max(listFseExportEventsQueryPageSizeMax).default(listFseExportEventsQueryPageSizeDefault)
 })
 
-export const ListFseExportEventsResponseItem = zod.record(zod.string(), zod.unknown())
-export const ListFseExportEventsResponse = zod.array(ListFseExportEventsResponseItem)
+
+export const listFseExportEventsResponsePageSizeMax = 200;
+
+export const listFseExportEventsResponseTotalMin = 0;
+
+
+
+export const ListFseExportEventsResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseExportEventsResponsePageSizeMax),
+  "total": zod.number().min(listFseExportEventsResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
 
 
 export const ListFseExportLinesParams = zod.object({
@@ -1474,12 +1567,28 @@ export const ListFseExportLinesQueryParams = zod.object({
   "pageSize": zod.coerce.number().min(1).max(listFseExportLinesQueryPageSizeMax).default(listFseExportLinesQueryPageSizeDefault)
 })
 
-export const ListFseExportLinesResponseItem = zod.record(zod.string(), zod.unknown())
-export const ListFseExportLinesResponse = zod.array(ListFseExportLinesResponseItem)
+
+export const listFseExportLinesResponsePageSizeMax = 200;
+
+export const listFseExportLinesResponseTotalMin = 0;
+
+
+
+export const ListFseExportLinesResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseExportLinesResponsePageSizeMax),
+  "total": zod.number().min(listFseExportLinesResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
 
 
 export const DownloadFseExportParams = zod.object({
   "id": zod.coerce.number()
+})
+
+export const DownloadFseExportQueryParams = zod.object({
+  "representation": zod.enum(['FSE_CANONICAL_AUDIT_XLSX_V1', 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1']).optional().describe('Rappresentazione derivata dallo stesso snapshot immutabile')
 })
 
 
@@ -1526,14 +1635,33 @@ export const listFseReconciliationsQueryPageSizeDefault = 50;
 export const listFseReconciliationsQueryPageSizeMax = 200;
 
 
+export const listFseReconciliationsQueryStatoMax = 60;
+
+
 
 export const ListFseReconciliationsQueryParams = zod.object({
   "page": zod.coerce.number().min(1).default(listFseReconciliationsQueryPageDefault),
-  "pageSize": zod.coerce.number().min(1).max(listFseReconciliationsQueryPageSizeMax).default(listFseReconciliationsQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().min(1).max(listFseReconciliationsQueryPageSizeMax).default(listFseReconciliationsQueryPageSizeDefault),
+  "magazzinoId": zod.coerce.number().min(1).optional(),
+  "dataCompetenzaDa": zod.date().optional(),
+  "dataCompetenzaA": zod.date().optional(),
+  "stato": zod.coerce.string().max(listFseReconciliationsQueryStatoMax).optional()
 })
 
-export const ListFseReconciliationsResponseItem = zod.record(zod.string(), zod.unknown())
-export const ListFseReconciliationsResponse = zod.array(ListFseReconciliationsResponseItem)
+
+export const listFseReconciliationsResponsePageSizeMax = 200;
+
+export const listFseReconciliationsResponseTotalMin = 0;
+
+
+
+export const ListFseReconciliationsResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseReconciliationsResponsePageSizeMax),
+  "total": zod.number().min(listFseReconciliationsResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
 
 
 
@@ -1579,11 +1707,14 @@ export const ListFseReconciliationLinesQueryParams = zod.object({
 
 export const listFseReconciliationLinesResponsePageSizeMax = 200;
 
+export const listFseReconciliationLinesResponseTotalMin = 0;
+
 
 
 export const ListFseReconciliationLinesResponse = zod.object({
   "page": zod.number().min(1),
   "pageSize": zod.number().min(1).max(listFseReconciliationLinesResponsePageSizeMax),
+  "total": zod.number().min(listFseReconciliationLinesResponseTotalMin),
   "rows": zod.array(zod.record(zod.string(), zod.unknown()))
 })
 
@@ -1623,10 +1754,14 @@ export const resolveFseReconciliationLineBodyMotivazioneMax = 500;
 
 
 
+
+
 export const ResolveFseReconciliationLineBody = zod.object({
   "versione": zod.number().min(1),
   "azione": zod.enum(['ABBINA', 'DISABBINA', 'ACCETTA_SCOSTAMENTO', 'SEGNALA_DA_CORREGGERE', 'RIAPRI']),
-  "motivazione": zod.string().min(resolveFseReconciliationLineBodyMotivazioneMin).max(resolveFseReconciliationLineBodyMotivazioneMax)
+  "motivazione": zod.string().min(resolveFseReconciliationLineBodyMotivazioneMin).max(resolveFseReconciliationLineBodyMotivazioneMax),
+  "movimentoId": zod.number().min(1).optional(),
+  "importazioneAgeaRigaId": zod.number().min(1).optional()
 })
 
 export const ResolveFseReconciliationLineResponse = zod.record(zod.string(), zod.unknown())
@@ -1687,24 +1822,44 @@ export const listFseMonitoringQueryPageSizeMax = 200;
 
 
 
+
 export const ListFseMonitoringQueryParams = zod.object({
   "page": zod.coerce.number().min(1).default(listFseMonitoringQueryPageDefault),
-  "pageSize": zod.coerce.number().min(1).max(listFseMonitoringQueryPageSizeMax).default(listFseMonitoringQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().min(1).max(listFseMonitoringQueryPageSizeMax).default(listFseMonitoringQueryPageSizeDefault),
+  "magazzinoId": zod.coerce.number().min(1).optional(),
+  "dataCompetenzaDa": zod.date().optional(),
+  "dataCompetenzaA": zod.date().optional()
 })
 
-export const ListFseMonitoringResponseItem = zod.record(zod.string(), zod.unknown())
-export const ListFseMonitoringResponse = zod.array(ListFseMonitoringResponseItem)
+
+export const listFseMonitoringResponsePageSizeMax = 200;
+
+export const listFseMonitoringResponseTotalMin = 0;
+
+
+
+export const ListFseMonitoringResponse = zod.object({
+  "page": zod.number().min(1),
+  "pageSize": zod.number().min(1).max(listFseMonitoringResponsePageSizeMax),
+  "total": zod.number().min(listFseMonitoringResponseTotalMin),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "summary": zod.record(zod.string(), zod.unknown()).optional()
+})
 
 
 
 export const createFseMonitoringBodyAnnoMeseRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
 
 
+
 export const CreateFseMonitoringBody = zod.object({
   "magazzinoId": zod.number().min(1),
   "annoMese": zod.string().regex(createFseMonitoringBodyAnnoMeseRegExp),
   "canaleUfficiale": zod.enum(['PACCHI', 'MENSA', 'STRADA']),
-  "dataRiferimento": zod.coerce.date()
+  "dataRiferimento": zod.coerce.date(),
+  "operazioneDistribuzioneId": zod.number().min(1).nullish(),
+  "fonte": zod.enum(['RILEVAZIONE_MANUALE_VERIFICATA', 'DERIVAZIONE_STRUTTURATA']),
+  "completezza": zod.enum(['PARZIALE', 'COMPLETA'])
 })
 
 

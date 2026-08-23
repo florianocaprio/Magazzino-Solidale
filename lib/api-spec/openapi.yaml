@@ -757,6 +757,7 @@ paths:
         - { $ref: "#/components/parameters/FseDataDa" }
         - { $ref: "#/components/parameters/FseDataA" }
         - { $ref: "#/components/parameters/FseDataAsOf" }
+        - { $ref: "#/components/parameters/FseIncludeArretrati" }
       responses:
         "200":
           {
@@ -777,8 +778,14 @@ paths:
         - { $ref: "#/components/parameters/FseMagazzinoId" }
         - { $ref: "#/components/parameters/FseDataDa" }
         - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FseIncludeArretrati" }
         - { $ref: "#/components/parameters/FsePage" }
         - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseQueueStato" }
+        - { $ref: "#/components/parameters/FseQueueCanale" }
+        - { $ref: "#/components/parameters/FseQueueFondo" }
+        - { $ref: "#/components/parameters/FseQueueProdottoId" }
+        - { $ref: "#/components/parameters/FseQueueQualityCode" }
       responses:
         "200":
           {
@@ -786,7 +793,7 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
               },
           }
         "400": { $ref: "#/components/responses/FseBadRequest" }
@@ -799,8 +806,14 @@ paths:
         - { $ref: "#/components/parameters/FseMagazzinoId" }
         - { $ref: "#/components/parameters/FseDataDa" }
         - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FseIncludeArretrati" }
         - { $ref: "#/components/parameters/FsePage" }
         - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseQueueStato" }
+        - { $ref: "#/components/parameters/FseQueueCanale" }
+        - { $ref: "#/components/parameters/FseQueueFondo" }
+        - { $ref: "#/components/parameters/FseQueueProdottoId" }
+        - { $ref: "#/components/parameters/FseQueueQualityCode" }
       responses:
         "200":
           {
@@ -808,7 +821,7 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
               },
           }
         "400": { $ref: "#/components/responses/FseBadRequest" }
@@ -821,8 +834,14 @@ paths:
         - { $ref: "#/components/parameters/FseMagazzinoId" }
         - { $ref: "#/components/parameters/FseDataDa" }
         - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FseIncludeArretrati" }
         - { $ref: "#/components/parameters/FsePage" }
         - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseQueueStato" }
+        - { $ref: "#/components/parameters/FseQueueCanale" }
+        - { $ref: "#/components/parameters/FseQueueFondo" }
+        - { $ref: "#/components/parameters/FseQueueProdottoId" }
+        - { $ref: "#/components/parameters/FseQueueQualityCode" }
       responses:
         "200":
           {
@@ -830,7 +849,7 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
               },
           }
         "400": { $ref: "#/components/responses/FseBadRequest" }
@@ -843,6 +862,10 @@ paths:
       parameters:
         - { $ref: "#/components/parameters/FsePage" }
         - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseOptionalMagazzinoId" }
+        - { $ref: "#/components/parameters/FseOptionalDataDa" }
+        - { $ref: "#/components/parameters/FseOptionalDataA" }
+        - { $ref: "#/components/parameters/FseOptionalStato" }
       responses:
         "200":
           {
@@ -850,7 +873,7 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
               },
           }
         "403": { $ref: "#/components/responses/FseForbidden" }
@@ -883,7 +906,7 @@ paths:
       operationId: getFseExport
       tags: [fse]
       parameters:
-        [{ name: id, in: path, required: true, schema: { type: integer } }]
+        - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         "200":
           {
@@ -911,7 +934,7 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
               },
           }
         "403": { $ref: "#/components/responses/FseForbidden" }
@@ -931,7 +954,7 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
               },
           }
         "403": { $ref: "#/components/responses/FseForbidden" }
@@ -941,7 +964,8 @@ paths:
       operationId: downloadFseExport
       tags: [fse]
       parameters:
-        [{ name: id, in: path, required: true, schema: { type: integer } }]
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { $ref: "#/components/parameters/FseDownloadRepresentation" }
       responses:
         "200":
           description: XLSX generato dallo snapshot
@@ -1020,6 +1044,10 @@ paths:
       parameters:
         - { $ref: "#/components/parameters/FsePage" }
         - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseOptionalMagazzinoId" }
+        - { $ref: "#/components/parameters/FseOptionalDataDa" }
+        - { $ref: "#/components/parameters/FseOptionalDataA" }
+        - { $ref: "#/components/parameters/FseOptionalStato" }
       responses:
         "200":
           {
@@ -1027,7 +1055,7 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
               },
           }
         "403": { $ref: "#/components/responses/FseForbidden" }
@@ -1233,6 +1261,9 @@ paths:
       parameters:
         - { $ref: "#/components/parameters/FsePage" }
         - { $ref: "#/components/parameters/FsePageSize" }
+        - { $ref: "#/components/parameters/FseOptionalMagazzinoId" }
+        - { $ref: "#/components/parameters/FseOptionalDataDa" }
+        - { $ref: "#/components/parameters/FseOptionalDataA" }
       responses:
         "200":
           {
@@ -1240,7 +1271,7 @@ paths:
             content:
               {
                 application/json:
-                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+                  { schema: { $ref: "#/components/schemas/FseRecordPage" } },
               },
           }
         "403": { $ref: "#/components/responses/FseForbidden" }
@@ -7782,13 +7813,29 @@ components:
       in: query
       required: true
       schema: { type: integer, minimum: 1 }
+    FseOptionalMagazzinoId:
+      name: magazzinoId
+      in: query
+      schema: { type: integer, minimum: 1 }
+    FseOptionalDataDa:
+      name: dataCompetenzaDa
+      in: query
+      schema: { type: string, format: date }
+    FseOptionalDataA:
+      name: dataCompetenzaA
+      in: query
+      schema: { type: string, format: date }
+    FseOptionalStato:
+      name: stato
+      in: query
+      schema: { type: string, maxLength: 60 }
     FseDataDa:
-      name: dataDa
+      name: dataCompetenzaDa
       in: query
       required: true
       schema: { type: string, format: date }
     FseDataA:
-      name: dataA
+      name: dataCompetenzaA
       in: query
       required: true
       schema: { type: string, format: date }
@@ -7796,6 +7843,10 @@ components:
       name: dataAsOf
       in: query
       schema: { type: string, format: date }
+    FseIncludeArretrati:
+      name: includeArretrati
+      in: query
+      schema: { type: boolean, default: true }
     FsePage:
       name: page
       in: query
@@ -7804,6 +7855,39 @@ components:
       name: pageSize
       in: query
       schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    FseQueueStato:
+      name: statoRendicontazione
+      in: query
+      schema:
+        type: string
+        enum: [DA_RENDICONTARE, ARRETRATO_NON_RENDICONTATO, BLOCCATO]
+    FseQueueCanale:
+      name: canale
+      in: query
+      schema: { type: string }
+    FseQueueFondo:
+      name: fondo
+      in: query
+      schema: { type: string }
+    FseQueueProdottoId:
+      name: prodottoId
+      in: query
+      schema: { type: integer, minimum: 1 }
+    FseQueueQualityCode:
+      name: qualityCode
+      in: query
+      schema: { type: string }
+    FseDownloadRepresentation:
+      name: representation
+      in: query
+      description: Rappresentazione derivata dallo stesso snapshot immutabile
+      schema:
+        type: string
+        enum:
+          [
+            FSE_CANONICAL_AUDIT_XLSX_V1,
+            SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1,
+          ]
     PageParam:
       name: page
       in: query
@@ -7950,20 +8034,31 @@ components:
     FseRecordList:
       type: array
       items: { $ref: "#/components/schemas/FseRecord" }
-    FseReconciliationRowsPage:
+    FseRecordPage:
       type: object
-      required: [page, pageSize, rows]
+      required: [page, pageSize, total, rows]
       properties:
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 200 }
+        total: { type: integer, minimum: 0 }
+        rows: { $ref: "#/components/schemas/FseRecordList" }
+        summary: { $ref: "#/components/schemas/FseRecord" }
+    FseReconciliationRowsPage:
+      type: object
+      required: [page, pageSize, total, rows]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 200 }
+        total: { type: integer, minimum: 0 }
         rows: { $ref: "#/components/schemas/FseRecordList" }
     FseExportInput:
       type: object
-      required: [magazzinoId, dataDa, dataA, dataAsOf, formatCode]
+      required:
+        [magazzinoId, dataCompetenzaDa, dataCompetenzaA, dataAsOf, formatCode]
       properties:
         magazzinoId: { type: integer, minimum: 1 }
-        dataDa: { type: string, format: date }
-        dataA: { type: string, format: date }
+        dataCompetenzaDa: { type: string, format: date }
+        dataCompetenzaA: { type: string, format: date }
         dataAsOf: { type: string, format: date }
         formatCode:
           type: string
@@ -7974,13 +8069,14 @@ components:
             ]
         maxMovimentoId: { type: integer, minimum: 1 }
         maxOperazioneDistribuzioneId: { type: integer, minimum: 1 }
+        includeArretrati: { type: boolean, default: true }
     FseVersionInput:
       type: object
       required: [versione]
       properties:
         versione: { type: integer, minimum: 1 }
         motivazione: { type: string, minLength: 3, maxLength: 500 }
-        data: { type: string, format: date-time }
+        data: { type: string, format: date }
         riferimentoEsterno: { type: string, minLength: 3, maxLength: 500 }
         conScostamenti: { type: boolean }
     FseMarkEnteredInput:
@@ -7988,7 +8084,7 @@ components:
       required: [versione, data, riferimentoEsterno]
       properties:
         versione: { type: integer, minimum: 1 }
-        data: { type: string, format: date-time }
+        data: { type: string, format: date }
         riferimentoEsterno: { type: string, minLength: 3, maxLength: 500 }
     FseCancelInput:
       type: object
@@ -8022,15 +8118,30 @@ components:
               RIAPRI,
             ]
         motivazione: { type: string, minLength: 3, maxLength: 500 }
+        movimentoId: { type: integer, minimum: 1 }
+        importazioneAgeaRigaId: { type: integer, minimum: 1 }
     FseMonitoringInput:
       type: object
-      required: [magazzinoId, annoMese, canaleUfficiale, dataRiferimento]
+      required:
+        [
+          magazzinoId,
+          annoMese,
+          canaleUfficiale,
+          dataRiferimento,
+          fonte,
+          completezza,
+        ]
       additionalProperties: true
       properties:
         magazzinoId: { type: integer, minimum: 1 }
         annoMese: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
         canaleUfficiale: { type: string, enum: [PACCHI, MENSA, STRADA] }
         dataRiferimento: { type: string, format: date }
+        operazioneDistribuzioneId: { type: [integer, "null"], minimum: 1 }
+        fonte:
+          type: string
+          enum: [RILEVAZIONE_MANUALE_VERIFICATA, DERIVAZIONE_STRUTTURATA]
+        completezza: { type: string, enum: [PARZIALE, COMPLETA] }
     FseMonitoringUpdate:
       type: object
       required: [versione]

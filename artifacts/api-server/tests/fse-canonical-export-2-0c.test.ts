@@ -1,11 +1,37 @@
 /* @vitest-environment node */
 
-import { db, esportazioniFseEventiTable, esportazioniFseRigheTable, esportazioniFseTable, lottiTable, magazziniTable, movimentiTable, operazioniDistribuzioneMagazzinoTable, pool, prodottiTable, utentiTable } from "@workspace/db";
+import {
+  db,
+  esportazioniFseEventiTable,
+  esportazioniFseIndicatoriTable,
+  esportazioniFseRigheTable,
+  esportazioniFseSaldiTable,
+  esportazioniFseTable,
+  lottiTable,
+  magazziniTable,
+  movimentiTable,
+  operazioniDistribuzioneMagazzinoTable,
+  pool,
+  prodottiTable,
+  utentiTable,
+} from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { buildFseCanonicalReport, canonicalJson, canonicalSha256, createFseExport, deactivateExportCoverage, FSE_CANONICAL_FORMAT, FSE_CHANNEL_MAP } from "../src/lib/fseCanonicalReporting";
-import { generateFseExportWorkbook, safeExcelText } from "../src/lib/fseExportWorkbook";
+import {
+  buildFseCanonicalReport,
+  canonicalJson,
+  canonicalSha256,
+  createFseExport,
+  deactivateExportCoverage,
+  FSE_CANONICAL_FORMAT,
+  FSE_CHANNEL_MAP,
+  listFseCanonicalPage,
+} from "../src/lib/fseCanonicalReporting";
+import {
+  generateFseExportWorkbook,
+  safeExcelText,
+} from "../src/lib/fseExportWorkbook";
 
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 let userId: number;
@@ -24,7 +50,8 @@ beforeAll(async () => {
       'esportazioni_fse_righe', 'rilevazioni_monitoraggio_fse'
     )
   `);
-  if (required.rows[0].count !== 4) throw new Error("Applicare la migration Magazzino 2.0C");
+  if (required.rows[0].count !== 4)
+    throw new Error("Applicare la migration Magazzino 2.0C");
   [{ id: userId }] = await db
     .insert(utentiTable)
     .values({
@@ -267,7 +294,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (exportIds.length) {
-    const events = await db.select({ id: esportazioniFseEventiTable.id }).from(esportazioniFseEventiTable).where(inArray(esportazioniFseEventiTable.esportazioneId, exportIds));
+    await db
+      .delete(esportazioniFseIndicatoriTable)
+      .where(inArray(esportazioniFseIndicatoriTable.esportazioneId, exportIds));
+    await db
+      .delete(esportazioniFseSaldiTable)
+      .where(inArray(esportazioniFseSaldiTable.esportazioneId, exportIds));
+    const events = await db
+      .select({ id: esportazioniFseEventiTable.id })
+      .from(esportazioniFseEventiTable)
+      .where(inArray(esportazioniFseEventiTable.esportazioneId, exportIds));
     if (events.length)
       await db.delete(esportazioniFseRigheTable).where(
         inArray(
@@ -275,11 +311,20 @@ afterAll(async () => {
           events.map((row) => row.id),
         ),
       );
-    await db.delete(esportazioniFseEventiTable).where(inArray(esportazioniFseEventiTable.esportazioneId, exportIds));
-    await db.delete(esportazioniFseTable).where(inArray(esportazioniFseTable.id, exportIds));
+    await db
+      .delete(esportazioniFseEventiTable)
+      .where(inArray(esportazioniFseEventiTable.esportazioneId, exportIds));
+    await db
+      .delete(esportazioniFseTable)
+      .where(inArray(esportazioniFseTable.id, exportIds));
   }
-  if (movementIds.length) await db.delete(movimentiTable).where(inArray(movimentiTable.id, movementIds));
-  await db.delete(operazioniDistribuzioneMagazzinoTable).where(eq(operazioniDistribuzioneMagazzinoTable.id, operationId));
+  if (movementIds.length)
+    await db
+      .delete(movimentiTable)
+      .where(inArray(movimentiTable.id, movementIds));
+  await db
+    .delete(operazioniDistribuzioneMagazzinoTable)
+    .where(eq(operazioniDistribuzioneMagazzinoTable.id, operationId));
   await db.delete(lottiTable).where(eq(lottiTable.id, lottoId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, magazzinoId));
@@ -289,8 +334,12 @@ afterAll(async () => {
 
 describe("Magazzino 2.0C — canonical reporting ed export", () => {
   it("usa JSON/hash canonici indipendenti dall'ordine delle proprietà", () => {
-    expect(canonicalJson({ b: 2, a: { d: 4, c: 3 } })).toBe('{"a":{"c":3,"d":4},"b":2}');
-    expect(canonicalSha256({ b: 2, a: 1 })).toBe(canonicalSha256({ a: 1, b: 2 }));
+    expect(canonicalJson({ b: 2, a: { d: 4, c: 3 } })).toBe(
+      '{"a":{"c":3,"d":4},"b":2}',
+    );
+    expect(canonicalSha256({ b: 2, a: 1 })).toBe(
+      canonicalSha256({ a: 1, b: 2 }),
+    );
   });
 
   it("mappa tutti i canali interni ammessi", () => {
@@ -310,25 +359,101 @@ describe("Magazzino 2.0C — canonical reporting ed export", () => {
       dataDa: "2026-08-01",
       dataA: "2026-08-31",
     });
+    const eventPage = await listFseCanonicalPage({
+      magazzinoId,
+      dataDa: "2026-08-01",
+      dataA: "2026-08-31",
+      dataAsOf: "2026-08-31",
+      includeArretrati: true,
+      projection: "events",
+      page: 1,
+      pageSize: 1,
+    });
+    const linePage = await listFseCanonicalPage({
+      magazzinoId,
+      dataDa: "2026-08-01",
+      dataA: "2026-08-31",
+      dataAsOf: "2026-08-31",
+      includeArretrati: true,
+      projection: "lines",
+      page: 1,
+      pageSize: 1,
+    });
+    expect(eventPage.total).toBeGreaterThan(0);
+    expect(eventPage.rows).toHaveLength(1);
+    expect(linePage.total).toBeGreaterThan(1);
+    expect(linePage.rows).toHaveLength(1);
     expect(report.lines.every((line) => line.fund === "FSE_PLUS")).toBe(true);
-    expect(report.lines.some((line) => movementIds.slice(2, 5).includes(line.movementId))).toBe(false);
-    const distribution = report.events.find((event) => event.operationDistributionId === operationId);
+    expect(
+      report.lines.some((line) =>
+        movementIds.slice(2, 5).includes(line.movementId),
+      ),
+    ).toBe(false);
+    const distribution = report.events.find(
+      (event) => event.operationDistributionId === operationId,
+    );
     expect(distribution).toMatchObject({
       packs: 2,
       occasionalPeople: 3,
       continuousPeople: 4,
     });
-    expect(report.events.filter((event) => event.operationDistributionId === operationId)).toHaveLength(1);
+    expect(
+      report.events.filter(
+        (event) => event.operationDistributionId === operationId,
+      ),
+    ).toHaveLength(1);
     expect(distribution?.qualityCodes).toContain("EVENTO_FONDI_MISTI");
-    expect(report.quality).toEqual(expect.arrayContaining([expect.objectContaining({ code: "FONDO_LEGACY_NON_DETERMINATO", count: 1, blocking: true }), expect.objectContaining({ code: "SNAPSHOT_INDICATORI_STORICI_MANCANTE", count: 1, blocking: true })]));
-    expect(report.lines.find((line) => line.movementId === movementIds[0])?.quantityPiecesSigned).toBe("-10.000000");
-    expect(report.lines.find((line) => line.movementId === movementIds.at(-1))?.quantityPiecesSigned).toBe("4.000000");
-    expect(report.lines.find((line) => line.accountingNature === "SALDO_INIZIALE")?.reportingDisposition).toBe("ESCLUSO_SALDO_INIZIALE");
-    expect(report.lines.find((line) => line.accountingNature === "SCARTO")?.reportingDisposition).toBe("MODIFICA_GIACENZA");
-    expect(report.lines.find((line) => line.accountingNature === "RESO")?.reportingDisposition).toBe("RESO_OPC");
-    expect(report.lines.find((line) => line.accountingNature === "TRASFERIMENTO_INTERNO_USCITA")?.reportingDisposition).toBe("SOLO_AUDIT_TRASFERIMENTO");
-    expect(report.lines.reduce((sum, line) => sum + Number(line.quantityPiecesSigned ?? 0), 0)).toBe(89);
-    expect(report.lines.reduce((sum, line) => sum + Number(line.quantityKgLtSigned ?? 0), 0)).toBe(44.5);
+    expect(report.quality).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "FONDO_LEGACY_NON_DETERMINATO",
+          count: 1,
+          blocking: true,
+        }),
+        expect.objectContaining({
+          code: "SNAPSHOT_INDICATORI_STORICI_MANCANTE",
+          count: 1,
+          blocking: true,
+        }),
+      ]),
+    );
+    expect(
+      report.lines.find((line) => line.movementId === movementIds[0])
+        ?.quantityPiecesSigned,
+    ).toBe("-10.000000");
+    expect(
+      report.lines.find((line) => line.movementId === movementIds.at(-1))
+        ?.quantityPiecesSigned,
+    ).toBe("4.000000");
+    expect(
+      report.lines.find((line) => line.accountingNature === "SALDO_INIZIALE")
+        ?.reportingDisposition,
+    ).toBe("ESCLUSO_SALDO_INIZIALE");
+    expect(
+      report.lines.find((line) => line.accountingNature === "SCARTO")
+        ?.reportingDisposition,
+    ).toBe("MODIFICA_GIACENZA");
+    expect(
+      report.lines.find((line) => line.accountingNature === "RESO")
+        ?.reportingDisposition,
+    ).toBe("RESO_OPC");
+    expect(
+      report.lines.find(
+        (line) => line.accountingNature === "TRASFERIMENTO_INTERNO_USCITA",
+      )?.reportingDisposition,
+    ).toBe("SOLO_AUDIT_TRASFERIMENTO");
+    expect(
+      report.lines.reduce(
+        (sum, line) => sum + Number(line.quantityPiecesSigned ?? 0),
+        0,
+      ),
+    ).toBe(89);
+    expect(
+      report.lines.reduce(
+        (sum, line) => sum + Number(line.quantityKgLtSigned ?? 0),
+        0,
+      ),
+    ).toBe(44.5);
   });
 
   it("fa replay a cutoff invariato, conserva snapshot e genera XLSX senza formule", async () => {
@@ -348,8 +473,19 @@ describe("Magazzino 2.0C — canonical reporting ed export", () => {
     const workbook = await generateFseExportWorkbook(first.export.id);
     expect(workbook.buffer.subarray(0, 2).toString()).toBe("PK");
     const parsedWorkbook = XLSX.read(workbook.buffer);
-    expect(parsedWorkbook.SheetNames).toEqual(expect.arrayContaining(["Metadati", "Eventi", "Righe prodotto-lotto", "Saldi as-of", "Indicatori", "Qualità"]));
-    const balances = XLSX.utils.sheet_to_json<Record<string, unknown>>(parsedWorkbook.Sheets["Saldi as-of"]);
+    expect(parsedWorkbook.SheetNames).toEqual(
+      expect.arrayContaining([
+        "Metadati",
+        "Eventi",
+        "Righe prodotto-lotto",
+        "Saldi as-of",
+        "Indicatori",
+        "Qualità",
+      ]),
+    );
+    const balances = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      parsedWorkbook.Sheets["Saldi as-of"],
+    );
     expect(balances).toContainEqual({
       magazzinoId,
       fondo: "FSE_PLUS",
@@ -359,8 +495,18 @@ describe("Magazzino 2.0C — canonical reporting ed export", () => {
       kgLt: "44.500000",
     });
     expect(safeExcelText("=2+2")).toBe("'=2+2");
-    const cancelled = await deactivateExportCoverage(first.export.id, userId, "Nuova elaborazione", first.export.versione);
+    const cancelled = await deactivateExportCoverage(
+      first.export.id,
+      userId,
+      "Nuova elaborazione",
+      first.export.versione,
+    );
     expect(cancelled.stato).toBe("ANNULLATA");
-    expect(await db.select().from(esportazioniFseEventiTable).where(eq(esportazioniFseEventiTable.esportazioneId, first.export.id))).not.toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(esportazioniFseEventiTable)
+        .where(eq(esportazioniFseEventiTable.esportazioneId, first.export.id)),
+    ).not.toHaveLength(0);
   });
 });

@@ -512,6 +512,16 @@ describe("regole di conteggio Pacchi e FSE+", () => {
             magazzinoId: warehouse.id,
             fsePlus: false,
           },
+          {
+            prodottoId: productKg.id,
+            codiceLotto: `HIST-${suffix}`,
+            dataCarico: "2026-05-01",
+            dataScadenza: "2026-06-30",
+            quantitaCaricata: "4",
+            quantitaResidua: "0",
+            magazzinoId: warehouse.id,
+            fsePlus: false,
+          },
         ])
         .returning({
           id: lottiTable.id,
@@ -548,6 +558,32 @@ describe("regole di conteggio Pacchi e FSE+", () => {
             beneficiarioId: beneficiary.id,
             bollaId: finalBolla.id,
             bollaRigaId: createdRows[1].id,
+          },
+          {
+            tipoMovimento: "carico",
+            tipoDettaglio: "test_as_of",
+            dataMovimento: "2026-05-01",
+            magazzinoId: warehouse.id,
+            prodottoId: productKg.id,
+            lottoId: lots[3].id,
+            quantita: "4",
+            quantitaKgLt: "4",
+            unitaMisura: "kg",
+            fondoOrigine: "NESSUN_FONDO",
+            naturaContabile: "CARICO",
+          },
+          {
+            tipoMovimento: "scarico",
+            tipoDettaglio: "test_as_of",
+            dataMovimento: "2027-01-02",
+            magazzinoId: warehouse.id,
+            prodottoId: productKg.id,
+            lottoId: lots[3].id,
+            quantita: "4",
+            quantitaKgLt: "4",
+            unitaMisura: "kg",
+            fondoOrigine: "NESSUN_FONDO",
+            naturaContabile: "DISTRIBUZIONE_FINALE",
           },
         ])
         .returning({ id: movimentiTable.id });
@@ -734,6 +770,9 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       expect(parcelDetails.total).toBe(1);
       expect(householdDetails.total).toBe(1);
       const logisticsReport = await buildLogisticaReport(filters);
+      expect(
+        logisticsReport.kpi.find((item) => item.key === "merceScaduta")?.value,
+      ).toBe(1);
       const stockRows = logisticsReport.tables.find((table) => table.key === "giacenze")?.rows ?? [];
       expect(stockRows).toEqual(expect.arrayContaining([expect.objectContaining({ unitaMisura: "kg", quantita: 15 }), expect.objectContaining({ unitaMisura: "pz", quantita: 16 })]));
 

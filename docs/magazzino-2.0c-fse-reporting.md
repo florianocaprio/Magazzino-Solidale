@@ -19,7 +19,7 @@ e le [Istruzioni Operative n. 22/2026](https://pninclusione21-27.lavoro.gov.it/s
 
 ## Unica contabilità e modello canonico
 
-`MAGAZZINO_2_0C_V1` non introduce saldi operativi paralleli:
+`MAGAZZINO_2_0C_R1_V2` non introduce saldi operativi paralleli:
 
 - corrente: residui delle Partite in `lotti`;
 - storico/as-of: ledger append-only `movimenti`;
@@ -84,6 +84,22 @@ frequenza, domicilio e anonimi UDS non generano inferenze.
 
 ## Export e workflow manuale
 
+Periodo di competenza e copertura amministrativa sono assi distinti. La coda
+include gli eventi del periodo e, con `includeArretrati=true`, gli eventi
+precedenti non ancora coperti; esclude invece gli eventi con copertura attiva
+in un export amministrativo pronto o già inserito. Eventi, righe e qualità
+sono filtrati e paginati in SQL (`page`, `pageSize`, `total`, `rows`,
+`summary`) per stato, canale, Fondo, prodotto e quality code.
+
+Stati evento: `DA_RENDICONTARE`, `ARRETRATO_NON_RENDICONTATO`,
+`IN_ESPORTAZIONE`, `INSERITO_MANUALMENTE`, `BLOCCATO`, `ANNULLATO` e
+`CORREZIONE_DA_GESTIRE_MANUALMENTE`. Stati pacchetto:
+`GENERATA_CON_BLOCCHI` o `PRONTA_PER_INSERIMENTO_MANUALE`, quindi
+`INSERITA_MANUALMENTE`; solo un pacchetto non inserito può essere annullato.
+Un pacchetto con blocchi è `AUDIT_ONLY` e non crea copertura amministrativa.
+Gli export pre-R1 non dimostrabili sono
+`LEGACY_2_0C_REVIEW_REQUIRED`, senza promozione automatica.
+
 Formati disponibili:
 
 - `FSE_CANONICAL_AUDIT_XLSX_V1`: pacchetto interno autorevole;
@@ -98,6 +114,11 @@ prodotto e lotto, con Pezzi e Kg/Lt separati. I testi che iniziano con `=`, `+`,
 macro. Nomi, codice fiscale, contatti, indirizzi, note sociali e altre PII non
 sono esportati.
 
+Eventi, righe, indicatori, saldi, lineage e metadati sono materializzati nello
+snapshot alla creazione. Entrambi i download sono proiezioni dello stesso
+snapshot e non interrogano Movimenti, Partite o rilevazioni live: modifiche
+successive non cambiano hash o contenuto del file già creato.
+
 Creazione e replay usano advisory lock, idempotency key, cutoff e hash canonico.
 La copertura attiva di evento/riga è unica. L'annullamento disattiva la
 copertura ma conserva lo snapshot. La marcatura `INSERITA_MANUALMENTE` richiede
@@ -108,8 +129,8 @@ una trasmissione automatica.
 
 Il flusso dedicato usa `POST /fse/resi-opc` e
 `POST /fse/resi-opc/{id}/storno`, protetti da `magazzino.fse.return`. Il reso
-accetta selezione FEFO o Partita esatta, ma preleva soltanto da Fondi FSE+ o
-nazionali cofinanziati. Destinazione OpC, motivazione e chiave di idempotenza
+accetta selezione FEFO o Partita esatta, ma preleva esclusivamente Fondo
+`FSE_PLUS`. Destinazione OpC, motivazione e chiave di idempotenza
 sono obbligatorie. Lo scarico conserva Fondo e Lotto nel Movimento con natura
 `RESO`; lo storno ripristina il Lotto esclusivamente tramite un Movimento
 compensativo `STORNO`. La versione passa da 1 a 2 e una versione stale produce

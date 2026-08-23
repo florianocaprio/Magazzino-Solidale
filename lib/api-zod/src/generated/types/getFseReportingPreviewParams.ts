@@ -8,6 +8,7 @@
 import type { FseDataAParameter } from './fseDataAParameter';
 import type { FseDataAsOfParameter } from './fseDataAsOfParameter';
 import type { FseDataDaParameter } from './fseDataDaParameter';
+import type { FseIncludeArretratiParameter } from './fseIncludeArretratiParameter';
 import type { FseMagazzinoIdParameter } from './fseMagazzinoIdParameter';
 
 export type GetFseReportingPreviewParams = {
@@ -15,7 +16,8 @@ export type GetFseReportingPreviewParams = {
  * @minimum 1
  */
 magazzinoId: FseMagazzinoIdParameter;
-dataDa: FseDataDaParameter;
-dataA: FseDataAParameter;
+dataCompetenzaDa: FseDataDaParameter;
+dataCompetenzaA: FseDataAParameter;
 dataAsOf?: FseDataAsOfParameter;
+includeArretrati?: FseIncludeArretratiParameter;
 };

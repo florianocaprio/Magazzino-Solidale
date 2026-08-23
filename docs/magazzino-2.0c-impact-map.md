@@ -50,7 +50,7 @@ controllo. In assenza di una specifica ufficiale verificata resta classificato
 | Audit                       | testate/versioni/utenti e log sistema             | mutazioni e risoluzioni tracciate                                | `DATA_QUALITY_RISK`          | optimistic lock, motivazioni, nessuna cancellazione fisica           |
 | Privacy                     | export, API, drill-down                           | solo aggregati e riferimenti operativi                           | `PRIVACY_RISK`               | esclusione nomi, CF, contatti, indirizzi e note sociali              |
 | Performance                 | ledger/export/reconciliation                      | 100k+ movimenti, 10k+ eventi                                     | `REGRESSION_RISK`            | query set-based, batch, paginazione e indici mirati                  |
-| Migration ledger            | nuova migration append-only                       | prima applicazione `NORMAL`, poi skipped                         | `DATA_MIGRATION_RISK`        | nessuna modifica al manifest/checksum storico                        |
+| Migration ledger            | `20260825_magazzino_2_0c_r1_reporting_hardening.sql` | snapshot completi, copertura, hash e workflow R1 in adozione `NORMAL` | `DATA_MIGRATION_RISK` | nessuna modifica a SQL 2.0C, manifest o checksum storici |
 | Docker                      | API/web e startup migration                       | verifica pending zero e restart                                  | `REGRESSION_RISK`            | build, first-start, health e restart smoke test                      |
 
 ## Conflitti da evitare
@@ -70,3 +70,12 @@ controllo. In assenza di una specifica ufficiale verificata resta classificato
 2. C2: riconciliazione AGEA/SIFEAD non mutante.
 3. C3: reporting `MAGAZZINO_2_0C_V1`, frontend e contratti generati.
 4. Migration ledger, acceptance reale AGEA, regressione completa e smoke Docker.
+
+## Correttivo 2.0C-R1
+
+R1 separa periodo e copertura, conserva indicatori/saldi nello snapshot,
+classifica conservativamente gli export legacy, rende idempotenti resi e
+riconciliazioni, introduce saldi Partita e risoluzioni con target reali,
+centralizza il segno contabile (incluso lo STORNO) e rende la coda paginata in
+SQL. Non modifica `20260824_magazzino_2_0c_fse_reporting.sql` né il baseline
+del Migration Ledger.

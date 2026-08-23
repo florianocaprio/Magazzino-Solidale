@@ -12,7 +12,9 @@ const requireReportCentro = requireAllModuli(["CENTRO_ASCOLTO", "REPORT"]);
 const requireReportUds = requireAllModuli(["UDS", "REPORT"]);
 
 router.use("/report", (req, res, next) => {
-  const guard = isUdsReportRequest(req) ? requireReportUds : requireReportCentro;
+  const guard = isUdsReportRequest(req)
+    ? requireReportUds
+    : requireReportCentro;
   guard(req, res, next);
 });
 router.use("/report/uds", requirePermission("uds.reports.view"));
@@ -38,10 +40,16 @@ function isValidIsoDate(s: string): boolean {
   if (!ISO_DATE.test(s)) return false;
   const [y, m, d] = s.split("-").map((p) => parseInt(p, 10));
   const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() === m - 1 &&
+    dt.getUTCDate() === d
+  );
 }
 
-type DateRange = { ok: true; da: string; a: string } | { ok: false; message: string };
+type DateRange =
+  | { ok: true; da: string; a: string }
+  | { ok: false; message: string };
 function parseDateRange(req: { query: Record<string, unknown> }): DateRange {
   const anno = parseIntParam(req.query.anno) ?? new Date().getFullYear();
   const daRaw = req.query.da ? String(req.query.da) : "";
@@ -75,11 +83,16 @@ router.get("/report/giacenze-per-magazzino", async (req, res) => {
   if (magazzinoId) conds.push(sql`mg.id = ${magazzinoId}`);
   const centroCond = ownOrNullSql(sql`mg.centro_ascolto_id`, caller);
   if (centroCond) conds.push(centroCond);
-  const areaOperativaCond = ownOrNullSql(sql`mg.area_operativa_id`, areaOperativa);
+  const areaOperativaCond = ownOrNullSql(
+    sql`mg.area_operativa_id`,
+    areaOperativa,
+  );
   if (areaOperativaCond) conds.push(areaOperativaCond);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
   if (qAreaOperativa) conds.push(sql`mg.area_operativa_id = ${qAreaOperativa}`);
-  const where = conds.length ? sql`WHERE ${sql.join(conds, sql` AND `)}` : sql``;
+  const where = conds.length
+    ? sql`WHERE ${sql.join(conds, sql` AND `)}`
+    : sql``;
 
   const result1 = await db.execute(sql`
     SELECT mg.nome as magazzino_nome,
@@ -119,10 +132,14 @@ router.get("/report/consegne-per-mese", async (req, res) => {
 
   const conds = [sql`c.data_prevista::date BETWEEN ${da} AND ${a}`];
   if (magazzinoId) conds.push(sql`c.magazzino_id = ${magazzinoId}`);
-  if (centroAscoltoId) conds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
+  if (centroAscoltoId)
+    conds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
   const centroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
   if (centroCond) conds.push(centroCond);
-  const areaOperativaCond = ownOrNullSql(sql`be.area_operativa_id`, areaOperativa);
+  const areaOperativaCond = ownOrNullSql(
+    sql`be.area_operativa_id`,
+    areaOperativa,
+  );
   if (areaOperativaCond) conds.push(areaOperativaCond);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
   if (qAreaOperativa) conds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
@@ -163,11 +180,17 @@ router.get("/report/consegne-per-centro", async (req, res) => {
   const scopeConds: SQL[] = [];
   const centroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
   if (centroCond) scopeConds.push(centroCond);
-  const areaOperativaCond = ownOrNullSql(sql`be.area_operativa_id`, areaOperativa);
+  const areaOperativaCond = ownOrNullSql(
+    sql`be.area_operativa_id`,
+    areaOperativa,
+  );
   if (areaOperativaCond) scopeConds.push(areaOperativaCond);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
-  if (qAreaOperativa) scopeConds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
-  const extraCentro = scopeConds.length ? sql` AND ${sql.join(scopeConds, sql` AND `)}` : sql``;
+  if (qAreaOperativa)
+    scopeConds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
+  const extraCentro = scopeConds.length
+    ? sql` AND ${sql.join(scopeConds, sql` AND `)}`
+    : sql``;
 
   const result = await db.execute(sql`
     SELECT be.centro_ascolto_id as centro_id,
@@ -187,7 +210,10 @@ router.get("/report/consegne-per-centro", async (req, res) => {
 
   res.json(
     rows.map((r: Record<string, unknown>) => ({
-      centroId: r.centro_id === null || r.centro_id === undefined ? null : Number(r.centro_id),
+      centroId:
+        r.centro_id === null || r.centro_id === undefined
+          ? null
+          : Number(r.centro_id),
       centroNome: r.centro_nome as string,
       dirette: Number(r.dirette),
       conVolontari: Number(r.con_volontari),
@@ -213,14 +239,25 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
   // axis, by their centro's area operativa (derived via centri_di_ascolto; NULL = a
   // universal mezzo or a centro without area operativa, kept visible like magazzini).
   const mezzoConds: SQL[] = [];
-  const effectiveMezzoCentro = effectiveMezzoCentroSql(sql`m.volontario_id`, sql`mv.centro_ascolto_id`, sql`m.centro_ascolto_id`);
-  if (centroAscoltoId) mezzoConds.push(sql`${effectiveMezzoCentro} = ${centroAscoltoId}`);
+  const effectiveMezzoCentro = effectiveMezzoCentroSql(
+    sql`m.volontario_id`,
+    sql`mv.centro_ascolto_id`,
+    sql`m.centro_ascolto_id`,
+  );
+  if (centroAscoltoId)
+    mezzoConds.push(sql`${effectiveMezzoCentro} = ${centroAscoltoId}`);
   const mCentroCond = ownOrNullSql(effectiveMezzoCentro, caller);
   if (mCentroCond) mezzoConds.push(mCentroCond);
-  const mAreaOperativaCond = ownOrNullSql(sql`ca.area_operativa_id`, areaOperativa);
+  const mAreaOperativaCond = ownOrNullSql(
+    sql`ca.area_operativa_id`,
+    areaOperativa,
+  );
   if (mAreaOperativaCond) mezzoConds.push(mAreaOperativaCond);
-  if (qAreaOperativa) mezzoConds.push(sql`ca.area_operativa_id = ${qAreaOperativa}`);
-  const mezzoWhere = mezzoConds.length ? sql`WHERE ${sql.join(mezzoConds, sql` AND `)}` : sql``;
+  if (qAreaOperativa)
+    mezzoConds.push(sql`ca.area_operativa_id = ${qAreaOperativa}`);
+  const mezzoWhere = mezzoConds.length
+    ? sql`WHERE ${sql.join(mezzoConds, sql` AND `)}`
+    : sql``;
 
   // Records counted per mezzo must respect the caller's perimeter too: otherwise
   // a visible mezzo (especially a universal one, centro_ascolto_id NULL) would
@@ -228,22 +265,36 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
   // scope via beneficiario (same as the other reports); turni scope via their
   // own centro_ascolto_id and that centro's area operativa.
   const beScopeConds: SQL[] = [];
-  if (centroAscoltoId) beScopeConds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
+  if (centroAscoltoId)
+    beScopeConds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
   const beCentroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
   if (beCentroCond) beScopeConds.push(beCentroCond);
-  const beAreaOperativaCond = ownOrNullSql(sql`be.area_operativa_id`, areaOperativa);
+  const beAreaOperativaCond = ownOrNullSql(
+    sql`be.area_operativa_id`,
+    areaOperativa,
+  );
   if (beAreaOperativaCond) beScopeConds.push(beAreaOperativaCond);
-  if (qAreaOperativa) beScopeConds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
-  const beScope = beScopeConds.length ? sql` AND ${sql.join(beScopeConds, sql` AND `)}` : sql``;
+  if (qAreaOperativa)
+    beScopeConds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
+  const beScope = beScopeConds.length
+    ? sql` AND ${sql.join(beScopeConds, sql` AND `)}`
+    : sql``;
 
   const turniScopeConds: SQL[] = [];
-  if (centroAscoltoId) turniScopeConds.push(sql`tu.centro_ascolto_id = ${centroAscoltoId}`);
+  if (centroAscoltoId)
+    turniScopeConds.push(sql`tu.centro_ascolto_id = ${centroAscoltoId}`);
   const tuCentroCond = ownOrNullSql(sql`tu.centro_ascolto_id`, caller);
   if (tuCentroCond) turniScopeConds.push(tuCentroCond);
-  const tuAreaOperativaCond = ownOrNullSql(sql`tca.area_operativa_id`, areaOperativa);
+  const tuAreaOperativaCond = ownOrNullSql(
+    sql`tca.area_operativa_id`,
+    areaOperativa,
+  );
   if (tuAreaOperativaCond) turniScopeConds.push(tuAreaOperativaCond);
-  if (qAreaOperativa) turniScopeConds.push(sql`tca.area_operativa_id = ${qAreaOperativa}`);
-  const turniScope = turniScopeConds.length ? sql` AND ${sql.join(turniScopeConds, sql` AND `)}` : sql``;
+  if (qAreaOperativa)
+    turniScopeConds.push(sql`tca.area_operativa_id = ${qAreaOperativa}`);
+  const turniScope = turniScopeConds.length
+    ? sql` AND ${sql.join(turniScopeConds, sql` AND `)}`
+    : sql``;
 
   const mezziResult = await db.execute(sql`
     SELECT m.id as mezzo_id,
@@ -289,8 +340,12 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
     WHERE b.mezzo_altro = true
       AND b.data_bolla::date BETWEEN ${da} AND ${a}${beScope}
   `);
-  const altroConsegne = Number((altroConsResult.rows as Array<Record<string, unknown>>)[0]?.n ?? 0);
-  const altroBolle = Number((altroBolleResult.rows as Array<Record<string, unknown>>)[0]?.n ?? 0);
+  const altroConsegne = Number(
+    (altroConsResult.rows as Array<Record<string, unknown>>)[0]?.n ?? 0,
+  );
+  const altroBolle = Number(
+    (altroBolleResult.rows as Array<Record<string, unknown>>)[0]?.n ?? 0,
+  );
 
   res.json({
     mezzi: mezziRows.map((r: Record<string, unknown>) => {
@@ -301,7 +356,10 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
         mezzoId: Number(r.mezzo_id),
         mezzoCodice: r.mezzo_codice as string,
         mezzoTipo: (r.mezzo_tipo as string) ?? "",
-        centroId: r.centro_id === null || r.centro_id === undefined ? null : Number(r.centro_id),
+        centroId:
+          r.centro_id === null || r.centro_id === undefined
+            ? null
+            : Number(r.centro_id),
         centroNome: (r.centro_nome as string) ?? null,
         consegne,
         bolle,
@@ -313,24 +371,41 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
   });
 });
 
-router.get("/report/fse-plus", async (req, res) => {
-  res.setHeader("Deprecation", "true");
-  res.setHeader("Link", '</api/report/fse-plus/integrato>; rel="successor-version"');
-  const parsedAnno = req.query.anno ? parseInt(req.query.anno as string, 10) : new Date().getFullYear();
-  if (Number.isNaN(parsedAnno) || parsedAnno < 2000 || parsedAnno > 2100) {
-    res.status(400).json({ message: "Parametro 'anno' non valido." });
-    return;
-  }
-  const anno = parsedAnno;
-  const caller = callerCentroId(req);
-  const areaOperativa = callerAreaOperativaId(req);
-  const centroSub = caller == null ? sql`` : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
-  const areaOperativaSub = areaOperativa == null ? sql`` : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${areaOperativa} OR area_operativa_id IS NULL)`;
-  const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
-  const areaOperativaQSub = qAreaOperativa == null ? sql`` : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${qAreaOperativa})`;
-  const centroCond = sql`${centroSub}${areaOperativaSub}${areaOperativaQSub}`;
+router.get(
+  "/report/fse-plus",
+  requirePermission("magazzino.fse.view"),
+  async (req, res) => {
+    res.setHeader("Deprecation", "true");
+    res.setHeader(
+      "Link",
+      '</api/report/fse-plus/integrato>; rel="successor-version"',
+    );
+    const parsedAnno = req.query.anno
+      ? parseInt(req.query.anno as string, 10)
+      : new Date().getFullYear();
+    if (Number.isNaN(parsedAnno) || parsedAnno < 2000 || parsedAnno > 2100) {
+      res.status(400).json({ message: "Parametro 'anno' non valido." });
+      return;
+    }
+    const anno = parsedAnno;
+    const caller = callerCentroId(req);
+    const areaOperativa = callerAreaOperativaId(req);
+    const centroSub =
+      caller == null
+        ? sql``
+        : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
+    const areaOperativaSub =
+      areaOperativa == null
+        ? sql``
+        : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${areaOperativa} OR area_operativa_id IS NULL)`;
+    const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
+    const areaOperativaQSub =
+      qAreaOperativa == null
+        ? sql``
+        : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${qAreaOperativa})`;
+    const centroCond = sql`${centroSub}${areaOperativaSub}${areaOperativaQSub}`;
 
-  const prodRes = await db.execute(sql`
+    const prodRes = await db.execute(sql`
     SELECT p.id as prodotto_id,
            p.nome as prodotto_nome,
            p.unita_misura,
@@ -346,9 +421,9 @@ router.get("/report/fse-plus", async (req, res) => {
     GROUP BY p.id, p.nome, p.unita_misura
     ORDER BY p.nome
   `);
-  const prodRows = prodRes.rows as Array<Record<string, unknown>>;
+    const prodRows = prodRes.rows as Array<Record<string, unknown>>;
 
-  const famRes = await db.execute(sql`
+    const famRes = await db.execute(sql`
     SELECT COUNT(DISTINCT b.beneficiario_id) as tot
     FROM bolle b
     JOIN bolla_righe br ON br.bolla_id = b.id
@@ -357,9 +432,11 @@ router.get("/report/fse-plus", async (req, res) => {
       AND b.stato = 'consegnato'
       AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
   `);
-  const beneficiariTotali = Number((famRes.rows[0] as Record<string, unknown>)?.tot ?? 0);
+    const beneficiariTotali = Number(
+      (famRes.rows[0] as Record<string, unknown>)?.tot ?? 0,
+    );
 
-  const persRes = await db.execute(sql`
+    const persRes = await db.execute(sql`
     WITH famiglie AS (
       SELECT DISTINCT b.beneficiario_id
       FROM bolle b
@@ -402,40 +479,41 @@ router.get("/report/fse-plus", async (req, res) => {
       COUNT(*) FILTER (WHERE area_provenienza = 'Extra-UE' AND sesso = 'F') as extra_ue_femmine
     FROM classificate
   `);
-  const p = (persRes.rows[0] ?? {}) as Record<string, unknown>;
+    const p = (persRes.rows[0] ?? {}) as Record<string, unknown>;
 
-  const prodotti = prodRows.map((r) => ({
-    prodottoId: Number(r.prodotto_id),
-    prodottoNome: r.prodotto_nome as string,
-    unitaMisura: r.unita_misura as string,
-    quantitaTotale: parseFloat(String(r.quantita_totale ?? 0)),
-    pesoKg: parseFloat(String(r.peso_kg ?? 0)),
-  }));
+    const prodotti = prodRows.map((r) => ({
+      prodottoId: Number(r.prodotto_id),
+      prodottoNome: r.prodotto_nome as string,
+      unitaMisura: r.unita_misura as string,
+      quantitaTotale: parseFloat(String(r.quantita_totale ?? 0)),
+      pesoKg: parseFloat(String(r.peso_kg ?? 0)),
+    }));
 
-  const pesoTotaleKg = prodotti.reduce((acc, x) => acc + x.pesoKg, 0);
+    const pesoTotaleKg = prodotti.reduce((acc, x) => acc + x.pesoKg, 0);
 
-  res.json({
-    anno,
-    pesoTotaleKg,
-    beneficiariTotali,
-    personeTotali: Number(p.totale ?? 0),
-    prodotti,
-    persone: {
-      maschi: Number(p.maschi ?? 0),
-      femmine: Number(p.femmine ?? 0),
-      ue: Number(p.ue ?? 0),
-      extraUe: Number(p.extra_ue ?? 0),
-      maschiAdulti: Number(p.maschi_adulti ?? 0),
-      maschiMinori: Number(p.maschi_minori ?? 0),
-      femmineAdulte: Number(p.femmine_adulte ?? 0),
-      femmineMinori: Number(p.femmine_minori ?? 0),
-      ueMaschi: Number(p.ue_maschi ?? 0),
-      ueFemmine: Number(p.ue_femmine ?? 0),
-      extraUeMaschi: Number(p.extra_ue_maschi ?? 0),
-      extraUeFemmine: Number(p.extra_ue_femmine ?? 0),
-    },
-  });
-});
+    res.json({
+      anno,
+      pesoTotaleKg,
+      beneficiariTotali,
+      personeTotali: Number(p.totale ?? 0),
+      prodotti,
+      persone: {
+        maschi: Number(p.maschi ?? 0),
+        femmine: Number(p.femmine ?? 0),
+        ue: Number(p.ue ?? 0),
+        extraUe: Number(p.extra_ue ?? 0),
+        maschiAdulti: Number(p.maschi_adulti ?? 0),
+        maschiMinori: Number(p.maschi_minori ?? 0),
+        femmineAdulte: Number(p.femmine_adulte ?? 0),
+        femmineMinori: Number(p.femmine_minori ?? 0),
+        ueMaschi: Number(p.ue_maschi ?? 0),
+        ueFemmine: Number(p.ue_femmine ?? 0),
+        extraUeMaschi: Number(p.extra_ue_maschi ?? 0),
+        extraUeFemmine: Number(p.extra_ue_femmine ?? 0),
+      },
+    });
+  },
+);
 
 /* ────────────────────────────────────────────────────────────────────────
  * UDS (Unità di Strada) reports. Street-outreach interventions / people.
@@ -444,19 +522,28 @@ router.get("/report/fse-plus", async (req, res) => {
  * continue to use the Beneficiario's current territorial assignment.
  * ──────────────────────────────────────────────────────────────────────── */
 
-function udsHistoricalScopeConds(req: { query: Record<string, unknown> }, callerAreaOperativa: number | null): SQL[] {
+function udsHistoricalScopeConds(
+  req: { query: Record<string, unknown> },
+  callerAreaOperativa: number | null,
+): SQL[] {
   const conds: SQL[] = [sql`i.ambito = 'uds'`];
-  if (callerAreaOperativa != null) conds.push(sql`i.area_operativa_id_snapshot = ${callerAreaOperativa}`);
+  if (callerAreaOperativa != null)
+    conds.push(sql`i.area_operativa_id_snapshot = ${callerAreaOperativa}`);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
-  if (qAreaOperativa) conds.push(sql`i.area_operativa_id_snapshot = ${qAreaOperativa}`);
+  if (qAreaOperativa)
+    conds.push(sql`i.area_operativa_id_snapshot = ${qAreaOperativa}`);
   const zonaId = parseIntParam(req.query.zonaUdsId);
   if (zonaId) conds.push(sql`i.zona_uds_id_snapshot = ${zonaId}`);
   return conds;
 }
 
-function udsCurrentPeopleScopeConds(req: { query: Record<string, unknown> }, callerAreaOperativa: number | null): SQL[] {
+function udsCurrentPeopleScopeConds(
+  req: { query: Record<string, unknown> },
+  callerAreaOperativa: number | null,
+): SQL[] {
   const conds: SQL[] = [sql`be.uds = true`];
-  if (callerAreaOperativa != null) conds.push(sql`be.area_operativa_id = ${callerAreaOperativa}`);
+  if (callerAreaOperativa != null)
+    conds.push(sql`be.area_operativa_id = ${callerAreaOperativa}`);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
   if (qAreaOperativa) conds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
   const zonaId = parseIntParam(req.query.zonaUdsId);
@@ -504,10 +591,13 @@ router.get("/report/uds/interventi-per-mese", async (req, res) => {
 router.get("/report/uds/interventi-giornalieri", async (req, res) => {
   const da = String(req.query.da ?? "");
   if (!isValidIsoDate(da)) {
-    res.status(400).json({ message: "Parametro 'da' obbligatorio (YYYY-MM-DD)" });
+    res
+      .status(400)
+      .json({ message: "Parametro 'da' obbligatorio (YYYY-MM-DD)" });
     return;
   }
-  const aRaw = req.query.a == null || req.query.a === "" ? da : String(req.query.a);
+  const aRaw =
+    req.query.a == null || req.query.a === "" ? da : String(req.query.a);
   if (!isValidIsoDate(aRaw)) {
     res.status(400).json({ message: "Parametro 'a' non valido (YYYY-MM-DD)" });
     return;
@@ -562,16 +652,24 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
       return {
         id: Number(r.id),
         beneficiarioId: Number(r.beneficiario_id),
-        beneficiarioNome: cognome && nome ? `${cognome} ${nome}` : (cognome ?? nome ?? null),
+        beneficiarioNome:
+          cognome && nome ? `${cognome} ${nome}` : (cognome ?? nome ?? null),
         soprannome: (r.soprannome as string | null) ?? null,
-        zonaUdsId: r.zona_uds_id_snapshot === null || r.zona_uds_id_snapshot === undefined ? null : Number(r.zona_uds_id_snapshot),
+        zonaUdsId:
+          r.zona_uds_id_snapshot === null ||
+          r.zona_uds_id_snapshot === undefined
+            ? null
+            : Number(r.zona_uds_id_snapshot),
         zonaNome: (r.zona_nome as string | null) ?? null,
         dataIntervento: r.data_intervento as string,
         tipoIntervento: r.tipo_intervento as string,
         descrizione: (r.descrizione as string | null) ?? null,
         note: (r.note as string | null) ?? null,
         noteUds: (r.note_uds as string | null) ?? null,
-        operatoreCodice: (r.operatore_matricola as string | null) ?? (r.operatore_username as string | null) ?? null,
+        operatoreCodice:
+          (r.operatore_matricola as string | null) ??
+          (r.operatore_username as string | null) ??
+          null,
         numeroIntervento: numero,
         primoIntervento: numero === 1,
       };
@@ -633,7 +731,10 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
   const rows = result.rows as Array<Record<string, unknown>>;
   res.json(
     rows.map((r) => ({
-      zonaId: r.zona_id === null || r.zona_id === undefined ? null : Number(r.zona_id),
+      zonaId:
+        r.zona_id === null || r.zona_id === undefined
+          ? null
+          : Number(r.zona_id),
       zonaNome: r.zona_nome as string,
       totInterventi: Number(r.tot_interventi),
     })),
@@ -659,7 +760,10 @@ router.get("/report/uds/persone-per-zona", async (req, res) => {
   const rows = result.rows as Array<Record<string, unknown>>;
   res.json(
     rows.map((r) => ({
-      zonaId: r.zona_id === null || r.zona_id === undefined ? null : Number(r.zona_id),
+      zonaId:
+        r.zona_id === null || r.zona_id === undefined
+          ? null
+          : Number(r.zona_id),
       zonaNome: r.zona_nome as string,
       totale: Number(r.totale),
       soloUds: Number(r.solo_uds),

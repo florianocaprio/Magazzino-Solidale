@@ -10,12 +10,13 @@ import type { FseExportInputFormatCode } from './fseExportInputFormatCode';
 export interface FseExportInput {
   /** @minimum 1 */
   magazzinoId: number;
-  dataDa: Date;
-  dataA: Date;
+  dataCompetenzaDa: Date;
+  dataCompetenzaA: Date;
   dataAsOf: Date;
   formatCode: FseExportInputFormatCode;
   /** @minimum 1 */
   maxMovimentoId?: number;
   /** @minimum 1 */
   maxOperazioneDistribuzioneId?: number;
+  includeArretrati?: boolean;
 }

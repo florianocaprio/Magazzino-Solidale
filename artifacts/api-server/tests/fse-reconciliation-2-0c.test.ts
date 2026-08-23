@@ -1,11 +1,32 @@
 /* @vitest-environment node */
 
-import { db, importazioniAgeaRigheTable, importazioniAgeaTable, lottiTable, magazziniTable, movimentiTable, operazioniDistribuzioneMagazzinoTable, pool, prodottiTable, riconciliazioniFseRigheTable, riconciliazioniFseTable, utentiTable } from "@workspace/db";
+import {
+  db,
+  importazioniAgeaRigheTable,
+  importazioniAgeaTable,
+  lottiTable,
+  magazziniTable,
+  movimentiTable,
+  operazioniDistribuzioneMagazzinoTable,
+  pool,
+  prodottiTable,
+  riconciliazioniFseRigheTable,
+  riconciliazioniFseTable,
+  utentiTable,
+} from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { calculateFseReconciliation, recalculateFseReconciliation, reconcileFseLines, type ReconciliationExternalLine, type ReconciliationLocalLine } from "../src/lib/fseReconciliation";
+import {
+  calculateFseReconciliation,
+  recalculateFseReconciliation,
+  reconcileFseLines,
+  type ReconciliationExternalLine,
+  type ReconciliationLocalLine,
+} from "../src/lib/fseReconciliation";
 
-function local(overrides: Partial<ReconciliationLocalLine> = {}): ReconciliationLocalLine {
+function local(
+  overrides: Partial<ReconciliationLocalLine> = {},
+): ReconciliationLocalLine {
   return {
     movementId: 1,
     operationDistributionId: 10,
@@ -28,7 +49,9 @@ function local(overrides: Partial<ReconciliationLocalLine> = {}): Reconciliation
   };
 }
 
-function external(overrides: Partial<ReconciliationExternalLine> = {}): ReconciliationExternalLine {
+function external(
+  overrides: Partial<ReconciliationExternalLine> = {},
+): ReconciliationExternalLine {
   return {
     importRowId: 20,
     externalMovementId: 30,
@@ -52,13 +75,23 @@ function external(overrides: Partial<ReconciliationExternalLine> = {}): Reconcil
 
 describe("Magazzino 2.0C — matching riconciliazione", () => {
   it("applica link diretto, exact e multinsieme in ordine deterministico", () => {
-    expect(reconcileFseLines([local({ caricoMagazzinoRigaId: 99 })], [external({ caricoMagazzinoRigaId: 99 })])[0]).toMatchObject({
+    expect(
+      reconcileFseLines(
+        [local({ caricoMagazzinoRigaId: 99 })],
+        [external({ caricoMagazzinoRigaId: 99 })],
+      )[0],
+    ).toMatchObject({
       matchMethod: "LINK_DIRETTO",
       status: "RICONCILIATA_ESATTA",
       blocking: false,
     });
-    expect(reconcileFseLines([local()], [external()])[0].matchMethod).toBe("EXACT_DETERMINISTICO");
-    const multi = reconcileFseLines([local(), local({ movementId: 2, lineKey: "MOVIMENTO:2" })], [external(), external({ importRowId: 21 })]);
+    expect(reconcileFseLines([local()], [external()])[0].matchMethod).toBe(
+      "EXACT_DETERMINISTICO",
+    );
+    const multi = reconcileFseLines(
+      [local(), local({ movementId: 2, lineKey: "MOVIMENTO:2" })],
+      [external(), external({ importRowId: 21 })],
+    );
     expect(multi).toHaveLength(2);
     expect(multi.every((row) => row.matchMethod === "MULTINSIEME")).toBe(true);
   });
@@ -72,16 +105,26 @@ describe("Magazzino 2.0C — matching riconciliazione", () => {
     [{ kgLt: "-1.5" }, "QUANTITA_KGLT_DIFFERENTE"],
     [{ packs: 2 }, "STATISTICHE_DIFFERENTI"],
     [{ modified: true }, "MOVIMENTO_AGEA_MODIFICATO"],
-  ] as Array<[Partial<ReconciliationExternalLine>, string]>)("rileva lo scostamento %s", (change, expected) => {
-    expect(reconcileFseLines([local()], [external(change)])[0]).toMatchObject({
-      status: expected,
-      blocking: true,
-    });
-  });
+  ] as Array<[Partial<ReconciliationExternalLine>, string]>)(
+    "rileva lo scostamento %s",
+    (change, expected) => {
+      expect(reconcileFseLines([local()], [external(change)])[0]).toMatchObject(
+        {
+          status: expected,
+          blocking: true,
+        },
+      );
+    },
+  );
 
   it("non auto-abbina identità ambigue e conserva gli elementi solo locali/AGEA", () => {
-    const ambiguous = reconcileFseLines([local(), local({ movementId: 2, lineKey: "MOVIMENTO:2", pieces: "-3" })], [external({ pieces: "-4" })]);
-    expect(ambiguous.some((row) => row.status === "IDENTITA_AMBIGUA")).toBe(true);
+    const ambiguous = reconcileFseLines(
+      [local(), local({ movementId: 2, lineKey: "MOVIMENTO:2", pieces: "-3" })],
+      [external({ pieces: "-4" })],
+    );
+    expect(ambiguous.some((row) => row.status === "IDENTITA_AMBIGUA")).toBe(
+      true,
+    );
     const only = reconcileFseLines(
       [
         local({ type: "STORNO" }),
@@ -94,7 +137,14 @@ describe("Magazzino 2.0C — matching riconciliazione", () => {
       ],
       [external({ productId: null, importRowId: 99 })],
     );
-    expect(only.map((row) => row.status)).toEqual(expect.arrayContaining(["STORNO_NON_RISCONTRATO", "RESO_NON_RISCONTRATO", "MODIFICA_GIACENZA_NON_RISCONTRATA", "PRODOTTO_NON_MAPPATO"]));
+    expect(only.map((row) => row.status)).toEqual(
+      expect.arrayContaining([
+        "STORNO_NON_RISCONTRATO",
+        "RESO_NON_RISCONTRATO",
+        "MODIFICA_GIACENZA_NON_RISCONTRATA",
+        "PRODOTTO_NON_MAPPATO",
+      ]),
+    );
   });
 });
 
@@ -189,7 +239,8 @@ beforeAll(async () => {
     .values({
       magazzinoId,
       nomeFile: "fixture-recon.xlsx",
-      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       dimensioneBytes: 100,
       sha256File: "a".repeat(64),
       tracciatoCodice: "SIFEAD_REGISTRO_XLSX_OSSERVATO_V1",
@@ -237,13 +288,25 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (reconciliationId) {
-    await db.delete(riconciliazioniFseRigheTable).where(eq(riconciliazioniFseRigheTable.riconciliazioneId, reconciliationId));
-    await db.delete(riconciliazioniFseTable).where(eq(riconciliazioniFseTable.id, reconciliationId));
+    await db
+      .delete(riconciliazioniFseRigheTable)
+      .where(
+        eq(riconciliazioniFseRigheTable.riconciliazioneId, reconciliationId),
+      );
+    await db
+      .delete(riconciliazioniFseTable)
+      .where(eq(riconciliazioniFseTable.id, reconciliationId));
   }
-  await db.delete(importazioniAgeaRigheTable).where(eq(importazioniAgeaRigheTable.id, importRowId));
-  await db.delete(importazioniAgeaTable).where(eq(importazioniAgeaTable.id, importId));
+  await db
+    .delete(importazioniAgeaRigheTable)
+    .where(eq(importazioniAgeaRigheTable.id, importRowId));
+  await db
+    .delete(importazioniAgeaTable)
+    .where(eq(importazioniAgeaTable.id, importId));
   await db.delete(movimentiTable).where(eq(movimentiTable.id, movementId));
-  await db.delete(operazioniDistribuzioneMagazzinoTable).where(eq(operazioniDistribuzioneMagazzinoTable.id, operationId));
+  await db
+    .delete(operazioniDistribuzioneMagazzinoTable)
+    .where(eq(operazioniDistribuzioneMagazzinoTable.id, operationId));
   await db.delete(lottiTable).where(eq(lottiTable.id, lottoId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, magazzinoId));
@@ -253,9 +316,18 @@ afterAll(async () => {
 
 describe("Magazzino 2.0C — snapshot riconciliazione PostgreSQL", () => {
   it("calcola e ricalcola senza modificare stock, ledger o raw AGEA", async () => {
-    const [beforeMovement] = await db.select().from(movimentiTable).where(eq(movimentiTable.id, movementId));
-    const [beforeLot] = await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId));
-    const [beforeRaw] = await db.select().from(importazioniAgeaRigheTable).where(eq(importazioniAgeaRigheTable.id, importRowId));
+    const [beforeMovement] = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.id, movementId));
+    const [beforeLot] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lottoId));
+    const [beforeRaw] = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .where(eq(importazioniAgeaRigheTable.id, importRowId));
     const result = await calculateFseReconciliation({
       magazzinoId,
       importazioneAgeaId: importId,
@@ -263,8 +335,14 @@ describe("Magazzino 2.0C — snapshot riconciliazione PostgreSQL", () => {
       creatoDa: userId,
     });
     reconciliationId = result.reconciliation.id;
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0]).toMatchObject({
+    expect(result.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tipoRiga: "SALDO_PARTITA" }),
+      ]),
+    );
+    expect(
+      result.rows.find((row) => row.tipoRiga !== "SALDO_PARTITA"),
+    ).toMatchObject({
       status: "RICONCILIATA_ESATTA",
       matchMethod: "EXACT_DETERMINISTICO",
     });
@@ -281,8 +359,24 @@ describe("Magazzino 2.0C — snapshot riconciliazione PostgreSQL", () => {
         actorId: userId,
       }),
     ).rejects.toThrow(/Versione/);
-    expect((await db.select().from(movimentiTable).where(eq(movimentiTable.id, movementId)))[0]).toEqual(beforeMovement);
-    expect((await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId)))[0]).toEqual(beforeLot);
-    expect((await db.select().from(importazioniAgeaRigheTable).where(eq(importazioniAgeaRigheTable.id, importRowId)))[0]).toEqual(beforeRaw);
+    expect(
+      (
+        await db
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.id, movementId))
+      )[0],
+    ).toEqual(beforeMovement);
+    expect(
+      (await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId)))[0],
+    ).toEqual(beforeLot);
+    expect(
+      (
+        await db
+          .select()
+          .from(importazioniAgeaRigheTable)
+          .where(eq(importazioniAgeaRigheTable.id, importRowId))
+      )[0],
+    ).toEqual(beforeRaw);
   });
 });
